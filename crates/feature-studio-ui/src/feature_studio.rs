@@ -496,26 +496,6 @@ pub fn studio_notices(imports: &noshape_model::custom::DocImports, tab: TabId, s
         .collect()
 }
 
-/// Format Feature Studio: re-indent by brace depth (4 spaces), trim line ends.
-fn format_source(src: &str) -> String {
-    let mut depth: i32 = 0;
-    let mut out = String::with_capacity(src.len());
-    for line in src.lines() {
-        let t = line.trim();
-        let opens = t.chars().filter(|c| matches!(c, '{' | '[' | '(')).count() as i32;
-        let closes = t.chars().filter(|c| matches!(c, '}' | ']' | ')')).count() as i32;
-        let leading_closes = t.chars().take_while(|c| matches!(c, '}' | ']' | ')')).count() as i32;
-        let indent = (depth - leading_closes).max(0) as usize;
-        if !t.is_empty() {
-            out.push_str(&"    ".repeat(indent));
-            out.push_str(t);
-        }
-        out.push('\n');
-        depth = (depth + opens - closes).max(0);
-    }
-    out
-}
-
 /// Character column of `name` (as a whole word) in `line`.
 fn column_of(line: &str, name: &str) -> usize {
     let is_id = |c: char| c.is_alphanumeric() || c == '_';
@@ -1268,7 +1248,7 @@ impl FeatureStudioView {
                     return;
                 }
                 let src = this.editor.read(cx).value().to_string();
-                let new = crate::fs_import::append_import(&src, line);
+                let new = noshape_model::custom::source::append_import(&src, line);
                 this.editor.update(cx, |e, cx| e.set_value(new, window, cx));
                 this.schedule_save(window, cx);
             }
@@ -1664,7 +1644,7 @@ impl FeatureStudioView {
 
     fn format(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let src = self.editor.read(cx).value().to_string();
-        let formatted = format_source(&src);
+        let formatted = noshape_model::custom::source::format_source(&src);
         if formatted != src && !self.read_only(cx) {
             self.editor.update(cx, |e, cx| e.set_value(formatted, window, cx));
             self.schedule_save(window, cx);

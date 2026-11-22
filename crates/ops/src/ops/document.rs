@@ -140,6 +140,19 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "tab",
+            verb: "properties",
+            summary: "A Part Studio's, Variable Studio's, Feature Studio's or file's Properties… (tab menu)",
+            description: "Without fields, replies with the tab's properties. Name (the tab's: an undoable rename), description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and custom properties, kept with the document as release management reads them. Fields not given keep their value; an empty text clears it. Assemblies: assembly_properties; drawings: drawing_properties.",
+            fields: vec![doc_field(), req("tab", s(), "Tab name or id."), opt("name", s(), "Name."), opt("description", s(), "Description."), opt("part_number", s(), "Part number."), opt("revision", s(), "Revision.")]
+                .into_iter()
+                .chain(super::parts::meta_fields())
+                .collect(),
+            mutates: true,
+            destructive: false,
+            run: tab_properties,
+        },
+        Op {
+            group: "tab",
             verb: "duplicate",
             summary: "Duplicate a tab",
             description: "Tab › Duplicate: \"<name> Copy 1\" right after it.",
@@ -509,6 +522,58 @@ fn tab_rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // Onshape: a tab rename isn't undoable (qa5 TABS5).
     od.session.edit_document_not_undoable(&docedit::rename_tab_description(&name), |d| docedit::rename_tab(d, tab, &name))?;
     Ok(json!({ "tab": tab.to_string(), "name": name }).into())
+}
+
+/// Tab › Properties… of the tabs whose metadata the store keeps (keys `tab_description:<id>` …, as the app's dialog).
+fn tab_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = doc::find_tab(od.doc(), a.str("tab")?)?;
+    match od.doc().tab(tab).map(|t| &t.content) {
+        Some(TabContent::Assembly(_)) => return Err(OpError::param("tab", "an assembly's Properties…: use assembly_properties")),
+        Some(TabContent::Drawing(_)) => return Err(OpError::param("tab", "a drawing's Properties…: use drawing_properties")),
+        _ => {}
+    }
+    let io = |e: noshape_store::StoreError| OpError::new("io", e.to_string());
+    let key = |k: &str| format!("{k}:{}", tab.0);
+    let text = |od: &OpenDoc, k: &str| od.session.store.get_meta(&key(k)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
+    let mut meta: noshape_model::partstudio::ItemMeta = serde_json::from_str(&text(od, "tab_item_meta")).unwrap_or_default();
+    meta.not_revision_managed = text(od, "tab_not_revision_managed") == "1";
+    let before = meta.clone();
+    super::parts::apply_meta(a, &mut meta)?;
+    let mut values: Vec<(&str, String)> = ["tab_description", "tab_part_number", "tab_revision"].into_iter().map(|k| (k, text(od, k))).collect();
+    for (field, v) in ["description", "part_number", "revision"].into_iter().zip(values.iter_mut()) {
+        if let Some(x) = a.opt_str(field)? {
+            v.1 = x.trim().to_string();
+        }
+    }
+    let new_name = a.opt_str("name")?.map(|n| n.trim().to_string());
+    if new_name.as_deref() == Some("") {
+        return Err(OpError::param("name", "must not be empty"));
+    }
+    let changed = values.iter().any(|(k, v)| *v != text(od, k)) || meta != before;
+    if changed {
+        let store = &mut od.session.store;
+        for (k, v) in &values {
+            store.set_meta(&key(k), Some(v.as_bytes()).filter(|b| !b.is_empty())).map_err(io)?;
+        }
+        store.set_meta(&key("tab_not_revision_managed"), Some(&b"1"[..]).filter(|_| meta.not_revision_managed)).map_err(io)?;
+        store.set_meta(&key("tab_item_meta"), Some(serde_json::to_string(&meta).unwrap_or_default().as_bytes())).map_err(io)?;
+    }
+    if let Some(name) = new_name
+        && od.doc().tab(tab).is_some_and(|t| t.name != name)
+    {
+        od.session.edit_document(&docedit::rename_tab_description(&name), |d| docedit::rename_tab(d, tab, &name))?;
+    }
+    let name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    let mut out = serde_json::to_value(&meta).unwrap_or_else(|_| json!({}));
+    out["tab"] = json!(tab.to_string());
+    out["name"] = json!(name);
+    out["not_revision_managed"] = json!(meta.not_revision_managed);
+    for (k, v) in values {
+        out[k.trim_start_matches("tab_")] = json!(v);
+    }
+    Ok(out.into())
 }
 
 fn tab_duplicate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

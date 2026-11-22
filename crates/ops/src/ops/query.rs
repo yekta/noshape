@@ -75,7 +75,7 @@ pub fn ops() -> Vec<Op> {
             verb: "mass_properties",
             summary: "Mass properties: volume, surface area, mass, center of mass, inertia",
             description: "Of the given parts, or all parts. Mass, center of mass and inertia need a material (or density) on every part, as in Onshape; mass overrides apply. Inertia (kg·length²) is about the center of mass, or about mate connector `reference`'s axes.",
-            fields: vec![doc_field(), tab_field(), opt("parts", strings(), "Part ids (`body:…`) or names; default all."), opt("reference", s(), "Mate connector id (`mc:…`) for the inertia axes."), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown.")],
+            fields: vec![doc_field(), tab_field(), opt("parts", strings(), "Part ids (`body:…`) or names; default all."), opt("reference", s(), "Mate connector id (`mc:…`) for the inertia axes."), opt("configuration", json!({ "type": "object" }), "In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown."), opt("variance", json!({ "type": "boolean" }), "Show calculation variance: `variance` holds each value's ± bound (none for an overridden value).")],
             mutates: false,
             destructive: false,
             run: mass,
@@ -782,8 +782,51 @@ fn mass(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     } else {
         v["note"] = json!("Assign a material (or density) to every part to get mass, center of mass and inertia.");
     }
-    if let Some(n) = mp.reference {
+    if let Some(n) = &mp.reference {
         v["reference"] = json!(n);
     }
+    if a.bool_or("variance", false)? {
+        let density = |b: &BodyId| ps.part_properties.get(b).and_then(|p| p.density);
+        if let Some(var) = noshape_model::regen::measure::mass_property_variance(&r.context, &bodies, &density) {
+            let all: Vec<BodyId> = if bodies.is_empty() { r.display.bodies.iter().map(|b| b.id.clone()).collect() } else { bodies.clone() };
+            let props = |b: &BodyId| ps.part_properties.get(b);
+            let one = match all.as_slice() {
+                [b] => props(b),
+                _ => None,
+            };
+            let mass_over = !all.is_empty() && all.iter().all(|b| props(b).and_then(|p| p.mass_override).is_some());
+            // The inertia's bound scales with an overriding mass, as the inertia.
+            let computed = noshape_model::regen::measure::mass_properties(&r.context, &bodies, &density).and_then(|m| m.mass);
+            let scale = match (mp.props.mass, computed) {
+                (Some(a), Some(b)) if b > 0.0 => a / b,
+                _ => 1.0,
+            };
+            let over = Overridden { mass: mass_over, center: one.is_some_and(|p| p.com_override.is_some()), inertia: one.is_some_and(|p| p.inertia_override.is_some()) };
+            v["variance"] = variance_json(&var, k, over, mp.props.mass.is_some(), scale);
+        }
+    }
     Ok(v.into())
+}
+
+/// The values an override replaces: Show calculation variance gives them no bound.
+pub(crate) struct Overridden {
+    pub mass: bool,
+    pub center: bool,
+    pub inertia: bool,
+}
+
+/// Show calculation variance: each mass property's ± bound in workspace
+/// units (kg for the mass, kg·length² for the inertia, one per entry as
+/// live); the mass, centre and inertia only with a mass, none for what an
+/// override replaces.
+pub(crate) fn variance_json(b: &noshape_model::regen::measure::MassProperties, k: f64, over: Overridden, has_mass: bool, inertia_scale: f64) -> Value {
+    let f = k * k;
+    let i = b.inertia * inertia_scale;
+    json!({
+        "volume": b.volume * k * k * k,
+        "surface_area": b.surface_area * f,
+        "mass_kg": b.mass.filter(|_| has_mass && !over.mass),
+        "center_of_mass": (has_mass && !over.center).then(|| json!([b.center_of_mass.x * k, b.center_of_mass.y * k, b.center_of_mass.z * k])),
+        "inertia": (has_mass && !over.inertia).then(|| json!([[i.x_axis.x * f, i.y_axis.x * f, i.z_axis.x * f], [i.x_axis.y * f, i.y_axis.y * f, i.z_axis.y * f], [i.x_axis.z * f, i.y_axis.z * f, i.z_axis.z * f]])),
+    })
 }

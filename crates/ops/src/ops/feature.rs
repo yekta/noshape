@@ -11,6 +11,8 @@ use serde_json::{Value, json};
 
 const PARAMS_DOC: &str = "Parameter values by parameter id (see `feature_schema`): booleans; enum option ids (\"BLIND\"); numbers as expression strings with units (\"25 mm\", \"0.5 in\", \"30 deg\", \"#width / 2\", \"2 * #t + 1 mm\"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools (\"region:…\", \"face:…\", \"edge:…\", \"plane:top\", \"body:…\"), where a field takes mate connectors an item `{\"mate_connector\": {Mate connector parameters}}` makes one inside the feature (the field's \"Select mate connectors\" button; no Mate connector feature is added), and where a field takes a point an item `{\"point\": {cPoint parameters: pointType EDGE_POINT, entities [an edge], parameter 0…1}}` makes a construction point inside the feature (Onshape's in-feature \"Edge point\"); array parameters as arrays of objects of their item parameters.";
 
+const CLICK_DOC: &str = "A button of the dialog to click after `params` (a Routing curve's processInputs (Process), resetTriad, confirmOrthoPath): the feature's editing logic runs with it (std's `clickedButton`), as the click does.";
+
 pub fn ops() -> Vec<Op> {
     vec![
         Op {
@@ -58,6 +60,7 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 tab_field(),
                 req("type", s(), "Feature type id (see `feature_types`)."),
+                opt("click", s(), CLICK_DOC),
                 opt("params", json!({ "type": "object" }), PARAMS_DOC),
                 opt("name", s(), "Feature name (default: \"Extrude 1\", ...)."),
                 opt("index", json!({ "type": "integer", "minimum": 0 }), "Position in the feature list (default: at the rollback bar)."),
@@ -71,7 +74,7 @@ pub fn ops() -> Vec<Op> {
             verb: "edit",
             summary: "Change a feature's parameters or name (what Edit and accepting its dialog does)",
             description: "Only the given parameters change. Configured parameters go to the active configuration's value (config_activate), as in the dialog. Given parameters the dialog then hides are ignored and listed in `ignored`, as in feature_add.",
-            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("params", json!({ "type": "object" }), PARAMS_DOC), opt("name", s(), "New name.")],
+            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("params", json!({ "type": "object" }), PARAMS_DOC), opt("name", s(), "New name."), opt("click", s(), CLICK_DOC)],
             mutates: true,
             destructive: false,
             run: edit,
@@ -296,6 +299,30 @@ fn hole_standard(feature: &mut noshape_model::Feature, set: &dyn Fn(&str) -> boo
 /// operation and merge scope of Extrude / Revolve / Sweep / Loft (Add into
 /// the one part the tool touches) and a Hole's scope and flip. Features
 /// whose dialog runs std's editing logic run it instead.
+/// A click on the dialog's button `button`: the feature's editing logic runs once with it (std's `clickedButton`), on
+/// the model before the feature.
+fn click_button(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, feature: &mut noshape_model::Feature, index: usize, button: &str, old: &noshape_model::params::ParamValues, creating: bool) -> Result<(), OpError> {
+    use noshape_model::params::Hints;
+    let ty = feature.feature_type().ok_or_else(|| OpError::invalid(format!("feature type `{}` is not available", feature.type_id)))?;
+    // Previous / Next only move the dialog's active point.
+    let buttons: Vec<&str> = ty.params.iter().filter(|p| p.hints.has(Hints::BUTTON) && !matches!(p.id, "previousPoint" | "nextPoint" | "orthoPrevious" | "orthoNext")).map(|p| p.id).collect();
+    if !buttons.contains(&button) {
+        return Err(OpError::param("click", &if buttons.is_empty() { format!("the {} dialog has no buttons", ty.name) } else { format!("a button of the {} dialog: {}", ty.name, buttons.join(", ")) }));
+    }
+    if !noshape_model::custom::std_feature::has_editing_logic(&feature.type_id) {
+        return Ok(());
+    }
+    let units = od.doc().settings.units;
+    let ctx = od.regenerate_with(tab, None, |o| o.upto = Some(index))?.context;
+    let ctx = noshape_model::regen::with_sub_features(ctx, feature, &units);
+    if let Some(changed) = noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &feature.type_id, feature.id, &feature.name, &units, old, &feature.params, &[], creating, button) {
+        for (k, v) in changed.0 {
+            feature.params.set(&k, v);
+        }
+    }
+    Ok(())
+}
+
 fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, feature: &mut noshape_model::Feature, index: usize, given: &serde_json::Map<String, Value>) -> Result<(), OpError> {
     let set = |k: &str| given.contains_key(k);
     let units = od.doc().settings.units;
@@ -648,6 +675,10 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => ps.rollback_index(),
     };
     dialog_logic(od, tab, &mut feature, index, &params)?;
+    if let Some(button) = a.opt_str("click")? {
+        let old = feature.params.clone();
+        click_button(od, tab, &mut feature, index, button, &old, true)?;
+    }
     let ignored = values::ignored_params(&ty.params, &feature.params, &params);
     let (id, name) = (feature.id, feature.name.clone());
     edit_studio(od, tab, &studio::insert_description(&name), |ps| Ok(studio::insert_feature(ps, feature, index)))?;
@@ -689,6 +720,10 @@ fn edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             hole_standard(&mut feature, &|k| params.contains_key(k) && edited.get(k) != before.get(k))?;
         }
         ignored = values::ignored_params(&ty.params, &feature.params, &params);
+    }
+    if let Some(button) = a.opt_str("click")? {
+        let old = feature.params.clone();
+        click_button(od, tab, &mut feature, index, button, &old, false)?;
     }
     if let Some(n) = a.opt_str("name")? {
         feature.name = n.trim().to_string();

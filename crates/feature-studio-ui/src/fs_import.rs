@@ -476,34 +476,3 @@ impl Render for ImportPanel {
             .into_any_element()
     }
 }
-
-/// `src` with `line` after its last `import(...)` line (live: not at the
-/// cursor), or after the `FeatureScript` header when it has none.
-pub fn append_import(src: &str, line: &str) -> String {
-    let lines: Vec<&str> = src.split('\n').collect();
-    let is_import = |l: &str| {
-        let t = l.trim_start();
-        t.starts_with("import(") || t.starts_with("export import(") || (t.contains("::import(") && !t.starts_with("//"))
-    };
-    let at = lines.iter().rposition(|l| is_import(l)).or_else(|| lines.iter().position(|l| l.trim_start().starts_with("FeatureScript"))).map(|i| i + 1).unwrap_or(0);
-    let mut out: Vec<&str> = lines[..at].to_vec();
-    out.push(line);
-    out.extend_from_slice(&lines[at..]);
-    out.join("\n")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::append_import;
-
-    #[test]
-    fn imports_go_after_the_last_import() {
-        let src = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\nexport const x = 1;";
-        let out = append_import(src, "import(path : \"a\", version : \"b\");");
-        assert_eq!(out, "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\nimport(path : \"a\", version : \"b\");\n\nexport const x = 1;");
-        let out = append_import("FeatureScript 3095;\n", "import(path : \"a\", version : \"b\");");
-        assert_eq!(out, "FeatureScript 3095;\nimport(path : \"a\", version : \"b\");\n");
-        let out = append_import("FeatureScript 3095;\nCsv::import(path : \"c\", version : \"d\");\nx", "import(path : \"a\", version : \"b\");");
-        assert_eq!(out, "FeatureScript 3095;\nCsv::import(path : \"c\", version : \"d\");\nimport(path : \"a\", version : \"b\");\nx");
-    }
-}

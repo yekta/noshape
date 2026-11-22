@@ -134,6 +134,24 @@ pub fn time_label(secs: i64, now: i64) -> String {
     if t.date_naive() == n.date_naive() { format!("{clock} Today") } else { format!("{clock} {}", t.format("%b %-d")) }
 }
 
+/// The panel as the agent API reads it (ui_notifications).
+pub fn snapshot(cx: &App) -> noshape_ops::window::Notices {
+    let Some(n) = cx.try_global::<Notifications>() else { return Default::default() };
+    let items = n.items.iter().map(|i| noshape_ops::window::Notice { title: i.title.clone(), body: i.body.clone(), time: i.time, unread: i.unread, open: i.open, failed: i.failed, steps: i.steps.iter().map(|s| s.text.clone()).collect(), link: i.link.clone() });
+    noshape_ops::window::Notices { only_unread: n.only_unread, items: items.collect() }
+}
+
+/// An agent's Only show unread or ⋮ menu item (ui_notifications), as the panel's.
+pub fn act(cx: &mut App, act: noshape_ops::window::NoticeAct) {
+    use noshape_ops::window::NoticeAct;
+    update(cx, |n| match act {
+        NoticeAct::OnlyUnread(on) => n.only_unread = on,
+        NoticeAct::MarkAllRead => n.items.iter_mut().for_each(|i| i.unread = false),
+        NoticeAct::ExpandAll => n.items.iter_mut().for_each(|i| i.open = true),
+        NoticeAct::DeleteAll => n.items.clear(),
+    });
+}
+
 fn update(cx: &mut App, f: impl FnOnce(&mut Notifications)) {
     f(cx.default_global::<Notifications>());
     cx.refresh_windows();

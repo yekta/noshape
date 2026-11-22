@@ -5,7 +5,9 @@
 use crate::Ctx;
 use crate::custom_properties::{CustomKind, CustomProperty, CustomState, CustomTarget, custom_properties, set_custom_properties};
 use crate::error::OpError;
-use crate::registry::{Args, Op, OpOutput, opt};
+use crate::registry::{Args, Op, OpOutput, opt, req};
+use super::{s, strings};
+use noshape_model::release::ItemKind;
 use serde_json::{Value, json};
 
 pub fn ops() -> Vec<Op> {
@@ -49,7 +51,110 @@ pub fn ops() -> Vec<Op> {
         mutates: false,
         destructive: false,
         run: numbering_schemes,
+    },
+    Op {
+        group: "company",
+        verb: "revisions",
+        summary: "Company settings › Revision tools › Find revisions: a part number's revisions of one object type",
+        description: "Revision tools › Reset part number type › Find revisions: `part_number` and `object_type` (Part, Assembly, Drawing or Blob), the revisions released with them across the documents on this computer (recently opened, the documents folder, the watched folders and the documents open here; `documents` lists others), newest first: part number, type, revision, document name, release name, state, created, re-releasable and can change type.",
+        fields: vec![
+            req("part_number", s(), "Part number."),
+            req("object_type", object_type(), "Object type."),
+            opt("documents", strings(), "Search these documents (paths) instead."),
+        ],
+        mutates: false,
+        destructive: false,
+        run: revisions,
+    },
+    Op {
+        group: "company",
+        verb: "reset_part_number_type",
+        summary: "Company settings › Revision tools › Reset part number type",
+        description: "Reset part number type (after its confirmation, \"This action cannot be undone.\"): every revision company_revisions finds for `part_number` and `object_type` is marked obsolete and re-releasable, so the part number can be released again with another object type. Revision history still shows the previous revisions. Refused when none is left to reset (the dialog's button is disabled then). Returns the revisions as Find revisions lists them afterwards.",
+        fields: vec![
+            req("part_number", s(), "Part number."),
+            req("object_type", object_type(), "Object type."),
+            opt("documents", strings(), "Search these documents (paths) instead."),
+        ],
+        mutates: true,
+        destructive: true,
+        run: reset_part_number_type,
     }]
+}
+
+/// Object type's choices (Revision tools: a file is a "Blob").
+const OBJECT_TYPES: [(&str, ItemKind); 4] = [("Part", ItemKind::Part), ("Assembly", ItemKind::Assembly), ("Drawing", ItemKind::Drawing), ("Blob", ItemKind::File)];
+
+fn object_type() -> Value {
+    json!({ "type": "string", "enum": OBJECT_TYPES.map(|(n, _)| n) })
+}
+
+/// The part number, object type and documents of a Revision tools call.
+fn revision_search(ctx: &Ctx, a: &Args) -> Result<(String, ItemKind, Vec<std::path::PathBuf>), OpError> {
+    let number = a.str("part_number")?.trim().to_string();
+    if number.is_empty() {
+        return Err(OpError::param("part_number", "a part number"));
+    }
+    let ty = a.str("object_type")?;
+    let Some(kind) = OBJECT_TYPES.iter().find(|(n, _)| n.eq_ignore_ascii_case(ty)).map(|(_, k)| *k) else {
+        return Err(OpError::param("object_type", "Part, Assembly, Drawing or Blob"));
+    };
+    let canon = |p: &std::path::Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let mut paths: Vec<std::path::PathBuf> = Vec::new();
+    let mut push = |p: std::path::PathBuf| {
+        let c = canon(&p);
+        if c.extension().is_some_and(|e| e == "noshape") && c.exists() && !paths.contains(&c) {
+            paths.push(c);
+        }
+    };
+    if let Some(list) = a.opt_array("documents")? {
+        for (i, v) in list.iter().enumerate() {
+            let path = std::path::PathBuf::from(v.as_str().unwrap_or_default());
+            if !path.exists() {
+                return Err(OpError::param(&format!("documents[{i}]"), "no such document"));
+            }
+            push(path);
+        }
+    } else {
+        ctx.open_paths().into_iter().for_each(|p| push(p.to_path_buf()));
+        crate::doc_library::recent().into_iter().for_each(&mut push);
+        for dir in std::iter::once(noshape_scene::documents_dir()).chain(crate::doc_library::watched_folders()) {
+            if let Ok(rd) = std::fs::read_dir(dir) {
+                rd.flatten().for_each(|e| push(e.path()));
+            }
+        }
+    }
+    Ok((number, kind, paths))
+}
+
+fn found_json(number: &str, kind: ItemKind, found: &[crate::release::FoundRevision]) -> Value {
+    let label = OBJECT_TYPES.iter().find(|(_, k)| *k == kind).map_or("", |(n, _)| *n);
+    let rows: Vec<Value> = found
+        .iter()
+        .map(|f| {
+            let r = &f.revision;
+            json!({ "part_number": number, "type": label, "revision": r.revision, "document": f.document, "path": f.path.display().to_string(), "release": r.release_name, "state": r.state.label(), "created": r.created, "re_releasable": r.re_releasable, "can_change_type": r.re_releasable })
+        })
+        .collect();
+    json!({ "part_number": number, "object_type": label, "revisions": rows })
+}
+
+fn revisions(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (number, kind, paths) = revision_search(ctx, a)?;
+    Ok(found_json(&number, kind, &crate::release::find_revisions(&paths, &number, kind)).into())
+}
+
+fn reset_part_number_type(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (number, kind, paths) = revision_search(ctx, a)?;
+    let found = crate::release::find_revisions(&paths, &number, kind);
+    if !found.iter().any(|f| !f.revision.re_releasable) {
+        return Err(OpError::param("part_number", &format!("no revisions of {number} left to reset ({} found)", found.len())));
+    }
+    let mut docs: Vec<std::path::PathBuf> = found.iter().map(|f| f.path.clone()).collect();
+    docs.dedup();
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
+    crate::release::reset_part_number_type(&docs, &number, kind, now).map_err(|e| OpError::new("io", format!("{e:#}")))?;
+    Ok(found_json(&number, kind, &crate::release::find_revisions(&paths, &number, kind)).into())
 }
 
 /// `current` with the fields of `set` replaced, read back as `T` (an error names the field at fault).

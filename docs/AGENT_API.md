@@ -320,7 +320,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
-- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_show_code`](#tab_show_code), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
+- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_properties`](#tab_properties), [`tab_duplicate`](#tab_duplicate), [`tab_show_code`](#tab_show_code), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library), [`documents_forms_library`](#documents_forms_library), [`documents_frames_library`](#documents_frames_library), [`documents_images_library`](#documents_images_library), [`documents_import`](#documents_import)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
@@ -328,11 +328,11 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **config**: [`config_list`](#config_list), [`config_add_input`](#config_add_input), [`config_edit_input`](#config_edit_input), [`config_delete_input`](#config_delete_input), [`config_add_option`](#config_add_option), [`config_edit_option`](#config_edit_option), [`config_configure`](#config_configure), [`config_set_value`](#config_set_value), [`config_activate`](#config_activate), [`config_copy_inputs`](#config_copy_inputs), [`config_duplicate_input`](#config_duplicate_input), [`config_propagate`](#config_propagate), [`config_edit_ids`](#config_edit_ids), [`config_visibility`](#config_visibility), [`config_reorder_inputs`](#config_reorder_inputs)
 - **assembly**: [`assembly_insert`](#assembly_insert), [`assembly_list`](#assembly_list), [`assembly_entities`](#assembly_entities), [`assembly_connectors`](#assembly_connectors), [`assembly_mate`](#assembly_mate), [`assembly_snap`](#assembly_snap), [`assembly_transform`](#assembly_transform), [`assembly_set_state`](#assembly_set_state), [`assembly_delete`](#assembly_delete), [`assembly_measure`](#assembly_measure), [`assembly_mass_properties`](#assembly_mass_properties), [`assembly_update_references`](#assembly_update_references), [`assembly_properties`](#assembly_properties), [`assembly_linked_part_properties`](#assembly_linked_part_properties), [`assembly_pin_reference`](#assembly_pin_reference), [`assembly_derived_mirror`](#assembly_derived_mirror), [`assembly_pattern`](#assembly_pattern), [`assembly_dissolve_pattern`](#assembly_dissolve_pattern), [`assembly_bom`](#assembly_bom), [`assembly_bom_settings`](#assembly_bom_settings), [`assembly_interference`](#assembly_interference), [`assembly_change_to_version`](#assembly_change_to_version), [`assembly_group`](#assembly_group), [`assembly_relation`](#assembly_relation), [`assembly_mate_connector`](#assembly_mate_connector), [`assembly_replace`](#assembly_replace), [`assembly_reorder`](#assembly_reorder), [`assembly_mate_value`](#assembly_mate_value), [`assembly_rename`](#assembly_rename), [`assembly_set_feature_state`](#assembly_set_feature_state), [`assembly_named_position`](#assembly_named_position), [`assembly_add_to_named_positions`](#assembly_add_to_named_positions), [`assembly_named_position_drivers`](#assembly_named_position_drivers), [`assembly_exploded_view`](#assembly_exploded_view), [`assembly_explode_step`](#assembly_explode_step), [`assembly_animate`](#assembly_animate), [`assembly_display_state`](#assembly_display_state), [`assembly_move_to_subassembly`](#assembly_move_to_subassembly), [`assembly_create_subassembly`](#assembly_create_subassembly), [`assembly_dissolve_subassembly`](#assembly_dissolve_subassembly), [`assembly_move_instance`](#assembly_move_instance), [`assembly_add_folder`](#assembly_add_folder), [`assembly_unpack_folder`](#assembly_unpack_folder), [`assembly_copy`](#assembly_copy), [`assembly_set_configuration`](#assembly_set_configuration), [`assembly_lock`](#assembly_lock), [`assembly_instance_properties`](#assembly_instance_properties), [`assembly_dynamic_suppression`](#assembly_dynamic_suppression), [`assembly_standard_content`](#assembly_standard_content), [`assembly_insert_standard`](#assembly_insert_standard), [`assembly_standard_properties`](#assembly_standard_properties), [`assembly_edit_standard`](#assembly_edit_standard), [`assembly_edit_in_context`](#assembly_edit_in_context), [`assembly_version_and_update`](#assembly_version_and_update), [`assembly_create_part_studio_in_context`](#assembly_create_part_studio_in_context), [`assembly_update_context`](#assembly_update_context), [`assembly_set_primary_instance`](#assembly_set_primary_instance), [`assembly_switch_to_tab`](#assembly_switch_to_tab), [`assembly_open_linked_document`](#assembly_open_linked_document)
 - **context**: [`context_list`](#context_list), [`context_show`](#context_show), [`context_update`](#context_update), [`context_rename`](#context_rename), [`context_delete`](#context_delete), [`context_exit`](#context_exit), [`context_insert_in_assembly`](#context_insert_in_assembly), [`context_go_to_assembly`](#context_go_to_assembly)
-- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_edit_section`](#drawing_edit_section), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_element_properties`](#drawing_element_properties), [`drawing_format_line`](#drawing_format_line), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_image`](#drawing_image), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_datum_target`](#drawing_datum_target), [`drawing_centermark`](#drawing_centermark), [`drawing_centermark_resize`](#drawing_centermark_resize), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_edge_condition`](#drawing_edge_condition), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_move`](#drawing_view_move), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_mbd`](#drawing_mbd), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_change_configuration`](#drawing_change_configuration), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_pin_reference`](#drawing_pin_reference), [`drawing_update_references`](#drawing_update_references), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
-- **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
+- **drawing**: [`drawing_templates`](#drawing_templates), [`drawing_create`](#drawing_create), [`drawing_get`](#drawing_get), [`drawing_insert_view`](#drawing_insert_view), [`drawing_projected_view`](#drawing_projected_view), [`drawing_dimension`](#drawing_dimension), [`drawing_update`](#drawing_update), [`drawing_export`](#drawing_export), [`drawing_section_view`](#drawing_section_view), [`drawing_edit_section`](#drawing_edit_section), [`drawing_jogged_section_view`](#drawing_jogged_section_view), [`drawing_aligned_section_view`](#drawing_aligned_section_view), [`drawing_detail_view`](#drawing_detail_view), [`drawing_edit_detail`](#drawing_edit_detail), [`drawing_auxiliary_view`](#drawing_auxiliary_view), [`drawing_break_view`](#drawing_break_view), [`drawing_crop_view`](#drawing_crop_view), [`drawing_broken_out_section`](#drawing_broken_out_section), [`drawing_edit_hatch`](#drawing_edit_hatch), [`drawing_element_properties`](#drawing_element_properties), [`drawing_format_line`](#drawing_format_line), [`drawing_title_field`](#drawing_title_field), [`drawing_hatch_region`](#drawing_hatch_region), [`drawing_image`](#drawing_image), [`drawing_custom_table`](#drawing_custom_table), [`drawing_insert_image`](#drawing_insert_image), [`drawing_insert_cad`](#drawing_insert_cad), [`drawing_sketch`](#drawing_sketch), [`drawing_delete`](#drawing_delete), [`drawing_edit_dimension`](#drawing_edit_dimension), [`drawing_format_painter`](#drawing_format_painter), [`drawing_inspection`](#drawing_inspection), [`drawing_properties`](#drawing_properties), [`drawing_centerline`](#drawing_centerline), [`drawing_virtual_sharp`](#drawing_virtual_sharp), [`drawing_hole_callout`](#drawing_hole_callout), [`drawing_callout`](#drawing_callout), [`drawing_ordinate`](#drawing_ordinate), [`drawing_datum`](#drawing_datum), [`drawing_datum_target`](#drawing_datum_target), [`drawing_centermark`](#drawing_centermark), [`drawing_centermark_resize`](#drawing_centermark_resize), [`drawing_note`](#drawing_note), [`drawing_gdt`](#drawing_gdt), [`drawing_surface_finish`](#drawing_surface_finish), [`drawing_weld`](#drawing_weld), [`drawing_edge_condition`](#drawing_edge_condition), [`drawing_revision_table`](#drawing_revision_table), [`drawing_revision_callout`](#drawing_revision_callout), [`drawing_table`](#drawing_table), [`drawing_table_cell`](#drawing_table_cell), [`drawing_view_table`](#drawing_view_table), [`drawing_view_display`](#drawing_view_display), [`drawing_view_edit`](#drawing_view_edit), [`drawing_view_properties`](#drawing_view_properties), [`drawing_view_show_hide`](#drawing_view_show_hide), [`drawing_view_move`](#drawing_view_move), [`drawing_view_linestyle`](#drawing_view_linestyle), [`drawing_sheet`](#drawing_sheet), [`drawing_table_edit`](#drawing_table_edit), [`drawing_annotation_edit`](#drawing_annotation_edit), [`drawing_mbd`](#drawing_mbd), [`drawing_table_properties`](#drawing_table_properties), [`drawing_copy`](#drawing_copy), [`drawing_paste`](#drawing_paste), [`drawing_change_configuration`](#drawing_change_configuration), [`drawing_paste_table`](#drawing_paste_table), [`drawing_replace`](#drawing_replace), [`drawing_replicate`](#drawing_replicate), [`drawing_switch_to_reference`](#drawing_switch_to_reference), [`drawing_pin_reference`](#drawing_pin_reference), [`drawing_update_references`](#drawing_update_references), [`drawing_open_feature_studio`](#drawing_open_feature_studio), [`drawing_constrain`](#drawing_constrain), [`drawing_measure`](#drawing_measure), [`drawing_arrange`](#drawing_arrange), [`drawing_move`](#drawing_move), [`drawing_styles`](#drawing_styles), [`drawing_sketch_styles`](#drawing_sketch_styles), [`drawing_hatch_styles`](#drawing_hatch_styles), [`drawing_switch_sheet`](#drawing_switch_sheet), [`drawing_sheets_panel`](#drawing_sheets_panel)
+- **ui**: [`ui_state`](#ui_state), [`ui_preferences`](#ui_preferences), [`ui_toolbar`](#ui_toolbar), [`ui_search_tools`](#ui_search_tools), [`ui_shortcuts`](#ui_shortcuts), [`ui_notifications`](#ui_notifications), [`ui_select`](#ui_select), [`ui_list`](#ui_list)
 - **history**: [`history_view`](#history_view), [`history_compare`](#history_compare), [`history_repair_view`](#history_repair_view), [`history_undo`](#history_undo), [`history_redo`](#history_redo), [`history_list`](#history_list), [`history_create_version`](#history_create_version), [`history_version_properties`](#history_version_properties), [`history_publish`](#history_publish), [`history_create_branch`](#history_create_branch), [`history_switch_branch`](#history_switch_branch), [`history_delete_branch`](#history_delete_branch), [`history_restore_branch`](#history_restore_branch), [`history_merge`](#history_merge), [`history_restore`](#history_restore)
 - **part**: [`part_where_used`](#part_where_used), [`part_rename`](#part_rename), [`part_set_properties`](#part_set_properties), [`part_configured_properties`](#part_configured_properties), [`part_annotation`](#part_annotation), [`part_set_material`](#part_set_material), [`part_set_appearance`](#part_set_appearance), [`part_remove_appearance`](#part_remove_appearance), [`part_appearance_row`](#part_appearance_row), [`part_appearances`](#part_appearances)
-- **company**: [`company_custom_properties`](#company_custom_properties), [`company_release_settings`](#company_release_settings), [`company_numbering_schemes`](#company_numbering_schemes)
+- **company**: [`company_custom_properties`](#company_custom_properties), [`company_release_settings`](#company_release_settings), [`company_numbering_schemes`](#company_numbering_schemes), [`company_revisions`](#company_revisions), [`company_reset_part_number_type`](#company_reset_part_number_type)
 - **material**: [`material_list`](#material_list), [`material_library_update`](#material_library_update), [`material_library_export`](#material_library_export)
 - **query**: [`query_parts`](#query_parts), [`query_entities`](#query_entities), [`query_datums`](#query_datums), [`query_measure`](#query_measure), [`query_mass_properties`](#query_mass_properties)
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
@@ -342,7 +342,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
-- **featurestudio**: [`featurestudio_std`](#featurestudio_std), [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
+- **featurestudio**: [`featurestudio_std`](#featurestudio_std), [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor), [`featurestudio_format`](#featurestudio_format), [`featurestudio_import`](#featurestudio_import), [`featurestudio_profile`](#featurestudio_profile)
 - **agents**: [`agents_status`](#agents_status), [`agents_connect`](#agents_connect), [`agents_disconnect`](#agents_disconnect)
 - **cli**: [`cli_status`](#cli_status), [`cli_install`](#cli_install)
 - **app**: [`app_user_guide`](#app_user_guide), [`app_system_check`](#app_system_check), [`app_about`](#app_about)
@@ -594,6 +594,38 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string | required | Tab name or id. |
 | `name` | string | required | New name. |
+
+#### tab_properties
+
+A Part Studio's, Variable Studio's, Feature Studio's or file's Properties… (tab menu) (edits the document (one undoable history entry)).
+
+Without fields, replies with the tab's properties. Name (the tab's: an undoable rename), description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and custom properties, kept with the document as release management reads them. Fields not given keep their value; an empty text clears it. Assemblies: assembly_properties; drawings: drawing_properties.
+
+Examples:
+
+```json
+{"tab": "Sizes"}
+{"tab": "Sizes", "description": "Shared sizes", "part_number": "VS-100", "revision": "A", "not_revision_managed": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | Tab name or id. |
+| `name` | string |  | Name. |
+| `description` | string |  | Description. |
+| `part_number` | string |  | Part number. |
+| `revision` | string |  | Revision. |
+| `vendor` | string |  | Vendor. |
+| `project` | string |  | Project. |
+| `product_line` | string |  | Product line. |
+| `title1` | string |  | Title 1. |
+| `title2` | string |  | Title 2. |
+| `title3` | string |  | Title 3. |
+| `not_revision_managed` | boolean |  | Not revision managed. |
+| `exclude_from_bom` | boolean |  | Exclude from all BOMs. |
+| `unit_of_measure` | one of `No value`, `Centimeter`, `Foot`, `Inch`, `Meter`, `Millimeter`, `Yard`, `Gram`, `Kilogram`, `Ounce`, `Pound`, `Liter`, `Gallon`, `Each`, `Fluid ounce`, `Milliliter`, `Centiliter`, `Package` |  | Unit of measure. |
+| `custom` | object |  | Custom properties: name → value ("" or null clears); company_custom_properties defines them. |
 
 #### tab_duplicate
 
@@ -1140,6 +1172,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `type` | string | required | Feature type id (see `feature_types`). |
+| `click` | string |  | A button of the dialog to click after `params` (a Routing curve's processInputs (Process), resetTriad, confirmOrthoPath): the feature's editing logic runs with it (std's `clickedButton`), as the click does. |
 | `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"), where a field takes mate connectors an item `{"mate_connector": {Mate connector parameters}}` makes one inside the feature (the field's "Select mate connectors" button; no Mate connector feature is added), and where a field takes a point an item `{"point": {cPoint parameters: pointType EDGE_POINT, entities [an edge], parameter 0…1}}` makes a construction point inside the feature (Onshape's in-feature "Edge point"); array parameters as arrays of objects of their item parameters. |
 | `name` | string |  | Feature name (default: "Extrude 1", ...). |
 | `index` | integer |  | Position in the feature list (default: at the rollback bar). |
@@ -1155,6 +1188,7 @@ Examples:
 ```json
 {"feature": "Extrude 1", "params": {"depth": "30 mm"}}
 {"feature": "Fillet 1", "name": "Edge rounds"}
+{"feature": "Routing curve 1", "click": "processInputs"}
 ```
 
 | field | type | | description |
@@ -1164,6 +1198,7 @@ Examples:
 | `feature` | string | required | Feature id or name. |
 | `params` | object |  | Parameter values by parameter id (see `feature_schema`): booleans; enum option ids ("BLIND"); numbers as expression strings with units ("25 mm", "0.5 in", "30 deg", "#width / 2", "2 * #t + 1 mm"; a bare number uses the workspace units); selections as arrays of reference ids from the query and sketch tools ("region:…", "face:…", "edge:…", "plane:top", "body:…"), where a field takes mate connectors an item `{"mate_connector": {Mate connector parameters}}` makes one inside the feature (the field's "Select mate connectors" button; no Mate connector feature is added), and where a field takes a point an item `{"point": {cPoint parameters: pointType EDGE_POINT, entities [an edge], parameter 0…1}}` makes a construction point inside the feature (Onshape's in-feature "Edge point"); array parameters as arrays of objects of their item parameters. |
 | `name` | string |  | New name. |
+| `click` | string |  | A button of the dialog to click after `params` (a Routing curve's processInputs (Process), resetTriad, confirmOrthoPath): the feature's editing logic runs with it (std's `clickedButton`), as the click does. |
 
 #### feature_get
 
@@ -1706,19 +1741,21 @@ Examples:
 
 Copy a sketch onto another plane (Copy sketch / Paste sketch) (edits the document (one undoable history entry)).
 
-The context menus' Copy sketch then Paste sketch on a plane or planar face: a copy of `sketch` (its entities, constraints and dimensions) on `plane`, at the rollback bar of `to_tab` (default: the sketch's own Part Studio). One edit ("Paste sketch"). Returns the new sketch.
+The context menus' Copy sketch then Paste sketch on a plane or planar face: a copy of `sketch` (its entities, constraints and dimensions; or of each of `sketches`, copied together) on `plane`, at the rollback bar of `to_tab` (default: the sketch's own Part Studio). One edit ("Paste sketch"). Returns the (first) new sketch, and with `sketches` the new sketches' `names`.
 
 Examples:
 
 ```json
 {"sketch": "Sketch 1", "plane": "plane:front"}
+{"sketches": ["Sketch 1", "Sketch 2"], "plane": "plane:right"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
-| `sketch` | string | required | Sketch feature id or name to copy. |
+| `sketch` | string |  | Sketch feature id or name to copy. |
+| `sketches` | array of string |  | Several sketches copied together (ids or names), pasted in one edit. |
 | `plane` | string | required | Plane to paste onto: `plane:top`, a Plane feature, a planar face id or a mate connector. |
 | `to_tab` | string |  | Part Studio to paste into (default: the same one). |
 
@@ -1755,6 +1792,7 @@ Examples:
 ```json
 {"sketch": "Sketch 1", "entities": ["entity:…"], "offset": [20, 0]}
 {"sketch": "Sketch 1", "entities": ["entity:…"], "to": "Sketch 2"}
+{"sketch": "Sketch 1", "entities": ["entity:…"], "to": "Sketch 1", "to_tab": "Part Studio 2"}
 ```
 
 | field | type | | description |
@@ -1764,6 +1802,7 @@ Examples:
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | Entity ids (`entity:…`) to copy. |
 | `to` | string |  | Sketch to paste into (default: the same one). |
+| `to_tab` | string |  | With `to`: the Part Studio that sketch is in (the clipboard reaches across tabs; default this one). |
 | `offset` | array of number or string |  | [x, y] move (lengths; default [0, 0]). |
 
 #### sketch_trim
@@ -2634,7 +2673,7 @@ Examples:
 
 Insert a part (or a whole Part Studio, or a subassembly) into an Assembly (edits the document (one undoable history entry)).
 
-The Insert dialog. Inserting the same item again offsets the new instance along X so they don't overlap. `document` + `version` insert from another document at a named version (the dialog's Other documents: a part, a whole Part Studio, or an Assembly as one subassembly, "Versioned … from other document"). Returns the instance id; place it with mates or assembly_transform.
+The Insert dialog. Inserting the same item again offsets the new instance along X so they don't overlap. `document` + `version` insert from another document at a named version (the dialog's Other documents: a part, a whole Part Studio, or an Assembly as one subassembly, "Versioned … from other document"); `document` + `part_number` (+ `revision`) one of its released items at the version it was released at (View released items). Returns the instance id; place it with mates or assembly_transform.
 
 Examples:
 
@@ -2642,18 +2681,21 @@ Examples:
 {"source": "Part Studio 1", "part": "Part 1"}
 {"source": "Part Studio 1"}
 {"source": "Bracket", "configuration": {"Size": "Large"}}
+{"document": "/path/to/library.noshape", "part_number": "PRT-0042", "revision": "B"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `source` | string | required | Part Studio or Assembly tab (name or id) to insert from (in `document` when given). |
+| `source` | string |  | Part Studio or Assembly tab (name or id) to insert from (in `document` when given); required but with `part_number`. |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance. |
 | `sketch` | string |  | A sketch of that Part Studio (feature id or name): the Insert dialog's sketches. |
 | `configuration` | object or string |  | Configuration of the source: {input id: value}, or the Insert dialog's "default" (Reset to default) / "last_viewed" (Set to last viewed: the configuration the source shows). |
 | `document` | string |  | Another .noshape document to insert from (with `version`). |
 | `version` | string |  | With `document`: the name of one of its versions (the dialog lists named versions). |
+| `part_number` | string |  | With `document`: View released items: its released part or assembly with this part number, inserted at the version it was released at (no `source` / `part` / `version`). |
+| `revision` | string |  | With `part_number`: the revision (default the newest released one; obsoleted ones are not offered). |
 
 #### assembly_list
 
@@ -2863,6 +2905,7 @@ Examples:
 ```json
 {}
 {"instances": ["Part 1 <1>"]}
+{"variance": true}
 {"faces": [{"instance": "Part 1 <1>", "entity": "face:…"}], "reference": {"origin": true}}
 ```
 
@@ -2873,6 +2916,7 @@ Examples:
 | `instances` | array of string |  | Top-level instances (name or id); default the whole assembly. |
 | `faces` | array of object |  | The Face tab: planar, coplanar faces [{instance, entity}] (an instance by name, id or "Sub <1> > Part <1>" path; a face id from assembly_entities); replies their surface area, perimeter, area moments Lxx / Lxy / Lyy and polar moment Lzz (length⁴) instead of the instances' values. |
 | `reference` | object |  | A mate connector, as assembly_mate's ends: inertia (and the Face tab's moments) about its origin, in its axes. |
+| `variance` | boolean |  | Show calculation variance (instances): `variance` holds each value's ± bound (none for an overridden mass). |
 
 #### assembly_update_references
 
@@ -3211,12 +3255,13 @@ Examples:
 
 Replace instances with another part, sketch, Part Studio or assembly (edits the document (one undoable history entry)).
 
-Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, with `document` + `version` one of another document's named versions (the Replace dialog's Other documents), or with `component` Standard content. One edit per instance ("Replace instance : Part 2").
+Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, with `document` + `version` one of another document's named versions (the Replace dialog's Other documents) or + `part_number` (and `revision`) one of its released items (View released items), or with `component` Standard content. One edit per instance ("Replace instance : Part 2").
 
 Examples:
 
 ```json
 {"instance": "Bolt <1>", "source": "Part Studio 2", "part": "Long bolt"}
+{"instance": "Bolt <1>", "document": "/path/to/library.noshape", "part_number": "PRT-0042"}
 ```
 
 | field | type | | description |
@@ -3237,6 +3282,8 @@ Examples:
 | `configuration` | object |  | Configuration of the source: {input id: value}. |
 | `document` | string |  | Another .noshape document (with `version`). |
 | `version` | string |  | With `document`: the name of one of its versions. |
+| `part_number` | string |  | With `document`: View released items: its released part or assembly with this part number, at the version it was released at (no `source` / `part` / `version`). |
+| `revision` | string |  | With `part_number`: the revision (default the newest released one). |
 | `all` | boolean |  | Replace all instances of the same source. |
 
 #### assembly_reorder
@@ -4107,6 +4154,8 @@ Examples:
 | `configuration` | object |  | Configuration of the source: {input id: value}. |
 | `template` | string |  | Existing templates: file or setup name (`drawing_templates`), e.g. "ANSI_A_INCH.dwt", "ISO A3". Default ANSI_A_INCH.dwt, the dialog's preselected row. |
 | `custom_template` | object |  | The Custom template tab instead of `template`: {"standard": "ANSI" \| "ISO" \| "JIS" (default ANSI, as the dialog in any units), "language": English (default), French, German, Spanish, Italian, Japanese, Korean, ChineseSimplified, ChineseTraditional or the list's own name, "size": ANSI A (default), A Portrait, B, C, D; ISO / JIS A4 (default), A4 Portrait, A3, A2, A1, A0, "units": Millimeters, Centimeter, Meter, Inches, Feet and inches, Foot, Yard, "decimal_separator": "period" \| "comma", "projection": "third_angle" \| "first_angle", "border": bool (default true), "horizontal_zones" / "vertical_zones": 0–20 even (default per size), "start_zones": "bottom_right" (default) \| "top_left", "title_block": bool (default true)}. Choosing a standard sets the units, separator and projection like the dialog (ANSI: Inches, period, third angle; ISO: Millimeters, comma, first angle; JIS: Millimeters, comma, third angle). |
+| `dwt` | string |  | Created by me: a DWT file tab of this document; its sheet formats and drawing properties go over the template. |
+| `dwt_path` | string |  | Created by me: a local .dwt file (as `dwt`). |
 | `name` | string |  | Tab name (default "<part> Drawing N" / "<sketch> Drawing N" / "Drawing N"). |
 | `suggested_views` | boolean |  | Suggested views (true) or No views (false, the dialog's default; place views with drawing_insert_view). |
 
@@ -4114,7 +4163,7 @@ Examples:
 
 A drawing sheet's views (with their edges in sheet coordinates), annotations and tables.
 
-Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds, `error` when it couldn't be computed (the app's red frame) and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.
+Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds, `error` when it couldn't be computed (the app's red frame) and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension. `sketch` lists the sheet sketch: its entities (id, type, end points / center and radius, `construction`, `external` for view geometry used by a constraint) and its constraints (kind and entity ids).
 
 Examples:
 
@@ -4308,7 +4357,7 @@ Examples:
 
 Edit section…: a section view's id, Show cut geometry only, direction, depth and Exclude from cut (edits the document (one undoable history entry)).
 
-A section view's menu › Edit section…: what isn't given stays. `cut_only` Show cut geometry only (off while a depth is set, as the dialog); `flip` Opposite direction; `depth` Section depth Blind in model mm (0 clears it); `exclude` the parts excluded from the cut (names as drawing_get's `exclude_from_cut` lists them, or `body:…`; assembly views only, as the dialog's Exclude from cut; [] unticks it).
+A section view's menu › Edit section…: what isn't given stays. `cut_only` Show cut geometry only (off while a depth is set, as the dialog); `flip` Opposite direction; `depth` Section depth Blind in model mm (0 clears it); `depth_to` Up to entity: a vertex or circle center of the parent view (sheet mm), with `depth_offset` (model mm past it; negative is Opposite direction; 0 clears it); `exclude` the parts excluded from the cut (names as drawing_get's `exclude_from_cut` lists them, or `body:…`; assembly views only, as the dialog's Exclude from cut; [] unticks it).
 
 Examples:
 
@@ -4327,6 +4376,8 @@ Examples:
 | `cut_only` | boolean |  | Show cut geometry only. |
 | `flip` | boolean |  | Opposite direction. |
 | `depth` | number |  | Section depth, Blind (model mm; 0 clears it). |
+| `depth_to` | array of number |  | Section depth Up to entity: a vertex or circle center of the parent view (sheet mm). |
+| `depth_offset` | number |  | Up to entity: Offset (model mm; negative: Opposite direction; 0 clears it). |
 | `exclude` | array of string |  | Exclude from cut: the parts (names or `body:…`); [] unticks it. |
 
 #### drawing_jogged_section_view
@@ -4424,6 +4475,8 @@ Examples:
 | `view` | integer | required | The detail view (drawing_get). |
 | `center` | array of number |  | New circle centre (sheet mm). |
 | `radius` | number |  | New circle radius (sheet mm). |
+| `profile` | one of `circle`, `rectangle`, `spline`, `polygon` |  | Edit closed profile: × then draw another (circle: `center` and `radius`; the others: `points`, sheet mm). |
+| `points` | array of array of number |  | profile rectangle (two corners), spline or polygon (at least 3 points), sheet mm. |
 | `leader` | boolean |  | Label on a leader (Add leader) or beside the circle. |
 | `label_at` | array of number |  | The label's position on its leader (sheet mm). |
 | `scale` | number |  | View scale. |
@@ -4450,8 +4503,9 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `mode` | one of `normal`, `in_line`, `axis` |  | The dialog's tab. |
-| `edge` | array of number | required | A point on the fold line (sheet mm). |
-| `position` | array of number | required | Where the view goes (sheet mm). |
+| `view` | integer |  | Edit auxiliary view… on this auxiliary view (its id) instead of placing one: `label`, `reverse`, `show_reference` change it ("Edit auxiliary view"). |
+| `edge` | array of number |  | A point on the fold line (sheet mm; a new view). |
+| `position` | array of number |  | Where the view goes (sheet mm; a new view). |
 | `label` | string |  | Auxiliary id (default the sheet's next letter). |
 | `reverse` | boolean |  | Reverse the direction. |
 | `show_reference` | boolean |  | Show the view reference indicator. |
@@ -4474,8 +4528,9 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `view` | integer | required | View to break. |
-| `from` | array of number | required | First break line (sheet mm). |
-| `to` | array of number | required | Second break line (sheet mm). |
+| `index` | integer |  | Edit... on break `index` of the view (0 = first): its `style` and `gap` change ("Break view"). |
+| `from` | array of number |  | First break line (sheet mm; a new break). |
+| `to` | array of number |  | Second break line (sheet mm; a new break). |
 | `orientation` | one of `vertical`, `horizontal` |  | Break line orientation. |
 | `style` | one of `zigzag`, `straight`, `curve`, `small_zigzag` |  | Break line style. |
 | `gap` | number |  | Gap (sheet mm; default 6 mm, 0.25 in in inch drawings). |
@@ -4796,6 +4851,7 @@ Examples:
 
 ```json
 {"drawing": "Part 1 Drawing 1", "annotation": 12, "tolerance": "Symmetrical", "tolerance_value": 0.1, "precision": 1}
+{"drawing": "Part 1 Drawing 1", "annotation": 4, "tolerance": "Fit", "hole_class": "H7", "shaft_class": "g6", "fit_type": "clearance", "fit_stacking": "stacked_with_line"}
 ```
 
 | field | type | | description |
@@ -4825,6 +4881,14 @@ Examples:
 | `dual_show_units` | boolean or string |  | The dual row's Show/hide units: true / false, or "drawing". |
 | `diameter` | boolean |  | Radial dimensions: diameter (true) or radius (false). |
 | `override_tolerance` | boolean |  | Hole callouts: Override precision/tolerance. |
+| `fit_type` | one of `user_defined`, `clearance`, `transition`, `interference` |  | Fits: Fit type. |
+| `fit_standard` | one of `drawing`, `iso`, `ansi` |  | Fits: Fit standard. |
+| `fit_precision` | integer or string |  | Fit with tolerance / Fit (Tolerance only): Fit tolerance precision, decimals 0–6 or "drawing". |
+| `fit_stacking` | one of `stacked_without_line`, `stacked_diagonally`, `stacked_with_line` |  | Fits: stacking. |
+| `show_hole_class` | boolean |  | Fits: Toggle hole class visibility. |
+| `show_shaft_class` | boolean |  | Fits: Toggle stacked visibility (the shaft class). |
+| `count_type` | one of `none`, `count_by_view`, `count_by_face`, `count_by_pattern`, `count_by_part`, `count_by_face_excluding_patterns` |  | Hole callouts: Count type. |
+| `reset_text_position` | boolean |  | Radial dimensions: Reset text position (the value back at 45°). |
 
 #### drawing_format_painter
 
@@ -5123,12 +5187,13 @@ Examples:
 
 Note (text) with an optional leader (edits the document (one undoable history entry)).
 
-The Note tool and panel: `text` (several lines with \n) placed at `position` (sheet mm); with `leader` (a vertex, circle center or edge point, sheet mm) a leader points there. `height` sets the text height (sheet mm; it becomes the drawing's note height default, as typing it in the panel does). One edit ("Note").
+The Note tool and panel: `text` (several lines with \n) placed at `position` (sheet mm); with `leader` (a vertex, circle center or edge point, sheet mm) a leader points there. `height` sets the text height (sheet mm; it becomes the drawing's note height default, as typing it in the panel does). One edit ("Note"). The panel's options: `font`, `bold`, `italic`, `underline`, `strikethrough`, `color`, `line_spacing`, `space_before` / `space_after`, `align` / `valign` (notes without leaders), `list`, `order`, `width`, flag notes (`flags`, `flag_shape`, `flag_size`). With `annotation`, Edit note… on that note: the fields given change it ("Edit note"; text "" deletes it: "Delete note").
 
 Examples:
 
 ```json
 {"drawing": "Part 1 Drawing 1", "text": "BREAK ALL SHARP EDGES", "position": [30, 40]}
+{"drawing": "Part 1 Drawing 1", "annotation": 7, "list": "numbers", "flags": [0], "font": "Tinos", "bold": true, "color": "FF0000"}
 ```
 
 | field | type | | description |
@@ -5136,10 +5201,29 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
-| `text` | string | required | The note's text. |
-| `position` | array of number | required | Where the text goes (sheet mm). |
-| `leader` | array of number |  | Where the leader points (a snap point, sheet mm). |
+| `annotation` | integer |  | Edit… this note (its id, drawing_get) instead of placing one. |
+| `text` | string |  | The note's text (required for a new note; editing: "" deletes the note). |
+| `position` | array of number |  | Where the text goes (sheet mm; a new note). |
+| `leader` | array of number |  | Where the leader points (a snap point, sheet mm; a new note). |
 | `height` | number |  | Text height (mm). |
+| `font` | one of `APMONO`, `ARComp`, `ARIsoP1`, `ARItal`, `ARMono`, `ARSimp`, `ARTxt`, `Arimo`, `DejaVu Sans`, `DejaVu Sans Mono`, `DejaVu Serif`, `Noto Sans`, `Noto Sans Chinese Simplified`, `Noto Sans Chinese Simplified Light`, `Noto Sans Chinese Traditional`, `Noto Sans Chinese Traditional Light`, `Noto Sans Japanese`, `Noto Sans Korean`, `Noto Sans UI`, `Noto Serif`, `Open Sans`, `Tinos` |  | Font family (the panel's Font list; Noto Sans is the note style's own). |
+| `bold` | boolean |  | Bold (not with an SHX font). |
+| `italic` | boolean |  | Italic (not with an SHX font). |
+| `underline` | boolean |  | Underline. |
+| `strikethrough` | boolean |  | Strikethrough. |
+| `color` | string |  | Color: hex RRGGBB (the Note color dialog; 000000 is the ink, no override). |
+| `line_spacing` | one of 1.0, 1.5, 2.0, 2.5, 3.0 |  | Line spacing. |
+| `space_before` | boolean |  | Add (true) / Remove (false) space before paragraph. |
+| `space_after` | boolean |  | Add (true) / Remove (false) space after paragraph. |
+| `align` | one of `left`, `center`, `right`, `justify` |  | Horizontal alignment (notes without leaders). |
+| `valign` | one of `top`, `middle`, `bottom` |  | Vertical alignment (notes without leaders). |
+| `list` | one of `none`, `numbers`, `bullets`, `uppercase_letters`, `lowercase_letters` |  | List. |
+| `order` | one of `top_to_bottom`, `bottom_to_top` |  | Note order. |
+| `width` | number or null |  | Bounding box width (mm; lines wrap at it); null: as wide as the text. |
+| `angle` | number |  | Rotation (degrees, counter-clockwise, whole degrees as the rotate grip; notes without leaders). |
+| `flags` | array of integer |  | Flag notes: the flagged list items (0 = first line); [] clears. |
+| `flag_shape` | one of `none`, `circle`, `diamond`, `double_circle`, `flag`, `hexagon`, `octagon`, `rectangle`, `square_circle`, `triangle`, `underline` |  | Flag notes border shape (default: the drawing's). |
+| `flag_size` | integer |  | Flag notes border size in characters (0 = Tight fit). |
 
 #### drawing_gdt
 
@@ -5305,12 +5389,13 @@ Examples:
 
 Type text into a general table cell (edits the document (one undoable history entry)).
 
-The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. One edit ("Edit cell").
+The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. The cell panel's options: `font`, `bold`, `italic`, `underline`, `strikethrough`, `align`, `valign`, `height` (mm, null: the table's); drawing_get lists a table's `cell_formats`. One edit ("Edit cell").
 
 Examples:
 
 ```json
 {"drawing": "Part 1 Drawing 1", "table": 5, "row": 0, "column": 0, "text": "Finish"}
+{"drawing": "Part 1 Drawing 1", "table": 5, "row": 1, "column": 0, "bold": true, "valign": "top", "height": 5}
 ```
 
 | field | type | | description |
@@ -5321,7 +5406,15 @@ Examples:
 | `table` | integer | required | Table id (drawing_get). |
 | `row` | integer | required | Row. |
 | `column` | integer | required | Column. |
-| `text` | string | required | Cell text. |
+| `text` | string |  | Cell text (kept when only the panel's options are given). |
+| `font` | one of `APMONO`, `ARComp`, `ARIsoP1`, `ARItal`, `ARMono`, `ARSimp`, `ARTxt`, `Arimo`, `DejaVu Sans`, `DejaVu Sans Mono`, `DejaVu Serif`, `Noto Sans`, `Noto Sans Chinese Simplified`, `Noto Sans Chinese Simplified Light`, `Noto Sans Chinese Traditional`, `Noto Sans Chinese Traditional Light`, `Noto Sans Japanese`, `Noto Sans Korean`, `Noto Sans UI`, `Noto Serif`, `Open Sans`, `Tinos` |  | Cell panel: Font. |
+| `bold` | boolean |  | Cell panel: Bold (not with an SHX font). |
+| `italic` | boolean |  | Cell panel: Italic (not with an SHX font). |
+| `underline` | boolean |  | Cell panel: Underline. |
+| `strikethrough` | boolean |  | Cell panel: Strikethrough. |
+| `align` | one of `left`, `center`, `right` |  | Cell panel: Horizontal alignment. |
+| `valign` | one of `top`, `middle`, `bottom` |  | Cell panel: Vertical alignment. |
+| `height` | number or null |  | Cell panel: Text height (mm); null: the table's. |
 
 #### drawing_view_table
 
@@ -5347,6 +5440,15 @@ Examples:
 | `origin` | array of number |  | Hole table: the origin vertex (sheet mm). |
 | `more_views` | array of object |  | Hole table: further views of the same part, each {view, origin}. |
 | `position` | array of number | required | Where the table goes (sheet mm). |
+| `template` | one of `follow_assembly`, `onshape_default` |  | BOM: Template (Follow assembly / Onshape Default BOM). |
+| `bom_type` | one of `flattened`, `structured_top_level`, `structured_multi_level` |  | BOM: BOM type. |
+| `order` | one of `top_to_bottom`, `bottom_to_top` |  | BOM, cut list: Order. |
+| `corner` | one of `top_right`, `top_left`, `bottom_right`, `bottom_left` |  | Select fixed corner (`position` is that corner; default top right). |
+| `file` | string |  | BOM data…: a CSV file tab of this document (its rows become the table, the first one the header). |
+| `path` | string |  | BOM data…: a local CSV file (imported as a tab first). |
+| `assembly` | string |  | BOM: the Source is an assembly (name or id) instead of a view's: one of this document's (Current document › Assemblies), or with `document` one of that document's (Other documents…); no `view`. |
+| `document` | string |  | BOM: Other documents…: the other document's path, its `assembly` at `version`. |
+| `version` | string |  | With `document`: its version by name (default its latest version, else its Main workspace as it is now). |
 
 #### drawing_view_display
 
@@ -5902,6 +6004,194 @@ Examples:
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `table` | integer | required | A custom table. |
 
+#### drawing_constrain
+
+Constrain sheet sketch geometry: horizontal, vertical, coincident, perpendicular, parallel, tangent (edits the document (one undoable history entry)).
+
+The drawing's sketch constraint tools. `picks` are clicks (sheet mm) as with the tool on: each takes a sheet sketch point (within 6 px), else a sketch curve, else a view's straight edge or face-on circle (copied into the sketch as fixed geometry first, its own edit "Use view geometry"); a constraint is made each time the picks complete it (Horizontal / Vertical: one line or two points; the others two), so `picks` can make several. `entities` instead are selected sketch entity ids (drawing_get `sketch`): the constraint key with them selected applies at once. One edit per constraint, named as the tool ("Perpendicular").
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "kind": "horizontal", "entities": [12]}
+{"drawing": "Part 1 Drawing 1", "kind": "perpendicular", "picks": [[40, 250], [120, 150]]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `kind` | one of `horizontal`, `vertical`, `coincident`, `perpendicular`, `parallel`, `tangent` | required | The constraint. |
+| `picks` | array of array of number |  | Clicks [x, y] (sheet mm) with the tool on. |
+| `entities` | array of integer |  | Selected sheet sketch entity ids (instead of `picks`). |
+
+#### drawing_measure
+
+Measure points, straight edges and circles of a view (the Measure panel).
+
+The drawing's Measure ([): each of `picks` is a click on the sheet (sheet mm) taking a snap point, else a straight edge, else a face-on circle, as the editor's. All picks must be in the first pick's view. Replies the picks as the panel names them ("Line 1"), its rows in model units (a point alone: none; a line: Length; a circle: Diameter, Length; two points: Min distance, dx, dy; a point and a line: Min distance, Length; a point or a line and a circle: Min / Max / Center distance, Length; two circles: Min / Center distance, Length; two lines: Parallel distance or an oblique pair's Angle, Min distance, Length; three picks or more: the curves' Length) and its relation ("Point-Line", "Parallel lines"…). Each row has `mm` (or `deg`) and `text` as the panel shows it in `unit` (default the drawing's), with `dual` the other unit system in brackets.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "picks": [[120, 150], [140, 162]]}
+{"drawing": "Part 1 Drawing 1", "picks": [[120, 150]], "unit": "inches", "dual": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `picks` | array of array of number | required | Clicks [x, y] on the sheet (sheet mm), in order. |
+| `unit` | one of `inches`, `millimeters`, `centimeters`, `feet`, `meters`, `yards` |  | The panel's unit (default the drawing's own). |
+| `dual` | boolean |  | Show dual unit. |
+
+#### drawing_arrange
+
+Move to ▸ layer, Bring to front / Send to back, Move to sheet… on annotations, sketch entities, tables and images (edits the document (one undoable history entry)).
+
+The context menus of annotations, tables and images, one edit each with the menu's name. `action`: `move_to` (Move to ▸ `layer`: drawing | border_frame | border_zones | title_block; annotations (several), sheet sketch entities (several), a table or an image; "Move to"), `bring_to_front` / `send_to_back` (a table or an image: the stacking order among the sheet's tables / images), `move_to_sheet` (a table: Move to sheet… `to_sheet`, number (1 = first) or name, omitted: a new sheet; it keeps its place and gets a new id there, the reply's `table`; "Move to sheet"). drawing_get lists a `layer` other than drawing.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "action": "move_to", "annotations": [7, 8], "layer": "title_block"}
+{"drawing": "Part 1 Drawing 1", "action": "move_to_sheet", "table": 3, "to_sheet": 2}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `action` | one of `move_to`, `bring_to_front`, `send_to_back`, `move_to_sheet` | required | The menu action. |
+| `annotations` | array of integer |  | Annotation ids (move_to). |
+| `table` | integer |  | Table id. |
+| `image` | integer |  | Image id. |
+| `sketch_entities` | array of integer |  | Sheet sketch entity ids (move_to; drawing_get `sketch`). |
+| `layer` | one of `drawing`, `border_frame`, `border_zones`, `title_block` |  | move_to: the layer. |
+| `to_sheet` | integer or string |  | move_to_sheet: the sheet, number (1 = first) or name; omitted: a new sheet. |
+
+#### drawing_move
+
+Drag an annotation, table, image, view label, break line or cutting line (edits the document (one undoable history entry)).
+
+Select and drag on the sheet, one edit with the drag's name. Exactly one of: `annotation` (a dimension's line follows the pointer as in the editor, a note or symbol moves; the other members of its annotation group follow unless `alone`, Shift: "Move annotation"), `table` ("Move table"), `image` ("Move image"), `view_label` (a view id: its label, "Move view label"), `break_line` (a broken view's id, with `index`: the break slides along the part keeping its width, "Move break"), `cutting_line` (a section view's id: its line moves sideways on the parent, "Move cutting line"). `by` is the drag (sheet mm); for annotations, tables and images `to` (sheet mm) is where their position goes instead.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "annotation": 7, "by": [10, 5]}
+{"drawing": "Part 1 Drawing 1", "table": 3, "to": [200, 80]}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `annotation` | integer |  | Annotation id (drawing_get). |
+| `table` | integer |  | Table id. |
+| `image` | integer |  | Image id. |
+| `view_label` | integer |  | View id: drag its label. |
+| `break_line` | integer |  | Broken view id: drag break `index`. |
+| `index` | integer |  | break_line: the break (0 = first). |
+| `cutting_line` | integer |  | Section view id: drag its cutting line. |
+| `by` | array of number |  | The drag [dx, dy] (sheet mm). |
+| `to` | array of number |  | annotation / table / image: where its position goes (sheet mm). |
+| `alone` | boolean |  | annotation: Shift (its group doesn't follow). |
+
+#### drawing_styles
+
+Styles panel: an annotation's own font, height, color, arrowheads and dimension text (edits the document (one undoable history entry)).
+
+The Styles panel with `annotations` selected, one edit "Style". A value sets the selection's own style; null puts the drawing's back ("(Drawing)"); `revert`: Revert to drawing properties (all of them). All annotations: `font`, `bold`, `italic`, `height` (mm), `color` (hex RRGGBB), `arrow` (arrowhead size, mm), `arrow_type`. Dimensions only: `justify`, `alignment` (horizontal | with_line), `text_gap`, `geometry_gap`, `extension` (mm); linear dimensions: `show_first_extension`, `show_second_extension`; chamfer dimensions: `chamfer_content`. Datums: `datum_size`. Callouts: `stack`, `stack_gap`. A field the selection's panel doesn't have is refused. drawing_get lists each annotation's own `annotation_style`.
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "annotations": [7, 8], "font": "Tinos", "height": 5, "color": "0000FF", "arrow_type": "open"}
+{"drawing": "Part 1 Drawing 1", "annotations": [7], "revert": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `annotations` | array of integer | required | The selected annotations (ids, drawing_get). |
+| `revert` | boolean |  | Revert to drawing properties. |
+| `font` | one of `APMONO`, `ARComp`, `ARIsoP1`, `ARItal`, `ARMono`, `ARSimp`, `ARTxt`, `Arimo`, `DejaVu Sans`, `DejaVu Sans Mono`, `DejaVu Serif`, `Noto Sans`, `Noto Sans Chinese Simplified`, `Noto Sans Chinese Simplified Light`, `Noto Sans Chinese Traditional`, `Noto Sans Chinese Traditional Light`, `Noto Sans Japanese`, `Noto Sans Korean`, `Noto Sans UI`, `Noto Serif`, `Open Sans`, `Tinos`, null |  | Font. |
+| `bold` | boolean |  | Bold (not with an SHX font). |
+| `italic` | boolean |  | Italic (not with an SHX font). |
+| `height` | number or null |  | Text height (mm). |
+| `color` | string or null |  | Color: hex RRGGBB. |
+| `arrow` | number or null |  | Arrowhead size (mm). |
+| `arrow_type` | one of `none`, `filled`, `unfilled`, `open`, `oblique`, `filled_dot`, null |  | Arrowhead type. |
+| `justify` | one of `left`, `center`, `right`, `auto`, null |  | Dimensions: Text justification. |
+| `alignment` | one of `horizontal`, `with_line`, null |  | Dimensions: Text alignment (Horizontal / Align with dimension line). |
+| `text_gap` | number or null |  | Dimensions: Text gap (mm). |
+| `geometry_gap` | number or null |  | Dimensions: Geometry gap (mm). |
+| `extension` | number or null |  | Dimensions: Extension past line (mm). |
+| `show_first_extension` | boolean |  | Linear dimensions: Show first extension line. |
+| `show_second_extension` | boolean |  | Linear dimensions: Show second extension line. |
+| `chamfer_content` | one of `angle_x_length`, `length_x_angle`, `length_x_length`, `c_length`, null |  | Chamfer dimensions: content. |
+| `datum_size` | number or null |  | Datums: Datum size (mm). |
+| `stack` | one of `auto`, `right`, `left`, `up`, `down`, null |  | Callouts: Stack direction. |
+| `stack_gap` | number or null |  | Callouts: Stack gap size (mm). |
+
+#### drawing_sketch_styles
+
+Styles panel: sheet sketch entities' linestyle, pitch scale, thickness and color (edits the document (one undoable history entry)).
+
+The Styles panel with sheet sketch entities selected (ids: drawing_get `sketch`), one edit "Style". `line`: Linestyle; `pitch`: Pitch scale (not for Solid lines; null: 1.00); `thickness` (mm, one of the list; null: the drawing's); `color` (hex RRGGBB; null: the drawing's); `revert`: Revert to drawing properties (Linestyle Solid, the drawing's color).
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "sketch_entities": [12, 15], "line": "center", "thickness": 0.35, "color": "0000FF"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `sketch_entities` | array of integer | required | The selected sketch entity ids. |
+| `revert` | boolean |  | Revert to drawing properties. |
+| `line` | one of `solid`, `phantom`, `center`, `dashed`, `dotted` |  | Linestyle. |
+| `pitch` | one of 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, null |  | Pitch scale. |
+| `thickness` | one of 0.13, 0.15, 0.18, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.53, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.4, 1.6, 2.0, null |  | Thickness (mm). |
+| `color` | string or null |  | Color: hex RRGGBB. |
+
+#### drawing_hatch_styles
+
+Styles panel: hatch regions' pattern, scale, angle and color (edits the document (one undoable history entry)).
+
+The Styles panel with hatch regions selected (ids: drawing_get), one edit "Style". `standard`: Hatch pattern group (another group takes its default pattern and Auto angle); `pattern`: its name as listed (or its first word); `scale`: "Auto" or 1–10; `angle`: "Auto" or 0–180 in 15° steps (the pattern's lines' angle on the sheet); no Scale or Angle on General; `color` (hex RRGGBB; null: the drawing's); `revert`: Revert to drawing properties (ANSI's default pattern, Auto scale and angle, the drawing's color).
+
+Examples:
+
+```json
+{"drawing": "Part 1 Drawing 1", "hatches": [1], "standard": "iso", "pattern": "ISO02W100", "scale": 2, "angle": 45}
+{"drawing": "Part 1 Drawing 1", "hatches": [1], "revert": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
+| `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
+| `hatches` | array of integer | required | The selected hatch region ids. |
+| `revert` | boolean |  | Revert to drawing properties. |
+| `standard` | one of `ansi`, `iso`, `general` |  | Hatch pattern group. |
+| `pattern` | string |  | Pattern name. |
+| `scale` | string or number |  | "Auto" or 1–10. |
+| `angle` | string or number |  | "Auto" or 0–180 (15° steps). |
+| `color` | string or null |  | Color: hex RRGGBB. |
+
 #### drawing_switch_sheet
 
 Show another sheet (sheet tabs; First / Last / Next / Previous sheet) (edits the document (one undoable history entry)).
@@ -6040,6 +6330,26 @@ Examples:
 |---|---|---|---|
 | `tab` | one of `General`, `Part Studio`, `Assembly`, `3D view`, `Sketch`, `Feature Studio`, `Drawing` |  | Only this tab. |
 | `search` | string |  | Search text (names and keys). |
+
+#### ui_notifications
+
+The Notifications panel: list, Only show unread, Mark all as read, Expand all, Delete all.
+
+The bell's Notifications panel (the app's own: imports and their steps, kept for the app's session): the notifications newest first as the panel lists them (all, or only the unread with `only_unread`), each with its title, message, time (s since 1970), unread, expanded, failed, steps and link, and the bell's unread count. `only_unread` sets the panel's Only show unread switch; `action` is the panel's ⋮ menu: mark_all_read, expand_all, delete_all. Without the app open (live mode) there are none.
+
+Examples:
+
+```json
+{}
+{"only_unread": true}
+{"action": "mark_all_read"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `only_unread` | boolean |  | Only show unread. |
+| `action` | one of `mark_all_read`, `expand_all`, `delete_all` |  | The ⋮ menu's Mark all as read, Expand all or Delete all. |
 
 #### ui_select
 
@@ -6267,10 +6577,13 @@ Examples:
 
 Create a branch (workspace) from the current state, or from a version (Branch to create workspace…), and switch to it (edits the document (one undoable history entry)).
 
+The Create workspace dialog (a version row's Branch to create workspace…): `name` (required, at most 256 characters: "Name is required and cannot exceed 256 characters."), `description` (at most 10000 characters; the workspace's Properties… show it), and Open new workspace (`open`, default on: switch to it; off: stay where you are).
+
 Examples:
 
 ```json
 {"name": "experiment"}
+{"name": "B2", "version": "V1", "description": "Try a bigger hole", "open": false}
 ```
 
 | field | type | | description |
@@ -6278,6 +6591,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | Branch name. |
 | `version` | string |  | The version (name or id) to branch from, as its row's Branch to create workspace…; default: the current state. |
+| `description` | string |  | Description. |
+| `open` | boolean |  | Open new workspace (default true). |
 
 #### history_switch_branch
 
@@ -6423,6 +6738,7 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `part` | string |  | Part id (`body:…`) or name. |
 | `parts` | array of string |  | Several parts' ids or names (instead of `part`). |
+| `reset` | boolean |  | Reset all first: each part's regenerated name and no metadata (description, part number, revision, the meta fields, mass override); the fields given then apply. |
 | `name` | string |  | Name. |
 | `description` | string |  | Description. |
 | `part_number` | string |  | Part number. |
@@ -6519,13 +6835,14 @@ Examples:
 
 Set the color and transparency of parts, faces or a feature (the Appearance editor) (edits the document (one undoable history entry)).
 
-Give `parts`, `faces` or `feature`. Color as "#3b61b4" or [r, g, b] (0–255, sRGB); transparency 0 (opaque) to 1. Parts also take the tessellation quality. One edit ("Edit appearance").
+Give `parts`, `faces`, `feature` or `features`. Color as "#3b61b4" or [r, g, b] (0–255, sRGB); transparency 0 (opaque) to 1. Parts also take the tessellation quality. One edit ("Edit appearance").
 
 Examples:
 
 ```json
 {"parts": ["Part 1"], "color": "#3b61b4"}
 {"faces": ["face:…"], "color": [200, 40, 40], "transparency": 0.3}
+{"features": ["Sketch 1", "Extrude 1"], "color": "#00ff00"}
 ```
 
 | field | type | | description |
@@ -6535,6 +6852,7 @@ Examples:
 | `parts` | array of string |  | Part ids or names. |
 | `faces` | array of string |  | Face ids (`face:…`). |
 | `feature` | string |  | Feature id or name (its faces; a sketch: its curves). |
+| `features` | array of string |  | Several features (ids or names): the feature list's Add appearance to N features… / Edit appearance of N sketches…, one feature appearance each. |
 | `color` | string or array | required | "#rrggbb" or [r, g, b]. |
 | `transparency` | number |  | 0 opaque (default) … 1 invisible. |
 | `tessellation` | one of `auto`, `coarse`, `medium`, `fine`, `very_fine` |  | Parts: tessellation quality (default auto). |
@@ -6635,6 +6953,42 @@ Numbering scheme settings: `release_objects`, `standard_content`, `items` and `r
 | field | type | | description |
 |---|---|---|---|
 | `set` | object |  | The fields to change, as returned. |
+
+#### company_revisions
+
+Company settings › Revision tools › Find revisions: a part number's revisions of one object type.
+
+Revision tools › Reset part number type › Find revisions: `part_number` and `object_type` (Part, Assembly, Drawing or Blob), the revisions released with them across the documents on this computer (recently opened, the documents folder, the watched folders and the documents open here; `documents` lists others), newest first: part number, type, revision, document name, release name, state, created, re-releasable and can change type.
+
+Examples:
+
+```json
+{"part_number": "PRT-002", "object_type": "Part"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `part_number` | string | required | Part number. |
+| `object_type` | one of `Part`, `Assembly`, `Drawing`, `Blob` | required | Object type. |
+| `documents` | array of string |  | Search these documents (paths) instead. |
+
+#### company_reset_part_number_type
+
+Company settings › Revision tools › Reset part number type (edits the document (one undoable history entry); deletes or overwrites).
+
+Reset part number type (after its confirmation, "This action cannot be undone."): every revision company_revisions finds for `part_number` and `object_type` is marked obsolete and re-releasable, so the part number can be released again with another object type. Revision history still shows the previous revisions. Refused when none is left to reset (the dialog's button is disabled then). Returns the revisions as Find revisions lists them afterwards.
+
+Examples:
+
+```json
+{"part_number": "PRT-002", "object_type": "Part"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `part_number` | string | required | Part number. |
+| `object_type` | one of `Part`, `Assembly`, `Drawing`, `Blob` | required | Object type. |
+| `documents` | array of string |  | Search these documents (paths) instead. |
 
 ### material
 
@@ -6794,6 +7148,7 @@ Examples:
 ```json
 {}
 {"parts": ["Part 1"]}
+{"parts": ["Part 1"], "variance": true}
 ```
 
 | field | type | | description |
@@ -6803,6 +7158,7 @@ Examples:
 | `parts` | array of string |  | Part ids (`body:…`) or names; default all. |
 | `reference` | string |  | Mate connector id (`mc:…`) for the inertia axes. |
 | `configuration` | object |  | In this configuration: {input: option or value} by id or name (config_list); the other inputs as shown. |
+| `variance` | boolean |  | Show calculation variance: `variance` holds each value's ± bound (none for an overridden value). |
 
 ### analysis
 
@@ -6853,7 +7209,7 @@ Examples:
 
 Curvature of edges, sketch curves and faces (Curve/surface analysis).
 
-The minimum radius of curvature over the selection and where it is, the inflection points of sketch curves, and the number of curvature combs (one per curve; U and V isoparametric curves per face).
+The minimum radius of curvature over the selection and where it is, the inflection points of sketch curves, the number of curvature combs (one per curve; U and V isoparametric curves per face), and for each selected spline curve or face (`splines`) the Details panel's degree, control points and spans (`u`, and `v` for a face), its Knot points and its Control point grid's points.
 
 Examples:
 
@@ -6916,12 +7272,13 @@ Examples:
 
 Dihedral angle along edges (Dihedral analysis).
 
-The minimum and maximum angle between the faces along the edges (degrees).
+The minimum and maximum angle between the faces along the edges (degrees; with `radians` also in radians, as the dialog's Show values in radians). Enable threshold display: `threshold` {high, low} (the dialog's High / Low threshold, angles 0 to 180 deg; default 180 deg and 0 deg) counts the comb's teeth drawn above the high one (yellow) and below the low one (purple).
 
 Examples:
 
 ```json
 {"entities": ["edge:…"]}
+{"entities": ["edge:…"], "radians": true, "threshold": {"high": "120 deg", "low": "30 deg"}}
 ```
 
 | field | type | | description |
@@ -6929,6 +7286,8 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `entities` | array of string | required | Edges. |
+| `radians` | boolean |  | Show values in radians: `min` / `max` in radians. |
+| `threshold` | object |  | Enable threshold display: {"high": "120 deg", "low": "30 deg"} (bare numbers in degrees). |
 
 #### analysis_interference
 
@@ -7140,6 +7499,8 @@ Examples:
 {"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}
 {"tab": "Part Studio 1", "tabs": ["Drawing 1"], "name": "Release 2", "generate_part_numbers": true, "draft": true}
 {"from_draft": "Release 2"}
+{"tab": "Part Studio 1", "name": "Large", "configuration": {"Size": "Large"}, "part_numbers": {"Part 1": "PRT-0002"}}
+{"from_release": "Release 1", "name": "Release 1 rework"}
 ```
 
 | field | type | | description |
@@ -7148,10 +7509,12 @@ Examples:
 | `tab` | string |  | The tab to release (name or id). Required unless `from_draft` gives the items. |
 | `tabs` | array of string |  | More tabs whose items join the candidate (the dialog's + Add items). |
 | `from_draft` | string |  | Start from this saved draft's items, name and notes (Release drafts › Review Release); the other fields change them. |
+| `from_release` | string |  | Clone: start from this release's items, name and notes as the current workspace has them (the review's Clone, "Recreate Release from the current workspace": names and part numbers as they are now, each at its next revision); the other fields change them. |
 | `draft` | boolean |  | Save draft instead of releasing: the candidate is kept in the document by its name (no checks but the name). |
 | `generate_part_numbers` | boolean |  | Generate part numbers for the items without one (Company settings' sequential numbering scheme). |
 | `revert` | array of string |  | Items (names or part ids) reverted to their last released revision (the State column's Revert). |
 | `parts` | array of string |  | Part Studio: only these parts (ids or names). |
+| `configuration` | object |  | Configured Part Studio: the parts of this configuration ({input name or id: value}; the dialog's Configuration inputs, then Generate). Default: the default configuration. |
 | `all_configurations` | boolean |  | Part Studio with `parts`: each part once per configuration (the part's Release all configurations…; the list inputs' options combined, at most 100). Every row is named as the part; `part_numbers` / `revisions` name one as its tooltip reads, "Part 1 / Size / Small". |
 | `instance` | string |  | Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents. |
 | `name` | string |  | Release name (the version's name); required unless `from_draft` names it. |
@@ -7167,35 +7530,37 @@ Examples:
 
 Approve a Pending release candidate (edits the document (one undoable history entry)).
 
-A submitted candidate's approver › Approve (from Release drafts): it is released at the version made when it was submitted; its items' states become Released.
+A submitted candidate's approver › Release (from Release drafts): `comment` is added to the candidate's comments, then it is released at the version made when it was submitted; its items' states become Released. Only an approver of the candidate (the local user, when listed in its Approvers) can release it.
 
 Examples:
 
 ```json
-{"name": "Release 3"}
+{"name": "Release 3", "comment": "Checked the hole sizes."}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | The candidate's release name. |
+| `comment` | string | required | Comment (required, as in the dialog). |
 
 #### release_reject
 
 Reject a Pending release candidate (edits the document (one undoable history entry)).
 
-A submitted candidate's approver › Reject: the candidate stays, Rejected; its items stay as they were (release them with another candidate).
+A submitted candidate's Reject (its approver's, or its creator's "Reject and override other approvers"): `comment` is added to the candidate's comments; the candidate stays, Rejected; its items stay as they were (release them with another candidate).
 
 Examples:
 
 ```json
-{"name": "Release 3"}
+{"name": "Release 3", "comment": "Wrong hole size."}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | The candidate's release name. |
+| `comment` | string | required | Comment (required, as in the dialog). |
 
 #### release_discard
 
@@ -7327,23 +7692,24 @@ Examples:
 
 #### render_named_view
 
-Save or delete a named view of a Part Studio (edits the document (one undoable history entry)).
+Save or delete a named view of a Part Studio or an Assembly (edits the document (one undoable history entry)).
 
-The Named views dialog's "+" (save the view, here a standard orientation zoomed to fit, with an optional section like render_image's) or its remove button (`delete`). An empty name gives "View 1", "View 2"... render_image and drawing_insert_view take named views.
+The Named views dialog's "+" (save the view: the window's camera with `view: "window"`, else a standard orientation zoomed to fit; with an optional section like render_image's) or its remove button (`delete`). An empty name gives "View 1", "View 2"... Not undo steps, as in the app. render_image and view_camera (`view`) take named views; drawing_insert_view a Part Studio's.
 
 Examples:
 
 ```json
 {"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}
 {"name": "Section A", "delete": true}
+{"tab": "Assembly 1", "name": "", "view": "window"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
-| `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
 | `name` | string | required | View name (empty: the next "View n"). |
-| `view` | string |  | Standard orientation to save (default isometric). |
+| `view` | string |  | What to save: "window" (the window's camera, view_camera) or a standard orientation zoomed to fit (default isometric). |
 | `section` | array of object |  | Section planes saved with the view (as render_image). |
 | `delete` | boolean |  | Delete the named view instead. |
 
@@ -7362,6 +7728,7 @@ Examples:
 {"view": "front", "perspective": true, "tangent_edges": "phantom", "hidden_edges": true}
 {"isolate": ["Part 1"], "zebra": {"stripes": 20}}
 {"normal_to": "plane:front", "reflection": {"image": "Blue sky", "rotation": 45}}
+{"tab": "Assembly 1", "exploded_view": "Explode 1"}
 ```
 
 | field | type | | description |
@@ -7386,6 +7753,8 @@ Examples:
 | `high_quality` | boolean |  | View in high quality (finer tessellation). |
 | `zebra` | object |  | Zebra stripes: {"stripes": 35, "flip": false, "show_edges": true}. |
 | `reflection` | object |  | Reflection analysis: {"image": an environment map name ("Blue sky", default the first) or an image file path, "rotation": degrees, "opposite": bool, "blur": bool, "show_edges": bool (default false)}. |
+| `exploded_view` | string |  | Assemblies: draw this exploded view (its name) exploded. |
+| `explode_progress` | integer |  | Assemblies: with `exploded_view`, only its first steps (its rollback bar); default all. |
 | `file` | string |  | Also write the PNG here. |
 
 #### render_print
@@ -7440,7 +7809,7 @@ Examples:
 
 Move the graphics area's camera as the view menus do (zoom to fit / selection / window, zoom in / out, previous view, standard views, view normal to, align vertical, perspective).
 
-The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {"instance", "entity"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection, `standard_view` (the standard view, else the view cube face looked at square on: `bottom` after `normal_to` twice on Top); a drawing's zoom (px per mm) and the sheet point at the centre (mm).
+The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit, `view` default isometric; or a saved named view: its camera, as the Named views dialog's pick, which in the app also restores its section), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {"instance", "entity"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection, `standard_view` (the standard view, else the view cube face looked at square on: `bottom` after `normal_to` twice on Top); a drawing's zoom (px per mm) and the sheet point at the centre (mm).
 
 Examples:
 
@@ -7455,7 +7824,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab. |
 | `action` | one of `get`, `zoom_fit`, `zoom_sheet`, `view`, `zoom_selection`, `zoom_in`, `zoom_out`, `zoom_window`, `previous`, `normal_to`, `normal_to_sketch`, `align_vertical`, `perspective` | required | What to do. |
-| `view` | one of `isometric`, `front`, `back`, `left`, `right`, `top`, `bottom`, `dimetric`, `trimetric` |  | view: the standard view (default isometric). |
+| `view` | string |  | view: a standard view (isometric (default), front, back, left, right, top, bottom, dimetric, trimetric) or a saved named view (render_named_view; as the Named views dialog's pick). |
 | `refs` | array of string or object |  | zoom_selection / normal_to / normal_to_sketch / align_vertical: entity ids (query_entities); in an assembly instance ids or names, and for normal_to {"instance", "entity": a planar face id}. |
 | `box` | array of array of number |  | zoom_window: [[x, y], [x, y]] corners in graphics-area pixels from the top left. |
 | `on` | boolean |  | perspective: on or off. |
@@ -7463,9 +7832,9 @@ Examples:
 
 #### view_display
 
-Display settings of a Part Studio or Assembly window: isolate, transparent, boundary edges, orient on edit, thickness off, mates, snap mode.
+Display settings of a Part Studio or Assembly window: isolate, transparent (and the dialog's transparency, select transparent, expand), boundary edges, orient on edit, thickness off, the Assembly context banner, mates, snap mode, the active exploded view.
 
-What the view and context menus change without editing the document, kept per tab (`ui_state`; nothing given: read them). `isolate` (Isolate…: these parts, the rest as ghosts) or `transparent` (Make transparent…: these as ghosts) replace the current isolation; `exit_isolate` ends it. Part Studios: `highlight_boundary` (Highlight boundary edges), `orient_on_edit` (Orient normal to sketch on edit), `thickness_analysis: false` (Turn thickness analysis off), `context_hidden` (the Assembly context banner's Hide/show instances). Assemblies (instances for isolate / transparent): `show_mates` (Hide/show mates: the mate indicators), `show_mates_mode` (Show mates mode), `snap_mode` (Snap mode). With the app open the window does the same; render_image `view: "window"` draws with them.
+What the view and context menus change without editing the document, kept per tab (`ui_state`; nothing given: read them). `isolate` (Isolate…: these parts, the rest as ghosts) or `transparent` (Make transparent…: these as ghosts) replace the current isolation; `exit_isolate` ends it. The Isolate / Make transparent dialog (with one shown): `transparency` (its slider, 0 to 1), `select_transparent` (Select transparent geometry), `expand` (Expand's steps: a Part Studio's distance slider 0 to 10; an assembly's one instance group per step, by `expand_by` connectivity (its default) or distance); `expanded` lists what Expand added. Part Studios: `highlight_boundary` (Highlight boundary edges), `orient_on_edit` (Orient normal to sketch on edit), `thickness_analysis: false` (Turn thickness analysis off), `context_hidden` (the Assembly context banner's Hide/show instances), `context_show_internal` / `context_select_transparent` / `context_transparency` (its Show internal geometry, Select transparent geometry and transparency slider, 0 to 1). Assemblies (instances for isolate / transparent): `show_mates` (Hide/show mates: the mate indicators), `show_mates_mode` (Show mates mode), `snap_mode` (Snap mode), `exploded_view` (an exploded view's Activate <view>: shown exploded, zoomed to fit; null: Done) and `explode_progress` (its rollback bar: the steps shown); `exploded` lists where the shown steps move the instances. With the app open the window does the same; render_image `view: "window"` draws with them.
 
 Examples:
 
@@ -7473,6 +7842,8 @@ Examples:
 {"isolate": ["Part 1"]}
 {"exit_isolate": true, "highlight_boundary": true}
 {"tab": "Assembly 1", "show_mates": true, "snap_mode": false}
+{"isolate": ["Part 1"], "transparency": 0.5, "expand": 3}
+{"tab": "Assembly 1", "exploded_view": "Explode 1", "explode_progress": 1}
 ```
 
 | field | type | | description |
@@ -7482,13 +7853,22 @@ Examples:
 | `isolate` | array of string |  | Isolate…: parts (ids or names) or, in an assembly, instances (one inside a subassembly instance by its path, "Sub <1>/Part 1 <1>"). |
 | `transparent` | array of string |  | Make transparent…: parts or instances. |
 | `exit_isolate` | boolean |  | Exit isolate. |
+| `transparency` | number |  | The Isolate / Make transparent dialog's transparency slider, 0 (left) to 1. |
+| `select_transparent` | boolean |  | The Isolate / Make transparent dialog's Select transparent geometry. |
+| `expand` | integer |  | The dialog's Expand slider in steps: a Part Studio's 0 to 10 (distance), an assembly's 0 to its number of instance groups. |
+| `expand_by` | one of `connectivity`, `distance` |  | Assembly: Expand: connectivity (mates; the default) or distance. Changing it starts at 0 steps. |
 | `highlight_boundary` | boolean |  | Part Studio: Highlight boundary edges. |
 | `orient_on_edit` | boolean |  | Part Studio: Orient normal to sketch on edit. |
 | `thickness_analysis` | boolean |  | Part Studio: false = Turn thickness analysis off (run the analysis with analysis_thickness). |
 | `context_hidden` | array of string |  | Part Studio: the shown Assembly context's Hide/show instances: the top-level instances (names or ids, context_list) to hide; [] shows all. |
+| `context_show_internal` | boolean |  | Part Studio: the Assembly context banner's Show internal geometry. |
+| `context_select_transparent` | boolean |  | Part Studio: the Assembly context banner's Select transparent geometry. |
+| `context_transparency` | number |  | Part Studio: the Assembly context banner's transparency slider, 0 to 1. |
 | `show_mates` | boolean |  | Assembly: Hide/show mates. |
 | `show_mates_mode` | boolean |  | Assembly: Show mates mode. |
 | `snap_mode` | boolean |  | Assembly: Snap mode. |
+| `exploded_view` | string or null |  | Assembly: Activate <view> (an exploded view's name: shown exploded, zoomed to fit); null: Done (assembled again). |
+| `explode_progress` | integer |  | Assembly: the active exploded view's rollback bar: the steps shown, 0 to its number of steps. |
 
 ### export
 
@@ -7645,6 +8025,61 @@ Examples:
 The FeatureScript notices panel's Monitor for a Part Studio: notices and println output.
 
 Regenerates the Part Studio and returns what its FeatureScript notices panel's Monitor shows: the compile warnings of the Feature Studios its custom features come from and each custom feature's runtime notices (message, severity, `line` / `column`, stack of `at` line:col and `in` module (function), ending with the Part Studio and feature), in Onshape's order, then the text the features printed (`println`).
+
+Examples:
+
+```json
+{"part_studio": "Part Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `part_studio` | string |  | Part Studio tab (name or id); default: the first. |
+
+#### featurestudio_format
+
+Format Studio: re-indent a Feature Studio's source (edits the document (one undoable history entry)).
+
+The ⋯ menu's Format Studio: every line re-indented by its brace depth (4 spaces), line ends trimmed; saved as a draft like typing ("Edit Feature Studio") when it changes. Returns the source and notices (`changed`: whether it did).
+
+Examples:
+
+```json
+{"tab": "Feature Studio 1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Feature Studio tab (name or id); default: the first. |
+
+#### featurestudio_import
+
+Import: add an import(...) line for another tab (Part Studio, Feature Studio, Variable Studio, file) to a Feature Studio (edits the document (one undoable history entry)).
+
+The Import panel: the `import(path : …, version : …);` line for a tab of this document (its workspace, or a `version` of it) or of another `document` (at a version: its latest when none is given), after the source's last import (else after the FeatureScript header); saved as a draft. Returns the `line`, the source and notices.
+
+Examples:
+
+```json
+{"tab": "Feature Studio 1", "import": "Part Studio 1"}
+{"tab": "Feature Studio 1", "import": "Gears", "document": "/home/me/lib.noshape", "version": "V1"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Feature Studio tab (name or id); default: the first. |
+| `import` | string | required | The tab to import, by name or id: a Part Studio, Feature Studio, Variable Studio or file (not the Feature Studio itself). |
+| `version` | string |  | A version by name: of this document (default: its workspace), or of `document` (default: its latest). |
+| `document` | string |  | Other documents: another document's path. |
+
+#### featurestudio_profile
+
+Monitor ▾ › Profile: time a Part Studio's full regeneration per Feature Studio line.
+
+Regenerates the Part Studio from scratch with FeatureScript line timing on, as Profile does: `total_ms` (the editor's badge, "288ms to fully regenerate …") and for each Feature Studio the lines that ran with their time (`label`: the bar's "<1ms" / "15ms").
 
 Examples:
 

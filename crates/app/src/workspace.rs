@@ -250,7 +250,7 @@ impl Workspace {
 
     /// What this window shows, for live-mode calls (`DocModel::window_snapshot`).
     fn window_snapshot(&self, cx: &App) -> noshape_ops::window::WindowSnapshot {
-        let mut s = noshape_ops::window::WindowSnapshot { active_tab: self.active, ..Default::default() };
+        let mut s = noshape_ops::window::WindowSnapshot { active_tab: self.active, notifications: Some(crate::notifications::snapshot(cx)), ..Default::default() };
         for (tab, view) in &self.views {
             let viewport = match view {
                 TabView::PartStudio(v) => {

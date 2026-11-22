@@ -101,17 +101,24 @@ pub fn studio_key(doc: &noshape_model::Document, tab: noshape_model::document::T
 
 pub(crate) fn key_for(doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize, build: &str) -> Option<String> {
     let tag = slot_tag(slot)?;
-    let mut h = blake3::Hasher::new();
-    {
-        // (Buffered: serde_json writes a document in small pieces.)
-        let mut w = std::io::BufWriter::with_capacity(1 << 16, &mut h);
-        serde_json::to_writer(&mut w, doc).ok()?;
-        serde_json::to_writer(&mut w, slot).ok()?;
-        serde_json::to_writer(&mut w, extra).ok()?;
-        std::io::Write::flush(&mut w).ok()?;
-    }
+    // Binary: a large document's numbers hashed as their bytes, not printed as text (asm 11-22: hashing a 400 MB
+    // document's JSON took 1.7-2.0 s of its 2.4-2.7 s cached first frame). JSON if bincode can't write a value.
+    let mut h = content_hash(|w| bincode::serialize_into(&mut *w, doc).ok()).or_else(|| content_hash(|w| serde_json::to_writer(&mut *w, doc).ok()))?;
+    serde_json::to_writer(&mut h, slot).ok()?;
+    serde_json::to_writer(&mut h, extra).ok()?;
     let b = blake3::hash(build.as_bytes()).to_hex();
     Some(format!("{tag}.{}.{}", h.finalize().to_hex(), &b[..16]))
+}
+
+/// The hasher after `write` wrote the document into it (buffered: serializers write in small pieces).
+fn content_hash(write: impl FnOnce(&mut std::io::BufWriter<&mut blake3::Hasher>) -> Option<()>) -> Option<blake3::Hasher> {
+    let mut h = blake3::Hasher::new();
+    {
+        let mut w = std::io::BufWriter::with_capacity(1 << 16, &mut h);
+        write(&mut w)?;
+        std::io::Write::flush(&mut w).ok()?;
+    }
+    Some(h)
 }
 
 /// A key without its build ("<tag>.<content>"; an older key whole).
@@ -520,6 +527,25 @@ mod tests {
         std::fs::write(path(&d, "k1"), b"NSDISP02garbage").unwrap();
         assert_eq!(load::<(Vec<u32>, String)>(&shelf, "k1"), None);
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// asm 11-22: the key hashes the document's binary form, not its JSON (a 400 MB document's JSON took 1.7-2.0 s):
+    /// a document with a sketch, a feature and a configuration writes as bincode (no JSON fallback), the same twice.
+    #[test]
+    fn a_documents_key_hashes_its_binary_form() {
+        let d = std::env::temp_dir().join(format!("noshape-display-cache-bin-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap();
+        call(&mut ctx, "document_create", serde_json::json!({ "path": d.join("doc.noshape").to_str().unwrap() }));
+        call(&mut ctx, "sketch_create", serde_json::json!({ "plane": "plane:top" }));
+        call(&mut ctx, "sketch_draw", serde_json::json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+        call(&mut ctx, "config_add_input", serde_json::json!({ "kind": "list", "name": "Size" }));
+        let doc = ctx.doc(None).unwrap().doc().clone();
+        assert!(bincode::serialize(&doc).is_ok(), "bincode writes the document");
+        let tab = doc.tabs[0].id;
+        assert_eq!(key_for(&doc, &("part studio", tab), &"c", "b"), key_for(&doc.clone(), &("part studio", tab), &"c", "b"));
     }
 
     /// Lead 11-21 (fast open): the display kept in the .noshape opens on another machine (an empty cache directory) and

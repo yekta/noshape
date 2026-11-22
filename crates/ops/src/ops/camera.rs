@@ -36,12 +36,12 @@ pub fn ops() -> Vec<Op> {
         group: "view",
         verb: "camera",
         summary: "Move the graphics area's camera as the view menus do (zoom to fit / selection / window, zoom in / out, previous view, standard views, view normal to, align vertical, perspective)",
-        description: "The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit; `view`, default isometric), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {\"instance\", \"entity\"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection, `standard_view` (the standard view, else the view cube face looked at square on: `bottom` after `normal_to` twice on Top); a drawing's zoom (px per mm) and the sheet point at the centre (mm).",
+        description: "The camera of a Part Studio's or Assembly's graphics area, or a drawing's zoom, as the window has it (kept per tab for the session; `get` reads it). 3D tabs: `zoom_fit` (Zoom to fit: the shown parts, sketches, planes and origin; an assembly's instances), `view` (a standard view zoomed to fit, `view` default isometric; or a saved named view: its camera, as the Named views dialog's pick, which in the app also restores its section), `zoom_selection` (the `refs`, else the window's selection (ui_select): parts, faces, edges, vertices, sketches, planes; an assembly's instances), `zoom_in` / `zoom_out` (Z / Shift+Z: ×1.75 about the centre, within Onshape's limits), `zoom_window` (`box`: two corners in graphics-area pixels), `previous` (Previous view: back one change), `normal_to` (View normal to the first of `refs`: a planar face, plane, sketch or mate connector; in an assembly a planar face {\"instance\", \"entity\"}; again on the same plane turns to its back), `normal_to_sketch` (View normal to sketch plane: `refs` [the sketch]), `align_vertical` (Align view with vertical axis: `refs` [a straight edge]), `perspective` (`on`). Drawings: `zoom_fit` / `zoom_sheet`, `zoom_in` / `zoom_out` (×2 / ×½), `zoom_window`. The graphics area is 1280×800 px until `viewport` sets it. With the app open the window does the same move at its own size. Returns the camera: the viewing direction and up (world), the target point and the visible height (document units), projection, `standard_view` (the standard view, else the view cube face looked at square on: `bottom` after `normal_to` twice on Top); a drawing's zoom (px per mm) and the sheet point at the centre (mm).",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio, Assembly or Drawing tab, by name or id. Default: the window's tab."),
             req("action", json!({ "type": "string", "enum": ACTIONS }), "What to do."),
-            opt("view", json!({ "type": "string", "enum": VIEWS.map(|v| v.0) }), "view: the standard view (default isometric)."),
+            opt("view", s(), "view: a standard view (isometric (default), front, back, left, right, top, bottom, dimetric, trimetric) or a saved named view (render_named_view; as the Named views dialog's pick)."),
             opt("refs", json!({ "type": "array", "items": { "type": ["string", "object"] } }), "zoom_selection / normal_to / normal_to_sketch / align_vertical: entity ids (query_entities); in an assembly instance ids or names, and for normal_to {\"instance\", \"entity\": a planar face id}."),
             opt("box", json!({ "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }, "minItems": 2, "maxItems": 2 }), "zoom_window: [[x, y], [x, y]] corners in graphics-area pixels from the top left."),
             opt("on", json!({ "type": "boolean" }), "perspective: on or off."),
@@ -123,8 +123,8 @@ fn camera(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         _ => {
             let asm = super::assembly::assembly(od, tab)?.clone();
-            let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
-            let fit = asm.instances.iter().filter(|i| !i.hidden).filter_map(|i| result.instance_bounds(i.id)).fold(None, |acc: Option<(DVec3, DVec3)>, (l, h)| Some(acc.map_or((l, h), |(x, y)| (x.min(l), y.max(h)))));
+            let result = super::assembly::shown_assembly(od, tab, &asm);
+            let fit = super::assembly::fit_box(&asm, &result);
             (fit, None, None)
         }
     };
@@ -153,14 +153,25 @@ fn camera(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         "view" => {
             let name = a.opt_str("view")?.unwrap_or("isometric");
-            let v = VIEWS.iter().find(|v| v.0 == name).ok_or_else(|| OpError::param("view", "isometric, front, back, left, right, top, bottom, dimetric or trimetric"))?.1;
-            let mut to = cam;
-            to.rotation = Camera::rotation_for(v);
-            if let Some((lo, hi)) = fit {
-                co::fit_camera_to_box(&mut to, lo, hi, vc.viewport, 0.0);
+            // A saved named view: as picking it in the Named views dialog.
+            if let Some(nv) = super::render::named_views(od, tab).into_iter().find(|v| v.name == name) {
+                let mut to = cam;
+                to.target = DVec3::from_array(nv.target);
+                to.rotation = glam::DQuat::from_array(nv.rotation).normalize();
+                to.distance = nv.distance;
+                to.projection = if nv.perspective { Projection::Perspective } else { Projection::Orthographic };
+                vc.set(to);
+                Some(CameraMove::Named(nv.name))
+            } else {
+                let v = VIEWS.iter().find(|v| v.0 == name).ok_or_else(|| OpError::param("view", "isometric, front, back, left, right, top, bottom, dimetric, trimetric or a named view of this tab"))?.1;
+                let mut to = cam;
+                to.rotation = Camera::rotation_for(v);
+                if let Some((lo, hi)) = fit {
+                    co::fit_camera_to_box(&mut to, lo, hi, vc.viewport, 0.0);
+                }
+                vc.set(to);
+                Some(CameraMove::Fit(Some(to.rotation)))
             }
-            vc.set(to);
-            Some(CameraMove::Fit(Some(to.rotation)))
         }
         "zoom_selection" => {
             // The `refs`, else the window's selection (ui_select).
@@ -177,7 +188,7 @@ fn camera(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 (to, lo, hi)
             } else {
                 let asm = super::assembly::assembly(od, tab)?.clone();
-                let result = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
+                let result = super::assembly::shown_assembly(od, tab, &asm);
                 let mut bb: Option<(DVec3, DVec3)> = None;
                 for (i, v) in list.iter().enumerate() {
                     let id = super::assembly::find_instance(&asm, v.as_str().unwrap_or_default(), &format!("refs[{i}]"))?;

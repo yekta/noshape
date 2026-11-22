@@ -649,10 +649,10 @@ pub struct DrawingEditor {
     pub hatch_dlg: Option<crate::drawing_hatch::HatchDlg>,
     /// Inspection item dialog (see `drawing_inspection`).
     pub inspection: Option<crate::drawing_inspection::InspectionDlg>,
-    pub measure: Option<Vec<crate::drawing_keys::MeasurePick>>,
+    pub measure: Option<Vec<noshape_scene::drawing_tools::MeasurePick>>,
     /// The Measure panel's Show dual unit.
     pub measure_dual: bool,
-    /// The Measure panel's unit (an index of `drawing_keys::MEASURE_UNITS`), None for the drawing's own.
+    /// The Measure panel's unit (an index of `drawing_tools::MEASURE_UNITS`), None for the drawing's own.
     pub measure_unit: Option<usize>,
     pub status: Option<SharedString>,
     /// The green success bubble at the top centre of the sheet (`show_toast`)

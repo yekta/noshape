@@ -892,25 +892,7 @@ mod erased {
 /// A package's items as they are in the workspace now: current names and
 /// part numbers, next revisions.
 fn refreshed_items(doc: &DocModel, items: &[ReleaseItem]) -> Vec<ReleaseItem> {
-    let log = release_log(doc);
-    items
-        .iter()
-        .map(|it| match &it.part {
-            // Versions don't change.
-            _ if it.document.is_some() => it.clone(),
-            Some(b) => {
-                let (ids, names) = studio_parts(doc, it.tab, &it.config);
-                let name = ids.iter().position(|x| x == b).map(|i| names[i].clone()).unwrap_or_else(|| it.name.clone());
-                part_items(doc, it.tab, std::slice::from_ref(b), &[name], &it.config).pop().unwrap_or_else(|| it.clone())
-            }
-            None => {
-                let pn = tab_part_number(doc, it.tab);
-                let pn = if pn.is_empty() { it.part_number.clone() } else { pn };
-                let name = doc.session.doc.tab(it.tab).map(|t| t.name.clone()).unwrap_or_else(|| it.name.clone());
-                ReleaseItem { name, revision: log.next_revision(&pn), part_number: pn, ..it.clone() }
-            }
-        })
-        .collect()
+    noshape_ops::release::refreshed_items(&doc.session, &*doc.derived_provider(), items)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

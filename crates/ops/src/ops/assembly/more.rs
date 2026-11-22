@@ -49,6 +49,7 @@ pub fn ops() -> Vec<Op> {
                 opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Top-level instances (name or id); default the whole assembly."),
                 opt("faces", json!({ "type": "array", "items": { "type": "object" } }), "The Face tab: planar, coplanar faces [{instance, entity}] (an instance by name, id or \"Sub <1> > Part <1>\" path; a face id from assembly_entities); replies their surface area, perimeter, area moments Lxx / Lxy / Lyy and polar moment Lzz (length⁴) instead of the instances' values."),
                 opt("reference", json!({ "type": "object" }), "A mate connector, as assembly_mate's ends: inertia (and the Face tab's moments) about its origin, in its axes."),
+                opt("variance", json!({ "type": "boolean" }), "Show calculation variance (instances): `variance` holds each value's ± bound (none for an overridden mass)."),
             ],
             mutates: false,
             destructive: false,
@@ -991,6 +992,17 @@ fn mass_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut v = json!({ "units": crate::ops::query::units_json(&units), "volume": r6(m.props.volume * k * k * k), "surface_area": r6(m.props.surface_area * k * k) });
     let whole = tops.is_empty() || asm.instances.iter().all(|i| tops.contains(&i.id));
     let overridden = asm.properties.mass_override.filter(|_| whole);
+    if a.bool_or("variance", false)?
+        && let Some(var) = noshape_model::assembly::analysis::assembly_mass_variance(&result, &tops, &density)
+    {
+        let has_mass = m.props.mass.or(overridden).is_some();
+        let scale = match (overridden, m.props.mass) {
+            (Some(o), Some(c)) if c > 0.0 => o / c,
+            _ => 1.0,
+        };
+        let over = crate::ops::query::Overridden { mass: overridden.is_some(), center: false, inertia: false };
+        v["variance"] = crate::ops::query::variance_json(&var, k, over, has_mass, scale);
+    }
     match m.props.mass.or(overridden) {
         Some(mass) => {
             // Live2 mass-override-1119: the assembly's Mass override scales the inertia by itself over the computed

@@ -91,9 +91,35 @@ fn menu_labels() -> BTreeSet<String> {
         };
         files.push((area.into(), e.path()));
     }
-    for e in std::fs::read_dir(part_studio.join("part_studio")).expect("part studio sources").flatten() {
-        files.push(("partStudio".into(), e.path()));
+    // A studio crate's folders (not its tests) are its area's.
+    fn walk(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for e in std::fs::read_dir(dir).expect("sources").flatten() {
+            let path = e.path();
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.contains("test") {
+                continue;
+            }
+            if path.is_dir() {
+                walk(&path, out);
+            } else if name.ends_with(".rs") {
+                out.push(path);
+            }
+        }
     }
+    for (area, dir) in [("partStudio", part_studio.clone()), ("assembly", assembly.clone()), ("drawing", drawing.clone())] {
+        for sub in std::fs::read_dir(&dir).expect("sources").flatten().map(|e| e.path()).filter(|p| p.is_dir()) {
+            let mut paths = Vec::new();
+            walk(&sub, &mut paths);
+            files.extend(paths.into_iter().map(|p| (area.to_string(), p)));
+        }
+    }
+    // Whole crates: the Feature Studio, release management, preferences; the notifications panel.
+    for (area, krate) in [("featureStudio", "feature-studio-ui"), ("release", "release-ui"), ("app", "preferences-ui")] {
+        let mut paths = Vec::new();
+        walk(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(krate).join("src"), &mut paths);
+        files.extend(paths.into_iter().map(|p| (area.to_string(), p)));
+    }
+    files.push(("app".into(), core.join("notifications.rs")));
     // The documents page.
     files.push(("documents".into(), std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../start-ui/src/start_window.rs")));
     let mut out = BTreeSet::new();
@@ -111,13 +137,23 @@ fn menu_labels() -> BTreeSet<String> {
                         continue;
                     }
                 }
+                let literal = |rest: &str| {
+                    let b = rest.as_bytes();
+                    let mut end = 0;
+                    while end < b.len() && !(b[end] == b'"' && (end == 0 || b[end - 1] != b'\\')) {
+                        end += 1;
+                    }
+                    end
+                };
                 let rest = &text[from..];
-                let mut end = 0;
-                let b = rest.as_bytes();
-                while end < b.len() && !(b[end] == b'"' && (end == 0 || b[end - 1] != b'\\')) {
-                    end += 1;
-                }
-                out.insert(format!("{area}:{}", &rest[..end]));
+                let end = literal(rest);
+                // A local `item(id, label, …)`: the label is the second string (an `icon_item(label, icon, …)`'s is the first).
+                let local = pat.starts_with("item") && !text[..at].ends_with("icon_");
+                let label = match rest[end + 1..].strip_prefix(", \"").filter(|_| local) {
+                    Some(next) => &next[..literal(next)],
+                    None => &rest[..end],
+                };
+                out.insert(format!("{area}:{label}"));
             }
         }
     }

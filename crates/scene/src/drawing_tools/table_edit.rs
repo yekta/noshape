@@ -278,3 +278,37 @@ pub fn pasted_table(id: u64, p: super::paste_html::PastedTable, at: [f64; 2]) ->
     }
     t
 }
+
+/// Rows of a CSV file (quoted fields, "" inside quotes; blank lines dropped).
+pub fn parse_csv(text: &str) -> Vec<Vec<String>> {
+    let mut rows = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let (mut cells, mut cur, mut quoted) = (Vec::new(), String::new(), false);
+        let mut chars = line.chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '"' if quoted && chars.peek() == Some(&'"') => {
+                    cur.push('"');
+                    chars.next();
+                }
+                '"' => quoted = !quoted,
+                ',' if !quoted => cells.push(std::mem::take(&mut cur).trim().to_string()),
+                _ => cur.push(c),
+            }
+        }
+        cells.push(cur.trim().to_string());
+        rows.push(cells);
+    }
+    rows
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn csv_rows_keep_quoted_commas() {
+        assert_eq!(super::parse_csv("Item,Name\n1,\"Bolt, M6\"\n\n2,\"Nut \"\"A\"\"\"\n"), vec![vec!["Item", "Name"], vec!["1", "Bolt, M6"], vec!["2", "Nut \"A\""]]);
+    }
+}

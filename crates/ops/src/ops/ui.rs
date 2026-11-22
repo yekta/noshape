@@ -190,7 +190,48 @@ pub fn ops() -> Vec<Op> {
             destructive: false,
             run: sheets_panel,
         },
+        Op {
+            group: "ui",
+            verb: "notifications",
+            summary: "The Notifications panel: list, Only show unread, Mark all as read, Expand all, Delete all",
+            description: "The bell's Notifications panel (the app's own: imports and their steps, kept for the app's session): the notifications newest first as the panel lists them (all, or only the unread with `only_unread`), each with its title, message, time (s since 1970), unread, expanded, failed, steps and link, and the bell's unread count. `only_unread` sets the panel's Only show unread switch; `action` is the panel's ⋮ menu: mark_all_read, expand_all, delete_all. Without the app open (live mode) there are none.",
+            fields: vec![
+                doc_field(),
+                opt("only_unread", json!({ "type": "boolean" }), "Only show unread."),
+                opt("action", json!({ "type": "string", "enum": ["mark_all_read", "expand_all", "delete_all"] }), "The ⋮ menu's Mark all as read, Expand all or Delete all."),
+            ],
+            mutates: false,
+            destructive: false,
+            run: notifications,
+        },
     ]
+}
+
+fn notifications(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::window::NoticeAct;
+    let doc = a.opt_str("doc")?;
+    let mut acts = Vec::new();
+    if let Some(on) = a.get("only_unread").and_then(Value::as_bool) {
+        acts.push(NoticeAct::OnlyUnread(on));
+    }
+    match a.opt_str("action")? {
+        None => {}
+        Some("mark_all_read") => acts.push(NoticeAct::MarkAllRead),
+        Some("expand_all") => acts.push(NoticeAct::ExpandAll),
+        Some("delete_all") => acts.push(NoticeAct::DeleteAll),
+        Some(_) => return Err(OpError::param("action", "mark_all_read, expand_all or delete_all")),
+    }
+    for act in acts {
+        show(ctx, doc, UiRequest::Notifications(act))?;
+    }
+    let n = &ctx.doc(doc)?.window.notifications;
+    let rows: Vec<Value> = n
+        .items
+        .iter()
+        .filter(|i| !n.only_unread || i.unread)
+        .map(|i| json!({ "title": i.title, "message": i.body, "time": i.time, "unread": i.unread, "expanded": i.open, "failed": i.failed, "steps": i.steps, "link": i.link }))
+        .collect();
+    Ok(json!({ "only_unread": n.only_unread, "unread": n.items.iter().filter(|i| i.unread).count(), "notifications": rows }).into())
 }
 
 // ------------------------------------------------------------ state, tabs

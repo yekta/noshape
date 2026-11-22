@@ -1,6 +1,6 @@
 //! Seeing the model: rendered images of a Part Studio from any view.
 
-use super::{doc_field, s, studio_target, tab_field};
+use super::{doc_field, s, studio_target};
 use crate::error::OpError;
 use crate::registry::{Args, Image, Op, OpOutput, opt, req};
 use crate::Ctx;
@@ -25,13 +25,13 @@ pub fn ops() -> Vec<Op> {
     Op {
         group: "render",
         verb: "named_view",
-        summary: "Save or delete a named view of a Part Studio",
-        description: "The Named views dialog's \"+\" (save the view, here a standard orientation zoomed to fit, with an optional section like render_image's) or its remove button (`delete`). An empty name gives \"View 1\", \"View 2\"... render_image and drawing_insert_view take named views.",
+        summary: "Save or delete a named view of a Part Studio or an Assembly",
+        description: "The Named views dialog's \"+\" (save the view: the window's camera with `view: \"window\"`, else a standard orientation zoomed to fit; with an optional section like render_image's) or its remove button (`delete`). An empty name gives \"View 1\", \"View 2\"... Not undo steps, as in the app. render_image and view_camera (`view`) take named views; drawing_insert_view a Part Studio's.",
         fields: vec![
             doc_field(),
-            tab_field(),
+            opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
             req("name", s(), "View name (empty: the next \"View n\")."),
-            opt("view", s(), "Standard orientation to save (default isometric)."),
+            opt("view", s(), "What to save: \"window\" (the window's camera, view_camera) or a standard orientation zoomed to fit (default isometric)."),
             opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section planes saved with the view (as render_image)."),
             opt("delete", json!({ "type": "boolean" }), "Delete the named view instead."),
         ],
@@ -65,6 +65,8 @@ pub fn ops() -> Vec<Op> {
             opt("high_quality", json!({ "type": "boolean", "default": false }), "View in high quality (finer tessellation)."),
             opt("zebra", json!({ "type": "object" }), "Zebra stripes: {\"stripes\": 35, \"flip\": false, \"show_edges\": true}."),
             opt("reflection", json!({ "type": "object" }), "Reflection analysis: {\"image\": an environment map name (\"Blue sky\", default the first) or an image file path, \"rotation\": degrees, \"opposite\": bool, \"blur\": bool, \"show_edges\": bool (default false)}."),
+            opt("exploded_view", s(), "Assemblies: draw this exploded view (its name) exploded."),
+            opt("explode_progress", json!({ "type": "integer", "minimum": 0 }), "Assemblies: with `exploded_view`, only its first steps (its rollback bar); default all."),
             opt("file", s(), "Also write the PNG here."),
         ],
         mutates: false,
@@ -175,6 +177,11 @@ fn image_with(ctx: &mut Ctx, a: &Args, render: RenderFn) -> Result<OpOutput, OpE
             }
         }
         return image_assembly(ctx, a, (width, height), vo, mode, &view_name, render);
+    }
+    for k in ["exploded_view", "explode_progress"] {
+        if a.get(k).is_some() {
+            return Err(OpError::param(k, "Assemblies only"));
+        }
     }
     opts.highlight_boundary = a.bool_or("boundary_edges", false)?;
     let (od, tab) = studio_target(ctx, a)?;
@@ -347,70 +354,83 @@ fn section_planes(od: &crate::OpenDoc, r: &noshape_model::regen::RegenResult, a:
     Ok((planes, skip))
 }
 
+/// A Part Studio's or Assembly's saved named views.
+pub(crate) fn named_views(od: &crate::OpenDoc, tab: noshape_model::document::TabId) -> Vec<noshape_model::partstudio::NamedView> {
+    use noshape_model::document::TabContent;
+    match od.doc().tab(tab).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) => ps.named_views.clone(),
+        Some(TabContent::Assembly(asm)) => asm.named_views.clone(),
+        _ => Vec::new(),
+    }
+}
+
+/// The Named views dialog's list edits; not undo steps (as the app's).
+fn edit_named_views(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, desc: &str, f: impl FnOnce(&mut Vec<noshape_model::partstudio::NamedView>)) -> Result<(), OpError> {
+    use noshape_model::document::TabContent;
+    od.session.edit_tab_not_undoable(tab, desc, |c| match c {
+        TabContent::PartStudio(ps) => f(&mut ps.named_views),
+        TabContent::Assembly(asm) => f(&mut asm.named_views),
+        _ => {}
+    })?;
+    Ok(())
+}
+
 fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let (od, tab) = studio_target(ctx, a)?;
+    use noshape_model::document::TabContent;
+    let assembly = super::configuration::asm::is_assembly(ctx, a)?;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = if assembly { od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))? } else { od.tab_of_kind(a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)? };
+    let existing: Vec<String> = named_views(od, tab).into_iter().map(|v| v.name).collect();
     let name = a.str("name")?.trim().to_string();
     if a.bool_or("delete", false)? {
-        let ps = crate::doc::studio(od.doc(), tab)?;
-        if !ps.named_views.iter().any(|v| v.name == name) {
+        if !existing.contains(&name) {
             return Err(OpError::param("name", "no named view of that name"));
         }
-        super::edit_studio(od, tab, &format!("Delete view : {name}"), |ps| {
-            ps.named_views.retain(|v| v.name != name);
-            Ok(())
-        })?;
+        edit_named_views(od, tab, &format!("Delete view : {name}"), |l| l.retain(|v| v.name != name))?;
         return Ok(json!({ "deleted": name }).into());
     }
     let view_name = a.opt_str("view")?.unwrap_or("isometric");
-    let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1).ok_or_else(|| OpError::param("view", "isometric, front, back, left, right, top, bottom, dimetric or trimetric"))?;
-    let r = od.regenerate(tab, None)?;
-    let (planes, _) = section_planes(od, &r, a)?;
-    let (lo, hi) = r.display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds).fold(None, |acc: Option<(glam::DVec3, glam::DVec3)>, (l, h)| Some(acc.map_or((l, h), |(a, b)| (a.min(l), b.max(h))))).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
-    let c = fit_camera(lo, hi, 4.0 / 3.0, Some(view));
-    let name = if name.is_empty() {
-        let existing: Vec<String> = crate::doc::studio(od.doc(), tab)?.named_views.iter().map(|v| v.name.clone()).collect();
-        (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default()
+    // The section saved with it: plane ids in a Part Studio, the default planes in an assembly.
+    let (c, section) = if view_name == "window" {
+        let camera = od.window.cameras.get(&tab).map(|v| v.camera).ok_or_else(|| OpError::param("view", "the window has no camera for this tab yet: move it with view_camera first"))?;
+        let section = if assembly {
+            asm_section(od, a)?
+        } else {
+            let r = od.regenerate(tab, None)?;
+            section_planes(od, &r, a)?.0
+        };
+        (camera, section)
     } else {
-        name
+        let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1).ok_or_else(|| OpError::param("view", "isometric, front, back, left, right, top, bottom, dimetric, trimetric or \"window\""))?;
+        let (lo, hi, section) = if assembly {
+            let asm = super::assembly::assembly(od, tab)?.clone();
+            let r = super::assembly::solve_assembly(od, tab, &asm, &Default::default());
+            let (lo, hi) = super::assembly::fit_box(&asm, &r).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
+            (lo, hi, asm_section(od, a)?)
+        } else {
+            let r = od.regenerate(tab, None)?;
+            let (planes, _) = section_planes(od, &r, a)?;
+            let (lo, hi) = r.display.bodies.iter().filter(|b| !b.hidden).filter_map(|b| b.bounds).fold(None, |acc: Option<(glam::DVec3, glam::DVec3)>, (l, h)| Some(acc.map_or((l, h), |(a, b)| (a.min(l), b.max(h))))).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
+            (lo, hi, planes)
+        };
+        (fit_camera(lo, hi, 4.0 / 3.0, Some(view)), section)
     };
-    let v = noshape_model::partstudio::NamedView { name: name.clone(), target: c.target.to_array(), rotation: c.rotation.to_array(), distance: c.distance, perspective: false, section: planes.iter().map(|(n, d)| [n.x, n.y, n.z, *d]).collect() };
-    super::edit_studio(od, tab, &format!("Save view : {name}"), |ps| {
-        ps.named_views.retain(|x| x.name != v.name);
-        ps.named_views.push(v);
-        Ok(())
+    let name = if name.is_empty() { (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default() } else { name };
+    let v = noshape_model::partstudio::NamedView { name: name.clone(), target: c.target.to_array(), rotation: c.rotation.to_array(), distance: c.distance, perspective: c.projection == noshape_render::Projection::Perspective, section: section.iter().map(|(n, d)| [n.x, n.y, n.z, *d]).collect() };
+    edit_named_views(od, tab, &format!("Save view : {name}"), |l| {
+        l.retain(|x| x.name != v.name);
+        l.push(v);
     })?;
-    Ok(json!({ "saved": name, "named_views": crate::doc::studio(od.doc(), tab)?.named_views.iter().map(|v| v.name.clone()).collect::<Vec<_>>() }).into())
+    Ok(json!({ "saved": name, "named_views": named_views(od, tab).into_iter().map(|v| v.name).collect::<Vec<_>>() }).into())
 }
 
-/// render_image of an Assembly tab: the solved assembly in its active
-/// configuration, drawn as the Assembly view does.
-fn image_assembly(ctx: &mut Ctx, a: &Args, (width, height): (u32, u32), vo: ViewOptions, mode: DisplayMode, view_name: &str, render: RenderFn) -> Result<OpOutput, OpError> {
-    use noshape_model::document::TabContent;
-    use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
-    let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
-    let od = ctx.doc(a.opt_str("doc")?)?;
-    let tab = od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
-    let window = window_camera(od, tab, view_name)?;
-    if view.is_none() && window.is_none() {
-        return Err(OpError::param("view", "a standard view (isometric, front, back, left, right, top, bottom, dimetric, trimetric) or \"window\""));
-    }
-    let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
-    let values = super::configuration::asm::values(od, tab, asm);
-    let eff = crate::assembly::effective(asm, &values);
-    let mut opts = AsmSceneOptions { display_mode: mode, tangent_edges: vo.tangent, hidden_edges_visible: vo.hidden_edges, zebra: vo.zebra, hide_edges: vo.hide_edges(), ..Default::default() };
-    // Make isolate / Make transparent (instances).
-    // Instances, or ones inside subassemblies by path ("Sub <1>/Part 1 <1>").
-    let occs = |k: &str| -> Result<Option<noshape_model::assembly::OccurrenceSet>, OpError> {
-        let Some(list) = a.opt_array(k)? else { return Ok(None) };
-        list.iter().enumerate().map(|(i, v)| super::assembly::find_occurrence(od.doc(), asm, v.as_str().unwrap_or_default(), &format!("{k}[{i}]"))).collect::<Result<_, _>>().map(Some)
-    };
-    opts.isolate = occs("isolate")?;
-    opts.ghost_paths = occs("transparent")?.unwrap_or_default();
-    // Section view: the default planes (an assembly's own planes).
+/// An assembly's section planes (`section`: the default planes, offset, flip) as (normal, distance).
+fn asm_section(od: &crate::OpenDoc, a: &Args) -> Result<Vec<(glam::DVec3, f64)>, OpError> {
+    use noshape_model::display::PlaneFrame;
+    use noshape_model::reference::{DatumPlane, Reference};
     let units = od.doc().settings.units;
+    let mut out = Vec::new();
     for (i, p) in a.opt_array("section")?.cloned().unwrap_or_default().iter().enumerate() {
-        use noshape_model::display::PlaneFrame;
-        use noshape_model::reference::{DatumPlane, Reference};
         let field = format!("section[{i}]");
         let o = p.as_object().ok_or_else(|| OpError::param(&field, "{\"plane\": \"plane:top|front|right\", \"offset\", \"flip\"}"))?;
         let f = match o.get("plane").and_then(|v| v.as_str()).and_then(crate::refs::parse_str) {
@@ -424,13 +444,67 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, (width, height): (u32, u32), vo: View
             None => 0.0,
         };
         let n = if o.get("flip").and_then(|v| v.as_bool()) == Some(true) { -f.normal } else { f.normal };
-        opts.section.push((n, n.dot(f.origin + f.normal * offset)));
+        out.push((n, n.dot(f.origin + f.normal * offset)));
+    }
+    Ok(out)
+}
+
+/// render_image of an Assembly tab: the solved assembly in its active
+/// configuration, drawn as the Assembly view does.
+fn image_assembly(ctx: &mut Ctx, a: &Args, (width, height): (u32, u32), vo: ViewOptions, mode: DisplayMode, view_name: &str, render: RenderFn) -> Result<OpOutput, OpError> {
+    use noshape_model::document::TabContent;
+    use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
+    let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, TabContent::Assembly(_)))?;
+    let window = window_camera(od, tab, view_name)?;
+    let named = named_views(od, tab).into_iter().find(|v| v.name.eq_ignore_ascii_case(view_name));
+    if view.is_none() && named.is_none() && window.is_none() {
+        return Err(OpError::param("view", "a standard view (isometric, front, back, left, right, top, bottom, dimetric, trimetric), a named view of this Assembly, or \"window\""));
+    }
+    let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| &t.content) else { unreachable!("checked") };
+    let values = super::configuration::asm::values(od, tab, asm);
+    let eff = crate::assembly::effective(asm, &values);
+    let mut opts = AsmSceneOptions { display_mode: mode, tangent_edges: vo.tangent, hidden_edges_visible: vo.hidden_edges, zebra: vo.zebra, hide_edges: vo.hide_edges(), ..Default::default() };
+    // Make isolate / Make transparent (instances).
+    // Instances, or ones inside subassemblies by path ("Sub <1>/Part 1 <1>").
+    let occs = |k: &str| -> Result<Option<noshape_model::assembly::OccurrenceSet>, OpError> {
+        let Some(list) = a.opt_array(k)? else { return Ok(None) };
+        list.iter().enumerate().map(|(i, v)| super::assembly::find_occurrence(od.doc(), asm, v.as_str().unwrap_or_default(), &format!("{k}[{i}]"))).collect::<Result<_, _>>().map(Some)
+    };
+    opts.isolate = occs("isolate")?;
+    opts.ghost_paths = occs("transparent")?.unwrap_or_default();
+    // Section view: the default planes (an assembly's own planes), else a named view's own.
+    opts.section = asm_section(od, a)?;
+    if a.get("section").is_none()
+        && let Some(v) = &named
+    {
+        opts.section = v.section.iter().map(|p| (glam::DVec3::new(p[0], p[1], p[2]), p[3])).collect();
     }
     for (i, v) in a.opt_array("section_exclude")?.cloned().unwrap_or_default().iter().enumerate() {
         let id = super::assembly::find_instance(asm, v.as_str().unwrap_or_default(), &format!("section_exclude[{i}]"))?;
         opts.section_skip.insert(id);
     }
-    let result = od.evaluate_assembly(&eff, &Default::default());
+    let explode = match a.opt_str("exploded_view")? {
+        Some(name) => {
+            let views: Vec<&str> = asm.exploded_views.iter().map(|v| v.name.as_str()).collect();
+            let ev = asm.exploded_views.iter().find(|v| v.name == name).ok_or_else(|| OpError::param("exploded_view", &format!("an exploded view: {}", views.join(", "))))?;
+            let n = ev.steps.len() as u64;
+            let progress = match a.opt_u64("explode_progress")? {
+                Some(p) if p > n => return Err(OpError::param("explode_progress", &format!("0 to {n} (the steps of {name})"))),
+                Some(p) => p as f64,
+                None => f64::INFINITY,
+            };
+            Some((ev.clone(), progress))
+        }
+        None if a.get("explode_progress").is_some() => return Err(OpError::param("explode_progress", "with `exploded_view`")),
+        None => None,
+    };
+    let mut result = od.evaluate_assembly(&eff, &Default::default());
+    if let Some((ev, progress)) = &explode {
+        let solved = result.solved.clone();
+        result.apply_placements_progress(solved, Some((ev, *progress)));
+    }
     let _gpu = crate::doc::gpu_lock();
     let off = ctx.offscreen()?;
     let up = off.renderer.uploader();
@@ -438,8 +512,18 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, (width, height): (u32, u32), vo: View
     let built = asm_scene::build(&result, &opts, &mut AsmGpuCache::default(), &up);
     let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap_or((glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05)));
     let aspect = width as f64 / height as f64;
-    let mut camera = window.unwrap_or_else(|| fit_camera(lo, hi, aspect, view));
-    if window.is_none() {
+    let mut camera = match (window, &named) {
+        (Some(w), _) => w,
+        (None, Some(v)) => {
+            let mut c = fit_camera(lo, hi, aspect, None);
+            c.rotation = glam::DQuat::from_array(v.rotation).normalize();
+            c.target = glam::DVec3::from_array(v.target);
+            c.distance = v.distance;
+            c
+        }
+        (None, None) => fit_camera(lo, hi, aspect, view),
+    };
+    if window.is_none() && named.is_none() {
         vo.finish_camera(&mut camera, lo, hi, aspect);
     }
     let style = vo.style();
@@ -473,10 +557,18 @@ fn window_display_args(ctx: &mut Ctx, a: &Args) -> Result<Option<serde_json::Val
             && !m.contains_key("isolate")
             && !m.contains_key("transparent")
         {
-            m.insert(if iso.transparent { "transparent" } else { "isolate" }.into(), json!(iso.ids));
+            m.insert(if iso.transparent { "transparent" } else { "isolate" }.into(), json!(iso.all_ids().collect::<Vec<_>>()));
         }
         if !assembly && d.highlight_boundary && !m.contains_key("boundary_edges") {
             m.insert("boundary_edges".into(), json!(true));
+        }
+        if let Some(e) = &d.explode
+            && !m.contains_key("exploded_view")
+        {
+            m.insert("exploded_view".into(), json!(e.view));
+            if let Some(p) = e.progress {
+                m.insert("explode_progress".into(), json!(p));
+            }
         }
     }
     // The image the window shows: its graphics area's size, or its aspect

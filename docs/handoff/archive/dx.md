@@ -3795,3 +3795,66 @@ State as of 2026-11-20 04:2x UTC. Rewritten, not appended (DECISIONS.md 11-15); 
   find one through a first difference before working on it. A SWEPT_FACE / SWEPT_BODY of an opSweep has no named path
   (only opExtrude / opRevolve): live's per-feature geometry maps them when present (5d8bc1 Shell 1 does).
 
+## (archived 11-22 10:49) STATE 05:55 11-22
+TASK (lead 05:1x): watch lands (DONE: 3af018e0 + afd3220a landed 05:29 as 1519a1df, main GREEN 05:42); hex iso
+circles (in test); bottle DXF rerun (DONE 05:2x vibex7: "matches", Front no longer moved, Iso 0.002 in; ARC 18/24,
+LINE 105/114, SPLINE 5/19); qa wf23 P1 DWG-SECTION-HATCH-PER-PART (written, in test) + P2 DETAIL label (live asked).
+Mac rules (DECISIONS def9ef908): one 4-job nice-20 load-gated slot (NOSHAPE_RB_HOST=mac); our app only while the user
+is idle >= 600 s (HIDIdleTime), one run, <= 3 min, killed at once when the user returns. Guarded runner:
+mac ~/noshape-host/dx-keep/gpu/macgpu.sh (watchdog 175 s, SIGKILL 3 s after SIGTERM); probe runner dx-keep/sig/.
+- UNCOMMITTED in dx-open (one drawing land, both): (a) views.rs MeshCover: views with mesh + other parts run a 2nd
+  HLR pass of the other parts alone; their visible pieces split where a mesh facet lies in front by more than the
+  view's defl (point-to-plane; Moller-Trumbore ray toward the viewer, 2D cell grid); glimpse rule removed. Test
+  views::tests::a_mesh_hides_what_lies_behind_its_facets_not_on_them (mesh lid 1 mm on a plate, same r 5 mm hole:
+  Iso far half ~0.46 seen, Top none). (b) per-part section hatch: ViewGeometry.section_part_ends (section_geometry
+  groups cut faces by owning ProjBody; detail copies it), build.rs: parts alternate 45/135 deg (hatch_flipped),
+  spacing part_hatch_spacing = part box diag / 13 (live wf23 s05 pixels: block 14.6 px, box 172x87; pin 10.6, 43x130);
+  cad_layers HatchRegion.flipped -> DXF ANSI31 angle 90. Test drawing::tests::a_section_through_several_parts_hatches_
+  each_its_own_way (demo asm: 2 plates + pin, 3 hatches false/true/false). Running: vibex7 bgpit1676 (drawing lib
+  views:: hatch cad_export section). Then: hex DXF via ~/agents/dx-keep/glb.sh (-> ops-gl) + hex2.sh (vibex7; check
+  ELLIPSE 2, LINE/LWPOLYLINE vs live 206/25, Top no CIRCLE), full ops e2e, land.
+- OPEN (hatch): rule for 3+ parts and two instances of one part unknown (instance order alternating is a guess):
+  REQUESTS dx 05:35 (live): DXF HATCH angle/scale per part on wf23 + a 4+ part assembly + DETAIL B label MTEXT.
+  P2 DETAIL label: ours y 11.2 vs live 14.0 (qa); detail label gap 5.3 mm (build.rs ~2640): wait for live's DXF.
+- Hex open point: pass 2's hidden pieces under visible mesh lines are now drawn (hidden lines shown only).
+- SIGTERM quit path LANDED (1519a1df 05:29, with the Mac SIGTERM-ignored fix, bottle lip, DRW-VIEW-CENTRE): crates/app/src/quit_signals.rs (Unix: TERM /
+  HUP / INT -> self-pipe -> cx.quit(); second signal or 10 s -> _exit; kept ignored if started ignored); DocModel's
+  quit_commit (cx.on_app_quit -> flush_pending) registered on the first deferred edit. Windows WM_ENDSESSION and macOS
+  applicationWillTerminate already run gpui's shutdown (observers called synchronously, before exit_now's future).
+  Tests: noshape bin quit_tests:: (fails without), T2 tests/quit_signal.rs (xvfb-run, 1.9 s): vibex7 pass.
+- NEXT 2: hex iso circles: see STATE (MeshCover). Data vibex7 ~/tmp/dx/exs-hex; old probe /root/dx-scratch/fo/glimpse-probe.diff.
+- GPU OPEN (Mac M6, ms from launch; r0 first open / rA another build's rows / rB own cached display): big-plate
+  505/178/151; l30 160/156/151; pins-1000 147/152/156; rings 1069/1320/160; infento full 13.3 s / 17.3 s / cached
+  frame 337 (display 282); isaac 15.6 s / 15.8 s / 170; scissor 56.5 s / 57.3 s / 187. Rows from the Linux build are
+  never used on the Mac (rA regenerates): not checked why (same-OS cross-release works). Regen = core's.
+- HOVER on the Mac GPU: plate 17.1 ms (live 53), parts-1000 18.6 ms (live 266). Done.
+- Live's open (software, s, warm / cold): infento 23.5-62.7 / 38.2, scissor 18.3-20.1 / 36.8, isaac 17.6-21.7 / 26.9.
+## STATE 08:33 11-22 (read first)
+- QUEUED c2e4fc1b (9 commits, vibe2): wf23 per-part section hatch + hex MeshCover (short runs < tol merged: rim touching
+  a facet corner), wf39 EXPORT-STORE-DETAILS, IMPORT-TAB-TOAST (DocModel::success_with_link, 5 s), tickets closed.
+  Tests green on vibex8: drawing lib 58, ops e2e:: 277, export dialog UI test, app an_import_translates_off_the_ui_thread.
+- QUEUED af0bd186 (dx-flake worktree): prefs images_library order-free. After it lands: git worktree remove dx-flake,
+  rm -rf vibex7 ~/agents/dx-flake/target.
+- export_dialog flake: cause = export_dialog_keys_as_live saving export_solid.json in parallel; psui's 454c71f2 fixes it.
+- RUNNING b4n0owrcu: vibex7 glb.sh + hex2.sh (hex DXF: want ELLIPSE 2, LINE/LWPOLYLINE vs live 206/25, Top no CIRCLE);
+  output /root/dx-scratch/fo/hex2.out.
+- asm (SPEED-ASM-OPEN): told one cache: display_cache::studio_key(doc, tab, config, fine) shared, StudioDisplay rows
+  written only with the Part Studio's own builder/tolerance; asm also feeds AssemblyEvaluator core's result_store.
+- LIVE ANSWERED dx 05:35 (behaviours "dx assembly section hatch per part", live/dx/hatch-1122/): ANSI31, one HATCH
+  per region, angle + spacing per INSTANCE. pin-block: block 0 deg (45 deg lines) 3.44 mm, pin 90 deg 2.46 mm, spacing
+  = instance section-bbox diag x 0.7/9 = what we ship (diag/13). 5 instances: 0/145/100/10/90 deg, spacing diag/9
+  except Part 1 <2> (0.7/9): rule unknown -> REQUESTS dx 08:39 (orders, 2-4 instances; when 0.7x). Ours alternates
+  0/90 in part order; repeated instances not split (section_part_ends groups by ProjBody: check instances are bodies).
+- DETAIL label: live DXF pin-block top 3.20 mm under a full r 16.8 mm circle (h 3.05, top-centre); labels-1118 ~5.3
+  under r ~34 (clip border; test a_detail_label_hangs_under_its_whole_circle pins 5.3 for both). No rule from two
+  points -> REQUESTS dx 08:39 (2). Code: build.rs ~2672 `Some((lo, hi)) => (lo, hi, 5.3)`.
+
+## Exchange leftovers (11-21)
+- Drawing rows (2/10): bottle lip + 0.015 in placement fixed above (verify with the rerun). Hex iso circles as
+  LWPOLYLINE (live ELLIPSE, r 0.0197 in, a mesh body "imported" + "shrunk" solid): next. faceblend ELLIPSE vs SPLINE;
+  the rest hidden-line geometry. Files /root/dx-scratch/drw, /root/dx-scratch/bin/dxfvlines.py.
+- Open: STL split (duct 2 parts vs live's 9 sheets, bottle 2 vs 148: rule unknown, REQUESTS dx 11-21 14:06;
+  /root/dx-scratch/stlcomp.py), housing IGES compat 80 / 45 edges / vertices vs 79 / 44 (one closed B-spline rim in two
+  IGES curves: join two G1 B-spline pieces bounding the same two faces in boolean.cpp's merge, kernel). Rhino as live
+  (46 / 118 / 76). CLI import probe: vibex6 ~/agents/dx-keep/sr/impprobe.py ./cli <file> [pp].
+

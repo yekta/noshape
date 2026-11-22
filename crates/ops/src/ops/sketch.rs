@@ -3,7 +3,7 @@
 //! snapping and automatic constraints), constrained with the constraint
 //! tools and dimensioned with the dimension tool.
 
-use super::{doc_field, edit_studio, feature_arg, s, studio_target, tab_field};
+use super::{doc_field, edit_studio, feature_arg, s, strings, studio_target, tab_field};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, doc, refs, studio};
@@ -228,8 +228,8 @@ pub fn ops() -> Vec<Op> {
             group: "sketch",
             verb: "paste",
             summary: "Copy a sketch onto another plane (Copy sketch / Paste sketch)",
-            description: "The context menus' Copy sketch then Paste sketch on a plane or planar face: a copy of `sketch` (its entities, constraints and dimensions) on `plane`, at the rollback bar of `to_tab` (default: the sketch's own Part Studio). One edit (\"Paste sketch\"). Returns the new sketch.",
-            fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name to copy."), req("plane", s(), "Plane to paste onto: `plane:top`, a Plane feature, a planar face id or a mate connector."), opt("to_tab", s(), "Part Studio to paste into (default: the same one).")],
+            description: "The context menus' Copy sketch then Paste sketch on a plane or planar face: a copy of `sketch` (its entities, constraints and dimensions; or of each of `sketches`, copied together) on `plane`, at the rollback bar of `to_tab` (default: the sketch's own Part Studio). One edit (\"Paste sketch\"). Returns the (first) new sketch, and with `sketches` the new sketches' `names`.",
+            fields: vec![doc_field(), tab_field(), opt("sketch", s(), "Sketch feature id or name to copy."), opt("sketches", strings(), "Several sketches copied together (ids or names), pasted in one edit."), req("plane", s(), "Plane to paste onto: `plane:top`, a Plane feature, a planar face id or a mate connector."), opt("to_tab", s(), "Part Studio to paste into (default: the same one).")],
             mutates: true,
             destructive: false,
             run: paste,
@@ -1314,10 +1314,20 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn paste(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     let ps = doc::studio(od.doc(), tab)?;
-    let id = feature_arg(ps, a, "sketch")?;
-    let f = ps.feature(id).expect("found").clone();
-    if f.type_id != "sketch" {
-        return Err(OpError::param("sketch", &format!("`{}` is a {}, not a sketch", f.name, f.type_id)));
+    // One sketch, or several copied together (Copy on several selected sketches).
+    let keys: Vec<(String, String)> = match (a.opt_str("sketch")?, a.opt_array("sketches")?) {
+        (Some(k), None) => vec![("sketch".into(), k.to_string())],
+        (None, Some(list)) if !list.is_empty() => list.iter().enumerate().map(|(i, v)| (format!("sketches[{i}]"), v.as_str().unwrap_or_default().to_string())).collect(),
+        (Some(_), Some(_)) => return Err(OpError::param("sketches", "give `sketch` or `sketches`, not both")),
+        _ => return Err(OpError::param("sketch", "required: the sketch to copy (or `sketches`)")),
+    };
+    let mut copied = Vec::new();
+    for (field, key) in &keys {
+        let f = doc::find_feature(ps, key).ok().and_then(|id| ps.feature(id)).ok_or_else(|| OpError::param(field, &format!("no feature `{key}`")))?;
+        if f.type_id != "sketch" {
+            return Err(OpError::param(field, &format!("`{}` is a {}, not a sketch", f.name, f.type_id)));
+        }
+        copied.push(f.clone());
     }
     let plane = refs::parse(a.get("plane").expect("required")).map_err(|e| e.with_param("plane"))?;
     let dest = match a.opt_str("to_tab")? {
@@ -1325,10 +1335,14 @@ fn paste(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => tab,
     };
     doc::studio(od.doc(), dest).map_err(|e| e.with_param("to_tab"))?;
-    let new = edit_studio(od, dest, "Paste sketch", |ps| Ok(crate::studio::paste_sketches_onto(ps, std::slice::from_ref(&f), plane)))?;
+    let new = edit_studio(od, dest, "Paste sketch", |ps| Ok(crate::studio::paste_sketches_onto(ps, &copied, plane)))?;
     let Some(new_id) = new.first().copied() else { return Err(OpError::new("internal", "nothing pasted")) };
     let mut v = sketch_state(od, dest, new_id, None)?;
-    v["name"] = json!(doc::studio(od.doc(), dest)?.feature(new_id).map(|f| f.name.clone()));
+    let names: Vec<String> = new.iter().filter_map(|id| doc::studio(od.doc(), dest).ok()?.feature(*id).map(|f| f.name.clone())).collect();
+    v["name"] = json!(names.first());
+    if keys.len() > 1 {
+        v["names"] = json!(names);
+    }
     Ok(v.into())
 }
 

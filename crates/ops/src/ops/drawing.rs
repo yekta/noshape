@@ -79,6 +79,8 @@ pub fn ops() -> Vec<Op> {
                 opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
                 opt("template", s(), "Existing templates: file or setup name (`drawing_templates`), e.g. \"ANSI_A_INCH.dwt\", \"ISO A3\". Default ANSI_A_INCH.dwt, the dialog's preselected row."),
                 opt("custom_template", json!({ "type": "object" }), CUSTOM_TEMPLATE_DOC),
+                opt("dwt", s(), "Created by me: a DWT file tab of this document; its sheet formats and drawing properties go over the template."),
+                opt("dwt_path", s(), "Created by me: a local .dwt file (as `dwt`)."),
                 opt("name", s(), "Tab name (default \"<part> Drawing N\" / \"<sketch> Drawing N\" / \"Drawing N\")."),
                 opt("suggested_views", json!({ "type": "boolean", "default": false }), "Suggested views (true) or No views (false, the dialog's default; place views with drawing_insert_view)."),
             ],
@@ -90,7 +92,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "get",
             summary: "A drawing sheet's views (with their edges in sheet coordinates), annotations and tables",
-            description: "Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds, `error` when it couldn't be computed (the app's red frame) and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension.",
+            description: "Coordinates are sheet millimeters from the sheet's lower-left corner. Each view lists its kind, parent, scale, sheet bounds, `error` when it couldn't be computed (the app's red frame) and the model edges as drawn (lines with end points, circles/arcs with center and radius, all in sheet mm) so you can click them with drawing_dimension. `sketch` lists the sheet sketch: its entities (id, type, end points / center and radius, `construction`, `external` for view geometry used by a constraint) and its constraints (kind and entity ids).",
             fields: vec![doc_field(), drawing_field(), sheet_field(), opt("edges", json!({ "type": "boolean", "default": true }), "Include each view's edges: its model edges (line / circle / arc / curve) and the silhouettes of curved faces (`silhouette`), in sheet mm.")],
             mutates: false,
             destructive: false,
@@ -313,7 +315,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 && let Some(ppl) = m.built.as_ref().and_then(|b| b.placement(*parent))
             {
                 let c = ppl.to_sheet(*center);
-                let mut d = json!({ "center": pt(c), "radius": ppl.len_to_sheet(*radius) });
+                let mut d = json!({ "center": pt(c), "radius": ppl.len_to_sheet(*radius), "profile": if v.detail_profile.is_some() { "outline" } else { "circle" } });
                 if let Some(o) = v.detail_label_at {
                     d["label_at"] = pt([c[0] + o[0], c[1] + o[1]]);
                 }
@@ -448,8 +450,17 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             }
             if !v.breaks.is_empty() {
                 j["breaks"] = json!(v.breaks.len());
+                j["break_lines"] = v.breaks.iter().map(|b| json!({ "vertical": b.vertical, "style": variant_name(&b.style), "gap_mm": b.gap_mm })).collect();
             }
             // A section view's Exclude from cut: its parts by name (drawing_edit_section takes them back).
+            if let Some(r) = &v.aux_ref {
+                j["auxiliary"] = json!({ "label": r.letter, "show_reference": r.show, "reverse": v.flip });
+            }
+            if let Some(d) = v.section_depth {
+                j["section_depth"] = json!({ "blind_mm": r3(d * 1000.0) });
+            } else if v.section_depth_ref.is_some() {
+                j["section_depth"] = json!({ "up_to_entity": true, "offset_mm": r3(v.section_depth_offset.unwrap_or(0.0) * 1000.0) });
+            }
             if !v.exclude_from_cut.is_empty() {
                 let parts = match &v.kind {
                     noshape_model::drawing::ViewKind::Section { parent, .. } => noshape_model::drawing::views::view_source(&m.drawing.sheets[m.sheet], *parent).and_then(|(k, _)| m.sources.get(&k)).map(|s| s.parts.clone()).unwrap_or_default(),
@@ -613,10 +624,23 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             match &a.kind {
                 noshape_model::drawing::AnnotationKind::Centermark { angle, .. } if angle.abs() > 1e-12 => j["angle"] = json!(r3(angle.to_degrees())),
                 noshape_model::drawing::AnnotationKind::Balloon { callout, .. } if !callout.stacked.is_empty() => j["stacked"] = json!(callout.stacked.len()),
+                noshape_model::drawing::AnnotationKind::Note { style, height_mm, .. } => {
+                    j["height"] = json!(r3(*height_mm));
+                    let st = super::drawing_note::style_json(style);
+                    if st.as_object().is_some_and(|o| !o.is_empty()) {
+                        j["style"] = st;
+                    }
+                }
                 _ => {}
             }
             if a.target.as_ref().is_some_and(|o| o.hide_dims) {
                 j["dimensions_hidden"] = json!(true);
+            }
+            if let Some(st) = &a.style {
+                j["annotation_style"] = super::drawing_styles::style_json(st);
+            }
+            if !a.layer.is_drawing() {
+                j["layer"] = json!(a.layer.name());
             }
             j
         })
@@ -671,8 +695,14 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             // The table menus' state.
             j["corner"] = json!(variant_name(&t.corner));
             j["text_height"] = json!(t.text_height);
+            if !t.layer.is_drawing() {
+                j["layer"] = json!(t.layer.name());
+            }
             if !t.merges.is_empty() {
                 j["merges"] = t.merges.iter().map(|g| json!({ "row": g.row, "column": g.col, "rows": g.rows, "columns": g.cols })).collect();
+            }
+            if !t.cell_formats.is_empty() {
+                j["cell_formats"] = t.cell_formats.iter().map(|c| super::drawing_note::cell_format_json(c.row, c.col, &c.format)).collect();
             }
             if let Some(l) = m.built.as_ref().and_then(|b| b.table_layout(t.id)) {
                 j["column_widths"] = l.xs.windows(2).map(|w| json!(r3(w[1] - w[0]))).collect();
@@ -682,7 +712,10 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                 j["part_rows"] = json!(r);
             }
             match &t.kind {
-                noshape_model::drawing::TableKind::Bom { structured, top_level, bottom_to_top, default_template, .. } => {
+                noshape_model::drawing::TableKind::Bom { structured, top_level, bottom_to_top, default_template, source: picked, .. } => {
+                    if let Some(s) = picked {
+                        j["source"] = json!(s.label);
+                    }
                     j["structured"] = json!(structured);
                     j["bom_type"] = json!(match (structured, top_level) { (false, _) => "flattened", (true, true) => "structured_top_level", (true, false) => "structured_multi_level" });
                     j["bottom_to_top"] = json!(bottom_to_top);
@@ -716,6 +749,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
         .map(|h| {
             let standard = ["ansi", "iso", "general"].get(h.standard).copied().unwrap_or("ansi");
             let mut j = json!({ "id": h.id, "standard": standard, "pattern": noshape_model::drawing::hatch_pat::pattern(h.standard, h.pattern).map(|p| p.name), "scale": h.scale });
+            j["angle"] = if h.angle.abs() < 1e-9 { json!("Auto") } else { json!(r3((h.angle + noshape_model::drawing::hatch_pat::base_angle(h.standard, h.pattern)).rem_euclid(360.0))) };
             if let Some(v) = h.view {
                 j["view"] = json!(v.0);
             }
@@ -725,7 +759,7 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             j
         })
         .collect();
-    let images: Vec<Value> = sheet.images.iter().map(|i| json!({ "id": i.id, "name": i.name, "position": pt(i.pos), "size": pt(i.size) })).collect();
+    let images: Vec<Value> = sheet.images.iter().map(|i| json!({ "id": i.id, "name": i.name, "position": pt(i.pos), "size": pt(i.size), "layer": i.layer.name() })).collect();
     let sketch_entities = sheet.sketch.sketch.entities().count();
     // Title block field cells: the stored text and the lines shown.
     let title_fields: Vec<Value> = m
@@ -744,7 +778,55 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
         .unwrap_or_default();
     // Format lines deleted or moved to another layer (drawing_format_line).
     let format_edits: Vec<Value> = sheet.format_edits.iter().map(|e| json!({ "a": [e.key[0] as f64 / 100.0, e.key[1] as f64 / 100.0], "b": [e.key[2] as f64 / 100.0, e.key[3] as f64 / 100.0], "deleted": e.deleted, "layer": e.layer.map(|l| l.name()), "offset": e.offset })).collect();
-    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities, "title_fields": title_fields, "format_edits": format_edits })
+    json!({ "sheet": sheet.name, "size_mm": [r3(w), r3(h)], "views": views, "annotations": annotations, "tables": tables, "hatches": hatches, "images": images, "sketch_entities": sketch_entities, "sketch": sketch_json(&sheet.sketch), "title_fields": title_fields, "format_edits": format_edits })
+}
+
+/// The sheet sketch as `drawing_get` lists it: each entity (sheet mm) with its id, and the constraints between them.
+fn sketch_json(sheet_sketch: &noshape_model::drawing::sheet_sketch::SheetSketch) -> Value {
+    use noshape_sketch::Geometry as G;
+    let sk = &sheet_sketch.sketch;
+    let at = |id: &noshape_sketch::EntityId| sk.point(*id).map(|p| pt([p.x, p.y])).unwrap_or(Value::Null);
+    let entities: Vec<Value> = sk
+        .entities()
+        .filter(|e| !e.reference_only)
+        .map(|e| {
+            let mut j = match &e.geometry {
+                G::Point { .. } => json!({ "type": "point", "at": at(&e.id) }),
+                G::Line { start, end } => json!({ "type": "line", "a": at(start), "b": at(end), "points": [start.0, end.0] }),
+                G::Circle { center, radius } => json!({ "type": "circle", "center": at(center), "radius": r3(*radius), "points": [center.0] }),
+                G::Arc { center, start, end } => json!({ "type": "arc", "center": at(center), "a": at(start), "b": at(end), "points": [center.0, start.0, end.0] }),
+                G::Ellipse { center, .. } => json!({ "type": "ellipse", "center": at(center) }),
+                G::EllipticalArc { center, .. } => json!({ "type": "elliptical_arc", "center": at(center) }),
+                _ => json!({ "type": "spline" }),
+            };
+            j["id"] = json!(e.id.0);
+            if e.construction {
+                j["construction"] = json!(true);
+            }
+            if e.external {
+                j["external"] = json!(true);
+            }
+            if let Some(st) = sheet_sketch.styles.get(&e.id.0) {
+                let mut sj = json!({ "line": st.line.name().to_lowercase() });
+                if let Some(c) = st.color {
+                    sj["color"] = json!(format!("{:02X}{:02X}{:02X}", c[0], c[1], c[2]));
+                }
+                if let Some(w) = st.thickness {
+                    sj["thickness"] = json!(w);
+                }
+                if let Some(p) = st.pitch {
+                    sj["pitch"] = json!(p);
+                }
+                if !st.layer.is_drawing() {
+                    sj["layer"] = json!(st.layer.name());
+                }
+                j["style"] = sj;
+            }
+            j
+        })
+        .collect();
+    let constraints: Vec<Value> = sk.constraints().map(|c| json!({ "id": c.id.0, "kind": c.kind.name(), "entities": c.kind.entities().iter().map(|e| e.0).collect::<Vec<_>>() })).collect();
+    json!({ "entities": entities, "constraints": constraints })
 }
 
 pub(super) fn reply(od: &mut OpenDoc, tab: TabId, sheet: usize, edges: bool) -> Result<Value, OpError> {
@@ -828,7 +910,31 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(s) = &source {
         od.prime_sources([noshape_model::drawing::views::SourceKey { tab: s.tab, config: s.config.clone(), explode: None, version: None, position: None, display: None }]);
     }
+    // Created by me: a DWT template's sheet formats and drawing properties over the template (live request 1627).
+    let dwt = match (a.opt_str("dwt")?, a.opt_str("dwt_path")?) {
+        (Some(_), Some(_)) => return Err(OpError::param("dwt_path", "give `dwt` or `dwt_path`, not both")),
+        (Some(n), None) => {
+            let id = doc::find_tab(od.doc(), n).map_err(|e| OpError::param("dwt", &e.message))?;
+            let f = match od.doc().tab(id).map(|t| &t.content) {
+                Some(TabContent::File(f)) if f.kind() == noshape_model::file_tab::FileKind::Template => f.clone(),
+                _ => return Err(OpError::param("dwt", "not a DWT file tab")),
+            };
+            Some(("dwt", f.file_name.clone(), f.bytes().ok_or_else(|| OpError::param("dwt", "the file data is damaged"))?))
+        }
+        (None, Some(p)) => {
+            let path = std::path::Path::new(p);
+            if !path.extension().is_some_and(|e| e.eq_ignore_ascii_case("dwt")) {
+                return Err(OpError::param("dwt_path", "not a .dwt file"));
+            }
+            let bytes = std::fs::read(path).map_err(|e| OpError::param("dwt_path", &format!("can't read {p}: {e}")))?;
+            Some(("dwt_path", path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default(), bytes))
+        }
+        (None, None) => None,
+    };
     let mut drawing = dr::new_drawing(od.doc(), &template, source.as_ref(), a.bool_or("suggested_views", false)?);
+    if let Some((param, file, bytes)) = dwt {
+        noshape_model::drawing::dwt::apply_dwt_template(&mut drawing, &file, &bytes).map_err(|e| OpError::param(param, &format!("the DWT template can't be used: {e}")))?;
+    }
     // The views are made from the document as it is now (see `old_state`).
     drawing.sources_at = od.session.head().ok().map(|m| m.to_string());
     let mut tab = None;

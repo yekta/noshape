@@ -7,6 +7,11 @@ use gpui_kit::*;
 use noshape_ops::window::{DisplaySet, ListAct, Selected};
 
 impl AssemblyView {
+    /// view_camera's named view: as picking it in the Named views dialog.
+    pub fn agent_named_view(&mut self, name: &str, cx: &mut Context<Self>) {
+        self.apply_named_view(name, cx);
+    }
+
     /// A display setting (view_display).
     pub fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
         match set {
@@ -32,7 +37,31 @@ impl AssemblyView {
                     self.toggle_snap(window, cx);
                 }
             }
-            DisplaySet::IsolateParts { .. } | DisplaySet::HighlightBoundary(_) | DisplaySet::OrientOnEdit(_) | DisplaySet::ThicknessOff | DisplaySet::ContextHidden(_) => {}
+            DisplaySet::IsolateControls { select_transparent, transparency, expand } => {
+                // As the Isolate / Make transparent dialog's controls.
+                if let Some(on) = select_transparent {
+                    self.ui.select_transparent = on;
+                }
+                if let Some(t) = transparency {
+                    self.ui.transparency = Some(crate::isolate_ui::t_alpha(t));
+                }
+                match expand {
+                    Some(e) => self.set_iso_expand(Some(e.connectivity), e.steps as i32, cx),
+                    None => {
+                        self.rebuild_scene(true, cx);
+                        cx.notify();
+                    }
+                }
+            }
+            // As the exploded view row's Activate <view> and the Done button.
+            DisplaySet::Explode(Some(i)) => self.activate_explode_from_menu(i, cx),
+            DisplaySet::Explode(None) => self.activate_explode(None, cx),
+            // As dropping the view's rollback bar under this many steps.
+            DisplaySet::ExplodeProgress(steps) => {
+                self.set_explode_progress(steps as f64, cx);
+                cx.notify();
+            }
+            DisplaySet::IsolateParts { .. } | DisplaySet::HighlightBoundary(_) | DisplaySet::OrientOnEdit(_) | DisplaySet::ThicknessOff | DisplaySet::ContextHidden(_) | DisplaySet::ContextControls { .. } => {}
         }
     }
 

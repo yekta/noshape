@@ -21,6 +21,7 @@ mod features;
 mod more;
 mod positions;
 mod standard;
+pub(crate) use positions::exploded_offsets;
 mod structure;
 
 const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name (a part inside a subassembly by its path, \"Sub <1> > Part 1 <1>\"), \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis, \"reorient\": 0–3 quarter turns of its secondary axis, \"move\": {\"x\", \"y\", \"z\", \"rotation_axis\": \"x\"|\"y\"|\"z\", \"rotation\"} moves it (the mate dialog's connector Move; expressions).";
@@ -32,16 +33,18 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "insert",
             summary: "Insert a part (or a whole Part Studio, or a subassembly) into an Assembly",
-            description: "The Insert dialog. Inserting the same item again offsets the new instance along X so they don't overlap. `document` + `version` insert from another document at a named version (the dialog's Other documents: a part, a whole Part Studio, or an Assembly as one subassembly, \"Versioned … from other document\"). Returns the instance id; place it with mates or assembly_transform.",
+            description: "The Insert dialog. Inserting the same item again offsets the new instance along X so they don't overlap. `document` + `version` insert from another document at a named version (the dialog's Other documents: a part, a whole Part Studio, or an Assembly as one subassembly, \"Versioned … from other document\"); `document` + `part_number` (+ `revision`) one of its released items at the version it was released at (View released items). Returns the instance id; place it with mates or assembly_transform.",
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("source", s(), "Part Studio or Assembly tab (name or id) to insert from (in `document` when given)."),
+                opt("source", s(), "Part Studio or Assembly tab (name or id) to insert from (in `document` when given); required but with `part_number`."),
                 opt("part", s(), "A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio as one instance."),
                 opt("sketch", s(), "A sketch of that Part Studio (feature id or name): the Insert dialog's sketches."),
                 opt("configuration", json!({ "type": ["object", "string"] }), "Configuration of the source: {input id: value}, or the Insert dialog's \"default\" (Reset to default) / \"last_viewed\" (Set to last viewed: the configuration the source shows)."),
                 opt("document", s(), "Another .noshape document to insert from (with `version`)."),
                 opt("version", s(), "With `document`: the name of one of its versions (the dialog lists named versions)."),
+                opt("part_number", s(), "With `document`: View released items: its released part or assembly with this part number, inserted at the version it was released at (no `source` / `part` / `version`)."),
+                opt("revision", s(), "With `part_number`: the revision (default the newest released one; obsoleted ones are not offered)."),
             ],
             mutates: true,
             destructive: false,
@@ -214,6 +217,23 @@ pub(crate) fn asm_target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut Open
 pub(crate) fn solve_assembly(od: &mut OpenDoc, tab: TabId, asm: &Assembly, opts: &SolveOptions) -> AssemblyResult {
     let eff = sa::effective(asm, &super::configuration::asm::values(od, tab, asm));
     od.evaluate_assembly(&eff, opts)
+}
+
+/// Assembly `asm` as its window shows it: solved, with the window's active
+/// exploded view (view_display `exploded_view`) applied.
+pub(crate) fn shown_assembly(od: &mut OpenDoc, tab: TabId, asm: &Assembly) -> AssemblyResult {
+    let mut r = solve_assembly(od, tab, asm, &Default::default());
+    let shown = od.window.display.get(&tab).and_then(|d| d.explode.clone());
+    if let Some((ev, e)) = shown.and_then(|e| Some((asm.exploded_views.iter().find(|v| v.name == e.view)?, e))) {
+        let solved = r.solved.clone();
+        r.apply_placements_progress(solved, Some((ev, e.progress.map_or(f64::INFINITY, |p| p as f64))));
+    }
+    r
+}
+
+/// What Zoom to fit frames in an assembly: its shown instances.
+pub(crate) fn fit_box(asm: &Assembly, r: &AssemblyResult) -> Option<(glam::DVec3, glam::DVec3)> {
+    asm.instances.iter().filter(|i| !i.hidden).filter_map(|i| r.instance_bounds(i.id)).fold(None, |acc, (l, h)| Some(acc.map_or((l, h), |(x, y): (glam::DVec3, glam::DVec3)| (x.min(l), y.max(h)))))
 }
 
 /// Solve the assembly in its default configuration.
@@ -389,9 +409,9 @@ fn instance_extras(v: &mut Value, i: &noshape_model::assembly::Instance) {
 
 fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     match (a.opt_str("document")?, a.opt_str("version")?) {
-        (Some(document), Some(version)) => return insert_external(ctx, a, document, version),
-        (Some(_), None) => return Err(OpError::param("version", "required with `document`: one of its named versions")),
+        (Some(document), _) => return insert_external(ctx, a, document),
         (None, Some(_)) => return Err(OpError::param("document", "required with `version`")),
+        (None, None) if a.get("part_number").is_some() => return Err(OpError::param("document", "required with `part_number`")),
         (None, None) => {}
     }
     let (od, tab) = target(ctx, a)?;
@@ -443,40 +463,17 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 /// Insert › Other documents: a part or Part Studio of another document, or
-/// its Assembly as one subassembly, pinned to a named version (the
-/// default configuration, as the dialog inserts them).
-fn insert_external(ctx: &mut Ctx, a: &Args, document: &str, version: &str) -> Result<OpOutput, OpError> {
-    use noshape_model::assembly::eval::AssemblyEvaluator;
-    for k in ["configuration", "sketch"] {
-        if a.get(k).is_some() {
-            return Err(OpError::param(k, "not with `document`: Other documents insert the default configuration's parts and assemblies"));
-        }
-    }
+/// its Assembly as one subassembly, pinned to a named version or to a
+/// released item's version (the default configuration, as the dialog
+/// inserts them).
+fn insert_external(ctx: &mut Ctx, a: &Args, document: &str) -> Result<OpOutput, OpError> {
+    let (source, label, item) = features::external_source(a, document)?;
     let (od, tab) = target(ctx, a)?;
-    let (path, v, snapshot) = crate::derived::named_version(document, version)?;
-    let src = doc::find_tab(&snapshot, a.str("source")?).map_err(|e| e.with_param("source"))?;
-    let t = snapshot.tab(src).ok_or_else(|| OpError::param("source", "no such tab in that version"))?;
-    let key = crate::derived::ExternalRef { path, microversion: v.microversion, tab: src.to_string() }.key();
-    let (body, label) = match &t.content {
-        TabContent::PartStudio(_) => match a.opt_str("part")? {
-            Some(p) => {
-                let mut ev = AssemblyEvaluator::default();
-                ev.set_external(std::sync::Arc::new(crate::derived::ExternalDocs));
-                let (_, r) = ev.external_studio(&key, &Default::default()).ok_or_else(|| OpError::param("source", "that version's Part Studio could not be read"))?;
-                let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", "no such part in that Part Studio"))?;
-                (Some(b.id.clone()), b.name.clone())
-            }
-            None => (None, t.name.clone()),
-        },
-        TabContent::Assembly(_) if a.get("part").is_some() => return Err(OpError::param("part", "only for a Part Studio")),
-        TabContent::Assembly(_) => (None, t.name.clone()),
-        _ => return Err(OpError::param("source", "a Part Studio or Assembly of that document")),
-    };
     let result = solve(od, tab, &SolveOptions::default())?;
-    let id = commit(od, tab, &format!("Insert : {} (other document)", t.name), &result, |asm| {
+    let id = commit(od, tab, &format!("Insert : {item} (other document)"), &result, |asm| {
         let id = InstanceId(asm.next_id());
         let name = asm.next_instance_name(&label);
-        asm.instances.push(noshape_model::assembly::Instance::new(id, name, InstanceSource::External { key, body, config: Default::default() }, Placement::default()));
+        asm.instances.push(noshape_model::assembly::Instance::new(id, name, source, Placement::default()));
         id
     })?;
     let mut v = describe(od, tab)?;

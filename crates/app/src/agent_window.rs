@@ -95,12 +95,18 @@ impl Workspace {
                     if mv == CameraMove::Previous {
                         return v.previous_view(cx);
                     }
+                    if let CameraMove::Named(name) = &mv {
+                        return v.agent_named_view(name, window, cx);
+                    }
                     v.push_camera_history(cx);
                     camera_move(&v.viewport, mv, cx);
                 }),
                 Some(TabView::Assembly(v)) => v.update(cx, |v, cx| {
                     if mv == CameraMove::Previous {
                         return v.on_camera_action(crate::camera_menu::Action::PreviousView, window, cx);
+                    }
+                    if let CameraMove::Named(name) = &mv {
+                        return v.agent_named_view(name, cx);
                     }
                     v.push_camera_history(cx);
                     camera_move(&v.viewport, mv, cx);
@@ -129,6 +135,7 @@ impl Workspace {
                 Some(TabView::Variables(v)) => v.update(cx, |v, cx| v.agent_list(act, cx)),
                 _ => {}
             },
+            R::Notifications(act) => crate::notifications::act(cx, act),
             R::ReloadToolbars => {
                 for v in self.views.values() {
                     match v {
@@ -179,7 +186,7 @@ fn camera_move(vp: &Entity<Viewport>, mv: CameraMove, cx: &mut App) {
         }
         CameraMove::Direction { forward, up } => vp.animate_to_direction(forward, up, cx),
         CameraMove::Perspective(on) => vp.set_projection(if on { Projection::Perspective } else { Projection::Orthographic }, cx),
-        CameraMove::Previous => {}
+        CameraMove::Previous | CameraMove::Named(_) => {}
     });
 }
 

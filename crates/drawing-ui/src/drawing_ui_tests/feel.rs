@@ -2323,7 +2323,7 @@ fn drawing_keys_as_lives_shortcut_sweep(cx: &mut TestAppContext) {
             assert_eq!(e.measure_text(0.3048), "1.00 ft");
             (e.measure_unit, e.drawing.units_mm) = (None, units_mm);
             let end = |x: f64| noshape_scene::drawing_tools::PickedPoint { view: noshape_model::drawing::ViewId(1), p: [x, 0.0], r: None };
-            let picks = e.measure.replace(vec![crate::drawing_keys::MeasurePick::Line(end(0.0), end(0.04))]);
+            let picks = e.measure.replace(vec![noshape_scene::drawing_tools::MeasurePick::Line(end(0.0), end(0.04))]);
             assert_eq!(e.measure_pick_names(), ["Line 1"]);
             e.measure = picks;
         })

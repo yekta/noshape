@@ -47,7 +47,7 @@ pub fn ops() -> Vec<Op> {
         op(
             "curvature",
             "Curvature of edges, sketch curves and faces (Curve/surface analysis)",
-            "The minimum radius of curvature over the selection and where it is, the inflection points of sketch curves, and the number of curvature combs (one per curve; U and V isoparametric curves per face).",
+            "The minimum radius of curvature over the selection and where it is, the inflection points of sketch curves, the number of curvature combs (one per curve; U and V isoparametric curves per face), and for each selected spline curve or face (`splines`) the Details panel's degree, control points and spans (`u`, and `v` for a face), its Knot points and its Control point grid's points.",
             vec![
                 req("entities", strings(), "Edges, faces (`edge:…`, `face:…`) or sketch curves (`entity:…`)."),
                 opt("extend", json!({ "type": "boolean" }), "Extend across face: include the tangent-connected faces."),
@@ -75,7 +75,17 @@ pub fn ops() -> Vec<Op> {
             ],
             connection,
         ),
-        op("dihedral", "Dihedral angle along edges (Dihedral analysis)", "The minimum and maximum angle between the faces along the edges (degrees).", vec![req("entities", strings(), "Edges.")], dihedral),
+        op(
+            "dihedral",
+            "Dihedral angle along edges (Dihedral analysis)",
+            "The minimum and maximum angle between the faces along the edges (degrees; with `radians` also in radians, as the dialog's Show values in radians). Enable threshold display: `threshold` {high, low} (the dialog's High / Low threshold, angles 0 to 180 deg; default 180 deg and 0 deg) counts the comb's teeth drawn above the high one (yellow) and below the low one (purple).",
+            vec![
+                req("entities", strings(), "Edges."),
+                opt("radians", json!({ "type": "boolean" }), "Show values in radians: `min` / `max` in radians."),
+                opt("threshold", json!({ "type": "object", "properties": { "high": { "type": ["string", "number"] }, "low": { "type": ["string", "number"] } } }), "Enable threshold display: {\"high\": \"120 deg\", \"low\": \"30 deg\"} (bare numbers in degrees)."),
+            ],
+            dihedral,
+        ),
         op(
             "interference",
             "Interference detection between parts",
@@ -141,11 +151,35 @@ fn curvature(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(n) = a.opt_u64("v_curves")? {
         o.v_curves = n.clamp(1, 50) as usize;
     }
-    let (r, k, units) = run(ctx, a, AnalysisKind::CurveSurface, sel, vec![], o)?;
+    let (r, k, units) = run(ctx, a, AnalysisKind::CurveSurface, sel.clone(), vec![], o)?;
     if r.combs.is_empty() {
         return Err(OpError::param("entities", "nothing to analyze: give edges, faces or sketch curves"));
     }
-    let mut v = json!({ "units": units, "combs": r.combs.len(), "inflections": r.inflections.iter().map(|p| pt(*p, k)).collect::<Vec<_>>() });
+    // The selected splines: the panel's Details (Deg. / CP / Spans, U and V for a face), Knot points and Control point
+    // grids.
+    let (od, tab) = studio_target(ctx, a)?;
+    let reg = od.regenerate(tab, None)?;
+    let names = a.array("entities")?.clone();
+    let splines: Vec<Value> = sel
+        .iter()
+        .zip(&names)
+        .filter_map(|(x, name)| {
+            use noshape_model::analysis::{edge_spline, face_spline, sketch_spline};
+            let sp = match x {
+                Reference::Edge(_) => edge_spline(&reg.context, x),
+                Reference::Face(_) => face_spline(&reg.context, x),
+                Reference::SketchEntity { sketch, entity } => sketch_spline(&reg.context, *sketch, *entity),
+                _ => None,
+            }?;
+            let dir = |d: &(usize, usize, usize)| json!({ "degree": d.0, "control_points": d.1, "spans": d.2 });
+            let mut j = json!({ "entity": name, "u": dir(&sp.u), "knot_points": sp.knots.iter().map(|p| pt(*p, k)).collect::<Vec<_>>(), "control_points": sp.poles.iter().map(|p| pt(*p, k)).collect::<Vec<_>>() });
+            if let Some(v) = &sp.v {
+                j["v"] = dir(v);
+            }
+            Some(j)
+        })
+        .collect();
+    let mut v = json!({ "units": units, "combs": r.combs.len(), "inflections": r.inflections.iter().map(|p| pt(*p, k)).collect::<Vec<_>>(), "splines": splines });
     if let Some((radius, at)) = r.min_radius {
         v["min_radius"] = json!({ "radius": radius * k, "at": pt(at, k) });
     }
@@ -186,7 +220,32 @@ fn dihedral(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sel = refs_arg(a, "entities")?;
     let (r, _, _) = run(ctx, a, AnalysisKind::Dihedral, sel, vec![], AnalysisOptions::default())?;
     let (lo, hi) = r.dihedral.ok_or_else(|| OpError::param("entities", "no dihedral angle: give edges between two faces"))?;
-    Ok(json!({ "min_deg": lo, "max_deg": hi }).into())
+    let mut v = json!({ "min_deg": lo, "max_deg": hi });
+    if a.bool_or("radians", false)? {
+        v["min"] = json!(lo.to_radians());
+        v["max"] = json!(hi.to_radians());
+        v["unit"] = json!("rad");
+    }
+    if let Some(t) = a.object("threshold")? {
+        // The dialog's angle fields: 0 to 180 deg, bare numbers in degrees.
+        let angle = |k: &str, default: f64| -> Result<f64, OpError> {
+            let field = format!("threshold.{k}");
+            let deg = match t.get(k) {
+                None => default,
+                Some(Value::Number(n)) => n.as_f64().unwrap_or(default),
+                Some(Value::String(s)) => noshape_units::evaluate_as(s, noshape_units::Dim::ANGLE, &noshape_units::UnitPrefs::default(), &noshape_units::EmptyScope).map_err(|e| OpError::param(&field, &e.to_string()))?.value.to_degrees(),
+                Some(_) => return Err(OpError::param(&field, "an angle (\"120 deg\") or a number of degrees")),
+            };
+            if !(0.0..=180.0).contains(&deg) {
+                return Err(OpError::param(&field, "an angle from 0 deg to 180 deg"));
+            }
+            Ok(deg)
+        };
+        let (high, low) = (angle("high", 180.0)?, angle("low", 0.0)?);
+        let teeth: Vec<f64> = r.combs.iter().flat_map(|(c, _)| c.teeth.iter().map(|t| t.length().to_degrees())).collect();
+        v["threshold"] = json!({ "high_deg": high, "low_deg": low, "teeth": teeth.len(), "above_high": teeth.iter().filter(|d| **d > high).count(), "below_low": teeth.iter().filter(|d| **d < low).count() });
+    }
+    Ok(v.into())
 }
 
 fn interference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -47,6 +47,50 @@ pub enum UiRequest {
     Restore { to: MicroversionId, name: String },
     /// The Reference manager (a linked feature's update indicator, Update linked document…).
     ReferenceManager,
+    /// The Notifications panel: Only show unread, or its ⋮ menu (ui_notifications).
+    Notifications(NoticeAct),
+}
+
+/// The Notifications panel's switch and ⋮ menu.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum NoticeAct {
+    OnlyUnread(bool),
+    MarkAllRead,
+    ExpandAll,
+    DeleteAll,
+}
+
+/// The app's notifications (live mode: imports and their steps), newest first.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Notices {
+    pub only_unread: bool,
+    pub items: Vec<Notice>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Notice {
+    pub title: String,
+    pub body: String,
+    /// Seconds since the epoch.
+    pub time: i64,
+    pub unread: bool,
+    /// Expanded (its message shown).
+    pub open: bool,
+    pub failed: bool,
+    /// A job's steps ("Uploaded", …).
+    pub steps: Vec<String>,
+    pub link: Option<String>,
+}
+
+impl Notices {
+    pub fn apply(&mut self, act: NoticeAct) {
+        match act {
+            NoticeAct::OnlyUnread(on) => self.only_unread = on,
+            NoticeAct::MarkAllRead => self.items.iter_mut().for_each(|i| i.unread = false),
+            NoticeAct::ExpandAll => self.items.iter_mut().for_each(|i| i.open = true),
+            NoticeAct::DeleteAll => self.items.clear(),
+        }
+    }
 }
 
 /// A list change as the list's menus make it.
@@ -120,7 +164,37 @@ pub enum DisplaySet {
     ShowMatesMode(bool),
     /// Assembly: Snap mode.
     SnapMode(bool),
+    /// The Isolate / Make transparent dialog's controls (what is given):
+    /// Select transparent geometry, the transparency slider (0 to 1), Expand.
+    IsolateControls { select_transparent: Option<bool>, transparency: Option<f32>, expand: Option<IsoExpand> },
+    /// Part Studio: the Assembly context banner's Show internal geometry,
+    /// Select transparent geometry and Context transparency (0 to 1).
+    ContextControls { show_internal: Option<bool>, select_transparent: Option<bool>, transparency: Option<f32> },
+    /// Assembly: Activate <view> (Some: its row, exploded, zoomed to fit) or
+    /// Done (None: assembled again).
+    Explode(Option<usize>),
+    /// Assembly: the active exploded view's rollback bar: this many steps shown.
+    ExplodeProgress(usize),
 }
+
+/// The exploded view shown in an assembly window: its name and the steps
+/// its rollback bar shows (None: all).
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShownExplode {
+    pub view: String,
+    pub progress: Option<usize>,
+}
+
+/// Isolate's Expand: by mate connectivity (assemblies) or distance, this
+/// many steps (a Part Studio's distance slider: 0 to 10).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct IsoExpand {
+    pub connectivity: bool,
+    pub steps: usize,
+}
+
+/// The Assembly context banner's transparency slider as it opens.
+pub const CONTEXT_TRANSPARENCY: f32 = 0.29;
 
 /// Make isolate / Make transparent: which, and the parts' (`body:…`) or
 /// instances' (`inst:…`) ids.
@@ -128,6 +202,24 @@ pub enum DisplaySet {
 pub struct Isolation {
     pub transparent: bool,
     pub ids: Vec<String>,
+    /// The dialog's controls as the agent set them (None: as the window
+    /// opened them).
+    pub select_transparent: bool,
+    pub transparency: Option<f32>,
+    pub expand: Option<IsoExpand>,
+    /// What Expand added to `ids`.
+    pub expanded: Vec<String>,
+}
+
+impl Isolation {
+    pub fn new(transparent: bool, ids: Vec<String>) -> Self {
+        Isolation { transparent, ids, select_transparent: false, transparency: None, expand: None, expanded: Vec::new() }
+    }
+
+    /// The chosen parts or instances and those Expand added.
+    pub fn all_ids(&self) -> impl Iterator<Item = &String> {
+        self.ids.iter().chain(&self.expanded)
+    }
 }
 
 /// A 3D tab's display settings as the agent set them.
@@ -138,9 +230,16 @@ pub struct TabDisplay {
     pub orient_on_edit: bool,
     /// The shown Assembly context's hidden top-level instances (`inst:` ids).
     pub context_hidden: Vec<String>,
+    /// The context banner's Show internal geometry, Select transparent
+    /// geometry and transparency, as the agent set them.
+    pub context_show_internal: Option<bool>,
+    pub context_select_transparent: Option<bool>,
+    pub context_transparency: Option<f32>,
     pub show_mates: bool,
     pub show_mates_mode: bool,
     pub snap_mode: bool,
+    /// Assembly: the active exploded view.
+    pub explode: Option<ShownExplode>,
 }
 
 /// A camera move as the view menus do it.
@@ -162,6 +261,8 @@ pub enum CameraMove {
     Previous,
     /// Perspective view on / off.
     Perspective(bool),
+    /// The Named views dialog's pick: this saved view (its camera and section).
+    Named(String),
 }
 
 /// A drawing zoom.
@@ -250,6 +351,8 @@ pub struct WindowState {
     pub lists: BTreeMap<TabId, ListState>,
     /// Live mode: the active Part Studio's on-screen state (WindowSnapshot::ui).
     pub ui: Option<serde_json::Value>,
+    /// Live mode: the app's notifications.
+    pub notifications: Notices,
 }
 
 /// What the open window shows (live mode): read before each call, so the
@@ -268,6 +371,8 @@ pub struct WindowSnapshot {
     /// drawing's `view:` / `annotation:` / `table:` / `break:` / `sketch:` /
     /// `hatch:` / `image:` ids.
     pub selection: BTreeMap<TabId, Vec<String>>,
+    /// The app's notifications.
+    pub notifications: Option<Notices>,
 }
 
 impl WindowState {
@@ -286,6 +391,9 @@ impl WindowState {
         self.sheets.extend(s.sheets);
         self.selection.extend(s.selection);
         self.ui = s.ui;
+        if let Some(n) = s.notifications {
+            self.notifications = n;
+        }
     }
 
     /// What `r` does to the window.
@@ -305,6 +413,7 @@ impl WindowState {
             UiRequest::Repair(r) => self.repair = r.clone(),
             // view_camera, view_display, ui_select and ui_list keep their state themselves.
             UiRequest::Camera { .. } | UiRequest::SheetZoom { .. } | UiRequest::Display { .. } | UiRequest::Select { .. } | UiRequest::List { .. } | UiRequest::ReloadToolbars | UiRequest::CloseHistory | UiRequest::Restore { .. } | UiRequest::ReferenceManager => {}
+            UiRequest::Notifications(act) => self.notifications.apply(*act),
         }
     }
 }

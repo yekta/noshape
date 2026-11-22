@@ -98,7 +98,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "edit_section",
             summary: "Edit section…: a section view's id, Show cut geometry only, direction, depth and Exclude from cut",
-            description: "A section view's menu › Edit section…: what isn't given stays. `cut_only` Show cut geometry only (off while a depth is set, as the dialog); `flip` Opposite direction; `depth` Section depth Blind in model mm (0 clears it); `exclude` the parts excluded from the cut (names as drawing_get's `exclude_from_cut` lists them, or `body:…`; assembly views only, as the dialog's Exclude from cut; [] unticks it).",
+            description: "A section view's menu › Edit section…: what isn't given stays. `cut_only` Show cut geometry only (off while a depth is set, as the dialog); `flip` Opposite direction; `depth` Section depth Blind in model mm (0 clears it); `depth_to` Up to entity: a vertex or circle center of the parent view (sheet mm), with `depth_offset` (model mm past it; negative is Opposite direction; 0 clears it); `exclude` the parts excluded from the cut (names as drawing_get's `exclude_from_cut` lists them, or `body:…`; assembly views only, as the dialog's Exclude from cut; [] unticks it).",
             fields: with(
                 common(),
                 vec![
@@ -107,6 +107,8 @@ pub fn ops() -> Vec<Op> {
                     opt("cut_only", json!({ "type": "boolean" }), "Show cut geometry only."),
                     opt("flip", json!({ "type": "boolean" }), "Opposite direction."),
                     opt("depth", json!({ "type": "number", "minimum": 0 }), "Section depth, Blind (model mm; 0 clears it)."),
+                    opt("depth_to", point(), "Section depth Up to entity: a vertex or circle center of the parent view (sheet mm)."),
+                    opt("depth_offset", json!({ "type": "number" }), "Up to entity: Offset (model mm; negative: Opposite direction; 0 clears it)."),
                     opt("exclude", json!({ "type": "array", "items": { "type": "string" } }), "Exclude from cut: the parts (names or `body:…`); [] unticks it."),
                 ],
             ),
@@ -171,6 +173,8 @@ pub fn ops() -> Vec<Op> {
                     view_id("view", "The detail view (drawing_get)."),
                     opt("center", point(), "New circle centre (sheet mm)."),
                     opt("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "New circle radius (sheet mm)."),
+                    opt("profile", json!({ "type": "string", "enum": ["circle", "rectangle", "spline", "polygon"] }), "Edit closed profile: × then draw another (circle: `center` and `radius`; the others: `points`, sheet mm)."),
+                    opt("points", json!({ "type": "array", "items": point() }), "profile rectangle (two corners), spline or polygon (at least 3 points), sheet mm."),
                     opt("leader", json!({ "type": "boolean" }), "Label on a leader (Add leader) or beside the circle."),
                     opt("label_at", point(), "The label's position on its leader (sheet mm)."),
                     opt("scale", json!({ "type": "number", "exclusiveMinimum": 0 }), "View scale."),
@@ -193,8 +197,9 @@ pub fn ops() -> Vec<Op> {
                 common(),
                 vec![
                     opt("mode", json!({ "type": "string", "enum": ["normal", "in_line", "axis"], "default": "normal" }), "The dialog's tab."),
-                    req("edge", point(), "A point on the fold line (sheet mm)."),
-                    req("position", point(), "Where the view goes (sheet mm)."),
+                    opt("view", json!({ "type": "integer" }), "Edit auxiliary view… on this auxiliary view (its id) instead of placing one: `label`, `reverse`, `show_reference` change it (\"Edit auxiliary view\")."),
+                    opt("edge", point(), "A point on the fold line (sheet mm; a new view)."),
+                    opt("position", point(), "Where the view goes (sheet mm; a new view)."),
                     opt("label", json!({ "type": "string" }), "Auxiliary id (default the sheet's next letter)."),
                     opt("reverse", json!({ "type": "boolean", "default": false }), "Reverse the direction."),
                     opt("show_reference", json!({ "type": "boolean", "default": true }), "Show the view reference indicator."),
@@ -213,8 +218,9 @@ pub fn ops() -> Vec<Op> {
                 common(),
                 vec![
                     view_id("view", "View to break."),
-                    req("from", point(), "First break line (sheet mm)."),
-                    req("to", point(), "Second break line (sheet mm)."),
+                    opt("index", json!({ "type": "integer", "minimum": 0 }), "Edit... on break `index` of the view (0 = first): its `style` and `gap` change (\"Break view\")."),
+                    opt("from", point(), "First break line (sheet mm; a new break)."),
+                    opt("to", point(), "Second break line (sheet mm; a new break)."),
                     opt("orientation", json!({ "type": "string", "enum": ["vertical", "horizontal"], "default": "vertical" }), "Break line orientation."),
                     opt("style", json!({ "type": "string", "enum": ["zigzag", "straight", "curve", "small_zigzag"], "default": "zigzag" }), "Break line style."),
                     opt("gap", json!({ "type": "number", "exclusiveMinimum": 0 }), "Gap (sheet mm; default 6 mm, 0.25 in in inch drawings)."),
@@ -493,6 +499,14 @@ pub fn ops() -> Vec<Op> {
                     opt("dual_show_units", json!({ "type": ["boolean", "string"] }), "The dual row's Show/hide units: true / false, or \"drawing\"."),
                     opt("diameter", json!({ "type": "boolean" }), "Radial dimensions: diameter (true) or radius (false)."),
                     opt("override_tolerance", json!({ "type": "boolean" }), "Hole callouts: Override precision/tolerance."),
+                    opt("fit_type", json!({ "type": "string", "enum": ["user_defined", "clearance", "transition", "interference"] }), "Fits: Fit type."),
+                    opt("fit_standard", json!({ "type": "string", "enum": ["drawing", "iso", "ansi"] }), "Fits: Fit standard."),
+                    opt("fit_precision", json!({ "type": ["integer", "string"] }), "Fit with tolerance / Fit (Tolerance only): Fit tolerance precision, decimals 0–6 or \"drawing\"."),
+                    opt("fit_stacking", json!({ "type": "string", "enum": ["stacked_without_line", "stacked_diagonally", "stacked_with_line"] }), "Fits: stacking."),
+                    opt("show_hole_class", json!({ "type": "boolean" }), "Fits: Toggle hole class visibility."),
+                    opt("show_shaft_class", json!({ "type": "boolean" }), "Fits: Toggle stacked visibility (the shaft class)."),
+                    opt("count_type", json!({ "type": "string", "enum": ["none", "count_by_view", "count_by_face", "count_by_pattern", "count_by_part", "count_by_face_excluding_patterns"] }), "Hole callouts: Count type."),
+                    opt("reset_text_position", json!({ "type": "boolean" }), "Radial dimensions: Reset text position (the value back at 45°)."),
                 ],
             ),
             mutates: true,
@@ -716,15 +730,20 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "note",
             summary: "Note (text) with an optional leader",
-            description: "The Note tool and panel: `text` (several lines with \\n) placed at `position` (sheet mm); with `leader` (a vertex, circle center or edge point, sheet mm) a leader points there. `height` sets the text height (sheet mm; it becomes the drawing's note height default, as typing it in the panel does). One edit (\"Note\").",
+            description: "The Note tool and panel: `text` (several lines with \\n) placed at `position` (sheet mm); with `leader` (a vertex, circle center or edge point, sheet mm) a leader points there. `height` sets the text height (sheet mm; it becomes the drawing's note height default, as typing it in the panel does). One edit (\"Note\"). The panel's options: `font`, `bold`, `italic`, `underline`, `strikethrough`, `color`, `line_spacing`, `space_before` / `space_after`, `align` / `valign` (notes without leaders), `list`, `order`, `width`, flag notes (`flags`, `flag_shape`, `flag_size`). With `annotation`, Edit note… on that note: the fields given change it (\"Edit note\"; text \"\" deletes it: \"Delete note\").",
             fields: with(
                 common(),
-                vec![
-                    req("text", json!({ "type": "string", "minLength": 1 }), "The note's text."),
-                    req("position", point(), "Where the text goes (sheet mm)."),
-                    opt("leader", point(), "Where the leader points (a snap point, sheet mm)."),
-                    opt("height", json!({ "type": "number", "exclusiveMinimum": 0 }), "Text height (mm)."),
-                ],
+                [
+                    vec![
+                        opt("annotation", json!({ "type": "integer" }), "Edit… this note (its id, drawing_get) instead of placing one."),
+                        opt("text", json!({ "type": "string" }), "The note's text (required for a new note; editing: \"\" deletes the note)."),
+                        opt("position", point(), "Where the text goes (sheet mm; a new note)."),
+                        opt("leader", point(), "Where the leader points (a snap point, sheet mm; a new note)."),
+                        opt("height", json!({ "type": "number", "exclusiveMinimum": 0 }), "Text height (mm)."),
+                    ],
+                    super::drawing_note::fields(),
+                ]
+                .concat(),
             ),
             mutates: true,
             destructive: false,
@@ -877,8 +896,8 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "table_cell",
             summary: "Type text into a general table cell",
-            description: "The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. One edit (\"Edit cell\").",
-            fields: with(common(), vec![req("table", json!({ "type": "integer" }), "Table id (drawing_get)."), req("row", json!({ "type": "integer", "minimum": 0 }), "Row."), req("column", json!({ "type": "integer", "minimum": 0 }), "Column."), req("text", json!({ "type": "string" }), "Cell text.")]),
+            description: "The cell editor of a general table: `text` into cell (`row`, `column`), counted from 0 (the header row, if any, is row 0). The table grows when the cell lies beyond it. The cell panel's options: `font`, `bold`, `italic`, `underline`, `strikethrough`, `align`, `valign`, `height` (mm, null: the table's); drawing_get lists a table's `cell_formats`. One edit (\"Edit cell\").",
+            fields: with(common(), [vec![req("table", json!({ "type": "integer" }), "Table id (drawing_get)."), req("row", json!({ "type": "integer", "minimum": 0 }), "Row."), req("column", json!({ "type": "integer", "minimum": 0 }), "Column."), opt("text", json!({ "type": "string" }), "Cell text (kept when only the panel's options are given).")], super::drawing_note::cell_fields()].concat()),
             mutates: true,
             destructive: false,
             run: table_cell,
@@ -897,6 +916,15 @@ pub fn ops() -> Vec<Op> {
                     opt("origin", point(), "Hole table: the origin vertex (sheet mm)."),
                     opt("more_views", json!({ "type": "array", "items": { "type": "object" } }), "Hole table: further views of the same part, each {view, origin}."),
                     req("position", point(), "Where the table goes (sheet mm)."),
+                    opt("template", json!({ "type": "string", "enum": ["follow_assembly", "onshape_default"] }), "BOM: Template (Follow assembly / Onshape Default BOM)."),
+                    opt("bom_type", json!({ "type": "string", "enum": ["flattened", "structured_top_level", "structured_multi_level"] }), "BOM: BOM type."),
+                    opt("order", json!({ "type": "string", "enum": ["top_to_bottom", "bottom_to_top"] }), "BOM, cut list: Order."),
+                    opt("corner", json!({ "type": "string", "enum": ["top_right", "top_left", "bottom_right", "bottom_left"] }), "Select fixed corner (`position` is that corner; default top right)."),
+                    opt("file", json!({ "type": "string" }), "BOM data…: a CSV file tab of this document (its rows become the table, the first one the header)."),
+                    opt("path", json!({ "type": "string" }), "BOM data…: a local CSV file (imported as a tab first)."),
+                    opt("assembly", json!({ "type": "string" }), "BOM: the Source is an assembly (name or id) instead of a view's: one of this document's (Current document › Assemblies), or with `document` one of that document's (Other documents…); no `view`."),
+                    opt("document", json!({ "type": "string" }), "BOM: Other documents…: the other document's path, its `assembly` at `version`."),
+                    opt("version", json!({ "type": "string" }), "With `document`: its version by name (default its latest version, else its Main workspace as it is now)."),
                 ],
             ),
             mutates: true,
@@ -1103,6 +1131,19 @@ fn edit_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
     };
     let (label, cut_only, flip, depth) = (a.opt_str("label")?.map(str::trim).filter(|l| !l.is_empty()).map(str::to_string), opt_bool(a, "cut_only")?, opt_bool(a, "flip")?, a.opt_f64("depth")?);
+    // Section depth › Up to entity: a vertex or circle center of the parent, and its Offset.
+    let up_to = match a.get("depth_to") {
+        Some(_) if depth.is_some() => return Err(OpError::param("depth_to", "give `depth` (Blind) or `depth_to` (Up to entity), not both")),
+        Some(to) => {
+            let c = point_value(to, "depth_to")?;
+            Some(snap_in(&t, &Tool::Select, parent, c).and_then(|s| s.r).ok_or_else(|| OpError::param("depth_to", "Select a vertex or circle center for the section depth"))?)
+        }
+        None => None,
+    };
+    let offset = a.opt_f64("depth_offset")?;
+    if offset.is_some() && up_to.is_none() && sheet.view(id).is_none_or(|v| v.section_depth_ref.is_none()) {
+        return Err(OpError::param("depth_offset", "only with depth_to (Up to entity), as live"));
+    }
     let mut t = t;
     let v = t.d.sheets[t.sheet].view_mut(id).expect("the view");
     if let (Some(l), ViewKind::Section { label, .. }) = (label, &mut v.kind) {
@@ -1113,6 +1154,12 @@ fn edit_section(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     if let Some(d) = depth {
         (v.section_depth, v.section_depth_ref, v.section_depth_offset) = ((d > 0.0).then_some(d / 1000.0), None, None);
+    }
+    if let Some(r) = up_to {
+        (v.section_depth, v.section_depth_ref) = (None, Some(r));
+    }
+    if let Some(o) = offset {
+        v.section_depth_offset = (o != 0.0).then_some(o / 1000.0);
     }
     if let Some(c) = cut_only {
         v.cut_only = c;
@@ -1183,7 +1230,23 @@ fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn auxiliary_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let t = target(od, a)?;
+    let mut t = target(od, a)?;
+    if a.get("view").is_some() {
+        let id = view_arg(&t, a, "view")?;
+        for k in ["edge", "position", "mode"] {
+            if a.get(k).is_some() {
+                return Err(OpError::param(k, "not when editing an auxiliary view (its edge stays)"));
+            }
+        }
+        let v = t.d.sheets[t.sheet].view_mut(id).expect("view");
+        let Some(r) = v.aux_ref.as_mut() else { return Err(OpError::param("view", "not an auxiliary view")) };
+        if let Some(l) = a.opt_str("label")? {
+            r.letter = l.trim().to_string();
+        }
+        r.show = a.bool_or("show_reference", r.show)?;
+        v.flip = a.bool_or("reverse", v.flip)?;
+        return done(od, t, "Edit auxiliary view", "view", id.0);
+    }
     let e = pt_arg(a, "edge")?;
     let tool0 = Tool::Auxiliary { parent: None };
     let mode = enum_arg(a, "mode", &[("normal", 0u8), ("in_line", 1), ("axis", 2)], 0)?;
@@ -1220,6 +1283,25 @@ fn break_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     refused(&t, "break", view, "view")?;
     let vertical = enum_arg(a, "orientation", &[("vertical", true), ("horizontal", false)], true)?;
     let style = enum_arg(a, "style", &[("zigzag", BreakStyle::ZigZag), ("straight", BreakStyle::Straight), ("curve", BreakStyle::Curve), ("small_zigzag", BreakStyle::SmallZigZag)], BreakStyle::ZigZag)?;
+    // Edit... on a break line: its line type and gap (the lines stay).
+    if let Some(i) = a.opt_u64("index")? {
+        for k in ["from", "to", "orientation"] {
+            if a.get(k).is_some() {
+                return Err(OpError::param(k, "not when editing a break (drawing_move break_line moves it)"));
+            }
+        }
+        let n = t.d.sheets[t.sheet].view(view).map(|v| v.breaks.len()).unwrap_or(0);
+        if i as usize >= n {
+            return Err(OpError::param("index", &format!("the view has {n} breaks")));
+        }
+        let (style, gap) = (a.get("style").map(|_| style), a.opt_f64("gap")?);
+        edit_view(&mut t, view, |v| {
+            let b = &mut v.breaks[i as usize];
+            b.style = style.unwrap_or(b.style);
+            b.gap_mm = gap.unwrap_or(b.gap_mm);
+        });
+        return done(od, t, "Break view", "view", view.0);
+    }
     let gap = a.opt_f64("gap")?.unwrap_or(dt::default_break_gap_mm(t.d.units_mm));
     let pl = t.m.pick(&Tool::Select, &[], [0.0; 2]).placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
     let b = dt::view_break(&pl, vertical, pt_arg(a, "from")?, pt_arg(a, "to")?, style, gap).ok_or_else(|| OpError::param("to", "the break band is empty"))?;
@@ -1458,7 +1540,37 @@ fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(_) if kind != TableTool::CutList => return Err(OpError::param("composite", "cut list tables only")),
         Some(c) => Some(composite_arg(od, c)?),
     };
+    for k in ["template", "bom_type", "file", "path", "assembly", "document"] {
+        if a.get(k).is_some() && kind != TableTool::Bom {
+            return Err(OpError::param(k, "BOM tables only"));
+        }
+    }
+    if a.get("order").is_some() && kind == TableTool::Hole {
+        return Err(OpError::param("order", "BOM and cut list tables only"));
+    }
+    // BOM data…: a CSV file's rows as the table (a file tab, or a local file imported).
+    let csv = match a.get("file").or(a.get("path")) {
+        Some(_) => {
+            let f = insert_file(od, a, noshape_model::file_tab::FileKind::Csv, "a CSV file")?;
+            let rows = noshape_scene::drawing_tools::table_edit::parse_csv(&String::from_utf8_lossy(&f.bytes().ok_or_else(|| OpError::param("file", "the file data is damaged"))?));
+            if rows.is_empty() {
+                return Err(OpError::param("file", "the CSV file has no rows"));
+            }
+            Some(rows)
+        }
+        None => None,
+    };
+    let bom_source = bom_source_arg(od, a)?;
+    let corner = enum_arg(a, "corner", &CORNERS, TableCorner::TopRight)?;
     let mut t = target(od, a)?;
+    if let Some(rows) = csv {
+        let id = t.d.sheets[t.sheet].next_table_id();
+        let mut table = noshape_model::drawing::Table::new(id, TableKind::General { cells: rows, title: None, header: true }, pt_arg(a, "position")?);
+        table.corner = corner;
+        let sheet = t.sheet;
+        t.d.sheets[sheet].tables.push(table);
+        return done(od, t, "BOM table", "table", id);
+    }
     if let Some(source) = composite {
         // Insert › Select a composite part (live2 2278): no view.
         let id = t.d.sheets[t.sheet].next_table_id();
@@ -1470,7 +1582,11 @@ fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         t.d.sheets[sheet].tables.push(table);
         return done(od, t, name, "table", id);
     }
-    let view = view_arg(&t, a, "view")?;
+    let view = match &bom_source {
+        Some(_) if a.get("view").is_some() => return Err(OpError::param("view", "a BOM lists a view's assembly or `assembly`, not both")),
+        Some(_) => ViewId(0),
+        None => view_arg(&t, a, "view")?,
+    };
     let origin = match (kind, a.get("origin")) {
         (TableTool::Hole, Some(o)) => {
             let c = point_value(o, "origin")?;
@@ -1499,9 +1615,66 @@ fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let TableKind::Hole { more: m, .. } = &mut table.kind {
         *m = more;
     }
+    // The insert dialog's Template, BOM type, Order and fixed corner.
+    let bottom = enum_arg(a, "order", &[("top_to_bottom", false), ("bottom_to_top", true)], false)?;
+    match &mut table.kind {
+        TableKind::Bom { structured, top_level, bottom_to_top, default_template, source, .. } => {
+            *source = bom_source;
+            (*structured, *top_level) = enum_arg(a, "bom_type", &[("flattened", (false, false)), ("structured_top_level", (true, true)), ("structured_multi_level", (true, false))], (*structured, *top_level))?;
+            *default_template = enum_arg(a, "template", &[("follow_assembly", false), ("onshape_default", true)], *default_template)?;
+            *bottom_to_top = bottom;
+        }
+        TableKind::CutList { bottom_to_top, .. } => *bottom_to_top = bottom,
+        _ => {}
+    }
+    if a.get("corner").is_some() {
+        table.corner = corner;
+    }
     let sheet = t.sheet;
     t.d.sheets[sheet].tables.push(table);
     done(od, t, name, "table", id)
+}
+
+/// A BOM's Source other than a view: `assembly` of this document, or of `document` at `version` (default its latest
+/// version, else its Main workspace now), labelled as the dialog lists it.
+fn bom_source_arg(od: &OpenDoc, a: &Args) -> Result<Option<noshape_model::drawing::BomSource>, OpError> {
+    use noshape_model::document::TabContent;
+    use noshape_model::drawing::BomSource;
+    if a.get("version").is_some() && a.get("document").is_none() {
+        return Err(OpError::param("version", "`version` goes with `document` (another document's version)"));
+    }
+    let Some(name) = a.opt_str("assembly")? else {
+        return match a.get("document") {
+            Some(_) => Err(OpError::param("assembly", "the assembly of `document` the BOM lists")),
+            None => Ok(None),
+        };
+    };
+    let Some(document) = a.opt_str("document")? else {
+        let tab = doc::tab_of_kind(od.doc(), Some(name), "Assembly", |c| matches!(c, TabContent::Assembly(_))).map_err(|e| e.with_param("assembly"))?;
+        let label = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+        return Ok(Some(BomSource { tab, version: None, label }));
+    };
+    let (path, label, mv, snapshot) = match a.opt_str("version")? {
+        Some(v) => {
+            let (path, v, snap) = crate::derived::named_version(document, v)?;
+            (path, v.label, v.microversion, snap)
+        }
+        None => {
+            let path = std::path::Path::new(document).canonicalize().map_err(|e| OpError::param("document", &format!("{document}: {e}")))?;
+            let info = crate::derived::external_doc_info(&path).map_err(|e| OpError::param("document", &format!("can't read it: {e}")))?;
+            let v = info.versions.first().cloned().ok_or_else(|| OpError::param("document", "it has no workspace"))?;
+            let snap = crate::derived::external_snapshot(&path, v.microversion).map_err(|e| OpError::param("document", &format!("can't read it: {e}")))?;
+            (path, if v.label == "Current state" { "Main".to_string() } else { v.label }, v.microversion, snap)
+        }
+    };
+    let asms: Vec<&noshape_model::document::Tab> = snapshot.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::Assembly(_))).collect();
+    let tab = asms.iter().find(|t| t.name == name || t.id.to_string() == name).ok_or_else(|| {
+        let there = asms.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", ");
+        OpError::param("assembly", &if there.is_empty() { format!("no assemblies in {}", path.display()) } else { format!("no assembly `{name}` in {}; there: {there}", path.display()) })
+    })?;
+    let doc_name = crate::derived::external_doc_info(&path).map(|i| i.name).unwrap_or_default();
+    let key = crate::derived::ExternalRef { path: path.clone(), microversion: mv, tab: tab.id.to_string() }.key();
+    Ok(Some(BomSource { tab: tab.id, version: Some(key), label: format!("{} ({doc_name} {label})", tab.name) }))
 }
 
 /// The `composite` argument: a composite part of one of the document's Part Studios, by names or ids.
@@ -1851,6 +2024,33 @@ fn centermark_resize(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
+    let sheet = t.sheet;
+    let shape = t.d.props.flag_shape;
+    if let Some(id) = a.opt_u64("annotation")? {
+        for k in ["position", "leader"] {
+            if a.get(k).is_some() {
+                return Err(OpError::param(k, "not when editing a note (drawing_move / drawing_annotation_edit)"));
+            }
+        }
+        let s = &mut t.d.sheets[sheet];
+        let Some(AnnotationKind::Note { text, height_mm, style }) = s.annotations.iter_mut().find(|x| x.id == id).map(|x| &mut x.kind) else {
+            return Err(OpError::param("annotation", "not a note on the sheet"));
+        };
+        if let Some(new) = a.opt_str("text")? {
+            if new.trim().is_empty() {
+                s.annotations.retain(|x| x.id != id);
+                return done(od, t, "Delete note", "annotation", id);
+            }
+            *text = new.to_string();
+        }
+        let mut st = style.clone();
+        super::drawing_note::apply(a, &mut st, text, shape)?;
+        *style = st;
+        if let Some(h) = a.opt_f64("height")? {
+            *height_mm = h;
+        }
+        return done(od, t, "Edit note", "annotation", id);
+    }
     let mut style = noshape_model::drawing::note::NoteStyle::default();
     // A first click on a snap point anchors a leader.
     if let Some(l) = a.get("leader") {
@@ -1858,8 +2058,9 @@ fn note(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let p = t.m.pick(&Tool::Note, &[], c).snap_or_edge_point(c).ok_or_else(|| OpError::param("leader", "not a vertex, circle center or edge point of a view"))?;
         style.leaders.push(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() });
     }
-    let sheet = t.sheet;
-    let ann = dt::new_note(&mut t.d, sheet, a.str("text")?.to_string(), a.opt_f64("height")?, style, pt_arg(a, "position")?).ok_or_else(|| OpError::param("text", "a note needs text"))?;
+    let text = a.str("text")?;
+    super::drawing_note::apply(a, &mut style, text, shape)?;
+    let ann = dt::new_note(&mut t.d, sheet, text.to_string(), a.opt_f64("height")?, style, pt_arg(a, "position")?).ok_or_else(|| OpError::param("text", "a note needs text"))?;
     let id = ann.id;
     t.d.sheets[sheet].annotations.push(ann);
     done(od, t, "Note", "annotation", id)
@@ -2065,10 +2266,30 @@ fn edit_detail(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let style = if a.get("style").is_some() { Some(enum_arg(a, "style", &[("in_line", 0u8), ("connected", 1), ("leader", 2)], 0)?) } else { None };
     let (scale, label) = (a.opt_f64("scale")?, a.opt_str("label")?.map(str::to_string));
     let (show, clip) = (a.get("show_profile").and_then(|v| v.as_bool()), a.get("clip_border").and_then(|v| v.as_bool()));
-    if center.is_none() && radius.is_none() && leader.is_none() && label_at.is_none() && style.is_none() && scale.is_none() && label.is_none() && show.is_none() && clip.is_none() {
+    // Edit detail…: × on the profile's chip, then another circle, rectangle, spline or polygon.
+    let shape = enum_arg(a, "profile", &[("circle", 0u8), ("rectangle", 1), ("spline", 2), ("polygon", 3)], 0)?;
+    let outline = match a.get("profile") {
+        Some(_) if shape > 0 => {
+            if center.is_some() || radius.is_some() {
+                return Err(OpError::param("profile", "a rectangle, spline or polygon takes `points`, not center / radius"));
+            }
+            let pts = a.opt_array("points")?.ok_or_else(|| OpError::param("points", "the profile's points"))?.iter().enumerate().map(|(i, p)| point_value(p, &format!("points[{i}]"))).collect::<Result<Vec<_>, _>>()?;
+            let local: Vec<[f64; 2]> = pts.iter().map(|p| ppl.to_view(*p)).collect();
+            Some(dt::detail_profile(shape, &local).ok_or_else(|| OpError::param("points", if shape == 1 { "two corners" } else { "at least 3 points" }))?)
+        }
+        _ => None,
+    };
+    let circle = a.get("profile").is_some() && shape == 0;
+    if (center.is_some() || radius.is_some()) && !circle && t.d.sheets[si].view(id).is_some_and(|v| v.detail_profile.is_some()) {
+        return Err(OpError::param("center", "the profile isn't a circle: give `profile` (circle with center and radius, or a shape with points)"));
+    }
+    if outline.is_none() && !circle && center.is_none() && radius.is_none() && leader.is_none() && label_at.is_none() && style.is_none() && scale.is_none() && label.is_none() && show.is_none() && clip.is_none() {
         return Err(OpError::param("center", "nothing to change"));
     }
     let v = t.d.sheets[si].view_mut(id).expect("view");
+    if circle {
+        v.detail_profile = None;
+    }
     if let Some(s) = scale {
         v.scale = Some(s);
     }
@@ -2090,6 +2311,10 @@ fn edit_detail(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     if let Some(rs) = radius {
         *r = rs / ppl.len_to_sheet(1.0).max(1e-12);
+    }
+    if let Some((poly, pc, pr)) = outline {
+        (*c, *r) = (pc, pr);
+        v.detail_profile = Some(poly);
     }
     // The label's offset from the circle centre (sheet mm).
     let (cs, rs) = (ppl.to_sheet(*c), ppl.len_to_sheet(*r));
@@ -2354,8 +2579,28 @@ fn table_cell(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("table", "not a general table (BOM, hole, cut list and revision tables fill themselves)"));
     }
     let (row, col) = (a.opt_u64("row")?.unwrap_or(0) as usize, a.opt_u64("column")?.unwrap_or(0) as usize);
-    dt::set_general_cell(table, row, col, a.str("text")?);
+    let formatted = super::drawing_note::CELL_FIELDS.iter().any(|k| a.value.get(*k).is_some());
+    match a.opt_str("text")? {
+        Some(text) => dt::set_general_cell(table, row, col, text),
+        None if formatted => {}
+        None => return Err(OpError::param("text", "required (or the cell panel's options)")),
+    }
+    if formatted {
+        let mut f = table.shown_cell_format(row, col);
+        super::drawing_note::apply_cell(a, &mut f, table.text_height)?;
+        table.set_cell_format(row, col, f);
+    }
     done(od, t, "Edit cell", "table", id)
+}
+
+/// A hatch pattern of group `standard` by its name as listed (or its first word: "ANSI31").
+pub(super) fn hatch_pattern_arg(standard: usize, name: &str) -> Result<usize, OpError> {
+    let (_, list) = noshape_model::drawing::hatch_pat::GROUPS[standard];
+    let lower = name.trim().to_lowercase();
+    list.iter()
+        .position(|p| p.name.to_lowercase() == lower)
+        .or_else(|| list.iter().position(|p| p.name.split_whitespace().next().is_some_and(|w| w.to_lowercase() == lower)))
+        .ok_or_else(|| OpError::param("pattern", &format!("one of {}", list.iter().map(|p| p.name).collect::<Vec<_>>().join(", "))))
 }
 
 fn hatch_region(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -2380,11 +2625,7 @@ fn hatch_region(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => existing.as_ref().map_or(0, |h| h.standard),
     };
     let pattern = match a.opt_str("pattern")? {
-        Some(name) => {
-            let (_, list) = hatch_pat::GROUPS[standard];
-            let lower = name.trim().to_lowercase();
-            list.iter().position(|p| p.name.to_lowercase() == lower).or_else(|| list.iter().position(|p| p.name.split_whitespace().next().is_some_and(|w| w.to_lowercase() == lower))).ok_or_else(|| OpError::param("pattern", &format!("one of {}", list.iter().map(|p| p.name).collect::<Vec<_>>().join(", "))))?
-        }
+        Some(name) => hatch_pattern_arg(standard, name)?,
         None => existing.as_ref().filter(|h| h.standard == standard).map_or(hatch_pat::default_pattern(standard), |h| h.pattern),
     };
     // Unset fields keep the edited hatch's values (as the dialog opens them).
@@ -3049,7 +3290,57 @@ fn edit_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             ann.hole = None;
         }
     }
+    edit_fit(a, ann)?;
+    if let Some(v) = a.opt_str("count_type")? {
+        if !hole {
+            return Err(OpError::param("count_type", "only hole callouts"));
+        }
+        let all = noshape_model::drawing::HoleCount::ALL;
+        let c = all.iter().copied().find(|c| c.name().to_lowercase().replace(['(', ')'], "").replace(' ', "_") == v).ok_or_else(|| OpError::param("count_type", "not a count type"))?;
+        ann.hole.get_or_insert_with(Default::default).count = c;
+        if ann.hole.as_deref().is_some_and(|h| *h == Default::default()) {
+            ann.hole = None;
+        }
+    }
+    if a.bool_or("reset_text_position", false)? {
+        let AnnotationKind::RadialDimension { angle, .. } = &mut ann.kind else { return Err(OpError::param("reset_text_position", "only radial dimensions")) };
+        *angle = std::f64::consts::FRAC_PI_4;
+    }
     done(od, t, if hole { "Edit hole callout" } else { "Edit dimension" }, "annotation", id)
+}
+
+/// The palette's fit lists (a Fit tolerance only).
+fn edit_fit(a: &Args, ann: &mut noshape_model::drawing::Annotation) -> Result<(), OpError> {
+    use noshape_model::drawing::{FitStacking, FitType, Tolerance};
+    const KEYS: [&str; 6] = ["fit_type", "fit_standard", "fit_precision", "fit_stacking", "show_hole_class", "show_shaft_class"];
+    let Some(k) = KEYS.iter().find(|k| a.get(k).is_some()) else { return Ok(()) };
+    if !matches!(ann.format.tolerance, Tolerance::Fit { .. }) {
+        return Err(OpError::param(k, "the tolerance isn't a fit"));
+    }
+    let key = |n: &str| n.to_lowercase().replace(' ', "_");
+    let f = &mut ann.format.fit;
+    if let Some(v) = a.opt_str("fit_type")? {
+        f.fit_type = FitType::ALL.iter().copied().find(|x| key(x.name()) == v).ok_or_else(|| OpError::param("fit_type", "not a fit type"))?;
+    }
+    f.iso = enum_arg(a, "fit_standard", &[("drawing", None), ("iso", Some(true)), ("ansi", Some(false))], f.iso)?;
+    match a.get("fit_precision") {
+        None => {}
+        Some(Value::String(s)) if s == "drawing" => f.precision = None,
+        Some(v) => f.precision = Some(v.as_u64().filter(|n| *n <= 6).ok_or_else(|| OpError::param("fit_precision", "decimals 0–6 or \"drawing\""))? as u8),
+    }
+    if a.get("fit_precision").is_some() && f.mode == noshape_model::drawing::FitMode::Fit {
+        return Err(OpError::param("fit_precision", "only Fit with tolerance and Fit (Tolerance only)"));
+    }
+    if let Some(v) = a.opt_str("fit_stacking")? {
+        f.stacking = FitStacking::ALL.iter().copied().find(|x| key(x.name()) == v).ok_or_else(|| OpError::param("fit_stacking", "not a stacking"))?;
+    }
+    if let Some(v) = a.get("show_hole_class").and_then(Value::as_bool) {
+        f.hide_hole = !v;
+    }
+    if let Some(v) = a.get("show_shaft_class").and_then(Value::as_bool) {
+        f.hide_shaft = !v;
+    }
+    Ok(())
 }
 
 fn delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

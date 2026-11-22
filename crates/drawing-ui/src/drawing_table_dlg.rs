@@ -139,7 +139,7 @@ impl DrawingEditor {
         let ed = cx.entity().downgrade();
         crate::drawing_hooks::pick_file(self.doc.clone(), "BOM data", &[noshape_model::file_tab::FileKind::Csv], &["csv"], window, cx, move |file, _, cx| {
             let text = file.bytes().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
-            let rows = parse_csv(&text);
+            let rows = noshape_scene::drawing_tools::table_edit::parse_csv(&text);
             let _ = ed.update(cx, |t, cx| {
                 if let Some(d) = &mut t.table_dlg
                     && !rows.is_empty()
@@ -845,38 +845,3 @@ impl DrawingEditor {
 /// Other documents…: the opened document's name and its assemblies (with
 /// their labels).
 type OpenedDoc = (String, Vec<(noshape_model::drawing::BomSource, String)>);
-
-/// Rows of a CSV file (quoted fields, "" inside quotes; blank lines dropped).
-fn parse_csv(text: &str) -> Vec<Vec<String>> {
-    let mut rows = Vec::new();
-    for line in text.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-        let (mut cells, mut cur, mut quoted) = (Vec::new(), String::new(), false);
-        let mut chars = line.chars().peekable();
-        while let Some(c) = chars.next() {
-            match c {
-                '"' if quoted && chars.peek() == Some(&'"') => {
-                    cur.push('"');
-                    chars.next();
-                }
-                '"' => quoted = !quoted,
-                ',' if !quoted => cells.push(std::mem::take(&mut cur).trim().to_string()),
-                _ => cur.push(c),
-            }
-        }
-        cells.push(cur.trim().to_string());
-        rows.push(cells);
-    }
-    rows
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn csv_rows_keep_quoted_commas() {
-        assert_eq!(super::parse_csv("Item,Name\n1,\"Bolt, M6\"\n\n2,\"Nut \"\"A\"\"\"\n"), vec![vec!["Item", "Name"], vec!["1", "Bolt, M6"], vec!["2", "Nut \"A\""]]);
-    }
-}
-

@@ -7278,6 +7278,29 @@ impl AssemblyView {
         Some(crate::named_views_dialog::render(props, &st, "asm-named-views", &cx.entity(), Self::on_named_views_action, cx))
     }
 
+    /// Picking a saved view in the Named views dialog (and view_camera's
+    /// named view): its camera and section.
+    fn apply_named_view(&mut self, name: &str, cx: &mut Context<Self>) {
+        let Some(v) = self.assembly(cx).and_then(|a| a.named_views.iter().find(|v| v.name == name).cloned()) else { return };
+        // Named views restore the section state too (Onshape).
+        if !v.section.is_empty() || self.ui.section.is_some() {
+            self.ui.section = (!v.section.is_empty()).then(|| AsmSection {
+                planes: v.section.iter().map(|q| AsmSectionPlane::new(DVec3::new(q[0], q[1], q[2]) * q[3], DVec3::new(q[0], q[1], q[2]), DVec3::new(q[0], q[1], q[2]).any_orthonormal_vector())).collect(),
+                ..Default::default()
+            });
+            self.rebuild_scene(false, cx);
+        }
+        self.push_camera_history(cx);
+        self.viewport.update(cx, |vp, cx| {
+            let mut to = vp.camera;
+            to.target = DVec3::from_array(v.target);
+            to.rotation = glam::DQuat::from_array(v.rotation).normalize();
+            to.distance = v.distance;
+            to.projection = if v.perspective { noshape_render::Projection::Perspective } else { noshape_render::Projection::Orthographic };
+            vp.animate_to(to, cx);
+        });
+    }
+
     /// The Named views dialog's buttons and list ([`crate::named_views_dialog`]).
     fn on_named_views_action(&mut self, a: crate::named_views_dialog::Action, window: &mut Window, cx: &mut Context<Self>) {
         use crate::named_views_dialog::Action;
@@ -7306,25 +7329,7 @@ impl AssemblyView {
                 st.update(cx, |s, cx| s.set_value("", window, cx));
             }
             Action::Pick(name) => {
-                if let Some(v) = self.assembly(cx).and_then(|a| a.named_views.iter().find(|v| v.name == name).cloned()) {
-                    // Named views restore the section state too (Onshape).
-                    if !v.section.is_empty() || self.ui.section.is_some() {
-                        self.ui.section = (!v.section.is_empty()).then(|| AsmSection {
-                            planes: v.section.iter().map(|q| AsmSectionPlane::new(DVec3::new(q[0], q[1], q[2]) * q[3], DVec3::new(q[0], q[1], q[2]), DVec3::new(q[0], q[1], q[2]).any_orthonormal_vector())).collect(),
-                            ..Default::default()
-                        });
-                        self.rebuild_scene(false, cx);
-                    }
-                    self.push_camera_history(cx);
-                    self.viewport.update(cx, |vp, cx| {
-                        let mut to = vp.camera;
-                        to.target = DVec3::from_array(v.target);
-                        to.rotation = glam::DQuat::from_array(v.rotation).normalize();
-                        to.distance = v.distance;
-                        to.projection = if v.perspective { noshape_render::Projection::Perspective } else { noshape_render::Projection::Orthographic };
-                        vp.animate_to(to, cx);
-                    });
-                }
+                self.apply_named_view(&name, cx);
                 self.ui.named_view_picked = Some(name);
             }
             Action::Remove => {

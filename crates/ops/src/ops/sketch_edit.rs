@@ -48,7 +48,7 @@ pub fn ops() -> Vec<Op> {
             "copy_entities",
             "Copy sketch entities and paste them into this or another sketch",
             "Copy sketch entities (the curve menu), then Paste sketch entities in the target sketch: the curves with the constraints among them, moved by `offset` (sketch coordinates of the target; the app pastes where they were and lets you drag them). Returns the pasted entities as `created`.",
-            vec![req("entities", ids(), "Entity ids (`entity:…`) to copy."), opt("to", s(), "Sketch to paste into (default: the same one)."), opt("offset", point(), "[x, y] move (lengths; default [0, 0]).")],
+            vec![req("entities", ids(), "Entity ids (`entity:…`) to copy."), opt("to", s(), "Sketch to paste into (default: the same one)."), opt("to_tab", s(), "With `to`: the Part Studio that sketch is in (the clipboard reaches across tabs; default this one)."), opt("offset", point(), "[x, y] move (lengths; default [0, 0]).")],
             copy_entities,
         ),
         op(
@@ -587,10 +587,19 @@ fn copy_entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut src = target(od, tab, a)?;
     let ids = a.array("entities")?.iter().enumerate().map(|(i, v)| parse_entity(v, &mut src, false, false).map_err(|e| e.with_param(format!("entities[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     let clip = src.data.sketch.extract(&ids);
+    let dest = match a.opt_str("to_tab")? {
+        Some(_) if a.get("to").is_none() => return Err(OpError::param("to", "required with `to_tab`: the sketch to paste into")),
+        Some(k) => {
+            let d = crate::doc::find_tab(od.doc(), k).map_err(|e| e.with_param("to_tab"))?;
+            crate::doc::studio(od.doc(), d).map_err(|e| e.with_param("to_tab"))?;
+            d
+        }
+        None => tab,
+    };
     let mut t = match a.opt_str("to")? {
         Some(to) => {
             let v = json!({ "sketch": to });
-            target(od, tab, &Args { op: a.op, value: &v }).map_err(|e| e.with_param("to"))?
+            target(od, dest, &Args { op: a.op, value: &v }).map_err(|e| e.with_param("to"))?
         }
         None => src,
     };

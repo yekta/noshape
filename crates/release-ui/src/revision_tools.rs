@@ -13,11 +13,8 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::release::{ItemKind, ReleaseLog, TypedRevision};
+use noshape_model::release::ItemKind;
 use std::path::PathBuf;
-
-/// The release log's key in a document's store (as the release dialog's).
-const META_KEY: &str = crate::release_dialog::META_KEY;
 
 /// Object type's choices (live revtools-1121: Part · Assembly · Drawing · Blob).
 const KINDS: [ItemKind; 4] = [ItemKind::Part, ItemKind::Assembly, ItemKind::Drawing, ItemKind::File];
@@ -28,11 +25,7 @@ fn kind_label(kind: ItemKind) -> &'static str {
 }
 
 /// One row of the search: a revision and the document it was released in.
-struct Found {
-    path: PathBuf,
-    document: String,
-    revision: TypedRevision,
-}
+type Found = noshape_ops::release::FoundRevision;
 
 pub struct RevisionToolsView {
     part_number: Entity<InputState>,
@@ -87,12 +80,10 @@ impl RevisionToolsView {
     fn reset(&mut self, cx: &mut Context<Self>) {
         let Some((number, kind, rows)) = &self.found else { return };
         let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
-        let mut paths: Vec<&PathBuf> = rows.iter().map(|r| &r.path).collect();
+        let mut paths: Vec<PathBuf> = rows.iter().map(|r| r.path.clone()).collect();
         paths.dedup();
-        for path in paths {
-            if let Err(e) = reset_in(path, number, *kind, now) {
-                log::warn!("could not reset part number type in {}: {e:#}", path.display());
-            }
+        if let Err(e) = noshape_ops::release::reset_part_number_type(&paths, number, *kind, now) {
+            log::warn!("could not reset part number type: {e:#}");
         }
         self.find(cx);
     }
@@ -101,28 +92,7 @@ impl RevisionToolsView {
 /// The revisions of `number` released as `kind` in every local document,
 /// newest first.
 fn search(number: &str, kind: ItemKind) -> Vec<Found> {
-    let mut out: Vec<Found> = Vec::new();
-    for path in crate::doc_files::other_documents(std::path::Path::new("")) {
-        let Ok(store) = noshape_store::Document::open_read_only(&path) else { continue };
-        let log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
-        let revisions = log.typed_revisions(number, kind);
-        if revisions.is_empty() {
-            continue;
-        }
-        let document = crate::derived::external_doc_info(&path).map(|i| i.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
-        out.extend(revisions.into_iter().map(|revision| Found { path: path.clone(), document: document.clone(), revision }));
-    }
-    out.sort_by_key(|f| std::cmp::Reverse(f.revision.created));
-    out
-}
-
-fn reset_in(path: &std::path::Path, number: &str, kind: ItemKind, now: i64) -> anyhow::Result<()> {
-    let mut store = noshape_store::Document::open(path)?;
-    let mut log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
-    if log.reset_part_number_type(number, kind, now) {
-        store.set_meta(META_KEY, Some(&log.to_json()))?;
-    }
-    Ok(())
+    noshape_ops::release::find_revisions(&crate::doc_files::other_documents(std::path::Path::new("")), number, kind)
 }
 
 /// Help image (1:1): bold 14 px labels, 380 x 32 fields, the table's columns.

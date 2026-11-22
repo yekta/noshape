@@ -21,10 +21,12 @@ pub fn ops() -> Vec<Op> {
                 opt("tab", s(), "The tab to release (name or id). Required unless `from_draft` gives the items."),
                 opt("tabs", strings(), "More tabs whose items join the candidate (the dialog's + Add items)."),
                 opt("from_draft", s(), "Start from this saved draft's items, name and notes (Release drafts › Review Release); the other fields change them."),
+                opt("from_release", s(), "Clone: start from this release's items, name and notes as the current workspace has them (the review's Clone, \"Recreate Release from the current workspace\": names and part numbers as they are now, each at its next revision); the other fields change them."),
                 opt("draft", json!({ "type": "boolean" }), "Save draft instead of releasing: the candidate is kept in the document by its name (no checks but the name)."),
                 opt("generate_part_numbers", json!({ "type": "boolean" }), "Generate part numbers for the items without one (Company settings' sequential numbering scheme)."),
                 opt("revert", strings(), "Items (names or part ids) reverted to their last released revision (the State column's Revert)."),
                 opt("parts", strings(), "Part Studio: only these parts (ids or names)."),
+                opt("configuration", json!({ "type": "object" }), "Configured Part Studio: the parts of this configuration ({input name or id: value}; the dialog's Configuration inputs, then Generate). Default: the default configuration."),
                 opt("all_configurations", json!({ "type": "boolean" }), "Part Studio with `parts`: each part once per configuration (the part's Release all configurations…; the list inputs' options combined, at most 100). Every row is named as the part; `part_numbers` / `revisions` name one as its tooltip reads, \"Part 1 / Size / Small\"."),
                 opt("instance", s(), "Assembly: only this instance's (its Release…): its part, another document's part at its version (linked to that version), or a subassembly's contents."),
                 opt("name", s(), "Release name (the version's name); required unless `from_draft` names it."),
@@ -44,8 +46,8 @@ pub fn ops() -> Vec<Op> {
             group: "release",
             verb: "approve",
             summary: "Approve a Pending release candidate",
-            description: "A submitted candidate's approver › Approve (from Release drafts): it is released at the version made when it was submitted; its items' states become Released.",
-            fields: vec![doc_field(), req("name", s(), "The candidate's release name.")],
+            description: "A submitted candidate's approver › Release (from Release drafts): `comment` is added to the candidate's comments, then it is released at the version made when it was submitted; its items' states become Released. Only an approver of the candidate (the local user, when listed in its Approvers) can release it.",
+            fields: vec![doc_field(), req("name", s(), "The candidate's release name."), req("comment", s(), "Comment (required, as in the dialog).")],
             mutates: true,
             destructive: false,
             run: approve,
@@ -54,8 +56,8 @@ pub fn ops() -> Vec<Op> {
             group: "release",
             verb: "reject",
             summary: "Reject a Pending release candidate",
-            description: "A submitted candidate's approver › Reject: the candidate stays, Rejected; its items stay as they were (release them with another candidate).",
-            fields: vec![doc_field(), req("name", s(), "The candidate's release name.")],
+            description: "A submitted candidate's Reject (its approver's, or its creator's \"Reject and override other approvers\"): `comment` is added to the candidate's comments; the candidate stays, Rejected; its items stay as they were (release them with another candidate).",
+            fields: vec![doc_field(), req("name", s(), "The candidate's release name."), req("comment", s(), "Comment (required, as in the dialog).")],
             mutates: true,
             destructive: false,
             run: reject,
@@ -176,17 +178,38 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     workflows_on()?;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let provider = crate::derived::DocStudios::new(od.doc().clone(), od.studio_cache.clone());
-    let draft = match a.opt_str("from_draft")? {
-        Some(n) => Some(rel::release_log(&od.session).drafts.iter().find(|d| d.name == n).cloned().ok_or_else(|| OpError::param("from_draft", &format!("no draft `{n}`")))?),
-        None => None,
+    let cloned = a.opt_str("from_release")?.is_some();
+    let draft = match (a.opt_str("from_draft")?, a.opt_str("from_release")?) {
+        (Some(_), Some(_)) => return Err(OpError::param("from_release", "either `from_draft` or `from_release`")),
+        (Some(n), None) => Some(rel::release_log(&od.session).drafts.iter().find(|d| d.name == n).cloned().ok_or_else(|| OpError::param("from_draft", &format!("no draft `{n}`")))?),
+        (None, Some(n)) => {
+            if od.session.viewing.is_some() {
+                return Err(OpError::param("from_release", "Clone recreates a release from the current workspace: return to the workspace first"));
+            }
+            let log = rel::release_log(&od.session);
+            let releases = || log.packages.iter().filter(|p| p.kind == PackageKind::Release).map(|p| p.name.clone()).collect::<Vec<_>>().join(", ");
+            let Some(p) = log.packages.iter().rev().find(|p| p.kind == PackageKind::Release && p.name == n) else {
+                return Err(OpError::param("from_release", &format!("no release `{n}`; releases: {}", releases())));
+            };
+            Some(Package { items: rel::refreshed_items(&od.session, &*provider, &p.items), approvers: Vec::new(), observers: Vec::new(), comments: Vec::new(), ..p.clone() })
+        }
+        (None, None) => None,
     };
     let tab = match a.opt_str("tab")? {
         Some(t) => Some(crate::doc::find_tab(od.doc(), t)?),
         None if draft.is_some() => None,
-        None => return Err(OpError::param("tab", "the tab to release (or `from_draft`)")),
+        None => return Err(OpError::param("tab", "the tab to release (or `from_draft` / `from_release`)")),
     };
     let mut items = match (&draft, tab, a.opt_str("instance")?) {
         (_, Some(tab), Some(k)) => instance_items(od, tab, k)?,
+        (_, Some(tab), None) if a.get("configuration").is_some() => {
+            if !matches!(od.doc().tab(tab).map(|t| &t.content), Some(TabContent::PartStudio(ps)) if !ps.configuration.inputs.is_empty()) {
+                return Err(OpError::param("configuration", "a configured Part Studio's (its Configuration inputs)"));
+            }
+            let config = super::source_config_arg(od, tab, a)?;
+            let (ids, names) = rel::studio_parts(&*provider, tab, &config);
+            rel::part_items(&od.session, tab, &ids, &names, &config)
+        }
         (_, Some(tab), None) => rel::tab_items(&od.session, &*provider, tab),
         (Some(d), None, _) => d.items.clone(),
         (None, None, _) => Vec::new(),
@@ -218,6 +241,9 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         items = keep;
     }
     if a.bool_or("all_configurations", false)? {
+        if a.get("configuration").is_some() {
+            return Err(OpError::param("all_configurations", "either `configuration` or `all_configurations`"));
+        }
         let tab = tab.filter(|t| matches!(od.doc().tab(*t).map(|t| &t.content), Some(TabContent::PartStudio(_))));
         let (Some(tab), true) = (tab, a.opt_array("parts")?.is_some()) else { return Err(OpError::param("all_configurations", "parts of a Part Studio `tab`, named in `parts`")) };
         items = items.iter().flat_map(|it| match &it.part {
@@ -305,7 +331,7 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let pkg = Package { id: 0, kind: PackageKind::Release, name: name.clone(), notes, created, version: None, items, re_releasable: false, approvers, observers, state: None, decided_by: None, comments };
         let mut log = rel::release_log(&od.session);
         log.save_draft(pkg.clone());
-        if let Some(old) = draft.as_ref().filter(|d| d.name != name) {
+        if let Some(old) = draft.as_ref().filter(|d| !cloned && d.name != name) {
             log.delete_draft(&old.name);
         }
         rel::save_log(&mut od.session, &log).map_err(|e| OpError::new("release", format!("{e:#}")))?;
@@ -365,11 +391,26 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn approve(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let name = a.str("name")?;
-    if rel::release_log(&od.session).candidate(name).is_none_or(|c| c.state != Some(noshape_model::release::CandidateState::Pending)) {
+    let me = noshape_store::local_user_name();
+    let Some(c) = rel::release_log(&od.session).candidate(name).filter(|c| c.state == Some(noshape_model::release::CandidateState::Pending)).cloned() else {
         return Err(OpError::param("name", &format!("no pending release candidate `{name}`")));
+    };
+    if !c.approvers.contains(&me) {
+        return Err(OpError::param("name", &format!("only its approvers can release `{name}` (Approvers: {})", c.approvers.join(", "))));
     }
+    let comment = review_comment(a)?;
+    rel::comment(&mut od.session, name, comment).map_err(|e| OpError::new("release", format!("{e:#}")))?;
     let pkg = rel::approve(&mut od.session, name).map_err(|e| OpError::new("release", format!("{e:#}")))?;
     Ok(json!({ "release": pkg.name, "state": "Released", "approved_by": pkg.decided_by, "version": pkg.version, "items": pkg.items.iter().map(item_json).collect::<Vec<_>>() }).into())
+}
+
+/// A review's Comment: required while the candidate is Pending (the dialog's "Required field must not be empty.").
+fn review_comment<'a>(a: &'a Args<'_>) -> Result<&'a str, OpError> {
+    let c = a.str("comment")?.trim();
+    if c.is_empty() {
+        return Err(OpError::param("comment", "Required field must not be empty."));
+    }
+    Ok(c)
 }
 
 fn discard(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
@@ -392,6 +433,11 @@ fn comment(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn reject(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let name = a.str("name")?;
+    if rel::release_log(&od.session).candidate(name).is_none_or(|c| c.state != Some(noshape_model::release::CandidateState::Pending)) {
+        return Err(OpError::param("name", &format!("no pending release candidate `{name}`")));
+    }
+    let comment = review_comment(a)?;
+    rel::comment(&mut od.session, name, comment).map_err(|e| OpError::new("release", format!("{e:#}")))?;
     rel::reject(&mut od.session, name).map_err(|_| OpError::param("name", &format!("no pending release candidate `{name}`")))?;
     Ok(json!({ "release": name, "state": "Rejected", "rejected_by": noshape_store::local_user_name() }).into())
 }

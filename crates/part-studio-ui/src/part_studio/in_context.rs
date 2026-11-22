@@ -64,7 +64,7 @@ fn face_boundary(m: &MeshBuffers, fi: usize) -> Vec<&[[f32; 3]]> {
 }
 
 /// Default slider position (live: the context draws at about 20 % opacity).
-const DEFAULT_SLIDER: f32 = 0.29;
+const DEFAULT_SLIDER: f32 = noshape_ops::window::CONTEXT_TRANSPARENCY;
 
 /// Events the Part Studio sends to the workspace.
 pub enum PartStudioEvent {

@@ -39,6 +39,7 @@ pub fn ops() -> Vec<Op> {
                 tab_field(),
                 opt("part", s(), "Part id (`body:…`) or name."),
                 opt("parts", json!({ "type": "array", "items": { "type": "string" } }), "Several parts' ids or names (instead of `part`)."),
+                opt("reset", json!({ "type": "boolean", "default": false }), "Reset all first: each part's regenerated name and no metadata (description, part number, revision, the meta fields, mass override); the fields given then apply."),
                 opt("name", s(), "Name."),
                 opt("description", s(), "Description."),
                 opt("part_number", s(), "Part number."),
@@ -186,6 +187,10 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         Some(_) => return Err(OpError::param("inertia_override", "nine numbers (Lxx, Lxy, … Lzz), or null")),
     };
+    let reset = a.bool_or("reset", false)?;
+    if reset && od.session.viewing.is_some() {
+        return Err(OpError::param("reset", "a version's Properties have no Reset all"));
+    }
     let r = od.regenerate(tab, None)?;
     let config = od.current_config(tab)?;
     let ps = crate::doc::studio(od.doc(), tab)?;
@@ -209,6 +214,11 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             meta: p.meta.clone(),
             mass_override: p.mass_override,
         };
+        if reset {
+            // Reset all: the regenerated name, no metadata.
+            let name = r.context.bodies.iter().find(|x| x.id == *body).map(|x| x.name.clone()).unwrap_or_else(|| shown.clone());
+            v = studio::PartPropertyValues { name, ..Default::default() };
+        }
         if let Some(x) = text("name")? {
             v.name = x;
         }

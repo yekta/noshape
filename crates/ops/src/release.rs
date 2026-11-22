@@ -327,6 +327,31 @@ pub fn release_description(pkg: &Package) -> String {
     format!("Release {}", pkg.name)
 }
 
+/// A release's items as the current workspace has them (the review's Clone, "Recreate Release from the current
+/// workspace"): parts and tabs renamed and renumbered as they are now, each at its part number's next revision;
+/// items from other documents' versions as they were.
+pub fn refreshed_items(session: &Session, provider: &dyn DerivedProvider, items: &[ReleaseItem]) -> Vec<ReleaseItem> {
+    let log = release_log(session);
+    items
+        .iter()
+        .map(|it| match &it.part {
+            // Versions don't change.
+            _ if it.document.is_some() => it.clone(),
+            Some(b) => {
+                let (ids, names) = studio_parts(provider, it.tab, &it.config);
+                let name = ids.iter().position(|x| x == b).map(|i| names[i].clone()).unwrap_or_else(|| it.name.clone());
+                part_items(session, it.tab, std::slice::from_ref(b), &[name], &it.config).pop().unwrap_or_else(|| it.clone())
+            }
+            None => {
+                let pn = tab_part_number(session, it.tab);
+                let pn = if pn.is_empty() { it.part_number.clone() } else { pn };
+                let name = session.doc.tab(it.tab).map(|t| t.name.clone()).unwrap_or_else(|| it.name.clone());
+                ReleaseItem { name, revision: log.next_revision(&pn), part_number: pn, ..it.clone() }
+            }
+        })
+        .collect()
+}
+
 /// Release (or obsolete) `pkg` as the dialog's Release / Obsolete button
 /// does: a release puts its part numbers onto the parts (one change per
 /// Part Studio) and the tab items, and is recorded at a new version named
@@ -532,4 +557,87 @@ fn set_release_state(session: &mut Session, pkg: &Package, state: &str) -> anyho
         d.item.state = Some(state.to_string());
     }
     crate::version_props::write(session, mv, &props)
+}
+
+/// A released revision of a part or assembly in an opened other document
+/// (View released items; help: "pick a particular revision; released items
+/// show a solid triangle icon").
+#[derive(Clone)]
+pub struct Released {
+    pub tab: TabId,
+    pub part: Option<BodyId>,
+    pub name: String,
+    pub assembly: bool,
+    pub revision: String,
+    pub part_number: String,
+    /// The version it was released at.
+    pub microversion: noshape_store::MicroversionId,
+}
+
+/// A release log's released parts and assemblies, newest release first
+/// (obsoleted revisions and items linked from other documents left out);
+/// `microversion` resolves a package's version (a version id, or a
+/// microversion for versions linked from elsewhere).
+pub fn released_items(log: &ReleaseLog, microversion: &dyn Fn(&str) -> Option<noshape_store::MicroversionId>) -> Vec<Released> {
+    let obsolete: Vec<(&str, &str)> = log.packages.iter().filter(|p| p.kind == PackageKind::Obsoletion).flat_map(|p| p.items.iter().map(|i| (i.part_number.as_str(), i.revision.as_str()))).collect();
+    let mut out = Vec::new();
+    for p in log.packages.iter().rev().filter(|p| p.kind == PackageKind::Release) {
+        let Some(mv) = p.version.as_deref().and_then(microversion) else { continue };
+        for i in &p.items {
+            if !matches!(i.kind, ItemKind::Part | ItemKind::Assembly) || i.document.is_some() || i.reverted || obsolete.contains(&(i.part_number.as_str(), i.revision.as_str())) {
+                continue;
+            }
+            out.push(Released { tab: i.tab, part: i.part.clone(), name: i.name.clone(), assembly: i.kind == ItemKind::Assembly, revision: i.revision.clone(), part_number: i.part_number.clone(), microversion: mv });
+        }
+    }
+    out
+}
+
+/// Another document's released parts and assemblies (the Insert and
+/// Replace dialogs' View released items), newest release first.
+pub fn document_released_items(path: &std::path::Path) -> anyhow::Result<Vec<Released>> {
+    let store = noshape_store::Document::open_read_only(path)?;
+    let graph = store.graph()?;
+    let at = |s: &str| graph.versions.iter().find(|v| v.id.to_string() == s).map(|v| v.microversion).or_else(|| s.parse().ok());
+    let log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
+    Ok(released_items(&log, &at))
+}
+
+/// Company settings › Revision tools › Find revisions: one revision of a part number and the document it was released in.
+pub struct FoundRevision {
+    pub path: std::path::PathBuf,
+    pub document: String,
+    pub revision: noshape_model::release::TypedRevision,
+}
+
+/// Find revisions: `number`'s revisions released as `kind` in the documents at `paths`, newest first.
+pub fn find_revisions(paths: &[std::path::PathBuf], number: &str, kind: ItemKind) -> Vec<FoundRevision> {
+    let mut out: Vec<FoundRevision> = Vec::new();
+    for path in paths {
+        let Ok(store) = noshape_store::Document::open_read_only(path) else { continue };
+        let log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
+        let revisions = log.typed_revisions(number, kind);
+        if revisions.is_empty() {
+            continue;
+        }
+        let document = crate::derived::external_doc_info(path).map(|i| i.name).unwrap_or_else(|_| path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
+        out.extend(revisions.into_iter().map(|revision| FoundRevision { path: path.clone(), document: document.clone(), revision }));
+    }
+    out.sort_by_key(|f| std::cmp::Reverse(f.revision.created));
+    out
+}
+
+/// Reset part number type: `number`'s revisions released as `kind` become obsolete and re-releasable in each of
+/// `paths` that has them. Returns the documents changed.
+pub fn reset_part_number_type(paths: &[std::path::PathBuf], number: &str, kind: ItemKind, now: i64) -> anyhow::Result<Vec<std::path::PathBuf>> {
+    let mut changed = Vec::new();
+    for path in paths {
+        let mut store = noshape_store::Document::open(path)?;
+        let mut log = store.get_meta(META_KEY).ok().flatten().map(|b| ReleaseLog::from_json(&b)).unwrap_or_default();
+        if log.reset_part_number_type(number, kind, now) {
+            store.set_meta(META_KEY, Some(&log.to_json()))?;
+            changed.push(path.clone());
+        }
+    }
+    Ok(changed)
 }

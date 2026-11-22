@@ -11,7 +11,7 @@ use crate::drawing_view::*;
 use gpui_kit::*;
 use noshape_model::drawing::Drawing;
 use noshape_model::drawing::sheet_sketch::SheetSketch;
-use noshape_sketch::{ConstraintKind, Curve2, DVec2, EntityId, Geometry};
+use noshape_sketch::{DVec2, EntityId, Geometry};
 
 pub use noshape_scene::drawing_tools::{SkCon, SkTool};
 
@@ -198,29 +198,15 @@ impl DrawingEditor {
     /// into the sketch as fixed external geometry).
     fn constrain_click(&mut self, cx: &mut Context<Self>) {
         let Tool::Constrain { kind, mut picks } = self.tool.clone() else { return };
-        let pick: Option<Result<u32, Curve2>> = if let Some((id, _)) = self.sketch_point_at(self.cursor) {
-            Some(Ok(id.0))
-        } else if let Some(id) = self.sketch_entity_at() {
-            Some(Ok(id.0))
-        } else if let Some(Pick::Line { a, b }) = self.line_pick() {
-            match (self.pick_sheet(&a), self.pick_sheet(&b)) {
-                (Some(pa), Some(pb)) => Some(Err(Curve2::Line { a: v2(pa), b: v2(pb) })),
-                _ => None,
-            }
-        } else if let Some(Pick::Circle { view, center, radius, .. }) = self.circle_pick(self.cursor) {
-            self.placement(view).map(|pl| Err(Curve2::Circle { center: v2(pl.to_sheet(center)), radius: pl.len_to_sheet(radius) }))
-        } else {
-            None
-        };
-        let Some(pick) = pick else { return };
+        let Some(pick) = self.pk().constrain_pick(self.cursor) else { return };
         let id = match pick {
-            Ok(id) => id,
+            Ok(id) => id.0,
             Err(curve) => {
                 // View geometry: a fixed external copy the constraint can use.
                 let mut ext = None;
                 self.edit_sheet("Use view geometry", cx, |s| {
                     if let Ok(r) = s.sketch.sketch.use_external(&curve) {
-                        ext = r.created.first().copied();
+                        ext = r.created.last().copied();
                     }
                 });
                 match ext {
@@ -240,24 +226,12 @@ impl DrawingEditor {
         self.redraw(cx);
     }
 
-    /// Whether `picks` (sketch entity ids) complete constraint `kind`:
-    /// Horizontal / Vertical take one line, or two points; the rest two.
     fn constraint_ready(&self, kind: SkCon, picks: &[u32]) -> bool {
-        let one_line = picks.len() == 1 && matches!(self.sketch().sketch.entity(EntityId(picks[0])).map(|e| &e.geometry), Some(Geometry::Line { .. }));
-        (kind.needs() == 1 && one_line) || picks.len() >= 2
+        noshape_scene::drawing_tools::constraint_ready(&self.sketch().sketch, kind, picks)
     }
 
     fn add_sketch_constraint(&mut self, kind: SkCon, picks: &[u32], cx: &mut Context<Self>) {
-        let (a, b) = (EntityId(picks[0]), picks.get(1).map(|x| EntityId(*x)));
-        let ck = match (kind, b) {
-            (SkCon::Horizontal, b) => Some(ConstraintKind::Horizontal { a, b }),
-            (SkCon::Vertical, b) => Some(ConstraintKind::Vertical { a, b }),
-            (SkCon::Coincident, Some(b)) => Some(ConstraintKind::Coincident { a, b }),
-            (SkCon::Perpendicular, Some(b)) => Some(ConstraintKind::Perpendicular { a, b }),
-            (SkCon::Parallel, Some(b)) => Some(ConstraintKind::Parallel { a, b }),
-            (SkCon::Tangent, Some(b)) => Some(ConstraintKind::Tangent { a, b }),
-            _ => None,
-        };
+        let ck = noshape_scene::drawing_tools::sketch_constraint(kind, picks);
         if let Some(ck) = ck {
             let mut err = None;
             self.edit_sketch(kind.name(), cx, |s| {

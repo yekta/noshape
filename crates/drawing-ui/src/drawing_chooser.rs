@@ -113,40 +113,7 @@ pub struct ChooserState {
     pub other_released: bool,
 }
 
-/// A released revision of a part or assembly in an opened other document
-/// (View released items; help: "pick a particular revision; released items
-/// show a solid triangle icon").
-#[derive(Clone)]
-pub struct Released {
-    pub tab: TabId,
-    pub part: Option<BodyId>,
-    pub name: String,
-    pub assembly: bool,
-    pub revision: String,
-    pub part_number: String,
-    /// The version it was released at.
-    pub microversion: noshape_store::MicroversionId,
-}
-
-/// A release log's released parts and assemblies, newest release first
-/// (obsoleted revisions and items linked from other documents left out);
-/// `microversion` resolves a package's version (a version id, or a
-/// microversion for versions linked from elsewhere).
-pub fn released_items(log: &noshape_model::release::ReleaseLog, microversion: &dyn Fn(&str) -> Option<noshape_store::MicroversionId>) -> Vec<Released> {
-    use noshape_model::release::{ItemKind, PackageKind};
-    let obsolete: Vec<(&str, &str)> = log.packages.iter().filter(|p| p.kind == PackageKind::Obsoletion).flat_map(|p| p.items.iter().map(|i| (i.part_number.as_str(), i.revision.as_str()))).collect();
-    let mut out = Vec::new();
-    for p in log.packages.iter().rev().filter(|p| p.kind == PackageKind::Release) {
-        let Some(mv) = p.version.as_deref().and_then(microversion) else { continue };
-        for i in &p.items {
-            if !matches!(i.kind, ItemKind::Part | ItemKind::Assembly) || i.document.is_some() || i.reverted || obsolete.contains(&(i.part_number.as_str(), i.revision.as_str())) {
-                continue;
-            }
-            out.push(Released { tab: i.tab, part: i.part.clone(), name: i.name.clone(), assembly: i.kind == ItemKind::Assembly, revision: i.revision.clone(), part_number: i.part_number.clone(), microversion: mv });
-        }
-    }
-    out
-}
+pub use noshape_ops::release::{Released, released_items};
 
 /// Other documents categories (live, as the assembly Insert dialog).
 const OTHER_SOURCES: [(&str, &str); 5] = [("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];

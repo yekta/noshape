@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 08:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 11:08 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,67 +13,99 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 08:33 11-22 (read first)
-- QUEUED c2e4fc1b (9 commits, vibe2): wf23 per-part section hatch + hex MeshCover (short runs < tol merged: rim touching
-  a facet corner), wf39 EXPORT-STORE-DETAILS, IMPORT-TAB-TOAST (DocModel::success_with_link, 5 s), tickets closed.
-  Tests green on vibex8: drawing lib 58, ops e2e:: 277, export dialog UI test, app an_import_translates_off_the_ui_thread.
-- QUEUED af0bd186 (dx-flake worktree): prefs images_library order-free. After it lands: git worktree remove dx-flake,
-  rm -rf vibex7 ~/agents/dx-flake/target.
-- export_dialog flake: cause = export_dialog_keys_as_live saving export_solid.json in parallel; psui's 454c71f2 fixes it.
-- RUNNING b4n0owrcu: vibex7 glb.sh + hex2.sh (hex DXF: want ELLIPSE 2, LINE/LWPOLYLINE vs live 206/25, Top no CIRCLE);
-  output /root/dx-scratch/fo/hex2.out.
-- asm (SPEED-ASM-OPEN): told one cache: display_cache::studio_key(doc, tab, config, fine) shared, StudioDisplay rows
-  written only with the Part Studio's own builder/tolerance; asm also feeds AssemblyEvaluator core's result_store.
-- LIVE ANSWERED dx 05:35 (behaviours "dx assembly section hatch per part", live/dx/hatch-1122/): ANSI31, one HATCH
-  per region, angle + spacing per INSTANCE. pin-block: block 0 deg (45 deg lines) 3.44 mm, pin 90 deg 2.46 mm, spacing
-  = instance section-bbox diag x 0.7/9 = what we ship (diag/13). 5 instances: 0/145/100/10/90 deg, spacing diag/9
-  except Part 1 <2> (0.7/9): rule unknown -> REQUESTS dx 08:39 (orders, 2-4 instances; when 0.7x). Ours alternates
-  0/90 in part order; repeated instances not split (section_part_ends groups by ProjBody: check instances are bodies).
-- DETAIL label: live DXF pin-block top 3.20 mm under a full r 16.8 mm circle (h 3.05, top-centre); labels-1118 ~5.3
-  under r ~34 (clip border; test a_detail_label_hangs_under_its_whole_circle pins 5.3 for both). No rule from two
-  points -> REQUESTS dx 08:39 (2). Code: build.rs ~2672 `Some((lo, hi)) => (lo, hi, 5.3)`.
-## STATE 05:55 (earlier) 11-22 (read first)
-TASK (lead 05:1x): watch lands (DONE: 3af018e0 + afd3220a landed 05:29 as 1519a1df, main GREEN 05:42); hex iso
-circles (in test); bottle DXF rerun (DONE 05:2x vibex7: "matches", Front no longer moved, Iso 0.002 in; ARC 18/24,
-LINE 105/114, SPLINE 5/19); qa wf23 P1 DWG-SECTION-HATCH-PER-PART (written, in test) + P2 DETAIL label (live asked).
-Mac rules (DECISIONS def9ef908): one 4-job nice-20 load-gated slot (NOSHAPE_RB_HOST=mac); our app only while the user
-is idle >= 600 s (HIDIdleTime), one run, <= 3 min, killed at once when the user returns. Guarded runner:
-mac ~/noshape-host/dx-keep/gpu/macgpu.sh (watchdog 175 s, SIGKILL 3 s after SIGTERM); probe runner dx-keep/sig/.
-- UNCOMMITTED in dx-open (one drawing land, both): (a) views.rs MeshCover: views with mesh + other parts run a 2nd
-  HLR pass of the other parts alone; their visible pieces split where a mesh facet lies in front by more than the
-  view's defl (point-to-plane; Moller-Trumbore ray toward the viewer, 2D cell grid); glimpse rule removed. Test
-  views::tests::a_mesh_hides_what_lies_behind_its_facets_not_on_them (mesh lid 1 mm on a plate, same r 5 mm hole:
-  Iso far half ~0.46 seen, Top none). (b) per-part section hatch: ViewGeometry.section_part_ends (section_geometry
-  groups cut faces by owning ProjBody; detail copies it), build.rs: parts alternate 45/135 deg (hatch_flipped),
-  spacing part_hatch_spacing = part box diag / 13 (live wf23 s05 pixels: block 14.6 px, box 172x87; pin 10.6, 43x130);
-  cad_layers HatchRegion.flipped -> DXF ANSI31 angle 90. Test drawing::tests::a_section_through_several_parts_hatches_
-  each_its_own_way (demo asm: 2 plates + pin, 3 hatches false/true/false). Running: vibex7 bgpit1676 (drawing lib
-  views:: hatch cad_export section). Then: hex DXF via ~/agents/dx-keep/glb.sh (-> ops-gl) + hex2.sh (vibex7; check
-  ELLIPSE 2, LINE/LWPOLYLINE vs live 206/25, Top no CIRCLE), full ops e2e, land.
-- OPEN (hatch): rule for 3+ parts and two instances of one part unknown (instance order alternating is a guess):
-  REQUESTS dx 05:35 (live): DXF HATCH angle/scale per part on wf23 + a 4+ part assembly + DETAIL B label MTEXT.
-  P2 DETAIL label: ours y 11.2 vs live 14.0 (qa); detail label gap 5.3 mm (build.rs ~2640): wait for live's DXF.
-- Hex open point: pass 2's hidden pieces under visible mesh lines are now drawn (hidden lines shown only).
-- SIGTERM quit path LANDED (1519a1df 05:29, with the Mac SIGTERM-ignored fix, bottle lip, DRW-VIEW-CENTRE): crates/app/src/quit_signals.rs (Unix: TERM /
-  HUP / INT -> self-pipe -> cx.quit(); second signal or 10 s -> _exit; kept ignored if started ignored); DocModel's
-  quit_commit (cx.on_app_quit -> flush_pending) registered on the first deferred edit. Windows WM_ENDSESSION and macOS
-  applicationWillTerminate already run gpui's shutdown (observers called synchronously, before exit_now's future).
-  Tests: noshape bin quit_tests:: (fails without), T2 tests/quit_signal.rs (xvfb-run, 1.9 s): vibex7 pass.
-- NEXT 2: hex iso circles: see STATE (MeshCover). Data vibex7 ~/tmp/dx/exs-hex; old probe /root/dx-scratch/fo/glimpse-probe.diff.
-- GPU OPEN (Mac M6, ms from launch; r0 first open / rA another build's rows / rB own cached display): big-plate
-  505/178/151; l30 160/156/151; pins-1000 147/152/156; rings 1069/1320/160; infento full 13.3 s / 17.3 s / cached
-  frame 337 (display 282); isaac 15.6 s / 15.8 s / 170; scissor 56.5 s / 57.3 s / 187. Rows from the Linux build are
-  never used on the Mac (rA regenerates): not checked why (same-OS cross-release works). Regen = core's.
-- HOVER on the Mac GPU: plate 17.1 ms (live 53), parts-1000 18.6 ms (live 266). Done.
-- Live's open (software, s, warm / cold): infento 23.5-62.7 / 38.2, scissor 18.3-20.1 / 36.8, isaac 17.6-21.7 / 26.9.
-## Exchange leftovers (11-21)
-- Drawing rows (2/10): bottle lip + 0.015 in placement fixed above (verify with the rerun). Hex iso circles as
-  LWPOLYLINE (live ELLIPSE, r 0.0197 in, a mesh body "imported" + "shrunk" solid): next. faceblend ELLIPSE vs SPLINE;
-  the rest hidden-line geometry. Files /root/dx-scratch/drw, /root/dx-scratch/bin/dxfvlines.py.
-- Open: STL split (duct 2 parts vs live's 9 sheets, bottle 2 vs 148: rule unknown, REQUESTS dx 11-21 14:06;
-  /root/dx-scratch/stlcomp.py), housing IGES compat 80 / 45 edges / vertices vs 79 / 44 (one closed B-spline rim in two
-  IGES curves: join two G1 B-spline pieces bounding the same two faces in boolean.cpp's merge, kernel). Rhino as live
-  (46 / 118 / 76). CLI import probe: vibex6 ~/agents/dx-keep/sr/impprobe.py ./cli <file> [pp].
+## STATE 12:26 11-22 (read first): AGENT API AUDIT, batch 2 (drawings) DONE, testing
+- !! /root/dx-scratch/env.sh does `cd /root/projects/noshape-wt/dx` : scripts must `. env.sh; cd
+  /root/projects/noshape-wt/dx-open` (b8.sh..b10.sh do). ssh remote ~ paths in quotes.
+- b8 (12:00): batches 1-6 compile clean, ops e2e 283/285; the 2 failures fixed (drawing_arrange id parse,
+  release test param `configuration.Colour` / row "Part 1 (Large)"). b9 confirmed the release param fix only.
+- RUNNING b10 12:05 (task b2ck4jyfh; vibex7, /root/dx-scratch/b10.sh -> b10.out): check, scene drawing_tools::,
+  coverage regen, FULL ops e2e. It predates tab_properties / curvature splines / part reset: NEXT run b11
+  (/root/dx-scratch/b11.sh -> b11.out, AGENT_API.md.b11; same steps, current tree). Fix failures, rerun until green,
+  then cp /root/dx-scratch/AGENT_API.md.b11 docs/AGENT_API.md, ONE commit "dx: agent API: …" (yekta), check
+  diff --stat (~55 files, all mine), land (NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh), report <=5 lines,
+  message asm (roster.md id) to re-measure the infento display key.
+- Also coded after b10 started (untested): op tab_properties (document.rs; Tab › Properties… of Part Studio /
+  VS / FS / file tabs, store meta tab_description / tab_part_number / tab_revision / tab_not_revision_managed /
+  tab_item_meta, name = undoable rename; e2e tab_properties_of_a_variable_studio); analysis_curvature `splines`
+  (u/v degree, control_points, spans, knot_points, control_points; e2e in the analysis test, Bezier);
+  part_set_properties `reset` (Reset all: regenerated name, no metadata; e2e after part_set_properties BR-1).
+  Release dialog row Properties = existing property ops (no gap).
+- Drawing hover x selection matrix: live is capturing it (lead 11-22 ~12:00); the ANNOTATION cells are dx's.
+  Not posted yet (check behaviours.md / REQUESTS for a drawing hover matrix section).
+- (b) after landing, crates/drawing (run full ops e2e before landing): detail label gap = 0.1 r + h/2 (build.rs
+  ~2661 `(lo, hi, 5.3)` for the circle case; h = label line height lh; test a_detail_label_hangs_under_its_whole_circle
+  in drawing tests.rs ~4002 expects 5.3). Hatch angle by set of parts (build.rs ~2177 alternates by
+  section_part_ends order, views.rs ~3757 groups cut faces per body): last part in Part Studio order 90, then
+  0/90 back; 5 regions 0,145,100,10,90; repeated part's 2nd copy 90 + 0.7x spacing. Spacing: live says per region
+  diag/9; ours part_hatch_spacing diag/13 per part (wf23 data) - reconcile before changing.
+- Batch 2 rest coded 12:05: scene drawing_tools/measure.rs (MeasurePick, measure_rows, measure_pick_names,
+  SheetPick::measure_pick; moved from drawing-ui drawing_keys.rs with its test); op drawing_measure (picks ->
+  rows {name, mm|deg, text}, relation, unit, dual); scene sketch.rs constraint_ready / sketch_constraint /
+  SheetPick::constrain_pick (drawing-ui uses them); op drawing_constrain (kind, picks | entities; view geometry
+  -> "Use view geometry" edit); drawing_get `sketch` {entities (id, type, points, style), constraints}; hatch
+  `angle`; ops drawing_sketch_styles / drawing_hatch_styles (Styles panel, "Style"); view_table BOM `assembly`
+  (+ `document`, `version`: Other documents…), table `source`; drawing_arrange `sketch_entities` (Move to).
+  e2e: drawing_measure_rows_as_the_panel, drawing_sketch_constraints (+ styles, Move to), hatch test (+ styles),
+  drawing_bom_split_and_unsplit (+ BOM source this doc / other doc V1).
+- Batch 2 coded (uncommitted, untested): ops/drawing_note.rs (Note panel fields: font B I U S color line_spacing
+  space_before/after align valign list order width angle flags flag_shape flag_size; cell panel fields; style_json /
+  cell_format_json), drawing_note `annotation` = Edit note ("" deletes), drawing_get annotation `style` + `height`,
+  tables `cell_formats`; drawing_table_cell cell-panel options (text optional then); ops/drawing_move.rs:
+  drawing_move (annotation/table/image/view_label/break_line/cutting_line, by/to, alone) + drawing_arrange (move_to
+  layer, bring_to_front/send_to_back tables+images, table move_to_sheet); ops/drawing_styles.rs drawing_styles (Styles
+  panel on annotations, null = (Drawing), revert; drawing_get `annotation_style`, `layer`); edit_dimension fit_type /
+  fit_standard / fit_precision / fit_stacking / show_hole_class / show_shaft_class / count_type / reset_text_position;
+  edit_section depth_to + depth_offset (drawing_get `section_depth`); auxiliary_view `view` = Edit auxiliary view
+  (drawing_get `auxiliary`); edit_detail `profile` + `points` (drawing_get detail.profile); break_view `index` = Edit
+  break (style, gap; drawing_get `break_lines`); view_table BOM data `file`/`path` CSV (parse_csv moved to
+  scene table_edit, test moved), template / bom_type / order / corner; drawing_create `dwt` / `dwt_path`.
+  Tests: e2e drawing_note_panel_edit_and_drags (new), drawing_views_and_dimensions (fit), drawing_table_menu_edits
+  (BOM options, CSV), detail test (profile), section test (aux edit). Examples added for each.
+## STATE 11:08 11-22: AGENT API AUDIT (user 11-22 ~09:50)
+Task: every UI command/option of this week's psui/asm/studios lands has an op with an e2e test, same options /
+results / errors; regenerate AGENT_API.md (UPDATE_DOCS=1 coverage::). Gap list (6 batches, file:line):
+/root/dx-scratch/api-gaps-1122.md. Reported to the user. STL-SURFACE-EDGES skipped (user: P3).
+All below is UNCOMMITTED in dx-open; UI crates + app check clean (b4), ops tests rerun b5 -> /root/dx-scratch/b5.out.
+- Batch 1: view_display Isolate dialog (transparency / select_transparent / expand / expand_by) + context banner
+  controls; DisplaySet::IsolateControls / ContextControls. render_image see-through look at a transparency: not done.
+- Batch 6: coverage scanner walks UI subfolders + feature-studio-ui / release-ui / preferences-ui / notifications;
+  `item(id, label)` takes the label (not icon_item). FS ops featurestudio_format / _import / _profile. MENUS: app
+  Delete all / Mark all as read / release Reset to default / Set to last viewed configuration = Planned (batch 4).
+  Local replica of the scanner: python3 /root/dx-scratch/menu_sim.py <worktree> (MISSING / STALE vs MENUS).
+- Batch 3: view_display exploded_view (Activate <view>, null = Done; raw a.value since get() drops null) +
+  explode_progress (rollback bar), window ShownExplode, assembly::shown_assembly / fit_box / exploded_offsets;
+  camera fits on Activate; render_image exploded_view / explode_progress (window fills them); asm UI handler
+  DisplaySet::Explode / ExplodeProgress. Named views on assemblies: render_named_view on PS or Assembly, view
+  "window" saves the window camera, NOT undoable (as the app); view_camera view = a named view (CameraMove::Named ->
+  agent_named_view in psui / asm, asm apply_named_view extracted); render_image named views on assemblies.
+  Mass `variance` (query_ / assembly_mass_properties; query::variance_json). Insert / Replace by `part_number` +
+  `revision` (View released items): ops::release::Released / released_items / document_released_items moved from
+  drawing-ui (re-exported there), assembly features::external_source shared by insert and replace. Mirror rows of
+  a subassembly's parts: already via assembly_derived_mirror (no change).
+- Batch 5 (partly): analysis_dihedral radians + threshold {high, low}; part_set_appearance features []; sketch_paste
+  sketches []; feature_add / feature_edit `click` (click_button: editing_logic_in_clicked; Previous/Next excluded).
+  Left: sketch_copy_entities to_tab, analysis_curvature details, part_set_properties reset.
+- Tests to watch: e2e view_display_*, feature_studio_format_import_and_profile, assembly_named_positions_and_exploded_
+  views, assembly_named_views, assembly_inserts_and_replaces_released_items_by_part_number, analysis_tools,
+  assembly_measure_and_mass_properties, materials_and_appearances, a_mass_override_without_a_material_*,
+  sketch_paste_export_and_imprinting, feature_dialog_buttons_run_the_editing_logic, coverage::.
+- b6 GREEN (coverage regenerated -> docs/AGENT_API.md). b7 RUNNING (vibex7, /root/dx-scratch/b7.sh -> b7.out): app
+  check + UPDATE_DOCS coverage (doc -> /root/dx-scratch/AGENT_API.md.b7) + FULL ops e2e:: on the pre-batch-4 tree.
+- Batch 4 CODED after b7 started (untested; touch -c the files before the next rb.sh): release_approve / _reject
+  `comment` required ("Required field must not be empty.", added to the candidate's comments; approve only by an
+  approver); history_create_branch `description` + `open`; company_revisions / company_reset_part_number_type (ops
+  release::find_revisions / reset_part_number_type, release-ui revision_tools uses them); ui_notifications
+  (only_unread, action mark_all_read / expand_all / delete_all; window Notices synced from app-core notifications
+  snapshot, UiRequest::Notifications -> notifications::act; MENUS app Delete all / Mark all / Expand all -> op);
+  release_create `from_release` (Clone; ops release::refreshed_items shared with the dialog) + `configuration`.
+  Tests: e2e revision_tools_find_and_reset_a_part_number_type, notifications_panel_switch_and_menu, release_*
+  (approve/reject comment, clone, configuration), a_workspace_branches_from_a_version. Left: candidate row
+  properties (release_dialog.rs 413).
+- Display key (asm's infento report) CODED: app-core display_cache key_for hashes the document as bincode (JSON
+  fallback); test a_documents_key_hashes_its_binary_form. Ask asm to re-measure after landing.
+- Next run: check -p noshape + release-ui / app-core tests + e2e release_ revision_tools notifications_ workspace
+  coverage:: (UPDATE_DOCS) -> commit "dx: agent API: …" -> land. Then batch 2 (drawings), then (b) below.
+- c2e4fc1b LANDED 10:02 (52581c36); af0bd186 LANDED (4b51bd939). Hex DXF rerun matches.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

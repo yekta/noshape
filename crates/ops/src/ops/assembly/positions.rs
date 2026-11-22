@@ -480,6 +480,28 @@ fn exploded_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         _ => return Err(OpError::param("action", "add, rename, duplicate, delete, move or lines")),
     }
+    // The window's active view follows a rename and ends with a delete; a
+    // changed step list shows all its steps again.
+    let old = a.opt_str("view")?.and_then(|v| view_row(&asm, v).ok()).map(|v| asm.exploded_views[v].name.clone());
+    let renamed = assembly(od, tab)?.exploded_views.iter().map(|v| v.name.clone()).find(|n| !asm.exploded_views.iter().any(|o| &o.name == n));
+    if let (Some(old), Some(d)) = (old, od.window.display.get_mut(&tab))
+        && d.explode.as_ref().is_some_and(|e| e.view == old)
+    {
+        match a.str("action")? {
+            "delete" if a.get("step").is_none() => d.explode = None,
+            "rename" if a.get("step").is_none() => {
+                if let (Some(e), Some(view)) = (d.explode.as_mut(), renamed) {
+                    e.view = view;
+                }
+            }
+            "delete" | "move" => {
+                if let Some(e) = d.explode.as_mut() {
+                    e.progress = None;
+                }
+            }
+            _ => {}
+        }
+    }
     let now = assembly(od, tab)?;
     Ok(json!({ "exploded_views": json(now).1 }).into())
 }
@@ -542,14 +564,25 @@ fn explode_step(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
     })?;
-    let now = assembly(od, tab)?.clone();
-    let ev = now.exploded_views[v].clone();
+    let ev = assembly(od, tab)?.exploded_views[v].clone();
+    if let Some(e) = od.window.display.get_mut(&tab).and_then(|d| d.explode.as_mut()).filter(|e| e.view == ev.name) {
+        e.progress = None;
+    }
     // Where the view puts the instances it moves (all its steps), to check
     // the step without a render.
+    let moved = exploded_offsets(od, tab, &ev, f64::INFINITY)?;
+    Ok(json!({ "view": ev.name, "steps": ev.steps.len(), "exploded": moved }).into())
+}
+
+/// The top-level instances an exploded view moves with `progress` of its
+/// steps shown: each one's offset from where it is assembled (document
+/// units) and whether it turned.
+pub(crate) fn exploded_offsets(od: &mut OpenDoc, tab: TabId, ev: &ExplodedView, progress: f64) -> Result<Vec<Value>, OpError> {
+    let now = assembly(od, tab)?.clone();
     let mut r = solve(od, tab, &SolveOptions::default())?;
     let before: std::collections::HashMap<_, _> = r.occurrences.iter().map(|o| (o.top(), o.transform)).collect();
     let solved = r.solved.clone();
-    r.apply_placements(solved, Some(&ev));
+    r.apply_placements_progress(solved, Some((ev, progress)));
     let k = len_scale(&od.doc().settings.units);
     let mut moved: Vec<Value> = Vec::new();
     for i in &now.instances {
@@ -560,7 +593,7 @@ fn explode_step(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             moved.push(json!({ "instance": i.name, "offset": [d.x * k, d.y * k, d.z * k], "turned": turned }));
         }
     }
-    Ok(json!({ "view": ev.name, "steps": ev.steps.len(), "exploded": moved }).into())
+    Ok(moved)
 }
 
 fn display_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

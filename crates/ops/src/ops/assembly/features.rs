@@ -73,7 +73,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "replace",
             summary: "Replace instances with another part, sketch, Part Studio or assembly",
-            description: "Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, with `document` + `version` one of another document's named versions (the Replace dialog's Other documents), or with `component` Standard content. One edit per instance (\"Replace instance : Part 2\").",
+            description: "Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, with `document` + `version` one of another document's named versions (the Replace dialog's Other documents) or + `part_number` (and `revision`) one of its released items (View released items), or with `component` Standard content. One edit per instance (\"Replace instance : Part 2\").",
             fields: vec![
                 doc_field(),
                 asm_field(),
@@ -91,6 +91,8 @@ pub fn ops() -> Vec<Op> {
                 opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
                 opt("document", s(), "Another .noshape document (with `version`)."),
                 opt("version", s(), "With `document`: the name of one of its versions."),
+                opt("part_number", s(), "With `document`: View released items: its released part or assembly with this part number, at the version it was released at (no `source` / `part` / `version`)."),
+                opt("revision", s(), "With `part_number`: the revision (default the newest released one)."),
                 opt("all", json!({ "type": "boolean" }), "Replace all instances of the same source."),
             ],
             mutates: true,
@@ -355,9 +357,12 @@ fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let name = spec.part_name();
             (InstanceSource::Standard { spec }, name)
         }
-        (Some(document), Some(version)) => replacement_from_document(a, document, version)?,
-        (Some(_), None) => return Err(OpError::param("version", "required with `document`: one of its named versions")),
+        (Some(document), _) => {
+            let (source, label, _) = external_source(a, document)?;
+            (source, label)
+        }
         (None, Some(_)) => return Err(OpError::param("document", "required with `version`")),
+        (None, None) if a.get("part_number").is_some() => return Err(OpError::param("document", "required with `part_number`")),
         (None, None) => replacement_here(od, tab, a)?,
     };
     let all = a.bool_or("all", false)?;
@@ -399,13 +404,25 @@ fn replacement_here(od: &mut crate::OpenDoc, tab: TabId, a: &Args) -> Result<(In
     }
 }
 
-/// The replacement from a named version of another document (the default configuration, as Insert takes them).
-fn replacement_from_document(a: &Args, document: &str, version: &str) -> Result<(InstanceSource, String), OpError> {
+/// Another document's part, Part Studio or Assembly as an instance source, in the default configuration (as the
+/// Insert and Replace dialogs' Other documents take them): at a named `version` (`source`, `part`), or a released
+/// item by `part_number` (`revision`: default the newest) at the version it was released at (View released items).
+/// Returns the source, the instance's label and the item's name.
+pub(super) fn external_source(a: &Args, document: &str) -> Result<(InstanceSource, String, String), OpError> {
     use noshape_model::assembly::eval::AssemblyEvaluator;
     for k in ["configuration", "sketch"] {
         if a.get(k).is_some() {
             return Err(OpError::param(k, "not with `document`: other documents give the default configuration's parts and assemblies"));
         }
+    }
+    let version = match (a.opt_str("version")?, a.opt_str("part_number")?) {
+        (Some(_), Some(_)) => return Err(OpError::param("part_number", "give `version` (with `source`) or a released item's `part_number`, not both")),
+        (None, None) => return Err(OpError::param("version", "required with `document`: one of its named versions (or a released item's `part_number`)")),
+        (None, Some(pn)) => return released_source(a, document, pn),
+        (Some(v), None) => v,
+    };
+    if a.get("revision").is_some() {
+        return Err(OpError::param("revision", "with `part_number`"));
     }
     let (path, v, snapshot) = crate::derived::named_version(document, version)?;
     let src = doc::find_tab(&snapshot, a.str("source")?).map_err(|e| e.with_param("source"))?;
@@ -426,7 +443,32 @@ fn replacement_from_document(a: &Args, document: &str, version: &str) -> Result<
         TabContent::Assembly(_) => (None, t.name.clone()),
         _ => return Err(OpError::param("source", "a Part Studio or Assembly of that document")),
     };
-    Ok((InstanceSource::External { key, body, config: Default::default() }, label))
+    Ok((InstanceSource::External { key, body, config: Default::default() }, label, t.name.clone()))
+}
+
+/// View released items: the released part or assembly with this part number (and revision), at its release's version.
+fn released_source(a: &Args, document: &str, part_number: &str) -> Result<(InstanceSource, String, String), OpError> {
+    for k in ["source", "part"] {
+        if a.get(k).is_some() {
+            return Err(OpError::param(k, "not with `part_number`: the released item is the part or assembly"));
+        }
+    }
+    let path = std::path::Path::new(document);
+    let path = path.canonicalize().map_err(|e| OpError::param("document", &format!("{}: {e}", path.display())))?;
+    let items = crate::release::document_released_items(&path).map_err(|e| OpError::param("document", &format!("can't read it: {e}")))?;
+    let revision = a.opt_str("revision")?;
+    let r = items.iter().find(|r| r.part_number == part_number && revision.is_none_or(|x| r.revision == x)).ok_or_else(|| {
+        let revisions: Vec<&str> = items.iter().filter(|r| r.part_number == part_number).map(|r| r.revision.as_str()).collect();
+        if !revisions.is_empty() {
+            return OpError::param("revision", &format!("released revisions of {part_number}: {}", revisions.join(", ")));
+        }
+        if items.is_empty() {
+            return OpError::param("part_number", "the document has no released parts or assemblies");
+        }
+        OpError::param("part_number", &format!("released items: {}", items.iter().map(|r| format!("{} {} ({})", r.part_number, r.name, r.revision)).collect::<Vec<_>>().join(", ")))
+    })?;
+    let key = crate::derived::ExternalRef { path, microversion: r.microversion, tab: r.tab.to_string() }.key();
+    Ok((InstanceSource::External { key, body: r.part.clone(), config: Default::default() }, r.name.clone(), r.name.clone()))
 }
 
 fn rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -10,6 +10,13 @@ use noshape_ops::window::{DisplaySet, ListAct, Selected};
 
 impl PartStudioView {
     /// A display setting (view_display).
+    /// view_camera's named view: as picking it in the Named views dialog.
+    pub fn agent_named_view(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(v) = self.studio(cx).and_then(|s| s.named_views.iter().find(|v| v.name == name).cloned()) {
+            self.apply_named_view(&v, window, cx);
+        }
+    }
+
     pub fn agent_display(&mut self, set: DisplaySet, window: &mut Window, cx: &mut Context<Self>) {
         match set {
             DisplaySet::IsolateParts { transparent, parts } => {
@@ -42,7 +49,39 @@ impl PartStudioView {
                 self.refresh_scene(false, cx);
                 cx.notify();
             }
-            DisplaySet::IsolateInstances { .. } | DisplaySet::ShowMates(_) | DisplaySet::ShowMatesMode(_) | DisplaySet::SnapMode(_) => {}
+            DisplaySet::IsolateControls { select_transparent, transparency, expand } => {
+                // As the Isolate / Make transparent dialog's controls.
+                if let Some(iso) = &mut self.ui.isolate {
+                    if let Some(on) = select_transparent {
+                        iso.select_transparent = on;
+                    }
+                    if let Some(t) = transparency {
+                        iso.opacity = t;
+                    }
+                    if let Some(e) = expand {
+                        iso.expand = e.steps.min(10);
+                    }
+                }
+                let d = self.display.clone();
+                self.apply_display(d, window, cx);
+            }
+            DisplaySet::ContextControls { show_internal, select_transparent, transparency } => {
+                // As the context banner's checks and slider.
+                if let Some(c) = &mut self.ui.in_context {
+                    if let Some(on) = show_internal {
+                        c.show_internal = on;
+                    }
+                    if let Some(on) = select_transparent {
+                        c.select_transparent = on;
+                    }
+                    if let Some(t) = transparency {
+                        c.slider = t;
+                    }
+                }
+                self.refresh_scene(false, cx);
+                cx.notify();
+            }
+            DisplaySet::IsolateInstances { .. } | DisplaySet::ShowMates(_) | DisplaySet::ShowMatesMode(_) | DisplaySet::SnapMode(_) | DisplaySet::Explode(_) | DisplaySet::ExplodeProgress(_) => {}
         }
     }
 

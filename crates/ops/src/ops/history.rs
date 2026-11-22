@@ -87,8 +87,14 @@ pub fn ops() -> Vec<Op> {
             group: "history",
             verb: "create_branch",
             summary: "Create a branch (workspace) from the current state, or from a version (Branch to create workspace…), and switch to it",
-            description: "",
-            fields: vec![doc_field(), req("name", s(), "Branch name."), opt("version", s(), "The version (name or id) to branch from, as its row's Branch to create workspace…; default: the current state.")],
+            description: "The Create workspace dialog (a version row's Branch to create workspace…): `name` (required, at most 256 characters: \"Name is required and cannot exceed 256 characters.\"), `description` (at most 10000 characters; the workspace's Properties… show it), and Open new workspace (`open`, default on: switch to it; off: stay where you are).",
+            fields: vec![
+                doc_field(),
+                req("name", s(), "Branch name."),
+                opt("version", s(), "The version (name or id) to branch from, as its row's Branch to create workspace…; default: the current state."),
+                opt("description", s(), "Description."),
+                opt("open", json!({ "type": "boolean" }), "Open new workspace (default true)."),
+            ],
             mutates: true,
             destructive: false,
             run: create_branch,
@@ -261,8 +267,20 @@ fn create_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(v) => version_info(od, v)?.microversion,
         None => od.session.head()?,
     };
-    let b = od.session.branch_from(from, a.str("name")?)?;
-    Ok(json!({ "branch": b.to_string(), "name": a.str("name")? }).into())
+    let name = a.str("name")?.trim();
+    if name.is_empty() || name.chars().count() > 256 {
+        return Err(OpError::param("name", "Name is required and cannot exceed 256 characters."));
+    }
+    let desc = a.opt_str("description")?.unwrap_or("");
+    if desc.chars().count() > 10000 {
+        return Err(OpError::param("description", "Maximum of 10000 characters"));
+    }
+    let open = a.bool_or("open", true)?;
+    let b = if open { od.session.branch_from(from, name)? } else { od.session.store.create_branch(from, name).map_err(|e| OpError::new("io", format!("{e:#}")))? };
+    if !desc.is_empty() {
+        od.session.store.set_meta(&format!("{}{b}", crate::versions::WORKSPACE_DESCRIPTION_KEY), Some(desc.as_bytes())).map_err(|e| OpError::new("io", format!("{e:#}")))?;
+    }
+    Ok(json!({ "branch": b.to_string(), "name": name, "description": desc, "current": od.session.branch == b }).into())
 }
 
 fn switch_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

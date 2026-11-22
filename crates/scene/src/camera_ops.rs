@@ -137,6 +137,41 @@ pub fn studio_fit_box(display: &StudioDisplay, base: Option<(DVec3, DVec3)>, ori
     acc
 }
 
+/// The parts Isolate's "Expand: distance" slider at `step` (0 to 10) adds to the chosen ones, as Onshape's isolate
+/// manager (woolsthorpe `maxForProximitySlider`, webgl `getAffectedOccurrencesForExpandEffectByProximity`): the slider
+/// runs to half the model box's diagonal plus the distance from the nearest chosen part's centre to the box's centre
+/// (`model`: what Zoom to fit frames, the shown planes included), in 10 steps; a part joins when its box centre is
+/// nearer than that to a chosen part's box centre. Live (behaviours "Part Studio Isolate…"): five 20 mm blocks 5 mm
+/// apart join at 20 / 40 / 50 / 70 %.
+pub fn expand_by_distance(model: (DVec3, DVec3), seeds: &[(DVec3, DVec3)], others: &[(noshape_model::BodyId, (DVec3, DVec3))], step: usize) -> Vec<noshape_model::BodyId> {
+    let centre = |(lo, hi): (DVec3, DVec3)| (lo + hi) * 0.5;
+    let seeds: Vec<DVec3> = seeds.iter().map(|b| centre(*b)).collect();
+    let Some(nearest) = seeds.iter().map(|s| s.distance(centre(model))).min_by(f64::total_cmp) else { return Vec::new() };
+    let max = (model.1 - model.0).length() / 2.0 + nearest;
+    let d = max / 10.0 * step as f64;
+    others.iter().filter(|(_, b)| seeds.iter().any(|s| s.distance_squared(centre(*b)) < d * d)).map(|(id, _)| id.clone()).collect()
+}
+
+#[cfg(test)]
+mod expand_by_distance_tests {
+    use super::*;
+    use noshape_model::BodyId;
+
+    /// Live's "ui iso" studio: Part 1 … 5, 20 × 20 × 15 mm blocks 5 mm apart along X, the default planes (±75 mm)
+    /// shown; Isolate on Part 1 adds Part 2 at 20 %, Part 3 at 40 %, Part 4 at 50 %, Part 5 at 70 %.
+    #[test]
+    fn five_blocks_join_at_lives_steps() {
+        let mm = 1e-3;
+        let block = |i: usize| (DVec3::new(25.0 * i as f64, 0.0, 0.0) * mm, DVec3::new(25.0 * i as f64 + 20.0, 20.0, 15.0) * mm);
+        let id = |i: usize| BodyId { feature: FeatureId(i as u64 + 1), index: 0 };
+        let model = (DVec3::new(-75.0, -75.0, -75.0) * mm, DVec3::new(120.0, 75.0, 75.0) * mm);
+        let others: Vec<_> = (1..5).map(|i| (id(i), block(i))).collect();
+        let joined = |step| expand_by_distance(model, &[block(0)], &others, step).len();
+        let counts: Vec<usize> = (0..=10).map(joined).collect();
+        assert_eq!(counts, [0, 0, 1, 1, 2, 3, 3, 4, 4, 4, 4]);
+    }
+}
+
 /// Bounding box of the referenced geometry (parts, faces, edges, vertices,
 /// sketches, planes, the origin): what Zoom to selection frames.
 pub fn selection_bounds(display: &StudioDisplay, refs: &[Reference]) -> Option<(DVec3, DVec3)> {

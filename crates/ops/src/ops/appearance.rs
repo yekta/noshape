@@ -72,13 +72,14 @@ pub fn ops() -> Vec<Op> {
             group: "part",
             verb: "set_appearance",
             summary: "Set the color and transparency of parts, faces or a feature (the Appearance editor)",
-            description: "Give `parts`, `faces` or `feature`. Color as \"#3b61b4\" or [r, g, b] (0–255, sRGB); transparency 0 (opaque) to 1. Parts also take the tessellation quality. One edit (\"Edit appearance\").",
+            description: "Give `parts`, `faces`, `feature` or `features`. Color as \"#3b61b4\" or [r, g, b] (0–255, sRGB); transparency 0 (opaque) to 1. Parts also take the tessellation quality. One edit (\"Edit appearance\").",
             fields: vec![
                 doc_field(),
                 tab_field(),
                 opt("parts", strings(), "Part ids or names."),
                 opt("faces", strings(), "Face ids (`face:…`)."),
                 opt("feature", s(), "Feature id or name (its faces; a sketch: its curves)."),
+                opt("features", strings(), "Several features (ids or names): the feature list's Add appearance to N features… / Edit appearance of N sketches…, one feature appearance each."),
                 req("color", json!({ "type": ["string", "array"] }), "\"#rrggbb\" or [r, g, b]."),
                 opt("transparency", json!({ "type": "number", "minimum": 0, "maximum": 1 }), "0 opaque (default) … 1 invisible."),
                 opt("tessellation", json!({ "type": "string", "enum": TESS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Parts: tessellation quality (default auto)."),
@@ -255,14 +256,22 @@ fn set_appearance(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(t) => TESS.iter().find(|x| x.0 == t).map(|x| x.1).ok_or_else(|| OpError::param("tessellation", "unknown quality"))?,
         None => TessQuality::Auto,
     };
-    let target = match (a.get("parts"), a.get("faces"), a.opt_str("feature")?) {
-        (Some(_), None, None) => AppearanceEditTarget::Parts(parts_arg(od, tab, a, "parts")?),
-        (None, Some(_), None) => AppearanceEditTarget::Faces(a.array("faces")?.iter().enumerate().map(|(i, v)| refs::parse(v).map_err(|e| e.with_param(format!("faces[{i}]")))).collect::<Result<_, _>>()?, None),
-        (None, None, Some(f)) => AppearanceEditTarget::Feature(doc::find_feature(doc::studio(od.doc(), tab)?, f).map_err(|e| e.with_param("feature"))?, None),
-        _ => return Err(OpError::invalid("give one of `parts`, `faces` or `feature`")),
+    let targets = match (a.get("parts"), a.get("faces"), a.opt_str("feature")?, a.opt_array("features")?) {
+        (Some(_), None, None, None) => vec![AppearanceEditTarget::Parts(parts_arg(od, tab, a, "parts")?)],
+        (None, Some(_), None, None) => vec![AppearanceEditTarget::Faces(a.array("faces")?.iter().enumerate().map(|(i, v)| refs::parse(v).map_err(|e| e.with_param(format!("faces[{i}]")))).collect::<Result<_, _>>()?, None)],
+        (None, None, Some(f), None) => vec![AppearanceEditTarget::Feature(doc::find_feature(doc::studio(od.doc(), tab)?, f).map_err(|e| e.with_param("feature"))?, None)],
+        // "Add appearance to 2 features…" / "Edit appearance of 2 sketches…": each its own feature appearance.
+        (None, None, None, Some(list)) if !list.is_empty() => {
+            let ps = doc::studio(od.doc(), tab)?;
+            list.iter().enumerate().map(|(i, v)| doc::find_feature(ps, v.as_str().unwrap_or_default()).map(|f| AppearanceEditTarget::Feature(f, None)).map_err(|e| e.with_param(format!("features[{i}]")))).collect::<Result<_, _>>()?
+        }
+        (None, None, None, Some(_)) => return Err(OpError::param("features", "at least one feature")),
+        _ => return Err(OpError::invalid("give one of `parts`, `faces`, `feature` or `features`")),
     };
     edit_studio(od, tab, ap::EDIT_APPEARANCE, |ps| {
-        ap::apply_appearance(ps, &target, rgb, transparency as f32, tess);
+        for target in &targets {
+            ap::apply_appearance(ps, target, rgb, transparency as f32, tess);
+        }
         Ok(())
     })?;
     Ok(json!({ "color": hex(rgb), "transparency": transparency }).into())
