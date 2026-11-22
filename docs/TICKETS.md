@@ -377,10 +377,9 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   drag live redraws the preview at the new radius (34 mm: a big rounded top; 112 mm: red title, magenta preview, red edge); ours keeps
   the 5 mm round drawn with the title black. Live leaves the focus where it was; ours moves it into Radius (as FEEL-FILLET-ARROW-CLICK).
   The 2 px dead zone =.
-- [ ] P1 **FEEL-FILLET-ARROW-ANCHOR (psui)** (live 01:43 (5), walk6-m5, behaviours "qa walk 6 manipulators" (5)): Fillet on the
-  edge (40, 0..30, 10) picked at (40, 5, 10) gives a frame pixel-identical to the (40, 20, 10) pick. Live's radius arrow doesn't follow
-  the pick point: it sits by the edge's front end (40, 0, 10), ≈ px (1217, 561) in the iso shot, for both picks. Ours anchors it at
-  the pick point.
+- [x] **FEEL-FILLET-ARROW-ANCHOR**: no gap (psui 01:5x, qa check on green 04389f02d, hm2/out-w6a). Live's arrow tail sits at the
+  edge's midpoint and its head ends by the front end (std edgeBlendCommon.fs: tangent line at 0.5); ours anchors at the midpoint too.
+  Picks at (40, 5, 10) and (40, 25, 10) give pixel-identical frames in ours, as in live.
 - [ ] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
   feature in live (blue on hover, no flip, no change, no field focused: the focus leaves the dialog). Ours moves the focus into Radius.
 - Matched live (no ticket):
