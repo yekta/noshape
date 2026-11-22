@@ -5,6 +5,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## bool, 2026-11-22 (c2-gamma-imported's Boolean 1; lead 06:2x: per-pair tolerances P1, staged, after the in-flight stack)
+- [ ] P1 **BOOL-PER-PAIR-TOL (bool)**: noshape's Boolean judges every pair of entities by twice the largest tolerance of
+  ANY argument (rust_boolean.cpp `tol`); an imported pin of 1.5-2.45 um widens the band for precise tools far from it
+  (c2-gamma-imported's Boolean 1, 87 tools: a non-manifold result at two 0.2 um tools' junctions). The two-stage stopgap
+  (object + precise tools, then the tolerant ones) fails too: the precise tools fused into one body, then fused with a
+  1.5-2.45 um pin moved 1 m away, is still non-manifold (bool 11-22 06:15, vibex8 /root/bool-scratch/gm-stages3.out,
+  branch bool-stages): the band reaches inside one argument. Fix: per-pair tolerances (each pair by its own two).
+
 ## asm, 2026-11-21 (asm-scissor-lift open profile)
 - [ ] P3 **FS-ERROR-ENUM-VERSION (core)**: at FeatureScript 1576 our std rejects BOOLEAN_NON_MANIFOLD_RESULT as an
   ErrorStringEnum value (it's gated at V2033_BOOLEAN_NON_MANIFOLD_RESULT_ERROR), so the feature's error text becomes "Type

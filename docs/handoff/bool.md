@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 05:43 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 05:53 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -19,62 +19,27 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
+## NEXT (lead 11-22 06:2x)
+1. Land the in-flight stack in order: wclip 6329aaae -> ruling 1d8788b5 (queued); arcpart/seambatch/bandbatch (bandbatch
+   gate DONE 06:15 vibe2 +0 -0, models 128 -> 128, dogbone noise only; knurls RUNNING 06:2x unit bool-kn-bandbatch ->
+   kn-bandbatch.out, then delete vibe2 ~/tmp/bool/kn-bandbatch, `git rebase --onto e6e55ac74 cbab7cfe5` -> land);
+   usdvol (gate vibex7 running -> knurls -> land).
+2. Then P1 BOOL-PER-PAIR-TOL (lead 06:2x: gamma Boolean 1 ~24 s cold vs live's doc ~0.25 s; mixed-tolerance imports
+   common): per-pair tolerances in crates/brep, STAGED (data model first: each entity's own tolerance carried in
+   BrepBody / the Boolean; then classification / merging by the pair's two), each stage through the full gate.
+   Two-stage fuse tried 06:15 and FAILS (bool-stages worktree, uncommitted; repro PROBE_FAR=1 PROBE_SUBSET=6,17,23,45
+   PROBE_RUST=1 on vibex8 BK/gm/rec/f68f43939fd850eb: a far 2.45 um pin still breaks the 0.2 um junctions).
+3. SPEED-STANDOFFS after.
+4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
+
 ## In flight (11-21 21:35 UTC)
 - Mac: usable via ONE 4-job nice-19 slot (DECISIONS a16b39297; mac-run.sh / NOSHAPE_RB_HOST=mac wait for it), never
   overloaded; default builds vibe2 / vibex8. Runner: /root/bool-scratch/vibe-run.sh <script> (H=vibe2 default,
   WT=<worktree>; host script run-<basename>, so two jobs need two script names; scripts see BK=~/agents/bool-keep).
   rb.sh keeps mtimes: touch edited files on the host before an A/B (cyl-ab.sh / sc-cur.sh do).
-- P0 SCISSOR-GEAR: LANDED 04:44 as 5b53e2db (sweepcap: right-handed start cap, exact helical cylinders; gear 236 faces as live).
-- GEAR SPEED (lead 11-21): Spur Gear ~4.8-5.7 s vs live 1.0-1.7 s. Cut (18 tools, rec vibe2 BK/sc/rec): OCCT build
-  1.9-2.3 s, group_disjoint 0.63-0.81 s (562 ms BRepExtrema_SelfIntersection over a 1e-4 diag mesh; PROBE_NO_GROUP
-  same result, saves 0.3-0.8 s), our declined attempt 0.3-0.4 s, unify 0.64 s. Ours declines "a non-manifold result"
-  (18 arcs at the y=-11 cylinder/cone boundary unbalanced; tool helical edges 0.34 um off the blank cylinder). bool-hat
-  draft: re-seated faces' B-spline edges rebuilt on the cylinder (GeomLib::BuildCurve3d, dev <1e-4 um) -> case
-  d3c9295114d15873; probe sc-nm.sh (PROBE_NM). Scripts sc-var.sh / sc-prof.sh / sc-cur.sh.
-- SHELL-HANG parked (lead OK). Rings: re-run rings-all.sh against live 568.750 / 732.479 mm3 once blend's Fillet 1 lands.
-  - 21:55 one-tool probe (sc-one.sh, PROBE_ONE=n in bool-hat shell.rs): 1 tool declines "a non-manifold result"
-    (8 edges: the y=-11 cyl/cone arc only on the cyl; tool's helical edges on the blank cyl used once; tool flank's
-    y=-10 edges once), 2-3 tools "a piece's point on another solid's face". Next: why the tooth-top arc / tool edges
-    aren't shared (the tool's exact r=10 face coincident with the blank cylinder).
-- blend 11-21 ~21:50: c2-rings-loft Fillet 1 queued (cf0a8bde); at 9.6 faces match live after Chamfer 1. Re-run
-  rings-all.sh at 9.6 once it lands (10.4 still has a 0.774 mm2 bore piece, blend's).
-  - 22:05 PROBE_SPLIT: the MIRRORED half's r=10 helical edges miss the y=-11 crossing by 0.3 um (FS mirrors the swept
-    half across its END CAP; OCCT's end-cap plane is tilted, vertices land at y -10.0001/-9.9999). bool-hat: end cap
-    re-seated on pp carried by the helix's screw motion (turn about axis + rise). sc-cur2.out.
-- SHELL-HANG slab fuse (22:10, vibe2 BK/shh/tools17 = Mac shh/tools17; sh-pairs.sh, PROBE_PAIRS=all|i-j, PROBE_NM):
-  all-47 declines "a face lost": tool 19 face 4 (extrusion/revolution = nurbs) has 5 curves and NO region. Pairs:
-  non-manifold = slabs touching along one whole shared edge (0-5 x=-55,y=-34; 12-32), whole_pair rule = OCCT keeps
-  both: irrelevant inside the full fuse. 4-17 / 16-17 "a face lost": a plane with holes whose only regions are its
-  holes (outer region's loop open). Also 17-24 coincident pieces differ, 6-25 point on another face, 31-38 ellipse
-  near an axis, 38-39 invalid result. Slab 17 has a 16 um step (z -10.716 / -10.7 at x -60).
-  - 22:20: all-47's lost face = slab 19 face 4, a 16 um sliver (u 62.3291..62.3447): section s586 twin of its own
-    edge s531 (same vertices) not merged -> no region. Pair 16-17's lost face 0:10 (plane, hole + chord 0-10-7):
-    regions() keeps cycles of positive area only; the outer cycle came out non-positive -> probe curve directions.
-  - Gear: end cap exact -> hobbed cut 2.8 s (was 4.8), Spur Gear 5.2 s (was 7.8); T1 herringbone cut path RUST.
-    But gear faces 218 / edges 612 vs live 236 / 630 (vertices 396 both), area 1598.141 vs live 1599.593 mm2:
-    A/B sc-ab.sh (PROBE_NO_ENDCAP=1) running.
-  - 22:27 A/B (sc-ab.sh): END CAP ON 218 faces / 612 edges, 2466.932 mm3, area 1598.141, r7.75 roots 18 (halves merged
-    by unify), cones 36, bspline 143; OFF (= sweepcap) 236 / 630 = live, 2466.976, area 1598.152, roots 33, cones 33,
-    bspline 131. Area gap to live (1599.593) is in both. End-cap fix PARKED in bool-hat until live's face breakdown
-    (live/REQUESTS.md bool 22:27; live messaged).
-  - live 22:29 (live/bool/gear-1121/faces-rb4.json): 180 B-spline (root is a B-spline, TWO per gap, one per half),
-    36 cones, 18 r10 tip cylinders (98.12 mm2), 2 planes; area 1599.5929. Exact end cap merges our two root halves
-    (r7.75 exact cylinders) -> 218: end-cap fix stays PARKED (needs roots kept apart or not exact; decision for lead).
-    (sc-ab's query_entities lists stop at 200 faces.)
-  - SHELL-HANG pair 16-17: slab 16's corner B-spline (rational deg 6, 19 poles) HOOKS back 38 um at its ends
-    (poles x 0.04 -> 0.039962 -> on), so it leaves vertex 0 along the straight edge to 8 -> regions() walk wrong.
-  - SHELL-HANG declines (22:35): slab() of a planar face is a prism of the PART's face, so both blockers are Part 3's
-    own input defects: (a) a corner B-spline (rational deg 6, 3 spans, end spans 0.0016 rad) hooking 38 um back along
-    its neighbouring line at both ends (pair 16-17 / 4-17 "a face lost": regions() sees two edges leave the vertex one
-    way); (b) a 16 um step face (z -10.716 / -10.7, slab 19 face 4 sliver; all-47 "a face lost"). Next: which earlier
-    feature of the fuzz doc makes them (live's part?), or regions() taking a curve's direction past such a hook.
-    Unlooked: 17-24 coincident pieces differ, 6-25 point on another face, 31-38 ellipse near an axis, 38-39 invalid.
-- GEAR SPEED, whole feature (22:45, sc-prof2.sh, end cap off): Spur Gear 4.0 s: op_boolean 3.25 s (OCCT build 2.15,
-  group_disjoint 0.78 = mesh 0.19 + pair check 0.47, our attempt 0.27), op_unify 0.54 (usd 0.45), mesh_prepare 0.15.
-- Branch bool-gpat (worktree /root/projects/noshape-wt/bool-gpat, from origin/main 71c0a9273, uncommitted):
-  group_disjoint: tools that are one shape placed by powers of one motion (is_power_pattern) -> ShapeProximity of
-  tool 0 vs the rest; conflict[i][j] = meets[j - i]. T1 boolean_groups::a_patterns_tools_group_as_their_copies_do.
-  gpat-t1.sh (vibe2 build), gpat-ab.sh (bool-hat port, PROBE_NO_PATTERN A/B on the gear case).
+- GEAR SPEED / SHELL-HANG: history in archive (11-22 06:2x move). Gear: sweepcap landed (236 faces as live); end cap
+  parked (END CAP RULED below). SHELL-HANG parked (lead OK): blockers are Part 3's own input defects (a corner
+  B-spline hooking 38 um back; a 16 um step face); probes sh-pairs.sh (vibe2 BK/shh/tools17).
 - bool-wclip 59fb7a789 (from main a597c1393) gate DONE 03:55 vibex8: replay +0 -0 (differing 2 -> 2), suite 129 -> 129,
   shells 6 -> 6, speed 0.99-1.01x, crate tests pass; knurls 05:26 vibex7 0 diff x5 (copies deleted). QUEUED 05:36 as
   6329aaae (rebased: gpat's test and wclip's both appended to boolean_groups.rs; the first queue job b28b8ef9 had the
@@ -133,6 +98,9 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
     applies them with one ReShape + one check (apply_band_merges; fallback one at a time): wire-clip bands 184 -> 120
     ms, unify ~920 -> 840 ms, same 889 faces; kernel T1 566 pass both ways (bb-all.sh, PROBE_NO_BANDBATCH in bool-hat).
     NB the kernel build has -Dnear= -Dfar=: no identifiers `near` / `far` in C++ (local syntax check: add them).
+  - seambatch gate DONE 05:33 (vibe2): replay +0 -0, models 128 -> 128, shells 6 -> 6, crates pass; only the dogbone
+    noise changed (gate log /root/bool-seambatch-scratch/gate-22f3c0c54.log). Lead told 05:50 (with decisions (a) gamma
+    per-pair tolerance vs two-stage fuse, (b) local check after the second group merge: louver 1173 -> 1131).
   - GATE: unit bool-seambatch-gate (vibe2, 04:42, chain-bool-seambatch.out) covers arcpart + seambatch; unit
     bool-bandbatch-gate (bandbatch-gate.sh) runs bool-bandbatch's after it (chain-bool-bandbatch.out). Then knurls
     (kn-run.sh vibe2 kn-bandbatch, k-br = ~/agents/bool-bandbatch-gate tree), land the stack after wclip + ruling.
@@ -156,8 +124,6 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
     1173 -> 1131 faces) -> decision for the lead.
   - patches probe (bool-hat): patches.patches/.groups/.usd/.valid, and patches.copy/.check/.volume inside
     merge_cylinder_patches (a whole BRepBuilderAPI_Copy per candidate pair + whole check + 2 whole volumes per merge).
-- bool-gpat QUEUED 01:32 as 16d2514a (in a land batch 04:45).
-- bool-sweepcap LANDED 04:44 as 5b53e2db (asm told 04:54).
 - SPEED-STANDOFFS st-brep.sh (in gm-st.sh): PROBE_BREP_TIMES stage marks in brep boolean_in (bool-hat, by line no.):
   Revolve 2's unify usd.check 328 ms is usdvol's; each Boolean's rust.brep 185-230 ms, sections_ahead 65-85 of it.
 - SPEED-STANDOFFS 01:20: the unify's usd.check is 70-307 ms a Boolean (B-spline thread faces): after the changed faces'
@@ -171,10 +137,6 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - SPEED-STANDOFFS: recorded (vibex8 + vibe2 BK/st/rec): 330d53143e91af3e cut 171 ms, de7a7e61c78a33a1 common
   276 ms, e714e22170ae3a0d cut 274 ms, all our path; a 6-face part x a 4-face thread sweep: brep 464 ms of which
   sections_ahead (OCCT IntTools_FaceFace on B-spline pairs) 216 ms. OCCT alone 1.4-2.8 s. Profile/st-prof.sh.
-- bool-gpat 551e6359c gate PASS-ish 01:04 (vibe2; replay +0 -0, model suite 128 -> 128 (cf-sheet-metal-overcut-dogbone
-  "changed" past its truncated text, a custom feature NOT BUILT both sides), shells 6 -> 6, crate tests pass; gear
-  2597 -> 2042 ms). Knurls (kn-run.sh vibe2 kn-gpat, k-main = bool-gate-base 71c0a9273) RUNNING 01:12 ->
-  kn-gpat.out; then delete ~/tmp/bool/kn-gpat, land, report.
 - END CAP RULED (lead 11-22 03:2x): not at 218 faces (face counts are parity; current 240 is closer to live 236). Take
   the exact cap's 2 s only if it also gives live's face split (aim 236: each gap's root kept as two B-spline halves,
   not merged r7.75 cylinders); else keep the current cap. bool-hat keeps it behind PROBE_NO_ENDCAP; low priority.
