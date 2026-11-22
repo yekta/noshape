@@ -385,6 +385,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   sides go dark grey (82,82,82) / (132,132,132). Hovered z arrow (step 4): live a thin dark-blue outline, ours a filled bright blue.
   wf24-triad.png. Steps 12-27 (BOM, Configuration "Large", Configure suppression, Switch to) hit the runner's config_row gap
   (UIS-CONFIG-ROW-MENU); up to there they match.
+- [ ] P1 **ASM-CONFIG-ROW-MENU (asm)** (workflow 24 steps 20-26, variant 24v-config-px with our row px, green b5b414278): right-click
+  a configuration row ("Large") in an assembly's Configuration panel: live's menu is Switch to "Large" / Set as default / Duplicate
+  row / Move up / Delete row (as our Part Studio's); ours shows only "Delete", so Switch to and the rest of 24 (Suppress writing
+  only Large's cell) can't be done (tickets/wf24-config-row-menu.png). P2: the assembly's configuration table sits 11 px higher than
+  live's (rows at y 259 / 293 vs 270 / 305; tickets/wf24-config-table.png). Steps 12-19 = live (BOM, the "No assembly features are
+  configured…" message, Configure suppression toast).
 - [ ] P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10, sm-box): live's Form opens on the account's last form (Circle
   emboss) and builds at the picked point; ours opens with "Select Part Studio…" empty, so Form 1 errors (and the flat view has no
   emboss). Corner relief width likewise: live remembered 3 mm (warns "A corner relief is too small…"), ours 5 mm. Rest of 27 matches
