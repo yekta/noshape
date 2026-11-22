@@ -1297,16 +1297,15 @@ impl Viewport {
         (a.x <= b.x).then_some((a, b))
     }
 
-    /// Fit the model's box as drawn, `margin` px clear on the side that limits it, centred (the sheet metal flat
-    /// view: live "skasm flat view fit", 12 px top and bottom of a tall flat).
-    pub fn zoom_to_fit_margin(&mut self, margin: f64, cx: &mut Context<Self>) {
+    /// Fit the model's box as drawn so it fills `fill` of the side that limits it, centred (the sheet metal flat view:
+    /// live "skasm flat orientation", 95.3 % of 712, 612 and 525 px panes alike).
+    pub fn zoom_to_fill(&mut self, fill: f64, cx: &mut Context<Self>) {
         let size = self.size();
-        if size.x <= 2.0 * margin || size.y <= 2.0 * margin {
+        if size.x <= 0.0 || size.y <= 0.0 || fill <= 0.0 {
             return;
         }
         let Some((a, b)) = self.fit_box_px() else { return };
-        let half = (b - a) * 0.5 * DVec2::new(size.x / (size.x - 2.0 * margin), size.y / (size.y - 2.0 * margin));
-        let c = (a + b) * 0.5;
+        let (c, half) = ((a + b) * 0.5, (b - a) * 0.5 / fill);
         let Some(to) = noshape_scene::camera_ops::zoom_to_window(&self.camera, c - half, c + half, size) else { return };
         self.camera = to;
         self.jump_camera();
