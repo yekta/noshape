@@ -5,31 +5,24 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 01:22 UTC) — RESUME HERE
+## State (2026-11-22 02:35 UTC) — RESUME HERE
 - QUEUED 33829c47 (welding flexible subs: assembly_transform `also` + Translator::place_all; welding 41/81 -> 81/81 occ,
-  28/28, 29/29; e2e a_flexible_subassemblys_parts_move_together). Stacked, NOT landed (land.sh after 33829c47 lands,
-  never while it's queued): 2d56de9dd (TICKETS batch 4), 2b3c38f3a (handoff), 017520625 (MANIPULATOR-RING: selected
-  edge band + vertex disc over the triad; render: a Lines instance `.on_top()` = nearest depth, selected lines only,
-  params.x bit 4), then the INSTANCE outline commit (state::INSTANCE 8192 with OUTLINE: an instance selected through an
-  entity gets the pushed-out back-face outline in #ffa033; lines draw over it, so the selected face's #ffa90a boundary
-  wins as live t1). Tests: hover_matrix_tests::edge_band_over_triad, ::entity_selected_instance_outlined; asm matrix +
-  feel 44/44, PS hover_matrix 71/71, render 68/68 (band version; INSTANCE version run hm-1122e.log).
-- Live answered the triad (behaviours "assembly triad depth", live/asm/triad-depth-1122/): NOT depth-tested; selected
-  band / vertex dot over it; selecting an entity selects the instance (outlined); Escape doesn't clear an assembly
-  selection, an empty click does (check ours: not yet).
-- qa 11-22: batch 4 12/20 (matrix 100/125); connector cells' navy rim / front square = shared ConnectorGlyphs (psui
-  FEEL-MC-LOOK), told qa. Tell qa the MANIPULATOR-RING commit when it lands.
-- blend waits on the scissor bisect for 9cbb0e Fillet 23 / 665cf3 Fillet 4 (told: after b3345866 + 21754bd8 land).
-- Next item after these: handoff "Next" 3 (triad value boxes: live 30 px X drag = 1.9 mm; ring 30 px right = 15 deg:
-  ours (assembly_view.rs ~3735): the ring angle is geometric, the pointer's ray on the plane ⟂ ring_axis(k) through
-  the triad centre, then ring_snap (Shift: free); the arrow uses arrow_snap_step_for. No test replays live's
-  triad-click-1120 drags (x.json / ring-z.json: pick (70,10,10), press px; no camera scale: measure mm/px from
-  x-0-after-click.png's block edges, then a feel test with live's camera: 30 px -> 1.9 mm, 30 px right -> 15.0 deg).
-- Runs: hm-1122e.log (clippy render/scene/assembly-ui + asm matrix/feel + PS hover_matrix + render on f843236ed) was
-  waiting for a vibex8 build slot at 01:32; infento inf-fix.out in its slot run (01:11 at studio 1dc32b feature 301).
-- Infento rerun with the welding fix: vibex8 ~/agents/asm-keep/weld/inf-fix.out (onerun-t.sh, 7200 s, bin ops-weld),
-  started 00:0x. Compare with 157/167 occ, 204/206 mates, 64/64 BOM; the 5 nested misses (b63c40 / bdf7bf / dfc972)
-  should close if they were the same one-at-a-time placing.
+  28/28, 29/29; e2e a_flexible_subassemblys_parts_move_together); main was red on dx's prefs flake until 281240db:
+  if 33829c47 fails on that, re-queue it. Stacked, NOT landed (land.sh after 33829c47 lands, never while it's
+  queued): 2d56de9dd (TICKETS batch 4), 2b3c38f3a (handoff), 017520625 (selected edge band + vertex disc over the
+  triad), f843236ed + e7d2a87ac (an entity-selected instance: a #ffa033 2 px band over its silhouette line, drawn
+  through the parts in front, via the hover_outline band pass with mask channels r coverage / g selected face seen /
+  b INSTANCE; a selected face's boundary #ffa90a, fs_body_face, live t1/t2), d931a59a0 (triad X arrow / Z ring drags
+  replayed from live triad-click-1120: 1.9 mm, 15 deg about world Y; manip_drag_text), this handoff.
+  All green on vibex8: clippy render/scene/assembly-ui, asm matrix 44/44, edge_looks, PS hover_matrix 71/71, render
+  68/68 (hm-1122f.log), the_triads_ 3/3 (triad-1122.log). After landing: tell qa the main sha (MANIPULATOR-RING).
+- Live triad (behaviours "assembly triad depth", live/asm/triad-depth-1122/): not depth-tested; selected band / vertex
+  dot over it; Escape keeps an assembly selection (ours too), an empty click clears it.
+- blend waits on the scissor bisect for 9cbb0e Fillet 23 / 665cf3 Fillet 4 (after b3345866 + 21754bd8 land; neither
+  on main at 02:11).
+- Infento rerun with the welding fix: vibex8 ~/agents/asm-keep/weld/inf-fix.out (slot, 7200 s, bin ops-weld; at
+  5218 s on mates at 02:11). Compare with 157/167 occ, 204/206 mates, 64/64 BOM; the 5 nested misses (b63c40 /
+  bdf7bf / dfc972) should close if they were the same one-at-a-time placing.
 - Scissor fed22d regression (main 10/24 mates vs 16/34): NOT skasm's two commits (their A/B). Top Openings is a red
   herring (taken back in both runs). First new failure is Extrude 18 with identical translation (regions, frame, params):
   the body before it differs. Good run vibe2 mc/asm-scissor-save.out (binary predates f5d9f0ea1 14:10), bad vibex7
@@ -37,7 +30,6 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   but parity_models doesn't print states. Next: rerun the scissor assembly once skasm's b3345866 and bool's 21754bd8
   (Spur Gear OK 2466.975 mm3) land; if Extrude 18 still fails, bisect the window in the assembly run stopped after
   fed22d (bisect-scissor.sh pattern). Notes /root/asm-scratch/notes-1121.md.
-- Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
 - transform-carry HELD (/root/asm-scratch/transform-carry.patch): its extra failures are the same Base mates.
 - Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
 - Infento main: 157/167 occ, 204/206 mates, 64/64 BOM; the 5 Wheel 7inch are deleted elements in live (not the gap).
