@@ -618,12 +618,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 
 ## qa, 2026-11-22 01:4x (USER P0 walk 8, lead: feature list / tree, Measure + Mass properties, mate dialog flow; green 50772462b / 04389f02d, ui-script cells on vibe2, kit qa-scratch/hm2/walk8 gen9.py, shots out-w8*; live behaviours "qa walk 8" 01:17–01:35, live/qa/walk8-1122/ + featurelist-feel, measure-mass-1118, asm/feel-1117)
 
-- [x] (fixed psui 11-22 e41b4f43: a 49 x 22 Final button right of the slider, #EAEAEA + focus ring when on, the slider greyed; list matrix row; qa to verify) P1 **FEEL-DIALOG-FINAL-BUTTON (psui)**: double-click Extrude 2 with Extrude 3 after it. Live's footer has a small 49 × 22
+- [x] (fixed psui 11-22 e41b4f43: a 49 x 22 Final button right of the slider, #EAEAEA + focus ring when on, the slider greyed; list matrix row; qa verified 12:4x, green dd2247649, hm2/out-pv/w8: a 22 px Final button right of the slider; pressed #EAEAEA with the blue ring, the slider greyed, Part 3 shown) P1 **FEEL-DIALOG-FINAL-BUTTON (psui)**: double-click Extrude 2 with Extrude 3 after it. Live's footer has a small 49 × 22
   secondary button "Final" to the right of the history slider (before "?"), tooltip "Preview Part Studio up to the rollback bar";
   pressed it turns rgb(234,234,234) with a blue focus ring, the slider greys out and the later features + Part 3 show
   (live/qa/walk8-1122 9a/9b, part-studio/2381). Ours draws a "☐ Final" checkbox to the left of the slider with the tooltip "Preview
   the finished model instead of rolling back to this feature" (feature_dialog.rs `dlg-final`; out-w8/w8-a-dblclick-feature/02.png).
-- [x] (fixed psui 11-22 e41b4f43: square, 1 px #1651B0, 24 high, to the list's right edge; list matrix row; qa to verify) P1 **FEEL-RENAME-INPUT-LOOK (psui)**: Extrude 1 › right-click › Rename. Live's inline box is square, a 1 px #1651B0 border,
+- [x] (fixed psui 11-22 e41b4f43: square, 1 px #1651B0, 24 high, to the list's right edge; list matrix row; qa verified 12:4x, green dd2247649, hm2/out-pv/w8 w8-a-rename 03: square, 1 px #1651B0, x 62-244 (the list edge), 24 high, the name all selected) P1 **FEEL-RENAME-INPUT-LOOK (psui)**: Extrude 1 › right-click › Rename. Live's inline box is square, a 1 px #1651B0 border,
   178 × 24 from x 62 to the list's right edge, the name all selected (featurelist-feel/D1-rename-input.png). Ours is rounded with a
   2 px light-blue #9EC9FF focus ring and ends ~10 px short of the edge (out-w8/w8-a-rename/03.png). Enter, Tab, a canvas click
   (commit) and Escape (restores) all behave as live.
@@ -776,15 +776,13 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
 - [x] verified qa 02:5x, green 09de25e3b (cmp-menus sk-line, -selected, -and-end, -end SAME) P0 **MENU-SK-HIDE-SKETCHES (psui)**: in sketch edit, a sketch line's menu (hovered, selected, with its end point, or on the
   end) lacks **Hide other sketches** and **Hide all sketches** (after Revolve…); live sk-line, sk-line-selected, sk-line-and-end,
   sk-line-end. Everything else matches.
-- [ ] (psui 11-21 22:3x: the face fixed; qa 02:5x green 09de25e3b: sk-model-face SAME (13), verified; the edge still adds Use, Curve/surface analysis…, Zoom to selection, Align view with vertical axis, waiting on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
 - [x] fixed (psui 11-21 22:3x: the line's midpoint menu) P0 **MENU-SKETCH-IN-PS (psui)**: right-click Sketch 2's line in the Part Studio graphics: ours Edit Sketch 2… · Show
   dependencies… · Select · Select other… · Zoom to fit · Delete Sketch 2. Live also has **Show dimensions**, **Hide**, **Hide other
   sketches**, **Hide all sketches**, **Create Drawing of Sketch 2…** and **Edit sketch appearance…** (sketch2-line-graphics).
 - [x] fixed (psui 11-21 22:3x: also with no other sketch shown) P0 **MENU-SK-HIDE-SKETCHES (psui)**: in sketch edit, a sketch line's menu (hovered, selected, with its end point, or on the
   end) lacks **Hide other sketches** and **Hide all sketches** (after Revolve…); live sk-line, sk-line-selected, sk-line-and-end,
   sk-line-end. Everything else matches.
-- [ ] (psui 11-21 22:3x: the face fixed (Section view…, View normal to, no Curve/surface analysis…); the edge waits on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
-- [x] (fixed psui 11-22 e41b4f43 per live psui walk 5: the edge's midpoint lights first and gets the short menu (no Use, analysis, Zoom to selection, Align view); off it the edge's keeps them as live; qa to verify) (psui 11-21 22:3x: the face fixed (Section view…, View normal to, no Curve/surface analysis…); the edge waits on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
+- [x] (fixed psui 11-22 e41b4f43 per live psui walk 5: the edge's midpoint lights first and gets the short menu (no Use, analysis, Zoom to selection, Align view); off it the edge's keeps them as live; qa verified 12:4x, green dd2247649, hm2/out-pv/w3 s7-sk-model-edge at live's point (20,0,10): the menu SAME as live (9); the cell had clicked (10,0,10), fixed) (psui 11-21 22:3x: the face fixed (Section view…, View normal to, no Curve/surface analysis…); the edge waits on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
   **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
   face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
   (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
@@ -962,20 +960,15 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   Both: qa 18:26, green 4f2cb3ce. Checked too: a second new Fillet opens with the radius typed in the first (2 mm), as live (per user
   or per document is not captured yet).
 - [x] verified qa 02:5x, green 09de25e3b (hm2/out-w1b: the circle stays #E4E7EA 0-9 s after the point and line drags). P0 **FEEL-SKETCH-REGION-FILL-AFTER-DRAG (psui)**: user walk. In Sketch 2 (block doc: point (60,25), line (60,5)-(90,5), arc, circle
-- [x] fixed psui (the release rebuilds the scene; test checks the drawn fill), qa to verify. P0 **FEEL-SKETCH-REGION-FILL-AFTER-DRAG (psui)**: user walk. In Sketch 2 (block doc: point (60,25), line (60,5)-(90,5), arc, circle
   c(100,20) r6), drag the free point (60,25) to (64,28), or the line up 4 mm, with no tool: the circle's shaded region (#E4E7EA) goes
   white and stays white 0.8, 3 and 9 s after the release (nothing else changed). Before the drag it is shaded. Live shades closed
   regions in sketch edit throughout (live confirmed 21:1x: shaded at 0 s and 3 s after the point drag, hover-matrix-1121/walk/w1-*). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
   05-10), drags2.png; qa 19:54, green 6be52caf4 (kit qa-scratch/hm2/walk, run.sh on vibe2 :481).
-- [x] (fixed psui 11-22 03:25 per live dimplane-1122: with Dimension picks a plane lights only on its outline (~2 px), the nearest; never over its inside; test a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline; qa to verify) REOPENED (qa 02:5x, green 09de25e3b, hm2/out-w1b/w-dim-line-placing 08-09: with the line picked, hovering (72,-3) and (74,-6) to place still lights the Front plane's outline #FFC685; 07 before the move is dark) P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
+- [x] (fixed psui 11-22 03:25 per live dimplane-1122: with Dimension picks a plane lights only on its outline (~2 px), the nearest; never over its inside; test a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline; qa verified 12:4x, green dd2247649, hm2/out-pv/w1 w-dim-line-placing 08-09: no plane lit while placing, as live) REOPENED (qa 02:5x, green 09de25e3b, hm2/out-w1b/w-dim-line-placing 08-09: with the line picked, hovering (72,-3) and (74,-6) to place still lights the Front plane's outline #FFC685; 07 before the move is dark) P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
   (66,5), move to about (74,-6) to place it, the pointer over the Front plane: ours lights the plane's edge orange while placing;
   live lights nothing (hover-matrix-1121/walk/w3-placing.png, w3-front-wide.png). qa-scratch/tickets/plane-lit-dimensioning-w1.png
   (live left, ours right); ours out-walk/w-dim-line-placing.
 - [x] verified qa 02:5x, green 09de25e3b (hm2/out-w1b: no blue point; the vertex an orange disc in the yellow square with × and —, the midpoint an empty yellow box on the band) P0 **FEEL-LINE-SNAP-MODEL-LOOK (psui)**: user walk. Line tool, before the first click, pointer 0.5 mm from the block's
-- [x] fixed (psui 11-21 22:3x: the plane the click would skip stays dark) P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
-  (66,5), move to about (74,-6) to place it, the pointer over the Front plane: ours lights the plane's edge orange while placing;
-  live lights nothing (hover-matrix-1121/walk/w3-placing.png, w3-front-wide.png). qa-scratch/tickets/plane-lit-dimensioning-w1.png
-  (live left, ours right); ours out-walk/w-dim-line-placing.
 - [x] fixed (psui 11-21 22:3x: no cursor point on a snapped point before the first click; "—" / "|" on the axes) P0 **FEEL-LINE-SNAP-MODEL-LOOK (psui)**: user walk. Line tool, before the first click, pointer 0.5 mm from the block's
   vertex (40,0,0) or 0.3 mm from the bottom front edge's midpoint (20,0,0), sketch on Front. (a) Ours draws a **blue point inside
   the snap marker** on both; live has none: the vertex is an orange disc in the yellow snap square, the midpoint an empty yellow
@@ -995,7 +988,6 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   dashed line runs along the edge right of the ring (live none). 8 cells; b4-score.png rows 1-4, columns 3-6.
 - [x] P0 **FEEL-ASM-DRAG-LIT (asm)** (qa verified 01:0x, green 50772462b, real xdotool drag: no hover look mid-drag, lit again after release; qa-scratch/tickets/asm-drag-lit-w7.png): user walk 2, real pointer (xdotool). Dragging free Part 2 by its top face (two-blocks): ours
 - [x] verified qa 02:5x, green 09de25e3b (hm2/out-w2s: no dot, grey list border, no scrollbar, bold hovered row). P0 **FEEL-SELECT-OTHER-LOOK (psui)**: user walk 2. Block, pointer on the top face, ` (Select other), a row hovered: ours draws a
-- [x] fixed psui (no point, grey border, no scrollbar; pixel test), qa to verify. P0 **FEEL-SELECT-OTHER-LOOK (psui)**: user walk 2. Block, pointer on the top face, ` (Select other), a row hovered: ours draws a
   ~9 px #FFC20E dot on the face where Select other was asked, and the hovered list gets a blue border and a scrollbar. Live: no
   dot, the list border stays #D7D7D7, no scrollbar (live uip/select-other-row-click-3.png). Rows, bold hover row, the lit face and
   the dialog's place match. Ours qa-scratch/hm2/w2c/so.png, out-w2/w2-selother-face/04 (green 2fb0ed1ac).
