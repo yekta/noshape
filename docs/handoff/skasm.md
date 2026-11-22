@@ -3,7 +3,7 @@
 Updated 2026-11-22 18:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (20:30)
+## NEXT (20:4x, compaction)
 - LANDED 09b4b72b (the whole 11-22 stack). QUEUED d2b509fc (20:2x): assembly + Part Studio take the shared chooser
   (assembly::inference::choose; Part Studio passes entered=false: its points come after the pointer is on the entity,
   psui's the_mate_connector_feature_infers_as_live wants the corner on the first hover); Trim-on-circle test (live sk3:
@@ -13,7 +13,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   2 mm off the line past the boundary drops the pick) not done: no clear rule.
 - asm will move EDGE_END_REACH_PX / the vertex pick in assembly/inference.rs for qa's FEEL-MC-EDGE-BEFORE-VERTEX-ASM
   after d2b509fc lands (shared: the Part Studio twin moves with it).
-- MC left (Part Studio): VERTEX-FROM-FACE (vertex_glyph in assembly/inference.rs, wire into part-studio hover),
+- UNCOMMITTED (20:4x, compaction): VERTEX-FROM-FACE: part-studio inference.rs takes PickKind::Vertex, InferenceHover.glyph
+  = assembly::inference::vertex_glyph(on, before); marks' glyph only if reached from a face/edge; inference_choice()
+  None on a vertex (click / triad ball unchanged); #[cfg(test)] inference_glyph_shown; test hover_matrix_tests
+  a_vertex_reached_from_its_face_keeps_the_connector_glyph; assembly_view.rs update_inference now calls vertex_glyph
+  (same rule). Running: vibex8 ~/tmp/skasm/vg.sh (local /root/skasm-scratch/bin/vg.sh: clippy psui+asm-ui, psui
+  connector/infer/mate_/triad/vertex tests, asm-ui vertex/connector/infer). If green: commit, ticket "fixed, to
+  verify", land after d2b509fc. If the new test fails: check that rehover keeps a Vertex hover_pick in the Origin field.
+- MC left (Part Studio):
   EDGE-TRIAD-HIDDEN (Z on top), PS-VERTEX-LOOK (white disc, orange rim), MARKER-SHAPES (midpoint squares in scene
   InferenceMarks), CAP-MARKER-HIDDEN (check asm's on-top dots from 3900b9e1), re-score SHIFT-NEAREST + PICKED-OWNER
   (psui's batch landed), MARKER-REACH + EDGE-PICK-RADIUS wait on live R1-R5.
