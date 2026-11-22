@@ -312,6 +312,26 @@ fn a_row_drags_from_5_px_under_a_pill_up_and_left_of_the_pointer(cx: &mut TestAp
     draw(cx, w);
 }
 
+/// Live docs-page-gaps-1122 c-25: Esc ends a row drag; nothing moves and the grabbed row is left selected.
+#[gpui::test]
+fn esc_ends_a_row_drag_and_leaves_the_row_selected(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "drag-esc");
+    let at = row_at(cx, w, "C");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(at, None, Modifiers::none());
+    vcx.simulate_mouse_down(at, MouseButton::Left, Modifiers::none());
+    vcx.simulate_mouse_move(at + point(px(0.), px(30.)), Some(MouseButton::Left), Modifiers::none());
+    draw(cx, w);
+    assert!(cx.update(|cx| cx.has_active_drag()), "dragging");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("escape");
+    draw(cx, w);
+    assert!(!cx.update(|cx| cx.has_active_drag()), "Esc ended the drag");
+    assert!(view.read_with(cx, |v, _| v.dragging.is_empty()), "the row no longer fades");
+    assert_eq!(selected(cx, &view), ["C"], "the grabbed row is selected");
+    VisualTestContext::from_window(w, cx).simulate_mouse_up(at + point(px(0.), px(30.)), MouseButton::Left, Modifiers::none());
+    draw(cx, w);
+}
+
 /// Live2 11-13: a single click on a document's name opens it; Ctrl or Shift on the name select as on the row.
 #[gpui::test]
 fn a_click_on_a_documents_name_opens_it(cx: &mut TestAppContext) {

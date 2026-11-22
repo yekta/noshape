@@ -3733,7 +3733,7 @@ impl StartView {
                     .when(trash_id.is_none(), |r| {
                         let target = f.clone();
                         r.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(selected, f, &name_for_drag, true), start_docs_drag(cx.entity().downgrade()))
-                            .drag_over::<DocsDrag>(|st, d, _, _| folder_drop_style(st, d))
+                            .drag_over::<DocsDrag>(|st, d, _, _| folder_row_drop_style(st, d))
                             .on_drop(cx.listener(move |this, drag: &DocsDrag, window, cx| this.drop_into_folder(drag, &target, window, cx)))
                     })
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
@@ -4793,6 +4793,18 @@ impl Render for StartView {
             .track_focus(&self.focus)
             // Dragged rows: off any target until one under the pointer says so as it is drawn (the ghost's icon).
             .on_drag_move::<DocsDrag>(|e, _, cx| e.drag(cx).over.set(false))
+            // Esc ends a drag of rows: nothing moves, the grabbed row is left selected (live docs-page-gaps-1122).
+            .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                if e.keystroke.key != "escape" || !cx.has_active_drag() {
+                    return;
+                }
+                let Some(row) = this.dragging.first().cloned() else { return };
+                cx.stop_active_drag(window);
+                cx.stop_propagation();
+                this.dragging.clear();
+                this.context_select(&row);
+                cx.notify();
+            }))
             // A press anywhere but on Create takes the focus off it, as a
             // click on the page blurs a focused button (live request 1669).
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| {
@@ -4984,6 +4996,13 @@ fn start_docs_drag(view: WeakEntity<StartView>) -> impl Fn(&DocsDrag, Point<Pixe
 fn folder_drop_style(st: StyleRefinement, d: &DocsDrag) -> StyleRefinement {
     d.over.set(true);
     st.border_2().border_color(rgb(0x1651b0)).bg(rgb(0xe8eef7))
+}
+
+/// A folder list row under dragged rows: the same fill, the lines top and bottom only, wherever on the row
+/// (live docs-page-gaps-1122).
+fn folder_row_drop_style(st: StyleRefinement, d: &DocsDrag) -> StyleRefinement {
+    d.over.set(true);
+    st.border_t_2().border_b_2().border_color(rgb(0x1651b0)).bg(rgb(0xe8eef7))
 }
 
 #[derive(Clone)]
