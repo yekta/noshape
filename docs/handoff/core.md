@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-22 23:01 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 23:41 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -15,6 +15,30 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   no cap and no deleted round and their box is clear of each round's wedge. defeature-0 540 -> 7.9 ms; suite A/B
   (same binary): identical matches, Move face 1 1391 -> 235 ms; interleaved rerun of 21 docs: none slower, gamma
   3005 -> 1736 ms (rest is bool's Boolean 2). T1 features::a_prisms_rounds_are_deleted_past_holes_through_its_sides.
+- **NOW P0 BOOLEAN-UNION-FIRST-TOOL-IDENTITY (psui/lead 11-22 23:4x; psui TICKETS):** user's doc
+  /root/lead-scratch/user-docs/macmini-m6.noshape (PRIVATE: copies only in ~/tmp/core, mode 700: mm6.noshape, mm6b =
+  Boolean 1 deleted). Live (behaviours "psui P0: STEP import colours..."): union result = FIRST tool (name, part id,
+  part appearance), every face appearance of both kept, the other's uncoloured faces in the result's colour. Found:
+  ours already keeps the first tool's id (result body:F604b26165b32.0, tools [.0, .64]); its name "root" is the
+  IMPORT's (both parts "root" even without the union; live names them Main / Fan from the STEP) -> dx's import naming,
+  tell psui/dx. part_properties is EMPTY in every saved version (no "Mac mini" rename stored: the user's renames never
+  reached the file; ask psui if rename persistence is the real bug). Two colours: face_appearance is keyed by body id,
+  so the merged part's (.64) face colours were dropped. FIX (uncommitted, core-rf): display.rs face_colors also matches
+  entries whose body no longer exists (merged away). Next: model test in crates/model/tests/features_b.rs after
+  import_foreign_names_and_colors (two boxes, B's face red, union A then B: one part with A's colour, B's red face kept,
+  B's other faces A's colour; B then A: B's id/colour), run it, then check mm6 in the CLI / app, land, report.
+  Probe: /root/green/noshape call feature_list '{"doc":"/root/tmp/core/mm6.noshape","tab":"Mac-mini-2024"}'.
+- **NOW: projected-curve-enclose Fill 1 (core-rf, uncommitted):** first difference is Fill 1 (feature 3): live one
+  cylinder face 5072.2167 mm2, ours a plate 5017.6 (Mutual trim 1's 186 ms is on that wrong input). Projected curve 1 =
+  ellipse 100x60 (Top) x R71.548 arc (Front). Change: kernel edge_on_faces (boolean.cpp: the edge copied with a p-curve
+  on each face it lies on); curves.rs two-sketch projection puts its joined edges on the prisms' analytic faces, so
+  fill's make_face_from_wire(w, false) finds the cylinder. T1 kernel core::a_curve_on_a_cylinder_fills_with_that_cylinder.
+  Second try in flight (b020ivs0n, .fc.sh -> /root/core-scratch/fc.log): k::edges_on_faces (all edges at once, each
+  face's surface converted once by GeomConvert_SurfToAnaSurf: an arc's extrusion is not a cylinder to OCCT, and
+  FindSurface needs ONE shared surface). First try failed (test's chaining; doc still plate). Then suite gate, land.
+- **QUEUED c8555cc4 (23:1x, carries c2f57b7b):** gamma Move face 1 speed (above) + loft-stations3 J/K: a guide beside
+  a guided loft's middle profile is LOFT_FAILED as live (end profile missed keeps "All guides..."; REQUESTS 23:08 asks
+  live2 for a guide running past an end profile).
 - **VALID-SURFLOFTS-LOFT1 LANDED e3e73b362 (18:27):** loft's own straight edges as lines (straight_edges_as_lines, op_loft;
   NOSHAPE_LOFT_SPLINE_EDGES=1 off). Suite 1984 -> 2015 features, none worse. Blend told: Face blend 2 next.
 - **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
@@ -154,7 +178,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0000. (lead 11-21, P1, after SUSPENSION-CIRCPAT1) STD-3132: bundled std 3112 -> 3132 (live/std-3132 +
+0000. DONE 8631c5717 (stale) STD-3132: bundled std 3112 -> 3132 (live/std-3132 +
    live/std-3132-vs-3112.diff, 14 files / 181 lines: SM pattern keeps collapsed walls V3128, hole error preview on a start
    plane, 7/8"-14 UNF tap drill 0.8125 in, thin extrude's new builtin @setThinWallOneSided: no-op unless annotations need
    it). Gate: model suite none worse + skasm's 25 SM docs; tell skasm when landed.
