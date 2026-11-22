@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-21 22:57 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 03:35 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,46 +13,40 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 00:55 11-22 (read first)
-TASK (user 21:5x): (1) fast open honestly measured vs live, target <= 0.5 s; (2) hover latency on heavy docs.
-RULING (lead 00:2x 11-22): software GL (llvmpipe, our Xvfb hosts, live's lane 4) is NOT a target: measure hover and
-open on the Mac's GPU (NOSHAPE_RB_HOST=mac, its slots). live's software orbit times (behaviours "qa walk 7
-navigation" (8)) are not targets either.
-- MAIN RED (prefs.rs:320, mine): the images library read a version's tabs in stored order (by tab id), not tab order:
-  random per run. Fix = ordered_tabs (images + forms libraries); 24/24 stress runs ok. QUEUED with 319feba2 (00:4x;
-  carries 425d28c1 display row of another build, f82cc940 software prewarm 1x, b42846179 STL surfaces, handoffs,
-  latency test). Lead told. CHECK land.sh --status; a failed land = next task.
-- HOVER on the Mac GPU (T2 part_studio latency::a_face_lights_on_heavy_part_studios): plate face lit 17.1 ms median
-  (live 53), parts-1000 18.6 ms (live 266); average pick 1.6-2.3 ms. Done (no gap). Assembly (pins-1000) not timed
-  on the Mac yet (assembly-ui has no latency harness; live 2000-inst asm 1.3-2.5 s render-bound).
-- OPEN on the Mac GPU: STOPPED 00:55 (user couldn't reach the Mac: the Mac is CLOSED to builds, tests and app runs
-  until reopened; my Mac target, docs and binaries deleted). No GPU open numbers yet: decision for the lead (GPU host).
-  Live's open (behaviours "heavy-doc open times", lane 4 software, s, warm shaded / cold): infento 23.5-62.7 / 38.2,
-  scissor 18.3-20.1 / 36.8, isaac 17.6-21.7 / 26.9, rings-loft 25.9-26.6 / 26.2, dx-big-asm 17.0-58.9 / 22.7,
-  400-hole plate 60.6-70.8 / 71.0 (list at 85-104 s).
-- 76d128b9c verified (vibex8 xbuild.sh): rows rewritten to another build's suffix are used: cached display 123-814 ms
-  on l30, big-plate, pins-1000, rings, infento, isaac (regen then replaces it).
-- OPEN numbers vibex8 llvmpipe (not a target now; ms from launch; run1 no rows / run2 rows + fresh cache / run3 same
-  cache): l30 3050/1606/1170; big-plate 2189/1800/1375; pins-1000 1737/1660/1509; rings 17153/1815/1337; isaac full
-  135 s / 1118 / 2628 (regen 164-191 s); scissor 452 s / 1835 / 1771 (regen 312-402 s); infento 34.7 s / 797 / 1023.
-  Live shaded 15-32 s. Regen-to-editable is the real gap (scissor 5-7 min vs live ~18 s): core's regen speed.
-- Software hover breakdown (vibex8, for the record): wait 5 x avg pick ~200, pick round trip 38-100, frame 60-220,
-  GPUI present 15-75 ms; a 120k-triangle pick pass alone 8 ms (bench). Not pursued (ruling).
-- Cleaned: local dx-scratch 23 -> 2.9 GB (user 00:3x); vibe2 dx-open target; vibex8 A/B bins; Mac dx, dx-land,
-  dx-main, dx-nightly worktrees.
-- NEXT: report to lead (<= 5 lines): open (Mac GPU) vs live, isaac / scissor regen gap
-  (core), perf.yml macOS broken since 11-18, main red fixed; then the queue below (bottle DXF 0.015 in).
+## STATE 03:35 11-22 (read first)
+TASK (user 21:5x 11-21): fast open vs live (<= 0.5 s), hover on heavy docs: both DONE on the Mac GPU.
+Mac rules (DECISIONS def9ef908): one 4-job nice-20 load-gated slot (NOSHAPE_RB_HOST=mac); our app only while the user
+is idle >= 600 s (HIDIdleTime), one run, <= 3 min, killed at once when the user returns. Guarded runner:
+mac ~/noshape-host/dx-keep/gpu/macgpu.sh (watchdog 175 s, SIGKILL 3 s after SIGTERM); probe runner dx-keep/sig/.
+- QUEUED (vibe2): 281240db job (main-red fix 75271def prefs ordered_tabs, hover T2, handoffs, display rows of another
+  build, software prewarm, STL surfaces) + 319feba2. Main GREEN 02:09. land.sh --status doesn't list them; ls
+  vibe2:~/land/jobs. Never rename job files.
+- TO LAND (dx-open4, rebased 03:3x): b68f653b suite places drawing views at live's position (DRW-VIEW-CENTRE);
+  4b5b5d13 kernel HLR hides a bead's own outline behind its tube (bottle lip; test fails without, kernel_core:: +
+  hlr:: 70/70 vibex7); e9e09154 SIGTERM fix (below) + TICKETS row. Pending: drawing + ops e2e on vibex7
+  (/root/dx-scratch/fo/e2e.out), Mac kernel_core:: (kmac.out), bottle suite rerun (vibex8 bot.sh, held for qa's speed
+  window till 04:00: check DXF rows, Front not moved, lip arc 90..180).
+- APP-SIGTERM-IGNORED-MAC fixed: macOS sigprocmask sets EVERY thread's mask; the guard's siglongjmp (and abort() from
+  std::terminate) restored a GCD-made thread's mask (fbfee027: all but fault signals) after a recovered OCCT fault
+  (infento's fillet: Geom2dAdaptor D1), so the whole app blocked TERM/INT/CHLD. Fix: sigsetjmp(env, 0) on every OS,
+  Darwin __sigreturn(NULL, UC_RESET_ALT_STACK) before the jump (as its longjmp), guarded terminate -> on_crash directly
+  (no abort: glibc's resets SIGABRT to default when it's blocked). Test kernel_core::a_recovered_fault_leaves_the_
+  process_ending_on_sigterm fails on the Mac before. C repros mac ~/noshape-host/dx-keep/sig/jmprepro*.c.
+  SIGTERM now ends the app by its default action (as on Linux / the plate); no quit handler added.
+- GPU OPEN (Mac M6, ms from launch; r0 first open / rA another build's rows / rB own cached display): big-plate
+  505/178/151; l30 160/156/151; pins-1000 147/152/156; rings 1069/1320/160; infento full 13.3 s / 17.3 s / cached
+  frame 337 (display 282); isaac 15.6 s / 15.8 s / 170; scissor 56.5 s / 57.3 s / 187. Rows from the Linux build are
+  never used on the Mac (rA regenerates): not checked why (same-OS cross-release works). Regen = core's.
+- HOVER on the Mac GPU: plate 17.1 ms (live 53), parts-1000 18.6 ms (live 266). Done.
+- Live's open (software, s, warm / cold): infento 23.5-62.7 / 38.2, scissor 18.3-20.1 / 36.8, isaac 17.6-21.7 / 26.9.
 ## Exchange leftovers (11-21)
-- Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180): Part 1 is one revolved solid (14 closed
-  edges), the arc is the lip torus's outline; its inner 41.8..90 part should be hidden by the torus's near side, ours
-  draws it on the left only (right 0..90 right): the torus seam in HLR (probe vibex6 ~/tmp/dx/lip.py). Views 0.015 in
-  low = DRW-VIEW-CENTRE (axes 0.09 in below, 0.06 above at 1:5); hex iso circles as
-  LWPOLYLINE (live ELLIPSE); faceblend ELLIPSE vs SPLINE; the rest hidden-line geometry. Files /root/dx-scratch/drw.
+- Drawing rows (2/10): bottle lip + 0.015 in placement fixed above (verify with the rerun). Hex iso circles as
+  LWPOLYLINE (live ELLIPSE, r 0.0197 in, a mesh body "imported" + "shrunk" solid): next. faceblend ELLIPSE vs SPLINE;
+  the rest hidden-line geometry. Files /root/dx-scratch/drw, /root/dx-scratch/bin/dxfvlines.py.
 - Open: STL split (duct 2 parts vs live's 9 sheets, bottle 2 vs 148: rule unknown, REQUESTS dx 11-21 14:06;
   /root/dx-scratch/stlcomp.py), housing IGES compat 80 / 45 edges / vertices vs 79 / 44 (one closed B-spline rim in two
   IGES curves: join two G1 B-spline pieces bounding the same two faces in boolean.cpp's merge, kernel). Rhino as live
   (46 / 118 / 76). CLI import probe: vibex6 ~/agents/dx-keep/sr/impprobe.py ./cli <file> [pp].
-- vibex6 dx-keep trimmed 11-21 (12 -> 3.5 GB): bin/exch.sh's default ops-ex is gone (pass OPSBIN or use the Mac's exx.sh).
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
