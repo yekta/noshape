@@ -1,40 +1,58 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 21:16 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-21 23:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-21 21:16 UTC)
 - **LANDED 11-21:** trunk-hanger 724b9cd2; fit spline ends 349ebdae9 + two-direction surface extrude ec2e52f99;
   UIP-THREAD-MESSAGE-TWICE 02ccb4ef; EDGE-CENTRE-SEAM + surf-intro Fill 1 / Boundary surface 1 dc6e16ff.
-- **QUEUED 45fb8d24 (core-cache): chamfer edge-sense re-land** (projected line keeps its way; a body failing for no
+- **LANDED 45fb8d24 as 1ca9f153 (core-cache): chamfer edge-sense re-land** (projected line keeps its way; a body failing for no
   named reason waits; a region key whose curves turned round still names its region). Full compat vs 0.4.64 = qa's
   6be52caf run (user docs ALL-SAME; same 3 ticket + 4 corpus DIFFs; impeller Part 1 96100.36 -> 96068.64, accepted by
   qa); infento 157/167. qa adds the TICKETS row after a green carries it. If it fails: fix forward.
-- **QUEUED 8061866b (core-bis2, branch core-kh, 4 commits): knifehandle** guided loft through >2 profiles (one face),
-  Mutual trim pieces, Union of surfaces closing to a solid (makeSolid), Move boundary keeps a moved side's edge ends
-  (BRepAlgoAPI_Splitter at the carried vertices) + natural column ends in loft_guided_multi. Extend handle 1/2/3,
-  24144.7 mm2 (live 24143.0); Loft 1 21458.3 (live 21469.9); Handle after Boolean 1 204640 mm3 (live 205332.7). Rest:
-  sketch P4's ellipse minor radius 15.952 vs live 16.6299 (under-defined; sent to skasm). Blend picks up Fillet 1 after.
-  Probe tools: vibex7 ~/agents/core-keep/kh (ev.py live surface sampler, save/), ~/tmp/core/khm.py (per-feature parts).
+- **QUEUED ed773d89 (core-bis2, branch core-kh, 6 commits): knifehandle + direct thicken + test fix.** 8061866b failed
+  (batch red 21:16): a31ec6648's Mutual trim rule (std's qSplitBy back body) broke model
+  features_b::offset_curve_move_boundary_mutual_trim, whose expectation was our old larger-side guess; test now expects
+  std's sides (abc1e409a). Knifehandle: guided loft through >2 profiles, Mutual trim pieces, Union of surfaces to a solid,
+  Move boundary edge ends; Extend handle 1/2/3, 24144.7 mm2 (live 24143.0). Rest: sketch P4's ellipse (skasm).
 - **ISAAC-BALL REOPEN NAMING: closed 11-21 21:10.** asm's repro came from their pre-rebase branch (ops-mc2, before
   89180ec5e); a main 626941712 session stores Extrude 6's split face as ordinal 0 (= scratch) and reopens Ok. asm agreed.
-- **THICKEN-DIRECT (core-bis2, uncommitted, on top of core-kh):** crates/kernel/cpp/thicken_direct.cpp, called from
-  features.cpp thicken()'s one-sided sharp-edge path before OCCT's intersection join (NOSHAPE_THICKEN_OCCT=1 forces OCCT;
-  remove before landing or keep for A/B?). Offsets per face (planes translated, else Geom_OffsetSurface); vertex images by
-  Newton (one face: offset point; 3 faces: triple point; sharp edge to the free boundary: crossing in the walls' common
-  plane, else bail); sharp edges marched in the edge's normal planes (Newton, adaptive 16..256 samples checked at
-  midpoints), free-edge rails = the pcurve on the offset; walls BRepFill::Face (planar when coplanar), sewn, solid,
-  UnifySameDomain (coplanar walls one face). c2-surf-workshop-split Thicken 1: 11/24/16, 14590.40 mm3, 10661.05 mm2 in
-  ~25 ms; live 11/24/16, 14589.80, 10661.06, 29 ms; OCCT 12/26/16, 14536.51, 230-420 ms. T1 test
-  a_sheet_with_sharp_edges_thickens_with_its_offsets_meeting (plate + square hole + walls, 3768 mm3, 15 faces).
-  Temporary in core.rs: probe_thicken (remove). A/B over the 18 thicken docs: .kab.sh (vibex7). Then land.
+- **THICKEN-DIRECT (in ed773d89):** crates/kernel/cpp/thicken_direct.cpp before OCCT's intersection join (OCCT fallback).
+  split Thicken 1: 11/24/16, 14590.40 mm3 (live 14589.80), 25-50 ms vs OCCT 12/26/16 in 230-440. A/B over the 18 thicken
+  docs: same or better everywhere. Kernel 566/0, GCC 13 clean.
+- **QUEUED f10fbdb6 (core-th, branch core-derived): scissor duplicate.** ops OpenDoc's tab Regenerators live in
+  studio_cache (shared with DocStudios); the app's Part Studio view starts from its snapshot. Serial open of every scissor
+  studio 292 -> 170 s (vibex7, same statuses). Test result_keys::a_derived_source_open_as_a_tab_is_regenerated_once.
+  The rest of scissor's cost is the Derived chains themselves (173-feature source 51 s, 78-feature 73 s, failing fillets).
+- **LOFT3-EDGES (core-th, branch core-loft3, QUEUED 05b06fe3e; carries f10fbdb6, one core-th result):** natural_loft
+  refused every two-profile path loft (halfway section added to the path's 7; centripetal sections). Loft 3 33 edges as
+  live; loft-paths-guides 16 -> 17/29; other 4 path-loft docs same; loft tests pass. After it lands: TICKETS
+  LOFT3-EDGES / LOFT-PATHS-TOPOLOGY rows.
+- **Lands to watch (11-21 23:25):** 45fb8d24 LANDED 23:21 as 1ca9f153. ed773d89 + 05b06fe3e checking (batch of 4 at
+  23:21); f10fbdb6 re-queued on its own; 4866d14d (Loft 4) queued 23:43. Then land core-cache's handoff commits. Report at queue empty or a failed land.
+- **FACE BLEND 1 (core-cache, landing with this handoff):** sides on two solid parts are fused first (live joins
+  Thicken 1's slabs): surfaces-lofts-projected Face blend 1 ERROR -> 1 part, 14 faces as live; left: its 2 blend faces
+  are rational B-splines (live cylinders; SurfToAna gap?), so the doc stays 3/45. A/B vibex7 ~/agents/core-keep/fb
+  (4 blend docs, none worse); test a_face_blend_across_overlapping_parts_joins_them (features_c, after FB6).
+- **QUEUED 4866d14d (core-th, ed9b6ef3f on top of 05b06fe3e): LOFT-PATHS Loft 4:**
+  Mirror 1's 65 vs live 67 edges = two 0.07 mm edges live has where Loft 2's top seam meets the cylinder end (x 0,
+  y -254.03, z +-50.8): tolerance sliver, not chased. The real next difference was **Loft 4 failing** ("the loft's sections
+  don't match", on main too): 2 slots (z 50.8 / 88.9) along an arc from the upper slot's tip to the lower's, profiles 18 /
+  55 deg off square to it, so planes square to the path cut the carried slots apart (3 edges). Fix: when cut sections
+  break and the path runs from profile to profile (its ends on the profile wires), the sections are MakePipeShell's
+  carried profiles (Simulate); and along a path the start cap is the one where the path starts (Loft 5's query: Loft 4
+  CAP_FACE isStart = Sketch 9's slot, the 2nd profile); loft_names names caps by their record's arg. Result: Loft 3..5
+  all as live's face counts, edges/vertices -2 only by Mirror 1's sliver; volumes in band (Loft 4 +36461 mm3, live
+  +36435). Kernel test a_loft_along_a_path_from_tip_to_tip_takes_the_profiles_as_carried. A/B 23:39 (vibex7 lp/ab-base.log /
+  ab-new.log): 5 path-loft docs same, loft tests pass (kernel 35, model 29); queued 23:43.
+  NOTE: the parity score stays 17/29 (first difference Mirror 1's sliver); saved docs from older builds keep
+  untranslated refs (re-import to check Loft 5). Scripts lp/q3.py q4.py q5.py; ~/tmp/core/m1.
 - **SURF-INTRO-OFFSET-END:** live (behaviours "core (11-21 20:33) surf-intro", dom/core-surfintro-loft1.txt): Loft 1 pairs
   its profiles BY PARAMETER (as ours), ruled 3x1, 120x2 CPs, knots doubled at 1/64. So our 1 mm2 gap is the profiles'
   own parametrisation (live's projected curves: 64 spans, doubled knots); compare ours with the dump next.
   Ours: Loft 1 12748.85 vs live 12749.86 mm2 (car body, derived b7635b82); scripts vibex7 ~/agents/core-keep/sib (ar.py
   areas per feature, dv.py, ed2.py).
-- **SCISSOR DERIVED COST: reported to asm; lending dropped (no gain; patch /root/core-scratch/lend-probes.patch).**
 - **Surf-intro Mutual trim 1 / Ruled surface 3 -> skasm (sent 11-21):** translator gives the sketch entity for Ruled
   surface 1's SWEPT_EDGE/FACE/BODY of edge Ao0Xs1GgygP800; repro vibex7 ~/agents/core-keep/mt.
 - Surf-intro builder side still mine: Boundary surface 1 WARNING (live OK), Fill 1 continuity.

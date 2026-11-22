@@ -3381,6 +3381,49 @@ fn face_blend_variants_as_live() {
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Cannot attach blended face. Select \"Detach\" to create a separate surface.".to_string()));
 }
 
+/// Face blend sides on two solid parts that overlap: the parts are joined, then blended (c2-surfaces-lofts-projected's
+/// Face blend 1 on Thicken 1's two slabs: live 1 part); parts apart can't attach (FB6 above).
+#[test]
+fn a_face_blend_across_overlapping_parts_joins_them() {
+    let mut s = Studio::new();
+    let box_part = |s: &mut Studio, pts: &[(f64, f64)]| {
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, pts, true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+        let r = s.regen();
+        let regions: Vec<Reference> = r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions.iter().map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
+        s.add("extrude", move |p| {
+            p.set("entities", ParamValue::Query(regions));
+            p.set("operationType", ParamValue::Enum("NEW".into()));
+            p.set("depth", expr("30 mm"));
+        });
+    };
+    box_part(&mut s, &[(0.0, 0.0), (40.0, 0.0), (40.0, 5.0), (0.0, 5.0)]);
+    box_part(&mut s, &[(20.0, 0.0), (25.0, 0.0), (25.0, 30.0), (20.0, 30.0)]);
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 2);
+    let at = |x: f64, z: f64| {
+        r.context.bodies.iter().find_map(|b| {
+            let i = b.shape.faces().iter().position(|f| {
+                let c = f.centroid().unwrap();
+                (c.x - mm(x)).abs() < 1e-9 && (c.z - mm(z)).abs() < 1e-9
+            })?;
+            Some(Reference::Face((*b.faces[i]).clone()))
+        })
+    };
+    let (side1, side2) = (at(20.0, 5.0).unwrap(), at(20.0, 15.0).unwrap());
+    s.add("faceBlend", move |p| {
+        p.set("side1", q(side1));
+        p.set("side2", q(side2));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    // The union (6000 + 4500 - 750 mm³) and one 2 mm round's corner along the 30 mm edge.
+    let expected = 9750.0 + (4.0 - std::f64::consts::PI) * 30.0;
+    assert!(near(volume(&r, 0) * 1e9, expected, 1e-3), "{} mm³, expected {expected}", volume(&r, 0) * 1e9);
+}
+
 /// Decal (std decal.fs): a 200 × 100 image on a 40 × 20 × 10 block's top
 /// face, 25 wide with the aspect kept, centred on the face, image X along
 /// world X; on a side face the image's up is world Z; shifted off the face

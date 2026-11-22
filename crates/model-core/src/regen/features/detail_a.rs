@@ -577,8 +577,8 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
 pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     use crate::regen::eval::err_at;
     // std's checkParameters, in its order (live 2333's texts and fields).
-    let side1 = ev.resolve_faces(ev.query("side1"));
-    let side2 = ev.resolve_faces(ev.query("side2"));
+    let mut side1 = ev.resolve_faces(ev.query("side1"));
+    let mut side2 = ev.resolve_faces(ev.query("side2"));
     let bodies_of = |faces: &[(usize, usize)]| faces.iter().map(|f| f.0).collect::<BTreeSet<usize>>();
     if side1.is_empty() {
         return err_at(&["side1"], "Select faces to blend.");
@@ -597,6 +597,17 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     if matches!(ev.enum_("trim"), "LONG" | "NO_TRIM") && !detach && solids {
         // (Both sides' fields marked, as live's: psui's face-blend-trim-no-trim.)
         return err_at(&["side1", "side2"], "Cannot attach long and no-trim blends to solid parts.");
+    }
+    // Sides on two solid parts that meet: joined, then blended (c2-surfaces-lofts-projected's Face blend 1 on Thicken 1's
+    // overlapping slabs); parts apart stay apart and can't attach (live FB6).
+    if let (Some(&b1), Some(&b2)) = (bodies_of(&side1).first(), bodies_of(&side2).first())
+        && b1 != b2
+        && !detach
+        && [b1, b2].iter().all(|&b| ev.ctx.bodies[b].kind == crate::display::BodyKind::Solid)
+    {
+        ev.fuse_targets(&[b1, b2], Vec::new(), &k::BooleanOptions::default())?;
+        side1 = ev.resolve_faces(ev.query("side1"));
+        side2 = ev.resolve_faces(ev.query("side2"));
     }
     let swept = ev.is("crossSection", "SWEPT_PROFILE");
     if swept {
