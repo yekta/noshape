@@ -13,7 +13,16 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 12:55 11-22 (read first): API committed; drawing rules testing; annotation hover cells in progress
+## STATE 13:5x 11-22 (read first): b14 GREEN (drawing 268, ops e2e 293), LAND QUEUED; next: apply hover-B.patch
+- Commits 2495c10ce "dx: agent API: ..." + dcf8e18c8 "dx: drawings: detail labels and multi-part section hatches as
+  live", rebased by hand on main 13:2x (land.sh conflict: ops/drawing.rs format_edits `offset` + my `sketch`; e2e.rs
+  paste test + my dialog test; both sides kept). RUNNING b14 (task b5cxn5jim, /root/dx-scratch/b14.sh -> b14.out,
+  AGENT_API.md.b14): check, scene, FULL drawing lib, coverage regen, FULL ops e2e. Green -> if AGENT_API.md.b14
+  differs from docs/AGENT_API.md, cp + commit "dx: agent API docs regenerated"; commit this handoff; land
+  (NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh), report <=5 lines, message asm (roster.md id): re-measure
+  the infento display key.
+- Hover edits (B below) set aside in /root/dx-scratch/hover-B.patch (git apply after the land queues).
+## Earlier 12:55 notes (B = hover cells, still current)
 - !! /root/dx-scratch/env.sh does `cd /root/projects/noshape-wt/dx` : scripts must `. env.sh; cd
   /root/projects/noshape-wt/dx-open`. ssh remote ~ paths in quotes.
 - COMMITTED fe448d324 "dx: agent API: ..." (64 files; b12 green: ops e2e 288/288, coverage regen = docs/AGENT_API.md,
