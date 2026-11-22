@@ -55,7 +55,9 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
 ## qa tickets waiting
-- (none besides the flat orientation above)
+- NEXT: P2 SKETCH-ON-IN-FEATURE-MC (TICKETS ~212: a sketch on its own in-feature mate connector, c2-sheet-metal-forms).
+- qa to verify on green: FEEL-BEND-FACE-PICKED-LOOK, SM-FLAT-VIEW-FIT (fit 9164879d + orientation 47bfb052),
+  SKETCH-LENGTH-LABEL-IN-PLANE, SM-TABLE-HEM-NAME (all landed in 9164879d).
 
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
