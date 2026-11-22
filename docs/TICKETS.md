@@ -5,6 +5,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## asm, 2026-11-22 (live asm/hover-list-1122, list × viewport hover)
+- [x] P0 **FEEL-ASM-TRIAD-STILL-POINTER (asm)**: (fixed asm: the triad a press shows or moves under the still pointer is
+  drawn unlit until the pointer moves; a drag clears it) a click on an instance's face shows the move triad at the click,
+  its handle under the pointer; live leaves its ring white until the pointer moves (a04), ours lit it blue at once.
+  Test: assembly_feel_tests::a_face_clicks_triad_stays_unlit_until_the_pointer_moves.
+
 ## bool, 2026-11-22 (c2-gamma-imported's Boolean 1; lead 06:2x: per-pair tolerances P1, staged, after the in-flight stack)
 - [ ] P1 **BOOL-PER-PAIR-TOL (bool)**: noshape's Boolean judges every pair of entities by twice the largest tolerance of
   ANY argument (rust_boolean.cpp `tol`); an imported pin of 1.5-2.45 um widens the band for precise tools far from it

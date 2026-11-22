@@ -1515,3 +1515,29 @@ fn a_flush_faces_pick_goes_to_the_later_free_instance(cx: &mut TestAppContext) {
     wait_until(cx, window, &view, |v, _| v.hover.is_some());
     assert_eq!(cx.update(|cx| view.read(cx).hover.as_ref().map(|h| h.path[0])), Some(p2), "hovered: Part 2");
 }
+
+/// Live asm/hover-list-1122 a04: a click on a face shows the triad at the click, under the pointer, unlit (its ring
+/// white); the ring lights once the pointer moves.
+#[gpui::test]
+fn a_face_clicks_triad_stays_unlit_until_the_pointer_moves(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "triad-still", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on = (lo + hi) * 0.5;
+    move_to(cx, window, &view, on);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    let click = at_window(cx, &view, on);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| v.manip_hover.is_some());
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.manipulator(cx).is_some() && v.manip_hover.is_some(), "the triad shown, its handle under the pointer");
+        assert!(v.manip_click.is_some_and(|(_, f)| f != v.manipulator(cx)), "drawn unlit: the click moved it under the still pointer");
+    });
+    move_to(cx, window, &view, on + DVec2::new(1.0, 0.0));
+    wait_until(cx, window, &view, |v, _| v.manip_click.is_none());
+    assert!(cx.update(|cx| view.read(cx).manip_click.is_none() && view.read(cx).manip_hover.is_some()), "lit once the pointer moves");
+}

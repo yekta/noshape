@@ -1006,6 +1006,20 @@ live 0.0506 mm/px, ours 0.0477 at 992 px (the same fit); live as2/ (lane 4, 20:1
 | vertex / edge / midpoint / face selected + hovered | the hollow ring turns blue #6087BD..#85A3D0 | the hollow ring turns blue (fixed asm); the dashed line on edge / midpoint | vertex, face =; edge, midpoint ≠ P0 FEEL-ASM-MANIPULATOR-RING |
 | mate connector hovered / selected / selected + hovered / hovered with the right face selected | the part's connector drawn (disc, ring, axes); lit #FFE79F, selected #FFE187, owner edges #DAB46B..#E9C177; the right face stays selected | drawn and lit (fixed asm), but the crisp navy rim and front square | ≠ P0 FEEL-MC-LOOK (psui) |
 
+An assembly's instance list × the viewport (live asm/hover-list-1122, behaviours "psui / asm list × viewport hover
+matrix"; ours: asm's frames of the same cells, one Part 1 instance after `f`, to be scored by qa):
+
+| Cell | Live | Ours | Status |
+|---|---|---|---|
+| instance row hovered | the instance's 2 px #FFC685 silhouette; the row #DEF1FB, eye icon, name tooltip; the viewport lights ~880–1030 ms after the pointer stops | the silhouette, row, eye and tooltip the same; the delay not measured | = (delay ?) |
+| Origin row hovered | nothing lit | the same | = |
+| face / edge hovered in the viewport | the face's boundary / edge band, and the whole instance's silhouette #FFC20E; no row lit | the same | = |
+| face selected in the viewport | the row selected #B2DDF6; the face #E5A222 with a #FFA90A boundary; the move triad at the click, its ring white under the still pointer; "Area: …" in the status bar | the same (#E6A423); the ring unlit until the pointer moves (fixed asm, FEEL-ASM-TRIAD-STILL-POINTER) | = |
+| instance selected (its row clicked) | the instance filled #F2B648 | #F0B648, outline #FFC04C | = |
+| suppressed instance's row hovered | the row tints, nothing lit | the same (nothing drawn: no geometry) | = |
+| Ctrl+click on a row | the instance's context menu | the same | = |
+| Meta / Shift+click on rows | multi-select | not checked | ? |
+
 Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf4; block doc after `f`, the field active; live b5/ (lane 4,
 20:13), ours qa-scratch/hm2/b5-score.png, cmp-b5/):
 

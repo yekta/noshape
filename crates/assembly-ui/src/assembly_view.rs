@@ -534,6 +534,9 @@ pub struct AssemblyView {
     hover: Option<AsmPickTarget>,
     /// Hovered manipulator handle and overlay item (origin / connector).
     manip_hover: Option<ManipHandle>,
+    /// The last press's position and the triad before it: a triad the click shows or moves under the still pointer
+    /// is drawn unlit until the pointer moves (live asm/hover-list-1122 a04).
+    manip_click: Option<(DVec2, Option<Frame>)>,
     hover_overlay: Option<OverlayPick>,
     /// Assembly connector ids in overlay pick order.
     overlay_connectors: Vec<OverlayConnector>,
@@ -780,6 +783,7 @@ impl AssemblyView {
             list_hover_mate: None,
             hover: None,
             manip_hover: None,
+            manip_click: None,
             hover_overlay: None,
             overlay_connectors: Vec::new(),
             overlay_sig: Vec::new(),
@@ -1750,7 +1754,9 @@ impl AssemblyView {
             vec![m]
         };
         // (Nothing is drawn at the pointer while placing: live2 asm-dialogs-1119 insz.)
-        h.manipulator = self.manipulator(cx).map(|f| (f, self.manip_size(cx), self.manip_hover.or(self.ui.manip_selected)));
+        let frame = self.manipulator(cx);
+        let unlit = self.manip_click.is_some_and(|(_, f)| f != frame);
+        h.manipulator = frame.map(|f| (f, self.manip_size(cx), self.manip_hover.filter(|_| !unlit).or(self.ui.manip_selected)));
         self.triad_drag_marks(&mut h, cx);
         h.section = self.section_glyph(cx);
         h.explode_triad = self.explode_edit;
@@ -3469,6 +3475,10 @@ impl AssemblyView {
                     }
                 }
                 self.pointer = *position;
+                if self.manip_click.is_some_and(|(at, _)| at != *position) {
+                    self.manip_click = None;
+                    self.refresh_scene(false, cx);
+                }
                 // A context menu's face only lasts while its menu is open.
                 self.ui.menu_face = None;
                 // Shift (hold) locks mate inference to the entity under the cursor.
@@ -3492,6 +3502,7 @@ impl AssemblyView {
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
                 self.pointer = *position;
+                self.manip_click = Some((*position, self.manipulator(cx)));
                 // Clicking a triad handle selects it (its context menu needs that).
                 let manip = match self.overlay(*pick) {
                     Some(OverlayPick::Manip(h)) => Some(h),
@@ -3575,6 +3586,7 @@ impl AssemblyView {
                 cx.notify();
             }
             ViewportEvent::ToolDown { position, .. } => {
+                self.manip_click = Some((*position, self.manipulator(cx)));
                 self.focus_from_viewport(window, cx);
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
@@ -3730,6 +3742,7 @@ impl AssemblyView {
                 });
             }
             ViewportEvent::ToolDrag { position, .. } => {
+                self.manip_click = None;
                 if self.drag_section(*position, window.modifiers().shift, cx) {
                     return;
                 }
