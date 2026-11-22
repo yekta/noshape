@@ -1,14 +1,17 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 10:15 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 10:59 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-22 10:15 UTC)
+## Now (11-22 10:59 UTC)
 
+- ORDER: knifehandle Fillet 2 (land the frame_at retries/fallback + convexity split from blend-cusp cleanly, then the
+  slivers) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end -> scissor 2d82a0 F13 (tool dumps in vibex7
+  ~/tmp/blend/sc2/f13tool-*.brep; body dump needs cli-cusp rebuilt: ZZ_BODYDUMP added uncommitted in blend-cusp).
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
 - KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
@@ -18,14 +21,17 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   CONIC rho 0.5 round of the face's closed edge, 138.6 mm); Fillet 2 Blade 7/15/10 -> 11/27/18 (0.6 mm CONIC rho 0.5,
   two edges, 472 mm chain). Ours Fillet 1: "the rolling balls jump along the edge", then a 64-section closed loft
   (valid, 881 mm3) whose cut is INVALID; time: Boolean 4.0 s (OCCT edge-face 1.8 s), face_project_point_near 1.7 s
-  (1975 calls), min_distance 1.0 s. Probe: blend10 has an UNCOMMITTED ZZ_KHDUMP=<prefix> (body + cut/add tools
+  (1975 calls), min_distance 1.0 s. Probe (parked patch): ZZ_KHDUMP=<prefix> (body + cut/add tools
   before the Booleans) and test features_c::zz_khcut (ZZ_KH=<prefix>: faces, validity per face, cut/common per
-  tool): bin/kh-dump.sh -> logs/kh-dump1.out. NEVER commit those two (git checkout the files before landing).
+  tool): bin/kh-dump.sh -> logs/kh-dump1.out. 
   Live per-feature data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.
   Fillet 1: the cut tool's contact edges stray 0.087 / 0.132 mm off the body between the 64 sections (a 2.1 mm step
   on the free-form handle): OCCT's cut is invalid, self-intersecting, two slivers; fuzzy 1e-6..1e-4 no good. Probe
-  ZZ_N=<n> (uncommitted) sets the section count: bin/kh-n.sh 128 256 -> logs/kh-n1.out. Our Handle in: 206033.639
-  mm3 2/3/2 vs live 205332.687 2/1/1 (told core 10:2x).
+  ZZ_N=<n> sets the section count (probe parked: blend-scratch/parked/kh-probe.patch, git apply on blend10; ZZ_KHDUMP +
+  zz_khcut too): N 128 -> Fillet 1 OK 9.0 s, cut valid 5 faces (live 6/10/7); N 256 -> invalid again (4 solids). The
+  0.087/0.132 mm 'stray' edges are the tool's air corners, not contacts. Not robust: wait for core's Loft 1 fix
+  (station spacing + end tangents; core tells me when it lands), then redo; 9 s vs live 200 ms needs another build. Our Handle in: 206033.639
+  mm3 2/3/2 vs live 205332.687 2/1/1 (core 10:5x: Loft 1 runs 0.19 % wide at the sides; core fixes station spacing + end tangents and tells me; my 2/3/2 counted seam edges).
   Fillet 2 (live 414 ms): main's ball path builds tools of 0.021 mm3 (the sections' 15.4 mm3: the balls are wrong,
   refused as inside out), then frame_at fails. On cli-cusp (frame_at retries + one-side fallback + convexity split) it
   regenerates in 10.1 s (vibex7 busy) to 18/37/21 (live 11/27/18): ~9 sliver faces < 2 mm2, from a 7 um chain edge
