@@ -608,6 +608,13 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if type_id == "sketch" {
         return Err(OpError::param("type", "make sketches with sketch_create, then draw with the sketch tools"));
     }
+    // Onshape has no Unfold, Refold or Rip tool (Rip is a Make joint type); the types stay for std and imported documents.
+    match type_id.as_str() {
+        "sheetMetalRip" => return Err(OpError::param("type", "Onshape has no Rip feature: make a rip with sheetMetalMakeJoint (Make joint)")),
+        "sheetMetalUnfold" => return Err(OpError::param("type", "Onshape has no Unfold feature (the flat pattern is the sheet metal flat view)")),
+        "sheetMetalRefold" => return Err(OpError::param("type", "Onshape has no Refold feature")),
+        _ => {}
+    }
     let ty = feature_type(ctx, a, &type_id)?;
     let params = resolve_queries(ctx, a)?.unwrap_or_default();
     let params = pattern_kind(ty, params);

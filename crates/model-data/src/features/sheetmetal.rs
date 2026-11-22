@@ -643,7 +643,7 @@ pub fn rip() -> FeatureType {
     FeatureType::new("sheetMetalRip", "Rip", Category::SheetMetal, p).hidden().describe("Split a sheet metal wall between vertex pairs")
 }
 
-/// Unfold (sheetMetalUnfold): flatten bends in the model.
+/// Internal (no such tool in live, qa EXTRA-UNFOLD-REFOLD-TOOLS; kept for std and imported documents): flatten bends.
 pub fn unfold() -> FeatureType {
     let all = |v: &ParamValues| v.bool("unfoldAll");
     let p = vec![
@@ -652,14 +652,14 @@ pub fn unfold() -> FeatureType {
         ParamSpec::query("entitiesToUnfold", "Bend or non-planar faces", QueryFilter::FACE | QueryFilter::CYLINDRICAL_FACE).visible(move |v| !all(v)),
         ParamSpec::query1("holdEntity", "Wall face or bounding edge to hold", QueryFilter::PLANAR_FACE | QueryFilter::EDGE),
     ];
-    FeatureType::new("sheetMetalUnfold", "Unfold", Category::SheetMetal, p).icon("unfold").describe("Flatten bends of a sheet metal part in place")
+    FeatureType::new("sheetMetalUnfold", "Unfold", Category::SheetMetal, p).hidden().icon("unfold").describe("Flatten bends of a sheet metal part in place")
 }
 
-/// Refold (sheetMetalRefold): fold unfolded bends back.
+/// Internal, as [`unfold`]: fold unfolded bends back.
 pub fn refold() -> FeatureType {
     let p = vec![ParamSpec::query("toRefold", "Parts or bends", QueryFilter::SOLID_BODY | QueryFilter::FACE | QueryFilter::CYLINDRICAL_FACE | QueryFilter::PLANAR_FACE | QueryFilter::EDGE)
         .hints(Hints::INITIAL_FOCUS)];
-    FeatureType::new("sheetMetalRefold", "Refold", Category::SheetMetal, p).icon("refold").describe("Fold unfolded bends back")
+    FeatureType::new("sheetMetalRefold", "Refold", Category::SheetMetal, p).hidden().icon("refold").describe("Fold unfolded bends back")
 }
 
 /// Internal: recognize sheet metal from constant-thickness bodies.

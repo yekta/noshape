@@ -180,6 +180,11 @@ fn sketch_extrude_fillet_pattern_export_render() {
     assert_eq!(e.param.as_deref(), Some("params.depth"), "{}", e.to_json());
     let e = try_call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "endBound": "NOPE" } })).unwrap_err();
     assert!(e.message.contains("BLIND"), "{}", e.to_json());
+    // Onshape has no Unfold, Refold or Rip feature (qa EXTRA-UNFOLD-REFOLD-TOOLS).
+    for ty in ["sheetMetalUnfold", "sheetMetalRefold", "sheetMetalRip"] {
+        let e = try_call(&mut ctx, "feature_add", json!({ "type": ty })).unwrap_err();
+        assert!(e.param.as_deref() == Some("type") && e.message.starts_with("Onshape has no"), "{}", e.to_json());
+    }
 
     // Extrude the plate region 10 mm.
     let ex = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [plate], "depth": "10 mm" } }));
