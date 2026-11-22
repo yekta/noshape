@@ -113,6 +113,8 @@ pub struct NoticeLink {
     pub run: NoticeAction,
     /// How long the info bubble stays when left alone.
     pub stays: std::time::Duration,
+    /// Its bubble's look when not the notice's own (an info notice drawn as the green success bubble).
+    pub kind: Option<crate::os_ui::BubbleKind>,
 }
 
 impl DocModel {
@@ -128,13 +130,21 @@ impl DocModel {
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice), gone after
     /// `stays_secs`.
     pub fn info_with_link(&mut self, notice: String, label: &str, stays_secs: u64, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
-        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::from_secs(stays_secs) });
+        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::from_secs(stays_secs), kind: None });
         cx.emit(DocEvent::Info(notice));
+    }
+
+    /// As [`Self::info_with_link`], drawn as the green success bubble (live import-toast-1122: "<file> has been imported.").
+    pub fn success_with_link(&mut self, notice: String, label: &str, stays_secs: u64, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
+        self.info_with_link(notice, label, stays_secs, run, cx);
+        if let Some(l) = &mut self.notice_link {
+            l.kind = Some(crate::os_ui::BubbleKind::Success);
+        }
     }
 
     /// An error notice (red, stays until ×) with a link after it.
     pub fn error_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
-        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::MAX });
+        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::MAX, kind: None });
         cx.emit(DocEvent::Error(notice));
     }
 
@@ -510,6 +520,7 @@ pub fn notice_bubble(id: impl Into<ElementId>, kind: impl Into<crate::os_ui::Bub
     match doc.read(cx).notice_link(&msg) {
         Some(link) => {
             let close = on_close.clone();
+            let kind = link.kind.unwrap_or_else(|| kind.into());
             crate::os_ui::message_bubble_with_link(id, kind, msg, link.label.clone(), move |e, window, cx| {
                 (link.run)(window, cx);
                 close(e, window, cx);

@@ -380,7 +380,8 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
                 };
                 match failed {
                     true => doc.error_with_link(notice, "Open document", open, cx),
-                    false => doc.info_with_link(notice, "Open document", 35, open, cx),
+                    // Live import-toast-1122: the green ✓ bubble, gone by itself 5 s after the import lands.
+                    false => doc.success_with_link(notice, "Open document", 5, open, cx),
                 }
             });
         });
