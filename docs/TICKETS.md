@@ -69,6 +69,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   mates 197 / 216 read π off the saved poses (our connector frames vs live's). The same group spends 11-15 s in
   least_change. Test: assembly::tests::a_revolved_faces_connectors_point_against_the_axis_as_drawn.
 
+## qa 11-22 18:3x: asm's 440a5c94e (queued db8b1ef09) checked on green 9ae39c2f4
+- = FEEL-ASM-CTRL, Ctrl+window half: the selected instance leaves the selection (1 -> 0), nothing moves (feel1122/fieldsel/sbs/fu-asm-b6-ctrl-result.png). The Ctrl+click menu half is still ≠ (no menu), waiting for asm's next land.
+- = FEEL-ASM-ORIGIN-ROW-HOVER (hl-a03: the light orange disc on the origin) and FEEL-ASM-ROW-EYE-ICON (hl-a01: a bold ~15 px eye), hm2/out-af-440a.
+- = UIS-PATTERN-SECOND-DIRECTION: wf35 steps 32-36 all shown (replay 0 "not shown"); s47 Isolate: the others see-through as live.
+- ≠ FEEL-ASM-CROSSING-OUTLINE, now colour only: the touched instance is outlined, in place, in peach (255,197,109); live #ffc20e (255,194,14) (fieldsel/sbs/fu-asm-crossing-mid.png).
+- ≠ FEEL-MC-CYL-SIDE-AXIS-MID-ASM: on the cylinder's side (cyl2/cyl6/cylL2, Fastened) live draws its white point at the axis midpoint; ours draws no point there (tickets/FEEL-MC-CYL-SIDE-AXIS-MID-ASM-9ae3.png).
+- FEEL-MC-SHIFT-NEAREST-ASM: the jump to the corner is gone (Shift keeps the top face and its centroid, as live) =; still ≠ on release over the cylinder: live lights the cylinder top with its centre glyph at once, ours keeps the block face until the pointer moves (tickets/FEEL-MC-SHIFT-NEAREST-ASM-9ae3.png steps 07-10).
+- ≠ ASM-OPEN-TYRES-TURNED reopened: infento-saved opens with Large wheel tyre <1> at (186.5, -47.1, -809.7) and <2> at (1179.6, 334.9, 92.4), the same as 0.4.66; live's assembly.json has them at (593.5, -47.1, 737.7) and (-399.6, 334.9, -164.4): both still ~1.6 m off (the suite's 17157c2f run: "our mates move it 1547 / 1579 mm"). Open 59.8 s.
+- wf08 s07 (second pick): Part 1's whole top no longer lights yellow, its orange outline as live; live also fills Part 2's top quadrant under the pointer yellow, ours not. s08 = (tickets/wf08-second-pick-9ae3.png).
+- wf25 s32 (MATE-GEAR-DRAG-TURNS-NOTHING): the drag now turns both parts; s28 (Gear dialog): ours draws the mates' parts a dull tan, live a bright see-through yellow with Part 1 <1>'s edges (tickets/wf25-gear-9ae3.png; the replay crop is shifted, look by eye).
+
 ## asm, 2026-11-22 (live psui/sel-gestures-1122 and asm/mc-infer-1122, assembly columns)
 - [x] P0 **FEEL-ASM-CLICK-TOGGLES (asm)**: (fixed asm) a click on a selected face deselected it and Shift+click on a
   selected instance dropped it; live keeps both. Test: assembly_feel_tests::a_click_on_a_selected_face_keeps_it.
