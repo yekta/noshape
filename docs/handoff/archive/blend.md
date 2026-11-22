@@ -1495,3 +1495,53 @@ Next: equal-radius rounds whose spines meet (cylinder axis through the torus' ce
   before the Booleans) and test features_c::zz_khcut (ZZ_KH=<prefix>: faces, validity per face, cut/common per
   tool): bin/kh-dump.sh -> logs/kh-dump1.out. 
   Live per-feature data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.
+
+## 11-22 20:26 Now block (superseded 22:41: Chamfer 1 fixed, Fillet 2 deterministic, Fillet 1 analysed)
+
+### Now (11-22 20:26 UTC)
+
+- ORDER: knifehandle Chamfer 1 (below; blocks Fillet 2 in the doc) -> land Fillet 2 + Chamfer 1 -> knifehandle Fillet 1
+  -> c2-surfaces-lofts-projected's Face blend 2 (core 11-22: feature 9 ERROR "Failed to blend faces", live OK, 8 -> 9/45
+  after core's Loft 1 fix e3e73b362) -> Suspension's cusp end -> scissor 2d82a0 F13.
+- Impeller bisect (qa, Part 3 invalid since 0.4.65): NOT blend's. qa's bisect-imp.log: 724b9cd2c, 10f9551f8, 16edb8de9,
+  8ed464f26 (my 11-21 trio), 39b98642f, dc58aff96 all valid; the break is after dc58aff96 (bool/core/skasm commits).
+- FILLET 2: blend10 branch blend-khtip = ab2805df1 (squashed real commit on d8000e10d, debug code stripped, probes made
+  real: short merged-vertex cut dropped only when its middle is also within snap (closed rim circles were dropped:
+  4 chamfer/tori tests broke, fixed), flat blend piece with 2A/P < sew_tol not sewn, fuse_all fallback dropped) +
+  b8cf1cb2a WIP (Chamfer 1 test + data + overlap fix, UNTESTED). Fillet 2 test 5/5; the 4 tests pass; g++-13 kernel
+  build OK. NOT LANDED: in the real doc Fillet 2 gets the wrong input because CHAMFER 1 IS A NO-OP (main too):
+  propagation then runs the blade's whole outline (6 edges, 974 mm) and errors in 25 s on blend-khtip vs 0.4 s on main.
+- CHAMFER 1 (my bug, on main too; test features_c::an_offset_angle_chamfer_of_a_blades_bottom_edges_as_live, data
+  knifehandle-chamfer1-input.brep = our Blade after Move face 2, 6/12/8, 10679.15 mm3): OFFSET_ANGLE 1.5 mm 26 deg on
+  the two 247.649 mm bottom edges; live 7/15/10, 10423.841 mm3 (-255.887). The bottom face is 1.39 mm wide: live's two
+  bevels meet in a ridge, the face gone. Ours: two loft tools (13 and 16 sections), each valid; cut together -> body
+  UNCHANGED yet status Ok (the unchanged check only retries for closed tools). cut1 (-y) alone -> clean 7/15/10, -139;
+  cut0 (+y) alone -> 10 faces with slivers (its contact edge 0.089 mm off the flank; it has no run-on at its ends,
+  cut1 runs 3 mm on at both). WIP b8cf1cb2a: if a multi-tool cut leaves the part unchanged, cut one tool at a time.
+  NEXT: build + run the test; find why cut0 has no run-on (probe ZZRUN in blend12 prints the run-on decision per end:
+  bin cmd in logs/kh-ch1-run.out, rerun it); then maybe more sections on free-form flanks; consider erroring when a
+  cut leaves the part unchanged. Then the doc run (bin/kh-f1dump2.sh style CLI on kh.noshape) must show Chamfer 1
+  7/15/10 and Fillet 2 OK; then gate: features tests, g13 (bin/g13.sh), pair (bin/kh-gate.sh: base wt blend-rgate,
+  detached main, reset it to the new base first), land.
+- Probe worktree blend12 (branch blend-khf1 on ab2805df1, never land): ZZ_KHDUMP (sections' body/tools), ZZ_SBDUMP
+  (each section_blend call's body + edges, ZZSB timing), ZZRUN, zz_khcut / zz_khchain tests (ZZ_KH / ZZ_BREP).
+  Doc copy: vibex7 ~/agents/blend-keep/kh.noshape; dumps vibex7 ~/tmp/blend/kh1 (s-sb0..3: Fillet 3, Chamfer 1,
+  Fillet 2, Fillet 1 inputs), ~/tmp/blend/ch1 (Chamfer 1 tools). Main CLI on the doc: bin/kh-maincli.sh (Fillet 3 Ok
+  716 ms, Chamfer 1 Ok 395 (no-op), Fillet 2 Error 401, Fillet 1 Error 3658).
+- Old Fillet 2 notes: the 0.106 mm largest tolerance predates the cap drop (look later); tip rounds 0.653 mm2 vs live
+  0.595 (in band).
+- Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
+  slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
+- KNIFEHANDLE FILLET 1 (live: Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767, a 4.5 mm CONIC rho 0.5 round of the
+  closed 140.75 mm edge, ~200 ms). Ours: "the rolling balls jump along the edge", then a 64-section closed loft whose
+  cut is INVALID (3.7-5 s). Live data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl. Its input:
+  vibex7 ~/tmp/blend/kh1/s-sb3.brep (main 11-22 19:23), make it a test input.
+  Fillet 1: the cut tool's contact edges stray 0.087 / 0.132 mm off the body between the 64 sections (a 2.1 mm step
+  on the free-form handle): OCCT's cut is invalid, self-intersecting, two slivers; fuzzy 1e-6..1e-4 no good. Probe
+  ZZ_N=<n> sets the section count (probe parked: blend-scratch/parked/kh-probe.patch, git apply on blend10; ZZ_KHDUMP +
+  zz_khcut too): N 128 -> Fillet 1 OK 9.0 s, cut valid 5 faces (live 6/10/7); N 256 -> invalid again (4 solids). The
+  0.087/0.132 mm 'stray' edges are the tool's air corners, not contacts. Not robust: wait for core's Loft 1 fix
+  (station spacing + end tangents; core tells me when it lands), then redo; 9 s vs live 200 ms needs another build. Our Handle in: 206033.639
+  mm3 2/3/2 vs live 205332.687 2/1/1 (core 10:5x: Loft 1 runs 0.19 % wide at the sides; core's fix landed 11-22 14:40 as c08ef29e; my 2/3/2 counted seam edges). RERUN 15:10 on main 1cae525e9
+  (bin/kh-f1main.sh, vibex8 ~/tmp/blend/khf1main.log): still ERROR 3161 ms (live 200): "the rolling balls jump", then
+  the 64-section closed loft (valid) cuts to an invalid result. Next after Fillet 2.
