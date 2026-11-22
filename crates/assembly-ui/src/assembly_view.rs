@@ -193,13 +193,8 @@ const BALL_RING_PX: f64 = 8.0;
 
 /// W's prompt while the zoom-window mode is armed (live keys-1118, as the Part Studio's).
 const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
-const INFERENCE_PICK_RADIUS_PX: f64 = 47.5;
-/// An edge midpoint's square on a face (live mc-infer-1122's sweeps: a corner's between 45.6 and 53.2 px, a midpoint's
-/// between 37.8 and 45.4).
-const MIDPOINT_PICK_RADIUS_PX: f64 = 41.5;
 /// A mate dialog's first-picked connector, faded (live2 recheck-1119 asm2: alpha 0.20 on all three channels).
 const FIRST_PICK_OPACITY: f32 = 0.2;
-const EDGE_END_PICK_RADIUS_PX: f64 = 15.0;
 const RELATION_KINDS: [RelationType; 4] = [RelationType::Gear, RelationType::RackAndPinion, RelationType::Screw, RelationType::Linear];
 
 #[path = "assembly_behaviors.rs"]
@@ -3169,46 +3164,8 @@ impl AssemblyView {
         let Some((key, occ, cands)) = &self.infer else { return false };
         let Some(o) = self.result.occurrences.get(*occ) else { return false };
         let vp = self.viewport.read(cx);
-        let mut best: Option<(usize, f64)> = None;
-        let mut in_square: Option<(usize, f64)> = None;
-        for (i, p) in cands.iter().enumerate() {
-            let w = o.transform.transform_point3(p.frame.origin);
-            if let Some(s) = vp.project(w) {
-                let d = s.distance(self.pointer);
-                if best.is_none_or(|(_, bd)| d < bd) {
-                    best = Some((i, d));
-                }
-                let off = (s - self.pointer).abs();
-                let reach = match p.reference {
-                    Reference::Implicit { inference: Inference::Midpoint, .. } => MIDPOINT_PICK_RADIUS_PX,
-                    _ => INFERENCE_PICK_RADIUS_PX,
-                };
-                if off.x.max(off.y) <= reach && in_square.is_none_or(|(_, bd)| d < bd) {
-                    in_square = Some((i, d));
-                }
-            }
-        }
-        // Live (asm/feel-1117 reach-corner-strip, asm-feel3-1118): over a planar face the connector jumps to a dot within
-        // the 47.5 px square around the pointer, else it sits at the face's centroid (a cylinder's side at its axis
-        // midpoint at any height: mc-infer-1122); over an edge at its midpoint (a circle's centre) unless an end is
-        // within 15 px (the strip: the end at 15 px, the midpoint at 18). Shift locks the face, not the point: the same
-        // rule with the pointer anywhere (mc-infer-1122 shift.png: off the face, its centroid).
-        let primary = |r: &Reference| match r {
-            Reference::Implicit { inference: Inference::Centroid | Inference::MidAxis, on } => matches!(**on, Reference::Face(_)),
-            Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
-            _ => false,
-        };
-        if matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
-            // (Entering a face, the centroid; its dots from the next move on: live2 place-1118 21:05.)
-            let near = match key.1 {
-                Reference::Face(_) if entered => None,
-                Reference::Face(_) => in_square,
-                _ => best.filter(|&(_, d)| d <= EDGE_END_PICK_RADIUS_PX),
-            };
-            self.infer_choice = Some(near.map_or(0, |b| b.0));
-            return old != self.infer_choice;
-        }
-        self.infer_choice = best.map(|b| b.0);
+        let points = cands.iter().map(|p| (&p.reference, vp.project(o.transform.transform_point3(p.frame.origin)))).collect();
+        self.infer_choice = noshape_model::assembly::inference::choose(&noshape_model::assembly::inference::OnScreen { on: &key.1, points }, self.pointer, entered);
         old != self.infer_choice
     }
 
