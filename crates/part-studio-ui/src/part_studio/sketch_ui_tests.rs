@@ -3530,8 +3530,8 @@ fn an_extrudes_picked_face_is_tinted_under_its_preview(cx: &mut TestAppContext) 
     assert_eq!(drawn, Some(vec![(true, 0.5), (false, 1.0), (false, 1.0)]), "the picked face's tint, then its outline");
 }
 
-/// Live manip-feel-1118 m6: a Transform that moves a part leaves its old place light grey and see-through with no
-/// edges, and shows the moved part dark grey and see-through.
+/// Live manip-feel-1118 m6, 1122 transform-x-drag: a Transform that moves a part leaves its old place light grey and
+/// see-through with no edges, and shows the moved part as it is, opaque in its colour (qa FEEL-TRANSFORM-TRIAD-LOOK).
 #[gpui::test]
 fn a_transforms_old_place_is_a_light_grey_ghost(cx: &mut TestAppContext) {
     let (window, view, _, _) = block_part(cx, "transform-ghost");
@@ -3555,7 +3555,8 @@ fn a_transforms_old_place_is_a_light_grey_ghost(cx: &mut TestAppContext) {
     let ghost = shown.bodies.iter().find(|b| b.id.index & (1 << 31) != 0).expect("the old place's ghost");
     assert!(near(ghost.color, lin(0xc9ced2), 0.6) && ghost.mesh.edges.is_empty(), "the ghost light grey at 0.6 with no edges: {:?}", ghost.color);
     let moved = shown.bodies.iter().find(|b| b.id == body).expect("the moved part");
-    assert!(near(moved.color, lin(crate::theme::viewport::TOOL_PREVIEW), 0.6), "the moved part dark grey at 0.6: {:?}", moved.color);
+    let own = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.id == body).map(|b| b.color)).expect("the part");
+    assert!(moved.color == own && moved.color[3] == 1.0 && !moved.mesh.edges.is_empty(), "the moved part in its own colour, opaque, with its edges: {:?} (its own {own:?})", moved.color);
 }
 
 /// Live shortcuts-ps-1118: Shift+T (Make transparent) with Part 1 selected makes it transparent and clears the
@@ -4256,6 +4257,56 @@ fn an_edge_midpoint_has_the_points_menu(cx: &mut TestAppContext) {
         assert!(!of_point.iter().any(|l| l == gone), "{gone} in {of_point:?}");
     }
     assert!(of_point.iter().any(|l| l == "Delete Extrude 1") && of_point.iter().any(|l| l == "Edit Extrude 1…"), "{of_point:?}");
+}
+
+/// Live multi-part-menu-1122 (qa FEEL-PS-MULTI-PART-MENU): the tops of two parts selected, the menu on either top is the
+/// two parts' (live's 26 rows less the cloud's Add comment and its separator), none greyed; on Part 1's unselected front
+/// face only the face count grows.
+#[gpui::test]
+fn two_parts_faces_give_the_two_parts_menu(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "corner_rectangle": [[60, 0], [80, 20]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "two-parts-menu", Some(start));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2);
+    // A part's face whose every vertex has `axis` at `value`.
+    let face = |cx: &mut TestAppContext, part: usize, axis: usize, value: f32| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let b = v.display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).nth(part).expect("the part");
+            b.face_refs
+                .iter()
+                .enumerate()
+                .find(|(fi, _)| b.mesh.face_ranges.get(*fi).is_some_and(|&(first, count)| b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][axis] - value).abs() < 1e-6)))
+                .map(|(_, r)| r.clone())
+                .expect("the face")
+        })
+    };
+    let (top1, top2, front1) = (face(cx, 0, 2, 0.02), face(cx, 1, 2, 0.01), face(cx, 0, 1, 0.0));
+    view.update(cx, |v, cx| {
+        v.selection = vec![top1.clone(), top2.clone()];
+        v.refresh_scene(false, cx);
+    });
+    let menu = |cx: &mut TestAppContext, r: Reference| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(Some(noshape_scene::builder::PickTarget { reference: r, kind: noshape_scene::builder::PickKind::Face, anchor: None }), gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+        draw(cx, window);
+        let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+        view.update(cx, |v, cx| v.close_context_menu(cx));
+        labels
+    };
+    let live = |faces: usize| {
+        let s = "Hide 2 parts|Isolate…|Make transparent…|Section view…|Check interference…|———|Copy 2 items|———|Export…|———|Clear selection|Select|Select other…|———|Zoom to fit|Zoom to selection|View normal to|———|Delete 2 parts…|Delete 2 features|———|Assign material for 2 parts…|Edit appearance for 2 parts…";
+        let mut rows: Vec<String> = s.split('|').map(String::from).collect();
+        rows.push(format!("Add appearance to {faces} faces…"));
+        rows
+    };
+    assert_eq!(menu(cx, top1), live(2), "on Part 1's selected top");
+    assert_eq!(menu(cx, top2), live(2), "on Part 2's selected top");
+    assert_eq!(menu(cx, front1), live(3), "on Part 1's unselected front");
+    assert_eq!(cx.update(|cx| view.read(cx).selection.len()), 2, "the selection stays at the two tops");
 }
 
 /// Live2 nav-feel-1119: "Where used for Part 1…" carries its icon (a part with a ?) in the face, edge and vertex menus.

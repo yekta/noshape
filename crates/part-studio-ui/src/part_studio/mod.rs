@@ -2009,8 +2009,9 @@ impl PartStudioView {
         // Live: with a dialog field active, what it doesn't take isn't
         // highlighted; on a plane's resize ring nothing is.
         let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
-        // A box being drawn lights nothing, whatever pick comes back meanwhile (live; main red 18:4x on a loaded host).
-        let id = id.filter(|_| !vp.read(cx).box_drag());
+        // A box being drawn lights nothing, whatever pick comes back meanwhile (live; main red 18:4x on a loaded host),
+        // but the plane hovered at its press (live box-hover-1122).
+        let id = id.filter(|&i| !vp.read(cx).box_drag() || vp.read(cx).box_plane() == Some(i));
         // Versions and history › Compare lights nothing under the pointer (live fc-1120 (10)).
         let id = id.filter(|_| crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none());
         let id = id.filter(|id| !self.preview_hides(*id, vp, cx));
@@ -3420,15 +3421,17 @@ impl PartStudioView {
         // sketch plane. Only outside a sketch does the hovered entity count
         // (otherwise N in a Top sketch could turn to whatever plane happened
         // to be under the cursor, leaving the sketch plane edge-on).
-        let frame_of = |this: &Self, r: &Reference| -> Option<noshape_model::display::PlaneFrame> {
+        // A face also gives its centre: live centres the view on it (nav-feel-1122 key-n).
+        let frame_of = |this: &Self, r: &Reference| -> Option<(noshape_model::display::PlaneFrame, Option<glam::DVec3>)> {
             match r {
-                Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => this.display.planes.iter().find(|p| &p.reference == r).map(|p| p.frame),
-                Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } => this.display.sketches.iter().find(|s| s.feature == *sketch).map(|s| s.frame),
+                Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => this.display.planes.iter().find(|p| &p.reference == r).map(|p| (p.frame, None)),
+                Reference::SketchRegion { sketch, .. } | Reference::SketchEntity { sketch, .. } => this.display.sketches.iter().find(|s| s.feature == *sketch).map(|s| (s.frame, None)),
                 Reference::Face(n) => this.context.as_ref()?.bodies.iter().find_map(|b| {
                     let fi = *b.find_faces(n).first()?;
-                    let pl = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?.face_plane().ok()??;
+                    let face = b.shape.sub_shape(noshape_kernel::ShapeType::Face, fi).ok()?;
+                    let pl = face.face_plane().ok()??;
                     let (normal, x) = (pl.unit_normal(), pl.unit_x());
-                    Some(noshape_model::display::PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal })
+                    Some((noshape_model::display::PlaneFrame { origin: pl.origin, x, y: normal.cross(x), normal }, face.centroid().ok()))
                 }),
                 _ => None,
             }
@@ -3437,13 +3440,13 @@ impl PartStudioView {
             .selection
             .iter()
             .find_map(|r| frame_of(self, r))
-            .or_else(|| self.sketch.as_ref().map(|s| s.frame))
+            .or_else(|| self.sketch.as_ref().map(|s| (s.frame, None)))
             .or_else(|| self.hover.as_ref().and_then(|r| frame_of(self, r)));
-        if let Some(f) = frame {
+        if let Some((f, centre)) = frame {
             self.push_camera_history(cx);
             let cur = self.viewport.read(cx).camera.forward();
             let fwd = noshape_scene::camera_ops::normal_forward(cur, f.normal);
-            self.viewport.update(cx, |vp, cx| vp.animate_to_direction(fwd, f.y, cx));
+            self.viewport.update(cx, |vp, cx| vp.animate_to_direction_centred(fwd, f.y, centre, cx));
         }
     }
 
@@ -4160,11 +4163,20 @@ impl PartStudioView {
             let view = cx.entity();
             let name = self.default_name(&r, cx);
             let renaming = self.ui.dg_renaming.as_ref().filter(|(x, ..)| *x == r).map(|(_, st, _)| st.clone());
+            // Under the dragged rollback bar the row lights with its eye (gpui's hover sleeps during a drag), and after the
+            // drop it shows no tooltip until the pointer leaves it (live sel-gestures-1122 bar-over-top-held,
+            // bar-released-over-top; qa FEEL-ROLLBACK-CLAMP-HOVER).
+            let bar_over = self.ui.rollback_drop_dg.as_ref() == Some(&r);
+            let lit = bar_over && cx.has_active_drag();
+            let row = crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected);
+            let row = if cx.has_active_drag() || bar_over { row } else { crate::ui::with_list_row_tooltip(row, name.clone()) };
+            let r4 = r.clone();
             // The parity suite clicks a default row by its name ({"feature": "Top"}).
             dg_rows.push(crate::ui_script::wrap(
                 // Live (part-studio/16): the hover band spans the list (x 40
                 // to 239); the indent is inside the row.
-                crate::ui::with_list_row_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
+                row
+                    .when(lit && !selected, |d| d.bg(pal.row_hover))
                     .mr(crate::ui::LIST_ROW_INSET)
                     .pl(px(23.))
                     // Live: the eye's center 19 px from the row's end.
@@ -4191,9 +4203,25 @@ impl PartStudioView {
                             });
                         // Hidden or not, only while the row is hovered (live2 feature-dialogs-1119: hidden default
                         // planes are grey rows with no icon).
-                        crate::ui::hover_reveal(eye, "dg-row")
+                        if lit { eye } else { crate::ui::hover_reveal(eye, "dg-row") }
                     })
+                    .on_drag_move(cx.listener(move |this, e: &DragMoveEvent<RollbackDrag>, _, cx| {
+                        if !e.bounds.contains(&e.event.position) || this.ui.rollback_drop_dg.as_ref() == Some(&r4) {
+                            return;
+                        }
+                        this.ui.rollback_tip_off = true;
+                        this.ui.rollback_drop_dg = Some(r4.clone());
+                        this.ui.rollback_drop_row = None;
+                        this.ui.list_hover = None;
+                        this.hover = Some(r4.clone());
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    }))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        if !*h && this.ui.rollback_drop_dg.as_ref() == Some(&r2) {
+                            this.ui.rollback_drop_dg = None;
+                            cx.notify();
+                        }
                         let new = if *h { Some(r2.clone()) } else { None };
                         // Leaving clears only this row's hover: going row to row the
                         // next row's enter may come first.
@@ -6442,6 +6470,11 @@ impl PartStudioView {
                 // (No "Rollback bar" tooltip on the dropped bar until the pointer leaves it: qa FEEL-ROLLBACK-DROP-ROW.)
                 this.ui.rollback_tip_off = true;
                 this.ui.rollback_drop_row = Some(id);
+                // Off a default geometry row: its light goes.
+                if this.ui.rollback_drop_dg.take().is_some() {
+                    this.hover = None;
+                    this.refresh_scene(false, cx);
+                }
                 if this.ui.feature_drop.get() != slot || this.ui.list_hover != Some(id) {
                     this.ui.feature_drop.set(slot);
                     this.ui.list_hover = Some(id);

@@ -444,6 +444,8 @@ pub struct Viewport {
     cursor_epoch: u64,
     cursor_platform: bool,
     hover: Option<u32>,
+    /// The plane hovered at the press: it stays lit through a box drag, nothing else lights (live box-hover-1122).
+    box_plane: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
     /// With Ctrl (Cmd) held a left press isn't the tool's even so: a box from an assembly's empty space, not its selection's
@@ -800,6 +802,7 @@ impl Viewport {
             cursor_epoch: 0,
             cursor_platform: true,
             hover: None,
+            box_plane: None,
             tool_captures_left: false,
             ctrl_boxes: false,
             box_preview: false,
@@ -1092,6 +1095,11 @@ impl Viewport {
     /// Always deferred: GPUI ignores `notify` during a window draw (the view
     /// is marked dirty but no redraw is scheduled), so notifying here could
     /// leave a stale frame on screen until the mouse moves.
+    /// The plane hovered at a box's press, lit until its release.
+    pub fn box_plane(&self) -> Option<u32> {
+        self.box_plane.filter(|_| self.box_drag())
+    }
+
     /// A box is drawn: being dragged, or released and waiting for the frame with its selection.
     pub fn box_shown(&self) -> bool {
         self.box_rect.is_some() || self.box_held.is_some()
@@ -1243,8 +1251,17 @@ impl Viewport {
 
     /// Animate to an arbitrary camera orientation looking along `forward`.
     pub fn animate_to_direction(&mut self, forward: DVec3, up: DVec3, cx: &mut Context<Self>) {
+        self.animate_to_direction_centred(forward, up, None, cx);
+    }
+
+    /// [`Self::animate_to_direction`] with `centre` (a face's) brought to the middle of the view, the zoom and the
+    /// target's depth kept (live nav-feel-1122 key-n: N on a face, and N again, turn about the face's centre).
+    pub fn animate_to_direction_centred(&mut self, forward: DVec3, up: DVec3, centre: Option<DVec3>, cx: &mut Context<Self>) {
         let mut to = self.camera;
         to.rotation = Camera::look_rotation(forward, up);
+        if let Some(c) = centre {
+            to.target = c + forward * (self.camera.target - c).dot(forward);
+        }
         self.animate_to(to, cx);
     }
 
@@ -1276,8 +1293,9 @@ impl Viewport {
     }
 
     /// Animate to `to` over `duration` with Onshape's easing (smootherstep).
+    /// Time-based at any frame rate: slow frames draw fewer steps, never a jump (live nav-anim-1122, 6x and 20x
+    /// throttled).
     pub fn animate_to_with(&mut self, to: Camera, duration: Duration, cx: &mut Context<Self>) {
-        let duration = nav::view_change_duration(duration, &self.frame_timer);
         self.animate_from(to, duration, (self.clock)(), cx);
     }
 
@@ -2566,7 +2584,6 @@ impl Viewport {
                 true
             }
             (level, Some(duration)) => {
-                let duration = nav::view_change_duration(duration, &self.frame_timer);
                 self.animate_from(level, duration, at, cx);
                 self.axis_tag = AxisTag::Levelling;
                 false
@@ -2631,6 +2648,7 @@ impl Viewport {
             return;
         }
         self.press_pos = p;
+        self.box_plane = self.hover.filter(|&id| (self.pick_class)(id) == noshape_render::PickClass::Plane);
         // Whether it pressed on empty space, as the pick there says now (the cache moves on with the pointer).
         self.press_empty = self.pick_at(p).map(|x| x.is_none());
         self.press_at = (self.clock)();
@@ -2795,8 +2813,8 @@ impl Viewport {
                 self.box_rect = Some((self.press_pos, p, p.x <= self.press_pos.x));
                 self.ctrl_in_box = e.modifiers.control;
                 self.request_box_preview(cx);
-                // A hover picked as the box started (a pick in flight) goes.
-                self.set_hover(None, cx);
+                // A hover picked as the box started (a pick in flight) goes; a plane hovered at the press stays.
+                self.set_hover(self.box_plane, cx);
                 cx.notify();
             }
             Drag::Tool => {
@@ -2898,6 +2916,7 @@ impl Viewport {
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, e.click_count, cx),
             Drag::Pending(MouseButton::Right) if menu => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
+                self.set_hover(None, cx);
                 if let Some((a, b, crossing)) = self.box_rect.take() {
                     let held = !self.box_by_pick && !self.zoom_window;
                     // After the event: its owner's new selection is in the frame this asks for.

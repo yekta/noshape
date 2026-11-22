@@ -982,6 +982,23 @@ fn rows() -> Vec<Row> {
             l.drag(cx, from, to, true);
             expect((shown.as_deref(), gap, after), (Some("Rollback bar"), true, None), "(tooltip on hover, 6.5 px under the bar's centre, any tooltip after a drop on a row)")
         } },
+        Row { id: "rollback bar / held over Top: Top lit with its eye; no tooltip after the drop", live: "the bar dragged onto Top: Top's row lit (its hover band, its eye) and the plane, not the row under the clamped drop line; dropped there, no 'Top' tooltip (live sel-gestures-1122 bar-over-top-held, bar-released-over-top; qa FEEL-ROLLBACK-CLAMP-HOVER)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "rollback"), l.at(cx, "feature:Top"));
+            l.drag(cx, from, to, false);
+            let held = cx.update(|cx| {
+                let v = l.view.read(cx);
+                (v.hover.clone(), v.ui.list_hover, v.ui.rollback_drop_dg.clone())
+            });
+            l.release(cx, to);
+            crate::ui_script::clear_tooltip();
+            l.wait(cx, 800);
+            let after = crate::ui_script::shown_tooltip();
+            let h = f32::from(l.bounds(cx, "feature:Extrude 3").ok_or("no row")?.size.height);
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 3", h - 6.));
+            l.drag(cx, from, to, true);
+            let top = Some(Reference::Plane(noshape_model::reference::DatumPlane::Top));
+            expect((held, after), ((top.clone(), None, top), None), "((the hover, the feature row lit, the default row under the bar) held over Top, any tooltip after the drop)")
+        } },
         Row { id: "panel / the list toggle: its tooltip, the model kept centred", live: "the toggle's tooltip 'Features and parts', collapsed or not; collapsing widens the canvas, the model moves half the change, its scale kept (live fc-1120 (9), panel-resize.json: canvas 1673 -> 1879 px, centre x 1159 -> 1052)", gap: false, check: |l, cx| {
             let tip = |l: &List, cx: &mut TestAppContext| -> Result<Option<String>, String> {
                 let at = l.bounds(cx, "list-toggle").ok_or("no toggle")?.center();

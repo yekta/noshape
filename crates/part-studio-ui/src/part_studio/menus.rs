@@ -140,6 +140,28 @@ impl PartStudioView {
         {
             faces.push(r.clone());
         }
+        // Live multi-part-menu-1122: faces, edges or vertices of two or more parts selected (the right-clicked entity's
+        // part joins them) give the menu for those parts.
+        let mut several: Vec<BodyId> = Vec::new();
+        let mut several_features: Vec<(FeatureId, String)> = Vec::new();
+        if !in_sketch && !editing && matches!(kind, Some(PickKind::Face | PickKind::Edge | PickKind::Vertex)) {
+            for r in self.selection.iter().filter(|r| matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))).chain(target_ref.iter()) {
+                if let Some(b) = self.owning_body(r)
+                    && !several.contains(&b)
+                {
+                    several.push(b);
+                }
+                if let Some(id) = self.creating_feature(r, cx)
+                    && !several_features.iter().any(|f| f.0 == id)
+                    && let Some(name) = studio.and_then(|s| s.feature(id)).map(|f| f.name.clone())
+                {
+                    several_features.push((id, name));
+                }
+            }
+        }
+        if several.len() < 2 {
+            several.clear();
+        }
         let menu = OsMenu::build(window, cx, move |mut m, window, cx| {
             let v = view.clone();
             // The empty-space menu lists the modes' exits itself, first.
@@ -497,6 +519,82 @@ impl PartStudioView {
                     m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit());
                     if let (Some(id), Some(name)) = (creator, creator_name.clone()) {
                         m = m.separator().item(icon_item(&format!("Delete {name}"), "menu-delete", Box::new(move |this, _, cx| this.delete_features(vec![id], cx))));
+                    }
+                }
+                // Several parts (live multi-part-menu-1122: 26 rows, none greyed; Add comment is the cloud's).
+                (Some(r), Some(k)) if !several.is_empty() => {
+                    let n = several.len();
+                    let refs: Vec<Reference> = several.iter().cloned().map(Reference::Body).collect();
+                    let parts = |f: fn(&mut PartStudioView, Vec<BodyId>, &mut Window, &mut Context<PartStudioView>)| {
+                        let b = several.clone();
+                        Box::new(move |this: &mut PartStudioView, w: &mut Window, cx: &mut Context<PartStudioView>| f(this, b.clone(), w, cx)) as MenuAction
+                    };
+                    let selecting = |f: fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)| {
+                        let refs = refs.clone();
+                        Box::new(move |this: &mut PartStudioView, w: &mut Window, cx: &mut Context<PartStudioView>| {
+                            this.selection = refs.clone();
+                            this.hover = None;
+                            f(this, w, cx)
+                        }) as MenuAction
+                    };
+                    let rs = r.clone();
+                    m = m
+                        .item(icon_item(&format!("Hide {n} parts"), "eye-off", parts(|this, b, _, cx| {
+                            this.set_visibility(&b.into_iter().map(Reference::Body).collect::<Vec<_>>(), true, cx);
+                            this.hover = None;
+                        })))
+                        .item(item("Isolate…", selecting(|this, w, cx| this.isolate(super::behaviors::IsolateMode::Isolate, w, cx))))
+                        .item(item("Make transparent…", parts(|this, b, w, cx| {
+                            let previous = std::mem::replace(&mut this.selection, b.into_iter().map(Reference::Body).collect());
+                            this.hover = None;
+                            this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                            this.selection = previous;
+                        })))
+                        .item(icon_item("Section view…", "menu-section-view", Box::new(move |this, w, cx| match this.owning_body(&rs) {
+                            Some(b) if this.frame_of_ref(&rs).is_none() => this.section_part(&b, w, cx),
+                            _ => this.section_through(rs.clone(), w, cx),
+                        })))
+                        .item(item("Check interference…", selecting(|this, w, cx| this.toggle_analysis_tool(super::analysis_tools::ToolKind::Interference, w, cx))))
+                        .separator()
+                        .item(icon_item(&format!("Copy {n} items"), "menu-copy", parts(|this, b, _, cx| this.copy_parts(&b, cx))))
+                        .separator()
+                        .item(item("Export…", parts(|this, b, w, cx| this.open_export_dialog(b, w, cx))))
+                        .separator();
+                    if has_selection {
+                        m = m.item(item("Clear selection", Box::new(|this, _, cx| {
+                            this.selection.clear();
+                            this.selected_features.clear();
+                            this.refresh_scene(false, cx);
+                            cx.notify();
+                        })));
+                    }
+                    m = select_menu(m, &r, k, window, cx).separator().item(zoom_fit());
+                    if k != PickKind::Vertex {
+                        m = m.item(zoom_sel(&r));
+                    }
+                    if planar {
+                        m = m.item(normal_to(&r));
+                    }
+                    m = m.separator().item(icon_item(&format!("Delete {n} parts…"), "menu-delete", selecting(|this, w, cx| this.start_feature("deleteBodies", w, cx))));
+                    let ids: Vec<FeatureId> = several_features.iter().map(|f| f.0).collect();
+                    let label = match several_features.as_slice() {
+                        [(_, name)] => format!("Delete {name}"),
+                        fs => format!("Delete {} features", fs.len()),
+                    };
+                    if !ids.is_empty() {
+                        m = m.item(icon_item(&label, "menu-delete", Box::new(move |this, _, cx| this.delete_features(ids.clone(), cx))));
+                    }
+                    m = m
+                        .separator()
+                        .item(item(&format!("Assign material for {n} parts…"), parts(|this, b, w, cx| this.open_material_panel(b, w, cx))))
+                        .item(item(&format!("Edit appearance for {n} parts…"), parts(|this, b, w, cx| {
+                            this.selection = b.iter().cloned().map(Reference::Body).collect();
+                            this.edit_appearance(super::appearance::EditTarget::Parts(b), w, cx)
+                        })));
+                    if !faces.is_empty() {
+                        let fs = faces.clone();
+                        let label = if fs.len() > 1 { format!("Add appearance to {} faces…", fs.len()) } else { "Add appearance to face…".to_string() };
+                        m = m.item(icon_item(&label, "add-appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));
                     }
                 }
                 // Part faces, edges and vertices.

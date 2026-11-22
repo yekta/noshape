@@ -2075,6 +2075,10 @@ fn transform_move_copy_rotate_scale() {
     let res = t.ok();
     assert!(near(total_volume(&res.context), 8e-6, 1e-6));
     t.set(tr, "transformType", en("ROTATION"));
+    // No axis yet: std's evAxis error names its own field "axis", so the dialog's entries don't turn red (live
+    // fields-list-1122 fields-rotate, qa FEEL-TRANSFORM-CHIP-RED).
+    let st = t.regen().display.features.last().cloned().unwrap();
+    assert_eq!((st.message.as_deref(), st.faulty.iter().map(|s| s.as_str()).collect::<Vec<_>>()), (Some("Cannot resolve entities."), vec!["axis"]));
     t.set(tr, "transformAxis", q(vec![edge_axis_z()]));
     t.set(tr, "angle", e("90 deg"));
     let res = t.ok();

@@ -320,7 +320,7 @@ fn rows() -> Vec<Row> {
             draw(cx, window);
             expect(state(cx), (before, None), "Radius and the focused number field after the click")
         } },
-        Row { id: "manipulators / Fillet's handle dragged toward the edge shrinks the radius", live: "live manip-1118b, walk6-m: toward the edge the radius falls to no less than 0.02414 mm (ours grew it either way), the focus left where it was (qa FEEL-FILLET-ARROW-DRAG)", gap: false, check: |cx| {
+        Row { id: "manipulators / Fillet's handle dragged toward the edge shrinks the radius", live: "live manip-1118b, walk6-m: toward the edge the radius falls to no less than 0.02414 mm (ours grew it either way), written to 5 decimals; manip-feel-1122 F1: the Radius field focused, its text selected, during the drag and after (qa FEEL-MANIP-DRAG-DECIMALS)", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-fillet-drag-in")?;
             let vp = cx.update(|cx| view.read(cx).viewport.clone());
             let (at, along) = cx
@@ -347,9 +347,10 @@ fn rows() -> Vec<Row> {
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 });
             draw(cx, window);
             let focused = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
-            expect((seen.iter().all(|v| *v <= before && *v >= 0.0241), focused.as_deref().is_some_and(|f| f.ends_with("radius"))), (true, false), &format!("radii from {before} mm toward the edge: {seen:?}, Radius focused after"))
+            let five = cx.update(|cx| dialog.read(cx).input_text("radius", cx)).is_some_and(|(t, _)| t.trim_end_matches(" mm").split('.').nth(1).is_some_and(|d| (4..=5).contains(&d.len())));
+            expect((seen.iter().all(|v| *v <= before && *v >= 0.0241), five, focused.as_deref().is_some_and(|f| f.ends_with("radius"))), (true, true, true), &format!("radii from {before} mm toward the edge: {seen:?}, 5 decimals, Radius focused after"))
         } },
-        Row { id: "manipulators / an arrow drag lights nothing; Depth has the keyboard, its text selected", live: "live manip-feel-1118 (1, 2): nothing lights under the pointer while the arrow is dragged; Depth focused with its whole text selected, rewritten each update, and so after the release", gap: false, check: |cx| {
+        Row { id: "manipulators / an arrow drag lights nothing; Depth has the keyboard, its text selected", live: "live manip-feel-1118 (1, 2): nothing lights under the pointer while the arrow is dragged; Depth focused with its whole text selected, rewritten each update, and so after the release; released on the arrow it is drawn hovered (manip-feel-1122 ex-released)", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-keys");
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
             draw(cx, window);
@@ -383,8 +384,10 @@ fn rows() -> Vec<Row> {
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: last, modifiers: Modifiers::default(), click_count: 1 });
             draw(cx, window);
             let after = state(cx);
+            // Released on the arrow: drawn hovered at once, not dragged (live manip-feel-1122 ex-released, qa FEEL-MANIP-RELEASED-LOOK).
+            let look = cx.update(|cx| (view.read(cx).ui.manip_hover, view.read(cx).manip_drag.is_some()));
             let want = (Some("in:depth".to_string()), true, None);
-            expect((during, after), (vec![want.clone(); 6], want), "(focused, Depth's whole text selected, lit) at each drag move, after the release")
+            expect((during, after, look), (vec![want.clone(); 6], want, (Some(0), false)), "(focused, Depth's whole text selected, lit) at each drag move, after the release; (the arrow hovered, dragged) after it")
         } },
         Row { id: "manipulators / an arrow drag is the pointer projected on its line; Ctrl / Alt change nothing", live: "live manip-feel-1118: Depth is the pointer projected on the arrow's line (a sideways move changes nothing), Ctrl or Alt held change nothing (Shift drags unstepped), the arrow drawn dragged (one solid blue stroke)", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-projection");
@@ -1285,6 +1288,74 @@ fn the_translate_triad_sits_at_the_parts_box_centre(cx: &mut TestAppContext) {
     let origin = cx.update(|cx| view.read(cx).current_triad(cx).map(|t| t.origin)).expect("the triad");
     let centre = (lo + hi) * 0.5;
     assert!(origin.distance(centre) < 1e-6, "triad at {origin:?}, the part's box centre {centre:?}");
+}
+
+/// Live manip-feel-1122 F2 (qa FEEL-TRANSFORM-PLANE-HANDLE, FEEL-TRIAD-RELEASE-FOCUS): Translate by XYZ's flat XY square
+/// spans 20-45 px along X and Y (client MANIPULATOR_TRIAD_PLANAR_OFFSET_PX / SIDE_LENGTH_PX), the whole square grabs, a
+/// drag right moves X and Y together (+40 px: 8.3 / 8.3 mm), Z stays 0, and the focus stays where it was.
+#[gpui::test]
+fn the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-triad-xy");
+    let part = cx.update(|cx| Reference::Body(view.read(cx).display.bodies.first().expect("the block").id.clone()));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("transform", w, cx))).unwrap();
+    draw(cx, window);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        if let Some(e) = &v.edit {
+            e.dialog.update(cx, |d, _| {
+                d.feature.params.set("transformType", noshape_model::params::ParamValue::Enum("TRANSLATION_3D".into()));
+                d.feature.params.set("entities", noshape_model::params::ParamValue::Query(vec![part.clone()]));
+            });
+        }
+        v.sync_manipulator(cx);
+    }));
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("Transform").dialog.clone());
+    let focus_before = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+    let t = cx.update(|cx| view.read(cx).current_triad(cx)).expect("the triad");
+    let at = |cx: &mut TestAppContext, w: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(w)).expect("on screen");
+    let wpp = {
+        let right = cx.update(|cx| view.read(cx).viewport.read(cx).camera.right());
+        1e-3 / at(cx, t.origin + right * 1e-3).distance(at(cx, t.origin))
+    };
+    let segs = cx.update(|cx| view.read(cx).triad_hit_segments(&t, cx));
+    let (q0, q2) = (segs[5].0, segs[5].1);
+    let centre = (q0 + q2) * 0.5;
+    let want = t.origin + (glam::DVec3::X + glam::DVec3::Y) * 32.5 * wpp;
+    assert!(centre.distance(want) < 0.5 * wpp, "the XY square's centre {:.1} px off live's", centre.distance(want) / wpp);
+    let (q1, q3) = (segs[segs.len() - 1].0, segs[segs.len() - 1].1);
+    for (k, w) in [centre, centre + (q1 - centre) * 0.85, centre + (q3 - centre) * 0.85, centre + (q0 - centre) * 0.85].into_iter().enumerate() {
+        let p = at(cx, w);
+        let h = cx.update(|cx| view.read(cx).triad_handle_at(&t, p, cx));
+        let grabs = cx.update(|cx| view.read(cx).viewport.read(cx).manipulator_at(p));
+        assert!(h == Some(5) && grabs, "point {k} of the square: handle {h:?} (the XY square is 5), the viewport grabs it: {grabs}");
+    }
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        let t = cx.update(|cx| view.read(cx).current_triad(cx)).expect("the triad");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.triad_event(t, &ev, w, cx))).unwrap();
+        draw(cx, window);
+    };
+    // The drag: live's capture is in Isometric (Shift+7), where screen right runs along X + Y.
+    cx.update(|cx| {
+        let vp = view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            vp.camera.set_view(noshape_render::StandardView::Isometric);
+            vp.request_frame(cx);
+        });
+    });
+    // (Screen-sized: the square's centre again at this view's scale.)
+    let wpp = {
+        let right = cx.update(|cx| view.read(cx).viewport.read(cx).camera.right());
+        1e-3 / at(cx, t.origin + right * 1e-3).distance(at(cx, t.origin))
+    };
+    let from = at(cx, t.origin + (glam::DVec3::X + glam::DVec3::Y) * 32.5 * wpp);
+    let to = from + glam::DVec2::new(40.0, 0.0);
+    event(cx, ViewportEvent::ToolDown { position: from, modifiers: Modifiers::default(), click_count: 1 });
+    event(cx, ViewportEvent::ToolDrag { position: to });
+    event(cx, ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() });
+    let mm = |cx: &mut TestAppContext, id: &str| cx.update(|cx| dialog.read(cx).feature.params.expr(id).and_then(|x| x.text.trim().trim_end_matches("mm").trim().parse::<f64>().ok())).unwrap_or(0.0);
+    let (dx, dy, dz) = (mm(cx, "dx"), mm(cx, "dy"), mm(cx, "dz"));
+    let focus_after = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+    assert!(dx > 1.0 && (dx - dy).abs() < 0.2 && dz == 0.0 && focus_after == focus_before, "+40 px right: X {dx}, Y {dy}, Z {dz} mm (live 8.3 / 8.3 / 0); the focus {focus_before:?} -> {focus_after:?}");
 }
 
 /// Live2 pattern-hole-1118 y (qa): Hole with no point: the title's tooltip ends "[Hole] did not regenerate properly: No

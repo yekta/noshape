@@ -568,6 +568,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Hide/show instances", Op("view_display")),
     ("partStudio:Input propagation…", Op("config_propagate")),
     ("partStudio:Insert and go to assembly", Op("context_insert_in_assembly")),
+    ("partStudio:Check interference…", Op("analysis_interference")),
     ("partStudio:Isolate…", Op("view_display")),
     ("partStudio:Isometric", Op("view_camera")),
     ("partStudio:Make transparent…", Op("view_display")),

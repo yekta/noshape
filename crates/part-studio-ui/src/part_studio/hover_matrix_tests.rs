@@ -1310,8 +1310,10 @@ fn plane_names_keep_their_blue_in_a_section_view(cx: &mut TestAppContext) {
     let at = cx.update(|cx| {
         let v = m.view.read(cx);
         let pl = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top))?;
-        let asc = 0.031 * 2.0 * pl.half_height;
-        v.viewport.read(cx).project(pl.corner(-1.0, 1.0) + pl.frame.x * (1.2 * asc) - pl.frame.y * (0.5 * asc))
+        // The name is 18.4 px to its ascender at any zoom (builder PLANE_NAME_ASC_PX): about its middle.
+        let vp = v.viewport.read(cx);
+        let px = noshape_scene::camera_ops::pixel_size_at(&vp.camera, pl.corner(-1.0, 1.0), vp.size());
+        vp.project(pl.corner(-1.0, 1.0) + pl.frame.x * (22.0 * px) - pl.frame.y * (9.0 * px))
     });
     let at = at.expect("Top's name on screen").round();
     let blue = |c: &[[u8; 3]]| c.iter().filter(|p| close(**p, 0x275eb5, 48)).count();
@@ -1326,6 +1328,38 @@ fn plane_names_keep_their_blue_in_a_section_view(cx: &mut TestAppContext) {
     let sectioned = blue(&crop);
     let mauve = crop.iter().filter(|p| close(**p, 0x8a7581, 20)).count();
     assert!(plain > 20 && sectioned * 10 >= plain * 8 && mauve < 5, "Top's name: {plain} blue px plain, {sectioned} in the section view, {mauve} mauve");
+}
+
+// A plane's name keeps its size on screen whatever the zoom (live client: PLANE_TEXT_HEIGHT_PX 20; nav-feel-1122 cube Top,
+// qa FEEL-PLANE-LABEL-NORMAL-VIEW: ours grew with the plane). Live circmid-1698 0-top-view: "Top" inks 18 rows, T's top to
+// p's tail.
+#[gpui::test]
+fn a_plane_name_keeps_its_screen_size_at_any_zoom(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "plane-name-size");
+    let mut rows = Vec::new();
+    for wpp in [0.2845e-3, 0.1e-3] {
+        let at = cx.update(|cx| {
+            let pl = m.view.read(cx).display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top)).cloned().expect("Top");
+            let vp = m.view.read(cx).viewport.clone();
+            vp.update(cx, |vp, cx| {
+                let size = vp.size();
+                let corner = pl.corner(-1.0, 1.0);
+                vp.camera.rotation = noshape_render::Camera::look_rotation(-DVec3::Z, DVec3::Y);
+                vp.camera.distance = wpp * size.y / (2.0 * (vp.camera.fov_y * 0.5).tan());
+                // The corner at (200, 150) from the top left.
+                vp.camera.target = corner + DVec3::X * ((size.x / 2.0 - 200.0) * wpp) - DVec3::Y * ((size.y / 2.0 - 150.0) * wpp);
+                vp.request_frame(cx);
+                vp.project(corner).expect("the corner on screen")
+            })
+        });
+        m.pointer.frames(cx, &m.view);
+        let crop = m.crop(cx, at.round() + DVec2::new(30.0, 30.0));
+        let ink: Vec<usize> = (0..80).filter(|y| (0..80).any(|x| close(crop[y * 80 + x], 0x275eb5, 48))).collect();
+        let (Some(lo), Some(hi)) = (ink.first(), ink.last()) else { panic!("no name at {wpp} m/px") };
+        rows.push(hi - lo + 1);
+    }
+    assert!(rows.iter().all(|r| (16..=20).contains(r)) && rows[0].abs_diff(rows[1]) <= 1, "Top's name {rows:?} px tall at 0.28 and 0.1 mm/px; live 18 at any zoom");
 }
 
 // Section view through Right on the bracket (live workflow 28, qa FEEL-SECTION-PLANE-LABEL-LOOK): the cut part's edges
@@ -1910,4 +1944,39 @@ fn the_mate_connector_feature_infers_as_live(cx: &mut TestAppContext) {
         wrong.push(format!("after the pick, Part 2's top hovered: lit {lit:?} (live Part 2), marks {marks}, {side} #ffc685 px at its bottom outline, {cap} at its top; field {filter:?}"));
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// Live sel-see-through-1122: the block's bottom face alone selected (hidden in the iso view): the fills stay as they
+/// were (no see-through amber), its boundary drawn orange over the part, so its back edge shows through the top.
+#[gpui::test]
+fn a_hidden_selected_faces_outline_shows_through_the_part(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "selected-see-through");
+    let bottom = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the block");
+        b.face_refs
+            .iter()
+            .enumerate()
+            .find(|(fi, _)| b.mesh.face_ranges.get(*fi).is_some_and(|&(first, count)| b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| b.mesh.positions[k as usize][2].abs() < 1e-6)))
+            .map(|(_, r)| r.clone())
+            .expect("the bottom face")
+    });
+    m.park(cx);
+    let orange = |c: [u8; 3]| c[0] > 225 && (130..=200).contains(&c[1]) && c[2] < 100;
+    let back = m.screen(cx, [20., 30., 0.]);
+    let top = m.screen(cx, [30., 8., 20.]);
+    let (w, _, before) = m.frame(cx);
+    let at = |px: &[[u8; 3]], p: DVec2| px[(p.y as u32 * w + p.x as u32) as usize];
+    let crop_before = m.crop(cx, back);
+    m.view.update(cx, |v, cx| {
+        v.selection = vec![bottom.clone()];
+        v.refresh_scene(false, cx);
+    });
+    let (_, _, after) = m.frame(cx);
+    let crop_after = m.crop(cx, back);
+    let (n0, n1) = (crop_before.iter().filter(|c| orange(**c)).count(), crop_after.iter().filter(|c| orange(**c)).count());
+    let (t0, t1) = (at(&before, top), at(&after, top));
+    let same = t0.iter().zip(t1).all(|(&a, b)| (i32::from(a) - i32::from(b)).abs() <= 3);
+    assert!(n0 == 0 && n1 >= 40 && same, "orange px round the hidden back edge: {n0} before, {n1} selected (live: its line through the top); the top's fill {t0:?} → {t1:?} (live: unchanged)");
 }

@@ -834,11 +834,9 @@ impl PartStudioView {
                             dlg.feature.params.set(f, ParamValue::Bool(!cur));
                         }
                         dlg.set_expr_text(a.param, &text, window, cx);
-                        // Live: the field shows the value selected while dragging; Fillet's leaves the focus where it
-                        // was (live walk6-m, qa FEEL-FILLET-ARROW-DRAG).
-                        if !fillet {
-                            dlg.focus_field_selected(a.param, window, cx);
-                        }
+                        // Live: the field shows the value selected while dragging, Fillet's too (manip-feel-1122 F1:
+                        // the Radius input focused, its whole text selected, from the drag's start and after).
+                        dlg.focus_field_selected(a.param, window, cx);
                     });
                 }
                 self.ui.manip_last_text = Some(text);
@@ -853,10 +851,8 @@ impl PartStudioView {
             ViewportEvent::ToolUp { .. } => {
                 let clicked = self.manip_drag.is_some_and(|m| m.delta == 0.0);
                 if !a.param.is_empty() && !(clicked && a.flip.is_some()) {
-                    // A plain click on an arrow with no flip changes nothing and focuses no field (live walk6-4c, Fillet); a Fillet drag
-                    // leaves the focus where it was (walk6-m).
-                    let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
-                    if clicked || fillet {
+                    // A plain click on an arrow with no flip changes nothing and focuses no field (live walk6-4c, Fillet).
+                    if clicked {
                         self.manip_drag = None;
                         return true;
                     }
@@ -881,11 +877,15 @@ impl PartStudioView {
 impl PartStudioView {
     /// End of a manipulator drag: Onshape leaves the value selected in its field.
     fn end_manip_drag(&mut self, param: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let dragged = self.manip_drag.take().is_some();
-        if dragged && let Some(e) = &self.edit {
+        let Some(d) = self.manip_drag.take() else { return false };
+        if let Some(e) = &self.edit {
             e.dialog.update(cx, |dlg, cx| dlg.focus_field_selected(param, window, cx));
         }
-        dragged
+        // Released with the pointer on it (the drag kept its grab): the handle's hover look at once, not the dragged
+        // one until the next move (live manip-feel-1122 ex-released, qa FEEL-MANIP-RELEASED-LOOK).
+        self.ui.manip_hover = Some(d.which);
+        self.refresh_scene(false, cx);
+        true
     }
 
     /// An angle arc's drag (std angularManipulator, live psb 10-24 rev-*):
@@ -894,7 +894,7 @@ impl PartStudioView {
     /// 52.2405 → 52.8758 → 55), up to a whole turn either way; dragged back
     /// past zero the first arc flips the direction (std's change functions:
     /// `oppositeDirection = angle < 0`, the angle its magnitude). The field
-    /// shows up to four decimals.
+    /// shows 7 decimals ([`dragged_angle_text`]).
     fn arc_event(&mut self, h: ArcHandle, which: usize, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         // Angle of the cursor around the axis (ray ∩ plane through the arc), in (−π, π].
         let angle_at = |this: &Self, p: DVec2, cx: &App| -> Option<f64> {
@@ -1478,13 +1478,14 @@ fn arrow_glyph(a: &Arrow, stem: Option<(f64, f64)>, hover: bool, dragging: bool,
     ]
 }
 
-/// A dragged angle's text (live's updateFromManipulator: formatValue at the workspace's precision, 3: 42.4154 →
-/// "42.415 deg"); other angle units as a quantity.
+/// A dragged angle's text: 7 decimals, zeros dropped, whatever the workspace's precision (live manip-feel-1122 Transform
+/// Rotate: 27.3659219, 12.6989031, Shift 69.6312847; a snapped 25; feel/dialogs.json 42.4154); other angle units as a
+/// quantity.
 fn dragged_angle_text(rad: f64, units: &noshape_units::UnitPrefs) -> String {
     if !matches!(units.angle, noshape_units::AngleUnit::Degree) {
         return noshape_units::format_quantity(Quantity::new(rad, Dim::ANGLE), units);
     }
-    format!("{} deg", noshape_units::format_number(rad.to_degrees(), units.angle_precision))
+    format!("{} deg", noshape_units::format_number(rad.to_degrees(), 7))
 }
 
 #[cfg(test)]
@@ -1523,15 +1524,16 @@ mod snap_tests {
         assert!(drag[2] > drag[0] + 100 && drag[..3].iter().map(|&c| u32::from(c)).sum::<u32>() < hover[..3].iter().map(|&c| u32::from(c)).sum::<u32>(), "deeper blue dragged: {drag:?}");
     }
 
-    /// Live feel/dialogs.json: a dragged angle is written at the workspace's angle precision (3 by default), zeros
-    /// dropped.
+    /// Live manip-feel-1122 (qa FEEL-MANIP-DRAG-DECIMALS): a dragged angle is written to 7 decimals, zeros dropped, at
+    /// any workspace precision.
     #[test]
-    fn a_dragged_angle_is_written_at_the_workspace_precision() {
+    fn a_dragged_angle_is_written_to_7_decimals() {
         let mut units = noshape_units::UnitPrefs::default();
-        assert_eq!(dragged_angle_text(42.4154f64.to_radians(), &units), "42.415 deg");
+        assert_eq!(dragged_angle_text(27.3659219f64.to_radians(), &units), "27.3659219 deg");
+        assert_eq!(dragged_angle_text(42.4154f64.to_radians(), &units), "42.4154 deg");
         assert_eq!(dragged_angle_text(45f64.to_radians(), &units), "45 deg");
         units.angle_precision = 1;
-        assert_eq!(dragged_angle_text(42.4154f64.to_radians(), &units), "42.4 deg");
+        assert_eq!(dragged_angle_text(12.6989031f64.to_radians(), &units), "12.6989031 deg");
     }
 
     /// Live feel/dialogs.json "linearStep": 0.1 mm at 0.207–0.293 mm/px, 1 mm at 0.414 mm/px (the switch at 0.316),

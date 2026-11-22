@@ -53,6 +53,7 @@ pub fn pick_class(kind: PickKind) -> noshape_render::PickClass {
     match kind {
         PickKind::Edge => noshape_render::PickClass::Edge,
         PickKind::Face | PickKind::SketchRegion => noshape_render::PickClass::Face,
+        PickKind::Plane => noshape_render::PickClass::Plane,
         _ => noshape_render::PickClass::Other,
     }
 }
@@ -975,19 +976,21 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             // Isolate takes the names away (qa5 KB3). A FeatureScript feature's
             // planes have none (live 11-02, "Leave planes").
             if !opts.faint_planes && !matches!(pl.reference, Reference::ConstructionPlane { .. }) {
-                let asc = 0.031 * 2.0 * pl.half_height;
-                // Live dk-921, psui/m-01 (light, same camera): the name's
-                // ink starts 0.11 of the ascender in from the corner, its
-                // baseline 1.0 down (Front, Top, Right within 1 px).
-                let base = pl.corner(-1.0, 1.0) + f.x * (0.11 * asc) - f.y * asc;
                 let text = theme::lin(theme::pick(theme::viewport::PLANE_TEXT, theme::viewport_dark::PLANE_TEXT));
-                let to_world = |q: glam::DVec2| base + f.x * (q.x * asc) + f.y * (q.y * asc);
                 let contours = plane_name_contours(&pl.name);
-                if let Some(m) = noshape_render::overlay::fill_mesh(&contours, to_world, f.normal) {
+                // In pixels from the corner, in the plane: the renderer sizes it for each frame's camera.
+                let to_px = |q: glam::DVec2| glam::DVec3::new(PLANE_NAME_INSET_PX + q.x * PLANE_NAME_ASC_PX, q.y * PLANE_NAME_ASC_PX - PLANE_NAME_BASELINE_PX, 0.0);
+                if let Some(m) = noshape_render::overlay::fill_mesh(&contours, to_px, glam::DVec3::Z) {
+                    // Live shrinks the name's text box (the ink, 2 px padding, a 24 px line) only to fit the plane's
+                    // half width and half height.
+                    let ink_w = contours.iter().flatten().fold(0.0_f64, |a, q| a.max(q.x)) * PLANE_NAME_ASC_PX;
+                    let max = (pl.half_width / (ink_w + 4.0)).min(pl.half_height / 28.0) as f32;
+                    let corner = pl.corner(-1.0, 1.0).as_vec3();
+                    let frame = glam::Mat4::from_cols(f.x.as_vec3().extend(0.0), f.y.as_vec3().extend(0.0), f.normal.as_vec3().extend(0.0), corner.extend(1.0));
                     // Just under 1: drawn with the see-through meshes, so it
                     // writes no depth and ambient occlusion leaves it alone
                     // (it darkened the name 8 %); parts in front still hide it.
-                    scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([text[0], text[1], text[2], 0.998]).unlit().unpickable().ignore_clip().over_transparent().layer(5));
+                    scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_transform(frame).pixel_sized(max).with_color([text[0], text[1], text[2], 0.998]).unlit().unpickable().ignore_clip().over_transparent().layer(5));
                 }
             }
         }
@@ -1261,6 +1264,13 @@ fn sketch_color(g: &crate::graphics_prefs::GraphicsPrefs, st: SketchEntityState,
     let hex = theme::sketch_color_for_theme(hex);
     [((hex >> 16) & 0xff) as u8, ((hex >> 8) & 0xff) as u8, (hex & 0xff) as u8, a]
 }
+
+/// A plane name's size on screen at any zoom, smaller only on a plane too small for it (live client
+/// `PLANE_TEXT_HEIGHT_PX` 20, Flama; circmid-1698 0-top-view: cap 14 px, its ink 2 px in from the plane's corner and the
+/// baseline 17 px down). Logical px; our font's cap is 0.76 of its ascender.
+const PLANE_NAME_ASC_PX: f64 = 18.4;
+const PLANE_NAME_INSET_PX: f64 = 2.0;
+const PLANE_NAME_BASELINE_PX: f64 = 17.0;
 
 /// A plane name's glyph outlines (ascender 1), laid out once per name.
 fn plane_name_contours(name: &str) -> Arc<Vec<Vec<glam::DVec2>>> {
@@ -1762,6 +1772,18 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
         }
         scene.instances.extend(again);
+    }
+    // Fills never show through, but a selected face's boundary and a selected edge are drawn over everything: a hidden
+    // selected face shows as its outline through the part (live sel-see-through-1122). The part edges drawn again where
+    // hidden, only their selected lines (where seen, the band stays as drawn).
+    let selected_edge = (1..scene.states.len() as u32).any(|id| scene.states[id as usize] & (state::SELECTED | state::BODY) == state::SELECTED && built.picks.get(id).is_some_and(|t| t.kind == PickKind::Edge));
+    if selected_edge {
+        let edges: Vec<Instance> = scene.instances[..built.static_instances]
+            .iter()
+            .filter(|i| matches!(i.drawable, Drawable::Lines(_)) && i.pickable && !i.pick_only && built.picks.get(i.pick_base + 1).is_some_and(|t| t.kind == PickKind::Edge))
+            .map(|i| i.clone().unpickable().selected_only().hidden_only())
+            .collect();
+        scene.instances.extend(edges);
     }
     if !overlay_pts.points.is_empty() {
         // After the sketches' lit points (a hovered sketch vertex's disc over its own).

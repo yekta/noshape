@@ -288,6 +288,8 @@ pub struct UiState {
     /// The row the rollback bar was dropped on: no tooltip on it until the pointer leaves it, its hover band kept
     /// (live rollback-drop-tip-1120: none in 2.2 s, nor after a 1 px move).
     pub rollback_drop_row: Option<noshape_model::reference::FeatureId>,
+    /// The same for a default geometry row (live sel-gestures-1122 bar-over-top-held: Top lit, its eye shown).
+    pub rollback_drop_dg: Option<Reference>,
     /// The edited sketch's splines were given handle arms on entry: regenerate once the display is applied.
     pub regen_for_arms: bool,
     /// The last toast that hides by itself (`flash_for`): Esc drops it.
@@ -862,6 +864,7 @@ impl UiState {
             rollback_hovered: None,
             rollback_tip_off: false,
             rollback_drop_row: None,
+            rollback_drop_dg: None,
             regen_for_arms: false,
             flashed: None,
             dependencies: None,
@@ -3140,13 +3143,10 @@ impl PartStudioView {
         if let Some(before) = &self.ui.preview_before
             && !self.ui.transform_ghost.is_empty()
         {
-            // Live (manip-feel-1118 m6): the old place light grey and see-through with no edges, outlined orange
-            // while selected (`ghost_outline_only`); the moved part dark grey and see-through with its edges.
+            // Live (manip-feel-1118 m6, 1122 transform-x-drag): the old place light grey and see-through with no
+            // edges, outlined orange while selected (`ghost_outline_only`); the moved part as it is, opaque in its
+            // colour with its edges (qa FEEL-TRANSFORM-TRIAD-LOOK; was dark grey and see-through).
             let mut d = (*self.display).clone();
-            let moved = crate::theme::lin(crate::theme::viewport::TOOL_PREVIEW);
-            for b in d.bodies.iter_mut().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
-                b.color = [moved[0], moved[1], moved[2], 0.6];
-            }
             let grey = crate::theme::lin(GHOST_GREY);
             for b in before.bodies.iter().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
                 let mut b = b.clone();

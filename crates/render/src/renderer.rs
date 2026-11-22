@@ -281,12 +281,13 @@ pub struct Frame {
 }
 
 /// What a pick id is to [`PickBuffer::pick_reaching`]: an edge (reached by its distance, further over a face), a face,
-/// a sketch line (its pick band reached by its distance, at any slant), or anything else (the pick square).
+/// a sketch line (its pick band reached by its distance, at any slant), a datum plane or anything else (the pick square).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PickClass {
     Edge,
     Face,
     Line,
+    Plane,
     Other,
 }
 
@@ -1205,7 +1206,8 @@ impl DrawLists {
                 }
                 Drawable::Image(img) => (img.0.bounds, mesh_margin),
             };
-            if let Some(b) = bounds
+            // A pixel-sized instance's model units are pixels: its unscaled box says nothing of where it lands.
+            if let Some(b) = bounds.filter(|_| inst.pixel_scale.is_none())
                 && outside_frustum(b, &(*view_proj * inst.transform), m)
             {
                 self.culled += 1;
@@ -3178,7 +3180,7 @@ impl Renderer {
     }
 
     /// Upload per-instance uniforms (only when they changed).
-    fn upload_instances(&mut self, scene: &Scene) {
+    fn upload_instances(&mut self, scene: &Scene, camera: &Camera, height_px: f64) {
         let n = scene.instances.len().max(1) as u64;
         if n > self.inst_capacity {
             self.inst_capacity = n.next_power_of_two();
@@ -3208,9 +3210,13 @@ impl Renderer {
             if let Some(n) = inst.pick_plane {
                 normal_m.w_axis = n.normalize_or_zero().extend(1.0);
             }
+            let transform = match inst.pixel_scale {
+                Some(max) => inst.transform * Mat4::from_scale(Vec3::splat((pixel_world(camera, inst.transform.w_axis.truncate().as_dvec3(), height_px) as f32).min(max))),
+                None => inst.transform,
+            };
             let model = match &inst.drawable {
-                Drawable::Mesh(m) => inst.transform * m.0.dequant,
-                _ => inst.transform,
+                Drawable::Mesh(m) => transform * m.0.dequant,
+                _ => transform,
             };
             let u = InstUniform {
                 model: model.to_cols_array_2d(),
@@ -3385,7 +3391,7 @@ impl Renderer {
         let msaa = msaa_of(&req.style);
         self.ensure_pipelines(msaa);
         self.upload_states(&req.scene.states);
-        self.upload_instances(&req.scene);
+        self.upload_instances(&req.scene, &req.camera, f64::from(req.height) / f64::from(req.device_pixel_ratio.max(1e-3)));
         if self.bind_color.is_none() {
             self.rebuild_bind_groups();
         }
@@ -3891,7 +3897,7 @@ impl Renderer {
         if !covered {
             let area = pick_area(need, width, height, last.style.software);
             self.upload_states(&last.scene.states);
-            self.upload_instances(&last.scene);
+            self.upload_instances(&last.scene, &last.camera, f64::from(height) / f64::from(last.device_pixel_ratio.max(1e-3)));
             if self.bind_color.is_none() {
                 self.rebuild_bind_groups();
             }
@@ -4027,7 +4033,7 @@ impl Renderer {
         let (sw, sh) = depth_sample_size(width, height, n);
         self.ensure_pipelines(msaa);
         self.upload_states(&last.scene.states);
-        self.upload_instances(&last.scene);
+        self.upload_instances(&last.scene, &last.camera, f64::from(height) / f64::from(last.device_pixel_ratio.max(1e-3)));
         if self.bind_color.is_none() {
             self.rebuild_bind_groups();
         }
@@ -4669,6 +4675,15 @@ fn room_of(bounds: Option<(glam::Vec3, glam::Vec3)>) -> [f32; 4] {
             [c.x, c.y, c.z, ((hi - lo).length() * 0.35).max(1e-6)]
         }
         None => [0.0, 0.0, 0.0, 1.0],
+    }
+}
+
+/// World length of one logical pixel at `p` (as the scene crate's `pixel_size_at`).
+fn pixel_world(camera: &Camera, p: glam::DVec3, height_px: f64) -> f64 {
+    let wpp = camera.world_per_pixel(height_px);
+    match camera.projection {
+        Projection::Orthographic => wpp,
+        Projection::Perspective => wpp * ((p - camera.eye()).dot(camera.forward()) / camera.distance.max(1e-12)).max(1e-6),
     }
 }
 

@@ -2312,9 +2312,11 @@ fn transform_of(ev: &EvalCtx) -> FResult<Option<k::Transform>> {
             k::Transform::Matrix(to * mc_frame(&base).inverse())
         }
         "ROTATION" => {
-            // std: evAxis's own errors (its field "axis" isn't the feature's).
-            let Some(r) = ev.query("transformAxis").first() else { return err("Cannot resolve entities.") };
-            let (origin, axis) = ev.resolve_axis(r).ok_or_else(|| fe("Cannot determine rotation axis."))?;
+            // std: evAxis's own errors, naming its field "axis", not the feature's: no field is marked, and the
+            // entries don't turn red as for an error naming none (live fields-list-1122 fields-rotate: the Entities
+            // chip stays grey; qa FEEL-TRANSFORM-CHIP-RED).
+            let Some(r) = ev.query("transformAxis").first() else { return err_at(&["axis"], "Cannot resolve entities.") };
+            let (origin, axis) = ev.resolve_axis(r).ok_or_else(|| FeatureError { faulty: vec!["axis"], ..fe("Cannot determine rotation axis.") })?;
             let a = ev.angle("angle")?;
             k::Transform::Rotate { origin, axis, angle: if ev.bool("oppositeDirection") { -a } else { a } }
         }

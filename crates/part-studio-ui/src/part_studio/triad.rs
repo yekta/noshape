@@ -22,12 +22,18 @@ use noshape_model::reference::Reference;
 use noshape_render::{Drawable, Instance, LineData, LineSegment};
 use noshape_units::{Dim, Quantity};
 
-/// Screen sizes (px) measured on the live capture.
+/// The full triad's screen sizes (px), measured on live2 routing-multi; its planar handles span this part of the shafts.
 const SHAFT_PX: f64 = 45.0;
 const HEAD_PX: f64 = 20.0;
-/// Planar handles span this part of the shafts.
 const PLANE_FROM: f64 = 0.32;
 const PLANE_TO: f64 = 0.58;
+/// Transform's (live client: MANIPULATOR_TRIAD_LINEAR_SHAFT_LENGTH_PX 60, MANIPULATOR_LINEAR_HEAD_LENGTH_PX 30 and
+/// HEAD_RADIUS_PX 10; MANIPULATOR_TRIAD_PLANAR_OFFSET_PX 20 and SIDE_LENGTH_PX 25: live manip-feel-1122 F2's XY square
+/// ~45 px right of the centre in iso).
+const TRANSFORM_SHAFT_PX: f64 = 60.0;
+const TRANSFORM_HEAD_PX: f64 = 30.0;
+const TRANSFORM_HEAD_RADIUS_PX: f64 = 10.0;
+const TRANSFORM_PLANE_PX: (f64, f64) = (20.0, 45.0);
 const PARAMS: [&str; 3] = ["dx", "dy", "dz"];
 /// The full triad's rings: their centre past each arrow's tip, their radius and their tick's half length (live2
 /// routing-multi h-*.png).
@@ -60,6 +66,31 @@ pub(super) struct Triad {
 }
 
 impl Triad {
+    fn shaft_px(&self) -> f64 {
+        if self.full { SHAFT_PX } else { TRANSFORM_SHAFT_PX }
+    }
+
+    fn head_px(&self) -> f64 {
+        if self.full { HEAD_PX } else { TRANSFORM_HEAD_PX }
+    }
+
+    fn head_radius_px(&self) -> f64 {
+        if self.full { HEAD_PX * 0.4 } else { TRANSFORM_HEAD_RADIUS_PX }
+    }
+
+    /// Where the planar handles start and end along both their axes (px).
+    fn plane_px(&self) -> (f64, f64) {
+        if self.full { (SHAFT_PX * PLANE_FROM, SHAFT_PX * PLANE_TO) } else { TRANSFORM_PLANE_PX }
+    }
+
+    /// A planar handle's corners for axes `i` and `j`.
+    fn plane_quad(&self, i: usize, j: usize, wpp: f64) -> [DVec3; 4] {
+        let (a, b) = (self.axes[i] * wpp, self.axes[j] * wpp);
+        let (p0, p1) = self.plane_px();
+        let o = self.origin;
+        [o + a * p0 + b * p0, o + a * p1 + b * p0, o + a * p1 + b * p1, o + a * p0 + b * p1]
+    }
+
     /// The field axis `i` drags.
     fn path(&self, i: usize) -> String {
         match self.item {
@@ -303,9 +334,7 @@ impl PartStudioView {
         // Planar handles first: they sit between the shafts.
         for h in 3..6 {
             let (i, j) = plane_axes(h);
-            let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
-            let quad = [o + a * PLANE_FROM + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_TO, o + a * PLANE_FROM + b * PLANE_TO];
-            let q: Option<Vec<DVec2>> = quad.iter().map(|w| s(*w)).collect();
+            let q: Option<Vec<DVec2>> = t.plane_quad(i, j, wpp).iter().map(|w| s(*w)).collect();
             if let Some(q) = q
                 && inside(&q, p)
             {
@@ -315,7 +344,7 @@ impl PartStudioView {
         let so = s(o)?;
         (0..3)
             .filter_map(|i| {
-                let tip = s(o + axis(i) * (SHAFT_PX + HEAD_PX) * wpp)?;
+                let tip = s(o + axis(i) * (t.shaft_px() + t.head_px()) * wpp)?;
                 let d = tip - so;
                 let u = ((p - so).dot(d) / d.length_squared().max(1e-9)).clamp(0.0, 1.0);
                 let dist = (so + d * u - p).length();
@@ -330,11 +359,11 @@ impl PartStudioView {
         let Some(wpp) = self.triad_wpp(t, cx).filter(|_| t.shown) else { return Vec::new() };
         let o = t.origin;
         let axis = |i: usize| t.axes[i];
-        let mut out: Vec<(DVec3, DVec3, f64)> = (0..3).map(|i| (o + axis(i) * 0.15 * SHAFT_PX * wpp, o + axis(i) * (SHAFT_PX + HEAD_PX) * wpp, 0.0)).collect();
+        let mut out: Vec<(DVec3, DVec3, f64)> = (0..3).map(|i| (o + axis(i) * 0.15 * t.shaft_px() * wpp, o + axis(i) * (t.shaft_px() + t.head_px()) * wpp, 0.0)).collect();
         for h in 3..6 {
             let (i, j) = plane_axes(h);
-            let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
-            out.push((o + (a + b) * PLANE_FROM, o + (a + b) * PLANE_TO, 0.0));
+            let q = t.plane_quad(i, j, wpp);
+            out.push((q[0], q[2], 0.0));
         }
         if t.full {
             for k in 0..3 {
@@ -342,6 +371,12 @@ impl PartStudioView {
                 out.push((c - side * TICK_PX * wpp, c + side * TICK_PX * wpp, 0.0));
             }
             out.push((o, o + axis(0) * 1e-9, 0.0));
+        }
+        // The planes' other diagonals: the whole square grabs (live manip-feel-1122 F2).
+        for h in 3..6 {
+            let (i, j) = plane_axes(h);
+            let q = t.plane_quad(i, j, wpp);
+            out.push((q[1], q[3], 0.0));
         }
         out
     }
@@ -659,9 +694,11 @@ impl PartStudioView {
                     self.rebuild_scene(cx);
                     return true;
                 }
+                // Transform's triad leaves the focus where it was (live manip-feel-1122 F2, manip2.json: nothing focused
+                // after; qa FEEL-TRIAD-RELEASE-FOCUS); a routing curve's point focuses its field.
                 let i = if d.handle < 3 { d.handle } else { plane_axes(d.handle).0 };
                 let field = Triad { item: d.item, ..t }.path(i);
-                if let Some(e) = &self.edit {
+                if let (Some(e), Some(_)) = (&self.edit, d.item) {
                     e.dialog.update(cx, |dlg, cx| dlg.focus_field_selected(&field, window, cx));
                 }
                 // The triad turns white again.
@@ -756,18 +793,17 @@ pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, turn:
     }).collect::<Vec<_>>();
     for i in 0..3 {
         let dir = axis(i);
-        let base = o + dir * SHAFT_PX * wpp;
-        let apex = base + dir * HEAD_PX * wpp;
+        let base = o + dir * t.shaft_px() * wpp;
+        let apex = base + dir * t.head_px() * wpp;
         let side = dir.cross(view_dir).try_normalize().unwrap_or_else(|| dir.any_orthonormal_vector());
-        let (l, r) = (base + side * HEAD_PX * 0.4 * wpp, base - side * HEAD_PX * 0.4 * wpp);
+        let (l, r) = (base + side * t.head_radius_px() * wpp, base - side * t.head_radius_px() * wpp);
         let on = hover == Some(i);
         stroke(&[o + dir * if t.full { BALL_PX * wpp } else { 0.0 }, base], on);
         stroke(&[l, apex, r, l], on);
     }
     for h in 3..6 {
         let (i, j) = plane_axes(h);
-        let (a, b) = (axis(i) * SHAFT_PX * wpp, axis(j) * SHAFT_PX * wpp);
-        let quad = [o + a * PLANE_FROM + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_FROM, o + a * PLANE_TO + b * PLANE_TO, o + a * PLANE_FROM + b * PLANE_TO];
+        let quad = t.plane_quad(i, j, wpp);
         stroke(&[quad[0], quad[1], quad[2], quad[3], quad[0]], hover == Some(h));
     }
     if t.full {

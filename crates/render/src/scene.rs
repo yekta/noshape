@@ -290,6 +290,10 @@ pub struct Instance {
     /// Left out of [`Scene::bounds`] (the depth range and zoom to fit): an
     /// annotation such as a measure line can reach far beyond the model.
     pub no_bounds: bool,
+    /// Drawn at a constant size on screen: its model units are logical pixels at its origin (the transform's
+    /// translation), at most this many world units each (Onshape's plane names: 20 px, smaller only where the plane
+    /// is). Set with [`Instance::pixel_sized`].
+    pub pixel_scale: Option<f32>,
     /// Drawn with its flat color, without lighting (construction planes).
     /// See [`Instance::back_silhouette`].
     pub back_silhouette: bool,
@@ -454,6 +458,7 @@ impl Instance {
             depth_rank: 0,
             ignore_clip: false,
             no_bounds: false,
+            pixel_scale: None,
             unlit: false,
             back_silhouette: false,
             preview: false,
@@ -609,6 +614,13 @@ impl Instance {
 
     /// See [`Instance::no_bounds`].
     pub fn no_bounds(mut self) -> Self {
+        self.no_bounds = true;
+        self
+    }
+
+    /// See [`Instance::pixel_scale`]; also out of the bounds (its world size follows the camera).
+    pub fn pixel_sized(mut self, max_world_per_px: f32) -> Self {
+        self.pixel_scale = Some(max_world_per_px);
         self.no_bounds = true;
         self
     }
@@ -1210,7 +1222,7 @@ impl Scene {
             }
             f(&mut h, &i.transform.to_cols_array());
             f(&mut h, &i.color);
-            f(&mut h, &[i.ghost, i.ambient, i.line_scale]);
+            f(&mut h, &[i.ghost, i.ambient, i.line_scale, i.pixel_scale.unwrap_or(0.0)]);
             f(&mut h, &i.pick_plane.map_or([0.0; 3], |n| n.to_array()));
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
             (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);

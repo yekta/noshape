@@ -352,17 +352,25 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
-        Row { id: "keys / N: normal to the face in 500 ms, again flips", live: "N views the selected face head on (500 ms); pressed when already normal it turns 180 deg", gap: false, check: |n, cx| {
+        Row { id: "keys / N: normal to the face in 500 ms, centred on it, again flips", live: "N views the selected face head on (500 ms), the face's centre in the middle, the zoom kept (nav-feel-1122 key-n: eye over (20, 15) on the 40 x 30 block); pressed when already normal it turns 180 deg about the same centre", gap: false, check: |n, cx| {
             n.reset(cx);
+            let before = n.cam(cx);
             n.select_top(cx);
             n.keys(cx, "n");
             let (_, d) = cx.update(|cx| n.vp.read(cx).animation()).ok_or("no animation")?;
             near(d.as_millis() as f64, 500., 0.5, "ms")?;
             n.settle(cx);
-            near(n.cam(cx).forward().z, -1., 1e-6, "looking down at the top face: forward z")?;
+            let c = n.cam(cx);
+            near(c.forward().z, -1., 1e-6, "looking down at the top face: forward z")?;
+            near(c.target.x * 1000., 20., 1e-6, "the view's centre x (mm)")?;
+            near(c.target.y * 1000., 15., 1e-6, "the view's centre y (mm)")?;
+            near(c.distance, before.distance, 1e-12, "the zoom")?;
             n.keys(cx, "n");
             n.settle(cx);
-            near(n.cam(cx).forward().z, 1., 1e-6, "N again: forward z")
+            let c = n.cam(cx);
+            near(c.forward().z, 1., 1e-6, "N again: forward z")?;
+            near(c.target.x * 1000., 20., 1e-6, "N again: centre x (mm)")?;
+            near(c.target.y * 1000., 15., 1e-6, "N again: centre y (mm)")
         } },
         Row { id: "keys / arrows: 15°, Shift 90°, Ctrl 5°, in 250 ms", live: "ROTATE_ANGLE 15, COARSE 90, PRECISION 5; 250 ms; every key repeat turns (behaviours: held arrow)", gap: false, check: |n, cx| {
             for (keys, deg) in [("left", 15.), ("shift-left", 90.), ("ctrl-left", 5.)] {
@@ -387,6 +395,21 @@ fn rows() -> Vec<Row> {
                 near(d.as_millis() as f64, 500., 0.5, &format!("{keys} ms"))?;
             }
             Ok(())
+        } },
+        Row { id: "keys / a view change is time-based at any frame rate", live: "throttled 20x (frames 100-700 ms apart) Shift+5 still draws 1-2 in-between frames, then the end; no jump at a low frame rate (live nav-anim-1122 C4)", gap: false, check: |n, cx| {
+            n.reset(cx);
+            let before = n.cam(cx);
+            n.keys(cx, "shift-5");
+            let (to, _) = cx.update(|cx| n.vp.read(cx).animation()).ok_or("no animation")?;
+            let total = turned(&before, &to);
+            for (ms, t) in [(200, 0.4), (400, 0.8)] {
+                n.tick(200);
+                draw(cx, n.window);
+                near(turned(&before, &n.cam(cx)) / total, crate::navigation::ease(t), 1e-3, &format!("the turn's share at {ms} ms"))?;
+            }
+            n.tick(200);
+            draw(cx, n.window);
+            near(turned(&n.cam(cx), &to), 0., 1e-9, "at 600 ms: the end")
         } },
         Row { id: "named views panel: a restore animates 250 ms", live: "three frames over ~240 ms on a software GPU, where the cube's and Shift views jump (live2 view-tools ours-1118)", gap: false, check: |n, cx| {
             n.reset(cx);

@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 18:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 21:41 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,22 +33,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## Now (18:5x UTC 11-22)
-P0 lit-end landed 93b1dfdd8 (cherry-picked to release/v0.4.67); psui-p0b worktree + vibex8 dir removed.
+## Now (21:41 UTC 11-22)
+Batch 1 LANDED 613b06bb (19:59). TICKETS ticked in the tree (uncommitted, goes with batch 2): EXTRUDE-ARROW-ANCHOR,
+PS-LONGPRESS-SELECTS, QUERY-PART-PICK-FILL, PICK-SKETCH-LINE-THROUGH-FACE, PLANE-LIT-AFTER-MENU, SECTION-PLANE-LABEL-LOOK.
+Lead told the hover matrix score (ours 94/94; qa's last 100/125, ask qa to rescore after batch 2).
 
-Batch 1 = commit 7af801429 (amended; rebased on main 17:5x). Rebase conflicts resolved: renderer band palettes use main's
-4-colour `[border, instance, face, picked]`, with our body_outline_rgb as slot 0; builder sketch curves use main's lit/unlit
-split plus our pick_plane. t58 (vibex8): part-studio-ui 491/492 (p13 of the list × viewport matrix failed: main's
-fs_body_face took every BAND|SELECTED face as an instance's selected face, so it drew no silhouette), app-core 117, scene 212+6,
-render 17+68, clippy (+assembly-ui) clean. Fix amended: shaders.wgsl fs_body_face needs INSTANCE|PICKED.
-t59a green: part-studio-ui hover_matrix 94/94, assembly-ui hover 23/23, render 17+68.
-NEXT:
-- If t59a is green: commit this handoff into batch 1 or stash it (land.sh needs a clean tree), then land.sh.
-- After the land, tick in TICKETS: PART-PICK-FILL, SECTION-PLANE-LABEL-LOOK, PICK-SKETCH-LINE-THROUGH-FACE,
-  PLANE-LIT-AFTER-MENU, PS-LONGPRESS-SELECTS. Report the hover matrix score (qa 100/125) + list × viewport cells p01-p31.
-- Then `git apply /root/psui-scratch/batch2.patch` (it holds no shaders.wgsl change).
-
-Batch 2 (NOT built; patch /root/psui-scratch/batch2.patch, 1094 lines). Covers qa P0s:
+Batch 2: applied uncommitted in the tree (backup /root/psui-scratch/batch2.patch; full test script run-t60.sh:
+clippy, features_a, app-core, scene, render, part-studio-ui). Covers qa P0s:
 - nav-anim-1122: view changes are time-based at any fps (`view_change_duration` removed); nav matrix row "a view change is time-based".
 - NAV-N-CENTRE: `Viewport::animate_to_direction_centred`; N row checks (20,15).
 - PLANE-LABEL-NORMAL-VIEW: plane names 20 px on screen (client PLANE_TEXT_HEIGHT_PX). `Instance::pixel_sized`; render
@@ -63,19 +54,28 @@ Batch 2 (NOT built; patch /root/psui-scratch/batch2.patch, 1094 lines). Covers q
 - TRANSFORM-CHIP-RED: Rotate's axis errors faulty ["axis"] (model-core pattern.rs). features_a transform test.
 - ROLLBACK-CLAMP-HOVER: default rows take RollbackDrag moves (`ui.rollback_drop_dg`). List row "held over Top".
 - interaction-feel.md rows for all of the above; this handoff.
-After applying: touch -c, build + test part-studio-ui, app-core, scene, render, `noshape-model --test all features_a::`, clippy
-(add assembly-ui) → commit "psui: …" → land.
+t60 (vibex8): clippy clean, features_a 130, app-core 116, scene 212+6, render 17+68; part-studio-ui 490/494.
+Live answered 19:58 (box-hover-1122, multi-part-menu-1122, sel-see-through-1122); added on top, uncommitted:
+- PS-BOX-DRAG-HOVER: `Viewport::box_plane` (the plane hovered at the press stays lit through the box, out at release; new
+  `PickClass::Plane`; box_ids never takes planes). Test feel `a_box_from_a_plane_keeps_that_plane_lit_to_the_release`: PASSES.
+- PS-MULTI-PART-MENU: menus.rs several-parts branch (live's 26 rows less Add comment); coverage "partStudio:Check
+  interference…". Test sketch_ui `two_parts_faces_give_the_two_parts_menu`: PASSES.
+- PS-SELECTED-SEE-THROUGH: builder `selected_edge`: part edge lines drawn again `selected_only().on_top()`. Test hover_matrix
+  `a_hidden_selected_faces_outline_shows_through_the_part`: PASSES. List × viewport matrix (p04) passes again (t62).
+- interaction-feel.md rows for the three.
+Fixed after t63: plane names weren't drawn because frustum culling tested the unscaled (pixel-unit) box; pixel-sized
+instances now skip the cull (renderer.rs). Plane-name test passes (t64). Triad XY-square test passes (Isometric for the
+drag). EDIT-BODY-SHADE: test dropped (ours top (118,127,133), live (132,147,155); preview mix 1 gives 97, 0 gives 166:
+the gap is not the mix alone); ticket stays open. Probes removed. coverage "partStudio:Check interference…" added.
+t65 (vibex8): clippy clean (+ops), features_a 130, app-core 116, scene 212, render 17+68, part-studio-ui 497/497, ops
+coverage 11. Scene edge_looks failed: the see-through copy doubled a seen selected edge's band; the copy is now
+`hidden_only` (drawn only where hidden). t66: scene 212+6, hover matrix 96/96 + list 4/4. Committed and landing batch 2.
+Next: land result → tick PS-BOX-DRAG-HOVER, PS-MULTI-PART-MENU, PS-SELECTED-SEE-THROUGH + batch 2's tickets → hover
+matrix score to lead (96/96), qa rescore.
 
 Open qa P0s (TICKETS "psui, 2026-11-22 …"):
-- Waiting on live (REQUESTS 18:15-18:3x):
-  - PS-BOX-DRAG-HOVER (box-hover-1122; live2 11-17 vs 1122 conflict, code reverted).
-  - PS-MULTI-PART-MENU (multi-part-menu-1122: the full 26 items).
-  - PS-SELECTED-SEE-THROUGH (sel-see-through-1122: which rule).
-- EXTRUDE-ARROW-ANCHOR: the anchor is the centroid in code (the entity is "Face of Sketch 1" → face_anchor). Run qa's cell
-  /root/qa-scratch/feel1122/manipnav/cells/m01-ex-hover.json to see the 13/17 px offset.
 - TRANSFORM-ROTATE-EDGE-SENSE: the sense matches live (qa amended); only the preview look is left (batch 2's opaque moved
   part should cover it; the orange axis edge to check).
-- EDIT-BODY-SHADE (low conf).
 - CTX-MENU-FLIP-UP (P1): the vertical flip already exists (anchored SwitchAnchorOrSnap, nav-feel-1119). Ask qa to re-check.
 skasm owns FEEL-MC-* Part Studio set (10) + SKETCH-DIM-PLACE-PICKS-PLANE (11-22 18:0x); mate connector inference code is
 skasm's. Told them batch 1 carries the Shift lock, ConnectorLook::Placed and the with-layer hover mask.
