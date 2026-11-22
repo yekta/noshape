@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 05:00 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 05:55 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,49 +13,34 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 03:35 11-22 (read first)
-TASK (user 21:5x 11-21): fast open vs live (<= 0.5 s), hover on heavy docs: both DONE on the Mac GPU.
+## STATE 05:55 11-22 (read first)
+TASK (lead 05:1x): watch lands (DONE: 3af018e0 + afd3220a landed 05:29 as 1519a1df, main GREEN 05:42); hex iso
+circles (in test); bottle DXF rerun (DONE 05:2x vibex7: "matches", Front no longer moved, Iso 0.002 in; ARC 18/24,
+LINE 105/114, SPLINE 5/19); qa wf23 P1 DWG-SECTION-HATCH-PER-PART (written, in test) + P2 DETAIL label (live asked).
 Mac rules (DECISIONS def9ef908): one 4-job nice-20 load-gated slot (NOSHAPE_RB_HOST=mac); our app only while the user
 is idle >= 600 s (HIDIdleTime), one run, <= 3 min, killed at once when the user returns. Guarded runner:
 mac ~/noshape-host/dx-keep/gpu/macgpu.sh (watchdog 175 s, SIGKILL 3 s after SIGTERM); probe runner dx-keep/sig/.
-- QUEUED (vibe2): 281240db job (main-red fix 75271def prefs ordered_tabs, hover T2, handoffs, display rows of another
-  build, software prewarm, STL surfaces) + 319feba2. Main GREEN 02:09. land.sh --status doesn't list them; ls
-  vibe2:~/land/jobs. Never rename job files.
-- TO LAND (dx-open4, rebased 03:3x): b68f653b suite places drawing views at live's position (DRW-VIEW-CENTRE);
-  4b5b5d13 kernel HLR hides a bead's own outline behind its tube (bottle lip; test fails without, kernel_core:: +
-  hlr:: 70/70 vibex7); e9e09154 SIGTERM fix (below) + TICKETS row. Pending: drawing + ops e2e on vibex7
-  (/root/dx-scratch/fo/e2e.out), Mac kernel_core:: (kmac.out), bottle suite rerun (vibex8 bot.sh, held for qa's speed
-  window till 04:00: check DXF rows, Front not moved, lip arc 90..180).
-- APP-SIGTERM-IGNORED-MAC fixed: macOS sigprocmask sets EVERY thread's mask; the guard's siglongjmp (and abort() from
-  std::terminate) restored a GCD-made thread's mask (fbfee027: all but fault signals) after a recovered OCCT fault
-  (infento's fillet: Geom2dAdaptor D1), so the whole app blocked TERM/INT/CHLD. Fix: sigsetjmp(env, 0) on every OS,
-  Darwin __sigreturn(NULL, UC_RESET_ALT_STACK) before the jump (as its longjmp), guarded terminate -> on_crash directly
-  (no abort: glibc's resets SIGABRT to default when it's blocked). Test kernel_core::a_recovered_fault_leaves_the_
-  process_ending_on_sigterm fails on the Mac before. C repros mac ~/noshape-host/dx-keep/sig/jmprepro*.c.
-  SIGTERM now ends the app by its default action (as on Linux / the plate); no quit handler added.
-- SIGTERM quit path DONE (queued 3af018e0, 15 commits, carries afd3220a): crates/app/src/quit_signals.rs (Unix: TERM /
+- UNCOMMITTED in dx-open (one drawing land, both): (a) views.rs MeshCover: views with mesh + other parts run a 2nd
+  HLR pass of the other parts alone; their visible pieces split where a mesh facet lies in front by more than the
+  view's defl (point-to-plane; Moller-Trumbore ray toward the viewer, 2D cell grid); glimpse rule removed. Test
+  views::tests::a_mesh_hides_what_lies_behind_its_facets_not_on_them (mesh lid 1 mm on a plate, same r 5 mm hole:
+  Iso far half ~0.46 seen, Top none). (b) per-part section hatch: ViewGeometry.section_part_ends (section_geometry
+  groups cut faces by owning ProjBody; detail copies it), build.rs: parts alternate 45/135 deg (hatch_flipped),
+  spacing part_hatch_spacing = part box diag / 13 (live wf23 s05 pixels: block 14.6 px, box 172x87; pin 10.6, 43x130);
+  cad_layers HatchRegion.flipped -> DXF ANSI31 angle 90. Test drawing::tests::a_section_through_several_parts_hatches_
+  each_its_own_way (demo asm: 2 plates + pin, 3 hatches false/true/false). Running: vibex7 bgpit1676 (drawing lib
+  views:: hatch cad_export section). Then: hex DXF via ~/agents/dx-keep/glb.sh (-> ops-gl) + hex2.sh (vibex7; check
+  ELLIPSE 2, LINE/LWPOLYLINE vs live 206/25, Top no CIRCLE), full ops e2e, land.
+- OPEN (hatch): rule for 3+ parts and two instances of one part unknown (instance order alternating is a guess):
+  REQUESTS dx 05:35 (live): DXF HATCH angle/scale per part on wf23 + a 4+ part assembly + DETAIL B label MTEXT.
+  P2 DETAIL label: ours y 11.2 vs live 14.0 (qa); detail label gap 5.3 mm (build.rs ~2640): wait for live's DXF.
+- Hex open point: pass 2's hidden pieces under visible mesh lines are now drawn (hidden lines shown only).
+- SIGTERM quit path LANDED (1519a1df 05:29, with the Mac SIGTERM-ignored fix, bottle lip, DRW-VIEW-CENTRE): crates/app/src/quit_signals.rs (Unix: TERM /
   HUP / INT -> self-pipe -> cx.quit(); second signal or 10 s -> _exit; kept ignored if started ignored); DocModel's
   quit_commit (cx.on_app_quit -> flush_pending) registered on the first deferred edit. Windows WM_ENDSESSION and macOS
   applicationWillTerminate already run gpui's shutdown (observers called synchronously, before exit_now's future).
   Tests: noshape bin quit_tests:: (fails without), T2 tests/quit_signal.rs (xvfb-run, 1.9 s): vibex7 pass.
-- NEXT 2 (in progress): hex iso circles (c2-hex-bookcase-derived drawing: live 2 ELLIPSE, ours 0). Probe (diff
-  /root/dx-scratch/fo/glimpse-probe.diff, env NOSHAPE_GLIMPSE_DEBUG; out /root/dx-scratch/fo/glimpse.txt): the solid's
-  2 mm screw-hole rims (compound edges 1546, 1550) lie just outside the mesh's inscribed polygonal holes (~36 facets,
-  chord sagitta 7.6 um). Iso: our HLR hides their far half but 12 um glimpses at facet corners (dropped by views.rs's
-  glimpse rule); the pieces between glimpses aren't even output (hlr.rs drops hidden lines under visible mesh lines).
-  Live draws the far half as ELLIPSE (pi..2pi) and hides the near half. Top: also only glimpses in ours, and live draws
-  nothing. So the rule is depth, not "a mesh is in front": in Top the cover is the mesh's top face, a hole depth above;
-  in Iso the far half is behind wall facets <= 7.6 um away from their planes (along the ray up to ~0.4 mm at the sides:
-  measure distance to the facet's PLANE, not along the ray).
-  Design (views.rs, views with a mesh part only): a second HLR pass of the non-mesh bodies alone; each non-mesh edge's
-  pieces come from it; its visible pieces split by a mesh test per polyline point (3D point = the edge's nearest dense
-  sample in 2D; ray toward the viewer vs the faceted mesh's triangles, Moller-Trumbore, 2D grid of the triangles'
-  boxes): covered when a facet it crosses lies farther than tol from the point (point-to-plane), tol ~ view defl
-  (diag/1500, 120 um here). This replaces the glimpse rule. Open point: pass 2's hidden pieces under visible mesh
-  lines would now be drawn (only with hidden lines shown). Check after: hex DXF ELLIPSE 2, LINE/LWPOLYLINE counts
-  (ours 178/17, live 206/25), Top 0 CIRCLE; drawing tests; full ops e2e (crates/drawing rule). Data vibex7
-  ~/tmp/dx/exs-hex, runner ~/agents/dx-keep/hex.sh (ops binary path inside; build with glb.sh, not on vibex8 while
-  qa holds it). Also seen: the hex views sit 0.0187 in (Front/Right) / 0.0246 in (Iso) off live's: check after.
+- NEXT 2: hex iso circles: see STATE (MeshCover). Data vibex7 ~/tmp/dx/exs-hex; old probe /root/dx-scratch/fo/glimpse-probe.diff.
 - GPU OPEN (Mac M6, ms from launch; r0 first open / rA another build's rows / rB own cached display): big-plate
   505/178/151; l30 160/156/151; pins-1000 147/152/156; rings 1069/1320/160; infento full 13.3 s / 17.3 s / cached
   frame 337 (display 282); isaac 15.6 s / 15.8 s / 170; scissor 56.5 s / 57.3 s / 187. Rows from the Linux build are
