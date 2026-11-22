@@ -62,6 +62,9 @@ readings). c2-impeller-loft from Shell Gehäuse: the cap JKK's evArea (1,356.939
 volume over the 4 mm it is extruded (5,427.7079 / 4 = 1,356.9270 mm²): 9.2e-6; the offset face JKG's evArea (13,509.2197
 mm²) against live's own tessellation of it converging to 13,508.158 (2484): 7.86e-5. So 7.86e-5. Our inner edges lie
 within 0.64 µm of live's (2482); topology is compared as usual.
+c2-surf-workshop-knifehandle from Sweep 2 (core 11-22): the Blade's area (18,227.2567 mm²) against the sum of its six
+faces' evArea (18,225.5247): 9.5e-5. The 4 mm top face is the path spline (238.10967 mm long) swept, exactly 952.43867 mm²:
+ours 952.438671, live's evArea 952.4035; ours, 18,225.8113 mm², lies between live's two readings.
 
 **c2-gamma-imported / c2-wire-clip-imported: live's STEP importer refits the PEM FH4-M3 studs (qa, lead 11-12, core's
 reason in core.md 11-11).** Live scales each stud's groove torus by 0.995 (its face 4.277452 mm², the exact 4.158573) and reads

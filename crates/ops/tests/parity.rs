@@ -88,6 +88,9 @@ const LIVE_SCATTER: &[LiveScatter] = &[
     // extrusion of that cap, 5,427.707922765784 / 4 mm²; the offset face JKG, evArea 13,509.219731117855 mm² against
     // live's own tessellation of it converging to 13,508.158 (2484). Our edges lie within 0.64 µm of live's (2482).
     LiveScatter { doc: "c2-impeller-loft", from_feature: "Shell Gehäuse", readings: &[(1356.939549157078, 5427.707922765784 / 4.0), (13509.219731117855, 13508.158)] },
+    // core 11-22: the Blade's area, 18,227.2567 mm², against the sum of its six faces' evArea, 18,225.5247. The 4 mm top
+    // face is the path spline (238.10967 mm) swept: exactly 952.43867 mm², ours 952.438671, live's evArea 952.4035.
+    LiveScatter { doc: "c2-surf-workshop-knifehandle", from_feature: "Sweep 2", readings: &[(18227.256747166535, 18225.524666273184)] },
 ];
 
 /// Imported parts live's STEP importer refits, written next to their evidence (PARITY-SUITES.md): in `docs`, a part whose
@@ -320,6 +323,17 @@ fn live_scatter_widens_every_part_both_ways() {
     assert!(differences(&live, &[part("Part 2", 5427.637657)]).is_empty(), "ours 1.3e-5 below");
     assert!(!differences(&live, &[part("Part 2", 5427.0)]).is_empty(), "1.3e-4 below");
     assert!(!differences(&allow_live_readings("c2-impeller-loft", &["Loft Gehäuse"], vec![part("Part 2", 5427.707922765784)]), &[part("Part 2", 5427.637657)]).is_empty(), "not before the Shell");
+}
+
+/// c2-surf-workshop-knifehandle's Blade after Sweep 2: live's area against its faces' sum (9.5e-5); ours, the faces' exact
+/// areas, lies 0.29 mm² above that sum and 1.45 mm² below live's area.
+#[test]
+fn live_scatter_holds_the_knifehandle_blade_within_its_own_face_sum() {
+    let part = |a: f64| PartState { name: "Blade".into(), faces: 6, edges: 12, vertices: 8, area: Some(a * 1e-6), area_band: Some([18226.44975120758e-6, 18228.063743125494e-6]), ..Default::default() };
+    let live = |reached: &[&str]| allow_live_readings("c2-surf-workshop-knifehandle", reached, vec![part(18227.256747166535)]);
+    assert!(differences(&live(&["Sweep 2"]), &[part(18225.811348)]).is_empty());
+    assert!(!differences(&live(&["Sweep 2"]), &[part(18225.0)]).is_empty(), "below live's faces");
+    assert!(!differences(&live(&["Blade profile"]), &[part(18225.811348)]).is_empty(), "not before Sweep 2");
 }
 
 /// Live's mass-property band of a part (its `volume_band`) holds on later features while live's volume of that part is
