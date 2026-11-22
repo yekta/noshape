@@ -1028,6 +1028,49 @@ fn a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline(cx: &mut Tes
     assert_eq!(lit(cx), right, "the line picked: on the Right plane's outline it lights");
 }
 
+/// qa SKETCH-DIM-PLACE-PICKS-PLANE (workflow 01 steps 15-20, live: a linear dimension of the side): with the pointer
+/// last over the Front plane's face (lit, nothing picked yet), a quick click on the rectangle's right side and then beside
+/// it places the side's length; the stale hover's plane, off its outline, isn't picked (a 90° angle to Front before).
+#[gpui::test]
+fn a_quick_placement_click_after_a_plane_hover_places_the_length(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-dim-quick-place", Tool::CornerRect);
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (x, y) in [(0., 0.), (40., 30.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    // Inside the Front plane's face, 40 mm above the sketch.
+    let before = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.02, 0.0, 0.04)).unwrap());
+    pointer.move_to(cx, &view, before);
+    assert_eq!(hovered(cx, &view), Some(Reference::Plane(DatumPlane::Front)), "nothing picked: the Front plane lit under the pointer");
+    for (x, y) in [(40., 15.), (48., 15.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    keys(cx, window, &["2", "5", "enter"]);
+    let right = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).expect("sketch data");
+        data.sketch.entities().find_map(|e| match data.sketch.curve(e.id) {
+            Some(noshape_sketch::Curve2::Line { a, b }) if a.x > 0.03 && b.x > 0.03 => Some((b - a).length()),
+            _ => None,
+        })
+    });
+    let right = right.expect("the rectangle's right side");
+    assert!((right - 0.025).abs() < 1e-9, "the right side dimensioned to 25 mm, it is {:.4} mm", right * 1e3);
+}
+
 /// The pixels across a point marker's middle row, drawn alone at a device pixel ratio of 2 (as the user's shots), from
 /// its centre out to `reach` px.
 fn marker_row(sprites: &[noshape_render::PointSprite], reach: i32) -> Vec<[u8; 3]> {

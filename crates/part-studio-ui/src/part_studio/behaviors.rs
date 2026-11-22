@@ -1270,7 +1270,7 @@ impl PartStudioView {
             return vec![Reference::SketchEntity { sketch: ed.feature, entity: e.0 }];
         }
         match &self.hover {
-            Some(r) if self.dimension_skips_plane(r, cx) => Vec::new(),
+            Some(r) if self.dimension_skips_plane(r, self.viewport.read(cx).pointer_position(), cx) => Vec::new(),
             Some(r @ Reference::Body(_)) => vec![r.clone()],
             // Else mid-draw the open sketch's entity under the pointer isn't recoloured.
             Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch && ed.mid_draw()) => Vec::new(),

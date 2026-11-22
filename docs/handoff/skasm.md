@@ -12,7 +12,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   (lead 11-22: live's conic / asymmetric / curvature corners are B-spline approximations, live/skasm/cb-curves-1122;
   our exact conics stay). Doc 35/37: 35/36 differ on the curvature corner (magnitude 0.7), still a circle on purpose
   (live's curve fits any G2 quartic/quintic to its 1.6 µm noise).
-- UNCOMMITTED: SK-BOX-FILL (scene SketchEditor::box_ends; psui sketch.rs render_sketch_labels draws app-core
+- Lead 18:0x: took from psui SKETCH-DIM-PLACE-PICKS-PLANE (fixed 18:2x, dimension_skips_plane checks the outline at the
+  press) and the Part Studio FEEL-MC-* inference P0s. Plan: move asm's chooser (assembly_view.rs ~3170: 47.5 px square,
+  midpoint reach, 15 px edge ends, MidAxis, entered -> centroid, Shift lock) into one pure fn by inference_candidates
+  (crates/assembly eval.rs), both views call it; AFTER psui 3ff88768b (Shift lock, ConnectorLook::Placed, hover mask
+  "with" layer) and asm f028bfc94 (dots on top = CAP-MARKER-HIDDEN, infer_vertex_glyph) land (asm keeps off the chooser
+  meanwhile). Then MARKER-SHAPES (midpoints squares), EDGE-TRIAD-HIDDEN (Z on top), PS-VERTEX-LOOK, EDGE-PICK-RADIUS
+  (~6 px, rim back half), MARKER-REACH (REQUESTS 18:08), PICKED-OWNER / SHIFT-NEAREST re-scored after psui's land.
+- (landed or queued) SK-BOX-FILL (scene SketchEditor::box_ends; psui sketch.rs render_sketch_labels draws app-core
   box_overlay, the polyline box gone; screen_to_plane cfg(test)); test backtick_on_a_clicked_sketch_line_opens_select_
   other_by_the_pointer. qa's SK-CTRL-BOX / SK-SELECT-OTHER were on green dc779d69f (15:58), before 905188129 (16:21)
   fixed both; sketch_boxes_take_whats_inside passes (GPU test, vibex8). Next: sgd.sh run -> commit, TICKETS rows
@@ -35,7 +42,17 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Open: live lists "Face of Sketch 3" twice in sketch Select other (we list once); a circle centred level with the
   Origin adds a construction Origin point a window box takes (not asked of live).
 - Model suite 14:2x (vibex6, suite-1122b.log): 130/188 docs, 2021/2680 features; no doc's first difference is a sketch.
-- REQUESTS: 12:32 length box side + midpoint vs crossing (live, open); 14:30 c2-constrained-surface refs (live, open).
+- REQUESTS 12:32 ANSWERED (live/skasm/lenbox-1122, behaviours "skasm length box side"): the line's length box sits LEFT of
+  the drawing direction, centred on the perpendicular through the middle, near edge ~13-14 px off (A right-to-left: below
+  +25 px; B downward: right +41; C 2nd segment: above -27; D down-left: 35 px down-right on the normal); only the last
+  finished segment has a box; in iso it lies in the sketch plane. Midpoint: from (20,15.5) the level wins (end (0,15.713),
+  HORIZONTAL + VERTICAL to the midpoint, no diamond); from (20,25) diamond + MIDPOINT, end exactly (0,15). TODO: compare
+  ours after the P0s.
+- REQUESTS 14:30 ANSWERED: /root/parity/models/c2-constrained-surface/refs.jsonl (1254 lines): feature 4's 1121 vertices
+  refs resolved (id, VERTEX, point, body, createdBy: Linear pattern 1 960, Sketch 1 80, Sketch 2 80, Origin 1 IB) + the
+  Sketch 1/2 constraint externals (IB origin, JEC mirror face, JDC angle face); Sketch 2's DISTANCE BEDuJiRx8D0e
+  externalFirst = IF, a VERTEX at (0,0,0) on body JFD. TODO after the P0s.
+- REQUESTS 18:08 (open, live): mc-reach-1122 (the Part Studio inference reach: ratio vs px margin to the centroid).
 - SM firsts left: corner-break model F (in flight), sm-loft-basic apex (archive "Loft apex 11-21"), hem-jog corner counts.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)

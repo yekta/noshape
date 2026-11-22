@@ -1146,10 +1146,7 @@ impl PartStudioView {
         // With entities picked for a dimension a plane lights by its outline only, the nearest within reach, whichever
         // plane's face is under the pointer: ~2 px (live dimplane-1122, behaviours "psui plane while dimensioning":
         // qa walk 1's (72, -3) inside Front lights nothing), 6 px with an ellipse picked (live plane-behind-1121).
-        let reach = self.sketch.as_ref().filter(|ed| ed.tool == Tool::Dimension && !ed.tool_picks().is_empty()).map(|ed| {
-            if self.sketch_data(cx).is_some_and(|d| !ed.takes_plane_faces(&d)) { 6.0 } else { DIM_PLANE_OUTLINE_PX }
-        });
-        if let Some(reach) = reach
+        if let Some(reach) = self.dimension_plane_reach(cx)
             && matches!(r, Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
         {
             (r, pick) = self.plane_by_outline(vp.read(cx).pointer_position(), reach, vp, cx).map_or((None, None), |(r, id)| (Some(r), Some(id)));
@@ -1450,7 +1447,7 @@ impl PartStudioView {
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
-                let skip_plane = |r: &Reference| self.dimension_skips_plane(r, cx);
+                let skip_plane = |r: &Reference| self.dimension_skips_plane(r, *position, cx);
                 // Offset on a model face (live q-off): its outer loop, offset as one chain.
                 if hovered.is_none()
                     && tool_now == Some(Tool::Offset)
@@ -1849,14 +1846,28 @@ impl PartStudioView {
     /// so the plane doesn't light either (its outline reached: [`Self::plane_by_outline`]). Never the sketch's own, nor
     /// (ui-parity sketch-circle-dimension, qa SKETCH-DIM-PLACE-CLICK-SELECTS) with a circle picked or the plane the
     /// picked lines lie in.
-    pub(super) fn dimension_skips_plane(&self, r: &Reference, cx: &App) -> bool {
+    /// Off the plane's outline at viewport point `at` too: a quick click's hover can still be the plane lit over its
+    /// face before the first pick (qa SKETCH-DIM-PLACE-PICKS-PLANE: workflow 01's placement made a 90° angle to Front).
+    pub(super) fn dimension_skips_plane(&self, r: &Reference, at: DVec2, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref().filter(|s| s.tool == Tool::Dimension) else { return false };
         let picks = ed.tool_picks();
         if picks.is_empty() || !matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) {
             return false;
         }
         let round_pick = self.sketch_data(cx).is_some_and(|d| picks.iter().any(|e| matches!(d.sketch.kind(*e), Some(noshape_sketch::EntityKind::Circle | noshape_sketch::EntityKind::Arc))));
-        round_pick || self.is_own_sketch_plane(r, cx) || self.plane_holds_lines(r, &picks, cx)
+        let off_outline = || {
+            let reach = self.dimension_plane_reach(cx).unwrap_or(DIM_PLANE_OUTLINE_PX);
+            let vp = self.viewport.read(cx);
+            self.display.planes.iter().find(|q| q.reference == *r).is_none_or(|q| plane_outline_px(q, at, vp) > reach)
+        };
+        round_pick || self.is_own_sketch_plane(r, cx) || self.plane_holds_lines(r, &picks, cx) || off_outline()
+    }
+
+    /// With entities picked for a dimension, the reach in px of a plane's outline: ~2 px (live dimplane-1122), 6 px
+    /// with an ellipse picked (live plane-behind-1121).
+    fn dimension_plane_reach(&self, cx: &App) -> Option<f64> {
+        let ed = self.sketch.as_ref().filter(|ed| ed.tool == Tool::Dimension && !ed.tool_picks().is_empty())?;
+        Some(if self.sketch_data(cx).is_some_and(|d| !ed.takes_plane_faces(&d)) { 6.0 } else { DIM_PLANE_OUTLINE_PX })
     }
 
     /// Whether `r` is the plane or face the edited sketch lies on (or a plane coincident with it).
