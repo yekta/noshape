@@ -367,7 +367,13 @@ fn spawn_worker(on_done: impl Fn(Completed) + Send + 'static) -> Result<(RenderW
                 let renderer = noshape_render::Renderer::with_device(&ctx.adapter, (*ctx.device).clone(), (*ctx.queue).clone());
                 return Ok((RenderWorker::spawn_with(renderer, on_done), Present::Texture));
             }
-            Some(ctx) => log::info!("GPUI renders with {:?} on a {:?} adapter: viewport frames are read back", ctx.adapter.get_info().backend, ctx.adapter.get_info().device_type),
+            Some(ctx) => {
+                log::info!("GPUI renders with {:?} on a {:?} adapter: viewport frames are read back", ctx.adapter.get_info().backend, ctx.adapter.get_info().device_type);
+                // A device of our own on GPUI's adapter: no second Vulkan instance (APP-VULKAN-SEGV).
+                if ctx.adapter.get_info().backend == gpui_wgpu::wgpu::Backend::Vulkan {
+                    noshape_render::renderer::share_adapter(ctx.adapter.clone());
+                }
+            }
             None => log::warn!("GPUI's GPU context did not appear: viewport frames are read back"),
         }
     }

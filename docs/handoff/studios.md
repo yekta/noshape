@@ -81,20 +81,18 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
   - COMMITTED 8b1d10552 on top of 7038164b0 (both unlanded): a hovered annotation reads lit after Esc only if Esc left
     it (`esc_kept`); Esc after a 2 point centerline keeps it (EDGE^); the Note color panel over its swatch (top 46),
     focus/Esc per live (j). x160/x161/x162 (vibex7): 23/26, 19/20, 147-scenario run 139/147.
-  - UNCOMMITTED (x164 on vibex7 running: tests, clippy on 5 crates, app, x162's 147 drw-* into uip1121n; x165 then
-    the other 224 drw-* into uip1121o, same binary; logs ~/agents/studios-keep/x164.log / x165.log):
-    (a) Esc on a table cell's menu and Esc with cells picked keep a custom table selected (`keep_custom_tables_selected`,
-        custom-table-cell s15, x163 green); hole/revision tables still cleared.
-    (b) Esc in Select keeps in `esc_kept` only the deselected annotation under the pointer (styles-radial s16 yes;
-        hcallout-palette-dual s24 / -tips s40 no). Test `esc_deselecting_a_dimension_keeps_it_lit_only_under_the_pointer`.
-    (c) P0 DRW-BORDER-DRAG (qa walk 6, live 22:54 live/qa/walk6-1121/walk6-5-border*: only the dragged line moves;
-        frame's top/bottom and zone ticks stay; recorder reads no selection): `FormatLineEdit.offset` (model-data,
-        saved; Eq dropped), build.rs adds it, `format_line_grip_overlay` follows, `Drag::MoveFormatLine`,
-        `extra_start_drag` selects + starts, `extra_drag_move`, commit "Move". Ops `drawing_format_line` `move` [dx, dy]
-        (adds to the offset), drawing_get format_edits `offset`; tests: e2e drawing_title_block_fields, drawing
-        format_lines_are_picked_deleted_and_moved_alone, UI the_sheet_border_line_drags.
-    Then: ops e2e full (drawing changed), commit, fetch, rebase, diff --stat, land
-    (NOSHAPE_RB_HOST=vibe2 NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh); TICKETS DRW-BORDER-DRAG note after the rebase.
+  - QUEUED e41a7227 (00:31 11-22; 4 commits: the Esc rework, custom table listing, max/min edge, note colour (j),
+    P0 DRW-BORDER-DRAG + TICKETS): x168 (vibex7) drawing-ui 159/159, clippy clean, 147 drw-* 140/147 (left: custom-table
+    x3 = live re-takes now on main, centerline-3pt = (k), table-cell-menu s3 = live timing, 2 flaky "no recording");
+    ops e2e 277/277 (x166 vibex8). Also in it: `pointer_off` (drawing_view): a rebuild under a palette/menu hovers
+    nothing at the last sheet position (hcallout-palette-dual s24 / -tips s40).
+  - P0 APP-VULKAN-SEGV fixed (committed after e41a7227, landing 01:1x 11-22): ui-parity "no recording" = app segfault
+    at start in libvulkan (kernel log: 17 vibex7 / 96 vibex8 since 11-18). gdb (installed on vibex7 with sudo): GPUI
+    create_pipelines (set_object_name) on main vs our `shared_device` second instance's vkEnumeratePhysicalDevices
+    dlclose on noshape-gpu-init. Fix: `renderer::share_adapter` (render) from app-core gpu.rs spawn_worker for a
+    Vulkan GPUI ctx read back. x172 (vibex7): clippy clean, gdb stress 0 segv / 42 starts (old 4 / 17); scenarios 5/7
+    (custom-table-properties s11 selection 0 vs 1; export-formats s4 DWG version "2000" vs live "2018").
+  - x169 done: 241/243 (break-view-small-zigzag = the segfault; export-formats = pre-rebase tree).
   - Expected after landing: drw-custom-table-insert/-delete/-properties s8 fail until live's re-takes (df57f52f, with
     1336af80) land; table-cell-menu s3 is live's own timing (field vs other at the Insert click across 3 takes).
   - Waiting on live: (k) 3 point circle centerline at hole centres read [] (drw-centerline-circle-3-point-hole-centres

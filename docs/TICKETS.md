@@ -12,6 +12,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (object + precise tools, then the tolerant ones) fails too: the precise tools fused into one body, then fused with a
   1.5-2.45 um pin moved 1 m away, is still non-manifold (bool 11-22 06:15, vibex8 /root/bool-scratch/gm-stages3.out,
   branch bool-stages): the band reaches inside one argument. Fix: per-pair tolerances (each pair by its own two).
+## studios, 2026-11-22 (ui-parity "no recording" runs on vibex7)
+
+- [x] P0 **APP-VULKAN-SEGV (studios)**: the app segfaults at start in libvulkan.so.1 (+0x237ce, "segfault at 7") on Linux
+  with a software Vulkan (llvmpipe): ui-parity's "no recording" runs (17 on vibex7, 96 on vibex8 since 11-18, kernel log).
+  gdb (vibex7, 4 crashes in 17 starts): the main thread in GPUI's `create_pipelines` (wgpu `set_object_name` through the
+  loader) while `noshape-gpu-init` makes a second Vulkan instance in `shared_device` whose `vkEnumeratePhysicalDevices`
+  dlcloses drivers. Fix: on a Vulkan GPUI context the app's offscreen device is made on GPUI's adapter
+  (`renderer::share_adapter`), no second instance. Fixed: 0 crashes in 42 starts under gdb (x172, vibex7; 4 in 17 before).
 
 ## asm, 2026-11-21 (asm-scissor-lift open profile)
 - [ ] P3 **FS-ERROR-ENUM-VERSION (core)**: at FeatureScript 1576 our std rejects BOOLEAN_NON_MANIFOLD_RESULT as an

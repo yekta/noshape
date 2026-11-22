@@ -2563,12 +2563,26 @@ pub struct RenderParams<'a> {
 /// An adapter with its device and queue.
 type Gpu = (wgpu::Adapter, wgpu::Device, wgpu::Queue);
 
-/// The process's GPU: the first high-performance adapter, its device and queue (see [`Renderer::new_async`]).
-/// The error says whether the device (`true`) or the adapter failed.
+/// The adapter the app's window draws with, once known ([`share_adapter`]).
+static SHARED_ADAPTER: std::sync::OnceLock<wgpu::Adapter> = std::sync::OnceLock::new();
+
+/// Offscreen renderers make their device on `adapter` (the window's, GPUI's) instead of on a Vulkan instance of their
+/// own: a second instance enumerating drivers while GPUI built pipelines crashed in libvulkan (APP-VULKAN-SEGV).
+/// Before the first [`Renderer::new`]; later calls are ignored.
+pub fn share_adapter(adapter: wgpu::Adapter) {
+    let _ = SHARED_ADAPTER.set(adapter);
+}
+
+/// The process's GPU: the shared adapter ([`share_adapter`]) or the first high-performance one, its device and queue
+/// (see [`Renderer::new_async`]). The error says whether the device (`true`) or the adapter failed.
 fn shared_device() -> Result<&'static Gpu, RenderError> {
     static SHARED: std::sync::OnceLock<Result<Gpu, (bool, String)>> = std::sync::OnceLock::new();
     let made = SHARED.get_or_init(|| {
         pollster::block_on(async {
+            if let Some(adapter) = SHARED_ADAPTER.get() {
+                let (device, queue) = Renderer::request_device(adapter).await.map_err(|e| (true, e))?;
+                return Ok((adapter.clone(), device, queue));
+            }
             let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
             let adapter = instance
                 .request_adapter(&wgpu::RequestAdapterOptions {
