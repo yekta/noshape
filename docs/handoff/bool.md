@@ -20,28 +20,29 @@ all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/kn
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## NEXT (lead 11-22 06:2x)
-1. LANDED 06:34: wclip 6a0389fbf, ruling 61e4c748b. Stack arcpart/seambatch/bandbatch rebased on main, QUEUED 06:3x as
-   b240ce47 (worktree bool-bandbatch; gates + knurls clean). usdvol: gate vibex7 running (chain-bool-usdvol.out) ->
-   knurls -> land. bool-ptol must be rebased onto main (`git rebase --onto origin/main dfbc7eef1`) once b240ce47 lands.
-2. P1 BOOL-PER-PAIR-TOL (lead 06:2x, DECISIONS 17157c2fa: gamma Boolean 1 ~24 s cold vs live ~0.25 s), STAGED, each
-   stage through the full gate + knurls. Two-stage fuse FAILED (bool-stages worktree, uncommitted, drop it).
-   FOUND 07:0x (worktree bool-ptol, uncommitted, on dfbc7eef1; rebase `--onto origin/main dfbc7eef1` once b240ce47
-   lands): the T1 bool_patterns::precise_parts_fused_with_a_far_tolerant_pin (case d596e8faa25b6a23: gamma's object +
-   clips 6/17/23 (0.2 um) + pin 45 (2.45 um) moved 1 m; OCCT 448 faces, 4.757e-4 m3) is non-manifold at the global band
-   4.9 um AND at 4.4e-7, passes at 4e-7: clip/clip junctions 11-25 um apart need the clips' own band. Per-pair code in
-   boolean.rs: Ctx.arg_tol (each arg's half: own max tol + fuzzy; the most tolerant / tolerance-less args 0.5*tol, so
-   equal-tolerance inputs are unchanged), Ctx.arg_reach (widest band with args whose boxes meet), helpers own_band(a),
-   band(f,g), edge_band(e,f), args_band(a,b), face_band(f), reach_band(a). STAGE A (construction) = sections
-   (plane_*/cyl_*/section_from/section_cut/nurbs/touch/generator/edges_piercing/round_apart/occt_sections/apart),
-   edges on faces (edge_in_face/edge_crossing/arc_*/edge_over_free_face/in_face_from), single-face bound/c2_of/
-   intervals_on/projected_*/boundary_tol + in-face crossings (face_band), arc->line + cylinder seam th0/rulings
-   (own_band), split_params regroup (band passed per seg: section band / face_band / args_band(own, who)), get_sedge
-   arc/other joins (SEdge.band, max of both). The decisive two were get_sedge's GREY*tol arc join and the rest
-   together; with all of A the T1 passes (07:0x, PROBE runs on vibex8 pt-probe2.sh). STAGE B (classification, still
-   global tol): ray_state, lies_on, same_surface, kept_by, clear_inside, apex_on_face, boolean_in's 100*tol `clear`,
-   symmetry/moved_pair, C++ build() vertex tol (max(tol, own)) and pcurve eps. 07:12 stage A alone (no switches)
-   passes the T1; committed 8811a09de on bool-ptol (on dfbc7eef1); gate unit bool-ptol-gate (ptol-gate.sh, vibe2) ->
-   chain-bool-ptol.out; then knurls, rebase, land; then stage B; then measure gamma Boolean 1.
+1. LANDED: wclip 6a0389fbf, ruling 61e4c748b, arcpart/seambatch/bandbatch 604e9158 (07:19). usdvol f0929e9df: gate on
+   vibex7 (unit bool-usdvol-gate, chain-bool-usdvol.out) queued since 05:42 behind vibex7's cargo slots (other agents'
+   suites) -> knurls (kn-run.sh vibex7 kn-usdvol) -> land.
+2. P1 BOOL-PER-PAIR-TOL (DECISIONS 17157c2fa), STAGED. Ctx.arg_tol (each arg's half: own max tol + fuzzy; the most
+   tolerant / tolerance-less args 0.5*tol, so equal-tolerance inputs are unchanged), Ctx.arg_reach (widest band with
+   args whose boxes meet); helpers own_band / band(f,g) / edge_band / args_band / face_band / reach_band.
+   - STAGE A 0b4f5ad47 (worktree bool-ptol, rebased on main 07:42): construction (sections, edges on faces, face_band
+     single-face sites, own_band arc->line / seam th0 / rulings, split_params band per seg, get_sedge SEdge.band);
+     two input edges join at args_band of their own args (jb), not reach (gamma: two clips' arcs 5 um apart joined at
+     the pin's reach -> "an edge outside its face's range"); free-form projections at band.max(face_band(f)) (the
+     chamfer T1 343b971ef15af720: blade 5 um, tools 0.1 um, a 20 um fit failed). T1
+     precise_parts_fused_with_a_far_tolerant_pin. GATE vibe2 07:43 (unit bool-ptol-gate, chain-bool-ptol.out) ->
+     knurls -> land.
+   - STAGE B a23eae9b3 (worktree bool-ptolb, on A): classification (state_at's coplanar checks, tangent_side, lies_on
+     closure, settles, ray_state(band), touching_only clear, apex_on_face). same_surface/lies_on METHODS stay global.
+     GATE vibex8 07:43 (unit bool-ptolb-gate, chain-bool-ptolb.out) -> knurls -> land after A.
+   - With A+B: gamma subsets 6,17,23 + 45 / 67 / 87 in place are ours (448 / 369 / 369 faces as OCCT, 230-300 ms);
+     every half/quarter of the 87 tools ours, faces = OCCT's. FULL Boolean 1 still declines ("a face's curves don't
+     close", OCCT 6-7 s on vibex8): needs tools 17-22 + both 44-65 and 66-87. Probe (bool-stages = probe tree on A+B,
+     PROBE_CLOSE / PROBE_FACE, gm-close.sh): clip arg 10's r4 quarter cylinder, a 2.5 um sliver between its ruling
+     and another clip's line 432 taken as on it at face_band (reach 2.55 um, wide only because the pin's box meets
+     the clips'). NEXT (stage C): in-face crossings / bound / c2_of by the curves' own args' band, not the face's
+     reach; then measure gamma Boolean 1.
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
