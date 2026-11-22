@@ -27,18 +27,8 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     frame; possible later cleanup: one assembly per click), views remade 47-83 ms (live 6.4 s); FS marker ~0.8 s (live
     0.86-0.95); VS steps 18-20 ms; history row click 17 ms. (Benches using run_until_parked count background work: don't.)
   - docver-1121 rows, Start as a version (store start_version / start_name; ops version_properties / publish).
-  - Drawing takes (8dc787fa + live 13:08 answers): no menu while Edit section is open; no Resize... for several cells;
-    Opposite direction swaps its arrow (icon section-flip-back.svg), no tint; Esc in Edit section stays open after a
-    checkbox click (`check_focused`, panel_focus; test `edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus`).
-  - Alphabetical past Y (live alpha-1121): model-core `ReleaseLog::settle_revision`; the dialog settles a revision on
-    Blur (`revision_event`, `Row::settled`, the yellow `Issue::Notice`), `items()` takes the proposal; no upper-casing;
-    ops release_create returns `revision_notes`. Tests `a_revision_it_cant_take_becomes_the_proposed_one_with_a_note`,
-    e2e release_parts_and_revision_history (A -> C with the note).
-  - Compare revisions (live rel-compare-*.png): review rows' button between Edit properties and Export… (`toggle_compare`,
-    `render_compare`, `CompareRow`, `compare_layout`); release_thumbs::compare renders A (the previous revision's
-    package version) and B (the package's version, else the workspace), plain and flat #acdbf5 / #e67d5e for a changed
-    part. Assembly / drawing rows show the same picture both ways (asked). Test
-    `compare_revisions_opens_revision_a_and_b_under_the_row`.
+  - Drawing takes (8dc787fa + live 13:08 answers): landed.
+  - Release: alphabetical past Y (`ReleaseLog::settle_revision`), Compare revisions (`render_compare`): landed.
 - LANDED cf9f4cc6 as a2a3382d (16:30): live rel-1121b (release dialog 1092 px, Compare revisions only with an earlier
   revision, `earlier_revision` / `comparable`) and search relevance (`noshape_ops::doc_library::search_order`, store
   `document_created`, `DocEntry::created`; bold whole words only).
@@ -103,7 +93,18 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     dimension: text black on the box; grips on hover too, `note_grips_of`; rotate grip r 6 px, solid side arrowheads
     2 px low, 2x4 stem); palette open keeps the arrowheads (no covers); FS-ERROR-WORDING (parser: a stray name where an
     import may come = "mismatched input 'x' expecting 'import'", test). Left: VIEW-FRAME-PAD (REQUESTS 03:4x, rule
-    unclear), VS-CHIP-ON-CLICK / FS-DRAG-SELECT-BAND (vendor GPUI tooltip / editor patches), BOM-CELL-TOOLBAR. Live drwm-5 (answer to 01:24): the palette's dimension tan (hover look, no
+    unclear), VS-CHIP-ON-CLICK / FS-DRAG-SELECT-BAND (vendor GPUI tooltip / editor patches), BOM-CELL-TOOLBAR.
+  - COMMITTED 641159b57 (walk 9 fixes) on 8419bdc8e; neither tested together yet. NEXT: x184 on vibex7 (after 04:00):
+    /root/studios-scratch/bin/x184.sh = drawing-ui tests + clippy, featurescript parser tests + clippy, app, shots
+    1122d of the 3 matrices, then all drw doc docs ver vs fs rel -> uip1122h (log ~/agents/studios-keep/x184*.log).
+    x181 (vibex8, old binary) was still queued for vibex8's suite slot at 03:40: kill it if x184 runs. Then rebase,
+    read the diff stat, land.sh. ops e2e not needed (no crates/drawing or ops change).
+  - qa workflow 09 (03:4x) P0s, not started: FEEL-DRW-VIEW-HOVER-AFTER-PLACE: after the click placing a view (and the
+    projected one), pointer still on it, live draws it hovered at once (tan frame, orange edges as the Projected tool's
+    parent); ours plain until the pointer moves (look for the rebuild after placing not re-running update_hover).
+    FEEL-DRW-DIM-PLACE-DOTS: after a Linear dimension's placement click ours leaves two orange dots on the edge's end
+    points (not dim_kept_points, which is Point2 only: find the source with a test), and its ±0.1 launcher shows
+    late: SHOW_AFTER 800 ms vs live present at 776 ms (drawing_launcher.rs; try 700). Live drwm-5 (answer to 01:24): the palette's dimension tan (hover look, no
     grips / diamonds) wherever the pointer is; more than PALETTE_REACH_PX (100) off the palette it closes by itself,
     keeping changes, dimension unselected (drawing_tools on_mouse_move, `palette_gap`; test extended in
     a_dimension_dragged_from_unselected_ends_unselected). Live's blue dots left after that = stale paint (its reader reads
