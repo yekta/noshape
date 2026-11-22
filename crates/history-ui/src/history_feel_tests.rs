@@ -536,3 +536,25 @@ fn the_branch_filter_shows_with_a_second_workspace_and_narrows_the_rows(cx: &mut
     assert!(!drawn(cx, "hist-branch-filter"), "deleting B1 takes the button away");
     assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show all branches");
 }
+
+/// Live history-gaps-1122: in version › Restore to Main… Enter does nothing (the dialog stays, nothing restored); Esc
+/// closes it.
+#[gpui::test]
+fn the_restore_dialog_ignores_enter_and_closes_on_esc(cx: &mut TestAppContext) {
+    let (window, _view, doc) = panel(cx, "restore-keys");
+    let v1 = cx.update(|cx| doc.read(cx).session.store.list_versions().expect("versions").into_iter().find(|v| v.name == "V1").expect("V1"));
+    let head = |cx: &mut TestAppContext| cx.update(|cx| doc.read(cx).session.store.graph().unwrap().microversions.len());
+    let before = head(cx);
+    cx.update_window(window, |_, w, cx| crate::merge_dialog::open_restore(doc.clone(), v1.microversion, "V1".into(), w, cx)).unwrap();
+    draw(cx, window);
+    let shown = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| gpui_kit::component::WindowExt::has_active_dialog(w, cx)).unwrap();
+    assert!(shown(cx), "Restoring changes into Main");
+    VisualTestContext::from_window(window, cx).simulate_keystrokes("enter");
+    draw(cx, window);
+    assert!(shown(cx), "Enter leaves it open");
+    assert_eq!(head(cx), before, "nothing restored");
+    VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert!(!shown(cx), "Esc closes it");
+    assert_eq!(head(cx), before, "still nothing restored");
+}

@@ -212,6 +212,8 @@ pub(crate) struct DialogProps {
     overlay_closable: bool,
     pub(crate) overlay_visible: bool,
     keyboard: bool,
+    // NOSHAPE PATCH: see `Dialog::enter_confirms`.
+    enter_confirms: bool,
     entrance: DialogEntrance,
 }
 
@@ -224,6 +226,7 @@ impl Default for DialogProps {
             max_width: None,
             overlay: true,
             keyboard: true,
+            enter_confirms: true,
             overlay_visible: false,
             close_button: true,
             overlay_closable: true,
@@ -535,6 +538,12 @@ impl Dialog {
         self
     }
 
+    /// NOSHAPE PATCH: whether Enter confirms a dialog with an OK decision (default `true`; a clicked OK still does).
+    pub fn enter_confirms(mut self, on: bool) -> Self {
+        self.props.enter_confirms = on;
+        self
+    }
+
     /// Sets how the dialog enters, defaulting to [`DialogEntrance::SlideDown`].
     ///
     /// This controls the surface and backdrop together. Reduced motion skips
@@ -619,7 +628,7 @@ impl RenderOnce for Dialog {
         // NOSHAPE PATCH: without an OK decision of its own, Enter must not
         // close the dialog (it would drop the edits in its fields); a clicked
         // OK button still confirms.
-        let enter_confirms = self.button_props.on_ok.is_some();
+        let enter_confirms = self.props.enter_confirms && self.button_props.on_ok.is_some();
         let on_cancel = self.button_props.cancel_handler();
 
         let window_paddings = crate::window_border::window_paddings(window);

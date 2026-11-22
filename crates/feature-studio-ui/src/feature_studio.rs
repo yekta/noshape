@@ -1197,7 +1197,6 @@ impl FeatureStudioView {
             .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)))
     }
 
-    /// Ace's tooltip over a squiggle (live document/fs-gutter-tooltip): see [`ace_tooltip`].
     /// The Ctrl link under the pointer (Ctrl held: `ctrl`); notifies when it changes.
     fn update_ctrl_link(&mut self, ctrl: bool, cx: &mut Context<Self>) {
         let link = self.pointer.filter(|_| ctrl).and_then(|p| {
@@ -1228,11 +1227,28 @@ impl FeatureStudioView {
         Some(deferred(anchored().position(link.bounds.origin).child(body)).with_priority(1).into_any_element())
     }
 
+    /// Live fs-editor-feel-1122: under the underlined line, at once: `#f5f5f5`, 14 px `#333`, padding 3/4, shadow 0 1 px
+    /// 2 px rgba(0,0,0,.3), no border.
     fn render_diagnostic_tooltip(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let at = self.hover_at?;
-        let entry = self.editor.read(cx).hovered_diagnostic()?;
-        let tip = ace_tooltip(&[(entry.severity, entry.message.clone())], cx);
-        Some(deferred(anchored().position(at + point(px(6.), px(14.))).snap_to_window_with_margin(px(4.)).child(tip)).with_priority(2).into_any_element())
+        let ed = self.editor.read(cx);
+        let entry = ed.hovered_diagnostic()?;
+        let below = ed.range_to_bounds(&entry.range).map_or(at.y + px(14.), |b| b.bottom());
+        let tip = h_flex()
+            .debug_selector(|| "fs-squiggle-tip".into())
+            .gap(px(4.))
+            .py(px(3.))
+            .px(px(4.))
+            .bg(rgb(0xf5f5f5))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.3), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
+            .text_size(px(14.))
+            .line_height(px(16.))
+            .font_family(cx.theme().mono_font_family.clone())
+            .text_color(rgb(0x333333))
+            .whitespace_nowrap()
+            .child(crate::assets::icon(gutter_icon(entry.severity), 14., cx))
+            .child(entry.message.clone());
+        Some(deferred(anchored().position(point(at.x, below)).snap_to_window_with_margin(px(4.)).child(tip)).with_priority(2).into_any_element())
     }
 
     /// Import: open or close the panel (live document/81).

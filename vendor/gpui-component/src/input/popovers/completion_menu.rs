@@ -138,7 +138,7 @@ impl RenderOnce for CompletionMenuItem {
         let item = self.item;
         if self.ace {
             // Ace's colours (live qa-fsc-A-list: matched #1c1c1c, the rest
-            // #666, the kind #8b8b8b, the selected row #d0dbe5).
+            // #666, the kind #666 too (fs-editor-feel-1122), the selected row #d0dbe5).
             // The provider's matched letters (`data`: `[[start, end], …]` byte
             // ranges), else the query's.
             let given: Option<Vec<std::ops::Range<usize>>> =
@@ -200,7 +200,7 @@ impl RenderOnce for CompletionMenuItem {
                     this.child(
                         div()
                             .flex_none()
-                            .text_color(gpui::rgb(0x8b8b8b))
+                            .text_color(gpui::rgb(0x666666))
                             .child(detail),
                     )
                 })

@@ -666,3 +666,56 @@ fn new_feature_boxes_its_tab_stops(cx: &mut TestAppContext) {
     assert!(boxed(cx).is_empty(), "the caret left them: no boxes");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live fs-editor-feel-1122: hovering the underlined span shows its error at once under the line (22 px high: 14 px
+/// text, padding 3); one character past the span, nothing.
+#[gpui::test]
+fn an_errors_tooltip_shows_under_its_line_only_over_the_underline(cx: &mut TestAppContext) {
+    use gpui_kit::{Modifiers, VisualTestContext};
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-squiggle-tip-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    let source = "FeatureScript 2581;\nimport(path : \"onshape/std/geometry.fs\", version : \"2581.0\");\n\nexport const ee = sqrt(;\n";
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+        call(&mut ctx, "featurestudio_edit", json!({ "tab": "Feature Studio 1", "source": source }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    pause(cx, window, 2500);
+    let range = cx.update(|cx| view.read(cx).editor.read(cx).diagnostics().and_then(|d| d.iter().next().map(|e| e.range.clone()))).expect("the error's underline");
+    let span = cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&range)).expect("laid out");
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(span.center(), None, Modifiers::default());
+    draw(cx, window);
+    let mut v = VisualTestContext::from_window(window, cx);
+    let tip = v.debug_bounds("fs-squiggle-tip").expect("the tooltip at once");
+    assert!((tip.top() - span.bottom()).abs() <= px(2.), "under the line: {tip:?} vs {span:?}");
+    assert_eq!(tip.size.height, px(22.), "14 px text, padding 3");
+    let past = cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&(range.end..range.end + 1))).expect("the next character");
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(past.center(), None, Modifiers::default());
+    draw(cx, window);
+    let mut v = VisualTestContext::from_window(window, cx);
+    assert!(v.debug_bounds("fs-squiggle-tip").is_none(), "nothing one character past the underline");
+    let _ = std::fs::remove_dir_all(&dir);
+}

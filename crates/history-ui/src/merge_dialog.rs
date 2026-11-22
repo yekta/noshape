@@ -550,6 +550,8 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             .child(body)
             // (The buttons are built after the modal: its ui-parity reading lists them.)
             .footer(os::modal_footer().when(!plan.restore, |d| d.child(help)).child(div().flex_1()).child(os::modal_ok(ok(plan.restore).when(!can_merge, |b| b.disabled(true).opacity(0.4)))).child(os::modal_cancel(os::cancel_button("merge-cancel", "Cancel", cx))))
+            // Live history-gaps-1122: Enter does nothing in Restore (a click restores); Esc closes it.
+            .enter_confirms(!plan.restore)
             .on_ok(move |_, _, cx| {
                 if !can_merge {
                     return false;

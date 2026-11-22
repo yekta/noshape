@@ -132,6 +132,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   dlcloses drivers. Fix: on a Vulkan GPUI context the app's offscreen device is made on GPUI's adapter
   (`renderer::share_adapter`), no second instance. Fixed: 0 crashes in 42 starts under gdb (x172, vibex7; 4 in 17 before).
 
+## studios, 2026-11-22 (live drw-drag-feel-1122's setup replayed on ours, vibex8)
+
+- [ ] P1 **DRW-DIM-HIDDEN-VERTEX-SNAP (studios)**: hole-plate-drawing, Dimension tool, a click on the Right view's top
+  edge at its middle takes a point (orange dot, then a vertical dotted preview) instead of the edge, so live's
+  scenario places no Right dimension. The point is the end of the hole's seam (r, 0, 20), hidden behind the x = 20 face
+  but projected onto the top edge's middle; every model vertex is a snap (`views.rs` "Snap points: vertices").
+  Live takes the edge. Snaps should be visible vertices only.
+- [ ] P2 **UIP-ANNOTATION-STALE-POS (studios)**: after a dimension's text is dragged, the runner's `annotation` locator
+  presses at the text's old spot (the drawing state reads the new position): the next drag becomes a box select.
+
 ## asm, 2026-11-21 (asm-scissor-lift open profile)
 - [ ] P3 **FS-ERROR-ENUM-VERSION (core)**: at FeatureScript 1576 our std rejects BOOLEAN_NON_MANIFOLD_RESULT as an
   ErrorStringEnum value (it's gated at V2033_BOOLEAN_NON_MANIFOLD_RESULT_ERROR), so the feature's error text becomes "Type
