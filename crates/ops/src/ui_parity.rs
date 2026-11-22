@@ -377,7 +377,8 @@ fn build_assembly(ctx: &mut Ctx, asm: &Value) -> Result<(), String> {
         let what = |e: String| format!("assembly instance {k}: {e}");
         let part = i["part"].as_str().ok_or_else(|| what("no part".into()))?;
         let made = call(ctx, "assembly_insert", json!({ "source": i["studio"].as_str().unwrap_or("Part Studio 1"), "part": part })).map_err(what)?;
-        let name = made["instances"].get(0).and_then(|x| x["name"].as_str()).or_else(|| made["name"].as_str()).map(str::to_string).ok_or_else(|| what(format!("no instance in {made}")))?;
+        // The one just inserted (`instances` lists the whole assembly's).
+        let name = made["instance"].as_str().or_else(|| made["name"].as_str()).map(str::to_string).ok_or_else(|| what(format!("no instance in {made}")))?;
         if let Some(at) = i.get("at") {
             call(ctx, "assembly_transform", json!({ "instance": name, "translation": at })).map_err(what)?;
         }
@@ -565,6 +566,25 @@ mod tests {
         // appearance item).
         let volume = call(&mut ctx, "query_mass_properties", json!({ "parts": ["Part 1"] })).unwrap()["volume"].as_f64().unwrap();
         assert!((volume - (12000.0 - std::f64::consts::PI * 9.0 * 10.0)).abs() < 1.0, "B1's Part 1 with its Ø6 hole: {volume} mm³");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A start's assembly places and fixes each instance it inserts, not the first one (qa UIS-ASM-START-FIRST-INSTANCE).
+    #[test]
+    fn a_starts_instances_each_take_their_own_place() {
+        let start = json!({ "units": "mm", "features": [
+            { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+        ], "assembly": { "instances": [{ "part": "Part 1" }, { "part": "Part 1", "at": [0, 0, 10] }, { "part": "Part 1", "fixed": true }] } });
+        let dir = std::env::temp_dir().join(format!("noshape-uip-asm-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("instances.noshape"), &start).unwrap();
+        let l = call(&mut ctx, "assembly_list", json!({})).unwrap();
+        let row = |n: &str| l["instances"].as_array().unwrap().iter().find(|i| i["name"] == n).cloned().unwrap_or_else(|| panic!("no {n}: {l}"));
+        let z = |n: &str| row(n)["translation"][2].as_f64().unwrap();
+        assert_eq!(z("Part 1 <1>"), 0.0, "{l}");
+        assert!((z("Part 1 <2>") - 10.0).abs() < 1e-9 && row("Part 1 <2>")["fixed"] == false, "{l}");
+        assert_eq!(row("Part 1 <3>")["fixed"].as_bool(), Some(true), "{l}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

@@ -827,7 +827,11 @@ pub fn frame_trim(ev: &mut EvalCtx) -> FResult<()> {
             if (piece.shape.volume().unwrap_or(0.0) - body.shape.volume().unwrap_or(0.0)).abs() < 1e-15 {
                 ev.warnings.push(format!("{} does not touch the frames of earlier groups", body.name));
             }
-            set_body(ev, bi, piece);
+            // No vertex left where a tool only touched an edge (live c2-cov2-frame-corners-trim-endcap-gusset's Part 12:
+            // 64 edges, not 66).
+            let joined = k::unify_edges(&piece.shape)?;
+            let names = ev.name_result(&[&piece.names], &joined.history, &joined.shape, &BTreeMap::new(), None);
+            set_body(ev, bi, NamedShape::new(joined.shape, names));
         }
     }
     Ok(())
@@ -862,6 +866,21 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
     }
     let feature = ev.feature;
     let mut count = 0u32;
+    // std getOffsetDirection: every gusset moves along the last edge picked (c2-cov2-frame-corners' Gusset offset flipped).
+    let mut along: Option<DVec3> = None;
+    let line = |ev: &EvalCtx, r: &Reference| -> Option<(DVec3, DVec3)> {
+        let &(b, i) = ev.resolve_edges(std::slice::from_ref(r)).first()?;
+        super::sheetmetal_util::line_of(&ev.ctx.bodies[b].shape.sub_shape(ShapeType::Edge, i).ok()?)
+    };
+    let aligned = match (ev.is("gussetPosition", "ALIGNED"), refs.first(), ev.query("alignedReference").first()) {
+        (true, Some(r), Some(ar)) => line(ev, r).zip(line(ev, ar)).and_then(|((p, q), (a0, a1))| {
+            let (m, e, d) = ((p + q) * 0.5, (q - p).normalize(), (a1 - a0).normalize());
+            let n = e.cross(d).cross(d);
+            let den = e.dot(n);
+            (den.abs() > 1e-9).then(|| e * ((a0 - m).dot(n) / den))
+        }),
+        _ => None,
+    };
     for r in refs.iter().rev() {
         let Some(&(bi, ei)) = ev.resolve_edges(std::slice::from_ref(r)).first() else { return crate::regen::eval::err_at(&["edges"], "Select linear edge on the frame segment cut face to create gusset.") };
         let body = ev.ctx.bodies[bi].clone();
@@ -928,15 +947,15 @@ pub fn gusset(ev: &mut EvalCtx) -> FResult<()> {
         // Position along the edge.
         let off = ev.length("offset").unwrap_or(0.0) * if ev.bool("shouldFlipOffset") { -1.0 } else { 1.0 };
         let mut s0 = -th * 0.5;
-        if ev.is("gussetPosition", "ALIGNED")
-            && let Some(ar) = ev.query("alignedReference").first()
-            && let Some(&(ab, ae)) = ev.resolve_edges(std::slice::from_ref(ar)).first()
-            && let Ok((a0, a1)) = ev.ctx.bodies[ab].shape.sub_shape(ShapeType::Edge, ae)?.endpoints()
-        {
-            let s_al = ((a0 + a1) * 0.5 - m).dot(e);
-            s0 = if ev.bool("shouldFlipAlignment") { s_al - th } else { s_al };
+        // std getAlignedOffset: from the first edge's middle to where its line meets the alignment edge's; the plate
+        // goes from there back towards the middle (Flip: away from it).
+        if let Some(aligned) = aligned {
+            let s_al = aligned.dot(e);
+            let away = (s_al >= 0.0) == ev.bool("shouldFlipAlignment");
+            s0 = if away { s_al } else { s_al - th };
         }
-        let base: Vec<DVec3> = pts.iter().map(|x| *x + e * (s0 + off)).collect();
+        let along = *along.get_or_insert(e);
+        let base: Vec<DVec3> = pts.iter().map(|x| *x + e * s0 + along * off).collect();
         // std's createMidpointManipulator / createLengthManipulator, on the last edge picked: the offset along the
         // edge from the gusset's place before it, and the size from the plate's middle across to its far side.
         if count == 0 {
@@ -1006,6 +1025,9 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                 (fc, -n * inset, -n)
             }
             _ => {
+                let off = ev.length("offsetDistance").unwrap_or(0.0);
+                let grow = if off <= 1e-12 { 0.0 } else if ev.bool("offsetDirection") { -off } else { off };
+                let mut circled = false;
                 let mut fc = match ptype.as_str() {
                     "RECTANGLE" | "CIRCLE" => {
                         let mut lo = DVec2::splat(f64::INFINITY);
@@ -1029,8 +1051,26 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                             k::make_plane_face(&frame_plane, lo.x, hi.x, lo.y, hi.y)?
                         } else {
                             let c = (lo + hi) * 0.5;
-                            let rad = samples.iter().map(|p| (frame_plane.to_local(*p) - c).length()).fold(0.0, f64::max);
-                            k::make_face_2d(&frame_plane, &[k::Segment2d::Circle { center: c, radius: rad }], &[])?
+                            // std generateProfileCircle: the farthest point of its "inner face", the second largest loop (by
+                            // its box's diagonal) when there are more (a tube's inside), else the outside.
+                            let diagonal = |w: &Shape| w.bounding_box(false).map_or(0.0, |b| (b.max - b.min).length());
+                            let mut loops = wires.clone();
+                            loops.sort_by(|a, b| diagonal(b).total_cmp(&diagonal(a)));
+                            let reach = loops.get(1).unwrap_or(&outer);
+                            let mut far: Vec<DVec3> = Vec::new();
+                            for e in reach.edges() {
+                                if let Ok(info) = e.edge_info() {
+                                    far.extend((0..=16).filter_map(|i| e.point_at(info.first_param + (info.last_param - info.first_param) * i as f64 / 16.0).ok()));
+                                }
+                            }
+                            let rad = far.iter().map(|p| (frame_plane.to_local(*p) - c).length()).fold(0.0, f64::max);
+                            // Its offset is the circle's own radius (OCCT's wire offset of a lone circle crashed: c2-cov2-frame-corners'
+                            // End cap circle offset flipped).
+                            if rad + grow <= 1e-9 {
+                                return err_at(&["offsetDistance"], "The offset is larger than the profile.");
+                            }
+                            circled = true;
+                            k::make_face_2d(&frame_plane, &[k::Segment2d::Circle { center: c, radius: rad + grow }], &[])?
                         }
                     }
                     _ => k::make_face_from_wire(&outer, true)?,
@@ -1041,13 +1081,13 @@ pub fn end_cap(ev: &mut EvalCtx) -> FResult<()> {
                     let mid = (info.first_param + info.last_param) * 0.5;
                     if let (Ok(q), Ok(tq)) = (e.point_at(mid), e.tangent_at(mid)) {
                         let out = tq.cross(n).normalize_or_zero();
-                        side = Some((q, if (q - frame_plane.origin).dot(out) < 0.0 { -out } else { out }));
+                        let out = if (q - frame_plane.origin).dot(out) < 0.0 { -out } else { out };
+                        // (The manipulator starts on the side before its offset.)
+                        side = Some((if circled { q - out * grow } else { q }, out));
                     }
                 }
-                let off = ev.length("offsetDistance").unwrap_or(0.0);
-                if off > 1e-12 {
-                    let d = if ev.bool("offsetDirection") { -off } else { off };
-                    let w = k::offset_wire_2d(&fc, d, k::JoinType::Intersection, false)?;
+                if grow != 0.0 && !circled {
+                    let w = k::offset_wire_2d(&fc, grow, k::JoinType::Intersection, false)?;
                     fc = k::make_face_from_wire(&w, true)?;
                 }
                 // std: unless Opposite direction, the member's end moves in by the thickness and the cap fills it.
