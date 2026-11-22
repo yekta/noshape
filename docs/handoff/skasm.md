@@ -1,22 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 22:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 22:12 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (22:0x)
-- LANDED today: d2b509fc (ff4a8ed0), e0fc1afc (mc-reach R1-R5: squares, POST layer glyph, 50 px reach, rim whole; asm
-  told; lead told: edge reach stays 7 px, asm's 1117 47.5 px test moved to 50).
-- QUEUED next (this land): 81af07285 query_entities `sketches` (pattern sketch copies' points; parity translator
-  sketch_copy_point_at; e2e sketch_points_a_pattern_copied_are_vertices), 33f314d8d Trim piece hover orange 5 px + dots
-  (S4 upper arc; sketch tools.rs upper-arc click test), 4dd5fc20e SM table: row lights bend as HOVER (Highlighting
-  faces_hovered), joint Type/Style list open lights its rip (ui.sm_joint_open; sm matrix row).
-- c2-constrained-surface parity pair NOT run yet (vibex8 slot queue 4 deep killed it at 30 min): run
-  `rb.sh bash -c '~/bin/slot bash ~/tmp/skasm/ut3t.sh c2-constrained-surface'` on a quiet host, timeout > 30 min.
-- qa 21:4x rows: BEND-LIT-LOOK + JOINT-LIT fixed (to verify); PANE-SPLIT: decision needed (live 40.5 % is likely a
-  remembered drag, default 50 %); SM-TABLE-CELL-EDIT (P1: blue focus box, centred, Enter -> next row's Radius, nothing
-  lit) and SM-TAB-MERGE-PICK (P1: Tab's Flange to merge click at (30,35,2) takes the wall in live, ours a plate face
-  behind; reproduce wf02 s5) still open: next.
-- Trim: live's tinted core (curve at ~1/3 over the band) not drawn (sketch mode has no curve states); minor.
+## NEXT (22:1x)
+- LANDED today: d2b509fc (ff4a8ed0), e0fc1afc (mc-reach R1-R5; asm + lead told).
+- QUEUED 37df74ed (supersedes 4179663c, 5 commits): query_entities `sketches` (c2-constrained-surface op + e2e), Trim
+  piece hover orange 5 px + dots (S4), SM table row lights bend as HOVER (Highlighting faces_hovered), joint Type/Style
+  list open lights its rip (ui.sm_joint_open), SM cells: blue outline after the grid border, editor text centred, Enter
+  moves the box down (ui.sm_edit_enter), no row lit. sm matrix rows added (sm_feel_tests.rs).
+- NEXT: SM-TAB-MERGE-PICK (P1): workflow 02 s5, Tab dialog, "Flange to merge" click at model (30,35,2): live takes the
+  flange wall in front ("Face of Flange 1"), ours a second plate face behind (picks through?). Reproduce in a UI test
+  (sm-box-like start, Tab), check the field's filter / the reclick-through rule (BEND-FACE-RECLICK, 09b4b72b).
+- c2-constrained-surface parity pair NOT run (vibex8 slot queue killed it at 30 min): rb.sh bash -c '~/bin/slot bash
+  ~/tmp/skasm/ut3t.sh c2-constrained-surface' with run_in_background timeout >= 60 min, quiet host.
+- PANE-SPLIT: lead 22:0x: REQUESTS row 22:07 (live: the fresh-document split, per doc/account memory). 50 % default
+  -> ours stays, replay seeded 0.405; else change SPLIT's default (sheet_metal_panel.rs SPLIT unwrap_or(0.5)).
+- JOINT-LIT: the list above the cell is the pane fit (lists stay in the tables pane) -> after the split answer.
+- Trim: live's tinted core (curve ~1/3 over the band) not drawn (sketch mode has no curve states); minor.
 - Context: never cat task output files or logs whole; tail -40 / grep.
 
 ## In flight (11-22 17:45 UTC)
