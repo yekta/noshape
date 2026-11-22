@@ -1247,6 +1247,8 @@ pub struct AssemblyEvaluator {
     /// Regeneration options for Part Studios with Derived or custom
     /// features (their sources: the app's / agent API's providers).
     studio_options: Option<StudioOptions>,
+    /// Part Studio regenerations kept across sessions ([`RegenOptions::store`]; the app's).
+    result_store: Option<Arc<dyn crate::regen::ResultStore>>,
     /// Part Studios (and configurations) already checked against the
     /// document during the current `evaluate` (each instance of a part
     /// asked again; hashing the Part Studio per instance cost ~40 ms for
@@ -2221,6 +2223,10 @@ impl AssemblyEvaluator {
         let entry = self.studios.entry(key).or_insert_with(|| StudioCacheEntry { hash: hash ^ 1, regen: Regenerator::new(), result: Arc::new(RegenResult::default()) });
         if entry.hash != hash {
             let r = entry.regen.regenerate(ps, &cfg, &doc.settings.units, &opts);
+            // Kept across sessions (`RegenOptions::store`), as a Part Studio's own regeneration.
+            if let Some(store) = opts.store.clone() {
+                crate::regen::persist::keep(store, &r);
+            }
             entry.result = Arc::new(r);
             entry.hash = hash;
         }
@@ -2247,6 +2253,7 @@ impl AssemblyEvaluator {
             None => RegenOptions::default(),
         };
         opts.coarser_levels = self.coarser_levels;
+        opts.store = self.result_store.clone();
         hash = hash.rotate_left(5) ^ u64::from(self.coarser_levels);
         // The Variable Studio tables the Part Studio shows (its #names).
         opts.document_variables = crate::variables::element_variables(doc, tab);
@@ -2315,6 +2322,9 @@ impl AssemblyEvaluator {
                 let run = move || {
                     while let Some((_, ps, cfg, opts, hash, entry)) = queue.lock().ok().and_then(|mut q| q.next()) {
                         entry.result = Arc::new(entry.regen.regenerate(ps, cfg, units, opts));
+                        if let Some(store) = opts.store.clone() {
+                            crate::regen::persist::keep(store, &entry.result);
+                        }
                         entry.hash = *hash;
                     }
                 };
@@ -2353,6 +2363,11 @@ impl AssemblyEvaluator {
     pub fn set_studio_options(&mut self, make: StudioOptions) {
         self.studio_options = Some(make);
         self.studios.clear();
+    }
+
+    /// Read Part Studio regenerations from `store` and keep them there ([`RegenOptions::store`]).
+    pub fn set_result_store(&mut self, store: Option<Arc<dyn crate::regen::ResultStore>>) {
+        self.result_store = store;
     }
 
     /// Set the resolver for parts inserted from other documents.

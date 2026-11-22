@@ -7086,3 +7086,33 @@ fn a_derived_mirror_holds_its_assemblys_instances_mirrored_in_xy() {
         assert_eq!(child.name, if derived { "Block-Mirrored <1>" } else { "Block <1>" });
     }
 }
+
+/// SPEED-ASM-OPEN (lead 11-22): an evaluator with the app's result store keeps its Part Studios' regenerations there;
+/// another one (the document reopened) reads them back instead of evaluating the features, the same parts.
+#[test]
+fn part_studio_regenerations_are_kept_across_sessions() {
+    let dir = std::env::temp_dir().join(format!("noshape-asm-results-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let store: std::sync::Arc<dyn crate::regen::ResultStore> = std::sync::Arc::new(crate::regen::persist::DirStore { dir: dir.clone(), build: "test".into(), cap: 1 << 30 });
+    let f = doc_with(vec![block_studio()]);
+    let open = || {
+        let mut ev = AssemblyEvaluator::new();
+        ev.set_result_store(Some(store.clone()));
+        ev.studio(&f.doc, f.studios[0], &ConfigValues::default()).unwrap()
+    };
+    let first = open();
+    assert!(!first.from_store && first.context.bodies.len() == 1, "evaluated");
+    // (Kept off the evaluating thread.)
+    let t0 = std::time::Instant::now();
+    let again = loop {
+        let r = open();
+        if r.from_store || t0.elapsed() > std::time::Duration::from_secs(20) {
+            break r;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    assert!(again.from_store, "read back from the store");
+    let ids = |r: &crate::regen::RegenResult| r.context.bodies.iter().map(|b| b.id.clone()).collect::<Vec<_>>();
+    assert_eq!(ids(&again), ids(&first), "the same parts");
+    let _ = std::fs::remove_dir_all(&dir);
+}

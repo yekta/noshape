@@ -39,6 +39,15 @@ pub fn assembly_evaluator(cache: StudioCache) -> noshape_model::assembly::eval::
     ev
 }
 
+/// [`assembly_evaluator`] whose Part Studio regenerations are read from `store` and kept in it (the app's results kept
+/// across sessions, as a Part Studio's own: an assembly reopens without evaluating its studios' features again, and a
+/// studio it evaluated opens at once in its own tab).
+pub fn assembly_evaluator_with_store(cache: StudioCache, store: Option<Arc<dyn noshape_model::regen::ResultStore>>) -> noshape_model::assembly::eval::AssemblyEvaluator {
+    let mut ev = assembly_evaluator(cache);
+    ev.set_result_store(store);
+    ev
+}
+
 pub struct DocStudios {
     doc: Arc<Document>,
     cache: Arc<Mutex<HashMap<String, Regenerator>>>,

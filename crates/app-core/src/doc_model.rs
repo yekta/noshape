@@ -123,7 +123,7 @@ impl DocModel {
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
         let studio_cache = crate::derived::StudioCache::default();
-        let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator(studio_cache.clone())));
+        let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator_with_store(studio_cache.clone(), crate::result_store::store())));
         Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None, quit_commit: None }
     }
 

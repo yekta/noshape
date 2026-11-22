@@ -93,6 +93,12 @@ pub fn key(doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Se
     key_for(doc, slot, extra, build_id())
 }
 
+/// The key of a Part Studio tab's display at configuration `config` (`fine`: meshed for View in high quality); the
+/// Part Studio's own rows, which an assembly inserting it reads too.
+pub fn studio_key(doc: &noshape_model::Document, tab: noshape_model::document::TabId, config: &impl Serialize, fine: bool) -> Option<String> {
+    key(doc, &("part studio", tab), &(config, fine))
+}
+
 pub(crate) fn key_for(doc: &noshape_model::Document, slot: &impl Serialize, extra: &impl Serialize, build: &str) -> Option<String> {
     let tag = slot_tag(slot)?;
     let mut h = blake3::Hasher::new();

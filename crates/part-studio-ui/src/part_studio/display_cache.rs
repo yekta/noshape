@@ -9,7 +9,7 @@ pub(super) use cache::Shelf;
 
 /// The cache key of tab `tab`'s display at configuration `config` (meshed finer: View in high quality).
 pub(super) fn key(doc: &noshape_model::Document, tab: noshape_model::document::TabId, config: &impl serde::Serialize, fine: bool) -> Option<String> {
-    cache::key(doc, &("part studio", tab), &(config, fine))
+    cache::studio_key(doc, tab, config, fine)
 }
 
 /// The display cached under `key`, if any.
