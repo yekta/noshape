@@ -3,17 +3,14 @@
 Updated 2026-11-22 18:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (18:56, compaction): FAILED LAND FIRST
-- FAILED 18:46 ab6987cc (and everything stacked: 2c5bffa7, 12befd2f, b6342565, b8015e9d, the length box 4abdbe370):
-  part-studio-ui sm_feel_tests::a_bends_face_clicked_again_stays_in_its_field: "the face kept after the click" left 0
-  on the land host (passed on vibex8 16:1x). Suspect a race: the click before the preview display is in (held_face_under
-  in mod.rs ~2054: `now` = current display lacks a face at the held face's depth) or the preview naming the face the
-  same (a plain toggle-off). Repeat script vibex8:~/tmp/skasm/bf.sh (5x the test, --nocapture), local copy
-  /root/skasm-scratch/bin/bf.sh; run it via tools/tiers/rb.sh bash -c 'bash ~/tmp/skasm/bf.sh'. Fix on top, land.sh.
-- Running at 18:56: se2 (vibex8, /root/skasm-scratch/se2.log: clippy scene+psui, scene lib, psui `sketch` tests) for
-  the sketch-edit-feel commit below (lit_picks with the edited dimension's entities). Check it before landing.
-- Waiting on psui 3ff88768b + asm f028bfc94 to reach main, then wire assembly::inference::choose (committed a2c066149)
-  into assembly_view.rs (~3150) and part-studio-ui inference.rs; then the FEEL-MC-* list below.
+## NEXT (19:17)
+- QUEUED 09b4b72b (19:16): the whole stack (Bend fix, corner breaks + model F + parity allowances, box fill, tickets
+  owner move, Dimension placement, assembly::inference, length box, sketch-edit-feel) + the land-fail fix: the Bend
+  test failed 5/5 after the rebase (not a race): the Bend preview lifts the clicked plate end 23 mm toward the eye, so
+  held_face_under's depth-equality took the held face out. Now: it leaves only where the preview has nothing there or
+  in front (Shell's removed face). Bend 3x, Shell re-click, sm:: + preview tests, clippy green on vibex8.
+- asm's mc-infer landed (4a9b608b1); psui 3ff88768b not on main at 19:16. Next: wire assembly::inference::choose into
+  assembly_view.rs (~3150), then part-studio-ui inference.rs after psui lands; then the FEEL-MC-* list below.
 - REQUESTS 18:08 (live, open): mc-reach-1122 R1-R6 (reach rule, edge reach with the tool, rim back half, Extend past
   the boundary).
 
