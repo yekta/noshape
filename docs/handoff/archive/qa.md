@@ -2362,3 +2362,14 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
    Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): FAST-OFF-CLEAR (ours 141-260 ms, live 5-7), toolbar tooltip (208-242, live 15-45), D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
    (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw; psui 51c01c9c first hover after a 3.5 s rest on 850efe (feel1120/psui5/abh.sh + hov.py: green vs b2b0cf9a9; 19:2x load 10 393 vs 561 ms, load 12 mixed).
+
+## 11-20 05:00 cut hold (moved 11-22 15:3x)
+00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
+   compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
+   that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
+   -> qa-scratch/prerel/cut0500-<sha>.txt and a qa-alerts line. Then read that + the compat loop's compat/<sha>.txt and send the lead GO.
+   TICKETS sweep done (f79c29aca and after): ~200 fixed rows verified / closed, 2 reopened (blend CHAMFER-ASYM, skasm SNAP-INSERT-FACE): no owner commit by 04:08, both owners told 04:09; walk on their word. Night ui suite done 04:06 (2145/2172); last "not run" (vs-ps-own-table-menu) matched alone: all routed.
+   Night ui run (1120-night-ui-a06ec927, vibex8) finishing: sent P1 ANALYSIS-READOUT-HIDDEN (psui, fix in its next land; waiter
+   qa-wait-psui-readout), P2 ASM-INSTANCE-PROPS-FIELD (asm), DOCS-CRUMB-TOOLTIP and VER-COMPARE-READOUT (studios); re-run-alone
+   matches were artefacts. When score.log lands: diff vs 1119-1302 for the last ~40, route, then restart qa-suites (rm suites/stop).
+   P2 T2-NIGHTLY-22-FAILURES filed for the lead. Speed left: FORM-PREVIEW gap vs live ~1.5 s on a quiet host.

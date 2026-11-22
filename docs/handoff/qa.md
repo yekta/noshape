@@ -112,15 +112,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
 00e. 11-21 17:4x compat: core's chamfer revert dc58aff96 verified on 2d708fa4 (cf-surface-pattern, cli-draft-hang SAME vs 0.4.64); cpcurves volume shift + manualblend Boundary surface 1 Error accepted by core (accepted.txt note). Core re-lands the chamfer edge sense next: then check cf-surface-pattern, cli-draft-hang, infento Linear pattern 1 (+y), add a TICKETS row. UIP-THREAD-MESSAGE-TWICE verified 18:17 (green 02ccb4ef7, 11/11).
 00e. skasm stack on 3fd4db71: 5 verified; FEEL-DIM-TWO-POINTS-ZERO / CHAIN-LASTPOINT / PASTE-PLACE still open. ANALYSIS-READOUT-HIDDEN
    verified 05:4x (2b3887ebe, 7/7); FEEL-DIM-PICK-READOUT (cov2-dim-orient step 8), ROLLBACK-DROP-ROW, SECTION-ARROW-FOOT: psui's next batch, on its word.
-00a. **05:00 cut HELD (lead 04:0x) until a green has core's 2f4f3bc5 (singularities Sketch 2; Mirror 2 is as live, accepted in
-   compat/accepted.txt; 2f4f's subject added to cut-must.txt).** Unit qa-prerel-2f4f (bin/prerel-when.sh "<subject>" cut0500): when
-   that commit is in the green, bin/prerel-run.sh uploads it to vibe2 and runs userdocs + prerel-edits + prerel-open (pixel diff at 90 s)
-   -> qa-scratch/prerel/cut0500-<sha>.txt and a qa-alerts line. Then read that + the compat loop's compat/<sha>.txt and send the lead GO.
-   TICKETS sweep done (f79c29aca and after): ~200 fixed rows verified / closed, 2 reopened (blend CHAMFER-ASYM, skasm SNAP-INSERT-FACE): no owner commit by 04:08, both owners told 04:09; walk on their word. Night ui suite done 04:06 (2145/2172); last "not run" (vs-ps-own-table-menu) matched alone: all routed.
-   Night ui run (1120-night-ui-a06ec927, vibex8) finishing: sent P1 ANALYSIS-READOUT-HIDDEN (psui, fix in its next land; waiter
-   qa-wait-psui-readout), P2 ASM-INSTANCE-PROPS-FIELD (asm), DOCS-CRUMB-TOOLTIP and VER-COMPARE-READOUT (studios); re-run-alone
-   matches were artefacts. When score.log lands: diff vs 1119-1302 for the last ~40, route, then restart qa-suites (rm suites/stop).
-   P2 T2-NIGHTLY-22-FAILURES filed for the lead. Speed left: FORM-PREVIEW gap vs live ~1.5 s on a quiet host.
 00b. **Night order (lead 11-19 03:45)**: qa-night-seq-1120 (flow/night-seq.sh latest 1120): 02:00 big document -> session replay ->
    everyday flows, then nightly/flows-done-<mmdd>; qa-w7-nightly waits for that flag (03:20 at the latest) before hat15 / dock;
    user flows after NIGHTLY-DONE. Re-arm each night with the next date. Cut verdict: a must-carry still queued reads PENDING
