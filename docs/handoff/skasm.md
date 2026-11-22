@@ -1,21 +1,16 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 03:30 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 04:50 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
-- LANDED 0f86a0f8: flat-face sketches (louver 36/36, modify-joint 11/11) + Rip 1 (c2-cov-sm-rip 5/5); 6a4ac440
-  Recognize 6/6. SM 25 docs (Mac): 22/24 docs, 291/295 features.
 - QUEUED ca26da57 (06:43): hem-plus Offset surface 1 (Mac-only; OCCT's joined offset fails in metres on the Mac,
   op_offset_shape retries in millimetres: Mac 6/6, other offset docs unchanged; g++-13 build clean on vibex8).
-- LANDED bc92cab1 (P1): sketch regions over tiny gaps: an end joins a Use'd curve's end, or a circular-pattern copy's
-  of one, within ~20 µm (live use-rule.json); plain ends and text outlines' (fixed curves sharing ends) only 0.2 µm.
-  Untested in live: linear-pattern / mirror copies of Use'd curves, pattern copies of plain lines.
 - Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
   ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
   8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- RE-QUEUE b3345866 + 6ef0420c + af26939c (committed, not on main): FAILED 01:54 on ops prefs::graphics_preferences_... = main RED
-  since dx 76f7b4926 (dx fix 281240db queued; lead 02:0x: re-queue once /tmp/lead/main-status is green). Then tell core + qa, report lead.
+- QUEUED f78f42fa 04:10 (10 commits: the 3 that failed on main's red prefs test + hem-jog curve_ends + handoffs).
+  Told lead, core (scissor mappings), qa (walk P0s; qa-skre re-runs them when green). If it fails: fix forward first.
   overcut-dogbone 10/10; base ab6-base.out vibe2, new vibex7 ~/agents/skasm-keep/ab6-new.out):
   - parity.rs: ruled_piece_from_query (mutualtrim SWEPT_*), region_query_sketch hint + pieces rule (scissor
     b58244 Extrude 1 KICB 445 mm², 0139f2 Extrude 8 Sketch 6's regions); recheck sc-* in vibe2 ~/tmp/skasm/scm.
@@ -67,29 +62,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - P0 11-21 (tablet-stand Sketch 3 warning): f9ad07b50's exact-thicken step; core's 199faacf fixes (verified by
   compat userdocs.py on vibex7). Compat repro: ~/tmp/skasm/compat on vibex7 (userdocs.py copy).
 - SM suite (Mac 11-21 12:30, my build after bc92cab1): 22/23 docs, 259/260 features; only c2-sm-loft-basic's apex left.
-- Loft apex (c2-sm-loft-basic 38 vs 40 faces): box rule still open after live's 12:32 copies. Samples:
-  live/skasm/sm-loft-fans-1121/<name> (chordal 0.1 / 0.05 / 0.035 / 0.022 in = 3-6 bends; "-plane4" = Plane 1 at 4 in,
-  two apexes, other differences too; fan-tol0p05 = loft-basic itself; 0p022 / 0p035 -simple / -sized1 / -round1 with
-  edge-ends.json). Parity on them: copy the dirs to Mac ~/noshape-host/tmp-skasm/fans, set NOSHAPE_PARITY_MODELS;
-  skasm-scratch/loft/ours.sh saves + dumps ours. Scratch: skasm-scratch/loft/flat.py develops live's walls / bends at
-  the neutral radius into bend m = floor(n/2)'s plane (u along it, from its cylinder's origin: sized1's origin differs
-  by 1.0954 mm, the others agree; canonical u = from the definition corner A (0, 203.2, 0)'s foot on bend m's axis);
-  rect.py corners, rnd.py round centres, cen.py centre lines, arc.py, verts.py. FOUND: live cuts the apex by ONE
-  rectangle in the flat, open toward the tip: u < uP (square to bend m) and vlo < v < vhi (lines along bend m).
-  Rectangle = scale x a box about its centre (0p022 at 1.0 / 1.2 to 1e-4 mm). Round (Scaled 1.0) = one circle centred
-  where the first and last bends' centre lines cross (both samples, 1e-4 mm), radius = to the box's far corner
-  (umax, vmin) (0p022 5.1083). Simple: every wall ends on one arc in the flat (0p022 centre canonical (-1.4033,
-  0.0699), r 5.3194; the bend strips end where their tangent lines cross it). Sized 1 mm: under-sized warning, each
-  bend squared at its wall corners (= ours today). Box (canonical mm, scale 1): 0p022 u -0.1395..4.1965, v
-  -1.2643..0.7095; 0p035 u -0.1030..3.9320, v -0.7085..0.8526 (u from the round's radius). vmax = the last wall's
-  corner v (free edge x its bend's tangent line); umin = bend 0's wall-0 tangent line's point nearest A (0.6 / 0.3 µm,
-  float32 captures); umax, vmin unexplained (tried: strip overlaps, square bend ends, A's feet, virtual sharps, arc
-  hits, 3D bbox in bend m's frame). Ours: each bend squared at its corners.
+- Loft apex (c2-sm-loft-basic 38 vs 40 faces): open; notes moved to the archive ("Loft apex 11-21").
 - Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
   fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
-- LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
-- LANDED eca6e645: Thicken / Convert flat lies by the largest wall (`Definition::extracted`); Sized relief ends
-  depth + R tan(a/2) in (live 8.3 mm). 201 -> 209/295.
 - Rejected: extract surface's faces in body order (hem-flange SM model 2 7 -> 4/8, frames BUTT/BUTT2 swap);
   patch ~/agents/skasm-keep/extract-order.patch (local).
 - c2-hgr-riser-weldment: dx's (lead 11-20).
@@ -116,6 +91,32 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
+## UNCOMMITTED (04:50; all in /root/skasm-scratch/wip-0450.patch; land.sh needs a clean tree)
+- qa P1 SKETCH-LENGTH-LABEL-IN-PLANE: the Line tool's active on-the-fly length box drawn in the sketch plane (sketch.rs
+  otf_box_in_plane, sketch_mode otf_active_in_plane; screen box skipped; the typing Input stays on screen): upright along
+  the sketch x (live wf05 box slants with the front edge = x, and a vertical line's box is horizontal in a normal view),
+  white 80 % fill, #788188 border + text. Seen on screen (wf05 step 10, in plane). Box width now from label_width_px
+  (it was ~25 % narrower than live's): CHECK on screen again, then land. Scene test only_a_line_length_box_lies_in_the_plane.
+- qa P1 SM-TABLE-HEM-NAME: a rolled bend is "Hem" only when std's joint has bendType HEM (Joints/Definition `hems`);
+  a Bend feature's arc is "Bend" (replay wf11: table now Bend A / Bend B). Test: bend_keeps_flat_length asserts it.
+- qa P0 SKETCH-USE-VERTEX-OTHER-SKETCH (wf12): a Select click on another sketch's entity (SketchEntity) now joins the
+  model selection, so u projects it (use_preselection). NOT built / replayed yet.
+- Build + check: vibex7 rb.sh `cargo build -p noshape`, clippy custom/part-studio-ui/model/scene, model test
+  `--ignored sheetmetal_std::bend_keeps_flat_length`. Replay kit: vibe2 ~/tmp/skasm/wf (qa's run.sh, starts.json, 05, 11
+  json; copy 12/13 from /root/qa-scratch/hm2/wf): `cd ~/tmp/skasm/wf && GLOB="05*" XD=:493 bash run.sh
+  ~/tmp/skasm/noshape ~/tmp/skasm/out-wf` (one app copy at ~/tmp/skasm/noshape, scp -3 from vibex7; a new XD per run).
+## qa tickets open (TICKETS "qa, 2026-11-22 03:4x", crops /root/qa-scratch/tickets/wf*.png, live left)
+- P0 FEEL-BEND-FACE-PICKED-LOOK (wf11 step 12): ours advances to "Sheet metal face to bend", filled by std onBendChange
+  with a Part 1 face, but lights only one edge of it under the preview; live outlines the whole pre-Bend plate face
+  (60 x 40) orange + tan fill. Find why the dialog highlight of a consumed input face draws only an edge.
+- P1 SM-FLAT-VIEW-FIT (wf11 step 18): ours lays the flat as in the model (bend lines along y, vertical) and the fit
+  runs off the pane (no margin, cube over it); live turns it 90° (flange strip at the top, bend lines across) and fits
+  with margins. Orientation = flat_place's fixed face (sheetmetal.rs flat_place): needs live's flat faces for wf11's
+  plate-bend (ask live). Fit: flat_view.rs pending_fit / zoom_to_fit(false).
+- P1 SKETCH-SELECTED-GLYPH-OFFSET (wf13): Show constraints off, fixed rectangle corner selected: our Coincident/Fix
+  glyph pair ~23 px right of live's (tickets/wf13-glyph-offset.png).
+- Host note: vibex8 still "held for a speed run" (qa, set 03:21) at 04:45.
+
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
 00b. qa P2 SUITE-INTRO-TAILFIN-INTERSECTED: LANDED 37638c76: an Intersection lands within 1 µm of live's ends (ours 0.19 µm
@@ -123,22 +124,6 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
    docs: nothing else changed). Left: Tail fin surface area 1.2e-5 off (3567.145 vs 3567.188 mm², ~0.6 µm of profile
    length, cause not found) and 3D fit spline 1's shape (starts x 32.70, live 33.94, same ends and start direction):
    core's (fit spline), told via the lead; Boundary surface 1 fails on it.
-00c. LANDED 5cf3fc94: a feature pattern re-runs each seed once per group: rocker-enclosure-body Mirror 3 200 -> 88 ms.
-   Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
-00d. LANDED 01d8226a: an edge with no curve of live's type within 5 % of live's length takes the nearest of any type
-   within 5 % (live's part first): surf-intro Boundary surface 1 builds (boundary conditions WARNING is core's).
-00e. LANDED 8ac743df (Corner+Joint): SIZED_ROUND corner relief under its bend-allowance square warns
-   SHEET_METAL_CORNER_UNDER_SIZED, not cut; the translator truncates a selection over the dialog's limit.
-00f. LANDED 1d354191 11-21 (Mac A/B 1976 -> 1990/2680, no doc worse): Bounds::trim with a solid start (start-extrude 19 ->
-   29/34); one bend's end at rips = BEND_END (corner-break 20 -> 23/37); frame trim by a surface body (frame 16 ->
-   17/23); edge-on circle Use (loft-paths-guides Sketch 4) and a constraint's non-part edge = an earlier sketch's
-   line (Sketch 6); a part edge between two definition faces with no joint = their shared definition edge (hem-jog's
-   TANGENT side); opPattern of a sketch body by a scale scales its geometry (std Hem's arc copy: hem-jog builds, INFO
-   flat collision, 27/52/27 vs live 29/61/34).
-   Next: corner-break model F convert of a filleted box (live 3 parts; ours "cannot be built"); start-extrude "arcs as
-   bends" (2 bend-end arcs not circles: rolled_bend's thicken_plain leaves the r 11.5 offset's end edges B-splines;
-   503396456 took the exact rebuild off sheet metal for tablet-stand's vertex refs: try k::thicken in rolled_bend only); frame Trim group 66 vs 64 edges, End cap signal 11, gusset on +y (live -y);
-   hem-jog flat collision. Loft 3 (37 vs 33 edges) is core's (TICKETS LOFT3-EDGES).
 00g. A/B 11-21 18:50 (core's asks): asm-scissor-lift (asm P0) and c2-surf-intro-mutualtrim, parity.rs only.
    Studio 0139f2 Extrude 8: region_at tied Sketch 1's regions with Sketch 6's projected ones (same plane, point, area);
    by_geometry now takes the sketch the region query names. b582441a Extrude 1 KICB (as a Derived source, no refs):

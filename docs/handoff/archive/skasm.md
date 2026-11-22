@@ -2511,3 +2511,49 @@ lines to "name N/M", LC_ALL=C sort, join, awk $2!=$3). None worse -> land.sh. Th
 ### Form speed P0 (closed 17:4x): no regression; live2's app A/B overlaps (A 2.3–4.0 s, B 2.9–3.4 s, by load); model
 regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete when done).
 
+
+## Loft apex 11-21 (moved from the handoff 2026-11-22 04:50 UTC)
+- Loft apex (c2-sm-loft-basic 38 vs 40 faces): box rule still open after live's 12:32 copies. Samples:
+  live/skasm/sm-loft-fans-1121/<name> (chordal 0.1 / 0.05 / 0.035 / 0.022 in = 3-6 bends; "-plane4" = Plane 1 at 4 in,
+  two apexes, other differences too; fan-tol0p05 = loft-basic itself; 0p022 / 0p035 -simple / -sized1 / -round1 with
+  edge-ends.json). Parity on them: copy the dirs to Mac ~/noshape-host/tmp-skasm/fans, set NOSHAPE_PARITY_MODELS;
+  skasm-scratch/loft/ours.sh saves + dumps ours. Scratch: skasm-scratch/loft/flat.py develops live's walls / bends at
+  the neutral radius into bend m = floor(n/2)'s plane (u along it, from its cylinder's origin: sized1's origin differs
+  by 1.0954 mm, the others agree; canonical u = from the definition corner A (0, 203.2, 0)'s foot on bend m's axis);
+  rect.py corners, rnd.py round centres, cen.py centre lines, arc.py, verts.py. FOUND: live cuts the apex by ONE
+  rectangle in the flat, open toward the tip: u < uP (square to bend m) and vlo < v < vhi (lines along bend m).
+  Rectangle = scale x a box about its centre (0p022 at 1.0 / 1.2 to 1e-4 mm). Round (Scaled 1.0) = one circle centred
+  where the first and last bends' centre lines cross (both samples, 1e-4 mm), radius = to the box's far corner
+  (umax, vmin) (0p022 5.1083). Simple: every wall ends on one arc in the flat (0p022 centre canonical (-1.4033,
+  0.0699), r 5.3194; the bend strips end where their tangent lines cross it). Sized 1 mm: under-sized warning, each
+  bend squared at its wall corners (= ours today). Box (canonical mm, scale 1): 0p022 u -0.1395..4.1965, v
+  -1.2643..0.7095; 0p035 u -0.1030..3.9320, v -0.7085..0.8526 (u from the round's radius). vmax = the last wall's
+  corner v (free edge x its bend's tangent line); umin = bend 0's wall-0 tangent line's point nearest A (0.6 / 0.3 µm,
+  float32 captures); umax, vmin unexplained (tried: strip overlaps, square bend ends, A's feet, virtual sharps, arc
+  hits, 3D bbox in bend m's frame). Ours: each bend squared at its corners.
+
+## Landed items moved from the handoff 2026-11-22 04:50 UTC
+- LANDED 0f86a0f8: flat-face sketches (louver 36/36, modify-joint 11/11) + Rip 1 (c2-cov-sm-rip 5/5); 6a4ac440
+  Recognize 6/6. SM 25 docs (Mac): 22/24 docs, 291/295 features.
+- LANDED bc92cab1 (P1): sketch regions over tiny gaps: an end joins a Use'd curve's end, or a circular-pattern copy's
+  of one, within ~20 µm (live use-rule.json); plain ends and text outlines' (fixed curves sharing ends) only 0.2 µm.
+  Untested in live: linear-pattern / mirror copies of Use'd curves, pattern copies of plain lines.
+- LANDED 6d80df66: Unfold unrolls only its bend, Refold puts back the held side (unfold-refold 6/6, 212/295).
+- LANDED eca6e645: Thicken / Convert flat lies by the largest wall (`Definition::extracted`); Sized relief ends
+  depth + R tan(a/2) in (live 8.3 mm). 201 -> 209/295.
+00c. LANDED 5cf3fc94: a feature pattern re-runs each seed once per group: rocker-enclosure-body Mirror 3 200 -> 88 ms.
+   Left: nested seeds re-run as tools (Mirror 1 / 2 inside Mirror 3).
+00d. LANDED 01d8226a: an edge with no curve of live's type within 5 % of live's length takes the nearest of any type
+   within 5 % (live's part first): surf-intro Boundary surface 1 builds (boundary conditions WARNING is core's).
+00e. LANDED 8ac743df (Corner+Joint): SIZED_ROUND corner relief under its bend-allowance square warns
+   SHEET_METAL_CORNER_UNDER_SIZED, not cut; the translator truncates a selection over the dialog's limit.
+00f. LANDED 1d354191 11-21 (Mac A/B 1976 -> 1990/2680, no doc worse): Bounds::trim with a solid start (start-extrude 19 ->
+   29/34); one bend's end at rips = BEND_END (corner-break 20 -> 23/37); frame trim by a surface body (frame 16 ->
+   17/23); edge-on circle Use (loft-paths-guides Sketch 4) and a constraint's non-part edge = an earlier sketch's
+   line (Sketch 6); a part edge between two definition faces with no joint = their shared definition edge (hem-jog's
+   TANGENT side); opPattern of a sketch body by a scale scales its geometry (std Hem's arc copy: hem-jog builds, INFO
+   flat collision, 27/52/27 vs live 29/61/34).
+   Next: corner-break model F convert of a filleted box (live 3 parts; ours "cannot be built"); start-extrude "arcs as
+   bends" (2 bend-end arcs not circles: rolled_bend's thicken_plain leaves the r 11.5 offset's end edges B-splines;
+   503396456 took the exact rebuild off sheet metal for tablet-stand's vertex refs: try k::thicken in rolled_bend only); frame Trim group 66 vs 64 edges, End cap signal 11, gusset on +y (live -y);
+   hem-jog flat collision. Loft 3 (37 vs 33 edges) is core's (TICKETS LOFT3-EDGES).
