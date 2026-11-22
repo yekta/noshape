@@ -325,6 +325,22 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P2 **IMPORT-TAB-TOAST (dx; live asked, REQUESTS qa 04:35)**: workflow 17 steps 9–12 (doc-tabs: Export… STEP to a new tab "Part Studio 1.step", that tab's Import… › Import to this document › Import): ours shows the toast "Part Studio 1.step has been imported. Open document ×" and keeps it; live's shots at 0.3 s and ~15 s show no toast (the new tab "Part Studio 1 (1)" lands right after the .step tab in both). The Export dialog's Preprocessing / derived-tolerance defaults differ too (live "Remove small entities only…", tolerances ticked; ours None, unticked), likely live's remembered settings, not filed.
 - [ ] P1 **SKETCH-SELECTED-GLYPH-OFFSET (skasm)**: workflow 13 steps 12–16 (empty, 25 × 25 rectangle on Top, Equal, Fix on the top-right corner, Show constraints off, corner selected): live draws the corner's glyph pair (Coincident, Fix) up-left with the Coincident ~61 px and the Fix ~39 px left of the corner; ours draws them ~23 px further right (Coincident ~38 px, Fix ~16 px). So live's click on the Fix glyph (px 1182, 525) hits **our Coincident**: Delete then removes a Coincident instead of the Fix, the corner stays fixed, the drag to (35, 35) pulls a split end off instead of growing the square (live 35.19, still square), and the dimension steps miss (tickets/wf13-glyph-offset.png). With only the Coincident shown (step 12) live's glyph sits ~37 px straight above the corner, ours ~20 px up-left.
 
+- [ ] P1 **FS-NEW-FEATURE-TABSTOPS (studios)** (workflow 26 step 6, green b5b414278): New feature in a Feature Studio: live inserts
+  the template as a snippet: "My Feature" selected, and `myFeature` (line 7) and both `// Define …` comments boxed as tab stops
+  (grey fill, thin outline). Ours selects "My Feature" only, no boxes. Crop qa-scratch/tickets/wf26-template.png (live left).
+- [ ] P1 **FS-TAB-UNCOMMITTED-STAR (studios)** (workflow 26 steps 5-13): live's tab reads "*Feature Studio 1" from the first
+  uncommitted edit until mod+s commits; ours always "Feature Studio 1" (our state has committed=false meanwhile).
+  qa-scratch/tickets/wf26-tabs.png.
+- [ ] P2 **FS-OUTLINE-ANNOTATION-LINE (studios)** (workflow 26 step 6): with the caret on the new annotation line, live's outline
+  button reads "myFeature(context, i…" at once; ours "Module outline" until the caret is in the body (step 8). Ours' button is
+  also narrower: "myFeature(co…". qa-scratch/tickets/wf26-toolbar.png, wf26-outline-ours.png.
+- [ ] P2 **FS-FOLD-ARROWS (studios)** (workflow 26): live's gutter has a fold ▾ on each line opening a block (template lines 9,
+  12); ours has none. wf26-template.png.
+- [ ] P2 **FS-COMMENT-OPERATOR-COLOURS (studios)** (workflow 26 step 11): live draws comments upright grey and `*` / `+` in blue;
+  ours draws comments italic and the operators black. wf26-template.png.
+  (Workflow 26 otherwise matches: typed fCuboid text as live, mod+s commits, "My Feature" from Custom features → MF My Feature 1,
+  Part 1; ours faster at every step with a real time.)
+
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
 - [ ] P0 **FEEL-DRW-TITLEBLOCK-CLICK (studios)**: the Front view selected (edges orange), click in the title block (sheet (200, 30) mm):
