@@ -620,6 +620,8 @@ pub struct Highlights {
     pub origin: Option<(f64, bool)>,
     /// The origin as a triad (picking it as a mate connector's origin); else the Part Studio's ring with a dot.
     pub origin_triad: bool,
+    /// The Origin row hovered in the list: the origin lit (live: its ring and dot over a light orange disc).
+    pub origin_row_hover: bool,
     /// Pickable mate connectors (the assembly's, then its parts' own): frame, size, look, opacity (the connector
     /// dialog's preview slider fades the edited one).
     pub connectors: Vec<(Frame, f64, crate::builder::ConnectorLook, f32)>,
@@ -1329,7 +1331,12 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             op.points.push(PointSprite { position: [0.0; 3], color: if hl { HANDLE_HL } else { DARK }, pick_id: id, size: 9.0, style: LineSegment::ON_TOP, _pad: 0 });
         } else {
             // Live keys-1118: the assembly's origin is the Part Studio's 11 px ring with a centre dot (point style 4).
-            let color = if hl { HANDLE_HL } else { theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)) };
+            let [disc, ring, _] = theme::viewport::POINT_HOVER;
+            // (qa FEEL-ASM-ORIGIN-ROW-HOVER, live picture a03: an 18 px disc under the ring in the hover's orange.)
+            if h.origin_row_hover {
+                op.points.push(PointSprite { position: [0.0; 3], color: theme::rgb8(disc), pick_id: id, size: 18.0, style: LineSegment::ON_TOP, _pad: 0 });
+            }
+            let color = if hl { HANDLE_HL } else if h.origin_row_hover { theme::rgb8(ring) } else { theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)) };
             op.points.push(PointSprite { position: [0.0; 3], color, pick_id: id, size: 11.0, style: 4 | LineSegment::ON_TOP, _pad: 0 });
         }
         scene.set_state(id, 0);

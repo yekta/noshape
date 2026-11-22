@@ -451,6 +451,8 @@ pub struct AsmUi {
     pub com_task: Option<Task<()>>,
     /// Origin row › Hide: the assembly origin triad is not drawn (still pickable from the row).
     pub origin_hidden: bool,
+    /// The Origin row under the pointer (the origin lit in the graphics).
+    pub origin_row_hover: bool,
     /// Snap-insert: (source connector on the inserted instance, target), and
     /// which of the instance's explicit mate connectors is the source.
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,

@@ -1535,6 +1535,7 @@ impl AssemblyView {
         // Assembly origin and assembly mate connectors (pickable).
         h.origin = (!self.ui.origin_hidden || picking).then_some((size * 0.8, picking && hovered_overlay == Some(OverlayPick::Origin)));
         h.origin_triad = picking;
+        h.origin_row_hover = self.ui.origin_row_hover;
         let mut overlay_connectors = Vec::new();
         if let Some(asm) = self.assembly(cx) {
             let editing_mc = self.mc.as_ref().map(|m| m.id);
@@ -1717,9 +1718,9 @@ impl AssemblyView {
         // A mate dialog's picked face under the pointer keeps the hover look after its click, and once both picks are in
         // (live workflows-1122 08 s06 / s07: plain, not filled, its boundary and its part's outline lit; yellow once the
         // pointer leaves).
-        // The pointer still where the second pick was, with the moved part now under it (wf08 s07: Part 2 brought onto
+        // The pointer still where the second pick's click was, with the moved part now under it (wf08 s07: Part 2 brought onto
         // Part 1's top): Part 1's top as hovered all the same, the moved part's face under the pointer lit as hovered.
-        let still = self.mate.as_ref().is_some_and(|s| s.hud == Some(self.pointer));
+        let still = self.mate.as_ref().is_some_and(|s| s.hud.is_some() && self.manip_click.is_some_and(|(at, _)| s.hud == Some(at)));
         let hovered = self.hover.as_ref().filter(|t| matches!(t.reference, Reference::Face(_))).map(|t| (t.path.clone(), t.reference.clone()));
         let under = hovered.filter(|k| h.hover_outline.is_none() && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
         if self.mate.is_some()
@@ -3470,6 +3471,10 @@ impl AssemblyView {
                 if self.drag.as_ref().is_some_and(|d| d.started) {
                     return;
                 }
+                // Nothing under the pointer (it left the graphics): the click's still-pointer looks end.
+                if id.is_none() && self.manip_click.take().is_some() {
+                    self.refresh_scene(false, cx);
+                }
                 let overlay = self.overlay(*id);
                 let manip = match overlay {
                     Some(OverlayPick::Manip(h)) => Some(h),
@@ -4804,11 +4809,12 @@ impl AssemblyView {
                 // Eye icon on hover (kept visible on hidden instances).
                 d.child(
                     div().when(!hidden, |d| crate::ui::hover_reveal(d, SharedString::from(format!("inst-row-{}", top.0)))).child(
-                        Button::new(SharedString::from(format!("eye-{}", top.0)))
-                            .icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" })))
-                            .ghost()
-                            .xsmall()
-                            .tooltip(if hidden { "Show" } else { "Hide" })
+                        // (Live hover-list-1122 a01: a ~15 px wide eye, qa FEEL-ASM-ROW-EYE-ICON.)
+                        div()
+                            .id(SharedString::from(format!("eye-{}", top.0)))
+                            .cursor_pointer()
+                            .child(crate::assets::icon(if hidden { "eye-off" } else { "eye" }, 20., cx))
+                            .tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(if hidden { "Show" } else { "Hide" }).build(w, cx))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 cx.stop_propagation();
                                 this.set_hidden(vec![top], !hidden, cx)

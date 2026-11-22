@@ -1514,6 +1514,11 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
             if g_all - g_own > 1e-3 * cost {
                 return None;
             }
+            // The damped step misses a drag pressed on a coupled part's axis (its lever a pixel's rounding: qa
+            // MATE-GEAR-DRAG-TURNS-NOTHING, live turns both gears): a small group's reach, scale-free.
+            if free.len() <= 16 && drag_reach(&jac, res.len() - drag_rows, &all, &res) - drag_reach(&jac, res.len() - drag_rows, &own, &res) > 1e-3 {
+                return None;
+            }
         }
     }
     for (b, t) in bodies.iter_mut().zip(&trial) {
@@ -1523,6 +1528,26 @@ fn solve_dragged_only(bodies: &mut [SolverBody], mates: &[SolverMate], relations
     }
     // The degrees of freedom are the whole assembly's (nothing held).
     Some(if dof { solve_inner(bodies, mates, relations, &[], true, true, memo) } else { r })
+}
+
+/// The share of the drag rows' residual (rows `mate_rows..`) that moves of the bodies `ks` (indices into the group's
+/// free bodies) keeping the mates' rows as they are (their null space) can take out: 0 none, 1 all.
+fn drag_reach(jac: &DMatrix<f64>, mate_rows: usize, ks: &[usize], res: &[f64]) -> f64 {
+    let cols: Vec<usize> = ks.iter().flat_map(|&k| k * 6..k * 6 + 6).collect();
+    let j = jac.select_columns(cols.iter());
+    let (jm, jd) = (j.rows(0, mate_rows), j.rows(mate_rows, j.nrows() - mate_rows));
+    let rd = DVector::from_column_slice(&res[mate_rows..]);
+    let eig = (jm.transpose() * jm).symmetric_eigen();
+    let top = eig.eigenvalues.iter().fold(0.0f64, |m, v| m.max(v.abs())).max(1e-30);
+    let keep: Vec<usize> = (0..eig.eigenvalues.len()).filter(|&i| eig.eigenvalues[i].abs() <= 1e-10 * top).collect();
+    if keep.is_empty() || rd.norm_squared() == 0.0 {
+        return 0.0;
+    }
+    let svd = (jd * eig.eigenvectors.select_columns(keep.iter())).svd(true, false);
+    let Some(u) = svd.u else { return 0.0 };
+    let floor = (1e-10 * svd.singular_values.max()).max(1e-12 * jd.norm());
+    let taken: f64 = svd.singular_values.iter().enumerate().filter(|(_, s)| **s > floor).map(|(i, _)| u.column(i).dot(&rd).powi(2)).sum();
+    taken / rd.norm_squared()
 }
 
 /// Mates that align the Z axes only as lines (Revolute, Cylindrical, Pin
@@ -2851,6 +2876,59 @@ mod tests {
         let p = bodies[1].pose;
         assert!(p.origin.length() < 1e-6, "{:?}", p.origin);
         assert!((p.transform_point(DVec3::new(0.01, 0.0, 0.0)) - DVec3::new(0.0, 0.0, 0.01)).length() < 1e-3);
+    }
+
+    /// Qa MATE-GEAR-DRAG-TURNS-NOTHING (live workflows-1122 25 s32): a geared Revolute part pressed on its axis (the
+    /// lever a pixel's rounding) and dragged away turns toward the pointer, and its gear with it, as live's.
+    #[test]
+    fn a_geared_part_grabbed_on_its_axis_turns_toward_the_pointer() {
+        let za = Frame::from_axes(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let zb = Frame::from_axes(DVec3::new(0.03, 0.0, 0.0), DVec3::Z, DVec3::X);
+        let down = Frame::from_axes(DVec3::ZERO, DVec3::NEG_Z, DVec3::X);
+        for dragged in [1, 2] {
+            for lever in [1e-5, 1e-3] {
+                let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false), body(DVec3::new(0.03, 0.0, 0.0), false)];
+                let mates = vec![mate(MateType::Revolute, 0, za, 1, down), mate(MateType::Revolute, 0, zb, 2, down)];
+                let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+                let (base_a, base_b) = (mate_values(&poses0, &mates[0])[0], mate_values(&poses0, &mates[1])[0]);
+                let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 1.0, reverse: false, base_a, base_b, value_a: 0, value_b: 0, a_start: 0.0, turns: 0.0 }];
+                let centre = poses0[dragged].origin;
+                let drags = vec![DragTarget { body: dragged, local_point: DVec3::new(lever, 0.0, 0.0), target: centre + DVec3::new(0.0, 0.05, 0.0), along: Some(DVec3::Z) }];
+                solve(&mut bodies, &mates, &rel, &drags);
+                let at = bodies[dragged].pose.transform_point(DVec3::new(lever, 0.0, 0.0)) - centre;
+                let angle = at.y.atan2(at.x).to_degrees();
+                assert!((angle - 90.0).abs() < 2.0, "body {dragged}, lever {lever}: the grab point turned {angle:.3} deg (toward the pointer: 90)");
+                let other = 3 - dragged;
+                let turned = (bodies[other].pose.rotation * DVec3::X).y.atan2((bodies[other].pose.rotation * DVec3::X).x).to_degrees().abs();
+                assert!((turned - 90.0).abs() < 2.0, "body {dragged}, lever {lever}: its gear turned {turned:.3} deg");
+            }
+        }
+    }
+
+    /// Live workflows-1122 25 s32: Revolute 1 limited to ±45°, a 2:1 Gear to Revolute 2; Part 2 <2> (Revolute 2)
+    /// dragged on its axis past where the limit lets it go turns as far as the limit allows, and Part 2 <1> to its limit.
+    #[test]
+    fn a_geared_drag_past_a_limit_turns_to_the_limit() {
+        let za = Frame::from_axes(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let zb = Frame::from_axes(DVec3::new(0.03, 0.0, 0.0), DVec3::Z, DVec3::X);
+        let down = Frame::from_axes(DVec3::ZERO, DVec3::NEG_Z, DVec3::X);
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false), body(DVec3::new(0.03, 0.0, 0.0), false)];
+        let mut limited = mate(MateType::Revolute, 0, za, 1, down);
+        limited.limits = vec![(0, Some(-45f64.to_radians()), Some(45f64.to_radians()))];
+        let mates = vec![limited, mate(MateType::Revolute, 0, zb, 2, down)];
+        let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let (base_a, base_b) = (mate_values(&poses0, &mates[0])[0], mate_values(&poses0, &mates[1])[0]);
+        let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 2.0, reverse: false, base_a, base_b, value_a: 0, value_b: 0, a_start: 0.0, turns: 0.0 }];
+        let centre = poses0[2].origin;
+        let target = centre + DQuat::from_rotation_z(150f64.to_radians()) * DVec3::new(0.05, 0.0, 0.0);
+        let drags = vec![DragTarget { body: 2, local_point: DVec3::new(1e-5, 0.0, 0.0), target, along: Some(DVec3::Z) }];
+        solve(&mut bodies, &mates, &rel, &drags);
+        let turned = |b: &SolverBody| {
+            let x = b.pose.rotation * DVec3::X;
+            x.y.atan2(x.x).to_degrees().abs()
+        };
+        let (a, b) = (turned(&bodies[1]), turned(&bodies[2]));
+        assert!((a - 45.0).abs() < 1.0 && (b - 90.0).abs() < 2.0, "Part 2 <1> turned {a:.2} deg (to its limit: 45), Part 2 <2> {b:.2} (90)");
     }
 
     /// A loop of 30 Fastened links closed by a mate it can't hold (live 1798 a2: every link red, nothing moves):

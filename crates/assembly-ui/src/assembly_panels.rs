@@ -977,6 +977,12 @@ impl AssemblyView {
             .when(origin_picked, |d| d.bg(pal.accent_soft))
             .when(!origin_picked, |d| d.hover(|d| d.bg(pal.row_hover)))
             .child(crate::ui::tree_icon("origin", self.ui.origin_hidden, cx))
+            .on_hover(cx.listener(|this, h: &bool, _, cx| {
+                if this.ui.origin_row_hover != *h {
+                    this.ui.origin_row_hover = *h;
+                    this.refresh_scene(false, cx);
+                }
+            }))
             .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child(crate::ui::user_text("Origin")))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                 if this.ui.ps_in_context.is_some() {
