@@ -3507,3 +3507,20 @@ fn a_section_edges_curve_off_a_free_form_face_is_projected_again() {
     assert!(o.shape.max_edge_tolerance() <= 2.0 * loosest, "{:e} m, inputs {loosest:e}", o.shape.max_edge_tolerance());
     assert!((o.shape.volume().unwrap() - c.summary.volume).abs() <= 1e-9 * c.summary.volume);
 }
+
+/// c2-gamma-imported's precise clips (0.2 um) fused with an imported pin of 2.45 um a metre away: noshape's Boolean
+/// judges each pair by its own two tolerances, so the pin's leave the clips' own nearby edges apart (by the largest
+/// of all, two of one clip's edges a few micrometres apart were taken for one: "a non-manifold result").
+#[test]
+fn precise_parts_fused_with_a_far_tolerant_pin() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "d596e8faa25b6a23").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+}

@@ -915,6 +915,8 @@ struct SEdge {
     origins: Vec<usize>,
     /// Its tolerance: the largest of its edges' and sections' own.
     t: f64,
+    /// The widest band of its edges and sections ([`Ctx::band`]).
+    band: f64,
 }
 
 /// A piece of an input face.
@@ -1081,6 +1083,11 @@ impl Sym {
 
 struct Ctx<'a> {
     tol: f64,
+    /// Each argument's half of a band: its entities' greatest tolerance (at least OCCT's 1e-7) plus the fuzzy value,
+    /// the most tolerant argument's half of `tol` ([`Ctx::band`]).
+    arg_tol: Vec<f64>,
+    /// Each argument's widest band with the arguments its box meets, itself included ([`Ctx::face_band`]).
+    arg_reach: Vec<f64>,
     pool: Pool,
     faces: Vec<GFace>,
     edges: Vec<GEdge>,
@@ -1175,7 +1182,59 @@ fn boxes_meet(alo: DVec3, ahi: DVec3, blo: DVec3, bhi: DVec3, tol: f64) -> bool 
     alo.x <= bhi.x + tol && blo.x <= ahi.x + tol && alo.y <= bhi.y + tol && blo.y <= ahi.y + tol && alo.z <= bhi.z + tol && blo.z <= ahi.z + tol
 }
 
+/// Each argument's half of a band ([`Ctx::arg_tol`]): half the Boolean's for the most tolerant one and for bodies
+/// without tolerances, the arguments' own for the others (c2-gamma-imported: precise clips of 0.2 um fused with an
+/// imported pin of 2.45 um were each held to the pin's band).
+fn arg_tols(args: &[&Body], tol: f64) -> Vec<f64> {
+    let own = |b: &Body| b.vertex_tol.iter().chain(&b.edge_tol).chain(&b.face_tol).fold(0.0f64, |m, &t| m.max(t));
+    let most = args.iter().map(|b| own(b)).fold(0.0f64, f64::max);
+    args.iter().map(|b| if b.vertex_tol.is_empty() || own(b) >= most { 0.5 * tol } else { (own(b).max(1e-7) + crate::fuzzy()).min(0.5 * tol) }).collect()
+}
+
+/// Each argument's widest band ([`Ctx::arg_reach`]): its own twice, or the sum with another argument's whose box meets
+/// its own within the Boolean's grey band.
+fn arg_reaches(solids: &[GSolid], half: &[f64], tol: f64) -> Vec<f64> {
+    let mut boxes = vec![(DVec3::INFINITY, DVec3::NEG_INFINITY); half.len()];
+    for s in solids {
+        let b = &mut boxes[s.arg as usize];
+        *b = (b.0.min(s.lo), b.1.max(s.hi));
+    }
+    (0..half.len()).map(|a| (0..half.len()).filter(|&b| b == a || boxes_meet(boxes[a].0, boxes[a].1, boxes[b].0, boxes[b].1, GREY * tol)).map(|b| half[a] + half[b]).fold(0.0, f64::max)).collect()
+}
+
 impl Ctx<'_> {
+    /// How far apart two entities of argument `a` may be and be one: twice its half (the Boolean's tolerance for the
+    /// most tolerant argument).
+    fn own_band(&self, a: u32) -> f64 {
+        2.0 * self.arg_tol[a as usize]
+    }
+
+    /// How far apart an entity of face `f` and another it meets may be and be one: its argument's widest band.
+    fn face_band(&self, f: usize) -> f64 {
+        self.arg_reach[self.faces[f].arg as usize]
+    }
+
+    /// How far apart edge `e` and face `f` may be and be one: the sum of their arguments' halves.
+    fn edge_band(&self, e: usize, f: usize) -> f64 {
+        self.args_band(self.edges[e].arg, self.faces[f].arg)
+    }
+
+    /// Argument `a`'s widest band ([`Ctx::arg_reach`]).
+    fn reach_band(&self, a: u32) -> f64 {
+        self.arg_reach[a as usize]
+    }
+
+    /// The sum of arguments `a`'s and `b`'s halves.
+    fn args_band(&self, a: u32, b: u32) -> f64 {
+        self.arg_tol[a as usize] + self.arg_tol[b as usize]
+    }
+
+    /// How far apart the entities of faces `f` and `g` may be and be one: the sum of their arguments' halves (the
+    /// Boolean's tolerance where both are of the most tolerant argument).
+    fn band(&self, f: usize, g: usize) -> f64 {
+        self.arg_tol[self.faces[f].arg as usize] + self.arg_tol[self.faces[g].arg as usize]
+    }
+
     fn p(&self, v: u32) -> DVec3 {
         self.pool.p[v as usize]
     }
@@ -1254,6 +1313,7 @@ impl Ctx<'_> {
     /// Segment `s` in face `f`'s parameter plane (`copy` 1: a seam's right side; `edge`: the input edge it is
     /// (a piece of), whose curve on a free-form face is OCCT's).
     fn c2_of(&self, f: usize, s: &Seg, copy: usize, edge: Option<usize>) -> R<C2> {
+        let band = self.face_band(f);
         let g = &self.faces[f];
         let copy = if edge.is_some_and(|e| g.right.contains(&e)) { 1 } else { copy };
         if let (Geo::Apex { a0, .. }, Surf::Cyl { full: false, .. }) = (s.g, &g.s)
@@ -1282,7 +1342,7 @@ impl Ctx<'_> {
                     0
                 } else if faces[1] == f {
                     1
-                } else if self.seg_within(s, 100.0 * self.tol) {
+                } else if self.seg_within(s, 100.0 * band) {
                     // (A piece a few tolerances long merged with another face's between the same vertices (three
                     // knurl faces' 0.32 um curves into one vertex): straight between its ends there.)
                     return Ok(C2::Seg { a: g.to2(self.p(s.v[0])), b: g.to2(self.p(s.v[1])) });
@@ -1333,10 +1393,10 @@ impl Ctx<'_> {
                     let at = |p: DVec3| {
                         let q = g.to2(p);
                         let (mut t, d) = whole.param_of(q);
-                        if d > self.tol {
+                        if d > band {
                             for &k in &turns {
                                 let (tk, dk) = whole.param_of(q + k);
-                                if dk < d.min(self.tol) {
+                                if dk < d.min(band) {
                                     t = tk;
                                     break;
                                 }
@@ -1409,11 +1469,11 @@ impl Ctx<'_> {
             // side of the seam, its end at a cone's apex at the ruling's angle.)
             // (A part without vertices (a section's, placed): by its curve's ends.)
             let (a, b) = (self.seg_at(s, 0.0), self.seg_at(s, 1.0));
-            let straight = (b - a).length() > self.tol
+            let straight = (b - a).length() > band
                 && [0.25, 0.5, 0.75].iter().all(|&t| {
                     let q = self.seg_at(s, t);
                     let d = (b - a).normalize_or_zero();
-                    (q - a - d * (q - a).dot(d)).length() <= self.tol
+                    (q - a - d * (q - a).dot(d)).length() <= band
                 });
             // (A ruling: its middle at the angle of its end off the axis (a short piece of a knurl's section is
             // straight within the tolerance, not a ruling).)
@@ -1431,7 +1491,7 @@ impl Ctx<'_> {
                     let d = g.to2(p).x - x;
                     (d - TAU * r * (d / (TAU * r)).round()).abs()
                 };
-                apart(self.seg_at(s, 0.5)) <= self.tol && (off(other) <= self.tol || apart(other) <= self.tol)
+                apart(self.seg_at(s, 0.5)) <= band && (off(other) <= band || apart(other) <= band)
             };
             if matches!(g.s, Surf::Cyl { .. }) && ((straight && ruling()) || edge.is_some_and(|e| self.edges[e].g == Geo::Line)) {
                 return g.curve2(a, b, &Geo::Line, copy);
@@ -1444,6 +1504,7 @@ impl Ctx<'_> {
     /// Segment `s` on free-form face `f` projected onto it, its parameters scaled by `su`, `sv` (None where it leaves
     /// the face's surface by more than the tolerance).
     fn projected_piece(&self, f: usize, s: &Seg, su: f64, sv: f64) -> Option<C2> {
+        let band = self.face_band(f);
         if matches!(s.g, Geo::Apex { .. }) {
             return None;
         }
@@ -1463,13 +1524,14 @@ impl Ctx<'_> {
             }
             Geo::Apex { .. } => (self.p(s.v[0]), DVec3::ZERO),
         };
-        let c = free::projected(&self.faces[f], &at, 0.0, 1.0, self.tol)?;
+        let c = free::projected(&self.faces[f], &at, 0.0, 1.0, band)?;
         Some(C2::Nurbs { c: free::scaled(&c, su, sv), t0: 0.0, t1: 1.0 })
     }
 
     /// The edge of another argument, lying on free-form face `f`, whose curve on it was projected (its pieces in `f`
     /// keep to it) that holds segment `s`.
     fn projected_edge(&self, f: usize, s: &Seg) -> Option<usize> {
+        let band = self.face_band(f);
         let g = &self.faces[f];
         g.pcurves.keys().filter(|k| !k.1 && self.edges[k.0].arg != g.arg).map(|k| k.0).find(|&e| match (self.edges[e].g, s.g) {
             (Geo::Arc { k: k1, .. }, Geo::Arc { k: k2, .. }) => k1 == k2,
@@ -1479,7 +1541,7 @@ impl Ctx<'_> {
                 let [a, b] = self.edges[e].v;
                 let (a, b) = (self.p(a), self.p(b));
                 let d = (b - a).normalize();
-                s.v.iter().all(|&w| (self.p(w) - a).cross(d).length() <= self.tol)
+                s.v.iter().all(|&w| (self.p(w) - a).cross(d).length() <= band)
             }
             _ => false,
         })
@@ -1508,6 +1570,7 @@ impl Ctx<'_> {
 
     /// Face `f`'s boundary in its parameter plane.
     fn bound(&self, f: usize) -> R<&[C2]> {
+        let band = self.face_band(f);
         let make = || -> R<Vec<C2>> {
             let mut bound = Vec::with_capacity(self.faces[f].edges.len());
             let mut seen: HashMap<usize, usize> = HashMap::default();
@@ -1524,7 +1587,7 @@ impl Ctx<'_> {
             if let Surf::Cyl { r, th0, .. } = self.faces[f].s
                 && self.faces[f].right.is_empty()
             {
-                let tol = self.tol;
+                let tol = band;
                 let on = |x: f64| (x - r * th0).abs() <= tol || (x - r * (th0 + TAU)).abs() <= tol;
                 let es = &self.faces[f].edges;
                 let mut at = 0;
@@ -1566,6 +1629,7 @@ impl Ctx<'_> {
     /// piece between them, for the rays [`inside2`] casts (one went through the gap). Not a seam's two copies, a turn
     /// apart.
     fn closed_bound(&self, f: usize) -> R<Vec<C2>> {
+        let band = self.face_band(f);
         let mut bound = self.bound(f)?.to_vec();
         let mut ends: HashMap<u32, Vec<DVec2>> = HashMap::default();
         for (k, &(e, _)) in self.faces[f].edges.iter().enumerate() {
@@ -1576,7 +1640,7 @@ impl Ctx<'_> {
         let mut keys: Vec<u32> = ends.keys().copied().collect();
         keys.sort_unstable();
         for w in keys {
-            let reach = 4.0 * self.pool.t[w as usize].max(self.tol);
+            let reach = 4.0 * self.pool.t[w as usize].max(band);
             let pts = &ends[&w];
             for (i, &a) in pts.iter().enumerate() {
                 for &b in &pts[i + 1..] {
@@ -1705,6 +1769,7 @@ impl Ctx<'_> {
 
     /// The same, `on_free` the curve on a free-form face `path` lies on (projected there).
     fn intervals_on(&self, f: usize, path: &Path, (t0, t1): (f64, f64), ends: [End; 2], closed: bool, on_free: Option<&(usize, Arc<NurbsCurve>)>) -> R<Vec<Ival>> {
+        let band = self.face_band(f);
         // (OCCT's section of a free-form face: within its curve's own accuracy of where the faces meet (a sharp knurl
         // tooth's section runs 3.5 µm inside its side edge, a sliver apart, as OCCT's); its paves (cuts at one
         // place, a vertex of the face on it) within the tolerance OCCT gives it (5e-6 at least), a vertex only where
@@ -1786,7 +1851,7 @@ impl Ctx<'_> {
                 // ending 0.18 mm from it): that vertex, as OCCT's pave.)
                 if ends[k] == End::Open {
                     let p = path.at(cuts[k].0);
-                    let near = self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v).map(|w| (w, (self.p(w) - p).length())).filter(|&(w, d)| d <= self.tol.max(self.pool.t[w as usize] + self.tol)).min_by(|a, b| a.1.total_cmp(&b.1));
+                    let near = self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v).map(|w| (w, (self.p(w) - p).length())).filter(|&(w, d)| d <= band.max(self.pool.t[w as usize] + band)).min_by(|a, b| a.1.total_cmp(&b.1));
                     if let Some((w, _)) = near {
                         cuts[k].1 = End::Vertex(w);
                     }
@@ -1816,7 +1881,7 @@ impl Ctx<'_> {
                 let crosses = c2.tangent(u).perp_dot(b.tangent(ub)).abs() > 0.1;
                 let graze = [0.0, 1.0].into_iter().filter(|_| crosses).find(|&e: &f64| {
                     let (q, chord) = (c2.at(e), (path.at(t0 + (t1 - t0) * e) - path.at(t)).length());
-                    chord > GREY * vtol && chord <= 1000.0 * self.tol && b.distance(q) <= tol && (1..16).all(|k| b.distance(c2.at(u + (e - u) * k as f64 / 16.0)) <= 0.5 * chord) && touching()
+                    chord > GREY * vtol && chord <= 1000.0 * band && b.distance(q) <= tol && (1..16).all(|k| b.distance(c2.at(u + (e - u) * k as f64 / 16.0)) <= 0.5 * chord) && touching()
                 });
                 if let Some(e) = graze {
                     let te = t0 + (t1 - t0) * e;
@@ -1848,7 +1913,7 @@ impl Ctx<'_> {
                 }
                 let q = self.faces[f].to2(self.p(w));
                 let (u, dist) = c2.param_of(q);
-                let on_other = || other.is_none_or(|g| free::surface_distance(&self.faces[g], self.p(w)) <= self.tol.max(self.pool.t[w as usize] + self.tol));
+                let on_other = || other.is_none_or(|g| free::surface_distance(&self.faces[g], self.p(w)) <= band.max(self.pool.t[w as usize] + band));
                 if (dist <= tol || (dist <= vtol && on_other())) && u > 0.0 && u < 1.0 {
                     cuts.push((t0 + (t1 - t0) * u, End::Vertex(w)));
                 }
@@ -1861,7 +1926,7 @@ impl Ctx<'_> {
                 if let End::Point(q) = cut.1 {
                     let near = self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v).filter(|&w| (self.p(w) - q).length() <= vtol).min_by(|&a, &b| (self.p(a) - q).length().total_cmp(&(self.p(b) - q).length()));
                     if let Some(w) = near
-                        && other.is_some_and(|g| free::surface_distance(&self.faces[g], self.p(w)) <= self.tol.max(self.pool.t[w as usize] + self.tol))
+                        && other.is_some_and(|g| free::surface_distance(&self.faces[g], self.p(w)) <= band.max(self.pool.t[w as usize] + band))
                     {
                         cut.1 = End::Vertex(w);
                     }
@@ -1878,7 +1943,7 @@ impl Ctx<'_> {
         // (A point where it touches the boundary a few tolerances on from one of the face's vertices on it, along the
         // boundary from there (an arc leaving a vertex nearly tangent to the face's edge, apart only past the
         // tolerance): that vertex alone, as OCCT's pave.)
-        let along = |x: f64, y: f64| apart(x.min(y), x.max(y)) <= 100.0 * self.tol && distance_with(c2.at((0.5 * (x + y) - t0) / (t1 - t0)), &bound, spans) <= tol;
+        let along = |x: f64, y: f64| apart(x.min(y), x.max(y)) <= 100.0 * band && distance_with(c2.at((0.5 * (x + y) - t0) / (t1 - t0)), &bound, spans) <= tol;
         let at_vertex: Vec<bool> = (0..cuts.len())
             .map(|k| {
                 matches!(cuts[k].1, End::Point(_))
@@ -1913,7 +1978,7 @@ impl Ctx<'_> {
         let flips: Vec<bool> = cuts.iter().zip(&alone).map(|(c, &one)| one && matches!(c.1, End::Point(_)) && across.contains(&c.0)).collect();
         // Clear of the boundary: on a free-form face OCCT's section's curve on it against its edges' (OCCT's too), as
         // OCCT tells it: beyond the model's tolerance.
-        let ctol = if let (Path::Nurbs { .. }, Surf::Nurbs { .. }) = (path, &self.faces[f].s) { self.tol } else { tol };
+        let ctol = if let (Path::Nurbs { .. }, Surf::Nurbs { .. }) = (path, &self.faces[f].s) { band } else { tol };
         let mut out: Vec<Ival> = Vec::new();
         // (The side of the interval before, where it was clear of the boundary: across one crossing the next is the
         // other side, no ray cast (a gear's end face: hundreds of curves a ray).)
@@ -1987,7 +2052,7 @@ impl Ctx<'_> {
                     let (mut m1, mut m2) = (hi - g * (hi - lo), lo + g * (hi - lo));
                     let (mut d1, mut d2) = (d(m1), d(m2));
                     for _ in 0..80 {
-                        if apart(lo.min(hi), lo.max(hi)) <= 0.1 * self.tol {
+                        if apart(lo.min(hi), lo.max(hi)) <= 0.1 * band {
                             break;
                         }
                         if d1 < d2 {
@@ -2055,7 +2120,7 @@ impl Ctx<'_> {
 
     /// The same, a closed path also cut at parameter `at` (where OCCT's curve starts).
     fn section_cut(&mut self, fs: usize, ft: usize, path: Path, t0: f64, t1: f64, at: Option<f64>) -> R<()> {
-        let tol = self.tol;
+        let tol = self.band(fs, ft);
         // A circle or ellipse in parts between the faces' seams (a vertex where it crosses one).
         let mut cuts: Vec<(f64, End)> = vec![(t0, End::Open)];
         if let (Some(t), Path::Ellipse(e)) = (at, &path) {
@@ -2168,7 +2233,7 @@ impl Ctx<'_> {
 
     /// Where both faces' intervals of a section overlap: its edges, in both faces.
     fn section_from(&mut self, fs: usize, ft: usize, path: Path, ia: Vec<Ival>, ib: Vec<Ival>) -> R<()> {
-        let tol = self.tol;
+        let tol = self.band(fs, ft);
         let stol = if let Path::Nurbs { id, .. } = &path { self.ncurves[*id as usize].tol } else { 0.0 };
         // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
         // either way: clearly not where the chord is longer, clearly so where its control polygon there is
@@ -2205,7 +2270,7 @@ impl Ctx<'_> {
             // (A point within ten tolerances of a vertex of both faces' boundaries (OCCT's section passing 0.6 um from
             // their corner, both faces' boundaries crossed short of it): that vertex, as OCCT's pave.)
             let corner = |cx: &Ctx, p: DVec3| {
-                let reach = 10.0 * cx.tol.max(stol);
+                let reach = 10.0 * cx.band(fs, ft).max(stol);
                 // (Its own vertices near the point first: a knurl's faces have hundreds of edges.)
                 let of = |f: usize| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v);
                 let near: Vec<(u32, f64)> = of(fs).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).collect();
@@ -2238,7 +2303,7 @@ impl Ctx<'_> {
             // (Else one of the two faces' ends lying on an edge of each, within ten tolerances: the two edges'
             // crossing, there before or after (the same sprockets' tooth gaps patterned, their crossings found later).)
             let crossing = |cx: &Ctx, p: DVec3| {
-                let reach = 10.0 * cx.tol.max(stol);
+                let reach = 10.0 * cx.band(fs, ft).max(stol);
                 [x.1, y.1].into_iter().find_map(|o| if let End::Point(q) = o && (q - p).length() <= reach && cx.on_an_edge(fs, q, 0.0) && cx.on_an_edge(ft, q, 0.0) { Some(q) } else { None })
             };
             let v = match end {
@@ -2313,7 +2378,7 @@ impl Ctx<'_> {
                             let sx = self.edge_seg(x);
                             // (Two faces all but tangent there: their section strays off the edge between its ends,
                             // up to 40 um on the knife's chamfer tool, as OCCT's section tolerance allows.)
-                            let reach = (GREY * self.pool.pair(self.edges[x].t, self.faces[b].t)).max((1e3 * self.tol).min(1e-4));
+                            let reach = (GREY * self.pool.pair(self.edges[x].t, self.faces[b].t)).max((1e3 * tol).min(1e-4));
                             // (Within the edge's own range: a section going straight on past its end is a section.)
                             let slack = reach / self.seg_length(&sx).max(1e-300);
                             (0..=4).all(|k| {
@@ -2403,6 +2468,7 @@ impl Ctx<'_> {
     /// and that point's tolerance; none where that's beyond the two edges' tolerances (OCCT's edge-edge crossing: a circle grazing a thread's
     /// run-out edge stays within 0.8 um of it for 44 degrees and crosses it at one point).
     fn edge_crossing(&self, e: usize, f: usize, point: &dyn Fn(f64) -> DVec3, off: f64, onto: f64) -> Option<(f64, DVec3, f64)> {
+        let band = self.edge_band(e, f);
         // (Two samples' spacing either way of their middle.)
         let b = 0.5 * (off + onto);
         let p = point(b);
@@ -2417,7 +2483,7 @@ impl Ctx<'_> {
         // at its foot on the edge (a rim grazing a thread crest's edge: their nearest points 0.65 um from OCCT's vertex
         // along them).)
         let m = (point(t) + q) * 0.5;
-        if let Some(&c) = self.crossing_hints.iter().filter(|&&c| (c - m).length() <= GREY * reach.max(self.tol)).min_by(|a, b| (**a - m).length().total_cmp(&(**b - m).length())) {
+        if let Some(&c) = self.crossing_hints.iter().filter(|&&c| (c - m).length() <= GREY * reach.max(band)).min_by(|a, b| (**a - m).length().total_cmp(&(**b - m).length())) {
             let (mut lo, mut hi) = (b - h, b + h);
             for _ in 0..100 {
                 let (m1, m2) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
@@ -2428,9 +2494,9 @@ impl Ctx<'_> {
                 }
             }
             let tc = 0.5 * (lo + hi);
-            return Some((tc, c, (point(tc) - c).length().max(self.edge_point_near(x, c).0).max(self.tol)));
+            return Some((tc, c, (point(tc) - c).length().max(self.edge_point_near(x, c).0).max(band)));
         }
-        Some((t, m, (0.5 * d).max(self.tol)))
+        Some((t, m, (0.5 * d).max(band)))
     }
 
     /// Edge `x`'s point nearest `p`, and its distance.
@@ -2481,6 +2547,7 @@ impl Ctx<'_> {
     /// the bore cylinder's seam and end circles across the thread's root strip, at each of its turns). With `bsplines`
     /// a B-spline edge too (of another free-form face on `f`'s surface).
     fn edge_over_free_face(&mut self, e: usize, f: usize, bsplines: bool) -> R<()> {
+        let band = self.edge_band(e, f);
         if self.in_face_done.contains(&(e, f)) {
             return Ok(());
         }
@@ -2523,13 +2590,13 @@ impl Ctx<'_> {
             return self.edge_in_face(e, f);
         }
         self.in_face_done.insert((e, f));
-        let parts: Vec<EdgePart> = parts.into_iter().filter(|&(a0, _, a1, _)| path.length(a0.min(a1), a0.max(a1)) > self.tol).collect();
+        let parts: Vec<EdgePart> = parts.into_iter().filter(|&(a0, _, a1, _)| path.length(a0.min(a1), a0.max(a1)) > band).collect();
         if parts.is_empty() {
             return Ok(());
         }
         let mut on_free = Vec::with_capacity(parts.len());
         for &(a0, _, a1, _) in &parts {
-            let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * self.tol) else {
+            let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * band.max(self.face_band(f))) else {
                 return Err(Decline("an edge on another argument's free-form face"));
             };
             on_free.push(Some((f, c)));
@@ -2540,6 +2607,7 @@ impl Ctx<'_> {
 
     /// Edge `e` lies on face `f`'s surface: its pieces inside `f` go into `f`.
     fn edge_in_face(&mut self, e: usize, f: usize) -> R<()> {
+        let band = self.edge_band(e, f);
         if !self.in_face_done.insert((e, f)) {
             return Ok(());
         }
@@ -2606,8 +2674,8 @@ impl Ctx<'_> {
             // 44 degrees and crosses it at one point, OCCT's vertex (c2-config-parts-standoffs).)
             let reach = if x == usize::MAX { 0.0 } else { self.pool.pair(self.edges[e].t, self.edges[x].t) };
             let (b, at) = match (x != usize::MAX && near.0 > reach).then(|| self.nearest_to_edge(x, &point, from.min(2.0 * b - from), from.max(2.0 * b - from))) {
-                Some((tb, d, q)) if d <= reach => (tb, End::Vertex(self.pool.add_tol((point(tb) + q) * 0.5, (0.5 * d).max(self.tol))?)),
-                _ if near.0 <= 1e3 * gap => (b, End::Vertex(self.pool.add_tol(near.1, (1.5 * near.0).max(self.tol))?)),
+                Some((tb, d, q)) if d <= reach => (tb, End::Vertex(self.pool.add_tol((point(tb) + q) * 0.5, (0.5 * d).max(band))?)),
+                _ if near.0 <= 1e3 * gap => (b, End::Vertex(self.pool.add_tol(near.1, (1.5 * near.0).max(band))?)),
                 _ => (b, End::Point(p)),
             };
             if end == 0 {
@@ -2622,7 +2690,7 @@ impl Ctx<'_> {
             // A B-spline across a round face's seam (a helix round a rod): in parts, a vertex at each crossing.
             let mut at = vec![(t0, e0)];
             for t in free::seam_cuts(self, [f, usize::MAX], c, t0.min(t1), t0.max(t1)) {
-                if path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol {
+                if path.length(t0.min(t), t0.max(t)) > band && path.length(t1.min(t), t1.max(t)) > band {
                     at.push((t, End::Point(c.at(t))));
                 }
             }
@@ -2632,7 +2700,7 @@ impl Ctx<'_> {
         }
         if let (Path::Circle(k), Some(seam)) = (path.clone(), self.seam_at(f, &path)) {
             let ts = t0 + (k.angle(seam) - t0).rem_euclid(TAU);
-            if (ts - t0) * k.r > self.tol && (t1 - ts) * k.r > self.tol {
+            if (ts - t0) * k.r > band && (t1 - ts) * k.r > band {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
             }
         }
@@ -2643,7 +2711,7 @@ impl Ctx<'_> {
             && t0 < t1
         {
             let ts = t0 + (el.param(seam) - t0).rem_euclid(TAU);
-            if ts < t1 && el.length(t0, ts) > self.tol && el.length(ts, t1) > self.tol {
+            if ts < t1 && el.length(t0, ts) > band && el.length(ts, t1) > band {
                 parts = vec![(t0, End::Vertex(s.v[0]), ts, End::Point(seam)), (ts, End::Point(seam), t1, End::Vertex(s.v[1]))];
             }
         }
@@ -2662,20 +2730,20 @@ impl Ctx<'_> {
             // (Across the seam of a face going a whole turn round (a small arc over a torus's seam, a rib's round end on
             // the private dock): in parts, a vertex where it crosses, each part's curve on the face its own; its
             // pieces there projected one by one, none of the whole edge kept.)
-            let mut cuts: Vec<f64> = free::seam_crossings(&self.faces[f], &at, t0, t1).into_iter().filter(|&t| path.length(t0.min(t), t0.max(t)) > self.tol && path.length(t1.min(t), t1.max(t)) > self.tol).collect();
+            let mut cuts: Vec<f64> = free::seam_crossings(&self.faces[f], &at, t0, t1).into_iter().filter(|&t| path.length(t0.min(t), t0.max(t)) > band && path.length(t1.min(t), t1.max(t)) > band).collect();
             cuts.retain(|&t| parts.iter().any(|&(a0, _, a1, _)| (t - a0) * (t - a1) < 0.0));
             if cuts.is_empty() {
-                let whole = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol).or_else(|| self.twin_pcurve(e, f, &at, t0, t1));
+                let whole = free::projected(&self.faces[f], &at, t0, t1, GREY * band.max(self.face_band(f))).or_else(|| self.twin_pcurve(e, f, &at, t0, t1));
                 // (Leaving the face's surface between its ends (a circle across a thread's run-out, 44 um off there):
                 // its stretches on the surface, each from where it crosses the face's edge to where it crosses it again.)
                 if whole.is_none()
                     && let [(a0, e0, a1, e1)] = parts[..]
                     && let Some(runs) = self.stretches_over(e, f, &|t| at(t).0, (a0, e0), (a1, e1), &|_, _, _| true)?
                 {
-                    parts = runs.into_iter().filter(|&(b0, _, b1, _)| path.length(b0.min(b1), b0.max(b1)) > self.tol).collect();
+                    parts = runs.into_iter().filter(|&(b0, _, b1, _)| path.length(b0.min(b1), b0.max(b1)) > band).collect();
                     on_free = Vec::with_capacity(parts.len());
                     for &(b0, _, b1, _) in &parts {
-                        let Some(c) = free::projected(&self.faces[f], &at, b0, b1, GREY * self.tol) else {
+                        let Some(c) = free::projected(&self.faces[f], &at, b0, b1, GREY * band.max(self.face_band(f))) else {
                             return Err(Decline("an edge on another argument's free-form face"));
                         };
                         on_free.push(Some((f, c)));
@@ -2701,7 +2769,7 @@ impl Ctx<'_> {
                 parts = split;
                 on_free = Vec::with_capacity(parts.len());
                 for &(a0, _, a1, _) in &parts {
-                    let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * self.tol) else {
+                    let Some(c) = free::projected(&self.faces[f], &at, a0, a1, GREY * band.max(self.face_band(f))) else {
                         return Err(Decline("an edge on another argument's free-form face"));
                     };
                     on_free.push(Some((f, c)));
@@ -2715,15 +2783,17 @@ impl Ctx<'_> {
     /// The greatest tolerance (past the Boolean's, up to half a millimetre) of face `f`'s edges that `p` is on within
     /// it, or 0.
     fn boundary_tol(&self, f: usize, p: DVec3) -> f64 {
+        let band = self.face_band(f);
         let on = |e: usize, t: f64| {
             let (u, d) = self.seg_param(&self.edge_seg(e), p);
             (0.0..=1.0).contains(&u) && d <= t
         };
-        self.faces[f].edges.iter().map(|&(e, _)| (e, self.edges[e].t)).filter(|&(e, t)| t > self.tol && t <= 5e-4 && on(e, t)).fold(0.0, |m: f64, x| m.max(x.1))
+        self.faces[f].edges.iter().map(|&(e, _)| (e, self.edges[e].t)).filter(|&(e, t)| t > band && t <= 5e-4 && on(e, t)).fold(0.0, |m: f64, x| m.max(x.1))
     }
 
     /// An edge's pieces in face `f` (where `path` lies inside it; the edge's tolerance `te`): its edges there.
     fn in_face_from(&mut self, f: usize, path: &Path, ivs: Vec<Ival>, te: f64, arg: u32) -> R<()> {
+        let band = self.args_band(arg, self.faces[f].arg);
         // (A point on it has its tolerance, and where it leaves the face, the tolerance of the face's edge it is on
         // too, OCCT's: an edge leaving a slab's face across its edge of 0.1 mm, 0.1 mm from another's vertex, is at
         // that vertex (OCCT's corner one vertex of 0.21 mm); up to half a millimetre.)
@@ -2733,7 +2803,7 @@ impl Ctx<'_> {
             for k in 0..2 {
                 ends[k] = match iv[k].1 {
                     End::Vertex(v) => v,
-                    End::Point(p) if te.max(self.boundary_tol(f, p)) > self.tol => self.pool.add_tol(p, te.max(self.boundary_tol(f, p)))?,
+                    End::Point(p) if te.max(self.boundary_tol(f, p)) > band => self.pool.add_tol(p, te.max(self.boundary_tol(f, p)))?,
                     End::Point(p) => self.pool.add(p)?,
                     End::Open => return Err(Decline("an edge's piece without ends")),
                 };
@@ -2852,6 +2922,7 @@ impl Ctx<'_> {
     /// the angle where it leaves the edge's and the face's tolerances, if that's past the tolerance along it (a round's
     /// edge running from a flat into another part's flush flat: c2-wire-clip-imported's clips, 2.5 um apart).
     fn arc_end_on_plane(&self, e: usize, f: usize) -> Option<(usize, f64)> {
+        let band = self.edge_band(e, f);
         let (Surf::Plane { n, d, .. }, Geo::Arc { k, a0, sweep }) = (&self.faces[f].s, self.edges[e].g) else { return None };
         if k.n.cross(*n).length() <= 1e-9 {
             return None;
@@ -2874,7 +2945,7 @@ impl Ctx<'_> {
                     a = m;
                 }
             }
-            ((a - from).abs() * k.r > self.tol).then_some((end, a))
+            ((a - from).abs() * k.r > band).then_some((end, a))
         })
     }
 
@@ -2883,6 +2954,7 @@ impl Ctx<'_> {
     /// (Only a part ending on the boundary: one leaving the plane inside the face runs along the section of its own
     /// flat there.)
     fn arc_part_in_face(&mut self, e: usize, f: usize, (end, t): (usize, f64)) -> R<()> {
+        let band = self.edge_band(e, f);
         if !self.in_face_done.insert((e, f)) {
             return Ok(());
         }
@@ -2891,7 +2963,7 @@ impl Ctx<'_> {
         let from = if end == 0 { a0 } else { a0 + sweep };
         let bound = self.bound(f)?.to_vec();
         let q = self.faces[f].to2(k.at(t));
-        if inside2(q, &bound) || distance2(q, &bound) <= self.tol {
+        if inside2(q, &bound) || distance2(q, &bound) <= band {
             return Ok(());
         }
         let (mut a, mut b) = (from, t);
@@ -2905,10 +2977,10 @@ impl Ctx<'_> {
         }
         let p = k.at(a);
         let (x, (d, q)) = self.faces[f].edges.iter().map(|&(x, _)| (x, self.edge_point_near(x, p))).fold((usize::MAX, (f64::INFINITY, p)), |m, x| if x.1.0 < m.1.0 { x } else { m });
-        if x == usize::MAX || d > self.pool.pair(self.edges[e].t, self.edges[x].t) || (a - from).abs() * k.r <= self.tol {
+        if x == usize::MAX || d > self.pool.pair(self.edges[e].t, self.edges[x].t) || (a - from).abs() * k.r <= band {
             return Ok(());
         }
-        let w = End::Vertex(self.pool.add_tol(q, (1.5 * d).max(self.tol))?);
+        let w = End::Vertex(self.pool.add_tol(q, (1.5 * d).max(band))?);
         let part = if end == 0 { (a0, End::Vertex(v), a, w) } else { (a, w, a0 + sweep, End::Vertex(v)) };
         self.pending.push(Pending::InFace(f, Path::Circle(k), vec![part], vec![None], e));
         Ok(())
@@ -3030,11 +3102,12 @@ impl Ctx<'_> {
     /// stretch of the axis (by their boxes, the grey band more) those circles never meet (c2-valve-config's pattern
     /// of seven cone cutters off the part's axis: OCCT's empty sections, 35-95 ms a pair).
     fn round_apart(&self, f1: usize, f2: usize) -> bool {
+        let band = self.band(f1, f2);
         let (&Surf::Cyl { o: o1, a: a1, r0: r1, k: k1, .. }, &Surf::Cyl { o: o2, a: a2, r0: r2, k: k2, .. }) = (&self.faces[f1].s, &self.faces[f2].s) else { return false };
         if a1.cross(a2).length() > 1e-12 {
             return false;
         }
-        let g = GREY * self.tol;
+        let g = GREY * band;
         let (sg, w) = (a1.dot(a2), o2 - o1);
         let along = w.dot(a1);
         let d = (w - a1 * along).length();
@@ -3072,7 +3145,7 @@ impl Ctx<'_> {
         if let Some(&x) = self.apart.get(&(fs, ft)) {
             return x;
         }
-        let x = free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6), [self.face_box(fs), self.face_box(ft)]);
+        let x = free::apart(&self.faces[fs], &self.faces[ft], GREY * self.band(fs, ft).max(5e-6), [self.face_box(fs), self.face_box(ft)]);
         self.apart.insert((fs, ft), x);
         x
     }
@@ -3179,6 +3252,7 @@ impl Ctx<'_> {
     }
 
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
+        let band = self.band(fs, ft);
         let Some(src) = self.src else { return Err(Decline("a curved face")) };
         // (Clearly apart, their control points tell: no section, without asking.)
         if self.faces_apart(fs, ft) {
@@ -3294,7 +3368,7 @@ impl Ctx<'_> {
         froms.retain(|_| (keep[k], k += 1).0);
         // (An end of one where another of them ends: OCCT's curves of one loop in parts; a vertex there.)
         let ends: Vec<[DVec3; 2]> = secs.iter().map(|c| [c.curve.at(c.t0), c.curve.at(c.t1)]).collect();
-        let joined = |i: usize, k: usize| ends.iter().enumerate().any(|(j, e)| j != i && e.iter().any(|q| (*q - ends[i][k]).length() <= self.tol));
+        let joined = |i: usize, k: usize| ends.iter().enumerate().any(|(j, e)| j != i && e.iter().any(|q| (*q - ends[i][k]).length() <= band));
         let joins: Vec<[bool; 2]> = (0..secs.len()).map(|i| [joined(i, 0), joined(i, 1)]).collect();
         for ((c, join), from) in secs.into_iter().zip(joins).zip(froms) {
             let id = self.ncurves.len() as u32;
@@ -3314,12 +3388,13 @@ impl Ctx<'_> {
     /// edges'; or beside a long one: two grooves' flanks at the cylinder's end, from the bottom edges' crossing to the
     /// ridges' 32 um above).
     fn occt_sections(&mut self, src: &dyn SectionSource, a: (u32, u32), b: (u32, u32)) -> R<Vec<SectionCurve>> {
+        let band = self.args_band(a.0, b.0);
         let mut secs: Vec<SectionCurve> = src.sections(a, b)?.into_iter().filter(|c| c.t1 > c.t0).collect();
         let face = |(arg, index): (u32, u32)| {
             let k = self.faces.partition_point(|g| (g.arg, g.index) < (arg, index));
             (k < self.faces.len() && (self.faces[k].arg, self.faces[k].index) == (arg, index)).then_some(k)
         };
-        let tol = self.tol;
+        let tol = band;
         // (A curve along an edge of both faces, within the tolerance all along: that edge, already there (OCCT's
         // sections of two faces tangent across their common edge, c2-extension-spring's Mirror 1: seven lines 2-4 um
         // apart on the 1 mm edge where the wire meets its mirror image).)
@@ -3371,6 +3446,7 @@ impl Ctx<'_> {
     /// Where face `f`'s edges cross face `g`'s cylinder or cone inside `g`, clear of its boundary: sign changes of the
     /// distance from that surface over 64 steps along each edge, halved down.
     fn edges_piercing(&self, f: usize, g: usize) -> R<Vec<DVec3>> {
+        let band = self.band(f, g);
         let Surf::Cyl { o, a, r0, k, .. } = self.faces[g].s else { return Ok(Vec::new()) };
         let off = |p: DVec3| {
             let w = p - o;
@@ -3400,7 +3476,7 @@ impl Ctx<'_> {
                 }
                 let p = self.seg_at(&s, 0.5 * (lo + hi));
                 let q = self.faces[g].to2(p);
-                if inside_with(q, bound, spans) && distance_with(q, bound, spans) > 10.0 * self.tol {
+                if inside_with(q, bound, spans) && distance_with(q, bound, spans) > 10.0 * band {
                     out.push(p);
                 }
             }
@@ -3429,7 +3505,7 @@ impl Ctx<'_> {
     fn boundaries_meet(&mut self, fa: usize, fb: usize) -> Vec<DVec3> {
         let (ea, eb): (Vec<usize>, Vec<usize>) = (self.faces[fa].edges.iter().map(|x| x.0).collect(), self.faces[fb].edges.iter().map(|x| x.0).collect());
         let bx = |p: &[DVec3]| p.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), q| (lo.min(*q), hi.max(*q)));
-        let tol = self.tol;
+        let tol = self.band(fa, fb);
         let mut out: Vec<DVec3> = Vec::new();
         for &x in &ea {
             let px = self.edge_polyline(x);
@@ -3632,16 +3708,17 @@ impl Ctx<'_> {
     }
 
     fn kept_by(&self, f: usize, r: &Rigid) -> bool {
+        let band = self.tol;
         match self.faces[f].s {
-            Surf::Plane { n, d, origin, .. } => (r.dir(n) - n).length() <= 1e-9 && (n.dot(r.point(origin)) - d).abs() <= self.tol,
+            Surf::Plane { n, d, origin, .. } => (r.dir(n) - n).length() <= 1e-9 && (n.dot(r.point(origin)) - d).abs() <= band,
             Surf::Cyl { o, a, k, .. } => {
                 let w = r.point(o) - o;
-                (r.dir(a) - a).length() <= 1e-9 && if k == 0.0 { w.cross(a).length() <= self.tol } else { w.length() <= self.tol }
+                (r.dir(a) - a).length() <= 1e-9 && if k == 0.0 { w.cross(a).length() <= band } else { w.length() <= band }
             }
             // (A whole turn of a torus turned about its own axis: a circular pattern of tread tools round a tyre,
             // asm-infento-subs. A part of one (a Shell slab's round) can't take the moved curves.)
             Surf::Nurbs { .. } => match self.faces[f].ns.as_deref() {
-                Some(crate::freeform::FreeSurface::Torus { o, z, .. }) => self.faces[f].uvbox[1] - self.faces[f].uvbox[0] >= TAU && (r.dir(*z) - *z).length() <= 1e-9 && (r.point(*o) - *o).length() <= self.tol,
+                Some(crate::freeform::FreeSurface::Torus { o, z, .. }) => self.faces[f].uvbox[1] - self.faces[f].uvbox[0] >= TAU && (r.dir(*z) - *z).length() <= 1e-9 && (r.point(*o) - *o).length() <= band,
                 _ => false,
             },
         }
@@ -3651,6 +3728,7 @@ impl Ctx<'_> {
     /// stay clear of its boundary (the face trims and splits OCCT's curves there): (moved, from).
     /// (`from`: theirs, when known.)
     fn clear_inside(&self, f: usize, curves: &[SectionCurve], r: &Rigid, from: Option<bool>) -> R<(bool, bool)> {
+        let band = self.tol;
         // (A free-form face's parameter plane isn't one the curves map onto here (a whole torus a motion keeps, the
         // rings' Circular pattern 1): not clear, the pair's own sections then.)
         if matches!(self.faces[f].s, Surf::Nurbs { .. }) {
@@ -3661,11 +3739,11 @@ impl Ctx<'_> {
         // there, and OCCT's curves meet it alike.)
         let axis = r.rotation();
         let kept = |e: usize| match (self.edges[e].g, axis) {
-            (Geo::Arc { k, sweep, .. }, Some((o, a, _))) => (sweep.abs() - TAU).abs() <= 1e-12 && (k.c - o).cross(a).length() <= self.tol && k.n.cross(a).length() <= 1e-9,
+            (Geo::Arc { k, sweep, .. }, Some((o, a, _))) => (sweep.abs() - TAU).abs() <= 1e-12 && (k.c - o).cross(a).length() <= band && k.n.cross(a).length() <= 1e-9,
             _ => false,
         };
         let moving: Vec<C2> = self.faces[f].edges.iter().zip(bound).filter(|x| !kept(x.0.0)).map(|x| x.1.clone()).collect();
-        let margin = 100.0 * GREY * self.tol;
+        let margin = 100.0 * GREY * band;
         // (The boundary's sample points, made once for all the curves.)
         let theirs: Vec<crate::curve2::Samples> = moving.iter().map(|_| Default::default()).collect();
         // A curve on the face's parameter plane clear of that boundary: not meeting it, its ends not on it.
@@ -3701,12 +3779,13 @@ impl Ctx<'_> {
     /// A section along OCCT's curve from `t0` to `t1`, cut at `cuts` (seams it crosses): a closed one has a
     /// vertex where it starts (as OCCT's), an open one ends where it does.
     fn section_nurbs(&mut self, fs: usize, ft: usize, path: Path, (t0, t1): (f64, f64), cuts: &[f64], join: [bool; 2]) -> R<()> {
-        let closed = (path.at(t0) - path.at(t1)).length() <= self.tol;
+        let band = self.band(fs, ft);
+        let closed = (path.at(t0) - path.at(t1)).length() <= band;
         let first = if closed || join[0] { End::Point(path.at(t0)) } else { End::Open };
         let last = if closed { first } else if join[1] { End::Point(path.at(t1)) } else { End::Open };
         let mut at: Vec<(f64, End)> = vec![(t0, first)];
         for &t in cuts {
-            if path.length(t0, t) > self.tol && path.length(t, t1) > self.tol {
+            if path.length(t0, t) > band && path.length(t, t1) > band {
                 at.push((t, End::Point(path.at(t))));
             }
         }
@@ -3719,6 +3798,7 @@ impl Ctx<'_> {
     }
 
     fn face_pair(&mut self, fs: usize, ft: usize) -> R<()> {
+        let band = self.band(fs, ft);
         // (Clearly apart: no section, and no edge of one in the other.)
         if self.faces_apart(fs, ft) {
             return Ok(());
@@ -3730,7 +3810,7 @@ impl Ctx<'_> {
                 // (Only edges that reach the other face's box can lie on it.)
                 let [a, b] = self.edges[e].v;
                 if let Geo::Line = self.edges[e].g
-                    && !boxes_meet(self.p(a).min(self.p(b)), self.p(a).max(self.p(b)), lo, hi, GREY * self.tol)
+                    && !boxes_meet(self.p(a).min(self.p(b)), self.p(a).max(self.p(b)), lo, hi, GREY * band)
                 {
                     continue;
                 }
@@ -3751,13 +3831,14 @@ impl Ctx<'_> {
     }
 
     fn plane_plane(&mut self, fs: usize, ft: usize) -> R<()> {
+        let band = self.band(fs, ft);
         let (Surf::Plane { n: n1, d: d1, .. }, Surf::Plane { n: n2, d: d2, origin: o2, .. }) = (&self.faces[fs].s, &self.faces[ft].s) else { unreachable!() };
         let (n1, d1, n2, d2, o2) = (*n1, *d1, *n2, *d2, *o2);
         let dir = n1.cross(n2);
         if dir.length() <= 1e-9 {
             let off = (n1.dot(o2) - d1).abs();
             // (Apart past the tolerance, or the two faces' own where that's more, OCCT's rule: no grey band.)
-            if off > self.tol.max(self.faces[fs].t + self.faces[ft].t) {
+            if off > self.band(fs, ft).max(self.faces[fs].t + self.faces[ft].t) {
                 return Ok(());
             }
             self.coplanar.push((fs, ft));
@@ -3772,7 +3853,7 @@ impl Ctx<'_> {
         let det = a1 * b2 - a2 * b1;
         let p = a * ((d1 * b2 - d2 * b1) / det) + b * ((a1 * d2 - a2 * d1) / det);
         let (lo, hi) = (self.faces[fs].lo.max(self.faces[ft].lo), self.faces[fs].hi.min(self.faces[ft].hi));
-        let (t0, t1) = box_range(p, dir, lo, hi, self.tol);
+        let (t0, t1) = box_range(p, dir, lo, hi, band);
         if t0 >= t1 {
             return Ok(());
         }
@@ -3782,7 +3863,7 @@ impl Ctx<'_> {
     fn plane_cyl(&mut self, fp: usize, fc: usize) -> R<()> {
         let Surf::Plane { n, d, .. } = self.faces[fp].s else { unreachable!() };
         let Surf::Cyl { o, a, x, y, r, r0, k: slope, th0, .. } = self.faces[fc].s else { unreachable!() };
-        let tol = self.tol;
+        let tol = self.band(fp, fc);
         let na = n.dot(a);
         if na.abs() >= 1.0 - 1e-12 {
             // A plane across the axis: a circle.
@@ -3894,7 +3975,7 @@ impl Ctx<'_> {
     fn plane_cone_hyperbola(&mut self, fp: usize, fc: usize) -> R<()> {
         let Surf::Plane { n, d, flip, .. } = self.faces[fp].s else { unreachable!() };
         let Surf::Cyl { o, a, x, y, r0, k: slope, .. } = self.faces[fc].s else { unreachable!() };
-        let tol = self.tol;
+        let tol = self.band(fp, fc);
         let na = n.dot(a);
         let apex = o - a * (r0 / slope);
         let up = if slope > 0.0 { a } else { -a };
@@ -3960,11 +4041,12 @@ impl Ctx<'_> {
 
     /// Whether cone face `fc` reaches its apex (the apex's height within its vertices' heights).
     fn apex_on_face(&self, fc: usize) -> bool {
+        let band = self.tol;
         let Surf::Cyl { o, a, r0, k, .. } = self.faces[fc].s else { unreachable!() };
         let hs = self.faces[fc].edges.iter().flat_map(|&(e, _)| self.edges[e].v).map(|w| (self.p(w) - o).dot(a));
         let (h0, h1) = hs.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), h| (lo.min(h), hi.max(h)));
         let ha = -r0 / k;
-        ha >= h0 - GREY * self.tol && ha <= h1 + GREY * self.tol
+        ha >= h0 - GREY * band && ha <= h1 + GREY * band
     }
 
     /// A plane at an angle to a cone's axis, cutting each of the face's nappe's rulings (else declined): an
@@ -3972,7 +4054,7 @@ impl Ctx<'_> {
     fn plane_cone(&mut self, fp: usize, fc: usize) -> R<()> {
         let Surf::Plane { n, d, flip, .. } = self.faces[fp].s else { unreachable!() };
         let Surf::Cyl { o, a, r0, k: slope, th0, .. } = self.faces[fc].s else { unreachable!() };
-        let tol = self.tol;
+        let tol = self.band(fp, fc);
         let na = n.dot(a);
         let along = slope.abs() * (1.0 - na * na).sqrt();
         if (na.abs() - along).abs() <= 1e-12 {
@@ -4030,7 +4112,7 @@ impl Ctx<'_> {
     fn plane_cone_parabola(&mut self, fp: usize, fc: usize) -> R<()> {
         let Surf::Plane { n, d, flip, .. } = self.faces[fp].s else { unreachable!() };
         let Surf::Cyl { o, a, r0, k: slope, .. } = self.faces[fc].s else { unreachable!() };
-        let tol = self.tol;
+        let tol = self.band(fp, fc);
         let apex = o - a * (r0 / slope);
         let up = if slope > 0.0 { a } else { -a };
         let side = (n - a * n.dot(a)).normalize();
@@ -4083,19 +4165,20 @@ impl Ctx<'_> {
 
     /// The section along cylinder or cone face `fc`'s generator at angle `th` (in its frame), with face `f`.
     fn generator(&mut self, f: usize, fc: usize, th: f64) -> R<()> {
+        let band = self.band(f, fc);
         let Surf::Cyl { o, a, x, y, r, r0, k, th0, full, .. } = self.faces[fc].s else { unreachable!() };
         let off = (th - th0).rem_euclid(TAU).min((th0 - th).rem_euclid(TAU)) * r;
-        if full && off <= self.tol {
+        if full && off <= band {
             // Its seam: an edge already, which lies on `f` (its edges on the other's faces add it there).
             return Ok(());
         }
-        if full && off <= GREY * self.tol {
+        if full && off <= GREY * band {
             return Err(Decline("a section along a cylinder's seam"));
         }
         let rad = x * th.cos() + y * th.sin();
         let (p, d) = if k == 0.0 { (o + rad * r, a) } else { (o + rad * r0, (a + rad * k).normalize()) };
         let (lo, hi) = (self.faces[f].lo.max(self.faces[fc].lo), self.faces[f].hi.min(self.faces[fc].hi));
-        let (t0, t1) = box_range(p, d, lo, hi, self.tol);
+        let (t0, t1) = box_range(p, d, lo, hi, band);
         if t0 >= t1 {
             return Ok(());
         }
@@ -4105,12 +4188,13 @@ impl Ctx<'_> {
     /// Face `f` touches cylinder face `fc`'s surface along its generator at `th`: declines where both faces
     /// reach the line.
     fn touch(&mut self, f: usize, fc: usize, th: f64) -> R<()> {
+        let band = self.band(f, fc);
         let Surf::Cyl { o, a, x, y, r, r0, k, .. } = self.faces[fc].s else { unreachable!() };
         let rad = x * th.cos() + y * th.sin();
         // (A cone's ruling: from its point at the origin's height.)
         let (p, d) = if k == 0.0 { (o + rad * r, a) } else { (o + rad * r0, (a + rad * k).normalize()) };
         let (lo, hi) = (self.faces[f].lo.max(self.faces[fc].lo), self.faces[f].hi.min(self.faces[fc].hi));
-        let (t0, t1) = box_range(p, d, lo, hi, self.tol);
+        let (t0, t1) = box_range(p, d, lo, hi, band);
         if t0 >= t1 {
             return Ok(());
         }
@@ -4120,7 +4204,7 @@ impl Ctx<'_> {
             return Ok(());
         }
         let ib = self.intervals(fc, &path, t0, t1, [End::Open; 2], true)?;
-        let meet = ia.iter().any(|x| ib.iter().any(|y| x[1].0.min(y[1].0) - x[0].0.max(y[0].0) > self.tol));
+        let meet = ia.iter().any(|x| ib.iter().any(|y| x[1].0.min(y[1].0) - x[0].0.max(y[0].0) > band));
         // Where both reach it: a section along it, as where they cross.
         if meet { self.generator(f, fc, th) } else { Ok(()) }
     }
@@ -4128,7 +4212,7 @@ impl Ctx<'_> {
     fn cyl_cyl(&mut self, f1: usize, f2: usize) -> R<()> {
         let Surf::Cyl { o: o1, a: a1, x, y, r: r1, r0: r01, k: k1, th0, .. } = self.faces[f1].s else { unreachable!() };
         let Surf::Cyl { o: o2, a: a2, r: r2, r0: r02, k: k2, .. } = self.faces[f2].s else { unreachable!() };
-        let tol = self.tol;
+        let tol = self.band(f1, f2);
         if a1.cross(a2).length() > 1e-12 {
             if k1 != 0.0 || k2 != 0.0 {
                 if self.src.is_some() {
@@ -4206,7 +4290,7 @@ impl Ctx<'_> {
         let (f1, f2) = if (self.faces[f2].arg, self.faces[f2].index) < (self.faces[f1].arg, self.faces[f1].index) { (f2, f1) } else { (f1, f2) };
         let Surf::Cyl { o: o1, a: a1, r: r1, th0, .. } = self.faces[f1].s else { unreachable!() };
         let Surf::Cyl { o: o2, a: a2, r: r2, .. } = self.faces[f2].s else { unreachable!() };
-        let tol = self.tol;
+        let tol = self.band(f1, f2);
         let w = o2 - o1;
         let dist = a1.cross(a2).normalize().dot(w).abs();
         if dist > r1 + r2 + GREY * tol {
@@ -4249,7 +4333,12 @@ impl Ctx<'_> {
             if own.is_some() && *who == own {
                 continue;
             }
-            let c = self.split_tol(s, list, te)?;
+            let band = match (own, who) {
+                (Some(a), Some(b)) => self.args_band(a, *b),
+                (Some(a), None) => self.reach_band(a),
+                _ => self.tol,
+            };
+            let c = self.split_tol(s, list, te, band)?;
             for &w in &c[1..c.len() - 1] {
                 chain.push((self.seg_param(s, self.p(w)).0, w));
             }
@@ -4262,19 +4351,19 @@ impl Ctx<'_> {
     }
 
     fn split(&self, s: &Seg, sorted_x: &Sorted3) -> R<Vec<u32>> {
-        self.split_tol(s, sorted_x, 0.0)
+        self.split_tol(s, sorted_x, 0.0, self.tol)
     }
 
     /// `split`, a vertex on `s` within the Boolean's tolerance or the sum of its own and `te` where that's more.
-    fn split_tol(&self, s: &Seg, sorted_x: &Sorted3, te: f64) -> R<Vec<u32>> {
-        self.split_reach(s, sorted_x, te, true)
+    fn split_tol(&self, s: &Seg, sorted_x: &Sorted3, te: f64, band: f64) -> R<Vec<u32>> {
+        self.split_reach(s, sorted_x, te, true, band)
     }
 
     /// `split_tol`; `te` counted towards the ends too (an edge's tolerance: a vertex within it of an end is that
     /// end) or only off the curve (a section's error: a crossing on it a few micrometres from its end is still a
     /// point of it).
-    fn split_reach(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool) -> R<Vec<u32>> {
-        Ok(self.split_params(s, sorted_x, te, at_ends)?.0)
+    fn split_reach(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool, band: f64) -> R<Vec<u32>> {
+        Ok(self.split_params(s, sorted_x, te, at_ends, band)?.0)
     }
 
     /// A box holding the NURBS curve `id` from `t0` to `t1`: its pieces' boxes over it (made once), else 16 samples a
@@ -4291,7 +4380,7 @@ impl Ctx<'_> {
     }
 
     /// [`Self::split_reach`]'s chain and its vertices' parameters on `s` (0 and 1 at its ends).
-    fn split_params(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool) -> R<(Vec<u32>, Vec<f64>)> {
+    fn split_params(&self, s: &Seg, sorted_x: &Sorted3, te: f64, at_ends: bool, band: f64) -> R<(Vec<u32>, Vec<f64>)> {
         let tol = self.tol;
         let reach = |w: u32| self.pool.pair(te, self.pool.t[w as usize]);
         let end_reach = |w: u32| if at_ends { reach(w) } else { self.pool.pair(0.0, self.pool.t[w as usize]) };
@@ -4373,7 +4462,7 @@ impl Ctx<'_> {
         if on.len() > 1 {
             let len = *len.get_or_init(|| self.seg_length(s));
             for w in on.windows(2) {
-                if w[0].1 != w[1].1 && (w[1].0 - w[0].0) * len <= tol {
+                if w[0].1 != w[1].1 && (w[1].0 - w[0].0) * len <= band {
                     let (p, q) = (self.p(w[0].1), self.p(w[1].1));
                     self.pool.regroup.lock().expect("a group").push(bounding_sphere(&[(p, self.pool.t[w[0].1 as usize]), (q, self.pool.t[w[1].1 as usize])]));
                 }
@@ -4879,6 +4968,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     }
     let mut cx = Ctx {
         tol,
+        arg_tol: arg_tols(args, tol),
+        arg_reach: vec![tol; args.len()],
         pool: Pool::new(tol, Vec::new(), regroup),
         faces: Vec::new(),
         edges: Vec::new(),
@@ -5098,9 +5189,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     let sweep = if v[0] == v[1] { TAU } else { (k.angle(cx.pool.p[v[1] as usize]) - a0).rem_euclid(TAU) };
                     // (An arc shorter than the tolerance between two vertices: straight between them here, within its
                     // sagitta; its edge keeps the circle.)
-                    if sweep * radius <= tol && v[0] != v[1] {
+                    if sweep * radius <= cx.own_band(a) && v[0] != v[1] {
                         Geo::Line
-                    } else if sweep * radius <= tol {
+                    } else if sweep * radius <= cx.own_band(a) {
                         return Err(Decline("a tiny arc"));
                     } else {
                         Geo::Arc { k, a0, sweep }
@@ -5265,7 +5356,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         if let Surf::Cyl { o, x, y, full: false, .. } = cx.faces[f].s {
             // The angles its boundary covers; th0 in the gap.
             let mut covered: Vec<(f64, f64)> = Vec::new();
-            let mut helix_round = false;
+            let (mut helix_round, tol) = (false, cx.own_band(cx.faces[f].arg));
             for &(e, _) in &cx.faces[f].edges {
                 if let Geo::Arc { k, a0, sweep } = cx.edges[e].g {
                     let w = k.at(a0) - o;
@@ -5344,8 +5435,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         // side left its loop open (an AppleWatchDock bore notched at its seam: a section 1.8 mm below the wall found
         // inside it).)
         if let Surf::Cyl { o, a, x, y, th0, r, flip, full: true, .. } = cx.faces[f].s {
-            let es = &cx.faces[f].edges;
-            let at = |p: DVec3| ((((p - o).dot(y).atan2((p - o).dot(x))) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= cx.tol;
+            let (es, band) = (&cx.faces[f].edges, cx.own_band(cx.faces[f].arg));
+            let at = |p: DVec3| ((((p - o).dot(y).atan2((p - o).dot(x))) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= band;
             let up = |(e, rev): (usize, bool)| {
                 let d = (cx.p(cx.edges[e].v[1]) - cx.p(cx.edges[e].v[0])).dot(a) * if rev { -1.0 } else { 1.0 };
                 if flip { -d > 0.0 } else { d > 0.0 }
@@ -5360,6 +5451,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         cx.solids[s].lo = cx.solids[s].lo.min(lo);
         cx.solids[s].hi = cx.solids[s].hi.max(hi);
     }
+    cx.arg_reach = arg_reaches(&cx.solids, &cx.arg_tol, tol);
     // (A tolerant vertex within its own tolerance of it, up to 1 mm, as OCCT's: Shell's slabs. It came out 3.3e-7 off
     // OCCT's in volume on a Shell's common (a vertex 44 um off, tolerance 0.12 mm; qa RUST-SHELL-GPF-REGRESS) while
     // the merged vertices kept the first one's point; at OCCT's merged vertex's, that one declines.)
@@ -5854,7 +5946,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     type Crossings = Vec<(usize, usize, f64, f64)>;
     let crossings_with = |f: usize, i: usize, js: &mut dyn Iterator<Item = usize>, curves: &[R<FaceCurves>]| -> Crossings {
         let Ok((c2, boxes)) = &curves[f] else { return Vec::new() };
-        let segs = &cx.face_segs[f];
+        let (segs, tol) = (&cx.face_segs[f], cx.face_band(f));
         let mut out = Vec::new();
         for j in js {
             // (A cancelled run's: what's found so far is dropped with it, par_map / the next phase decline.)
@@ -6067,7 +6159,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // (`te`: the piece's edge's own tolerance, 0 for a section's: its curve's.)
     // (`arg`: the piece's edge's argument, for OCCT's rule for two edges of different arguments between the same two
     // vertices.)
-    let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg, te: f64, arg: Option<u32>| -> (usize, bool) {
+    // (`band`: how far apart its curve and another's between the same vertices may be and be one ([`Ctx::band`]).)
+    let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg, te: f64, arg: Option<u32>, band: f64| -> (usize, bool) {
         let key = (s.v[0].min(s.v[1]), s.v[0].max(s.v[1]));
         let mid = cx.seg_at(&s, 0.5);
         let list = sedge_of.entry(key).or_default();
@@ -6116,6 +6209,12 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     _ => {}
                 }
             }
+            // (Two input edges: by their two arguments' band, not either's widest (two precise parts' arcs 5 um apart,
+            // a tolerant part's box meeting theirs: c2-gamma-imported's clips and pin).)
+            let jb = match arg {
+                Some(a) if !sedges[i].origins.is_empty() => sedges[i].origins.iter().map(|&e| cx.args_band(a, cx.edges[e].arg)).fold(0.0, f64::max),
+                _ => band.max(sedges[i].band),
+            };
             let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
                 || (s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
@@ -6132,7 +6231,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 }
                 // (Two arcs or ellipses between the same ends: one only on one course (a hole's circle and another
                 // part's crossing it at both ends bulge apart).)
-                (Geo::Arc { .. }, Geo::Arc { .. }) | (Geo::Ell { .. }, Geo::Ell { .. }) => (cx.seg_at(o, 0.5) - mid).length() <= GREY * cx.tol,
+                (Geo::Arc { .. }, Geo::Arc { .. }) | (Geo::Ell { .. }, Geo::Ell { .. }) => (cx.seg_at(o, 0.5) - mid).length() <= GREY * jb,
                 // (Pieces of one curve: by their ranges, either way round.)
                 (Geo::Nurbs { id: a, t0: a0, t1: a1 }, Geo::Nurbs { id: b, t0: b0, t1: b1 }) if a == b => {
                     let near = |x: f64, y: f64| (x - y).abs() <= 1e-9 * (1.0 + x.abs());
@@ -6155,7 +6254,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     };
                     on(o, &s) && on(&s, o)
                 }
-                _ => (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * cx.tol,
+                _ => (cx.seg_at(o, 0.5) - mid).length() <= 100.0 * jb,
             };
             if alike && !apart && (std::mem::discriminant(&o.g) != std::mem::discriminant(&s.g) || together) {
                 let rev = match (o.g, s.g) {
@@ -6165,6 +6264,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 };
                 let ts = te.max(stol(&s.g));
                 sedges[i].t = sedges[i].t.max(ts);
+                sedges[i].band = sedges[i].band.max(band);
                 return (i, rev);
             }
         }
@@ -6173,7 +6273,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].tol,
             _ => 0.0,
         });
-        sedges.push(SEdge { seg: s, origins: Vec::new(), t });
+        sedges.push(SEdge { seg: s, origins: Vec::new(), t, band });
         (sedges.len() - 1, false)
     };
     let involved: Vec<bool> = (0..ns).map(|s| meets[s * ns..(s + 1) * ns].iter().any(|&m| m)).collect();
@@ -6384,7 +6484,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let mut pieces = Vec::with_capacity(chain.len() - 1);
         let parts = if matches!(s.g, Geo::Apex { .. }) { apex_parts(&cx, e)? } else { cx.pieces_of(&s, &chain) };
         for piece in parts {
-            let (si, rev) = get_sedge(&cx, &mut sedges, piece, cx.edges[e].t, Some(cx.edges[e].arg));
+            let (si, rev) = get_sedge(&cx, &mut sedges, piece, cx.edges[e].t, Some(cx.edges[e].arg), cx.reach_band(cx.edges[e].arg));
             if !sedges[si].origins.contains(&e) {
                 sedges[si].origins.push(e);
             }
@@ -6473,7 +6573,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         p != pair(k) && (cx.seg_at(sg, (t + 1e-4).min(1.0)) - cx.seg_at(sg, (t - 1e-4).max(0.0))).normalize_or_zero().dot(d).abs() > 0.999
     };
     let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| {
-        let (chain, ts) = cx.split_params(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false)?;
+        let (chain, ts) = cx.split_params(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false, cx.band(cx.sections[k].1, cx.sections[k].2))?;
         let n = chain.len();
         let keep: Vec<bool> = (0..n).map(|i| i == 0 || i + 1 == n || !along_joint(k, chain[i], ts[i])).collect();
         let (chain, ts): (Vec<u32>, Vec<f64>) = chain.into_iter().zip(ts).zip(keep).filter(|x| x.1).map(|x| x.0).unzip();
@@ -6483,7 +6583,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
     let own_ts: Vec<std::sync::OnceLock<Vec<f64>>> = (0..own.len()).map(|_| std::sync::OnceLock::new()).collect();
     let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| {
-        let (chain, ts) = cx.split_params(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false)?;
+        let (chain, ts) = cx.split_params(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false, cx.face_band(extra_segs[own[i]].0))?;
         let _ = own_ts[i].set(ts);
         Ok(chain)
     })?
@@ -6518,7 +6618,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_at(&s, &chain, ts.as_deref()).into_iter().filter(|x| !micro(x)) {
-            face_extra[f].push(get_sedge(&cx, &mut sedges, piece, te.0, te.1).0);
+            face_extra[f].push(get_sedge(&cx, &mut sedges, piece, te.0, te.1, cx.face_band(f)).0);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
@@ -6528,7 +6628,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_at(&s, &chain, ts.into_inner().as_deref()).into_iter().filter(|x| !micro(x)) {
-            let (si, _) = get_sedge(&cx, &mut sedges, piece, 0.0, None);
+            let (si, _) = get_sedge(&cx, &mut sedges, piece, 0.0, None, cx.band(fs, ft));
             section_faces.push((si, fs));
             section_faces.push((si, ft));
         }
