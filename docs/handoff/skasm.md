@@ -1,28 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 12:41 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 12:53 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 12:41 UTC): P1 SKETCH-LENGTH-LABEL-IN-PLANE residual, UNCOMMITTED, run going
-- QUEUED c572df92 (12:28, #4): sk/* hover combined states + SMFlatOp (live smflat-1122) + BEND-FACE-RECLICK-EMPTIES +
-  the tablet-stand names (acf660cb's content; acf660cb itself FAILED on a handoff rebase conflict) + flat orientation
-  47bfb052. Older 53a54598 was CHECKING at 12:28. If c572df92 fails: fix forward, land again.
-  (Its hover fix: lit-only sketch copies drawn after the points, the lit curve lifted 9 px + 1.5; ON_TOP discs over
-  a lit sketch point (psui's midpoint_overlay no-band disc, overlay_pts) moved to over_lines. psui told via the lead.)
-- Residual (qa: wf05 step 12, ours "20.001" on the far side, live "20" on the near side), two causes, both fixed:
-  1. sketch_mode apply_external_snap: a direction (H/V/perp) crossing a model edge now beats the edge's MIDPOINT too
-     (live wf05 s11: pointer on the left edge's midpoint (0,15), level 2.6 px off: glyphs horizontal + coincident,
-     segment exactly 20). New ui test a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it;
-     a_model_edge_on_the_sketch_plane_snaps_unhovered's start moved 20 px off the level (live 11-17's was 17 px off).
-  2. line_length_field(.., drawn): the Line tool's box lies left of the drawing direction unless vertical (verticals
-     stay left; live 11-17 chain and wf05 agree; MidpointLine keeps the old rule). Unit test
-     a_drawn_lines_box_lies_left_of_its_direction.
-- Run: skasm-scratch/bin/lbl2.sh on vibex6 (full sketch::ui_tests + clippy), log /root/skasm-scratch/lbl-run2.log
-  (started ~12:38). Green: commit "skasm: ..." + mark SKETCH-LENGTH-LABEL-IN-PLANE row (main's row is "[x] verified ...;
-  left: ..." line ~318: add a fixed-to-verify note for the residual), land.
-- Asked live (REQUESTS 12:32 "length box side and model-edge midpoint vs a crossing"): box side for leftward /
-  downward / clockwise / slanted lines, and the midpoint-vs-crossing rule with and without a level near. Adjust to it.
-- TICKETS union rows: rebuild from origin/main + own marks (script pattern: compare rows by **ID (agent)** key) before land.
+## In flight (11-22 12:53 UTC): re-landing c572df92's content + the SKETCH-LENGTH-LABEL residual (df6391b5a)
+- c572df92 FAILED 12:28 (rebase conflict, renderer.rs / shaders.wgsl): asm took params.x bit 4 for on_top lines
+  (80a580be3). Rebased by hand: unlit_only moved to bit 7 (128); over_lines stays bit 5; psui's on_top silhouettes
+  (64, not on main yet) untouched. 53a54598 (47bfb052, tablet-stand content) still QUEUED; my next land carries all.
+- Branch = 9 commits over main: sk/* hover combined states, SMFlatOp per live smflat-1122, BEND-FACE-RECLICK-EMPTIES,
+  tablet-stand names, flat orientation, and df6391b5a (residual: a level/vertical/perp direction crossing a model edge
+  beats its MIDPOINT; a drawn line's length box lies left of its direction, verticals left; tests
+  a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it, a_drawn_lines_box_lies_left_of_its_direction).
+  Before the rebase: clippy + 416/416 sketch::ui_tests green (12:50).
+- Run on the rebased tree: skasm-scratch/bin/rbv.sh on vibex6 (clippy render/scene/psui/custom, render tests,
+  scene sketch_mode, sketch::ui_tests, e2e an_extrude_in_the_flat*), log /root/skasm-scratch/rbv-run.log. Green: land.
+- TICKETS rebuilt vs main (SKETCH-LENGTH residual note on row ~318; other duplicate IDs are on main itself, qa's).
+- Asked live (REQUESTS 12:32 "length box side and model-edge midpoint vs a crossing"); adjust to the answer.
+- psui FYI (lead 12:5x): a_closed_sketchs_lit_end_goes_with_it broke from my Esc hold 438a9d313 (hover pick only on
+  id change); psui's f8b0a2d8 (queued) fixes it. Nothing for me.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
