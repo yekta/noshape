@@ -464,7 +464,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P0 **FEEL-DRW-BALLOON-HOVER-LEADER (studios)** (workflow 23 step 24, pin-block-asm-drawing, green b5b414278): balloon 2 hovered
   after Esc (attached to Section A-A's edge): live tints only the balloon (tan ring + fill), its leader stays black with a filled black
   arrowhead at the edge; ours draws the whole leader tan and thin, with no arrowhead (tickets/wf23-hatch-balloon.png, bottom; live left).
-- [ ] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
+- [x] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (fixed dx 11-22 2e73853c8, queued: each part of a section its own hatch, 45 / 135 deg alternating in part order, spacing = the part's box diagonal / 13 as live s05's pixels; 3+ parts and repeated instances asked of live, REQUESTS dx 05:35; the DETAIL B label P2 stays open, waits for that answer) (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
   the opposite angle and closer spacing than the block, so adjacent parts read apart; ours hatches both at the same angle and spacing
   (tickets/wf23-hatch-balloon.png, top). Also P2: "DETAIL B SCALE 2:1" sits at y 11.2 mm vs live 14.0. The rest of 23 = live:
   views, section A-A, detail B 2:1, .787, BOM rows 1 / 2, balloons 1 / 2 at the same spots (tickets/wf23-sheet.png).
@@ -501,7 +501,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   the same readouts and panel values (Min dist 39.051, X/Y/Z 0/30/25, Max dist 55.902, Length 40). MEASURE-VALUE-CLICK-PIN also
   holds inside the panel (variant 36v-measure-px, live's px): live's click on Min dist selects the value as 39.05125 with the full
   value in a chip above and the row lit, a second click 39.051 selected; ours changes nothing (rows 2-3).
-- [ ] P2 **EXPORT-STORE-DETAILS (dx)** (workflow 39, doc-tabs, green 984adcc30; variant 39v-short-waits, the 20 s waits cut to 3 s
+- [x] P2 **EXPORT-STORE-DETAILS (dx)** (fixed dx 11-22 da2ecf9c3, queued: .iges; Move to document… / Export… / Download one group; STEP's Version checkboxes 31 px apart, Options' stay 39 as live) (workflow 39, doc-tabs, green 984adcc30; variant 39v-short-waits, the 20 s waits cut to 3 s
   because 7 x 20 s ran past the app's 180 s script budget): (1) the IGES export stored in a tab is "Part Studio 1.**igs**", live
   "Part Studio 1.**iges**"; (2) STEP's four checkboxes under Version are 39 px apart, live 31 (Options and Export sit 24 px lower);
   (3) a stored file tab's menu has a separator between Export… and Download, live none (tickets/wf39-tabs.png row 5,
