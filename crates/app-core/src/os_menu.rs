@@ -217,6 +217,9 @@ pub struct OsMenu {
     /// Onshape's icon-less list menus (documents page, Bootstrap
     /// `list-no-icons`): 13 px text 17 px from the edge.
     plain: bool,
+    /// The documents page's menus (live docs-page-gaps-1122): `plain` with 12 px `#666` text (`#333` hovered), a 1 px
+    /// `#d7d7d7` border, radius 5.25, 1 px above and below, no shadow.
+    documents: bool,
     /// Feature Studio snippet menus: 33 px rows, 14 px `#333` text 14 px in.
     snippets: bool,
     /// The list's tallest height, past it the rows scroll, and its gap under the field (`max_height`).
@@ -252,6 +255,8 @@ pub struct OsMenu {
     on_escape: Option<EscapeHandler>,
     /// Run after Esc dismissed the menu (a drawing table cell's menu: live closes the Cell panel too).
     after_escape: Option<EscapeHandler>,
+    /// ↓ / ↑ close the menu and go to its page instead (live docs-page-gaps-1122: the documents list's selection moves).
+    on_arrow: Option<ArrowHandler>,
     /// A page's dropdown (a panel's ⋯, the in-context carets): Escape leaves it open (live: the page keeps the
     /// keyboard, the key never reaches a Bootstrap dropdown).
     page: bool,
@@ -273,6 +278,7 @@ pub struct OsMenu {
 
 /// An `OsMenu`'s one-shot Esc handler.
 type EscapeHandler = Rc<dyn Fn(&mut Window, &mut App)>;
+type ArrowHandler = Rc<dyn Fn(isize, &mut Window, &mut App)>;
 
 impl EventEmitter<DismissEvent> for OsMenu {}
 
@@ -285,7 +291,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, snippets: false, max_height: None, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, moved: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, flip: None, plain: false, documents: false, snippets: false, max_height: None, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, sep_margin: 0., text_inset: None, text_px: None, camera: false, on_escape: None, after_escape: None, on_arrow: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, moved: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -392,6 +398,12 @@ impl OsMenu {
     }
 
     /// Run `f` after an Esc dismissed the menu.
+    /// See `on_arrow`: `f(1)` for ↓, `f(-1)` for ↑, after the menu closed.
+    pub fn arrows_leave(mut self, f: impl Fn(isize, &mut Window, &mut App) + 'static) -> Self {
+        self.on_arrow = Some(Rc::new(f));
+        self
+    }
+
     pub fn after_escape(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.after_escape = Some(Rc::new(f));
         self
@@ -420,14 +432,14 @@ impl OsMenu {
     /// A right-click menu's height (22 px rows, 1 px separators, its 1 px border), for placing it before it is drawn.
     pub fn context_height(&self) -> Pixels {
         let (row, sep) = (self.row_height.unwrap_or(ROW_H), 1. + 2. * self.sep_margin);
-        px(2. + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { sep } else { row }).sum::<f32>())
+        px(self.pad() + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { sep } else { row }).sum::<f32>())
     }
 
     /// The row `y` below the menu's top edge (in its 1 px border) shows hovered, as a pointer resting there when it
     /// opens (live: a menu opened above the pointer has it on its last row).
     pub fn hover_at(&mut self, y: Pixels) {
         let (row, sep) = (self.row_height.unwrap_or(ROW_H), 1. + 2. * self.sep_margin);
-        let mut top = 1.;
+        let mut top = self.pad() / 2.;
         for (ix, i) in self.items.iter().enumerate() {
             let h = if matches!(i, OsMenuItem::Separator) { sep } else { row };
             if !matches!(i, OsMenuItem::Separator) && f32::from(y) >= top && f32::from(y) < top + h {
@@ -441,11 +453,24 @@ impl OsMenu {
     /// Its rows' and separators' height inside the 1 px border (as [`OsMenu::hover_at`] lays them out).
     pub fn content_height(&self) -> f32 {
         let (row, sep) = (self.row_height.unwrap_or(ROW_H), 1. + 2. * self.sep_margin);
-        2. + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { sep } else { row }).sum::<f32>()
+        self.pad() + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { sep } else { row }).sum::<f32>()
+    }
+
+    /// Its border above and below the rows, and the documents page's 1 px padding.
+    fn pad(&self) -> f32 {
+        if self.documents { 4. } else { 2. }
     }
 
     pub fn list_no_icons(mut self) -> Self {
         self.plain = true;
+        self
+    }
+
+    /// The documents page's look (see `documents`).
+    pub fn documents_list(mut self) -> Self {
+        self.plain = true;
+        self.documents = true;
+        self.text_px = Some(12.);
         self
     }
 
@@ -608,6 +633,12 @@ impl OsMenu {
         }
     }
 
+    fn arrow(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(f) = self.on_arrow.clone() else { return self.step(delta, cx) };
+        self.dismiss(window, cx);
+        f(delta, window, cx);
+    }
+
     fn step(&mut self, delta: isize, cx: &mut Context<Self>) {
         let n = self.items.len() as isize;
         if n == 0 {
@@ -655,6 +686,7 @@ impl Render for OsMenu {
         // In dropdowns a ✓ takes the icon place too (documents Folders sort menu).
         let any_check = self.items.iter().any(|i| matches!(i, OsMenuItem::Item { checked: true, .. }));
         let snippets = self.snippets;
+        let documents = self.documents;
         let max_height = self.max_height;
         let sep_margin = self.sep_margin;
         let (row_h, icon_x, icon_sz, text_x, text_sz): (f32, f32, f32, f32, f32) = if snippets {
@@ -692,7 +724,7 @@ impl Render for OsMenu {
         let row_tops: Vec<f32> = self
             .items
             .iter()
-            .scan(if plain_menu { 1.0f32 } else { 2.0 }, |y, i| {
+            .scan(if plain_menu && !documents { 1.0f32 } else { 2.0 }, |y, i| {
                 let top = *y;
                 *y += if matches!(i, OsMenuItem::Separator) { if dropdown { 15. } else { 1. } } else { row_h };
                 Some(top)
@@ -794,7 +826,7 @@ impl Render for OsMenu {
                         .get(&ix)
                         .cloned()
                         .map_or_else(|| row(ix), |(text, extra)| crate::ui::with_side_tooltip_expanded(row(ix), text, extra))
-                        .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
+                        .text_color(if *disabled { pal.text_faint } else if documents { gpui_kit::rgb(if hovered { 0x333333 } else { 0x666666 }) } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
                         .when(active_checked && *checked, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
                         // Chrome's native list: #1967d2 / white; in dark #99c8ff / black (live dk-pref-select-open).
@@ -861,8 +893,8 @@ impl Render for OsMenu {
             .key_context("OsMenu")
             .track_focus(&self.focus)
             .occlude()
-            .on_action(cx.listener(|this, _: &MenuDown, _, cx| this.step(1, cx)))
-            .on_action(cx.listener(|this, _: &MenuUp, _, cx| this.step(-1, cx)))
+            .on_action(cx.listener(|this, _: &MenuDown, window, cx| this.arrow(1, window, cx)))
+            .on_action(cx.listener(|this, _: &MenuUp, window, cx| this.arrow(-1, window, cx)))
             .on_action(cx.listener(|this, _: &MenuRight, window, cx| this.open_into_submenu(window, cx)))
             .on_action(cx.listener(|this, _: &MenuConfirm, window, cx| this.confirm(window, cx)))
             // Esc closes the menu, like Onshape; Left leaves a submenu.
@@ -906,8 +938,8 @@ impl Render for OsMenu {
             // Live (part-studio/53): the camera menu's border is #d7d7d7 like
             // a dropdown's; right-click menus use #ccc.
             // Static: dark mode keeps the light outline (live dk-924: #ccc).
-            .border_color(gpui_kit::rgb_static(if dropdown || camera { 0xd7d7d7 } else { 0xcccccc }))
-            .rounded(px(if dropdown { 5.25 } else { 4. }))
+            .border_color(gpui_kit::rgb_static(if dropdown || camera || documents { 0xd7d7d7 } else { 0xcccccc }))
+            .rounded(px(if dropdown || documents { 5.25 } else { 4. }))
             .when(dropdown, |d| d.py(px(4.)).min_w(px(253.)).text_color(gpui_kit::rgb(0x555555)))
             .when_some(self.min_width, |d, w| d.min_w(px(w)))
             // At least the field's width, wider for a longer option (Chrome's
@@ -915,6 +947,7 @@ impl Render for OsMenu {
             .when_some(select, |d, w| if truncate { d.w(px(w)) } else { d.min_w(px(w)) }.rounded(px(0.)).p_0())
             // 0 5px 10px rgba(0,0,0,.2).
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+            .when(documents, |d| d.shadow(Vec::new()).py(px(1.)))
             .when(native, |d| d.shadow(Vec::new()).py(px(1.)).border_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0x858585 } else { 0x767676 })))
             .text_color(pal.text)
             // Live (fs-compact-snippet-menu): the compact toolbar's snippet list is a 675 px box that scrolls.

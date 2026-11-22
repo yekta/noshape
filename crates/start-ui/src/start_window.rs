@@ -396,6 +396,8 @@ pub struct StartView {
     selected: Option<PathBuf>,
     /// The document row under the pointer: its quick actions show (live docs-import-feel-1118).
     hovered_row: Option<PathBuf>,
+    /// The folder tile under the pointer: white, its name underlined, its Trash pill shown (live docs-page-gaps-1122).
+    hovered_tile: Option<PathBuf>,
     /// A document's Versions and history page in place of the list (live 2435), from its row's menu.
     page: Option<(PathBuf, AnyView)>,
     also: Vec<PathBuf>,
@@ -633,6 +635,7 @@ impl StartView {
             query: String::new(),
             selected: None,
             hovered_row: None,
+            hovered_tile: None,
             page: None,
             also: Vec::new(),
             also_of: None,
@@ -921,7 +924,7 @@ impl StartView {
     fn selection_menu(view: Entity<StartView>, menu: OsMenu, cx: &App) -> OsMenu {
         let n = view.read(cx).selection_len();
         let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view);
-        menu.list_no_icons()
+        menu.documents_list()
             .item(OsMenuItem::new("Details").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.show_selection_panel(false, cx))))
             .item(OsMenuItem::new("Labels…").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.show_selection_panel(true, cx))))
             .item(OsMenuItem::new(format!("Move selected ({n}) to…")).on_click(move |_, window, cx| v3.update(cx, |t, cx| t.move_selected(window, cx))))
@@ -1787,7 +1790,7 @@ impl StartView {
                 view.update(cx, |this, cx| act(this, f, window, cx));
             })
         };
-        let menu = menu.list_no_icons();
+        let menu = menu.documents_list();
         if let Some(id) = trash_id {
             let (v1, v2, i1, i2) = (view.clone(), view.clone(), id.clone(), id);
             return menu
@@ -2962,7 +2965,7 @@ impl StartView {
             let (v1, v2, p1, p2) = (view.clone(), view.clone(), d.path.clone(), d.path.clone());
             let id_of = |v: &StartView, p: &Path| v.trash.item_of(p).map(|i| i.id.clone());
             return menu
-                .list_no_icons()
+                .documents_list()
                 .item(item("Details", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Details, cx)))
                 .item(OsMenuItem::new("Restore").on_click(move |_, window, cx| {
                     v1.update(cx, |t, cx| {
@@ -2979,8 +2982,14 @@ impl StartView {
                     })
                 }));
         }
+        // (167 px wide: live docs-page-gaps-1122.)
         let menu = menu
-            .list_no_icons()
+            .documents_list()
+            .min_width(167.)
+            .arrows_leave({
+                let view = view.clone();
+                move |delta, _, cx| view.update(cx, |t, cx| t.move_selection(delta, cx))
+            })
             .item(item("Open", &view, &d, |t, d, w, cx| t.open_path(d.path, w, cx)))
             // Live's "Open in new browser tab": a document always opens in a window of its own here.
             .item(item("Open in new browser tab", &view, &d, |t, d, w, cx| t.open_path(d.path, w, cx)))
@@ -3465,10 +3474,26 @@ impl StartView {
             let selected = sel.contains(f.as_os_str());
             let name = trash_id.as_ref().and_then(|id| self.trash.get(id)).map(|t| t.name.clone()).unwrap_or_else(|| folder_label(&f));
             let (f1, f2) = (f.clone(), f.clone());
+            let hovered = self.hovered_tile.as_ref() == Some(&f) && !selected;
+            // (A library folder has no Send to trash: live 2497.)
+            let trashable = trash_id.is_none() && self.library_of(&f).is_none();
+            let label = div().id("folder-name").debug_selector(|| format!("folder-name:{name}")).min_w_0().truncate().when(hovered, |d| d.underline()).child(crate::ui::user_text(name.clone()));
+            let label = if trash_id.is_none() { crate::ui::with_user_tip(label, format!("Click to open {name}."), crate::ui::TipSide::Above) } else { label };
             tiles = tiles.child(
                 h_flex()
                     .id(SharedString::from(format!("folder-{i}")))
+                    .debug_selector(|| format!("folder-tile:{name}"))
                     .map(|d| crate::ui_script::mark(d, || format!("doc_row:{name}")))
+                    .on_hover({
+                        let path = f.clone();
+                        cx.listener(move |this, on: &bool, _, cx| {
+                            let now = on.then(|| path.clone());
+                            if this.hovered_tile != now && (*on || this.hovered_tile.as_ref() == Some(&path)) {
+                                this.hovered_tile = now;
+                                cx.notify();
+                            }
+                        })
+                    })
                     .w(px(267.))
                     .h(px(48.))
                     .px(px(8.))
@@ -3477,11 +3502,33 @@ impl StartView {
                     .border_1()
                     .cursor_pointer()
                     .when(selected, |d| d.bg(pal.accent_soft).border_color(pal.accent_soft))
-                    .when(!selected, |d| d.bg(rgb(0xf5f5f5)).border_color(rgb(0xeeeeee)).hover(|d| d.bg(pal.row_hover)))
+                    .when(!selected && !hovered, |d| d.bg(rgb(0xf5f5f5)).border_color(rgb(0xeeeeee)))
+                    // Hovered: white with a soft shadow (live docs-page-gaps-1122).
+                    .when(hovered, |d| d.bg(rgb(0xffffff)).border_color(rgb(0xeeeeee)).shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(4.), spread_radius: px(0.), inset: false }]))
                     .text_size(px(14.))
                     .text_color(pal.text)
                     .child(os::glyph(self.folder_glyph(&f), 20., pal.text))
-                    .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())).into_any_element()))
+                    .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().child(label).into_any_element()))
+                    // Its Send to trash in a white pill at the right end (live's Share is cloud-only).
+                    .when(hovered && trashable, |d| {
+                        let (f, name) = (f.clone(), name.clone());
+                        d.child(
+                            h_flex().flex_none().h(px(28.)).px(px(6.)).rounded(px(14.)).bg(rgb(0xffffff)).child(
+                                div()
+                                    .id("folder-trash")
+                                    .debug_selector(|| "folder-trash".into())
+                                    .map(|d| crate::ui_script::mark(d, || "row_icon:Send to trash".into()))
+                                    .size(px(20.))
+                                    .cursor_pointer()
+                                    .tooltip(crate::ui::tooltip("Send to trash"))
+                                    .child(os::glyph(os::GLYPH_TRASH, 20., pal.text))
+                                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                        cx.stop_propagation();
+                                        this.confirm_trash(vec![(f.clone(), name.clone(), true)], window, cx);
+                                    })),
+                            ),
+                        )
+                    })
                     .when(trash_id.is_none(), |t| {
                         let target = f.clone();
                         t.drag_threshold(DOCS_DRAG_PX).on_drag(self.drag_items(selected, &f, &name, true), start_docs_drag(cx.entity().downgrade()))
@@ -3857,6 +3904,24 @@ impl StartView {
                     .into_any_element()
             }
         }
+    }
+
+    /// A list row's thumbnail, its popover over it while hovered (see [`ThumbPopover`]).
+    fn row_thumbnail(&self, d: &DocEntry) -> AnyElement {
+        let anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let (a2, img) = (anchor.clone(), d.thumbnail.clone());
+        div()
+            .id("doc-thumb")
+            .debug_selector(|| format!("doc-thumb:{}", d.name))
+            .relative()
+            .flex_none()
+            .child(self.thumbnail(d, 64.0, 36.0, false))
+            .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
+            .tooltip(move |_, cx| {
+                let (img, anchor) = (img.clone(), anchor.get());
+                cx.new(|_| ThumbPopover { img, anchor }).into()
+            })
+            .into_any_element()
     }
 
     fn open_badge() -> AnyElement {
@@ -4416,12 +4481,14 @@ impl StartView {
                             .pl(px(16.))
                             .pr(px(15.))
                             .gap(px(14.))
-                            .child(self.thumbnail(d, 64.0, 36.0, false))
+                            .child(self.row_thumbnail(d))
                             .child(self.inline_rename_field(&d.path, cx).unwrap_or_else(|| {
                                 // A plain click on the name opens the document (live2 11-13); Ctrl / Shift select as on the row.
                                 let d5 = d.clone();
-                                div()
-                                    .id("doc-name")
+                                let name = div().id("doc-name").debug_selector(|| format!("doc-name:{}", d.name));
+                                // Live docs-page-gaps-1122: "Click to open <name>." above the name.
+                                let name = if d.trashed { name } else { crate::ui::with_user_tip(name, format!("Click to open {}.", d.name), crate::ui::TipSide::Above) };
+                                name
                                     .min_w_0()
                                     .truncate()
                                     .text_color(if d.broken { pal.warning } else { pal.text })
@@ -5646,6 +5713,71 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
             s.select_all(window, cx);
         })
     });
+}
+
+
+/// A document's thumbnail large in a white popover above its list row's icon, its arrow pointing down at the icon (live
+/// docs-page-gaps-1122: 302 x 183, fading in).
+struct ThumbPopover {
+    img: Option<Arc<RenderImage>>,
+    anchor: Bounds<Pixels>,
+}
+
+impl Render for ThumbPopover {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let (w, h, arrow) = (px(302.), px(183.), px(8.));
+        let a = self.anchor;
+        let x = (a.center().x - w * 0.5).max(px(2.)).min(window.viewport_size().width - w - px(2.));
+        let at = point(x, a.top() - h - arrow);
+        let tip_x = a.center().x - x;
+        let border = rgb(0xd7d7d7);
+        let body = div()
+            .debug_selector(|| "thumb-popover".into())
+            .w(w)
+            .h(h)
+            .p(px(8.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .bg(rgb(0xffffff))
+            .border_1()
+            .border_color(border)
+            .rounded(px(4.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(6.), spread_radius: px(0.), inset: false }])
+            .map(|d| match &self.img {
+                Some(img) => d.child(gpui_kit::img(img.clone()).size_full().object_fit(ObjectFit::Contain)),
+                None => d.child(icon(os::GLYPH_DOCUMENT).size(px(40.)).text_color(p().text_faint)),
+            });
+        // The arrow: white, outlined on its two slanted sides, over the box's bottom edge.
+        let tip = canvas(
+            |_, _, _| {},
+            move |b, _, window, _| {
+                let (l, r, m) = (point(b.left(), b.top()), point(b.right(), b.top()), point(b.center().x, b.bottom()));
+                let mut fill = PathBuilder::fill();
+                fill.move_to(l);
+                fill.line_to(r);
+                fill.line_to(m);
+                fill.close();
+                if let Ok(path) = fill.build() {
+                    window.paint_path(path, rgb(0xffffff));
+                }
+                let mut edge = PathBuilder::stroke(px(1.));
+                edge.move_to(l);
+                edge.line_to(m);
+                edge.line_to(r);
+                if let Ok(path) = edge.build() {
+                    window.paint_path(path, border);
+                }
+            },
+        )
+        .absolute()
+        .top(h - px(1.))
+        .left(tip_x - arrow)
+        .w(arrow * 2.)
+        .h(arrow + px(1.));
+        let content = div().relative().w(w).h(h + arrow).child(body).child(tip);
+        anchored().position(at).snap_to_window().child(content.with_animation("thumb-fade", Animation::new(crate::ui::TOOLTIP_FADE_IN), |c, t| c.opacity(t)))
+    }
 }
 
 #[cfg(test)]

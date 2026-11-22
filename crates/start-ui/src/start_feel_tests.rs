@@ -389,3 +389,104 @@ fn an_emptied_search_box_keeps_the_results_until_enter(cx: &mut TestAppContext) 
     let focused = cx.update_window(w, |_, window, cx| gpui_kit::Focusable::focus_handle(search.read(cx), cx).is_focused(window)).unwrap();
     assert!(!focused, "⊗: the box loses focus");
 }
+
+/// Live docs-page-gaps-1122: a document's menu is 167 px wide with no shadow; ↓ closes it and moves the list's selected
+/// row down, ↑ (with a menu open again) up.
+#[gpui::test]
+fn arrows_close_a_documents_menu_and_move_the_selection(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "menu-arrows");
+    let open_menu = |cx: &mut TestAppContext, name: &str| {
+        let at = row_at(cx, w, name);
+        let mut vcx = VisualTestContext::from_window(w, cx);
+        vcx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
+        vcx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
+        draw(cx, w);
+    };
+    let at = row_at(cx, w, "B");
+    click(cx, w, at, Modifiers::none());
+    open_menu(cx, "B");
+    let menu = cx.read(crate::os_menu::ui_state).expect("a menu");
+    assert_eq!(menu["rows"][0], "Open", "{menu}");
+    let b = cx.read(crate::os_menu::open_bounds).expect("the menu's bounds");
+    assert!(b.size.width >= px(167.), "167 px wide: {b:?}");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("down");
+    draw(cx, w);
+    assert!(cx.read(crate::os_menu::ui_state).is_none(), "↓ closed the menu");
+    assert_eq!(selected(cx, &view), ["C"], "↓ moved the selection down");
+    open_menu(cx, "C");
+    VisualTestContext::from_window(w, cx).simulate_keystrokes("up");
+    draw(cx, w);
+    assert!(cx.read(crate::os_menu::ui_state).is_none(), "↑ closed the menu");
+    assert_eq!(selected(cx, &view), ["B"], "↑ moved the selection up");
+}
+
+/// Live docs-page-gaps-1122: over a document's name the tooltip "Click to open <name>." shows above it.
+#[gpui::test]
+fn a_documents_name_tips_click_to_open_above_it(cx: &mut TestAppContext) {
+    let (w, _view) = page(cx, "name-tip");
+    let name = bounds(cx, w, "doc-name:C");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(name.center(), None, Modifiers::none());
+    for _ in 0..20 {
+        vcx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, w);
+    }
+    crate::ui_script::clear_tooltip();
+    draw(cx, w);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Click to open C."));
+}
+
+/// Live docs-page-gaps-1122: a hovered folder tile shows its Send to trash (in a white pill at its right end) and its
+/// name tips "Click to open <name>." above it; another tile shows nothing.
+#[gpui::test]
+fn a_hovered_folder_tile_shows_its_trash_and_name_tip(cx: &mut TestAppContext) {
+    let (w, view) = page(cx, "tile-hover");
+    let dir = std::env::temp_dir().join(format!("noshape-start-feel-tiles-{}", std::process::id()));
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            (v.view, v.folders_open, v.outside) = (ViewMode::Grid, true, vec![dir.join("Parts"), dir.join("Tools")]);
+            v.refresh_body(cx);
+        })
+    });
+    draw(cx, w);
+    draw(cx, w);
+    let tile = bounds(cx, w, "folder-tile:Parts");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(tile.center(), None, Modifiers::none());
+    draw(cx, w);
+    let trash = bounds(cx, w, "folder-trash");
+    assert!(tile.contains(&trash.center()) && trash.center().x > tile.center().x, "the pill at the tile's right end: {trash:?} in {tile:?}");
+    let name = bounds(cx, w, "folder-name:Parts");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(name.center(), None, Modifiers::none());
+    for _ in 0..20 {
+        vcx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, w);
+    }
+    crate::ui_script::clear_tooltip();
+    draw(cx, w);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Click to open Parts."));
+    let other = bounds(cx, w, "folder-tile:Tools");
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(other.center(), None, Modifiers::none());
+    draw(cx, w);
+    let trash = bounds(cx, w, "folder-trash");
+    assert!(other.contains(&trash.center()), "only the hovered tile's pill: {trash:?} in {other:?}");
+}
+
+/// Live docs-page-gaps-1122: over a row's thumbnail a 302 x 183 popover shows the thumbnail large above the icon,
+/// centred on it.
+#[gpui::test]
+fn a_rows_thumbnail_pops_up_large_above_it(cx: &mut TestAppContext) {
+    let (w, _view) = page(cx, "thumb-pop");
+    let thumb = bounds(cx, w, "doc-thumb:E");
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(thumb.center(), None, Modifiers::none());
+    for _ in 0..20 {
+        vcx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, w);
+    }
+    let pop = bounds(cx, w, "thumb-popover");
+    assert_eq!((pop.size.width, pop.size.height), (px(302.), px(183.)), "{pop:?}");
+    assert!(pop.bottom() < thumb.top() && thumb.top() - pop.bottom() <= px(10.), "just above the icon: {pop:?} {thumb:?}");
+    assert!((pop.center().x - thumb.center().x).abs() < px(1.), "centred on it: {pop:?} {thumb:?}");
+}

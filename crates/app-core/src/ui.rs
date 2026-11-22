@@ -605,6 +605,12 @@ pub fn with_tip_kept_on_click(el: Stateful<Div>, text: impl Into<SharedString>, 
     tip_with(el, text.into(), side, false, Pixels::ZERO, true)
 }
 
+/// [`with_tip`] whose text holds a user's name (never translated): the documents page's "Click to open <name>." above a
+/// name (live docs-page-gaps-1122).
+pub fn with_user_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
+    tip_with(el, text.into(), side, true, Pixels::ZERO, false)
+}
+
 /// A list row's tooltip, beside the row (live part-studio/16, 95), showing
 /// its stored name (user text, never translated).
 pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
