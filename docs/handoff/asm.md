@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 08:47 UTC) — RESUME HERE
+## State (2026-11-22 09:54 UTC) — RESUME HERE
 - LANDING the whole stack in one land.sh (rebased on main 06:4x): f3a8ff93 welding (33829c47 failed only on dx's
   flaky prefs images_library test; dx fixes it order-free), the outline band / triad drag commits, 55f3ff11 followers +
   Replicate seed, e658bb03 assembly config row menu (config_edit_option for assemblies, AGENT_API regenerated, filter
@@ -20,7 +20,9 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   (+1/2/5), fed22d Fillet 4/5/24/25 still fail.
 - Infento rerun with the welding fix timed out at 7200 s in the mate checks (121 checked, ~32 s each on a loaded
   vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
-- QUEUED a8722d2a (13 commits, 06:5x; checking again since 08:22): don't land again till it lands; then tell qa the sha.
+- a8722d2a FAILED 09:27 (e2e a_moved_instance_brings_its_mated_followers: solve_placed's moved-part-alone trial snapped a
+  Fastened part back). Fixed: followers solved first (fol2.log: e2e 281, assembly 168, assembly-ui 172, clippy 0).
+  Re-landed with Isolate + result store (see LAND line below); tell qa the sha when it lands.
 - ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1) COMMITTED 2b04436c8 (r9-1122.log green; land after a8722d2a):
   app-core isolate_ui: ☐ Show internal geometry above Select transparent geometry (28 px rows, 220 × 231 as live
   ps-panel), Isolate's slider a plain line "Adjust opacity"; `isolate_alpha` (0 = not drawn .. 0.9, ticked x0.55);

@@ -451,7 +451,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   (Area 1000 mm²); ours selects the Sketch 3 line (Length 28.284 mm). Step 27, 7 px away, ours picks the face as live.
   tickets/wf36-pick-sketch-line.png (live left; ours draws the line selected). Workflow 36's 65-step take otherwise = live:
   selections at every step (Escape keeps the measure selection; a second click on a lone vertex clears it) and all 9 other readouts.
-- [ ] P1 **ISOLATE-SHOW-INTERNAL-GEOMETRY (asm)** (workflow 35 step 47, two-blocks asm, green 17157c2fa): the Isolate panel (instance menu >
+- [ ] fixed asm 11-22 (to verify; 6e6c4a57d: the box above Select transparent geometry, 28 px rows, 220 × 231 panel; the slider the left-out parts' opacity, one remembered knob per box state shared with the Part Studio; ticked, the isolated parts drawn in front, the others' edges faint through them) P1 **ISOLATE-SHOW-INTERNAL-GEOMETRY (asm)** (workflow 35 step 47, two-blocks asm, green 17157c2fa): the Isolate panel (instance menu >
   Isolate…): live lists Transparency controls, **Show internal geometry**, Select transparent geometry, slider, Component controls,
   Expand: connectivity, slider; ours has no Show internal geometry row. tickets/wf35-isolate-panel.png. Workflow 35 otherwise = live
   (Revolute offset 10, Fastened places Part 2 <2> as live, Hide/Show, Exit isolate, Section view, Turn off section view); runner gap: the
