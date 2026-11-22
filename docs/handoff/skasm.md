@@ -1,23 +1,29 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 07:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 08:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 07:58 UTC)
-- QUEUED 408ac79d (checking since 07:19, batch of 4): FEEL-BEND-FACE-PICKED-LOOK (filled face outlined whole),
-  SKETCH-USE-VERTEX-OTHER-SKETCH (other_sketch_point_at, 5 px), SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME,
-  SKETCH-TRIM-SHORT-END (trim_pick_at), SKETCH-OFFSET-DEFAULT-SIDE, SKETCH-MIRROR-LINE-LOOK (MIRROR_LINE 0xbdc764),
-  PASTE-SKETCH-CENTRED (centre_pasted_sketch; corner dots wait on REQUESTS skasm 05:57), EXTRA-UNFOLD-REFOLD-TOOLS.
-- TO LAND after it (worktree, clippy + tests green on vibex8 07:56):
+## In flight (11-22 08:45 UTC)
+- QUEUED 408ac79d (alone in the queue's check since 08:22): FEEL-BEND-FACE-PICKED-LOOK, SKETCH-USE-VERTEX-OTHER-SKETCH,
+  SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME, SKETCH-TRIM-SHORT-END, SKETCH-OFFSET-DEFAULT-SIDE,
+  SKETCH-MIRROR-LINE-LOOK, PASTE-SKETCH-CENTRED (first half), EXTRA-UNFOLD-REFOLD-TOOLS.
+- TO LAND after it (worktree; clippy + tests green on vibex8):
   - 8b31621ae / 36d0ed547: ui.sketch_hover_held_at: a mirrored entity and a chain's end after Esc stay plain under the
-    still pointer until it moves (wf22 s11, s35). Tests a_mirrored_entity_is_plain_until_the_pointer_moves,
-    esc_ending_a_chain_leaves_its_end_plain_until_the_pointer_moves.
-  - b2d4f1303 P2 CORNER-RELIEF-TOO-SMALL-WARN: a Square - Sized relief narrower than the bend allowance warns
-    SHEET_METAL_CORNER_UNDER_SIZED (custom host sheetmetal.rs corner_reliefs). T2 an_under_sized_corner_relief_warns.
-- App replays on vibe2 (~/tmp/skasm/wf, binary ~/tmp/skasm/noshape 07:56 incl. all above): wf22, 29, 12 running.
-- Closed, no app change: FORM-REMEMBERED (runner seed; qa seeded, 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0
-  wf32: live swallowed the press after a drag = lost input, DECISIONS 11-07; Esc keeps a sketch selection, behaviours
-  189 / 32552; told qa to change the workflow).
+    still pointer until it moves (wf22 s11, s35; replayed on vibe2: match).
+  - b2d4f1303 P2 CORNER-RELIEF-TOO-SMALL-WARN: Square - Sized narrower than the bend allowance warns (T2 green).
+  - 33652bc4d: a line-line Distance's default label at the midpoint on its dimension line (wf22 s35's Offset "5").
+  - 7f474e30d SKETCH-SELECTED-GLYPH-OFFSET: Show constraints off, a point's glyph row centred 40 px above it (+4 px;
+    behaviours "skasm point glyph placement"); Show constraints on keeps up-left + leader. Not done: live moves the row
+    when its spot is taken by lingering glyphs (an inference, not measured).
+  - bf9db14a8 SM-FLAT-VIEW-FIT (fit half): Viewport::zoom_to_fit_margin(12 px) for the flat's first fit; sm matrix
+    row "flat view / fitted". Orientation (live: model +X up, flat x = -Y for plate-bend's THICKEN plate) waits on
+    REQUESTS skasm 08:38 (evPlane x of a THICKEN face; first segment / long side?). flat_place uses PlaneFrame::face_x.
+  - 679420eb2 PASTE-SKETCH-CENTRED: centred on the mean of line end points (live's L). The corner dots are psui's
+    (SKETCH-ON-FACE-EXITED-LOOK, builder.rs FreeEnds; psui confirmed 08:45).
+- Closed, no app change: FORM-REMEMBERED (runner seed, qa 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0 wf32:
+  live's take swallowed the press after a drag = lost input, DECISIONS 11-07; told qa to change the workflow).
+- Replay kit: vibe2 ~/tmp/skasm/wf (run.sh, starts.json, 05/11/12/22/29 json), binary ~/tmp/skasm/noshape (07:56),
+  shots ~/tmp/skasm/out-wf; compares in /root/skasm-scratch/wfcmp.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
@@ -36,10 +42,7 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
 ## qa tickets waiting
-- P1 SM-FLAT-VIEW-FIT (wf11 s18) and P1 SKETCH-SELECTED-GLYPH-OFFSET (wf13): REQUESTS skasm 11-22 05:1x (glyph rects per
-  corner in iso / normal view with 1-3 glyphs; wf11 flat camera + face). Live wf13 iso: 1 glyph centred (-3,-39) from
-  the corner, a pair (-60,-19) / (-38,-19); behaviours 22938 normal view: fixed (-27,-27)..(-8,-8). Ours: box top-left
-  (-27-22k, -26) (sketch.rs ~4580).
+- (none besides the flat orientation above)
 
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
