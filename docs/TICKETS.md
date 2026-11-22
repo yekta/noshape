@@ -408,6 +408,11 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P1 **SURFACE-LOFT-GUIDE-FAILS (core)** (workflow 12 steps 18-25, curves, seeded Loft = Surface, green 17157c2fa): Surface Loft, New,
   profiles Edge of Sketch 2 + Edge of Sketch 3, Guides and continuity ticked, guide Edge of Sketch 4, ✓: live builds the surface
   ("Surfaces (1)", the preview shows it while the dialog is open); ours shows no preview and Loft 1 ends red. tickets/wf12-surface-loft-guide.png.
+- [ ] P1 **DRW-TITLEBLOCK-EDIT-BOX (studios)** (workflow 31 steps 38-42, holes-plate-drawing, green d15cec8db): dblclick the title
+  block's TITLE cell (sheet (230, 37) mm): live's edit box spans the whole cell (the ruler bar the cell's width, text centred,
+  "PLATE 60X40" centred while typing); ours opens a narrow box at the cell's left end (a short ruler, text left-aligned).
+  tickets/wf31-titleblock-edit-box.png (live left). Workflow 31 otherwise = live: Section A-A, Detail B (2:1), the 3 dimensions, the
+  3X hole callout, the BREAK ALL SHARP EDGES note.
 - [ ] P0 **FEEL-PICK-SKETCH-LINE-THROUGH-FACE (psui)** (workflow 36 step 1, bracket, green 17157c2fa): with Measure, a click at
   (1104, 484) on the base's top face where Sketch 3's line is drawn faintly across it (seen through the face): live selects the face
   (Area 1000 mm²); ours selects the Sketch 3 line (Length 28.284 mm). Step 27, 7 px away, ours picks the face as live.
