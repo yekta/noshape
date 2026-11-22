@@ -674,8 +674,10 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [x] P2 **FS-DBLCLICK-BRACKETS (studios)**: double-click `import` on line 2: live outlines the `(` after it and its `)` (caret at the
   word's end); ours draws no bracket boxes with the word selected.
   **Fixed (studios 11-22):** the bracket boxes show at the caret with a selection too.
-- [ ] P2 **FS-DRAG-SELECT-BAND (studios)**: drag from line 1's start to inside line 2: live paints line 1's selection the full width
+- [x] P2 **FS-DRAG-SELECT-BAND (studios)**: drag from line 1's start to inside line 2: live paints line 1's selection the full width
   (#9ec9ff) and drops the active-line band; ours stops line 1's selection at the text end and keeps the #ededed band on line 2.
+  **Fixed (studios 11-22 12:22):** a selection over several lines runs to the full width but on its last line, no band (Ace's
+  line style; vendored editor, code editor mode only).
 - [x] (fixed psui 11-22 03:36: "empty" in a drawing, a Variable or Feature Studio = live's window pixel (1560, 960); ace_word = the nth whole word of the code, at its middle (feature_studio ui_tests ace_line_keys…); README) P2 **UIS-EMPTY-NON-PS (psui)**: ui-script's `{"empty": true}` fails outside a Part Studio / Assembly ("not a drawing target",
   "not in a Part Studio, an Assembly or a Drawing"), and `ace_word` (live's Feature Studio target) is unknown; walk 9 used px
   stand-ins. Live's drwm / vsm / fsm scenarios should replay as recorded.
