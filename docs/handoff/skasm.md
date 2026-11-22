@@ -3,16 +3,25 @@
 Updated 2026-11-22 18:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (19:17)
-- QUEUED 09b4b72b (19:16): the whole stack (Bend fix, corner breaks + model F + parity allowances, box fill, tickets
-  owner move, Dimension placement, assembly::inference, length box, sketch-edit-feel) + the land-fail fix: the Bend
-  test failed 5/5 after the rebase (not a race): the Bend preview lifts the clicked plate end 23 mm toward the eye, so
-  held_face_under's depth-equality took the held face out. Now: it leaves only where the preview has nothing there or
-  in front (Shell's removed face). Bend 3x, Shell re-click, sm:: + preview tests, clippy green on vibex8.
-- asm's mc-infer landed (4a9b608b1); psui 3ff88768b not on main at 19:16. Next: wire assembly::inference::choose into
-  assembly_view.rs (~3150), then part-studio-ui inference.rs after psui lands; then the FEEL-MC-* list below.
-- REQUESTS 18:08 (live, open): mc-reach-1122 R1-R6 (reach rule, edge reach with the tool, rim back half, Extend past
-  the boundary).
+## NEXT (20:30)
+- LANDED 09b4b72b (the whole 11-22 stack). QUEUED d2b509fc (20:2x): assembly + Part Studio take the shared chooser
+  (assembly::inference::choose; Part Studio passes entered=false: its points come after the pointer is on the entity,
+  psui's the_mate_connector_feature_infers_as_live wants the corner on the first hover); Trim-on-circle test (live sk3:
+  already as live); a level near a model edge's midpoint -> HORIZONTAL + VERTICAL to a point MIDPOINT on the used edge
+  (WOKEN_EDGE_MID, live lenbox E; wf05 step 11 test updated); Extend preview past the boundary, snap only with the
+  pointer on it, picked line SELECTION orange once snapped (extend_crossed; live mc-reach-1122 R6). Case B of R6 (click
+  2 mm off the line past the boundary drops the pick) not done: no clear rule.
+- asm will move EDGE_END_REACH_PX / the vertex pick in assembly/inference.rs for qa's FEEL-MC-EDGE-BEFORE-VERTEX-ASM
+  after d2b509fc lands (shared: the Part Studio twin moves with it).
+- MC left (Part Studio): VERTEX-FROM-FACE (vertex_glyph in assembly/inference.rs, wire into part-studio hover),
+  EDGE-TRIAD-HIDDEN (Z on top), PS-VERTEX-LOOK (white disc, orange rim), MARKER-SHAPES (midpoint squares in scene
+  InferenceMarks), CAP-MARKER-HIDDEN (check asm's on-top dots from 3900b9e1), re-score SHIFT-NEAREST + PICKED-OWNER
+  (psui's batch landed), MARKER-REACH + EDGE-PICK-RADIUS wait on live R1-R5.
+- c2-constrained-surface (P2, after the P0s): refs now translate except the patterned sketch points: live's 960
+  vertices are Linear pattern 1's sketch copies (feature pattern of Sketch 1+2, centred 4 -> 7 instances; ours makes
+  them: pattern.rs copy_sketches, ids mix(pattern, sketch, code)|1<<62). The translator (ops/src/parity.rs
+  sketch_point_at) only searches sketch features; needs an op exposing the copies' points (SketchEntity{copy, entity})
+  + e2e test. Run: ut3t.sh c2-constrained-surface on vibex8 (via ~/bin/slot).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
