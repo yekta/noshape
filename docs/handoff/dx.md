@@ -13,25 +13,20 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 22:57 11-21 (read first)
+## STATE 23:28 11-21 (read first)
 TASK (user 21:5x, two speed items, both user-facing): (1) fast open honestly measured: open -> first frame WITH the model
 on infento, scissor, isaac, rings, 400-hole plate, vs live; target <= 0.5 s; close gaps >= 2x and >= 100 ms. (2) hover
 latency on heavy docs (qa: plate 353-487 ms, 1000-inst asm 560-750, 30-feature 150-245): profile, cut what's > ~100 ms.
-Builds on the Mac or vibex8 (vibe2 = land queue).
-- COMMITTED, NOT QUEUED (on top of e418ada0 + 9bfd6596f docs):
-  76d128b9c display_cache: key "<tag>.<content>.<build16>"; a doc row of the same content from ANOTHER build stands in
-    (load / load_keyed via `shows`, only if `same_layout`: decoded value re-encodes to the same bytes). Before: every
-    release missed the rows -> full regen on first open after each update. Test display_cache:: 4/4 (Mac).
-    BEFORE LANDING: verify on real docs that same_layout passes (StudioDisplay / assembly Snapshot may hold maps ->
-    always a miss = old behaviour, safe): build I on vibex8, open fo-H-* docs (rows written by noshape-H) with it.
-  860c7fb02 render prewarm: a software adapter prewarms 1x MSAA (built 4x first: ~100 ms render thread, unused).
-    Test a_software_rasteriser (Mac). Clippy app-core/render/model-core/model clean (Mac).
-  e16205d6e importing.rs: STL open pieces = separate surfaces, no composite (file parts PVZ/OBJ keep the closed
-    composite). Test features_b::an_stl_s_open_pieces_are_surfaces; features_b 68/68 (Mac).
-- QUEUED e418ada0 (21:53, #4): DRW-VIEW-CENTRE + handoff; carries bbd56cd5 (SETLIB-IMAGES), b51ca6b9 (STEP b-surf).
-- vcex (22:1x, ops-vcB): duct DXF + options match; bottle STILL 0.015 in off (Front/Right) -> DRW-VIEW-CENTRE's axes
-  rule doesn't move the bottle: cause unknown, reopen. STL rows "1 parts" = the composite -> fixed by e16205d6e.
-  Delete vibex8 ~/agents/dx-keep/bin/ops-vcB (A/B done). noshape-H (release app, 22:18) kept for A/B; delete after.
+Builds on the Mac or vibex8 (vibe2 = land queue; my vibe2 dx-open target deleted 23:00, lead asked).
+- QUEUED 21f0ca98 (23:2x, 9 commits): 76d128b9c (display row of another build stands in if same_layout), 860c7fb02
+  (software prewarms 1x), e16205d6e (STL open pieces = surfaces), handoffs; carries e418ada0 (DRW-VIEW-CENTRE, checking).
+- VERIFY 76d128b9c (after landing is fine, it is safe either way): build I = vibex8 ~/agents/dx-keep/bin/noshape-I;
+  script vibex8 ~/agents/dx-keep/bin/xbuild.sh <bin> <tag> doc:tab.. (run 1 writes rows, rows' build suffix rewritten to
+  fff.., run 2 fresh cache must show "cached display in"). Rows written by H (old key format) never match: expected.
+- UNCOMMITTED: crates/render/tests/instancing_bench.rs software_pick_cost (T2 bench: pick pass + frame time vs
+  triangles on a software adapter); running on vibex8 -> /root/dx-scratch/fo/pickbench.out. If the pick pass grows
+  with triangles (llvmpipe's vertex stage is one thread), cut it: pick-only index buffer in spatial chunks with boxes,
+  draw only chunks in the pick area (software only; no look change). Then the 5x-avg wait shrinks with it.
 - OPEN numbers (vibex8 llvmpipe, load 11-20, ms from launch; /root/dx-scratch/fo/openH.out, script fo/open3.sh,
   logs vibex8 ~/tmp/dx/fo-H-<doc>/run{1,2,3}.log; run1 = no rows, run2 = rows + fresh cache, run3 = rows + same cache):
   l30 3050 / 1606 / 1170; big-plate 2189 / 1800 / 1375; pins-1000 1737 / 1660 / 1509; rings 17153 / 1815 / 1337;
@@ -56,8 +51,13 @@ Builds on the Mac or vibex8 (vibe2 = land queue).
   Gap: plate top face ours ~350 vs 45 (both software). Real-GPU hover (perf.yml 11-04 pins-1000): p50 23-32 ms.
   Levers: software pick cheaper (cull instances / per-face ranges outside the pick rect frustum; or pick ids in the
   colour pass so picks are always "covered") -> also shrinks the 5x-avg wait; highlight without a full re-render.
-- NEXT: verify 76d128b9c on real docs (build I), land the 3 commits; report to lead (<= 5 lines): open table, isaac /
-  scissor regen gap (core), macOS perf.yml broken, Mac GUI decision; then the software pick cut.
+- HOVER breakdown 23:0x (vibex8 under load 11-14, plate, frame log + NOSHAPE_PERF_PERIOD=4): move->ask ~200 (5x avg
+  pick, cap 250), pick ~70-100 (alone), hover frame r.gpu_ms 150-220, gpui.present 55-75. NOSHAPE_PERF_SKIP A/B
+  (lines / silhouettes / backsil / ao / meshes): each cuts the frame only ~10-30%: no single pass dominates.
+  Plate 116,812 triangles fine (20,812 preview). Overlay highlight (no full re-render) = big renderer change ->
+  decision for the lead. perf record impossible on vibex8 (paranoid 4).
+- NEXT: xbuild verify; pick bench -> chunked pick cut; report to lead (<= 5 lines): open table, isaac / scissor regen
+  gap (core), macOS perf.yml broken since 11-18, Mac GUI decision, overlay-highlight decision.
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180): Part 1 is one revolved solid (14 closed
   edges), the arc is the lip torus's outline; its inner 41.8..90 part should be hidden by the torus's near side, ours
