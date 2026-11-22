@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 23:39 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 23:58 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -49,8 +49,8 @@ psui APPEARANCE-PART-UNDER-FACE-COLOURS (test + app check after dx). Both told. 
 Render side already as live (display.rs: part props > import colour; a face colour over it).
 Corner break arrow: solid in our render at f5ebb8b3 (dumped): ask qa to re-check after it lands.
 EDIT-BODY-SHADE stays open (ours top (118,127,133), live (132,147,155)).
-Queue: P1
-CONFIG-FILTER-HELP-STILL-POINTER, P2 FEEL-ROW-TIP-AFTER-DBLCLICK, UIS-LIST-ROW-MENU-ROWS, CUSTOM-FEATURE-ROW-ICON,
+Queue: (CONFIG-FILTER-HELP-STILL-POINTER landed: app-core `ui::help_tooltip`, title beside the box then the 400 px
+help under it after TOOLTIP_EXPAND_DELAY; tell asm, its assembly panel has the same box) P2 FEEL-ROW-TIP-AFTER-DBLCLICK, UIS-LIST-ROW-MENU-ROWS, CUSTOM-FEATURE-ROW-ICON,
 CUSTOM-FEATURE-DIALOG-HELP, UIS-FEATURE-INITIALS (row test-named "feature:…" only, mod.rs ~4770).
 - CONFIG-FILTER-HELP-STILL-POINTER: we have no hover help on the filter box at all (only the funnel's menu,
   config_panel.rs CONFIG_FILTER_COMMANDS); live: 'Filter inputs' tooltip, then a 'Supported filters' popover. To build.

@@ -1325,7 +1325,7 @@ impl PartStudioView {
                         .child(crate::ui::glyph("filter", 19., pal.text))
                         .tooltip(crate::ui::tooltip("Filter configuration inputs"))
                         .os_dropdown_menu("cfg-filter-menu", false, move |mut menu, _, _| {
-                            for (cmd, text) in CONFIG_FILTER_COMMANDS {
+                            for (cmd, _, text) in CONFIG_FILTER_COMMANDS {
                                 let f = filter.clone();
                                 menu = menu.item(crate::os_menu::OsMenuItem::new(format!("{cmd} – {text}")).on_click(move |_, w, cx| {
                                     f.update(cx, |s, cx| {
@@ -1338,7 +1338,11 @@ impl PartStudioView {
                         })
                 })
                 .child(
+                    // Live (workflows-1123 06 s2-s4): resting on it shows "Filter inputs" beside it, then the
+                    // supported filters under it.
                     div()
+                        .id("cfg-filter-box")
+                        .debug_selector(|| "cfg-filter-box".into())
                         .flex_1()
                         .relative()
                         .ml(px(11.))
@@ -1348,7 +1352,12 @@ impl PartStudioView {
                         .rounded(px(2.))
                         .flex()
                         .items_center()
-                        .child(crate::ui::input_with_placeholder(&filter, "Filter inputs", cx).appearance(false).small().text_size(px(13.33)).pl(px(6.))),
+                        .child(crate::ui::input_with_placeholder(&filter, "Filter inputs", cx).appearance(false).small().text_size(px(13.33)).pl(px(6.)))
+                        .child(canvas({
+                            let a = self.ui.cfg_filter_anchor.clone();
+                            move |b, _, _| a.set(b)
+                        }, |_, _, _, _| {}).absolute().top(px(-1.)).left(px(-1.)).right(px(-1.)).bottom(px(-1.)))
+                        .tooltip(crate::ui::help_tooltip("Filter inputs", config_filter_help_text(), config_filter_help, self.ui.cfg_filter_anchor.clone())),
                 )
                 .child(toggles)
                 .child({
@@ -3611,15 +3620,45 @@ impl PartStudioView {
     }
 }
 
-/// The Configurations panel's filter commands (live 1712, the funnel's menu).
-const CONFIG_FILTER_COMMANDS: [(&str, &str); 6] = [
-    (":name", "Filter inputs by name"),
-    (":featurescriptid", "Filter inputs by Featurescript ID"),
-    (":featurename", "Filter inputs if they affect features/instances with a given name"),
-    (":part", "Filter inputs by the parts they affect"),
-    (":hasvisibilitycondition", "Filter inputs by whether they have a visibility condition or not"),
-    (":excludedfromproperties", "Filter inputs by whether they are excluded from properties or not"),
+/// The Configurations panel's filter commands (live 1712, the funnel's menu) and their help's argument (live
+/// workflows-1123 06 s3).
+const CONFIG_FILTER_COMMANDS: [(&str, &str, &str); 6] = [
+    (":name", "name", "Filter inputs by name"),
+    (":featurescriptid", "featurescriptId", "Filter inputs by Featurescript ID"),
+    (":featurename", "featureName", "Filter inputs if they affect features/instances with a given name"),
+    (":part", "partName", "Filter inputs by the parts they affect"),
+    (":hasvisibilitycondition", "true/false", "Filter inputs by whether they have a visibility condition or not"),
+    (":excludedfromproperties", "true/false", "Filter inputs by whether they are excluded from properties or not"),
 ];
+
+/// The filter box's help under its "Filter inputs" title (live workflows-1123 06 s3): the supported filters, each a
+/// bold command, its italic argument and what it does, then two examples.
+const CONFIG_FILTER_EXAMPLES: [(&str, &str, &str); 2] = [
+    ("For example, ", ":featurename extrude 1", " will filter to display configuration inputs that affect Extrude 1. It will also display inputs that affect Extrude 10, Extrude 11, Extrude 12, etc."),
+    ("Use quotation marks to match the filter query exactly: e.g., ", ":featurename \"extrude 1\"", " will only display inputs affecting Extrude 1."),
+];
+
+fn config_filter_help() -> AnyElement {
+    let bold = || HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() };
+    let italic = || HighlightStyle { font_style: Some(FontStyle::Italic), ..Default::default() };
+    let items = CONFIG_FILTER_COMMANDS.iter().map(|(cmd, arg, text)| {
+        let line = format!("{cmd} {arg}: {text}");
+        let (b, i) = (0..cmd.len(), cmd.len() + 1..cmd.len() + 1 + arg.len());
+        h_flex().items_start().child(div().w(px(20.)).flex_none().flex().justify_center().child("•")).child(div().flex_1().min_w_0().child(StyledText::new(line).with_highlights([(b, bold()), (i, italic())])))
+    });
+    let examples = CONFIG_FILTER_EXAMPLES.iter().map(|(before, cmd, after)| {
+        let b = before.len()..before.len() + cmd.len();
+        div().child(StyledText::new(format!("{before}{cmd}{after}")).with_highlights([(b, bold())]))
+    });
+    v_flex().child(div().child("Supported filters")).child(v_flex().mb(px(14.)).children(items)).children(examples).into_any_element()
+}
+
+/// The help's words (the parity recorder reads them).
+fn config_filter_help_text() -> String {
+    let items = CONFIG_FILTER_COMMANDS.iter().map(|(cmd, arg, text)| format!("{cmd} {arg}: {text}"));
+    let examples = CONFIG_FILTER_EXAMPLES.iter().map(|(a, b, c)| format!("{a}{b}{c}"));
+    std::iter::once("Supported filters".to_string()).chain(items).chain(examples).collect::<Vec<_>>().join(" ")
+}
 
 impl PartStudioView {
     /// Whether a configuration input passes the Filter inputs box: plain text

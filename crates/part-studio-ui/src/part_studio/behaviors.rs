@@ -762,6 +762,8 @@ pub struct UiState {
     /// being edited (its key) and the filter text.
     pub cfg_properties_tab: bool,
     pub cfg_only_kinds: [bool; 3],
+    /// The Configurations panel's filter box, last drawn (its help tooltip sits beside and under it).
+    pub cfg_filter_anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
     pub cfg_folded: std::collections::HashSet<String>,
     /// While an input is dragged by its header: the section it would land
     /// next to, and whether after it.
@@ -1091,6 +1093,7 @@ impl UiState {
             configure_pick: None,
             cfg_properties_tab: false,
             cfg_only_kinds: [false; 3],
+            cfg_filter_anchor: Default::default(),
             cfg_folded: Default::default(),
             cfg_drop: None,
             cfg_editing: None,

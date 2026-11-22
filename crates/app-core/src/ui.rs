@@ -315,6 +315,11 @@ pub struct RichTooltip {
     anchor: Bounds<Pixels>,
     /// The title-only box's width, measured on its first frame (drawn hidden until then).
     width: std::rc::Rc<std::cell::Cell<Option<Pixels>>>,
+    /// The title beside the element, not under it (a text box's: live workflows-1123 06 s2, "Filter inputs" at the
+    /// box's right end); the expanded tooltip still goes under it.
+    beside: bool,
+    /// The expanded body drawn by its owner (rich text), in place of the description's paragraphs.
+    body: Option<std::rc::Rc<dyn Fn() -> AnyElement>>,
 }
 
 /// Width of the expanded tooltip (live).
@@ -344,7 +349,10 @@ impl Render for RichTooltip {
                 .w(px(RICH_TOOLTIP_W))
                 .bg(gpui_kit::rgb(0xffffff))
                 .child(title)
-                .child(div().p(px(4.)).line_height(px(18.)).child(tool_description(&self.description)))
+                .child(div().p(px(4.)).line_height(px(18.)).map(|d| match &self.body {
+                    Some(body) => d.child(body()),
+                    None => d.child(tool_description(&self.description)),
+                }))
                 .into_any_element()
         } else {
             title.into_any_element()
@@ -372,7 +380,7 @@ impl Render for RichTooltip {
         let a = self.anchor;
         let win = window.viewport_size().width;
         let x = w.map_or(a.left(), |w| (a.center().x - w * 0.5).min(win - w - px(2.)).max(px(2.)));
-        let at = point(x, a.bottom() + px(3.));
+        let at = if self.beside && !self.expanded { point(a.right() + px(3.), a.center().y - px(13.)) } else { point(x, a.bottom() + px(3.)) };
         // Never drawn over an open context menu (QA3: a stale tooltip covered its items).
         div().when(!crate::os_menu::is_open(cx), |d| d.child(anchored().position(at).snap_to_window().child(content)))
     }
@@ -439,9 +447,32 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
                 })
                 .detach();
             }
-            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor, width: Default::default() }
+            RichTooltip { title: title.clone(), description: description.clone(), expanded: false, anchor, width: Default::default(), beside: false, body: None }
         });
         view.into()
+    }
+}
+
+/// A text box's help (live workflows-1123 06 s2-s4, the Configurations panel's "Filter inputs"): the title beside the
+/// box, then after [`TOOLTIP_EXPAND_DELAY`] the expanded tooltip under it, centred, `body` under the title band.
+/// `text` is the body's words, for the parity recorder.
+pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString>, body: impl Fn() -> AnyElement + 'static, anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+    let (title, text): (SharedString, SharedString) = (title.into(), text.into());
+    let body: std::rc::Rc<dyn Fn() -> AnyElement> = std::rc::Rc::new(body);
+    move |_, cx| {
+        let (anchor, body) = (anchor.get(), body.clone());
+        cx.new(|cx| {
+            cx.spawn(async move |this: WeakEntity<RichTooltip>, cx| {
+                cx.background_executor().timer(TOOLTIP_EXPAND_DELAY).await;
+                let _ = this.update(cx, |t, cx| {
+                    t.expanded = true;
+                    cx.notify();
+                });
+            })
+            .detach();
+            RichTooltip { title: title.clone(), description: text.clone(), expanded: false, anchor, width: Default::default(), beside: true, body: Some(body) }
+        })
+        .into()
     }
 }
 

@@ -7095,6 +7095,48 @@ fn escape_on_a_dialog_takes_its_configured_field_away(cx: &mut TestAppContext) {
     assert_eq!(configured(cx), 1, "kept in Configure features mode");
 }
 
+/// Qa CONFIG-FILTER-HELP-STILL-POINTER (live workflows-1123 06 s2-s4): the pointer resting on the Configurations panel's
+/// filter box shows "Filter inputs" beside it, then the supported filters 400 px wide, centred 3 px under it.
+#[gpui::test]
+fn the_config_filter_box_shows_its_help_under_a_still_pointer(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-filter-help", &[("width", "30 mm")]);
+    view.update(cx, |v, cx| {
+        v.edit_config("Configure", cx, |ps| {
+            noshape_ops::config::add_input(ps, "List");
+        });
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+        cx.notify();
+    });
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel);
+    let step = |cx: &mut TestAppContext, ms: u64| {
+        for _ in 0..ms / 10 {
+            cx.executor().advance_clock(std::time::Duration::from_millis(10));
+            draw(cx, window);
+        }
+    };
+    let b = at(cx, "cfg-filter-box").expect("the filter box");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(px(20.), px(300.)), None, gpui_kit::Modifiers::default());
+    step(cx, 1000);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(b.center(), None, gpui_kit::Modifiers::default());
+    step(cx, 700);
+    let short = at(cx, "rich-tooltip").expect("the Filter inputs tooltip");
+    step(cx, 2000);
+    let long = at(cx, "rich-tooltip").expect("the supported filters");
+    let win = cx.update_window(window, |_, w, _| f32::from(w.viewport_size().width)).unwrap();
+    let near = |x: gpui_kit::Pixels, want: f32| (f32::from(x) - want).abs() < 1.;
+    let left = (f32::from(b.center().x) - 200.).min(win - 402.).max(2.);
+    let row = (
+        near(short.left(), f32::from(b.right()) + 3.),
+        near(short.center().y, f32::from(b.center().y)),
+        near(long.size.width, 400.),
+        near(long.left(), left),
+        near(long.top(), f32::from(b.bottom()) + 3.),
+        f32::from(long.size.height) > 150.,
+    );
+    assert_eq!(row, (true, true, true, true, true, true), "(short beside the box, centred on it; long 400 px, centred, 3 px under, tall) box {b:?}, short {short:?}, long {long:?}");
+}
+
 /// Live2 config.json (tableKeys): in the Configurations table, Enter on an edited value commits it and moves the
 /// selection down one row (the cell below framed).
 #[gpui::test]
