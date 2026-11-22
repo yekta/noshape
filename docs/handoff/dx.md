@@ -22,14 +22,11 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   /root/projects/noshape-wt/dx-open`. ssh remote ~ paths in quotes; rb.sh remote scripts as `bash -c 'bash $HOME/..'`.
 - Drawings DXF (vibex7 dx-keep/exd-h1.log; local /root/dx-scratch/exd-m1/): sm-louver MATCHES; rings-loft model
   geometry (core/bool).
-- NOW: extension-spring Isometric: live has a Visible LINE (8.4702, 5.9285)-(8.4943, 5.9145) (0.028 in): the visible
-  end of a straight edge along model X, from the TANGENT line's end (8.4943, 5.9145) to where it meets the silhouette
-  spline (ours pole 2 is (8.4702, 5.9284) after +0.0076 y); ours hides it all (HLR visibility, not a kind issue; ours'
-  29-pole spline there passes within 0.010 in, hence "on another kind"). Live also splits that spline at (8.4978,
-  5.9246). Probe: /root/dx-scratch/hlr-probe.rs (copy over crates/kernel/tests/hlr.rs; probe_step_hlr, ignored:
-  straight X edges' visibility in 4 iso directions); run /root/dx-scratch/hlrt.sh (vibex7 slot, STEP
-  ~/agents/dx-keep/probe/spring.step); a run was waiting for vibex7's slot 19:3x. Remove the probe before committing.
-- housing-draft 1.2 in "on another kind": NOT HLR. The four draft-corner edges (live STEP #121-#132, cubic Beziers in
+- extension-spring Isometric (live's Visible LINE (8.4702, 5.9285)-(8.4943, 5.9145), 0.028 in): LIVE'S HLR ERROR, no
+  change. It is the lower bar's top-back edge (y 0.5, z 3, x 9.6-10.47 mm) next to the hook; rays toward the iso eye
+  (1,-1,1) from it pass through the hook's material (enter t 0.87-1.73, exit 1.732 mm) in ours.step AND in live.step
+  (probe 19:5x on vibe2, /root/dx-scratch/hlr-probe.rs + hlrt3.sh). Ours hides it (correct). Parity, not shortcomings.
+- NOW: housing-draft 1.2 in "on another kind": NOT HLR. The four draft-corner edges (live STEP #121-#132, cubic Beziers in
   vertical planes ~5 deg off YZ): live writes ONE LINE between the ends in Front (the curve bulges 0.012 in off it), a
   4-LINE chain (chord ~0.002 in) in Right, SPLINEs in Iso; ours SPLINEs (cad_export.rs `straight` needs 1e-4). Rule
   unknown: REQUESTS 19:3x "when does a drawing's DXF write a curved edge as LINEs" (live/dx/dxf-line-curves-1122/).
