@@ -4291,6 +4291,48 @@ fn a_hole_placed_on_an_in_feature_mate_connector(cx: &mut TestAppContext) {
     assert!(hole_ok && !features.iter().any(|t| t == "mateConnector"), "{features:?}");
 }
 
+/// qa SKETCH-ON-IN-FEATURE-MC (c2-sheet-metal-forms' Sketch 3): the Sketch plane field's mate connector button on, a
+/// face picked makes a mate connector inside the sketch, and the sketch opens on it (the face's centroid, its normal);
+/// no Mate connector feature is added.
+#[gpui::test]
+fn a_sketch_on_its_own_in_feature_mate_connector(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "sketch-in-feature-mc");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sketch", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Sketch dialog").dialog.clone());
+    assert!(cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.active_query = Some("sketchPlane".into());
+        d.toggle_mc_mode(cx)
+    })), "the Sketch plane field takes mate connectors (ctrl+m)");
+    cx.update(|cx| dialog.update(cx, |d, cx| d.add_pick(top.clone(), cx)));
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    let (subs, chips) = cx.update_window(window, |_, w, cx| {
+        let d = dialog.read(cx);
+        let state = d.ui_state(w, cx);
+        let chips = state["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Sketch plane").map(|f| f["items"].clone()).unwrap_or_default();
+        (d.feature.sub_features.len(), chips)
+    }).unwrap();
+    assert_eq!((subs, chips), (1, serde_json::json!(["Mate connector"])));
+    // The top face's centre and normal (the block's top at z = its highest mesh point).
+    let (frame, z_top) = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        (v.sketch.as_ref().map(|s| s.frame), b.mesh.positions.iter().map(|p| p[2]).fold(f32::MIN, f32::max))
+    });
+    let frame = frame.expect("the sketch editor");
+    assert!((frame.origin.z - f64::from(z_top)).abs() < 1e-6 && (frame.normal.z - 1.0).abs() < 1e-9, "{frame:?} on z {z_top}");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    let (types, ok) = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.studio(cx).unwrap();
+        let sk = s.features.iter().rfind(|f| f.type_id == "sketch").expect("the new sketch");
+        (s.features.iter().map(|f| f.type_id.clone()).collect::<Vec<_>>(), sk.sub_features.len() == 1 && v.display.feature_state(sk.id).is_some_and(|st| st.status == noshape_model::display::FeatureStatus::Ok))
+    });
+    assert!(ok && !types.iter().any(|t| t == "mateConnector"), "{types:?}");
+}
+
 /// Live (feel/3d.json "double_click_face", 3d/dblclick-face.png): a part face double-clicked shows its feature's
 /// sketch (consumed, so hidden) until the selection changes; the two clicks select then deselect.
 #[gpui::test]
