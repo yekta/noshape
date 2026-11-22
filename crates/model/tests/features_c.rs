@@ -5032,6 +5032,81 @@ fn a_conic_round_beside_a_curved_face_lies_on_it_as_live() {
     assert!((1.2..1.8).contains(&removed), "{removed} mm³ off (live 1.59)");
 }
 
+/// c2-surf-workshop-knifehandle's Fillet 2 on the Blade as Chamfer 1 leaves it (live 7/15/10, 10423.338 mm³): a conic
+/// round (R 0.6, rho 0.5) of the top face's two long edges (235.89 mm, the blade's curved top), tangent propagation on. Live
+/// (q-knifehandle-f2-1119): 11/27/18, 10392.312 mm³; the two long rounds (236.448 mm² each) and, carried on past the
+/// tip by the propagation, two small ones (0.595 mm²) running ~1.3 mm on over the tip's free-form faces. This input's tip
+/// is our Sweep 2's (its tip face 2.045 mm², live's 1.850; 3.5 mm³ more blade): ours 0.653 mm² small rounds, 30.46 mm³ off.
+#[test]
+fn a_conic_round_of_a_blades_long_top_edges_as_live() {
+    let brep = include_str!("data/knifehandle-fillet2-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let before = volume(&r, 0) * 1e9;
+    let b = &r.context.bodies[0];
+    let picks: Vec<Reference> = b
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.edge_info().is_ok_and(|i| near(i.length, mm(235.892), mm(0.01))))
+        .map(|(k, _)| Reference::Edge((*b.edges[k]).clone()))
+        .collect();
+    assert_eq!(picks.len(), 2, "the top face's long edges");
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picks));
+        p.set("crossSection", en("CONIC"));
+        p.set("nonCircularRadius", expr("0.6 mm"));
+        p.set("rho", expr("0.5"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let shown = shape.shown_topology().unwrap();
+    let counts = (shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count());
+    let removed = before - volume(&r, 0) * 1e9;
+    let areas: Vec<f64> = shape.faces().iter().map(|f| f.area().unwrap() / (mm(1.0) * mm(1.0))).filter(|a| (a - 236.448).abs() < 0.05 || (a - 0.595).abs() < 0.1).collect();
+    assert_eq!(counts, (11, 27, 18), "removed {removed} mm³, rounds {areas:?} mm²");
+    assert!((removed - 31.026).abs() < 0.6, "{removed} mm³ off (live 31.026)");
+    assert_eq!(areas.len(), 4, "rounds {areas:?} mm² (live 236.448 x 2, 0.595 x 2)");
+}
+
+/// c2-surf-workshop-knifehandle's Chamfer 1 on the Blade as Move face 2 leaves it (live 6/12/8, 10679.728 mm³): OFFSET_ANGLE
+/// 1.5 mm at 26 deg on the two bottom edges (247.649 mm, the flanks meeting the narrow bottom face). Live: 7/15/10,
+/// 10423.841 mm³, each flank's edge bevelled.
+#[test]
+fn an_offset_angle_chamfer_of_a_blades_bottom_edges_as_live() {
+    let brep = include_str!("data/knifehandle-chamfer1-input.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let before = volume(&r, 0) * 1e9;
+    let b = &r.context.bodies[0];
+    let picks: Vec<Reference> = b
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.edge_info().is_ok_and(|i| near(i.length, mm(247.649), mm(0.01))))
+        .map(|(k, _)| Reference::Edge((*b.edges[k]).clone()))
+        .collect();
+    assert_eq!(picks.len(), 2, "the bottom edges");
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(picks));
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", expr("1.5 mm"));
+        p.set("angle", expr("26 deg"));
+        p.set("tangentPropagation", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    let shown = shape.shown_topology().unwrap();
+    let counts = (shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count());
+    let after = volume(&r, 0) * 1e9;
+    assert_eq!(counts, (7, 15, 10), "{before} -> {after} mm³");
+    assert!((before - after - 255.887).abs() < 1.0, "{before} -> {after} mm³ (live 10679.728 -> 10423.841)");
+}
+
 /// asm-isaac-ball's e54410 Chamfer 1 (feature 51) on its part as Extrude 22 leaves it: TWO_OFFSETS 2 / 5 mm on the R 10.5
 /// arc (28.96 mm) where an arch's top (a cylinder, axis X) meets the side plane x -4; its ends at z 0 beside 0.19 mm
 /// ledges. OCCT's chamfer fails. Live (q-isaac-e54410-ch1): one cone, 2 mm on the plane and 5 on the cylinder, run on

@@ -3,6 +3,12 @@
 
 #include "internal.hpp"
 #include <OSD_Parallel.hxx>
+#include <Geom2d_BSplineCurve.hxx>
+#include <NCollection_HArray1.hxx>
+#include <Geom2dAPI_Interpolate.hxx>
+#include <ShapeAnalysis_Surface.hxx>
+#include <ShapeAnalysis_Curve.hxx>
+#include <ShapeFix_Edge.hxx>
 
 #include <chrono>
 #include <exception>
@@ -98,6 +104,43 @@ bool tangent_along_shared_circle(const TopoDS_Face& a, const TopoDS_Face& b, dou
       BRep_Tool::Surface(b)->D1(ub, vb, q, b1, b2);
       const gp_Vec na = a1.Crossed(a2), nb = b1.Crossed(b2);
       if (na.Magnitude() > 0 && nb.Magnitude() > 0 && na.IsParallel(nb, angle))
+        return true;
+    }
+  }
+  return false;
+}
+
+// Whether two blend faces end on one curve (a conic round's pieces end to end, c2-surf-workshop-knifehandle's Fillet 2:
+// the long rounds and the ones carried on past the tip share their conic end section): their section is that curve.
+bool share_end_curve(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
+{
+  const auto points = [](const TopoDS_Edge& e) {
+    BRepAdaptor_Curve c(e);
+    const double      f = c.FirstParameter(), l = c.LastParameter();
+    return std::array<gp_Pnt, 3>{c.Value(f), c.Value(0.5 * (f + l)), c.Value(l)};
+  };
+  for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const auto pa = points(TopoDS::Edge(x.Current()));
+    if (pa[0].Distance(pa[2]) < tol)
+      continue;
+    for (TopExp_Explorer y(b, TopAbs_EDGE); y.More(); y.Next())
+    {
+      const auto pb = points(TopoDS::Edge(y.Current()));
+      const bool same = pa[1].Distance(pb[1]) < tol && ((pa[0].Distance(pb[0]) < tol && pa[2].Distance(pb[2]) < tol) || (pa[0].Distance(pb[2]) < tol && pa[2].Distance(pb[0]) < tol));
+      if (same)
+        return true;
+      // (One's section a part of the other's from a shared end: the round carried on past the tip trimmed where the
+      // part's crease crosses it, the long one still whole there.)
+      const auto along = [&](const TopoDS_Edge& e, const std::array<gp_Pnt, 3>& p) {
+        const BRepAdaptor_Curve c(e);
+        ShapeAnalysis_Curve     sa;
+        gp_Pnt                  proj;
+        double                  t;
+        return std::all_of(p.begin(), p.end(), [&](const gp_Pnt& q) { return sa.Project(c, q, tol, proj, t, false) < tol; });
+      };
+      const bool shared_end = pa[0].Distance(pb[0]) < tol || pa[0].Distance(pb[2]) < tol || pa[2].Distance(pb[0]) < tol || pa[2].Distance(pb[2]) < tol;
+      if (shared_end && pb[0].Distance(pb[2]) > tol && (along(TopoDS::Edge(x.Current()), pb) || along(TopoDS::Edge(y.Current()), pa)))
         return true;
     }
   }
@@ -493,23 +536,37 @@ std::vector<TopoDS_Face> split_face(const TopoDS_Face& face_in, const std::vecto
     bb.MakeCompound(bound_edges);
     for (const Domain::Bound& bd : bounds)
       bb.Add(bound_edges, bd.e);
+    // (Within a fiftieth of its own length at most: a short touch curve near a narrow face's edge is a real cut, the
+    // 0.43 mm round's edge on the side face at c2-surf-workshop-knifehandle's tip in Fillet 2.)
     auto along_boundary = [&](const Cut& c) {
+      const double within = std::min(snap, 0.02 * c.c3->Value(c.f).Distance(c.c3->Value(c.l)));
       for (const double t : {0.1, 0.3, 0.5, 0.7, 0.9})
       {
         BRepExtrema_DistShapeShape dd(BRepBuilderAPI_MakeVertex(c.c3->Value(c.f + (c.l - c.f) * t)).Vertex(), bound_edges);
-        if (!dd.IsDone() || dd.Value() > snap)
+        if (!dd.IsDone() || dd.Value() > within)
           return false;
       }
       return true;
     };
+    std::vector<int> why(cuts.size(), 0);
     for (size_t i = 0; i < cuts.size(); ++i)
     {
       drop[i] = along_boundary(cuts[i]);
+      why[i]  = drop[i] ? 1 : 0;
+      // (Shorter than the snap, its ends one vertex: a tool's end section just over the face's edge.)
+      if (!drop[i] && cut_at[i][0].v.IsSame(cut_at[i][1].v) && cuts[i].c3->Value(0.5 * (cuts[i].f + cuts[i].l)).Distance(BRep_Tool::Pnt(cut_at[i][0].v)) < snap)
+        drop[i] = true, why[i] = 1;
       for (const Domain::Bound& bd : bounds)
-        drop[i] = drop[i] || !d.cross(cuts[i].c2, cuts[i].f, cuts[i].l, bd.c2, bd.f, bd.l, [](double, double) {});
+        if (!drop[i] && !d.cross(cuts[i].c2, cuts[i].f, cuts[i].l, bd.c2, bd.f, bd.l, [](double, double) {}))
+          drop[i] = true, why[i] = 2;
       for (size_t j = 0; j < i && !drop[i]; ++j)
-        drop[i] = !drop[j] && !d.cross(cuts[i].c2, cuts[i].f, cuts[i].l, cuts[j].c2, cuts[j].f, cuts[j].l, [](double, double) {});
+        if (!drop[j] && !d.cross(cuts[i].c2, cuts[i].f, cuts[i].l, cuts[j].c2, cuts[j].f, cuts[j].l, [](double, double) {}))
+          drop[i] = true, why[i] = 3 + (int)j;
     }
+    if (debug())
+      for (size_t i = 0; i < cuts.size(); ++i)
+        if (drop[i])
+          std::fprintf(stderr, "    cut %zu dropped: %s (snap %.3e mm)\n", i, why[i] == 1 ? "along the boundary" : why[i] == 2 ? "along a boundary curve" : "along an earlier cut", snap * 1e3);
     if (debug())
       for (size_t i = 0; i < cuts.size(); ++i)
       {
@@ -629,6 +686,9 @@ std::vector<TopoDS_Face> split_face(const TopoDS_Face& face_in, const std::vecto
       b.Range(piece, at[k].t, at[k + 1].t);
       b.UpdateVertex(at[k].v, at[k].t, piece, BRep_Tool::Tolerance(at[k].v));
       b.UpdateVertex(at[k + 1].v, at[k + 1].t, piece, BRep_Tool::Tolerance(at[k + 1].v));
+      // (Its curves on the faces checked over its own range: the input's can stray where BRepCheck's samples missed it,
+      // 38 um on c2-surf-workshop-knifehandle's blade crease near the tip.)
+      ShapeFix_Edge().FixSameParameter(piece);
       for (size_t o : uses)
         edges.Append(bounds[o].e.Orientation() == TopAbs_REVERSED ? piece.Reversed() : piece);
     }
@@ -703,13 +763,46 @@ bool point_in(const TopoDS_Face& f, gp_Pnt& p, gp_Vec& n, const occ::handle<IntT
   return true;
 }
 
+// A curve's curve on `surf` from its points' feet, each from the last, interpolated at the curve's own parameters; null
+// where a foot is more than `gap` off (where GeomProjLib's projection fails).
+occ::handle<Geom2d_Curve> curve_by_feet(const occ::handle<Geom_Curve>& c3, double f, double l, const occ::handle<Geom_Surface>& surf, double gap)
+{
+  ShapeAnalysis_Surface                      sas(surf);
+  constexpr int                              N = 32;
+  occ::handle<NCollection_HArray1<gp_Pnt2d>> uv = new NCollection_HArray1<gp_Pnt2d>(1, N + 1);
+  occ::handle<NCollection_HArray1<double>>   ts = new NCollection_HArray1<double>(1, N + 1);
+  gp_Pnt2d                                   last;
+  for (int k = 0; k <= N; ++k)
+  {
+    const double t = f + (l - f) * k / N;
+    last           = k == 0 ? sas.ValueOfUV(c3->Value(t), 1e-9) : sas.NextValueOfUV(last, c3->Value(t), 1e-9);
+    if (sas.Gap() > gap)
+    {
+      if (debug())
+        std::fprintf(stderr, "    curve by feet: point %d/%d %.3e mm off (allowed %.3e)\n", k, N, sas.Gap() * 1e3, gap * 1e3);
+      return nullptr;
+    }
+    uv->SetValue(k + 1, last);
+    ts->SetValue(k + 1, t);
+  }
+  Geom2dAPI_Interpolate ip(uv, ts, false, 1e-9);
+  ip.Perform();
+  if (!ip.IsDone())
+    return nullptr;
+  return occ::handle<Geom2d_Curve>(ip.Curve());
+}
+
 // `e`'s 3D curve and its curve on `face` (projected when it has none there).
 bool cut_of(const TopoDS_Edge& e, const TopoDS_Face& face, Cut& c)
 {
   double f, l;
   c.c3 = BRep_Tool::Curve(e, f, l);
   if (c.c3.IsNull())
+  {
+    if (debug())
+      std::fprintf(stderr, "    cut_of: an edge with no 3D curve\n");
     return false;
+  }
   c.f = f;
   c.l = l;
   double f2, l2;
@@ -750,6 +843,11 @@ bool cut_of(const TopoDS_Edge& e, const TopoDS_Face& face, Cut& c)
       }
     }
   c.c2 = GeomProjLib::Curve2d(c.c3, f, l, BRep_Tool::Surface(face));
+  if (!c.c2.IsNull())
+    return true;
+  // Else its points' feet (c2-surf-workshop-knifehandle's Fillet 2 at the tip: a touch curve on a side face carried past
+  // its edges, where the projection failed).
+  c.c2 = curve_by_feet(c.c3, f, l, BRep_Tool::Surface(face), std::max(1e3 * BRep_Tool::Tolerance(e), 1e-6 * c.c3->Value(f).Distance(c.c3->Value(l))));
   return !c.c2.IsNull();
 }
 
@@ -1071,6 +1169,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
               part.f   = from;
               part.l   = close ? c.l : t;
               part.c2  = GeomProjLib::Curve2d(c.c3, part.f, part.l, sg);
+              if (part.c2.IsNull())
+                part.c2 = curve_by_feet(c.c3, part.f, part.l, sg, 5e-3 * size);
               if (part.c2.IsNull())
                 no("a touch curve with no curve on its face");
               on_part[j].push_back(part);
@@ -1612,7 +1712,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
   HHist                        h = new BRepTools_History();
   // (A loft's side only approximating its faces: its blend's other boundary, a hold line, is as loose against the part's
   // edge there, ~0.01 mm on c2-variable-fillet-faceblend's pocket rim.)
-  BRepBuilderAPI_Sewing        sew(approx.empty() ? 10 * tol : 1e-4 * size);
+  const double                 sew_tol = approx.empty() ? 10 * tol : 1e-4 * size;
+  BRepBuilderAPI_Sewing        sew(sew_tol);
   std::vector<std::pair<TopoDS_Shape, TopoDS_Face>> made; // (from, piece)
   // The part's faces: split where curves fall on them, the pieces kept outside every tool.
   Bnd_Box tb;
@@ -1648,6 +1749,20 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         GProp_GProps gp;
         BRepGProp::SurfaceProperties(piece, gp);
         std::fprintf(stderr, "  piece area %.6f mm2, valid %d\n", gp.Mass() * 1e6, (int)BRepCheck_Analyzer(piece).IsValid());
+        if (!BRepCheck_Analyzer(piece).IsValid())
+          print_check(piece);
+      }
+      // (A piece with no area: where a tool's side runs out on a part face's edge, c2-surf-workshop-knifehandle's Fillet
+      // 2 at the tip.)
+      {
+        GProp_GProps gp;
+        BRepGProp::SurfaceProperties(piece, gp);
+        if (gp.Mass() < tol * tol)
+        {
+          if (dbg)
+            std::fprintf(stderr, "    dropped: no area\n");
+          continue;
+        }
       }
       if (!point_in(piece, p, n, ctx))
         no("a piece with no point inside");
@@ -1695,7 +1810,8 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
         // (Two pieces of a held blend, end to end: they meet along their shared section, its slope there each loft's
         // own.)
         const bool ends_meet = meet.count(std::minmax(blend_tool[k], blend_tool[m])) > 0;
-        if (ends_meet ? tangent_along_shared_circle(all_blends[k], all_blends[m], 100 * tol, M_PI / 2) : tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
+        if (ends_meet ? tangent_along_shared_circle(all_blends[k], all_blends[m], 100 * tol, M_PI / 2) || share_end_curve(all_blends[k], all_blends[m], 100 * tol)
+                      : tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
         {
           if (dbg)
             std::fprintf(stderr, "  section of blends %zu and %zu: tangent along their shared circle\n", k, m);
@@ -1741,6 +1857,15 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
       const gp_Pnt q = p.Translated(n * eps);
       if (in_p(q) == added[i] || inside_kind(q, i, added[i]))
         continue;
+      // (A tool's flat end cap thinner than the sewing tolerance: the sewing shuts it.)
+      if (BRepAdaptor_Surface(piece, false).GetType() == GeomAbs_Plane)
+      {
+        GProp_GProps ga, gl;
+        BRepGProp::SurfaceProperties(piece, ga);
+        BRepGProp::LinearProperties(piece, gl);
+        if (2 * ga.Mass() < sew_tol * gl.Mass())
+          continue;
+      }
       // (A taken tool's faces face out of it, into what is left: turned round.)
       const TopoDS_Face f = added[i] ? piece : TopoDS::Face(piece.Reversed());
       sew.Add(f);
