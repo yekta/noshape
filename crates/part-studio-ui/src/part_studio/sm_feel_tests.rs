@@ -611,6 +611,9 @@ fn a_bends_face_clicked_again_stays_in_its_field(cx: &mut TestAppContext) {
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).ui.preview_before.is_some());
     assert_eq!(faces(cx), 1, "the face filled from the line");
     cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("face")));
+    // The click is on the preview's face (the Bend's name), not the face before it: wait for the preview's display.
+    let bend = cx.update(|cx| dialog.read(cx).feature.id);
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().any(|b| b.face_refs.iter().any(|r| crate::part_studio::behaviors::made_by(r, bend))));
     let pointer = super::feel::Pointer::new(cx, window, &view);
     let p = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.020, 0.020, 0.002))).expect("on screen").round();
     pointer.move_to(cx, &view, p);

@@ -2056,11 +2056,11 @@ impl PartStudioView {
         let held: Vec<Reference> = e.dialog.read(cx).selected_refs().into_iter().filter(|r| matches!(r, Reference::Face(_))).collect();
         let changed = self.changed_picks(&held);
         let (o, d) = self.viewport.read(cx).ray(position);
-        // (Not where the preview still has a face, under whatever name: a Bend's face re-clicked stays in its field, live
-        // wf11 step 14 with a Flange before it, qa BEND-FACE-RECLICK-EMPTIES.)
+        // (Not where the preview has a face there or in front, under whatever name: a Bend's face re-clicked stays in its
+        // field, also where the Bend lifts it, live wf11 step 14 with a Flange before it, qa BEND-FACE-RECLICK-EMPTIES.)
         let before = self.ui.preview_before.as_ref()?;
         let now = face_depths(&self.display, None, o, d);
-        let r = changed.into_iter().find(|r| face_depths(before, Some(r), o, d).iter().any(|t| !now.iter().any(|n| (n - t).abs() < 5e-5)))?;
+        let r = changed.into_iter().find(|r| face_depths(before, Some(r), o, d).iter().any(|t| !now.iter().any(|n| *n < t + 5e-5)))?;
         Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
     }
 
