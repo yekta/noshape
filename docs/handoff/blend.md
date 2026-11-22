@@ -25,8 +25,8 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   restore base), ZZ_DROPSHORT/ZZ_THINCAP env gates (make real), the ZZ face print in features_c.rs (~line 5008), and
   check includes (ShapeAnalysis_Curve used by share_end_curve, ShapeFix_Edge used). Decide: the k::fuse_all Boolean
   fallback in blend_section.rs (flaky, ~1 in 6 two solids) - drop it unless Fillet 3 / features tests need it.
-  Open: largest tolerance 0.106 mm in the result (run bin/kh-thin2.sh, logs/kh-thin2.out: baseline without THINCAP
-  vs with, and 5 repeats for flakiness). Then gate (features tests, knifehandle, scissor, parity via slot), git diff
+  Checked (logs/kh-thin2.out): 5/5 repeats pass; the 0.106 mm largest tolerance is there without THINCAP too (not
+  from the cap drop; look at it later). Then gate (features tests, knifehandle, scissor, parity via slot), git diff
   --stat origin/main...HEAD, land. Tools: bin/kh-thin.sh, kh-thin2.sh, kh-faces.sh, kh-stride2..6.sh, kh-rep.sh.
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
