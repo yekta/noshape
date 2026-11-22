@@ -2291,6 +2291,60 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
             return std::nullopt;
           return n * 2 * M_PI;
         };
+        // A pcurve off its edge by more than the edge's tolerance (a line across the generators, a few micrometres
+        // long; another argument's arc a little off the axis): straight between its points' (u, v) at 1 to 64 even
+        // steps instead, the fewest whose middles are as close as those points, its tolerance raised to cover it
+        // (c2-gamma-imported's Boolean 1 by per-pair tolerances).
+        auto off_edge = [&](const occ::handle<Geom2d_Curve>& pc) {
+          double worst = 0;
+          for (int j = 0; j <= 4; ++j)
+          {
+            const double   t = f0 + (f1 - f0) * j / 4;
+            const gp_Pnt2d q = pc->Value(t);
+            worst = std::max(worst, s->Value(q.X(), q.Y()).Transformed(loc.Transformation()).Distance(c->Value(t).Transformed(el.Transformation())));
+          }
+          return worst > BRep_Tool::Tolerance(e);
+        };
+        auto chord_pcurve = [&]() -> const char* {
+          const auto at3 = [&](double t) { return c->Value(t).Transformed(el.Transformation()); };
+          const auto off = [&](const gp_XY& q, double t) { return s->Value(q.X(), q.Y()).Transformed(loc.Transformation()).Distance(at3(t)); };
+          std::vector<gp_Pnt2d> uv;
+          for (int n = 1; n <= 64; n *= 2)
+          {
+            uv.clear();
+            for (int j = 0; j <= n; ++j)
+            {
+              double pu = 0, pv = 0;
+              params(at3(f0 + (f1 - f0) * j / n), pu, pv);
+              const double near_u = uv.empty() ? 0.5 * (umin + umax) : uv.back().X();
+              uv.emplace_back(pu + 2 * M_PI * std::round((near_u - pu) / (2 * M_PI)), pv);
+            }
+            double knots_off = 0, mids_off = 0;
+            for (int j = 0; j <= n; ++j)
+              knots_off = std::max(knots_off, off(uv[j].XY(), f0 + (f1 - f0) * j / n));
+            for (int j = 0; j < n; ++j)
+              mids_off = std::max(mids_off, off(0.5 * (uv[j].XY() + uv[j + 1].XY()), f0 + (f1 - f0) * (j + 0.5) / n));
+            if (knots_off > tol)
+              return "an edge off its cylinder or cone";
+            if (mids_off > knots_off + 0.1 * BRep_Tool::Tolerance(e) && n < 64)
+              continue;
+            for (const gp_Pnt2d& q : uv)
+              if (q.X() < umin - eps || q.X() > umax + eps)
+                return "an edge outside its face's range";
+            NCollection_Array1<gp_Pnt2d> poles(1, n + 1);
+            NCollection_Array1<double>   knots(1, n + 1);
+            NCollection_Array1<int>      mults(1, n + 1);
+            for (int j = 0; j <= n; ++j)
+            {
+              poles(j + 1) = uv[j];
+              knots(j + 1) = f0 + (f1 - f0) * j / n;
+              mults(j + 1) = j == 0 || j == n ? 2 : 1;
+            }
+            bb.UpdateEdge(e, new Geom2d_BSplineCurve(poles, knots, mults, 1), s, loc, std::max(BRep_Tool::Tolerance(e), 1.05 * std::max(knots_off, mids_off) + 1e-12));
+            return nullptr;
+          }
+          return "an edge off its cylinder or cone";
+        };
         double u = 0, v = 0;
         if (b.curves[11 * k] == 5 && r.edge_section[k] != UINT32_MAX)
         {
@@ -2320,7 +2374,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           if (!sh)
             return "an edge outside its face's range";
           u += *sh;
-          bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(sg, 0)), s, loc, BRep_Tool::Tolerance(e));
+          const occ::handle<Geom2d_Curve> pc = new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(sg, 0));
+          if (off_edge(pc))
+          {
+            if (const char* why = chord_pcurve())
+              return why;
+            continue;
+          }
+          bb.UpdateEdge(e, pc, s, loc, BRep_Tool::Tolerance(e));
           continue;
         }
         const occ::handle<Geom_Line> gl = occ::down_cast<Geom_Line>(bc);
@@ -2345,7 +2406,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
           u = umin;
         if (!on_seam)
         {
-          bb.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(0, dv)), s, loc, BRep_Tool::Tolerance(e));
+          const occ::handle<Geom2d_Curve> pc = new Geom2d_Line(gp_Pnt2d(u, v), gp_Dir2d(0, dv));
+          if (off_edge(pc))
+          {
+            if (const char* why = chord_pcurve())
+              return why;
+            continue;
+          }
+          bb.UpdateEdge(e, pc, s, loc, BRep_Tool::Tolerance(e));
           continue;
         }
         // A seam: the way up on the face's right, the way down on its left.

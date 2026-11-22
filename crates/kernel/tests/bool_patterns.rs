@@ -3524,3 +3524,22 @@ fn precise_parts_fused_with_a_far_tolerant_pin() {
     assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
     assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
 }
+
+/// c2-gamma-imported's Boolean 1 with 32 of its tools (gamma's object, precise clips and tolerant pins): a precise
+/// clip's arc a little off a tolerant part's cylinder axis and a 2.5 um chord across a quarter round's generators,
+/// each lying on its cylinder within the two parts' band, get curves on it that follow them (the arc's was turned
+/// 0.01 rad, the chord's 4 mm along the axis: "a face's curves don't close").
+#[test]
+fn an_off_axis_arc_and_a_chord_on_a_cylinder_get_curves_on_it_that_follow_them() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "3c7300ba68882d9d").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+    assert_eq!(r.shape.count(k::ShapeType::Edge), c.summary.edges);
+}
