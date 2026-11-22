@@ -1,23 +1,27 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 09:43 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 10:15 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-22 09:43 UTC)
+## Now (11-22 10:15 UTC)
 
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
-- KNIFEHANDLE (core -> blend 09:3x: the fillets are mine; Loft 1 builds on main since 11-21). Main parity 07:19: model
-  13.8 s vs live 1.0; Fillet 1 10.4 s, fails (live 200 ms OK); Fillet 2 fails; Fillet 3 1381 ms (live 12); Chamfer 1
-  470 (live 35); Blade 7/15/10 vs live 11/27/18, first off at Sweep 2 (not mine: told lead 09:42 to fix Sweep first).
-  Fillet 1 fix a7bf86f2c (Frame.air) QUEUED 8f6dc228 from blend10 (checking since 09:27). After it lands: parity on
-  main, NOSHAPE_PARITY_ONLY=c2-surf-workshop-knifehandle parity::parity_models; qa's copy vibex7 ~/qa/corpus (09:32).
-  Quick list: bin/kh-list.sh <cli> <prefix> (vibex8 ~/tmp/blend/kh, kh.noshape there; cli-khfix is pre-Loft-fix).
-  Fillet 2 on the old CLI: "a rolling balls' tool inside out", then sections "could not orient a face at the edge".
+- KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
+  through Chamfer 1; core lands a LIVE_SCATTER 9.5e-5 so the pair reports Fillet 2 first). Fillet 1 fix a7bf86f2c
+  LANDED 390a776a (10:02). Main + fix (blend10, vibex8 ~/tmp/blend/cli-kh 10:10): everything Ok but Fillet 2 (718 ms,
+  error) and Fillet 1 (7852 ms, error). Live: Fillet 1 Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767 (a 4.5 mm
+  CONIC rho 0.5 round of the face's closed edge, 138.6 mm); Fillet 2 Blade 7/15/10 -> 11/27/18 (0.6 mm CONIC rho 0.5,
+  two edges, 472 mm chain). Ours Fillet 1: "the rolling balls jump along the edge", then a 64-section closed loft
+  (valid, 881 mm3) whose cut is INVALID; time: Boolean 4.0 s (OCCT edge-face 1.8 s), face_project_point_near 1.7 s
+  (1975 calls), min_distance 1.0 s. Probe: blend10 has an UNCOMMITTED ZZ_KHDUMP=<prefix> (body + cut/add tools
+  before the Booleans) and test features_c::zz_khcut (ZZ_KH=<prefix>: faces, validity per face, cut/common per
+  tool): bin/kh-dump.sh -> logs/kh-dump1.out. NEVER commit those two (git checkout the files before landing).
+  Live per-feature data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.
 - SCISSOR (asm 07:18 main 207/239). Doc vibex7 ~/agents/blend-keep/scissor.noshape. One feature: bin/sc-main2.sh <cli>
   <tab> "<F>" <out> "<env>" (prints only the last 50 lines of the block; grep ~/tmp/blend/sc2/prof-<tab>.txt for
   more). Probe CLI blend-cusp -> vibex7 ~/tmp/blend/cli-cusp (bin/sc-cusp5.sh builds + runs 3; sc-cusp6.sh first
@@ -33,12 +37,16 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
     tori, still "Failed to fillet selections." (2602 ms): grep the tail of ~/tmp/blend/sc2/prof-fed22d.txt.
   - Watch: the frame fallback made other earlier 2d82a0 features print "the result is not one valid solid": check
     every earlier feature's status vs main before landing anything from blend-cusp.
-- SUSPENSION Fillet 3: ZZ_CBALL + packed vanishing stations >= 0.05 r (was 1e-3 r: a near-point end crossed itself) ->
-  ONE VALID SOLID 61/146/87, 393419.692 mm3 (live 53/98/46, 393486.602; -0.017 %). Live faces: 19 torus, 14 cylinder,
-  8 plane, 4 sphere, 8 OTHER (4 x 25.287, 4 x 29.602 mm2). zz_susp now prints ZZF <type> <area> <centre> per face
-  (logs/zzsusp18.out) -> find the 8 extra faces. BUT zzsusp18 (same env, build with the frame fallback + ZZONE)
-  went back to "the union lost one of its parts" -> sections 89/260/153: find which change (try the build without the
-  frame fallback) or whether it is nondeterministic (run zzsusp17's setup twice). Then a clean land branch (ZZ_CBALL + 0.05 r without the probes).
+- SUSPENSION Fillet 3 (blend-cusp, bin/zzsusp6.sh, env ZZ_NOTIP=1 ZZ_SINK=0; ZZ_NOFB=1 turns the frame fallback
+  off): WITH the fallback ONE VALID SOLID 61/146/87, 393419.692 mm3, twice (zzsusp22/23); WITHOUT it the union fails
+  (zzsusp21, sections 89/260/153). zzsusp18's failure was the missing ZZ_NOTIP/ZZ_SINK, not the build. Live 53/98/46,
+  393486.602 (capture: onshape-research/live/blend/q-susp-knuckle-f3/summary.txt). The 8 faces: (a) +10 junk at the
+  4 cusps x 17.5..22.5: 4 zero-area planes [17.81, +-39.06, +-38.73] and 6 tiny tori (0.174 / 0.215 mm2) beside our
+  OTHER 29.098/29.272 (live one OTHER 29.602 each); (b) -4: live puts an OTHER 25.287 corner patch where three
+  r 2.5 rounds meet at x -27.5..-30.1, |y| 26..29.4, |z| 67..74.3 (its tori there: 127.912 x4, 353.558 x2, 1031.193
+  x2; ours 155.732 x4, 405.639 x2, 1148.690 x2, no patch); (c) +2 planes, one of our pairs 173.406 [-30,0,+-88.09] or
+  270.177 [-25,0,+-80] (live's planes adjacent to created edges: 2297.29, 3040.244, 923.16 x2). Next: (a) first
+  (drop the slivers at the cusp refill), then a clean land branch (ZZ_CBALL + 0.05 r + fallback, no probes).
 - blend-cusp env switches: ZZ_NOTIP, ZZ_CBALL, ZZ_FLIPMAP, ZZ_ORIENTDBG, ZZ_SOLIDS (+ZZONE), ZZ_BALLDUMP, ZZ_TOOLDUMP,
   ZZ_SECDIST, ZZ_RUNON.
 - RINGS Fillet 1 landed 18f929e78 (open: 10.4 mm leaves a 0.774 mm2 bore island).
