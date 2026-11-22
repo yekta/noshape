@@ -293,15 +293,20 @@ Both sides render in software here (live SwiftShader, repainting every 0.4–1.1
 orbiting a light part), so the shape is compared, not the speed. Ours answers sooner on the light part: first changed frame 150–300 ms
 for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms.
 
-- [ ] P0 **FEEL-NAV-INERTIA (psui)**: right-drag 200 px left in 10 moves 16 ms apart, released while moving. Live keeps turning
+- [ ] P2 software-GL-only **FEEL-NAV-INERTIA (psui)**: right-drag 200 px left in 10 moves 16 ms apart, released while moving. Live keeps turning
   2.1–2.9 s after the release: all three flicks end further round than the same drag held still 150 ms before release. Ours stops:
   in 2 of 3 runs the flick's end view is pixel-identical to the held drag's (qa-scratch/tickets/inertia-w7.png). Ours runs ~10 fps
   here; the matrix notes "none below 20 fps", but live turns on at far lower rates, so check that rule against live's client.
-- [ ] P0 **FEEL-NAV-ANIM-LOW-FPS (psui)**: from an orbited view, F, Shift+5 and Shift+7, and a click on the cube's Front face.
+  Software-GL-only (lead 11-22: speed and frame-rate rules are judged on real GPUs): ours drops inertia below 20 fps
+  (`DETAIL_REDUCTION_THRESHOLD_FPS`) and has it above (`navigation::Inertia`, 0.77 per 60 Hz frame); llvmpipe runs ~10 fps, so
+  the gap shows only there. Not testable on the Mac yet (synthetic input from ssh is not trusted there).
+- [ ] P2 software-GL-only **FEEL-NAV-ANIM-LOW-FPS (psui)**: from an orbited view, F, Shift+5 and Shift+7, and a click on the cube's Front face.
   Live animates: its page-side camera trace has 4–5 camera steps for F over 1.9–2.2 s, 4–8 for Shift+5 and 8–15 for Shift+7, and the
   screen shows 2–4 changed frames. Ours jumps: one changed frame (150–300 ms) plus the edge refinement ~500 ms later, at ~10 fps. The
   cube's ▶ arrow animates in both (ours 4 frames over ~330 ms). This contradicts live nav-1117 (one frame for these keys on the same
   renderer); psui to settle it from live's client (when `animateTo` jumps) and match.
+  Software-GL-only: ours jumps only below 20 fps (`view_change_duration`, ba389b093) and animates 500 ms above; qa-w7-macnav
+  checks it on the Mac GPU (frame log per view change).
 - [ ] P0 **FEEL-CUBE-CORNER-HOVER (psui)**: the view cube at iso, pointer on the front-right-top corner (the vertex facing the
   viewer). Live draws a light-blue disc on the corner. Ours lights nothing there: a 5 × 5 grid of points (±8 px) round the corner
   lights only the neighbouring edges' bands (qa-scratch/tickets/cube-hover-w7.png).
