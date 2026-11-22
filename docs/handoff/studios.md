@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 13:08 UTC.
+Updated 2026-11-22 17:56 UTC.
 
 ## In flight
 
@@ -26,27 +26,28 @@ crates/drawing land (drawing-ui alone: not needed).
 - LANDED d1452c9a as d425fa05 (14:40): palette halo, FS-DRAG-SELECT-BAND, view box rule, insert-row selection clear.
 - LANDED cd7b7401 as 634aa1f1 (15:21): Select line reach 8 px (lit at 7, not 8), SELECT_FORMAT_REACH_PX 9 (sheet border
   lit at 8, not 9). vibex8 drw run on it (uip1122k): 371/374, same 3 diffs; hover matrices 3/3.
-- CHECKING dd49dc0f (queued 14:50): TICKETS, own stale [ ] rows of VS-NAME-FOCUS-BOX / HISTORY-BRANCH-FILTER dropped.
-- UNCOMMITTED, dx's 3 cells from drw-hover-1122 (lead 15:1x), tests not yet run on this whole diff:
-  (1) text reach: live's tan box is the glyphs + 0.5 h on every side (dimension 1.575: glyphs 679..721 x 539..550, box
-  673..726 x 533..556); reach from it 8 px. `font::text_hover_box` / `text_hover_distance` (model-data font.rs, replaces
-  text_box_distance; build.rs hit_reach uses it only when text_tol > 0, tools' hit unchanged), SELECT_TEXT_REACH_PX 9 -> 8,
-  D1 test measures from the hover box. (2) no-tool centerline 7 px: covered by the 8 px line reach; check added to
-  `a_centerline_on_a_view_edge_gives_way_to_the_view`. (3) Note tool on a centerline: NOTE_CENTERLINE_REACH_PX 9, hover
-  arm for Tool::Note, `SheetPick::note_leader_point` (snap, then hovered centerline, then edge), used by the Note click
-  and the ops drawing_note leader (description + error text changed: regenerate AGENT_API with UPDATE_DOCS=1
-  coverage::); e2e check in drawing_lists_silhouettes; UI check in the centerline feel test. A leader stores view +
-  view-coords point, so no new model reference is needed.
-  RUNNING when the cap hit: x201.sh on vibex7 (bz9r0c63x) on (1)+(2) only. Next: rerun x201 on the whole diff (it
-  already includes the full ops e2e: crates/drawing changed) + UPDATE_DOCS coverage + clippy -p noshape-ops, commit,
-  vibex8 drw run (x184e.sh), land.
-- drw-table-cells-insert-row step 11 still keeps the Cell panel in the app (the unit test closes it). Our runner moves
-  from Insert to Row Below in 3 steps with 20 ms sleeps, crossing Remove ▸, so ours likely lands in the wrong submenu.
-  Live's runner (4 Playwright steps) may cross Remove ▸ too, and live has no safe triangle (live/psui/submenu-diag-1119),
-  so live's dialog null may come from a missed click. A runner jump was tried and dropped: it would change 49 scenarios
-  on a guess. REQUESTS 13:59 asks live for the menu rects and the row count after step 11. Waiting on it.
-- drw-table-cell-menu step 3 (focus after the Custom table's Insert): live noise (5 of 6 recordings read "other");
-  re-record asked in the same request.
+- LANDED dd49dc0f as 1a9112ed (15:47): TICKETS stale rows.
+- COMMITTED 3806ff953 (not queued): dx's 3 cells from drw-hover-1122. (1) text reach 8 px from live's tan box (glyphs +
+  0.5 h every side; `font::text_hover_box` / `text_hover_distance`, SELECT_TEXT_REACH_PX 8); (2) no-tool centerline 7 px
+  (the 8 px line reach; check in the centerline feel test); (3) Note tool lights a centerline from 8 px
+  (NOTE_CENTERLINE_REACH_PX 9) and its leader attaches there (`note_leader_point`; ops drawing_note too, AGENT_API
+  regenerated; e2e note check at the END of drawing_lists_silhouettes, it adds an annotation). Tests green on vibex7
+  (x202: drawing-ui 166, scene 11, model-data 124, drawing 268, ops 489 full, clippy incl. ops clean).
+- COMMITTED c1b5a6a07 (not queued): live's re-record (0a3ac2eee, page live/studios/drw-table-insert-row-1122/): the
+  straight move to Row Below crosses Remove, Insert ▸ closes, the click lands on the sheet: live ends the cell edit
+  (dialog null). Entering sideways, Row Below inserts and the Cell panel STAYS on the cell. Done: Insert ▸ keeps
+  cell_sel (shifted for Row Above / Column Left); DrawingEditor::on_mouse_down: with cell_sel and frame_menu open, a
+  left press beside ends the edit, a right press only closes. 3 feel tests (cell_menu_open helper) pass, 168 green.
+  BUT the real app still fails both scenarios (insert-row s11 dialog Cell; cell-menu s27 menu still open; at s27 our
+  menu starts at x 981 so the rclick at 980 is beside it, same cause). The branch doesn't fire in the app.
+  RUNNING at the cap: x209.sh (blvor77uy) = debug build with an UNCOMMITTED eprintln "DBGSTUDIOS down ..." in
+  on_mouse_down (drawing_tools.rs, after `let menu_open`), then insert-row on vibex8 with NOSHAPE_UIP_LOGS=1; read
+  `ssh vibex8 'grep -E "UI-SCRIPT|DBGSTUDIOS" ~/agents/studios-keep/shots-drw-table-cells-insert-row/*.stderr'`.
+  Suspects: the press doesn't reach the editor, or the host already let go (is_open_menu false). REMOVE the eprintln
+  (`git checkout crates/drawing-ui/src/drawing_tools.rs`) before committing the fix.
+  vibex8 drw run with both commits (uip1122k, live re-records scp'd into vibex8 src): 370/374: centerline Ø8, the two
+  table ones, drw-title-block-dblclick s1 (dialog null, likely load 23 on vibex8; recheck when quieter).
+  Then land both (fetch, rebase, diff --stat, TICKETS duplicates; full ops e2e already ran).
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.
 - Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. P2s
