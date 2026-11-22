@@ -5,21 +5,27 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-21 23:55 UTC) — RESUME HERE
-- P0 batch 4 (qa hover matrix, assembly) LANDED 8eb92415 (11-21 23:31): PS-MC-MISSING, MANIPULATOR-RING, VERTEX-LOOK,
-  MATE-VERTEX, DRAG-LIT; assembly hover matrix 21/21, feel 21/21; on psui's f411d924 part-studio hover matrix 71/71.
-  Open: the white dashed line along a selected edge (live seems to depth-test the triad's X shaft against the part).
-- Welding flexible subs (landing, welding 41/81 -> 81/81 occ, 28/28, 29/29): the translator placed a flexible sub's parts one at a time, each
-  `assembly_transform` solved with the others at their old places, so the sub's own mates pulled it back part-way
-  (Sub 0eadef <4>: -63.26 deg -> -67.35 -> -72.83, live -75.56). Fix: assembly_transform `also` (several in one edit,
-  one solve) + Translator::place_all per level and tab. vibex8 probe3.py: all five at live's -75.56 exactly. e2e
-  a_flexible_subassemblys_parts_move_together; clippy clean; AGENT_API regenerated. Infento rerun with it: vibex8
-  ~/agents/asm-keep/weld/inf-fix.out (bin ops-weld; onerun's 3000 s too short, rerun at 7200 s). Infento's 5 nested misses
-  (b63c40 / bdf7bf / dfc972) are likely the same.
-- suite-main (vibex7, main d5c8c1e79): scissor 205/239 10/24 58/87, suspension 23/28 8/8 21/21, welding 41/81 28/28
-  29/29. Scissor fed22d (Top Openings 23.0 mm, Base - Left/Right and Aligner lost): skasm 22:0x says neither
-  c721b3513 nor 1d3541912 (single studio 28/60 both, 14.95 mm); in the assembly run Top Openings' plane resolves to
-  another face query (face:jY8x… vs face:jY-x…). Rerun scissor once skasm's b3345866 lands (Move-face regions).
+## State (2026-11-22 00:25 UTC) — RESUME HERE
+- QUEUED 33829c47 (welding flexible subs: assembly_transform `also` + Translator::place_all; welding 41/81 -> 81/81 occ,
+  28/28, 29/29; e2e a_flexible_subassemblys_parts_move_together). Stacked, NOT landed: 2d56de9dd (TICKETS: batch 4
+  fixed) + this handoff: land.sh after 33829c47 lands (never while it's queued).
+- LANDED 8eb92415 (11-21 23:31): P0 batch 4 (PS-MC-MISSING, VERTEX-LOOK, MATE-VERTEX, DRAG-LIT; MANIPULATOR-RING's ring);
+  qa told. Open: MANIPULATOR-RING's X shaft along a selected edge (ours ON_TOP white shaft over the edge band; live hides
+  it, the band crosses the ring stroke, the triad whole over a selected face). Likely live draws the triad depth-tested
+  with a line bias (beats faces, loses to the lifted lit edge): style 0 instead of ON_TOP in asm_scene.rs manipulator
+  `stroke`. Waiting on live: REQUESTS.md "is the assembly move triad depth-tested?" (asked 00:0x, live messaged).
+  Crops: our dump NOSHAPE_HOVER_MATRIX_DUMP=<dir> on the hover matrix tests; /root/asm-scratch/{ours,live}-sel-crops.png.
+- Infento rerun with the welding fix: vibex8 ~/agents/asm-keep/weld/inf-fix.out (onerun-t.sh, 7200 s, bin ops-weld),
+  started 00:0x. Compare with 157/167 occ, 204/206 mates, 64/64 BOM; the 5 nested misses (b63c40 / bdf7bf / dfc972)
+  should close if they were the same one-at-a-time placing.
+- Scissor fed22d regression (main 10/24 mates vs 16/34): NOT skasm's two commits (their A/B). Top Openings is a red
+  herring (taken back in both runs). First new failure is Extrude 18 with identical translation (regions, frame, params):
+  the body before it differs. Good run vibe2 mc/asm-scissor-save.out (binary predates f5d9f0ea1 14:10), bad vibex7
+  mc/suite-main.out; window <14:10 .. 19:26. Single studio on ops-weld (vibex8 ~/tmp/asm/one-fed) builds every feature
+  but parity_models doesn't print states. Next: rerun the scissor assembly once skasm's b3345866 and bool's 21754bd8
+  (Spur Gear OK 2466.975 mm3) land; if Extrude 18 still fails, bisect the window in the assembly run stopped after
+  fed22d (bisect-scissor.sh pattern). Notes /root/asm-scratch/notes-1121.md.
+- Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
 - transform-carry HELD (/root/asm-scratch/transform-carry.patch): its extra failures are the same Base mates.
 - Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
 - Infento main: 157/167 occ, 204/206 mates, 64/64 BOM; the 5 Wheel 7inch are deleted elements in live (not the gap).
@@ -28,11 +34,12 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   Boolean 3: ours 160/352/186 92358 mm3, live 158/325/165 61977) and 665cf3 Fillet 4 (Top Cover after Boolean 1: ours
   98/228/130 3515, live 42/87/42 7110) are wrong inputs: mine to bisect (665cf3 derives 0139f2: skasm's region bug;
   9cbb0e after 2d82a0's Fillet 13). Core took the derived-import cost (DocStudios::context's own Regenerator cache).
-- Gear 184ad0: bool found the cause in core's c703c330e (helical sweep start cap on a left-handed plane), fix in test.
-- Landed today: 89180ec5 (scissor P0: 38 -> 22 min), da49b2418 (FS-ERROR-ENUM-VERSION), 1fc9fca74 (handoff).
+- Gear 184ad0: bool's fix queued 21754bd8 (helical sweep start cap right-handed; OK 2466.975 mm3, live 2466.978).
+- Landed 11-21: 89180ec5 (scissor P0: 38 -> 22 min), da49b2418, 1fc9fca74, 8eb92415 (P0 batch 4).
 - Then: xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5, tvc 41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc /
-  cli-tc and ~/tmp/asm/q copies (it*, iy, iz, sc-tc, ia..ie); vibe2 ops-tc / ab1120e-*.out / old mc/*.out.
+  cli-tc and ~/tmp/asm/q copies (it*, iy, iz, sc-tc, ia..ie); vibe2 ops-tc / ab1120e-*.out / old mc/*.out; local branch
+  asm-rb-check (trial rebase, delete); vibex8 weld/w0-p*.noshape probe copies after the welding land.
 
 ## State (2026-11-20 18:50 UTC)
 
