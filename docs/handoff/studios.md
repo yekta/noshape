@@ -23,14 +23,23 @@ score line "score: N/978"; x184d.sh: drw only + the three hover matrices). Never
 crates/drawing land (drawing-ui alone: not needed).
 - LANDED 155f85da as f4dda516 (11-22 13:07): the drawing P0 stack (hover/select, click_still, balloon leader, Change to
   version, Esc rework, qa walk 9, workflow 09 / 26 batches).
-- QUEUED d1452c9a (11-22 13:58, 12 commits): palette halo (live drwm d7), FS-DRAG-SELECT-BAND (vendor/gpui-base
-  element.rs), the view box rule (scene `view_frame_box` / `in_view_reach`: box 5.5 % of the view's longer side out,
-  Select reach 1 mm past it; live drw-hover-1122), a cell's Insert ▸ / Duplicate ▸ clears the selection, TICKETS.
-  vibex8 drw run on it: 371/374, the same 3 diffs as before (uip1122j).
-- COMMITTED, NOT QUEUED: bcbd54eb2. Select's line reach is now 8 px (lit at 7, not 8), from dx: live drw-hover-1122's
-  centerline lights at 7, not 8, and D1's at 6, not 8. New SELECT_FORMAT_REACH_PX 9: the sheet border lights at 8, not 9
-  (test `the_sheet_border_lights_at_lives_reach`). Checked: drawing-ui 168, scene 9, clippy clean. RUNNING: vibex8 drw
-  run + hover matrices on it (x184e.sh, out ~/agents/studios-keep/uip1122k, log x184e.log). Land if 371/374 holds.
+- LANDED d1452c9a as d425fa05 (14:40): palette halo, FS-DRAG-SELECT-BAND, view box rule, insert-row selection clear.
+- LANDED cd7b7401 as 634aa1f1 (15:21): Select line reach 8 px (lit at 7, not 8), SELECT_FORMAT_REACH_PX 9 (sheet border
+  lit at 8, not 9). vibex8 drw run on it (uip1122k): 371/374, same 3 diffs; hover matrices 3/3.
+- CHECKING dd49dc0f (queued 14:50): TICKETS, own stale [ ] rows of VS-NAME-FOCUS-BOX / HISTORY-BRANCH-FILTER dropped.
+- UNCOMMITTED, dx's 3 cells from drw-hover-1122 (lead 15:1x), tests not yet run on this whole diff:
+  (1) text reach: live's tan box is the glyphs + 0.5 h on every side (dimension 1.575: glyphs 679..721 x 539..550, box
+  673..726 x 533..556); reach from it 8 px. `font::text_hover_box` / `text_hover_distance` (model-data font.rs, replaces
+  text_box_distance; build.rs hit_reach uses it only when text_tol > 0, tools' hit unchanged), SELECT_TEXT_REACH_PX 9 -> 8,
+  D1 test measures from the hover box. (2) no-tool centerline 7 px: covered by the 8 px line reach; check added to
+  `a_centerline_on_a_view_edge_gives_way_to_the_view`. (3) Note tool on a centerline: NOTE_CENTERLINE_REACH_PX 9, hover
+  arm for Tool::Note, `SheetPick::note_leader_point` (snap, then hovered centerline, then edge), used by the Note click
+  and the ops drawing_note leader (description + error text changed: regenerate AGENT_API with UPDATE_DOCS=1
+  coverage::); e2e check in drawing_lists_silhouettes; UI check in the centerline feel test. A leader stores view +
+  view-coords point, so no new model reference is needed.
+  RUNNING when the cap hit: x201.sh on vibex7 (bz9r0c63x) on (1)+(2) only. Next: rerun x201 on the whole diff (it
+  already includes the full ops e2e: crates/drawing changed) + UPDATE_DOCS coverage + clippy -p noshape-ops, commit,
+  vibex8 drw run (x184e.sh), land.
 - drw-table-cells-insert-row step 11 still keeps the Cell panel in the app (the unit test closes it). Our runner moves
   from Insert to Row Below in 3 steps with 20 ms sleeps, crossing Remove ▸, so ours likely lands in the wrong submenu.
   Live's runner (4 Playwright steps) may cross Remove ▸ too, and live has no safe triangle (live/psui/submenu-diag-1119),
