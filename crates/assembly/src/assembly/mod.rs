@@ -6,6 +6,7 @@ pub use noshape_model_data::assembly::{config, ops};
 pub mod analysis;
 pub mod bom;
 pub mod eval;
+pub mod inference;
 pub mod solver;
 pub mod standard;
 #[cfg(test)]
