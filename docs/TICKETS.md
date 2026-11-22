@@ -287,6 +287,28 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-22 00:2x (USER P0 walk 7, lead: viewport navigation as a user feels it; green a597c1393, real xdotool input + a 60 fps grab on local Xvfb, kit qa-scratch/w7; live 11-22 00:05 behaviours "qa walk 7 navigation", live/qa/walk7-1121/)
+
+Both sides render in software here (live SwiftShader, repainting every 0.4–1.1 s at load 20; ours llvmpipe with read-back, ~10 fps
+orbiting a light part), so the shape is compared, not the speed. Ours answers sooner on the light part: first changed frame 150–300 ms
+for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms.
+
+- [ ] P0 **FEEL-NAV-INERTIA (psui)**: right-drag 200 px left in 10 moves 16 ms apart, released while moving. Live keeps turning
+  2.1–2.9 s after the release: all three flicks end further round than the same drag held still 150 ms before release. Ours stops:
+  in 2 of 3 runs the flick's end view is pixel-identical to the held drag's (qa-scratch/tickets/inertia-w7.png). Ours runs ~10 fps
+  here; the matrix notes "none below 20 fps", but live turns on at far lower rates, so check that rule against live's client.
+- [ ] P0 **FEEL-NAV-ANIM-LOW-FPS (psui)**: from an orbited view, F, Shift+5 and Shift+7, and a click on the cube's Front face.
+  Live animates: its page-side camera trace has 4–5 camera steps for F over 1.9–2.2 s, 4–8 for Shift+5 and 8–15 for Shift+7, and the
+  screen shows 2–4 changed frames. Ours jumps: one changed frame (150–300 ms) plus the edge refinement ~500 ms later, at ~10 fps. The
+  cube's ▶ arrow animates in both (ours 4 frames over ~330 ms). This contradicts live nav-1117 (one frame for these keys on the same
+  renderer); psui to settle it from live's client (when `animateTo` jumps) and match.
+- [ ] P0 **FEEL-CUBE-CORNER-HOVER (psui)**: the view cube at iso, pointer on the front-right-top corner (the vertex facing the
+  viewer). Live draws a light-blue disc on the corner. Ours lights nothing there: a 5 × 5 grid of points (±8 px) round the corner
+  lights only the neighbouring edges' bands (qa-scratch/tickets/cube-hover-w7.png).
+- Matched live: a wheel notch is one jump anchored at the pointer (in and out); a middle drag follows the pointer and stops on
+  release; a drag held still before release doesn't turn after it; cube hover on a face (fill), the top-front edge (band), the ▶ arrow
+  and a rotate arrow (light blue). The heavy documents (scissor, infento, the 400-hole plate) are being measured on vibex8 (results to follow).
+
 ## qa, 2026-11-21 22:2x (USER P0 walk 6, lead: feature dialogs, drawings, document tabs as a user uses them; green e1f14b57b, vibe2 hm2/walk6/gen8.py, out-w8, out-w8b)
 
 - [ ] P0 **FEEL-EXTRUDE-DRAG-PREVIEW (psui)**: block, top face, Shift+E, drag the depth arrow up 66 px: Depth reads 44.1 mm (0.1 mm
