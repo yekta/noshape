@@ -52,6 +52,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   the stopped unit was gone, so the fuzz was down 11-17 02:01-10:08.
 
 ## Release checks (per release; lead cuts 05:00 / 17:00)
+0r. Corpus re-save (lead 08:1x: knifehandle Loft 1 + loft-paths-guides Loft 5 alerts = stale copies; tablet-stand Sketch 3 real, open until skasm's stable naming): unit qa-resave-loft (vibex7 slot, models ~/qa-parity/resave-loft/m, log tmp/resave-loft.log) -> check Loft Ok, copy saved/*.noshape over vibex7 ~/qa/corpus/ (drop -shm/-wal), tell core.
 0. v0.4.66 (cut 04:5x from b5b414278 + dx 75271defe; lead: published checks + feel spot-check): units qa-pub-0466 (bin/pub-wait.sh 0.4.65 0.4.66 vibex7 ~/qa-rel/cand-b5b41427/noshape -> compat/published-0.4.66.txt, rel-0.4.66.txt, qa-alerts line) and qa-relfeel-0466 (bin/rel-feel.sh: walk 3/5 s[357] + walk 1 w-[dl] cells green -> hm2/rf-green done 05:1x; after PUB-DONE the released app -> hm2/rf-rel, shot diff -> compat/relfeel-0.4.66.txt + qa-alerts). Report both to the lead; eyeball the hover-fix cells (psui 0102516b3/5b7743f97/4f2cb3ce8/6be52caf4, asm 8eb924151).
 1. Candidate: bin/rel-cand.sh <prev> <tag> (checks out nothing: check out the candidate in worktree qa-bisect first; builds
    its CLI on vibex7 through rb.sh, then userdocs vs <prev>: user docs + f197, the 4 Hole docs, tickets, authored docs) ->
