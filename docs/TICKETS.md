@@ -336,7 +336,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P2 **HISTORY-BRANCH-FILTER (studios)**: same workflow: once the document has a second workspace (B1), live's Versions and history panel adds a **filter ▾ button** right of the search box; ours has only the search box (tickets/wf16-history-filter.png).
 - [ ] P0 **SKETCH-USE-VERTEX-OTHER-SKETCH (skasm)**: workflow 12 steps 9–12 (curves, after Sweep 1: Sketch 4 on Right, click Sketch 2's line end vertex (-10, -20, 0), u; Sketch 3's end vertex (-10, 0, 20), u): live projects each selected vertex **at once** into a point on the line where it crosses the plane (hollow points at (0, -20) and (0, 20)); ours selects the vertex but u only switches the Use tool on/off and **no point is made** (sketch entities stay empty). The guide line drawn next (steps 13–15) is then not tied to the profiles (blue, one Horizontal) and the Loft with that guide (steps 18–24) **fails** (Loft 1 in error, the guide red); live's gives Surfaces (1) (tickets/wf12-use-vertex.png, wf12-loft-guide.png). u on a selected model edge works (verified e3368b77).
 - [ ] P0 **FEEL-VERTEX-SELECTED-HOVER-DOT (psui)**: same step 9 (a sketch vertex of another sketch clicked, pointer still on it): live draws the selected, hovered vertex as an orange dot **~12 px** across; ours ~7 px (tickets/wf12-use-vertex.png row 9).
-- [ ] P1 **IMPORT-TAB-TOAST (dx)** (workflow 17 steps 9–12, doc-tabs: Export… STEP to a new tab "Part Studio 1.step", that tab's
+- [x] P1 **IMPORT-TAB-TOAST (dx)** (fixed dx 11-22, queued: the green success bubble, gone by itself 5 s after the import lands, as live import-toast-1122) (workflow 17 steps 9–12, doc-tabs: Export… STEP to a new tab "Part Studio 1.step", that tab's
   Import… › Import to this document › Import; live answered REQUESTS qa 04:35, behaviours "qa workflow 17 import toast",
   live/qa/import-toast-1122/): live shows "Part Studio 1.step has been imported. Open document ×" top centre as a **green success**
   toast (check-circle icon, green ×), 9.6 s after the click, and **removes it by itself after 5.0 s**; ours shows the same text as a
@@ -464,7 +464,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P0 **FEEL-DRW-BALLOON-HOVER-LEADER (studios)** (workflow 23 step 24, pin-block-asm-drawing, green b5b414278): balloon 2 hovered
   after Esc (attached to Section A-A's edge): live tints only the balloon (tan ring + fill), its leader stays black with a filled black
   arrowhead at the edge; ours draws the whole leader tan and thin, with no arrowhead (tickets/wf23-hatch-balloon.png, bottom; live left).
-- [x] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (fixed dx 11-22 2e73853c8, queued: each part of a section its own hatch, 45 / 135 deg alternating in part order, spacing = the part's box diagonal / 13 as live s05's pixels; 3+ parts and repeated instances asked of live, REQUESTS dx 05:35; the DETAIL B label P2 stays open, waits for that answer) (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
+- [x] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (fixed dx 11-22, queued: each part of a section its own hatch, 45 / 135 deg alternating in part order, spacing = the part's box diagonal / 13 as live s05's pixels; 3+ parts and repeated instances asked of live, REQUESTS dx 05:35; the DETAIL B label P2 stays open, waits for that answer) (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
   the opposite angle and closer spacing than the block, so adjacent parts read apart; ours hatches both at the same angle and spacing
   (tickets/wf23-hatch-balloon.png, top). Also P2: "DETAIL B SCALE 2:1" sits at y 11.2 mm vs live 14.0. The rest of 23 = live:
   views, section A-A, detail B 2:1, .787, BOM rows 1 / 2, balloons 1 / 2 at the same spots (tickets/wf23-sheet.png).
@@ -501,7 +501,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   the same readouts and panel values (Min dist 39.051, X/Y/Z 0/30/25, Max dist 55.902, Length 40). MEASURE-VALUE-CLICK-PIN also
   holds inside the panel (variant 36v-measure-px, live's px): live's click on Min dist selects the value as 39.05125 with the full
   value in a chip above and the row lit, a second click 39.051 selected; ours changes nothing (rows 2-3).
-- [x] P2 **EXPORT-STORE-DETAILS (dx)** (fixed dx 11-22 da2ecf9c3, queued: .iges; Move to document… / Export… / Download one group; STEP's Version checkboxes 31 px apart, Options' stay 39 as live) (workflow 39, doc-tabs, green 984adcc30; variant 39v-short-waits, the 20 s waits cut to 3 s
+- [x] P2 **EXPORT-STORE-DETAILS (dx)** (fixed dx 11-22, queued: .iges; Move to document… / Export… / Download one group; STEP's Version checkboxes 31 px apart, Options' stay 39 as live) (workflow 39, doc-tabs, green 984adcc30; variant 39v-short-waits, the 20 s waits cut to 3 s
   because 7 x 20 s ran past the app's 180 s script budget): (1) the IGES export stored in a tab is "Part Studio 1.**igs**", live
   "Part Studio 1.**iges**"; (2) STEP's four checkboxes under Version are 39 px apart, live 31 (Options and Export sit 24 px lower);
   (3) a stored file tab's menu has a separator between Export… and Download, live none (tickets/wf39-tabs.png row 5,
