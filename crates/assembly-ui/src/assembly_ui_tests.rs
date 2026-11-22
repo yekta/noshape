@@ -1281,8 +1281,7 @@ fn two_selected_instances_have_lives_list_menu(cx: &mut TestAppContext) {
 
 /// Live asm/feel-1117 (reach-corner-strip) and asm-feel3-1118: over a planar face the preview connector jumps to a dot
 /// within a 47.5 px square around the pointer (a corner 3 px away; kept at (25, 46) and (47, 40), lost at (26, 48) and
-/// (49, 42)), else it sits at the face's centroid; with Shift locking the face's points the nearest is taken at any
-/// distance.
+/// (49, 42)), else it sits at the face's centroid; Shift locks the face and keeps the rule (mc-infer-1122).
 #[gpui::test]
 fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
@@ -1329,6 +1328,10 @@ fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mu
             v.infer_locked = true;
             v.update_inference(cx);
             assert_ne!(v.infer_choice, Some(0), "Shift: the corner by the pointer");
+            // Live mc-infer-1122 shift.png: Shift locks the face, not the point: off the face, its centroid.
+            v.pointer = c1 + (c1 - c0) * 3.0;
+            v.update_inference(cx);
+            assert_eq!(v.infer_choice, Some(0), "Shift, the pointer past the face: its centroid");
         })
     })
     .unwrap();

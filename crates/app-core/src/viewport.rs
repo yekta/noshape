@@ -100,6 +100,8 @@ pub enum ViewportEvent {
     /// `crossing`: dragged right→left (touched ids), else window (inside);
     /// `rect` the box's corners (viewport-local).
     BoxSelect { ids: Vec<u32>, modifiers: Modifiers, crossing: bool, rect: (DVec2, DVec2) },
+    /// What a crossing box touches while it is dragged ([`Viewport::box_preview`]); empty once it ends or turns window.
+    BoxTouched { ids: Vec<u32> },
     /// Left-button press/drag/release while a tool captured the pointer.
     ToolDown { position: DVec2, modifiers: Modifiers, click_count: usize },
     ToolDrag { position: DVec2 },
@@ -144,6 +146,7 @@ enum PickPurpose {
     Click { position: DVec2, modifiers: Modifiers, click_count: usize },
     ContextMenu { position: DVec2, window_position: Point<Pixels> },
     Box { a: DVec2, b: DVec2, crossing: bool, modifiers: Modifiers },
+    BoxPreview { a: DVec2, b: DVec2 },
     /// Visible-depth samples for the rotate centre (nothing under the cursor).
     DepthPivot,
 }
@@ -443,6 +446,9 @@ pub struct Viewport {
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
+    /// With Ctrl (Cmd) held a left drag boxes even so: an assembly's drag of its selection from empty space (live
+    /// sel-gestures-1122: Ctrl + window over the selection removes it).
+    pub ctrl_boxes: bool,
     /// Every move picks at once, no pause (live's `alwaysPreHighlightOnMouseMove`): only while a sketch creation tool
     /// is active (live2 hover-time-1118); everywhere else a fast move's pick waits for the pause.
     pub pick_on_move: bool,
@@ -529,6 +535,13 @@ pub struct Viewport {
     pub fit_inset_left: f64,
     /// The box being dragged: press point, pointer, crossing.
     box_rect: Option<(DVec2, DVec2, bool)>,
+    /// A crossing box reports what it touches as it is dragged (an assembly outlines those instances: live
+    /// sel-gestures-1122).
+    pub box_preview: bool,
+    /// A preview pick in flight; asked again when it answers if the box moved meanwhile; some ids shown.
+    box_preview_query: bool,
+    box_preview_again: bool,
+    box_preview_shown: bool,
     /// A box released without a pick ([`Self::box_by_pick`] off), still drawn until a frame submitted after its frame
     /// `.3` is presented: the selection comes up as the box goes, never a frame of neither (live recheck 5c922906).
     box_held: Option<(DVec2, DVec2, bool, u64)>,
@@ -785,6 +798,11 @@ impl Viewport {
             cursor_platform: true,
             hover: None,
             tool_captures_left: false,
+            ctrl_boxes: false,
+            box_preview: false,
+            box_preview_query: false,
+            box_preview_again: false,
+            box_preview_shown: false,
             pick_on_move: false,
             capture_picks_below: None,
             capture_probe: None,
@@ -1555,6 +1573,18 @@ impl Viewport {
             PickPurpose::ContextMenu { position, window_position } => {
                 let pick = pick_in(&buf, position, s);
                 cx.emit(ViewportEvent::ContextMenu { pick, position: window_position });
+            }
+            PickPurpose::BoxPreview { a, b } => {
+                self.box_preview_query = false;
+                if self.drag != Drag::Box {
+                    return;
+                }
+                let ids = buf.as_ref().map(|buf| box_ids(buf, a, b, s, true)).unwrap_or_default();
+                self.box_preview_shown = !ids.is_empty();
+                cx.emit(ViewportEvent::BoxTouched { ids });
+                if std::mem::take(&mut self.box_preview_again) {
+                    self.request_box_preview(cx);
+                }
             }
             PickPurpose::Box { a, b, crossing, modifiers } => {
                 let ids = match &buf {
@@ -2607,7 +2637,7 @@ impl Viewport {
             }
         }
         match e.button {
-            MouseButton::Left if self.tool_captures_left || self.manipulator_at(p) || self.press_on_capture_pick(p) => {
+            MouseButton::Left if (self.tool_captures_left && !(self.ctrl_boxes && (e.modifiers.control || e.modifiers.platform))) || self.manipulator_at(p) || self.press_on_capture_pick(p) => {
                 self.drag = Drag::Tool;
                 cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers, click_count: e.click_count });
             }
@@ -2753,6 +2783,7 @@ impl Viewport {
                 // only while the pointer is right of the press.
                 self.box_rect = Some((self.press_pos, p, p.x <= self.press_pos.x));
                 self.ctrl_in_box = e.modifiers.control;
+                self.request_box_preview(cx);
                 // A hover picked as the box started (a pick in flight) goes.
                 self.set_hover(None, cx);
                 cx.notify();
@@ -2900,6 +2931,7 @@ impl Viewport {
     /// A finished box (left drag, or a two-finger long press): zoom to it in
     /// zoom-window mode, else select (window or crossing).
     fn finish_box(&mut self, a: DVec2, b: DVec2, crossing: bool, modifiers: Modifiers, cx: &mut Context<Self>) {
+        self.end_box_preview(cx);
         if std::mem::take(&mut self.zoom_window) {
             self.zoom_to_box(a, b, cx);
             cx.notify();
@@ -2911,15 +2943,39 @@ impl Viewport {
         }
         // Crossing selection only needs the box; window selection also needs
         // what is outside it.
-        let rect = if crossing {
-            let s = self.scale as f64;
-            let (x0, y0) = ((a.x.min(b.x) * s).floor() as i32, (a.y.min(b.y) * s).floor() as i32);
-            let (x1, y1) = ((a.x.max(b.x) * s).ceil() as i32, (a.y.max(b.y) * s).ceil() as i32);
-            PickRect { x: x0, y: y0, width: (x1 - x0).max(0) as u32 + 1, height: (y1 - y0).max(0) as u32 + 1, depth_samples: 0 }
-        } else {
-            self.whole_frame_rect()
-        };
+        let rect = if crossing { self.box_pick_rect(a, b) } else { self.whole_frame_rect() };
         self.request_pick(rect, PickPurpose::Box { a, b, crossing, modifiers });
+    }
+
+    fn box_pick_rect(&self, a: DVec2, b: DVec2) -> PickRect {
+        let s = self.scale as f64;
+        let (x0, y0) = ((a.x.min(b.x) * s).floor() as i32, (a.y.min(b.y) * s).floor() as i32);
+        let (x1, y1) = ((a.x.max(b.x) * s).ceil() as i32, (a.y.max(b.y) * s).ceil() as i32);
+        PickRect { x: x0, y: y0, width: (x1 - x0).max(0) as u32 + 1, height: (y1 - y0).max(0) as u32 + 1, depth_samples: 0 }
+    }
+
+    /// The crossing box's touched ids for [`Self::box_preview`]: one pick in flight, the latest box asked when it answers.
+    fn request_box_preview(&mut self, cx: &mut Context<Self>) {
+        if !self.box_preview || !self.box_by_pick || self.zoom_window {
+            return;
+        }
+        let Some((a, b, true)) = self.box_rect else {
+            self.end_box_preview(cx);
+            return;
+        };
+        if self.box_preview_query {
+            self.box_preview_again = true;
+            return;
+        }
+        self.box_preview_query = true;
+        self.request_pick(self.box_pick_rect(a, b), PickPurpose::BoxPreview { a, b });
+    }
+
+    fn end_box_preview(&mut self, cx: &mut Context<Self>) {
+        self.box_preview_again = false;
+        if std::mem::take(&mut self.box_preview_shown) {
+            cx.emit(ViewportEvent::BoxTouched { ids: Vec::new() });
+        }
     }
 
     /// A button released outside the viewport: finish a drag that started in

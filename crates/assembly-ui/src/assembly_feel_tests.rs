@@ -183,16 +183,22 @@ pub(super) fn move_to(cx: &mut TestAppContext, window: AnyWindowHandle, view: &E
 
 /// A press at `from`, a drag through to `to` in steps and the release there.
 fn drag(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, from: DVec2, to: DVec2) {
+    drag_with(cx, window, view, from, to, Modifiers::default(), |_| {});
+}
+
+/// [`drag`] with keys held, `before_release` run with the pointer at `to` still pressed.
+fn drag_with(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, from: DVec2, to: DVec2, keys: Modifiers, before_release: impl FnOnce(&mut TestAppContext)) {
     move_to(cx, window, view, from);
     let w = at_window(cx, view, from);
-    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, keys);
     for k in 1..=8 {
         let p = at_window(cx, view, from + (to - from) * (f64::from(k) / 8.0));
-        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), keys);
         frames(cx, window, view);
     }
+    before_release(cx);
     let w = at_window(cx, view, to);
-    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, Modifiers::default());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, keys);
     settle(cx, window, view);
 }
 
@@ -278,10 +284,49 @@ fn a_box_takes_whole_instances_as_live(cx: &mut TestAppContext) {
     drag(cx, window, &view, DVec2::new(lo.x - 30.0, above), DVec2::new(hi.x + 20.0, below));
     assert_eq!(selected(cx), vec!["Part 1 <1>".to_string()], "a window around the part takes the instance");
     clear(cx);
-    drag(cx, window, &view, DVec2::new(mid, below), DVec2::new(lo.x - 30.0, above));
+    // Live sel-gestures-1122: the instance a crossing box touches is outlined as hovered while it is dragged.
+    drag_with(cx, window, &view, DVec2::new(mid, below), DVec2::new(lo.x - 30.0, above), Modifiers::default(), |cx| {
+        wait_until(cx, window, &view, |v, _| !v.ui.box_touched.is_empty());
+        let outlined = cx.update(|cx| {
+            let v = view.read(cx);
+            v.ui.box_touched.iter().map(|id| v.assembly(cx).unwrap().instances.iter().find(|i| i.id == *id).unwrap().name.clone()).collect::<Vec<_>>()
+        });
+        assert_eq!(outlined, vec!["Part 1 <1>".to_string()], "the touched instance outlined while the crossing box is dragged");
+    });
     assert_eq!(selected(cx), vec!["Part 1 <1>".to_string()], "a crossing box over half a part takes the whole instance");
+    assert!(cx.update(|cx| view.read(cx).ui.box_touched.is_empty()), "no outline once the box is released");
     let faces = cx.update(|cx| view.read(cx).hover.is_some() || view.read(cx).selected_mate.is_some());
     assert!(!faces, "no face or mate taken by a box");
+
+    // Live sel-gestures-1122: Ctrl + a window over the selection removes it (a box, not the selection's drag).
+    let before = screen_box(cx, &view, "Part 1 <1>");
+    let ctrl = Modifiers { control: true, ..Default::default() };
+    drag_with(cx, window, &view, DVec2::new(lo.x - 30.0, above), DVec2::new(hi.x + 20.0, below), ctrl, |_| {});
+    assert!(selected(cx).is_empty(), "Ctrl + window over the selected instance removes it");
+    assert_eq!(screen_box(cx, &view, "Part 1 <1>"), before, "and doesn't move it");
+}
+
+/// Live sel-gestures-1122 (assembly): a click on a selected face keeps it selected, a Shift+click too (no toggle).
+#[gpui::test]
+fn a_click_on_a_selected_face_keeps_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "no-toggle");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on = (lo + hi) * 0.5;
+    move_to(cx, window, &view, on);
+    wait_until(cx, window, &view, |v, _| v.hover.as_ref().is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face));
+    let w = at_window(cx, &view, on);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.ui.entity_sel.is_empty());
+    let picked = cx.update(|cx| view.read(cx).ui.entity_sel.clone());
+    assert_eq!(picked.len(), 1, "the face selected");
+    // (Apart: two clicks within 500 ms are a double click, which clears.)
+    for (keys, what) in [(Modifiers::default(), "a click"), (Modifiers { shift: true, ..Default::default() }, "a Shift+click")] {
+        cx.update(|cx| view.update(cx, |v, _| v.ui.last_click = None));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, keys);
+        settle(cx, window, &view);
+        assert_eq!(cx.update(|cx| view.read(cx).ui.entity_sel.clone()), picked, "{what} on the selected face keeps it");
+    }
 }
 
 /// Live feel cov-1120 A1 (qa FEEL-ASM-DRAG-DEAD-ZONE): a free instance pressed and dragged through the pointer's real
@@ -577,6 +622,33 @@ fn a_mate_rows_double_click_edits_the_mate(cx: &mut TestAppContext) {
     cx.update(|cx| assert_eq!(view.read(cx).mate.as_ref().and_then(|m| m.editing), Some(id), "a double-click opens Fastened 1's dialog"));
 }
 
+/// qa FEEL-GEAR-DIALOG-MATES-LOOK (live wf25 step 28): a relation dialog's mates show as a shown mate's: their parts lit
+/// and their connector triads; nothing once the field is emptied.
+#[gpui::test]
+fn a_relation_dialogs_mates_light_their_parts(cx: &mut TestAppContext) {
+    let (window, view) = mated_blocks(cx, "relation-mates");
+    let id = cx.update(|cx| view.read(cx).result.mates[0].id);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let a = v.assembly(cx).unwrap();
+        let mut names: Vec<String> = a.instances.iter().filter(|i| built.picks.faces_of(i.id).iter().any(|f| scene.states[*f as usize] & noshape_render::state::ACCENT != 0)).map(|i| i.name.clone()).collect();
+        names.sort();
+        names
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selected_mate = None;
+        v.open_relation(noshape_model::assembly::RelationType::Gear, None, w, cx);
+        v.pick_relation_mate(id, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(lit(cx), vec!["Part 1 <1>".to_string(), "Part 2 <1>".to_string()], "the Mates field's mate: both its parts lit");
+    cx.update(|cx| view.update(cx, |v, cx| v.pick_relation_mate(id, cx)));
+    draw(cx, window);
+    assert!(lit(cx).is_empty(), "the field emptied: nothing lit");
+}
+
 /// Interaction-feel "Mate row hover": a hovered mate row lights both its parts and shows its glyph in the frame it
 /// arrives; off the row both go (the flyout's rows: `a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set`).
 #[gpui::test]
@@ -869,6 +941,52 @@ fn the_second_pick_outlines_its_part_and_shows_plain_under_the_pointer(cx: &mut 
     settle(cx, window, &view);
     assert_eq!(picked_faces(cx, &view), 1, "Part 2's top filled the picks' yellow with the pointer away (live s08)");
     assert!(part_banded(cx, &view, "Part 2 <1>"), "Part 2 still outlined");
+}
+
+/// Qa FEEL-MATE-SECOND-PICK-HOVER reopened (wf08 s07, picks in live's order: Part 2 <1> first, then Part 1 <1>'s top,
+/// which the moved Part 2 then covers under the pointer): with the pointer still where it picked, Part 1's top shows
+/// plain; once the pointer moves away it fills the picks' yellow.
+#[gpui::test]
+fn the_second_pick_shows_plain_while_the_pointer_stays_on_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mate-second-still", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let mut at = DVec2::ZERO;
+    for name in ["Part 2 <1>", "Part 1 <1>"] {
+        let (lo, hi) = screen_box(cx, &view, name);
+        at = (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2);
+        move_to(cx, window, &view, at + DVec2::new(300.0, 300.0));
+        settle(cx, window, &view);
+        move_to(cx, window, &view, at);
+        wait_until(cx, window, &view, |v, _| v.infer.is_some());
+        settle(cx, window, &view);
+        let click = at_window(cx, &view, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
+        settle(cx, window, &view);
+    }
+    assert!(cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors_complete())), "both connectors picked");
+    let filled = picked_faces(cx, &view);
+    let away = at + DVec2::new(400.0, 200.0);
+    move_to(cx, window, &view, away);
+    settle(cx, window, &view);
+    assert_eq!((filled, picked_faces(cx, &view)), (0, 1), "the second pick plain under the still pointer (live s07), filled once it moves (s08)");
 }
 
 /// Interaction-feel "Toolbar's place" and "Toolbar's grip" (live2 REQUESTS 18:20, place-1118): the mate toolbar's top

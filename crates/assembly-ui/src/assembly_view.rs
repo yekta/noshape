@@ -194,6 +194,9 @@ const BALL_RING_PX: f64 = 8.0;
 /// W's prompt while the zoom-window mode is armed (live keys-1118, as the Part Studio's).
 const ZOOM_WINDOW_PROMPT: &str = "Drag to create zoom bounding box.";
 const INFERENCE_PICK_RADIUS_PX: f64 = 47.5;
+/// An edge midpoint's square on a face (live mc-infer-1122's sweeps: a corner's between 45.6 and 53.2 px, a midpoint's
+/// between 37.8 and 45.4).
+const MIDPOINT_PICK_RADIUS_PX: f64 = 41.5;
 /// A mate dialog's first-picked connector, faded (live2 recheck-1119 asm2: alpha 0.20 on all three channels).
 const FIRST_PICK_OPACITY: f32 = 0.2;
 const EDGE_END_PICK_RADIUS_PX: f64 = 15.0;
@@ -1454,7 +1457,9 @@ impl AssemblyView {
                 }
             }
         }
-        for mid in [shown_mate, self.list_hover_mate].into_iter().flatten() {
+        // A relation dialog's mates as shown ones: their instances lit, their triads (live wf25 step 28, Gear 1).
+        let relation_mates = self.relation.as_ref().map(|r| [r.a, r.b]).unwrap_or_default();
+        for mid in [shown_mate, self.list_hover_mate].into_iter().chain(relation_mates).flatten() {
             if selected_mate.as_ref().is_none_or(|m| m.id != mid) {
                 h.accent_tops.extend(self.mate_instances(mid, cx));
             }
@@ -1473,6 +1478,7 @@ impl AssemblyView {
         if let Some(top) = self.ui.list_hover {
             h.hover_tops.push(top);
         }
+        h.hover_tops.extend(self.ui.box_touched.iter().copied());
         h.selected_tops.extend(self.ui.step_hover.iter().copied());
         if let Some(m) = &self.ui.measure {
             h.selected_entities.extend(m.iter().cloned());
@@ -1709,14 +1715,21 @@ impl AssemblyView {
             h.hover_vertex_open = matches!(entity, Reference::Vertex(_));
         }
         // A mate dialog's picked face under the pointer keeps the hover look after its click, and once both picks are in
-        // (live workflows-1122 08 s06 / s07: plain, its boundary lit; yellow once the pointer leaves).
+        // (live workflows-1122 08 s06 / s07: plain, not filled, its boundary and its part's outline lit; yellow once the
+        // pointer leaves).
+        // The pointer still where the second pick was, with the moved part now under it (wf08 s07: Part 2 brought onto
+        // Part 1's top): Part 1's top as hovered all the same, the moved part's face under the pointer lit as hovered.
+        let still = self.mate.as_ref().is_some_and(|s| s.hud == Some(self.pointer));
+        let hovered = self.hover.as_ref().filter(|t| matches!(t.reference, Reference::Face(_))).map(|t| (t.path.clone(), t.reference.clone()));
+        let under = hovered.filter(|k| h.hover_outline.is_none() && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
         if self.mate.is_some()
-            && h.hover_outline.is_none()
-            && let Some(t) = &self.hover
-            && matches!(t.reference, Reference::Face(_))
-            && h.picked_entities.iter().any(|(p, r)| *p == t.path && *r == t.reference)
+            && let Some((path, face)) = under
         {
-            h.hover_outline = Some((t.path.clone(), t.reference.clone()));
+            h.picked_entities.retain(|(p, r)| *p != path || *r != face);
+            if h.hover_outline.is_none() {
+                h.hover_outline = Some((path.clone(), face));
+            }
+            h.hover_part = Some(path);
         }
         // A dragged section base on geometry: the snapped entity in orange
         // and the mate-connector glyph at the point (live: unsnapped, the
@@ -2775,6 +2788,7 @@ impl AssemblyView {
             history: Default::default(),
             _ratio_sub: ratio_sub,
         });
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
@@ -3163,21 +3177,26 @@ impl AssemblyView {
                     best = Some((i, d));
                 }
                 let off = (s - self.pointer).abs();
-                if off.x.max(off.y) <= INFERENCE_PICK_RADIUS_PX && in_square.is_none_or(|(_, bd)| d < bd) {
+                let reach = match p.reference {
+                    Reference::Implicit { inference: Inference::Midpoint, .. } => MIDPOINT_PICK_RADIUS_PX,
+                    _ => INFERENCE_PICK_RADIUS_PX,
+                };
+                if off.x.max(off.y) <= reach && in_square.is_none_or(|(_, bd)| d < bd) {
                     in_square = Some((i, d));
                 }
             }
         }
         // Live (asm/feel-1117 reach-corner-strip, asm-feel3-1118): over a planar face the connector jumps to a dot within
-        // the 47.5 px square around the pointer, else it sits at the face's centroid;
-        // over an edge at its midpoint (a circle's centre) unless an end is within 15 px (the strip: the end at 15 px,
-        // the midpoint at 18). Shift (locked points) takes the nearest at any distance.
+        // the 47.5 px square around the pointer, else it sits at the face's centroid (a cylinder's side at its axis
+        // midpoint at any height: mc-infer-1122); over an edge at its midpoint (a circle's centre) unless an end is
+        // within 15 px (the strip: the end at 15 px, the midpoint at 18). Shift locks the face, not the point: the same
+        // rule with the pointer anywhere (mc-infer-1122 shift.png: off the face, its centroid).
         let primary = |r: &Reference| match r {
-            Reference::Implicit { inference: Inference::Centroid, on } => matches!(**on, Reference::Face(_)),
+            Reference::Implicit { inference: Inference::Centroid | Inference::MidAxis, on } => matches!(**on, Reference::Face(_)),
             Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
             _ => false,
         };
-        if !locked && matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
+        if matches!(key.1, Reference::Face(_) | Reference::Edge(_)) && cands.first().is_some_and(|c| primary(&c.reference)) {
             // (Entering a face, the centroid; its dots from the next move on: live2 place-1118 21:05.)
             let near = match key.1 {
                 Reference::Face(_) if entered => None,
@@ -3205,8 +3224,11 @@ impl AssemblyView {
         // A press on a part drags it before its hover arrived too (asm-drag-free-part).
         let below = (free && !self.explode_edit && self.snap.is_none()).then(|| self.built.as_ref().map(assembly_scene::overlay_base)).flatten();
         let probe = below.map(|_| self.capture_probe());
+        let boxes_select = self.pick_mode(cx).is_none() && self.placing.is_none();
         self.viewport.update(cx, |vp, _| {
             vp.tool_captures_left = capture;
+            vp.ctrl_boxes = selection_drag;
+            vp.box_preview = boxes_select;
             vp.capture_picks_below = below;
             vp.capture_probe = probe;
         });
@@ -3410,7 +3432,7 @@ impl AssemblyView {
                     let at = self.connector_world_origin(i);
                     self.ui.entity_sel.clear();
                     self.selected.clear();
-                    self.select_entity(AsmPickTarget { path, reference, kind: PickKind::Connector, occ, anchor: None }, false);
+                    self.select_entity(AsmPickTarget { path, reference, kind: PickKind::Connector, occ, anchor: None });
                     if let (Some(at), [top]) = (at, &self.selected[..])
                         && let Some(p) = self.result.solved.placement(*top)
                     {
@@ -3908,7 +3930,18 @@ impl AssemblyView {
                 }
                 cx.notify();
             }
+            ViewportEvent::BoxTouched { ids } => {
+                let mut tops: Vec<InstanceId> = ids.iter().filter_map(|id| self.pick(Some(*id))).map(|t| t.path[0]).collect();
+                tops.sort_unstable();
+                tops.dedup();
+                if tops != self.ui.box_touched {
+                    self.ui.box_touched = tops;
+                    self.refresh_scene(false, cx);
+                    cx.notify();
+                }
+            }
             ViewportEvent::BoxSelect { ids, modifiers, crossing, rect } => {
+                self.ui.box_touched.clear();
                 // Live ("nav2 selection" (7), 10-25; ui-asmbox 10-26): a box
                 // (with nothing selected; otherwise the drag moves the
                 // selection) selects whole part occurrences: a crossing box
@@ -3916,7 +3949,9 @@ impl AssemblyView {
                 if self.pick_mode(cx).is_some() || self.placing.is_some() {
                     return;
                 }
-                if !(modifiers.shift || modifiers.secondary()) {
+                // Live (sel-gestures-1122): Shift adds, Ctrl (Cmd) removes what the box takes.
+                let remove = modifiers.control || modifiers.platform;
+                if !(modifiers.shift || remove) {
                     self.clear_selection();
                 }
                 let mut occurrences: Vec<InstanceId> = ids.iter().filter_map(|id| self.pick(Some(*id))).map(|t| t.path[0]).collect();
@@ -3934,7 +3969,10 @@ impl AssemblyView {
                     occurrences.retain(|o| inside(*o));
                 }
                 for o in occurrences {
-                    if !self.selected.contains(&o) {
+                    if remove {
+                        self.selected.retain(|x| *x != o);
+                        self.ui.entity_sel.retain(|(p, _)| p[0] != o);
+                    } else if !self.selected.contains(&o) {
                         self.selected.push(o);
                     }
                 }
@@ -4124,13 +4162,14 @@ impl AssemblyView {
             // whole).
             let instances_field = self.pattern.as_ref().is_some_and(|p| p.active.is_none()) || (self.explode_edit && self.step_edit.is_none());
             match target {
-                Some(t) if instances_field => self.select_target(Some(t), true, cx),
-                Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.select_entity(t, !additive),
+                Some(t) if instances_field => self.select_target(Some(t), true, true, cx),
+                // Live (sel-gestures-1122): a click, plain or with Shift, on a selected face or instance keeps it.
+                Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.select_entity(t),
                 // Mass properties shows the selection as its chips; an empty
                 // click keeps a dialog's chips (live qa5 pass 7).
                 None if self.ui.mass.is_some() => {}
                 None if !additive => self.clear_selection(),
-                target => self.select_target(target, additive, cx),
+                target => self.select_target(target, additive, false, cx),
             }
             self.triad_at_click(position, cx);
         }
@@ -4138,19 +4177,14 @@ impl AssemblyView {
         self.ui.scroll_to_selection = true;
     }
 
-    /// A face, edge or vertex clicked: added to the selection (a click on a
-    /// selected one drops it unless Shift / Ctrl is held); its instance's
-    /// row is selected while it has selected entities.
-    fn select_entity(&mut self, t: AsmPickTarget, toggle: bool) {
+    /// A face, edge or vertex clicked: added to the selection (a selected one
+    /// stays); its instance's row is selected while it has selected entities.
+    fn select_entity(&mut self, t: AsmPickTarget) {
         self.selected_mate = None;
         self.manip_value = None;
         let key = (t.path.clone(), t.reference.clone());
-        match self.ui.entity_sel.iter().position(|k| *k == key) {
-            Some(i) if toggle => {
-                self.ui.entity_sel.remove(i);
-            }
-            Some(_) => {}
-            None => self.ui.entity_sel.push(key),
+        if !self.ui.entity_sel.contains(&key) {
+            self.ui.entity_sel.push(key);
         }
         let top = t.path[0];
         if self.ui.entity_sel.iter().any(|(p, _)| p[0] == top) {
@@ -4187,7 +4221,7 @@ impl AssemblyView {
         self.ui.entity_measure_task = None;
     }
 
-    fn select_target(&mut self, target: Option<AsmPickTarget>, additive: bool, _cx: &mut Context<Self>) {
+    fn select_target(&mut self, target: Option<AsmPickTarget>, additive: bool, toggle: bool, _cx: &mut Context<Self>) {
         self.selected_mate = None;
         self.manip_value = None;
         match target {
@@ -4195,7 +4229,9 @@ impl AssemblyView {
                 let top = t.path[0];
                 if additive {
                     if let Some(i) = self.selected.iter().position(|x| *x == top) {
-                        self.selected.remove(i);
+                        if toggle {
+                            self.selected.remove(i);
+                        }
                     } else {
                         self.selected.push(top);
                     }
@@ -6588,6 +6624,7 @@ impl AssemblyView {
                                             r.b = None;
                                         }
                                     }
+                                    this.refresh_scene(false, cx);
                                     cx.notify();
                                 })),
                         )

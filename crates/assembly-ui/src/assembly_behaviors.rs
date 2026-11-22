@@ -290,6 +290,8 @@ pub struct AsmUi {
     pub filter_focused: bool,
     /// Instance row under the cursor in the list (highlighted in the viewport).
     pub list_hover: Option<InstanceId>,
+    /// Instances a crossing box touches while it is dragged: outlined as hovered (live sel-gestures-1122).
+    pub box_touched: Vec<InstanceId>,
     /// The instance row a dragged row would land above (its insertion line).
     /// The row a dragged instance would land by, and whether below it (the pointer past the row's middle).
     pub list_drop: Option<(InstanceId, bool)>,
@@ -1417,7 +1419,7 @@ impl AssemblyView {
                 match pick.clone() {
                     Some(p) => {
                         t.clear_selection();
-                        t.select_entity(p, false);
+                        t.select_entity(p);
                     }
                     None => t.selected = vec![top],
                 }
@@ -4201,6 +4203,7 @@ impl AssemblyView {
         } else {
             r.b = Some(id);
         }
+        self.refresh_scene(false, cx);
         cx.notify();
     }
 
@@ -4659,7 +4662,7 @@ impl AssemblyView {
         self.ui.list_hover = None;
         self.clear_selection();
         match row {
-            SelectOtherRow::Entity(t) => self.select_entity(t, false),
+            SelectOtherRow::Entity(t) => self.select_entity(t),
             SelectOtherRow::Instance(id) => self.selected = vec![id],
         }
         self.ui.scroll_to_selection = true;
