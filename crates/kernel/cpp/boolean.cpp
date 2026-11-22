@@ -3133,13 +3133,56 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
   return s;
 }
 
+// A cylinder face's seam moved: its face `a`, the new face `F`, its end circles each with what replaces it in the part
+// (as the part uses it), the seams that go.
+struct BandMove
+{
+  TopoDS_Face                                      a, F;
+  std::vector<std::pair<TopoDS_Edge, TopoDS_Edge>> ends;
+  std::vector<TopoDS_Edge>                         seams;
+};
+
+// The seams `moves` moved in `s` with one rebuild of the part (faces with no edge in common). Null where the faces
+// around the new end circles don't come out valid.
+TopoDS_Shape apply_band_moves(const TopoDS_Shape& s, const std::vector<BandMove>& moves, HHist& hist)
+{
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  std::vector<TopoDS_Shape>      made;
+  for (const BandMove& m : moves)
+  {
+    rs->Replace(m.a, m.F);
+    for (const auto& [old, ring] : m.ends)
+    {
+      rs->Replace(old.Oriented(TopAbs_FORWARD), ring);
+      made.push_back(ring);
+    }
+  }
+  const TopoDS_Shape out = rs->Apply(s);
+  if (out.IsNull() || !valid_around(out, made))
+    return {};
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  HHist h = rs->History();
+  if (h.IsNull())
+    h = new BRepTools_History();
+  for (const BandMove& m : moves)
+  {
+    if (h->Modified(m.a).IsEmpty())
+      h->AddModified(m.a, m.F);
+    for (const TopoDS_Edge& e : m.seams)
+      h->Remove(e);
+  }
+  hist->Merge(h);
+  return out;
+}
+
 // A cylinder face between one end circle and a chain of other edges round the axis whose seam splits the chain (a
 // shaft's band below spline slots, a run-out crossing the seam, cf-straight-spline; live's faces have no seams, its
 // run-out is one edge): the seam moved to run from the circle to the chain's vertex nearest it, the circle's vertex
 // with it; join_loop_pieces then joins what the old seam split. Null where it doesn't apply or doesn't come out valid
-// with the same area.
-TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
-                            const TopoDS_Edge& end, const std::vector<TopoDS_Edge>& rest, const ShapeAncMap& ef, HHist& hist)
+// with the same area (`ef` the part's edges' faces).
+std::optional<BandMove> seam_vertex_face(const TopoDS_Face& a, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams, const TopoDS_Edge& end,
+                                         const std::vector<TopoDS_Edge>& rest, const ShapeAncMap& ef)
 {
   auto uv = [&ca](const gp_Pnt& p) {
     double u, v;
@@ -3378,33 +3421,17 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
     hole.Closed(true);
     B.Add(F, hole);
   }
-  if (!BRepCheck_Analyzer(F).IsValid())
+  if (!BRepCheck_Analyzer(F).IsValid() || !same_area(a, F))
     return {};
-  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
-  rs->Replace(a, F);
   const bool same = BRepAdaptor_Curve(end).Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
-  rs->Replace(end.Oriented(TopAbs_FORWARD), same ? ring : TopoDS::Edge(ring.Reversed()));
-  const TopoDS_Shape out = rs->Apply(s);
-  if (out.IsNull() || !same_area(a, F) || !valid_around(out, {ring}))
-    return {};
-  if (hist.IsNull())
-    hist = new BRepTools_History();
-  HHist h = rs->History();
-  if (h.IsNull())
-    h = new BRepTools_History();
-  if (h->Modified(a).IsEmpty())
-    h->AddModified(a, F);
-  for (const TopoDS_Edge& e : seams)
-    h->Remove(e);
-  hist->Merge(h);
-  return out;
+  return BandMove{a, F, {{end, same ? ring : TopoDS::Edge(ring.Reversed())}}, seams};
 }
 
 // Cylinder band `a` (between the end circles `ends`, its seams `seams`, its other edges `rest`) with its seam moved to
-// angle `alpha`, the end circles' vertices with it (`la` its surface's location). Null where it doesn't come out valid
-// with the same area.
-TopoDS_Shape band_seam_to(const TopoDS_Shape& s, const TopoDS_Face& a, TopLoc_Location la, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
-                          const std::vector<TopoDS_Edge>& ends, const std::vector<TopoDS_Edge>& rest, double alpha, HHist& hist)
+// angle `alpha`, the end circles' vertices with it (`la` its surface's location). None where the face doesn't come out
+// valid with the same area.
+std::optional<BandMove> band_seam_face(const TopoDS_Face& a, TopLoc_Location la, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
+                                       const std::vector<TopoDS_Edge>& ends, const std::vector<TopoDS_Edge>& rest, double alpha)
 {
   bool ok = true;
   const double  r = ca.Radius();
@@ -3502,32 +3529,25 @@ TopoDS_Shape band_seam_to(const TopoDS_Shape& s, const TopoDS_Face& a, TopLoc_Lo
     hole.Closed(true);
     B.Add(F, hole);
   }
-  if (!ok || !BRepCheck_Analyzer(F).IsValid())
+  if (!ok || !BRepCheck_Analyzer(F).IsValid() || !same_area(a, F))
     return {};
-  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
-  rs->Replace(a, F);
+  BandMove m{a, F, {}, seams};
   for (size_t k = 0; k < 2; ++k)
   {
-    const TopoDS_Edge&  old   = ends[k];
-    const TopoDS_Edge&  made  = (k == 0) == first_low ? low : top;
-    BRepAdaptor_Curve   old_c(old);
-    const bool          same  = old_c.Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
-    rs->Replace(old.Oriented(TopAbs_FORWARD), same ? made : TopoDS::Edge(made.Reversed()));
+    const TopoDS_Edge& made = (k == 0) == first_low ? low : top;
+    const bool         same = BRepAdaptor_Curve(ends[k]).Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
+    m.ends.emplace_back(ends[k], same ? made : TopoDS::Edge(made.Reversed()));
   }
-  const TopoDS_Shape out = rs->Apply(s);
-  if (out.IsNull() || !same_area(a, F) || !valid_around(out, {low, top}))
-    return {};
-  if (hist.IsNull())
-    hist = new BRepTools_History();
-  HHist h = rs->History();
-  if (h.IsNull())
-    h = new BRepTools_History();
-  if (h->Modified(a).IsEmpty())
-    h->AddModified(a, F);
-  for (const TopoDS_Edge& e : seams)
-    h->Remove(e);
-  hist->Merge(h);
-  return out;
+  return m;
+}
+
+// Cylinder band `a` of `s` with its seam moved to angle `alpha` (band_seam_face). Null where it doesn't come out valid
+// with the same area.
+TopoDS_Shape band_seam_to(const TopoDS_Shape& s, const TopoDS_Face& a, TopLoc_Location la, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
+                          const std::vector<TopoDS_Edge>& ends, const std::vector<TopoDS_Edge>& rest, double alpha, HHist& hist)
+{
+  const std::optional<BandMove> m = band_seam_face(a, la, ca, seams, ends, rest, alpha);
+  return m ? apply_band_moves(s, {*m}, hist) : TopoDS_Shape();
 }
 
 } // namespace
@@ -3577,17 +3597,20 @@ namespace {
 // the result isn't valid with the same area.
 TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s0, HHist& hist)
 {
-  // A seam moved, the faces again from the first, but not those tried before and the same since (held, so their
-  // addresses stay theirs; wire-clip's Boolean 2: 26 moves, 383 tries of its faces); the part's edges' faces mapped
-  // once a pass, where needed.
+  // Passes over the faces, not those tried before and the same since (held, so their addresses stay theirs); a pass's
+  // moves made with one rebuild of the part (faces sharing no edge; wire-clip's Boolean 2: 26 moves, each a rebuild
+  // and a pass before), one by one where together they don't come out valid. The part's edges' faces mapped once a
+  // pass, where needed.
   TopoDS_Shape              s = s0;
   std::set<const void*>     tried;
   std::vector<TopoDS_Shape> held;
   for (bool again = true; again;)
   {
     again = false;
-    ShapeAncMap ef;
-    for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More() && !again; fx.Next())
+    ShapeAncMap           ef;
+    std::vector<BandMove> batch;
+    ShapeIMap             busy;
+    for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
     {
       if (!tried.insert(fx.Current().TShape().get()).second)
         continue;
@@ -3638,15 +3661,27 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s0, HHist& hist)
       BRepTools::UVBounds(a, u0, u1, v0f, v1f);
       if (std::abs(u1 - u0 - 2 * M_PI) > 1e-9)
         continue;
+      // (A face sharing an edge with one moved in this pass: the next pass.)
+      bool shares = false;
+      for (TopExp_Explorer x(a, TopAbs_EDGE); x.More() && !shares; x.Next())
+        shares = busy.Contains(x.Current());
+      if (shares)
+      {
+        tried.erase(fx.Current().TShape().get());
+        continue;
+      }
+      auto add = [&](std::optional<BandMove> m) {
+        if (!m)
+          return;
+        for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+          busy.Add(x.Current());
+        batch.push_back(std::move(*m));
+      };
       if (ends.size() == 1)
       {
         if (ef.IsEmpty())
           TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
-        const TopoDS_Shape out = seam_to_vertex(s, a, ca, seams, ends[0], rest, ef, hist);
-        if (out.IsNull())
-          continue;
-        s     = out;
-        again = true;
+        add(seam_vertex_face(a, ca, seams, ends[0], rest, ef));
         continue;
       }
       // The angles the other edges cover (their curves on the face, sampled): the new seam in the widest gap.
@@ -3675,12 +3710,20 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s0, HHist& hist)
         }
       if (gap < 1e-3)
         continue;
-      const TopoDS_Shape out = band_seam_to(s, a, la, ca, seams, ends, rest, alpha, hist);
-      if (out.IsNull())
-        continue;
-      s     = out;
-      again = true;
+      add(band_seam_face(a, la, ca, seams, ends, rest, alpha));
     }
+    if (batch.empty())
+      continue;
+    again                  = true;
+    const TopoDS_Shape out = apply_band_moves(s, batch, hist);
+    if (!out.IsNull())
+    {
+      s = out;
+      continue;
+    }
+    for (const BandMove& m : batch)
+      if (const TopoDS_Shape one = apply_band_moves(s, {m}, hist); !one.IsNull())
+        s = one;
   }
   return s;
 }
