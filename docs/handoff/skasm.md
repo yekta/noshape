@@ -3,11 +3,11 @@
 Updated 2026-11-22 10:00 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 08:45 UTC)
-- QUEUED 408ac79d (alone in the queue's check since 08:22): FEEL-BEND-FACE-PICKED-LOOK, SKETCH-USE-VERTEX-OTHER-SKETCH,
+## In flight (11-22 10:10 UTC)
+- QUEUED acf660cb (10:03, on bb0d5959 in the check since 09:27): the batch below + TABLET-STAND-FACE-NAMES. Earlier 408ac79d: FEEL-BEND-FACE-PICKED-LOOK, SKETCH-USE-VERTEX-OTHER-SKETCH,
   SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME, SKETCH-TRIM-SHORT-END, SKETCH-OFFSET-DEFAULT-SIDE,
   SKETCH-MIRROR-LINE-LOOK, PASTE-SKETCH-CENTRED (first half), EXTRA-UNFOLD-REFOLD-TOOLS.
-- TO LAND after it (worktree; clippy + tests green on vibex8):
+- Also in bb0d5959 / acf660cb:
   - 8b31621ae / 36d0ed547: ui.sketch_hover_held_at: a mirrored entity and a chain's end after Esc stay plain under the
     still pointer until it moves (wf22 s11, s35; replayed on vibe2: match).
   - b2d4f1303 P2 CORNER-RELIEF-TOO-SMALL-WARN: Square - Sized narrower than the bend allowance warns (T2 green).
@@ -21,7 +21,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
     x 0-30 piece (origin corner + picked face), ours the base. ANSWERED 09:3x (behaviours "skasm flat fixed piece",
     live/skasm/flat-orient-1122/ff-*): the piece carrying the Flange stays put, the other folds (5 cases: x10, x50,
     line drawn -Y, flange on the x 0 edge); flat frame = the FOLDING piece's original bottom (wall outer) face,
-    (p·x, p·(x×n)). To do after the P1.
+    (p·x, p·(x×n)). NEXT (in progress 10:10): the fold side already matches (Bend runs std's onBendChange /
+    applyEditLogicForHoldOther: more faces, then edges, then bigger box stays); only flat_place's fixed wall differs
+    (custom/host/sheetmetal.rs flat_place: "first made" by def.wall_ids WALL attributeId). Check in a model test
+    (plate 60x40 + Flange on (60,20,2) + Bend at x 30) which pieces carry which wall id after the Bend (tie -> lowest
+    face index?); make the fixed wall the piece that folded (live, all 5 cases), keeping 2468's rules otherwise.
   - 679420eb2 PASTE-SKETCH-CENTRED: centred on the mean of line end points (live's L). The corner dots are psui's
     (SKETCH-ON-FACE-EXITED-LOOK, builder.rs FreeEnds; psui confirmed 08:45).
 - Closed, no app change: FORM-REMEMBERED (runner seed, qa 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0 wf32:
