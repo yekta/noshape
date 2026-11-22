@@ -1324,15 +1324,16 @@ impl DrawingEditor {
     /// The grips of the one selected note: sides (resize) and, without
     /// leaders, the middle (rotate), on the sheet.
     pub fn note_grips(&self) -> Option<(u64, Vec<NoteGrip>)> {
-        if !matches!(self.tool, Tool::Select) {
-            return None;
-        }
         let [Sel::Annotation(id)] = self.selection.as_slice() else { return None };
-        // None while the note is edited in place (live 225).
-        if self.inplace_hidden == Some(*id) {
+        self.note_grips_of(*id)
+    }
+
+    /// The grips of note `id` (with no tool; none while it is edited in place, live 225).
+    fn note_grips_of(&self, id: u64) -> Option<(u64, Vec<NoteGrip>)> {
+        if !matches!(self.tool, Tool::Select) || self.inplace_hidden == Some(id) {
             return None;
         }
-        let a = self.current_sheet().annotations.iter().find(|a| a.id == *id)?;
+        let a = self.current_sheet().annotations.iter().find(|a| a.id == id)?;
         let (b, angle) = note_box(a)?;
         let AnnotationKind::Note { style, .. } = &a.kind else { return None };
         let mid = noshape_model::drawing::note::center(&b);
@@ -1347,7 +1348,7 @@ impl DrawingEditor {
         if style.leaders.is_empty() {
             out.push((2, rot([mid[0], b[3] + 20.0 / self.zoom.max(1e-6)])));
         }
-        Some((*id, out))
+        Some((id, out))
     }
 
     /// The selected note's grips as live drawing/229b and 234 draw them: 10 px
@@ -1395,7 +1396,12 @@ impl DrawingEditor {
             }
             return;
         }
-        let Some((id, grips)) = self.note_grips() else { return };
+        // A hovered note shows them too (live drwm-3 n1).
+        let hovered = || match self.hover.and_then(|h| self.sel_of_pick(h)) {
+            Some(Sel::Annotation(id)) => self.note_grips_of(id),
+            _ => None,
+        };
+        let Some((id, grips)) = self.note_grips().or_else(hovered) else { return };
         let k = 1.0 / self.zoom.max(1e-6);
         const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
         const EDGE: [u8; 4] = [0xe6, 0xc9, 0xae, 255];
@@ -1413,13 +1419,15 @@ impl DrawingEditor {
                     o.tinted.push((vec![[p[0] - h, p[1] - h], [p[0] + h, p[1] - h], [p[0] + h, p[1] + h], [p[0] - h, p[1] + h], [p[0] - h, p[1] - h]], EDGE, 1.0));
                 }
                 _ => {
-                    // The rotate circle, its two arrowheads and the stem dot.
-                    o.tinted.push((ring(*p, 5.5 * k), TAN, 1.5));
+                    // The rotate circle (r 6 px), a small solid arrowhead clear of it on each side, 2 px below its
+                    // centre, and the 2 x 4 px stem under it (live drwm-3 n1).
+                    o.tinted.push((ring(*p, 6.0 * k), TAN, 1.5));
                     for s in [-1.0, 1.0] {
-                        let x = p[0] + s * 7.5 * k;
-                        o.tinted.push((vec![[x - s * 2.5 * k, p[1] + 2.5 * k], [x + s * 1.0 * k, p[1] - 0.5 * k], [x - s * 2.5 * k, p[1] - 2.5 * k]], TAN, 2.0));
+                        let (x0, x1, y) = (p[0] + s * 8.0 * k, p[0] + s * 11.0 * k, p[1] - 2.0 * k);
+                        o.tinted.push((vec![[x0, y], [x1, y]], TAN, 3.0));
+                        o.tinted.push((vec![[x1, y], [x1 + s * 1.0 * k, y]], TAN, 1.0));
                     }
-                    o.tinted.push((vec![[p[0], p[1] - 10.0 * k], [p[0], p[1] - 13.0 * k]], TAN, 3.0));
+                    o.tinted.push((vec![[p[0], p[1] - 12.0 * k], [p[0], p[1] - 16.0 * k]], TAN, 2.0));
                 }
             }
         }

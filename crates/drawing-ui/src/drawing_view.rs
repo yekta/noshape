@@ -1733,10 +1733,10 @@ impl DrawingEditor {
             let placing = matches!(self.tool, Tool::Dimension { .. });
             // An annotation being dragged is drawn plain black (live2 drw-tools-1119 dt).
             let dragged = self.dragging_annotation_id();
-            // A selected dimension keeps its text black on an orange box, its lines orange with its grips (live dsel3,
-            // drw-styles-radial s10): drawn by push_annotation_look, not tinted.
+            // A selected dimension or note keeps its text black on an orange box, its lines orange with its grips (live
+            // dsel3, drw-styles-radial s10, drwm-3 n2): drawn by push_annotation_look, not tinted.
             let cur = &self.drawing.sheets[self.sheet];
-            let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && a.kind.is_dimension()))).collect();
+            let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && (a.kind.is_dimension() || matches!(a.kind, AnnotationKind::Note { .. }))))).collect();
             let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
             for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).chain(boxed).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
@@ -2133,9 +2133,12 @@ impl DrawingEditor {
         }
         let mut points = PointData::default();
         let r = 6.0 / self.zoom.max(1e-6);
+        // Its palette open: only the attachment dots, its arrowheads kept, no end dots or flip diamonds (live drwm-2
+        // d5-d7, drwm-5).
+        let editing = self.palette.as_ref().is_some_and(|p| picks.first().is_some_and(|k| self.picks_of(Sel::Annotation(p.id)).contains(k)));
         // Onshape shows the grips instead of the arrowheads: cover the
         // arrows that end at this annotation's dimension-line ends.
-        let ends: Vec<[f64; 2]> = g.grips.iter().filter(|gr| picks.contains(&gr.pick) && gr.kind == GripKind::End).map(|gr| gr.pos).collect();
+        let ends: Vec<[f64; 2]> = g.grips.iter().filter(|gr| !editing && picks.contains(&gr.pick) && gr.kind == GripKind::End).map(|gr| gr.pos).collect();
         let mut covers = MeshData::default();
         for f in g.fills.iter().filter(|f| f.points.len() == 3 && ends.iter().any(|e| (e[0] - f.points[0][0]).abs() < 1e-6 && (e[1] - f.points[0][1]).abs() < 1e-6)) {
             let base = covers.positions.len() as u32;
@@ -2146,8 +2149,6 @@ impl DrawingEditor {
             }
             covers.indices.extend_from_slice(&[base, base + 1, base + 2]);
         }
-        // Its palette open: only the attachment dots, no end dots or flip diamonds (live drwm-2 d5-d7).
-        let editing = self.palette.as_ref().is_some_and(|p| picks.first().is_some_and(|k| self.picks_of(Sel::Annotation(p.id)).contains(k)));
         for gr in g.grips.iter().filter(|gr| picks.contains(&gr.pick) && (!editing || gr.kind == GripKind::Origin)) {
             let [x, y] = gr.pos;
             match gr.kind {

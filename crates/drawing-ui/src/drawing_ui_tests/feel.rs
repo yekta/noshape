@@ -2863,6 +2863,33 @@ fn a_click_away_from_a_typed_note_commits_it_and_the_note_tool_goes_on(cx: &mut 
     draw(cx, window);
     assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Select)), "Esc ends the tool");
     assert_eq!(notes(cx), after, "Esc adds nothing");
+    // Live drwm-3 (qa FEEL-DRW-NOTE-SELECTED-AFTER-PLACE): the placed note isn't left selected, so a click selects it.
+    let (id, mid) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = e.drawing_sheet().annotations.iter().rev().find(|x| matches!(&x.kind, noshape_model::drawing::AnnotationKind::Note { text, .. } if text == "ab")).map(|x| x.id).expect("the note");
+        let b = e.built.clone().expect("built");
+        let picks = e.picks_of(Sel::Annotation(id));
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("its text");
+        let q = noshape_model::drawing::font::text_box(t);
+        (id, [(q[0][0] + q[2][0]) / 2.0, (q[0][1] + q[2][1]) / 2.0])
+    });
+    assert!(!cx.update(|cx| editor.read(cx).selection.contains(&Sel::Annotation(id))), "not selected after Esc");
+    // Hovered: its grips show (live drwm-3 n1).
+    assert_eq!(lit_at(cx, window, &editor, mid), Some(Sel::Annotation(id)));
+    let grips = cx.update(|cx| {
+        let mut o = crate::drawing_scene::Overlay::default();
+        editor.read(cx).note_grip_overlay(&mut o);
+        o.tinted.len()
+    });
+    assert!(grips > 0, "a hovered note shows its grips");
+    assert_eq!(click_at(cx, window, &editor, mid, Modifiers::default()), vec![Sel::Annotation(id)], "a click selects it");
+    // Selected: its text stays black on the box (n2), not tinted.
+    let tinted = cx.update(|cx| {
+        let e = editor.read(cx);
+        let scene = e.build_scene();
+        e.picks_of(Sel::Annotation(id)).iter().any(|p| scene.states.get(*p as usize).is_some_and(|s| s & noshape_render::state::SELECTED != 0))
+    });
+    assert!(!tinted, "a selected note's text isn't tinted");
 }
 
 /// Live drw-hcallout-fit 14: a panel over a view hides it from the pointer: nothing under the panel lights (ours lit

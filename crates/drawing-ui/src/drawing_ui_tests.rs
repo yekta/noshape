@@ -1845,8 +1845,12 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "a selected one stays selected");
     assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "live drwm-2 d5: its palette opens on release");
     // With its palette open: no flip diamonds (layer 21) nor end dots, only the attachment dots (live drwm-2 d5-d7).
-    let diamonds = cx.update(|cx| editor.update(cx, |e, _| e.build_scene().instances.iter().any(|i| i.layer == 21)));
+    let (diamonds, covers) = cx.update(|cx| editor.update(cx, |e, _| {
+        let scene = e.build_scene();
+        (scene.instances.iter().any(|i| i.layer == 21), scene.instances.iter().any(|i| i.layer == 19))
+    }));
     assert!(!diamonds, "no diamonds while the palette is open");
+    assert!(!covers, "its arrowheads drawn (not covered for end dots)");
     // Live drwm-5: the dimension is tan while its palette is open, the pointer 25 px off it too; well away, the
     // palette closes by itself and the dimension is left unselected.
     let (origin, at) = cx.update(|cx| {

@@ -341,6 +341,10 @@ impl<'a> Parser<'a> {
                     if annotation.is_some() || export {
                         return self.unexpected("{'enum', 'type', 'function', 'predicate', 'operator', 'typeconvert', 'const'}", None);
                     }
+                    // Where an import may still come, a name starts `NS::import(...)` (live fsm-1: a stray `opExtrude`).
+                    if expect == TOP_EXPECT_IMPORTS && matches!(self.peek(), Tok::Ident(_)) {
+                        return self.err(format!("mismatched input {} expecting 'import'", self.peek().describe()));
+                    }
                     return self.err(format!("extraneous input {} expecting {expect}", self.peek().describe()));
                 }
             };
@@ -1027,6 +1031,14 @@ fn is_lvalue(e: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live fsm-1: a stray name after the imports reads as live's ANTLR error (a name there starts `NS::import`).
+    #[test]
+    fn a_stray_name_after_the_imports_expects_import() {
+        let src = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\nopExtrude\n";
+        let e = parse(src).unwrap_err();
+        assert_eq!(e.message, "mismatched input 'opExtrude' expecting 'import'");
+    }
 
     #[test]
     fn template_parses() {

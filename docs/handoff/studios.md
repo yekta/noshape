@@ -26,15 +26,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     view), Update click 62-85 ms (two sheet assemblies ~20 ms each on the UI thread; bench now holds it to <100 ms, not a
     frame; possible later cleanup: one assembly per click), views remade 47-83 ms (live 6.4 s); FS marker ~0.8 s (live
     0.86-0.95); VS steps 18-20 ms; history row click 17 ms. (Benches using run_until_parked count background work: don't.)
-  - docver-1121: Create version 255 limit; search empty keeps results, ⊗ clears + blurs (vendor Input `clear_blurs`);
-    State column; Delete/Backspace -> Send to trash (`TrashSelected`); rename while open (hook
-    `start_hooks::rename_open_document` -> app `files::rename_open_document`: store name, file kept); row icons hover only;
-    version bar (app-core version_bar.rs) in Part Studio / Assembly / Drawing; the assembly redraws on Reloaded (its
-    cached toolbar showed the bar late); versions page ••• on hover; release BlankRevision etc.
-  - Start is a version (live 13:11): store `start_version` / `start_name` / `update_start_version` (meta start_name,
-    start_description); row, view-only bar, version lists read it; menu Properties… (`Item::Start`) + Publish
-    FeatureScript… (`versions::publish_target`, key `published_featurescript:start`); ops version_properties / publish
-    take it by name; "Document must contain a PDF" (live words, 8 tsv).
+  - docver-1121 rows, Start as a version (store start_version / start_name; ops version_properties / publish).
   - Drawing takes (8dc787fa + live 13:08 answers): no menu while Edit section is open; no Resize... for several cells;
     Opposite direction swaps its arrow (icon section-flip-back.svg), no tint; Esc in Edit section stays open after a
     checkbox click (`check_focused`, panel_focus; test `edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus`).
@@ -102,7 +94,16 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     x180 shots1122c: note matrix 32/32; dimension matrix 28/31 (s19-27 palette fields, old); edge/view 20/44: a click in
     the title block kept the view in live (now: select_click, title_block_rect) and live's reader says EDGE for a
     selected view under the pointer (tan frame; drawing_ui_state); test a_title_block_click_keeps_a_selected_view...
-    x182 (vibex8): drawing-ui tests + clippy with all of it; x181 runs on x180's binary (before the title block fix). Live drwm-5 (answer to 01:24): the palette's dimension tan (hover look, no
+    x182 (vibex8): 161/162 + clippy clean; the BOM test's table ran off the sheet (a BOM anchors top-right): it sets
+    the hover directly now (passes). COMMITTED 8419bdc8e (all the above).
+  - qa walk 9 (03:3x, on green e97ac7f1c, without 8419bdc8e / e41a7227): those two hold TITLEBLOCK-CLICK,
+    DIM-HOVER-ON-SELECTED, DIM-PALETTE-LOOK, BOM-HOVER-ROW, BOM-CELL-SELECTED-LOOK, BOM-SELECTED-FILLS, DIM-DRAG-EDITOR,
+    DIM-PALETTE-AUTOCLOSE, FS-DBLCLICK-BRACKETS, NOTE-SELECTED-AFTER-PLACE (e41a7227's Esc; test extended in
+    a_click_away_from_a_typed_note_commits_it...). New after 8419bdc8e: NOTE-HOVER-LOOK (a selected note drawn as a
+    dimension: text black on the box; grips on hover too, `note_grips_of`; rotate grip r 6 px, solid side arrowheads
+    2 px low, 2x4 stem); palette open keeps the arrowheads (no covers); FS-ERROR-WORDING (parser: a stray name where an
+    import may come = "mismatched input 'x' expecting 'import'", test). Left: VIEW-FRAME-PAD (REQUESTS 03:4x, rule
+    unclear), VS-CHIP-ON-CLICK / FS-DRAG-SELECT-BAND (vendor GPUI tooltip / editor patches), BOM-CELL-TOOLBAR. Live drwm-5 (answer to 01:24): the palette's dimension tan (hover look, no
     grips / diamonds) wherever the pointer is; more than PALETTE_REACH_PX (100) off the palette it closes by itself,
     keeping changes, dimension unselected (drawing_tools on_mouse_move, `palette_gap`; test extended in
     a_dimension_dragged_from_unselected_ends_unselected). Live's blue dots left after that = stale paint (its reader reads
