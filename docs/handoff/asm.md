@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 09:54 UTC) — RESUME HERE
+## State (2026-11-22 10:41 UTC) — RESUME HERE
 - LANDING the whole stack in one land.sh (rebased on main 06:4x): f3a8ff93 welding (33829c47 failed only on dx's
   flaky prefs images_library test; dx fixes it order-free), the outline band / triad drag commits, 55f3ff11 followers +
   Replicate seed, e658bb03 assembly config row menu (config_edit_option for assemblies, AGENT_API regenerated, filter
@@ -43,6 +43,20 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   its first frame when its own row is missing; dx: WRITE a row only if built by the same mesher/tolerance as the PS's
   for that fine level, else read-only. Before timings: vibex8 ~/agents/asm-keep/asm-open-times.sh (green 604e9158 app
   at ~/tmp/asm/app/noshape, assembly tab seeded via last-viewed.json; out ot-before.out); isaac saved doc building (vibex8 ~/tmp/asm/isaac, /root/asm-scratch/isaac-save.sh); after run ot-after.out.
+- RUNNING at compaction: (a) probe on vibex7 (/root/asm-scratch/probe.log: KEY lines per Part Studio in two processes,
+  diffed; EVAL ms of each run with one DirStore at ~/tmp/asm/probe-store; out ~/tmp/asm/probe-{1,2}.txt there). Differing
+  keys -> find the session-dependent input of model-core regen result_key / per-feature keys (suspects: derived
+  version(), custom/files version set by the background script compile vs the evaluator's start); equal keys -> the
+  app's opts differ from ops'. Then fix, rebuild app-b, rerun asm-open-times.sh (slot, vibex8) for infento + isaac.
+  After that: revert the probe test from crates/ops/tests/assembly_perf.rs (git checkout that file).
+  (b) isaac saved doc on vibex8 (/root/asm-scratch/isaac-save.log -> ~/tmp/asm/isaac/asm-isaac-ball.noshape; tab id for
+  the timing script from the doc). Report to lead: scissor numbers below; dx: infento's 1.7-2 s display key hash.
+- SPEED-ASM-OPEN timings (vibex8 loaded, ot-before.out / ot-after.out, ~/tmp/asm/ot-{before,after}/<doc>/*.log):
+  scissor reopen to interactive (full model frame) 144 / 172 s -> 53 / 63 s (assembly eval 90-98 -> 28-30 s; features
+  run 722 -> 219); cached first model frame 1.5-1.6 -> 1.0-1.1 s. infento NO gain (307 of 328 features rerun, 52-58 s):
+  store keys miss across sessions; probe on vibex7 (uncommitted probe_store_keys in ops tests/assembly_perf.rs, DO
+  NOT COMMIT; /root/asm-scratch/probe.sh, probe.log). infento's cached frame waits 1.7-2.0 s on "display key"
+  (dx's key hashes the whole 400 MB document's JSON).
 - SPEED-ASM-OPEN profile (perf, vibex8 ~/tmp/asm/speed): the scissor open is the Part Studio regenerations, OCCT
   geometry (BSplCLib::Bohm 6.8 %, BSplSLib::RationalDerivative 3.7, Extrema_GenExtPS / math_FunctionSetRoot,
   IntPatch walking, BRepGProp); no mate-solver frames. 2x of live needs the open to show stored studio results
