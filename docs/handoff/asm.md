@@ -13,7 +13,15 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   mc_owner_selected: the owner gets BAND|PICKED, live's tan = the mate pick band); PATTERN-PICK-LOOK
   (Highlights.entities_only: no instance band; pattern axes no longer push triads). assembly-ui 183/183 + clippy clean.
 - RUNNING vibex7 (queued in its slot): lc-t.sh timings (A ~/tmp/asm/app 20:09, B app-b 19:45) -> /root/asm-scratch/
-  lc-t.log; A1: evaluated 63.2 s cold, 21.3 s, 13.9 s. Report A vs B to the lead.
+  lc-t.log: STOPPED at its 2 h limit (the A2 pass was still waiting in the slot; killed). A1 (app 20:09) evaluated
+  63.2 / 21.3 / 13.9 s; B1 (app-b 19:45) 41.0 / 15.8 / 19.9 s: noisy (loaded host), no clear A vs B gap; rerun A/B
+  interleaved off-peak before reporting, or report as inconclusive.
+- NOW (lead 22:1x ruling): MSAA on for software rendering, the GPU path's count: renderer.rs msaa_of drop the
+  `style.software` early return (line ~1658; also the 3326 comment "4x set was 100 ms of the render thread's start" and
+  test a_software_rasteriser_draws_without_msaa -> (4, 4)). Measure frame time before/after on a vibex (software;
+  NOSHAPE_PERF_MSAA=1 vs 4 on one binary gives both) + the render thread's start; numbers in the commit body. psui: go
+  ahead (their renderer.rs 670eb17e queued + draw_lists/InstUniform hunks uncommitted, different hunks).
+  Then P0 FEEL-ASM-SELECT-SAME-CONFIG-TRIAD.
 - OPEN MC-LOOK: selected + hovered live's centre ring blue (probably the triad's centre ring takes the hover; ours the
   connector), and with a face selected the hovered connector keeps the face's #ffa90a (ours #ffc20e).
 - qa workflows-1123 rows (TICKETS 452-464): P0 FEEL-ASM-SELECT-SAME-CONFIG-TRIAD (wf07 s25 inserted instance selected:
