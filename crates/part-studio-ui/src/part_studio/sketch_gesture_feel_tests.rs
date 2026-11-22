@@ -149,3 +149,28 @@ fn backtick_over_a_sketch_line_lists_the_line_first(cx: &mut TestAppContext) {
     assert_eq!(rows.first().map(String::as_str), Some("Edge of Sketch 1"), "the line first (panel open {open}): {rows:?}");
     assert!(rows.iter().any(|r| r == "Face of Sketch 1"), "the rectangle's region behind it: {rows:?}");
 }
+
+/// Live (sk-16): a rectangle's line clicked, then ` with the pointer still on it: the Select other panel by the pointer,
+/// the line first.
+#[gpui::test]
+fn backtick_on_a_clicked_sketch_line_opens_select_other_by_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = rectangle_and_circle(cx, "sketch-gesture-backtick-clicked");
+    let (lines, _) = shapes(cx, &view);
+    let l = lines.iter().max_by(|x, y| (x.1.x + x.2.x).total_cmp(&(y.1.x + y.2.x))).unwrap();
+    let pointer = Pointer::new(cx, window, &view);
+    let at = (l.1 + l.2) * 0.5;
+    pointer.move_to(cx, &view, at);
+    pointer.click(cx, &view, at);
+    assert_eq!(selected(cx, &view), vec![l.0], "the line clicked");
+    keys(cx, window, &["`"]);
+    let (anchor, rows) = cx.update(|cx| {
+        let v = view.read(cx);
+        let label = v.labeler(cx);
+        (v.ui.select_other.as_ref().map(|s| s.at), v.ui.select_other.as_ref().map(|s| s.hits.iter().map(|r| label(r)).collect::<Vec<String>>()).unwrap_or_default())
+    });
+    let anchor = anchor.expect("Select other open");
+    assert!(anchor.distance(at) < 3.0, "by the pointer {at:?}: {anchor:?}");
+    assert_eq!(rows.first().map(String::as_str), Some("Edge of Sketch 1"), "the line first: {rows:?}");
+}

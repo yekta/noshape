@@ -3297,6 +3297,7 @@ impl SketchEditor {
         m.inverse() * (p - o)
     }
 
+    #[cfg(test)]
     fn screen_to_plane(&self, s: DVec2) -> DVec2 {
         let Some((o, ex, ey)) = self.screen_map else { return s };
         o + glam::DMat2::from_cols(ex, ey) * s
@@ -7222,14 +7223,6 @@ impl SketchEditor {
             }
             points.points.push(PointSprite { position: w(*q), color: [0xf2, 0xe0, 0x30, 255], pick_id: 0, size: 14.0, style: on_top, _pad: 0 });
         }
-        // Box selection rectangle (on the screen).
-        if let (Some(DragState::Box { start }), Some(end)) = (&self.drag, self.box_end) {
-            let (a, b) = (self.plane_to_screen(*start), self.plane_to_screen(end));
-            // Onshape box select: crossing #ffdc74 (right to left), window #789ad1.
-            let color = if b.x < a.x { [0xff, 0xdc, 0x74, 255] } else { [0x78, 0x9a, 0xd1, 255] };
-            let pts3: Vec<[f32; 3]> = [a, DVec2::new(b.x, a.y), b, DVec2::new(a.x, b.y), a].iter().map(|q| w(self.screen_to_plane(*q))).collect();
-            lines.push_polyline(&pts3, color, 0, 1.0, on_top | if b.x < a.x { LineSegment::DASHED } else { 0 });
-        }
         // The sketch frame.
         {
             let (lo, hi) = self.sketch_box();
@@ -9369,6 +9362,14 @@ impl SketchEditor {
     /// (with the sketch's name at its top-left). Returns the lower-left and
     /// upper-right corners in sketch coordinates; before the view placed it,
     /// a frame of 0.7 x 1000 px at the current zoom around the origin.
+    /// The box selection being dragged: its press and the pointer, on the plane (the app draws it as the Part Studio's).
+    pub fn box_ends(&self) -> Option<(DVec2, DVec2)> {
+        match (&self.drag, self.box_end) {
+            (Some(DragState::Box { start }), Some(end)) => Some((*start, end)),
+            _ => None,
+        }
+    }
+
     /// A box selection is being dragged.
     pub fn box_dragging(&self) -> bool {
         matches!(self.drag, Some(DragState::Box { .. }))

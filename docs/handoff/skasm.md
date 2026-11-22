@@ -1,24 +1,22 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 17:09 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 17:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 17:09 UTC), UNCOMMITTED in agent/skasm until the run below passes, then commit + land
-- corner-break model F (c2-cov2-sm-corner-break-relief-joint 23/37 -> 30/37): build_part refuses only curved BENDS;
-  sheetmetal.rs arc_band (pulled_face pulls a curved rip by its clearance along the arc) + rips_pulled (a rolled wall's
-  arc rips cut). T2 sheetmetal_frames a_curved_rip_is_pulled_back_by_the_clearance.
-- Corner break in the flat (sm_flat.rs; live per-feature volumes in /root/parity/models/c2-cov2-sm-corner-break-relief-
-  joint/live.jsonl, Part 9 = plate 600..700, Part 10 = 800..900, T 1.5): Break::Chamfer / ChamferAngle / FilletWidth
-  (all = live, 34/37) and Conic(first, second, rho) (asymmetric: ellipse quadrant w = sin θ/2; conic w = rho/(1-rho);
-  offsets -> along-side (a1 + a2 cos θ)/sin θ), Corner::{Arc, Conic, Line}, the conic a rational Bezier (make_bspline).
-  First side = n·(d1×d2) > 0; live's flipped R4/9 at (800,60) runs 9 along x = 800 (first). Our test plate's normal
-  runs the other way (its first side at (0,40) is y = 40). T2 corner_break_chamfers_take_their_distances_on_lives_sides,
-  corner_break_conic_and_asymmetric_fillets. Asymmetric within 1e-6 of live (0.0028 mm² corner area); conic 0.0117 mm²
-  off (2e-6 of the part, fails); curvature (mag 0.7) still a circle (wrong): REQUEST "skasm 17:08 corner break conic /
-  curvature" for live's curves. Quartic/quintic Bezier fits miss live's centroid (0.804 vs 0.785).
-- RUN 17:1x: clippy 0, 115 T2 pass, SM docs 311/325 (nothing else changed); conic now 0.018 mm³ off live (its 2 straight
-  edges live counts as other), committed + landing.
-- The paste_sketch fix 0af3b2150 is cherry-picked onto the release (lead 17:0x).
+## In flight (11-22 17:45 UTC)
+- CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
+  Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =
+  rho/(1-rho), a rational Bezier via make_bspline; first side n·(d1×d2) > 0) + model F (curved rips pulled back by the
+  clearance; build_part refuses only curved bends). T2 sheetmetal_frames corner_break_*.
+- 2f05e73c4 (committed, not queued yet): parity LIVE_SCATTER + LIVE_LINES_AS_OTHER for corner-break from feature 34
+  (lead 11-22: live's conic / asymmetric / curvature corners are B-spline approximations, live/skasm/cb-curves-1122;
+  our exact conics stay). Doc 35/37: 35/36 differ on the curvature corner (magnitude 0.7), still a circle on purpose
+  (live's curve fits any G2 quartic/quintic to its 1.6 µm noise).
+- UNCOMMITTED: SK-BOX-FILL (scene SketchEditor::box_ends; psui sketch.rs render_sketch_labels draws app-core
+  box_overlay, the polyline box gone; screen_to_plane cfg(test)); test backtick_on_a_clicked_sketch_line_opens_select_
+  other_by_the_pointer. qa's SK-CTRL-BOX / SK-SELECT-OTHER were on green dc779d69f (15:58), before 905188129 (16:21)
+  fixed both; sketch_boxes_take_whats_inside passes (GPU test, vibex8). Next: sgd.sh run -> commit, TICKETS rows
+  "fixed, to verify", land.
 - QUEUED ab6987cc (16:32): closed straight hems at a corner unfold off their own edges (rolled_strip tests the axis by
   the edge's curve ends; a closed corner's shared vertex is off the hem line): cov2-sm-hem-jog no false flat collision
   INFO; T2 sheetmetal_std closed_straight_hems_unfold_off_their_edges. SM docs (26): 23/26 match, nothing worse.

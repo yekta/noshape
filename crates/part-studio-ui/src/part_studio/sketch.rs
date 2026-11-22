@@ -4045,6 +4045,11 @@ impl PartStudioView {
         let frame = ed.frame;
         let vp = self.vp().read(cx);
         let project = |q: DVec2| vp.project(frame.to_world(q)).map(|s| (s.x as f32, s.y as f32));
+        // A box selection: drawn as the Part Studio's, its infill under the line (live sel-gestures-1122).
+        if let Some((a, b)) = ed.box_ends().and_then(|(a, b)| vp.project(frame.to_world(a)).zip(vp.project(frame.to_world(b)))) {
+            let style = if b.x < a.x { crate::viewport::BoxStyle::Crossing } else { crate::viewport::BoxStyle::Window };
+            out.push(crate::viewport::box_overlay(a, b, style).into_any_element());
+        }
         let editing = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone()));
 
         // Polygon side spinner (live sketch/91): the editor draws "◀ 6 ▶" along
