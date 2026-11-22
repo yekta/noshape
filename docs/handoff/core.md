@@ -29,7 +29,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   knifehandle's shortest row is u .5 (err .018, replica +66): no fit (st8-st10.py). Its P4 misses both guides, so lead
   (b): keep centre chord. loft-stations3 J/K (profile 3 mm off its guides): live REFUSES (LOFT_FAILED), so P4 "off its
   guides" was a sketch misread; the shortest-row test already used live's own surface loops (err .018 stands). PARKED at
-  +0.13 % (lead 11-22). Todo: ours must refuse J/K as live (check loft_guided_multi's meet tolerance).
+  +0.13 % (lead 11-22). J/K: ours refused them with "All guides should intersect..."; now a guide beside a MIDDLE profile is
+  LOFT_FAILED as live (an end profile missed keeps "All guides": psb 10-24 g). Asked live2 (REQUESTS 11-22 23:08) for a guide
+  running past an end profile to tell end-vs-middle from short-vs-beside.
 - **THICKEN-DIRECT + SPEED-SPLIT-THICKEN closed (11-22 14:10):** gate on 20 thicken docs, direct vs OCCT (temporary
   NOSHAPE_THICKEN_OCCT in core-rf branch core-thg, reverted): same matches everywhere (253/368); workshop-split 140-143 ms
   vs live 112 (A/B 10 runs; first gate's 239-253 was host load). Analytic offsets (Geom_OffsetSurface::Surface()) tried:

@@ -2081,8 +2081,11 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
       gp_Pnt at;
       if (loops[i])
       {
+        // A guide that misses an end profile is live's LOFT_GUIDE_INTERSECT; one that passes beside a middle profile
+        // its LOFT_FAILED (live loft-stations3 J/K: 3 mm off).
         if (meet(g, *loops[i]->c, loops[i]->wire, tol, t, at) > tol)
-          fail_op("All guides should intersect each profile boundary.");
+          fail_op(i == 0 || i + 1 == n ? "All guides should intersect each profile boundary."
+                                       : "loft_guided_multi: a guide passes beside a middle profile");
       }
       else
       {
