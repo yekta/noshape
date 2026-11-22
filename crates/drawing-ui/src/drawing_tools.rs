@@ -2218,8 +2218,12 @@ impl DrawingEditor {
             return;
         }
         // A click away (on the empty sheet too) closes the palette, keeping its changes (live2 REQUESTS 11-14 00:43,
-        // drawing.json dimensionPalette.clickOutside_1114).
-        if self.palette.is_some() {
+        // drawing.json dimensionPalette.clickOutside_1114); a click (a double-click) on its dimension keeps it (live
+        // drw-dimension-hover-matrix d7).
+        if let Some(p) = &self.palette {
+            if !p.hole && pick.and_then(|h| self.sel_of_pick(h)) == Some(Sel::Annotation(p.id)) {
+                return;
+            }
             self.close_palette(true, cx);
             return;
         }

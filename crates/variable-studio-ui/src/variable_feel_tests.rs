@@ -297,3 +297,15 @@ fn the_value_cells_hash_list_holds_the_variables_above_only(cx: &mut TestAppCont
     assert_eq!(list(cx, "e1"), Some((vec!["w".to_string()], None)), "h's row: (variables, New variable…)");
     assert_eq!(list(cx, "e2"), Some((vec!["h".to_string(), "w".to_string()], None)), "d's row: (variables, New variable…)");
 }
+
+/// qa workflow 15 (VS-NAME-FOCUS-BOX): the add row's empty Name cell is outlined blue while it has the focus, after
+/// the click and again after Enter adds the variable.
+#[gpui::test]
+fn the_focused_add_row_name_is_outlined(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "name-outline");
+    let outlined = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.read(cx).add_name_focused(w, cx)).unwrap();
+    assert!(outlined(cx), "focused: outlined");
+    keys(cx, window, &["d", "enter"]);
+    assert_eq!(names(cx, &view), ["w", "d"], "Enter adds it");
+    assert!(outlined(cx), "after Enter: outlined again");
+}

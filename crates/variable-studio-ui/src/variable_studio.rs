@@ -454,6 +454,11 @@ impl VariableStudioView {
         self.cell_focus.values().any(|f| f.is_focused(window))
     }
 
+    /// The add row's Name input has the focus: outlined blue (live workflow 15).
+    pub(crate) fn add_name_focused(&self, window: &Window, cx: &App) -> bool {
+        self.inputs.get("new").is_some_and(|(st, _)| st.read(cx).focus_handle(cx).is_focused(window))
+    }
+
     fn cell_focus_handle(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
         self.cell_focus.entry(key.to_string()).or_insert_with(|| cx.focus_handle()).clone()
     }
@@ -1499,6 +1504,8 @@ impl VariableStudioView {
         // the text stays as entered (lead 11-18 on live fsvs-feel-1118: not while typing). Esc throws the text away.
         let name_bad = self.name_error.as_deref().is_some_and(|t| *t == *new_name.read(cx).value() && invalid_name(t));
         let esc_name = new_name.clone();
+        // Focused, the empty Name cell is outlined blue as an edited cell (live workflow 15: after a click, after Enter).
+        let name_focused = !name_bad && self.add_name_focused(window, cx);
         let add_cell = cell_div(0)
             .when(name_bad, |d| d.bg(p().error_fill).border_1().border_color(p().error))
             .capture_action(cx.listener(move |_, _: &gpui_kit::component::input::Escape, window, cx| {
@@ -1733,7 +1740,7 @@ impl VariableStudioView {
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band
                     // (live dark/dk-961: `#1c1c1c` across them).
-                    t.child(h_flex().child(gpui_kit::base::input::input_frame(add_cell.border_l_1().map(|d| crate::ui_script::mark(d, || "var_cell:Name".into())).child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
+                    t.child(h_flex().child(gpui_kit::base::input::input_frame(add_cell.border_l_1().when(name_focused, |d| d.border_2().border_color(rgb(0x1651b0))).map(|d| crate::ui_script::mark(d, || "var_cell:Name".into())).child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
                 })
             });
         if self.host.is_some() {

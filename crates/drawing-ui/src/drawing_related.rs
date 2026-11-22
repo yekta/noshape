@@ -269,18 +269,10 @@ impl DrawingEditor {
         }
         let dragged = self.dragging_annotation_id();
         let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).filter(|a| Some(*a) != dragged).collect();
-        // A dimension just placed with the tool still on keeps the snap discs on its points, no blue (live2
-        // drw-tools-1119 p2p).
+        // A dimension just placed with the tool still on: no blue, and no dots on an edge's ends (qa workflow 09 s10; a
+        // 2 point one keeps its points' discs, dim_kept_points).
         if matches!(self.tool, Tool::Dimension { .. }) {
-            let discs: Vec<[f64; 2]> = anns.drain(..).flat_map(|a| self.reference_vertex_points(a)).collect();
-            if !discs.is_empty() {
-                let mut data = PointData::default();
-                for p in discs {
-                    data.points.push(PointSprite { position: [p[0] as f32, p[1] as f32, 0.65], color: drawing_scene::SNAP_DISC_RGB, pick_id: 0, size: drawing_scene::SNAP_DISC_PX, style: LineSegment::ON_TOP, _pad: 0 });
-                }
-                let up = self.gpu.uploader();
-                scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&data))).per_primitive_color().unpickable().layer(18));
-            }
+            anns.clear();
         }
         if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| dragged.is_none_or(|d| *s != Sel::Annotation(d))) {
             anns.push(a);

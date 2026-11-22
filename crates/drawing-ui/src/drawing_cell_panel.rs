@@ -103,8 +103,10 @@ impl DrawingEditor {
         let (bold, italic, underline, strike) = (all(&|f| f.bold), all(&|f| f.italic), all(&|f| f.underline), all(&|f| f.strikethrough));
         // Live drw-hole-table-cell-panel / -cell-format 13: by the selected cell (a merged one whole), 10 px left of
         // it, its bottom 59 px above the cell's top.
+        // A BOM's stands at the table's left whatever the cell (live drwm-4b b3, b8).
         let (a, b) = self.cell_sel_rect()?;
-        let tl = self.sheet_to_local([a[0], b[1]]);
+        let x = if matches!(t.kind, TableKind::Bom { .. }) { l.xs.first().copied().unwrap_or(a[0]) } else { a[0] };
+        let tl = self.sheet_to_local([x, b[1]]);
         let bottom = (self.size_px()[1] - tl[1] + 59.0) as f32;
         let left = (tl[0] - 10.0).max(4.0) as f32;
         let ed = cx.entity();
@@ -222,7 +224,12 @@ impl DrawingEditor {
         // live2 drw-revision-cell-format 11-17, tables-1118 e1), and a custom table's (live drw-custom-table-cell s10).
         let bom = matches!(t.kind, TableKind::Bom { .. });
         let sizes_only = bom || matches!(t.kind, TableKind::Hole { .. } | TableKind::Revision { .. } | TableKind::Custom { .. });
-        let row1 = if sizes_only { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
+        // A BOM's row 1: the size icons, the cell's text and its Override, greyed (live drwm-4b b3).
+        let override_box = || div().pl(px(6.)).pr(px(4.)).text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("cp-override").native().label("Override").checked(false).disabled(true));
+        let cell_text = if single { self.cell_text(cs.table, r0, c0) } else { String::new() };
+        let row1 = if bom {
+            h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows).child(div().flex_1().min_w_0().pl(px(8.)).overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(cell_text)).child(override_box())
+        } else if sizes_only { h_flex().h(px(30.)).pl(px(1.)).gap(px(2.)).child(size_cols).child(size_rows) } else { h_flex()
             .h(px(30.))
             .pl(px(1.))
             .gap(px(2.))
@@ -361,9 +368,7 @@ impl DrawingEditor {
             .child(toggle("cp-s", "note-strike", "Strikethrough", strike, |f, v| f.strikethrough = v, cx))
             .child(popup_btn("cp-spacing", "note-line-spacing", "Line spacing", false, cx))
             .child(crate::ui_script::mark(popup_btn("cp-align", align_icon, "Horizontal alignment", true, cx), || "dropdown:Horizontal alignment".into()).os_dropdown_menu("cp-align-dd", false, fmt_menu(align)))
-            .child(crate::ui_script::mark(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx), || "dropdown:Vertical alignment".into()).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)))
-            // A BOM cell's Override, greyed: a drawing BOM's cells aren't overridden (live cferr-bomclk-1118 (b)).
-            .when(bom, |r| r.child(div().pl(px(6.)).text_size(px(12.)).child(crate::drawing_chrome::DrCheckbox::new("cp-override").native().label("Override").checked(false).disabled(true))));
+            .child(crate::ui_script::mark(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx), || "dropdown:Vertical alignment".into()).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)));
 
         // Live's recorder since 2026-11-15.1 reads its controls (live drw-hole-table-cell-format); the runner takes `old`, the
         // panel's texts, for older takes (live2 drw-revision-cell-*).
@@ -380,6 +385,10 @@ impl DrawingEditor {
                 fields.push(menu("Duplicate cells", true));
             }
             fields.extend([button("Size columns equally", cols_on), button("Size rows equally", rows_on)]);
+            // A BOM cell's Override, greyed: a drawing BOM's cells aren't overridden (live cferr-bomclk-1118 (b)).
+            if bom {
+                fields.push(serde_json::json!({ "label": "Override", "kind": "checkbox", "value": false, "enabled": false }));
+            }
             if !sizes_only {
                 fields.extend([menu("Merge cells", merge_on), button("Unmerge cells", merged)]);
             }
@@ -394,9 +403,6 @@ impl DrawingEditor {
                 menu("Horizontal alignment", true),
                 menu("Vertical alignment", true),
             ]);
-            if bom {
-                fields.push(serde_json::json!({ "label": "Override", "kind": "checkbox", "value": false, "enabled": false }));
-            }
             serde_json::json!({
                 "kind": "cell-format",
                 "title": "Cell",

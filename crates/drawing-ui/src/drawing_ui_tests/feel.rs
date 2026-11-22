@@ -3279,4 +3279,99 @@ fn a_title_block_click_keeps_a_selected_view_and_a_hovered_one_reads_edge(cx: &m
     let away = cx.update(|cx| [editor.read(cx).current_sheet().size.size_mm().0 - 4.6, 19.0]);
     assert_eq!(lit_at(cx, window, &editor, away), None);
     assert_eq!(read(cx), json!([{"kind": "VIEW", "owner": name}]), "the pointer away: VIEW");
+    // Its View properties open (a double-click), the pointer back on it: the selection frame, VIEW (live
+    // drw-edge-view-hover-matrix v5).
+    lit_at(cx, window, &editor, centre);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_view_props(v, w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(read(cx), json!([{"kind": "VIEW", "owner": name}]), "View properties open: VIEW");
+}
+
+/// qa workflow 09 (FEEL-DRW-VIEW-HOVER-AFTER-PLACE): the view Insert view just placed is drawn picked, its edges and
+/// frame orange, the pointer still on it (live s05); the projected view placed next takes the tan hover frame with
+/// the pointer on it, its edges plain, and the parent is no longer lit (live s06).
+#[gpui::test]
+fn a_just_placed_view_is_lit_under_the_pointer(cx: &mut TestAppContext) {
+    use crate::drawing_view::{DRAWING_HOVER, DRAWING_SELECTED};
+    use noshape_render::state;
+    SUGGESTED.set(false);
+    let (window, editor) = drawing(cx, "feel-place-lit");
+    let studio = cx.update(|cx| editor.read(cx).doc.read(cx).session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).map(|t| t.id).expect("the Part Studio"));
+    cx.update(|cx| editor.update(cx, |e, cx| e.choose_source(studio, None, cx)));
+    for _ in 0..600 {
+        if cx.update(|cx| editor.read(cx).pending_view().is_some()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let lit = |cx: &mut TestAppContext, v: noshape_model::drawing::ViewId, flag: u32| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let scene = e.build_scene();
+            let picks = e.picks_of(Sel::View(v));
+            (picks.iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| s & flag != 0)).count(), picks.len())
+        })
+    };
+    let frames = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).view_frames());
+    let drawn = |cx: &mut TestAppContext, n: usize| {
+        for _ in 0..1500 {
+            let ids = cx.update(|cx| {
+                let e = editor.read(cx);
+                let ids: Vec<_> = e.drawing_sheet().views.iter().map(|v| v.id).collect();
+                (ids.len() == n && ids.iter().all(|v| e.placement(*v).is_some() && !e.picks_of(Sel::View(*v)).is_empty())).then_some(ids)
+            });
+            if let Some(ids) = ids {
+                return ids;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            cx.executor().advance_clock(std::time::Duration::from_millis(50));
+            draw(cx, window);
+        }
+        panic!("{n} views not drawn");
+    };
+    let base_at = [150.0, 190.0];
+    click_sheet(cx, window, &editor, base_at);
+    let base = drawn(cx, 1)[0];
+    assert!(cx.update(|cx| editor.read(cx).selection.is_empty()), "not selected");
+    assert_eq!(frames(cx), vec![(base, DRAWING_SELECTED)], "the new view framed in orange under the pointer");
+    let (on, all) = lit(cx, base, state::SELECTED);
+    assert!(all > 0 && on == all, "its edges orange: {on} of {all}");
+    let below = [base_at[0], base_at[1] - 90.0];
+    click_sheet(cx, window, &editor, below);
+    let projected = drawn(cx, 2).into_iter().find(|id| *id != base).expect("the projected view");
+    assert_eq!(frames(cx), vec![(projected, DRAWING_HOVER)], "the placed projected view framed in tan, the parent no longer");
+    assert_eq!(lit(cx, projected, state::SELECTED | state::HOVER).0, 0, "its edges plain");
+    assert_eq!(lit(cx, base, state::SELECTED | state::HOVER).0, 0, "the parent plain");
+}
+
+/// qa workflow 09 (FEEL-DRW-DIM-PLACE-DOTS): a dimension placed on a view's edge, the tool still on, is bold and
+/// selected with no dots on the edge's ends (live s10); the 2 point one keeps its points' discs (the test above).
+#[gpui::test]
+fn a_dimension_placed_on_an_edge_leaves_no_dots_on_its_ends(cx: &mut TestAppContext) {
+    use noshape_render::Drawable;
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-place-dots");
+    real_sheet(cx, window, &editor);
+    let mid = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (p, q) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        [(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0]
+    });
+    let points = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).build_scene().instances.iter().filter(|i| i.layer == 18 && matches!(i.drawable, Drawable::Points(_))).count());
+    let before = points(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx)));
+    draw(cx, window);
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    assert!(cx.update(|cx| editor.read(cx).pending_annotation().is_some()), "a dimension being placed");
+    let sel = click_at(cx, window, &editor, [mid[0] + 2.0, mid[1] + 12.0], Modifiers::default());
+    assert!(matches!(sel.as_slice(), [Sel::Annotation(_)]), "placed: selected ({sel:?})");
+    assert!(cx.update(|cx| editor.read(cx).overlay.marks.is_empty()), "no discs on the edge's ends");
+    assert_eq!(points(cx), before, "no dots drawn on the edge's ends");
 }

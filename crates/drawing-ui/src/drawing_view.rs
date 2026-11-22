@@ -1394,7 +1394,7 @@ impl DrawingEditor {
     /// Work still to show (the parity runner's settle, UIP-DRW-START-FLAKY: the start state read before the views on
     /// a loaded machine): a source regenerating, the views computing, or a view whose source is here not placed yet.
     pub fn ui_busy(&self) -> bool {
-        if self.computing || self.compute_task.is_some() || !self.regenerating.is_empty() {
+        if self.computing || self.compute_task.is_some() || !self.regenerating.is_empty() || self.launcher_pending() {
             return true;
         }
         let sheet = self.current_sheet();
@@ -1738,7 +1738,8 @@ impl DrawingEditor {
             let cur = &self.drawing.sheets[self.sheet];
             let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && (a.kind.is_dimension() || matches!(a.kind, AnnotationKind::Note { .. }))))).collect();
             let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
-            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).chain(boxed).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
+            let lit_parent = self.lit_parent().map(Sel::View);
+            for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).chain(boxed).chain(lit_parent.iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
                 for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
@@ -1760,7 +1761,7 @@ impl DrawingEditor {
                     // a tan label box and its grips, drawn on top below.
                     Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_look(&mut scene, b, &self.picks_of(s), DRAWING_HOVER),
                     // A hovered view keeps its edges and gets the tan frame (push_view_frames).
-                    Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select) => {}
+                    Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select | Tool::Projected { parent: Some(_) }) => {}
                     // Hovered labels and indicators show their dots only.
                     Some(Sel::ViewLabel(_) | Sel::AuxIndicator(_)) if !single => {}
                     Some(Sel::Table(_)) if matches!(self.tool, Tool::Select) => {}
@@ -1979,15 +1980,22 @@ impl DrawingEditor {
     pub(crate) fn view_frames(&self) -> Vec<(ViewId, u32)> {
         // (The Hatch region dialog frames no view: live2 drw-tools-1119 hc.png.)
         let select = matches!(self.tool, Tool::Select) && self.hatch_dlg.is_none();
+        // Placing projected views: the view under the pointer framed as hovered, the parent (and a picked one) as
+        // selected (live workflow 09 s05, s06).
+        let projecting = matches!(self.tool, Tool::Projected { parent: Some(_) });
+        let lit = self.lit_parent();
         let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
-            Sel::View(v) | Sel::Edge(v, _) | Sel::CutLine(v) if select => Some(v),
+            // Its View properties open, a selected view keeps the selection frame under the pointer (live
+            // drw-edge-view-hover-matrix v5).
+            Sel::View(v) | Sel::Edge(v, _) | Sel::CutLine(v) if select && !(self.view_props.is_some() && self.selection.contains(&Sel::View(v))) => Some(v),
+            Sel::View(v) if projecting && lit != Some(v) && !self.selection.contains(&Sel::View(v)) => Some(v),
             _ => None,
         });
         // A hovered cutting line frames its section view light blue (live2 drw-tools-1119 sl.png).
         let colour = if select && self.hovered_cut_line().is_some() { 0x90cef1 } else { DRAWING_HOVER };
         let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, colour)).into_iter().collect();
         let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
-        for s in self.selection.iter().chain(boxed) {
+        for s in self.selection.iter().chain(boxed).chain(lit.map(Sel::View).iter()) {
             if let Sel::View(v) = s
                 && Some(*v) != hovered
                 && !frames.iter().any(|f| f.0 == *v)
@@ -1996,6 +2004,15 @@ impl DrawingEditor {
             }
         }
         frames
+    }
+
+    /// The view just placed while the projected view tool goes on: drawn picked, orange with an orange frame, though
+    /// not selected (live 2068, workflow 09 s05).
+    pub(crate) fn lit_parent(&self) -> Option<ViewId> {
+        match self.tool {
+            Tool::Projected { parent: Some(p) } if self.projection_parent_lit => Some(p),
+            _ => None,
+        }
     }
 
     /// The tables hovered (in Select) or selected, each with the row (or a general table's cell) under the pointer.
@@ -2256,7 +2273,7 @@ impl DrawingEditor {
     pub fn update_hover(&mut self, cx: &mut Context<Self>) {
         // The table being placed is not lit: it follows the pointer in black lines (live2 place-1118).
         let placing = |t: &PickTarget| matches!(t, PickTarget::Table(id) if self.drawing_sheet().table(*id).is_none());
-        let hover = self.pk().hover_at().filter(|h| !self.pointer_off && !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
+        let hover = self.pk().hover_at().or_else(|| self.projecting_hover()).filter(|h| !self.pointer_off && !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
         if hover != self.hover {
             if hover.and_then(|h| self.sel_of_pick(h)).is_some_and(|s| !self.esc_kept.contains(&s)) {
                 self.esc_kept.clear();
@@ -2267,6 +2284,18 @@ impl DrawingEditor {
             // The Replicate region box follows the pointer.
             self.redraw(cx);
         }
+    }
+
+    /// Placing projected views: the placed view under the pointer, which takes the hover frame (the preview never; live
+    /// workflow 09 s06).
+    fn projecting_hover(&self) -> Option<u32> {
+        if !matches!(self.tool, Tool::Projected { parent: Some(_) }) {
+            return None;
+        }
+        let b = self.built.as_ref()?;
+        let area = |p: &&noshape_model::drawing::build::ViewPlacement| (p.max[0] - p.min[0]) * (p.max[1] - p.min[1]);
+        let v = b.placements.iter().filter(|p| p.contains(self.cursor, noshape_scene::drawing_tools::VIEW_REACH_MM) && self.drawing_sheet().view(p.id).is_some()).min_by(|a, c| area(a).total_cmp(&area(c)))?;
+        b.picks.iter().position(|t| *t == PickTarget::View(v.id)).map(|i| i as u32)
     }
 
     /// The pointer over a panel: nothing on the sheet under it stays lit (live drw-hcallout-fit 14: the palette over a

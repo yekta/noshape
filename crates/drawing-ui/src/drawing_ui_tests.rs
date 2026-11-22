@@ -1874,6 +1874,22 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     hover_to(cx, at[0] + 407. + 25., at[1] + 60.);
     assert!(cx.update(|cx| editor.read(cx).palette.is_some()), "25 px off the palette: still open");
     assert_eq!(looks(cx), (true, false), "the dimension tan, not orange");
+    // A click on its own text keeps the palette (live drw-dimension-hover-matrix d7: a double-click there).
+    let text = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let t = b.geometry.texts.iter().find(|t| b.picks.get(t.pick as usize) == Some(&noshape_model::drawing::build::PickTarget::Annotation(id))).map(|t| t.pos).expect("its text");
+        let l = e.sheet_to_local(t);
+        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+    });
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_move(&MouseMoveEvent { position: text, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "a click on its text: the palette stays");
     let far = [8f32, 8f32];
     assert!(at[0] - far[0] > 150. || at[1] - far[1] > 150., "the far point is well away");
     hover_to(cx, far[0], far[1]);

@@ -28,6 +28,12 @@ pub struct Launcher {
 }
 
 impl DrawingEditor {
+    /// The "±0.1" launcher still on its delay: work still to show (qa workflow 09 s10, live shows it 1.2 s after the
+    /// placement click).
+    pub(crate) fn launcher_pending(&self) -> bool {
+        self.launcher.target.is_some_and(|(_, at)| at.elapsed() < SHOW_AFTER)
+    }
+
     /// The selected dimensions, or hole callouts (no palette open): the
     /// last one selected (live request 1744: one launcher serves the
     /// selection) and whether they are callouts.
