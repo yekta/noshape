@@ -549,6 +549,7 @@ impl PartStudioView {
             let mut vp = Viewport::new(gpu.clone(), window, cx);
             // What a box takes is worked out here (box_select.rs): it selects at the release.
             vp.box_by_pick = false;
+            vp.long_press_cancels = Some(std::time::Duration::from_millis(520));
             vp
         });
         let mut subs = Vec::new();
@@ -1359,6 +1360,7 @@ impl PartStudioView {
         }
         o.display_only = self.ui.transform_ghost.clone();
         o.through_sketches = self.dblclick_sketches();
+        o.lit_through = self.ui.list_hover.filter(|f| self.display.sketches.iter().any(|s| s.hidden && s.feature == *f));
         // Isolate (live ui/iso-901): the planes fade to faint outlines; Make transparent below 10 %: solid
         // washed-out ghosts.
         // Show dimensions: the parts' shadowed faces come up a little (live).
@@ -1640,7 +1642,7 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))) }, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)) }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
@@ -1686,7 +1688,8 @@ impl PartStudioView {
         // Live (selection/10): a feature hovered in the list outlines its
         // part's silhouette in the hover orange, on the outline itself; its
         // faces keep their shading and its inner edges stay black.
-        if let Some(f) = self.row_hovered_feature(cx) {
+        // (Not a selected row's: no change, live hover-list-1122 p14.)
+        if let Some(f) = self.row_hovered_feature(cx).filter(|f| !self.selected_features.contains(f) && !self.selection.contains(&Reference::Feature(*f))) {
             let mut faces = Vec::new();
             for g in self.feature_geometry(f) {
                 let face = matches!(g, Reference::Face(_));
@@ -3013,8 +3016,16 @@ impl PartStudioView {
         // Clear missing references (live 1993 (c); retaken fillet-chip-clear-missing e4ff71a8). So is one the last
         // regeneration couldn't resolve, its edge consumed by a feature dragged above (live workflow 33, qa
         // FEAT-MISSING-REF-CHIP: "Missing Edge of Extrude 1").
-        // (Only when the feature failed: a warning's lost selection keeps its plain label, greyed.)
+        // (Only when the feature failed: a warning's lost selection keeps its plain label, greyed. One a later feature
+        // makes stays grey italic: live 1990 5.15.)
+        let later_refs: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx).filter(|_| !is_new) {
+            Some(s) => {
+                Arc::new(later_reference(s, index))
+            }
+            None => Arc::new(|_: &Reference| false),
+        };
         let mut unresolved: Vec<Reference> = self.display.feature_state(feature_id).filter(|s| s.status == FeatureStatus::Error).map(|s| s.missing_refs.clone()).unwrap_or_default();
+        unresolved.retain(|r| !later_refs(r));
         let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
             Some(s) => {
                 let gone = noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s);
@@ -3026,12 +3037,6 @@ impl PartStudioView {
                 let unresolved = unresolved.clone();
                 Arc::new(move |r: &Reference| unresolved.contains(r))
             }
-        };
-        let later_refs: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx).filter(|_| !is_new) {
-            Some(s) => {
-                Arc::new(later_reference(s, index))
-            }
-            None => Arc::new(|_: &Reference| false),
         };
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
         let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();

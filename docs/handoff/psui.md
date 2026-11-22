@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 10:59 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 18:55 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,40 +33,53 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## Now (10:59 UTC 11-22): lead order: batch → land; corner dots; Recognize; wf tickets
-QUEUED 91ae59a8 (10:53; carries 9ad9b5d6, the batch: 6d72a4e3 failed 10:01 on a rebase conflict at
-sketch_ui_tests.rs's end with skasm's u_on_another_sketchs_vertex_projects_it, both kept). Batch: t35 + t36 green
-(hover_matrix 85/85, list 112/112, feedback, fields, sketch_hover, measure, feel, scene lib, ops e2e::sketch, clippy).
-91ae59a8: section labels (t39: 96/96 incl. hover_matrix 86/86, render lib 17/17). Reported to lead 09:58 (batch);
-the section-label land not yet reported. Core and qa told 09:58.
-Ticked: FEEL-HELIX-FACE-PICKED-LOOK, FEEL-QUERY-PART-PICK-FILL, APPEARANCE-RGB-FIELD-SCROLL, SPLIT-KEEP-TOOLS-AUTO,
-FEEL-SKETCH-RCLICK-PLANE-LIT, MEASURE-VALUE-CLICK-PIN, MEASURE-READOUT-VARIABLE-ICON, FEAT-MISSING-REF-CHIP,
-PARTS-ROW-OF-PICK, SKETCH-ON-FACE-EXITED-LOOK. Not ticked: UIS-WORLD-TARGET (asm's half), EXPR-AUTOCOMPLETE-LOOK (the
-list's left edge in a sketch dimension box), MEASURE-PANEL-POSITION (qa recheck; note rb.sh sets a temp
-NOSHAPE_CONFIG_DIR, so a drag test may be possible there, but not in CI). FEEL-SECTION-PLANE-LABEL-LOOK: labels half
-done (annotated, not ticked).
-- P0 FEEL-PICK-SKETCH-LINE-THROUGH-FACE: CAUSE CONFIRMED (t38b, offline pick buffer, diag test
-  /root/psui-scratch/line-band-diag.patch, rendered like Matrix::crop with pick: true). On the shown-sketch-reach
-  rectangle the two FAR lines (screen normal pointing up) lose their inner band pixels (-1, -2 px) to the region's
-  pick id; the near lines keep the full -2..+2 band. Tilt: across the band, the tilted plane's depth gains more than
-  the line's pick lift (vs_line: 1.5 * min(half, 1.5 * scale) = 2.25 px toward the eye; iso tan ~1.4 x 2 px = 2.8).
-  Plan: (a) sketch-line instances carry their plane normal (new Instance field, e.g. in a free params.z bit plus a
-  vec; params.z bits 1-7 are free; normal_m is used by silhouette lines, shaders 883) and in picking lift by
-  half * tan(tilt) + 1 px, clamped ~20 px; or (b) regions not overwriting a line's band (needs a stencil; the pick
-  depth is Depth32Float, no stencil). Prefer (a). Then reapply pickclass-line.patch (PickClass::Line, circle r² ~29 at
-  scale 1) and restore line-8px-test.rs. Check sketch_hover a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live
-  (-7 px inside lit) + the 8 px test (wf36).
-- FEEL-SECTION-PLANE-LABEL-LOOK labels half (in 91ae59a8): the section's back-face tint (shaders mesh_shade,
-  accent*0.5) hit unlit meshes (plane names, fills) seen from behind; now shaded faces only. Test hover_matrix
-  plane_names_keep_their_blue_in_a_section_view. OPEN half: ours outlines the cut part in thick black ~3 px edges,
-  live 1 px (qa-scratch/tickets/wf28-section-zoom.png).
-- PARTS-ROW-OF-PICK: body_of_input falls back to a face next to an edge/vertex the preview consumed (a Fillet's edge).
-- Model-core changes (core told): FeatureState.missing_refs, SketchDisplay.on_face (serde default).
-RECOGNIZE: CLOSED 09:26 (live offers it nowhere; ours is .hidden(); existing features still evaluate and edit).
-NEXT: the P0 line pick (plan above), the section's thick edges, CTX-MENU-FLIP-UP (submenu-at-once: needs live
-evidence whether a row under the pointer at open lights), the autocomplete list position, tooltip-after-press opt-out.
-OPEN: tooltip after a press (gpui-pre div.rs TooltipPressGate needs a per-element opt-out). Helix arrow direction = the
-revolve axis (core/skasm). CTX-MENU-FLIP-UP: ours fits below as it lacks live's cloud rows.
+## Now (18:5x UTC 11-22)
+P0 lit-end landed 93b1dfdd8 (cherry-picked to release/v0.4.67); psui-p0b worktree + vibex8 dir removed.
+
+Batch 1 = commit 7af801429 (amended; rebased on main 17:5x). Rebase conflicts resolved: renderer band palettes use main's
+4-colour `[border, instance, face, picked]`, with our body_outline_rgb as slot 0; builder sketch curves use main's lit/unlit
+split plus our pick_plane. t58 (vibex8): part-studio-ui 491/492 (p13 of the list × viewport matrix failed: main's
+fs_body_face took every BAND|SELECTED face as an instance's selected face, so it drew no silhouette), app-core 117, scene 212+6,
+render 17+68, clippy (+assembly-ui) clean. Fix amended: shaders.wgsl fs_body_face needs INSTANCE|PICKED.
+t59a green: part-studio-ui hover_matrix 94/94, assembly-ui hover 23/23, render 17+68.
+NEXT:
+- If t59a is green: commit this handoff into batch 1 or stash it (land.sh needs a clean tree), then land.sh.
+- After the land, tick in TICKETS: PART-PICK-FILL, SECTION-PLANE-LABEL-LOOK, PICK-SKETCH-LINE-THROUGH-FACE,
+  PLANE-LIT-AFTER-MENU, PS-LONGPRESS-SELECTS. Report the hover matrix score (qa 100/125) + list × viewport cells p01-p31.
+- Then `git apply /root/psui-scratch/batch2.patch` (it holds no shaders.wgsl change).
+
+Batch 2 (NOT built; patch /root/psui-scratch/batch2.patch, 1094 lines). Covers qa P0s:
+- nav-anim-1122: view changes are time-based at any fps (`view_change_duration` removed); nav matrix row "a view change is time-based".
+- NAV-N-CENTRE: `Viewport::animate_to_direction_centred`; N row checks (20,15).
+- PLANE-LABEL-NORMAL-VIEW: plane names 20 px on screen (client PLANE_TEXT_HEIGHT_PX). `Instance::pixel_sized`; render
+  `upload_instances(scene, camera, h)` scales by `pixel_world`; builder PLANE_NAME_*. Test hover_matrix
+  `a_plane_name_keeps_its_screen_size_at_any_zoom`; the section-plane-names test locates the label by px.
+- MANIP-DRAG-DECIMALS (angles 7 decimals) + FILLET-DRAG-FOCUS (qa new P0: Radius focused during and after the drag).
+- TRIAD-RELEASE-FOCUS, TRANSFORM-PLANE-HANDLE (qa new P0), TRANSFORM-TRIAD-LOOK:
+  - Transform triad uses the client constants: shaft 60, head 30/r10, planes 20-45 px. Routing's full triad unchanged.
+  - Second plane diagonals are hit segments (appended last). No focus on release. Moved part opaque in its own colour.
+  - Tests: dialogs_feel `the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus`; sketch_ui transform ghost test.
+- MANIP-RELEASED-LOOK: `end_manip_drag` sets manip_hover + refresh. Dialogs row "an arrow drag lights nothing" checks it.
+- TRANSFORM-CHIP-RED: Rotate's axis errors faulty ["axis"] (model-core pattern.rs). features_a transform test.
+- ROLLBACK-CLAMP-HOVER: default rows take RollbackDrag moves (`ui.rollback_drop_dg`). List row "held over Top".
+- interaction-feel.md rows for all of the above; this handoff.
+After applying: touch -c, build + test part-studio-ui, app-core, scene, render, `noshape-model --test all features_a::`, clippy
+(add assembly-ui) → commit "psui: …" → land.
+
+Open qa P0s (TICKETS "psui, 2026-11-22 …"):
+- Waiting on live (REQUESTS 18:15-18:3x):
+  - PS-BOX-DRAG-HOVER (box-hover-1122; live2 11-17 vs 1122 conflict, code reverted).
+  - PS-MULTI-PART-MENU (multi-part-menu-1122: the full 26 items).
+  - PS-SELECTED-SEE-THROUGH (sel-see-through-1122: which rule).
+- EXTRUDE-ARROW-ANCHOR: the anchor is the centroid in code (the entity is "Face of Sketch 1" → face_anchor). Run qa's cell
+  /root/qa-scratch/feel1122/manipnav/cells/m01-ex-hover.json to see the 13/17 px offset.
+- TRANSFORM-ROTATE-EDGE-SENSE: the sense matches live (qa amended); only the preview look is left (batch 2's opaque moved
+  part should cover it; the orange axis edge to check).
+- EDIT-BODY-SHADE (low conf).
+- CTX-MENU-FLIP-UP (P1): the vertical flip already exists (anchored SwitchAnchorOrSnap, nav-feel-1119). Ask qa to re-check.
+skasm owns FEEL-MC-* Part Studio set (10) + SKETCH-DIM-PLACE-PICKS-PLANE (11-22 18:0x); mate connector inference code is
+skasm's. Told them batch 1 carries the Shift lock, ConnectorLook::Placed and the with-layer hover mask.
+Then: assembly column of sel-gestures (tell asm first); autocomplete list position. Lead rule: end turns at ~180k context.
 
 ## Agents
 

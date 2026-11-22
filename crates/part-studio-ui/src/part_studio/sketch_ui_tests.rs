@@ -3635,6 +3635,26 @@ fn the_transparency_slider_is_remembered_per_dialog(cx: &mut TestAppContext) {
     assert_eq!(open(cx, IsolateMode::Isolate, None), Some(crate::isolate_ui::KNOB_START), "Isolate");
 }
 
+/// Live workflow 02 step 29 (qa FEEL-EXTRUDE-ARROW-HOVER-LOOK): a 50 × 25 rectangle's depth arrow stands at its centre
+/// (25, 12.5), where live's pointer finds it.
+#[gpui::test]
+fn an_extrudes_arrow_stands_at_its_regions_centre(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [50, 25]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "arrow-centre", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.sketches.first().is_some_and(|s| !s.regions.is_empty()));
+    let region = cx.update(|cx| {
+        let sk = &view.read(cx).display.sketches[0];
+        Reference::SketchRegion { sketch: sk.feature, key: sk.regions[0].key.clone() }
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![region]), cx)));
+    let base = cx.update(|cx| view.read(cx).current_arrow(cx).map(|a| a.base * 1e3));
+    assert!(base.is_some_and(|b| b.distance(glam::DVec3::new(25.0, 12.5, 0.0)) < 0.01), "the arrow's base (mm): {base:?}");
+}
+
 /// Live workflow 15 (qa EXTRUDE-ARROW-GONE-WITH-VARIABLE): Depth "#depth", a Variable Studio's 25 mm, keeps the depth
 /// arrow, 25 mm long.
 #[gpui::test]
@@ -4746,7 +4766,7 @@ fn a_mate_connector_picked_at_a_hovered_faces_corner(cx: &mut TestAppContext) {
         let p = &dialog.read(cx).feature.params;
         (p.query("originQuery").to_vec(), p.enum_("entityInferenceType").to_string(), p.query("secondaryOriginQuery").to_vec())
     });
-    assert_eq!((origin, inference.as_str()), (vec![top], "POINT"));
+    assert_eq!((origin, inference.as_str()), (vec![top.clone()], "POINT"));
     assert!(matches!(secondary.as_slice(), [Reference::Vertex(_)]), "{secondary:?}");
     // Live fc-1120 (7): the chip names the vertex, the connector attached to its owner.
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !dialog.read(cx).feature.params.query("ownerPart").is_empty());
@@ -4755,6 +4775,19 @@ fn a_mate_connector_picked_at_a_hovered_faces_corner(cx: &mut TestAppContext) {
         (d.chip_labels("originQuery"), d.feature.params.enum_("attachmentOption").to_string())
     });
     assert_eq!((chips, attach.as_str()), (vec!["Vertex of Extrude 1".to_string()], "TO_OWNER"), "(the origin's chip, Attachment)");
+    // Live mc-infer-1122: after its one pick the feature infers no more (the face hovered again shows no points), and
+    // the owner part is what the dialog shows lit (its #ffc04c outline).
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.ui.hover_pick = Some(noshape_scene::builder::PickTarget { reference: top.clone(), kind: noshape_scene::builder::PickKind::Face, anchor: None });
+        v.update_inference(false, w, cx);
+    }))
+    .unwrap();
+    let (applies, marks, active) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.inference_applies(cx), v.inference_marks().is_some(), dialog.read(cx).active_refs())
+    });
+    assert!(!applies && !marks, "inference after the pick: applies {applies}, marks {marks}");
+    assert!(matches!(active.as_slice(), [Reference::Body(_)]), "the lit picks after the pick: {active:?} (live: the owner part)");
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).display.connectors.is_empty());
     let (o, z) = cx.update(|cx| view.read(cx).display.connectors.first().map(|c| (c.origin, c.z))).unwrap();

@@ -1242,9 +1242,42 @@ fn region_anchor(positions: &[[f32; 3]], indices: &[u32]) -> Option<DVec3> {
         return None;
     }
     let centroid = tris.iter().fold(DVec3::ZERO, |acc, t| acc + t.0 * t.1) / total;
-    // Nearest sizable triangle center to the centroid.
-    let min_area = total / tris.len() as f64 * 0.25;
-    tris.iter().filter(|t| t.1 >= min_area).min_by(|a, b| a.0.distance_squared(centroid).total_cmp(&b.0.distance_squared(centroid))).map(|t| t.0)
+    // The region's point nearest its centroid: the centroid itself when it lies in the region (std's extrude
+    // manipulator; live workflow 02: a 50 × 25 rectangle's arrow at (25, 12.5), where a triangle's centre was 19 px off).
+    indices.as_chunks::<3>().0.iter().filter_map(|t| Some(closest_on_triangle(centroid, v(t[0])?, v(t[1])?, v(t[2])?))).min_by(|a, b| a.distance_squared(centroid).total_cmp(&b.distance_squared(centroid)))
+}
+
+/// The point of triangle abc nearest p (Ericson, Real-Time Collision Detection 5.1.5).
+fn closest_on_triangle(p: DVec3, a: DVec3, b: DVec3, c: DVec3) -> DVec3 {
+    let (ab, ac, ap) = (b - a, c - a, p - a);
+    let (d1, d2) = (ab.dot(ap), ac.dot(ap));
+    if d1 <= 0.0 && d2 <= 0.0 {
+        return a;
+    }
+    let bp = p - b;
+    let (d3, d4) = (ab.dot(bp), ac.dot(bp));
+    if d3 >= 0.0 && d4 <= d3 {
+        return b;
+    }
+    let vc = d1 * d4 - d3 * d2;
+    if vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0 {
+        return a + ab * (d1 / (d1 - d3));
+    }
+    let cp = p - c;
+    let (d5, d6) = (ab.dot(cp), ac.dot(cp));
+    if d6 >= 0.0 && d5 <= d6 {
+        return c;
+    }
+    let vb = d5 * d2 - d1 * d6;
+    if vb <= 0.0 && d2 >= 0.0 && d6 <= 0.0 {
+        return a + ac * (d2 / (d2 - d6));
+    }
+    let va = d3 * d6 - d5 * d4;
+    if va <= 0.0 && d4 - d3 >= 0.0 && d5 - d6 >= 0.0 {
+        return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+    }
+    let denom = 1.0 / (va + vb + vc);
+    a + ab * (vb * denom) + ac * (vc * denom)
 }
 
 /// A manipulator's glyph for the renderer (`noshape_render::camera_geometry`).

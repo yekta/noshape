@@ -340,9 +340,16 @@ impl PickMap {
         self.priority_fn_with(allow)
     }
 
-    /// Each pick id's class: the viewport reaches edges further over a face (live reach-px-1119).
-    pub fn class_fn(&self) -> Arc<dyn Fn(u32) -> noshape_render::PickClass + Send + Sync> {
-        let class: Vec<noshape_render::PickClass> = self.iter().map(|t| pick_class(t.kind)).collect();
+    /// Each pick id's class: the viewport reaches edges further over a face (live reach-px-1119), and the curves of a
+    /// sketch not being edited by their distance (live workflow 36).
+    pub fn class_fn(&self, editing: Option<FeatureId>) -> Arc<dyn Fn(u32) -> noshape_render::PickClass + Send + Sync> {
+        let class: Vec<noshape_render::PickClass> = self
+            .iter()
+            .map(|t| match (t.kind, &t.reference) {
+                (PickKind::SketchCurve, Reference::SketchEntity { sketch, .. }) if Some(*sketch) != editing => noshape_render::PickClass::Line,
+                _ => pick_class(t.kind),
+            })
+            .collect();
         Arc::new(move |id| if id == 0 { noshape_render::PickClass::Other } else { class.get(id as usize - 1).copied().unwrap_or(noshape_render::PickClass::Other) })
     }
 
@@ -453,6 +460,8 @@ pub struct SceneOptions {
     /// Sketches drawn through the parts as an edited one looks (constraint-state colours, its points): a double-clicked
     /// face's sketch (live feel/3d dblclick-face.png: Sketch 1 blue with its corner dots, seen through the block).
     pub through_sketches: Vec<FeatureId>,
+    /// A hidden sketch whose row is hovered: its curves over the parts in its own colour (live hover-list-1122 p02).
+    pub lit_through: Option<FeatureId>,
     /// Bodies rendered dimmed (e.g. features below the rolled-back bar preview).
     pub transparent_bodies: bool,
     /// Solid bodies drawn light gray instead of their colour (Interference
@@ -1022,7 +1031,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // Hovered / selected it keeps a dark core like a part edge
                 // (live sketch/21, 22).
                 // (A handle arm on top: it runs along its spline from the end, and under it it couldn't be picked.)
-                let style = sketch_curve_style(c, editing) | if through { LineSegment::ON_TOP } else { 0 };
+                let style = sketch_curve_style(c, editing) | if through || opts.lit_through == Some(sk.feature) { LineSegment::ON_TOP } else { 0 };
                 // Graphics preferences: active 2 px, inactive 1 px by default.
                 let width = if c.handle { 1.0 } else if editing || through { opts.graphics.sketch_line_width } else { opts.graphics.inactive_line_width };
                 lines.push_polyline(&c.points, color, id, width, style);
@@ -1091,8 +1100,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let m = glam::Mat4::from_cols(x.extend(0.0), y.extend(0.0), z.extend(0.0), ll.extend(1.0));
                 scene.instances.push(Instance::new(Drawable::Image(handle)).with_transform(m).ignore_clip().layer(8));
             }
-            let curves = Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().layer(10);
-            let dots = Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().ignore_clip().layer(11);
+            let plane = sk.frame.normal.as_vec3();
+            let curves = Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().pick_plane(plane).layer(10);
+            let dots = Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().ignore_clip().pick_plane(plane).layer(11);
             // A lit curve's band over its unlit end points, a lit point over the band (live hover-matrix-1121 sk/line-*,
             // ps/sketch-line-*: the band covers the end dot; skasm/hm-sk-1122 c1a: a hovered end on a selected line).
             let lit = (curves.clone().unpickable().selected_only().over_lines(), dots.clone().unpickable().selected_only().over_lines());
@@ -1436,13 +1446,15 @@ pub struct Highlighting {
     /// Selected parts drawn by their outline alone, in their own colour (an open part appearance editor: live
     /// tools-1119 a1-appearance, a2-red).
     pub untinted_parts: bool,
+    /// A sketch's row hovered: its curves take the hover band, as hovered in the graphics (live hover-list-1122 p02, p27).
+    pub curves_hovered: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
-    let Highlighting { error, dialog, untinted_parts } = mode;
+    let Highlighting { error, dialog, untinted_parts, curves_hovered } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, no_occlusion: built.scene.no_occlusion };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, body_outline_rgb: None, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();
@@ -1553,13 +1565,29 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     // failing feature's inputs (qa PART-HOVER-RED: a part hovered for an
     // empty Split was drawn red; live's part hover is the light orange).
     for r in accent {
-        mark(r, state::ACCENT, &mut scene);
+        // A part a hovered feature row made: its outline in hover orange, as its part row hovered (live hover-list-1122
+        // p01); nothing while it is selected (p14).
+        if let Reference::Body(b) = r
+            && let Some(body) = display.body(b).filter(|b| !b.hidden && !b.face_refs.is_empty())
+        {
+            if !selection.contains(r) {
+                for f in &body.face_refs {
+                    for &id in built.picks.ids_for(f) {
+                        scene.add_flag(id, state::HOVER | state::OUTLINE);
+                        scene.hover_outline = true;
+                    }
+                }
+            }
+            continue;
+        }
+        let lit = if curves_hovered && matches!(r, Reference::SketchEntity { .. }) { state::HOVER } else { state::ACCENT };
+        mark(r, lit, &mut scene);
     }
     // A whole selected part: Onshape's lighter part amber (live #c09039 …
-    // #f0b850, part-studio/09), not a selected face's.
+    // #f0b850, part-studio/09), not a selected face's. In a dialog its band, also while the feature fails (live
+    // workflow 19 step 10: Subtract's Tools Part 2 with no Targets yet).
     for r in selection {
-        if !error
-            && untinted_parts
+        if untinted_parts
             && let Reference::Body(b) = r
             && let Some(body) = display.body(b).filter(|b| !b.face_refs.is_empty())
         {
@@ -1569,6 +1597,27 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 }
             }
             scene.body_outline = true;
+            continue;
+        }
+        // A part its selected feature row made: a selected face's amber on every face, its edges plain under it and one
+        // #FFA90A silhouette round it (live hover-list-1122 p13), not each face's boundary.
+        if !error
+            && let Reference::Body(b) = r
+            && selection.contains(&Reference::Feature(b.feature))
+            && let Some(body) = display.body(b).filter(|b| !b.face_refs.is_empty())
+        {
+            for f in &body.face_refs {
+                for &id in built.picks.ids_for(f) {
+                    scene.add_flag(id, state::SELECTED | state::OUTLINE | state::BAND);
+                }
+            }
+            for e in body.edge_refs.iter().filter(|e| !selection.contains(e)) {
+                for &id in built.picks.ids_for(e) {
+                    scene.add_flag(id, state::BODY);
+                }
+            }
+            scene.body_outline = true;
+            scene.body_outline_rgb = Some([0xff, 0xa9, 0x0a]);
             continue;
         }
         let flag = if error {
@@ -1624,7 +1673,11 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     // What is selected isn't pre-highlighted again (live selection/05 =
     // 04, sketch/23 = 22, "plane and mate connector hover" (c); a part edge
     // too, behaviours "psui (2026-10-27, P1) EDGE-HIGHLIGHT-LOOK" (c)).
-    if let Some(h) = hover.filter(|h| !selection.contains(h)) {
+    // Nor a face or edge of a part selected whole outside a dialog (live hover-list-1122 p16, p19: no change).
+    let in_selected_part = |h: &Reference| {
+        !untinted_parts && selection.iter().any(|r| matches!(r, Reference::Body(b) if display.body(b).is_some_and(|b| b.face_refs.contains(h) || b.edge_refs.contains(h))))
+    };
+    if let Some(h) = hover.filter(|h| !selection.contains(h) && !in_selected_part(h)) {
         match h {
             // A hovered part (live "psui (2026-10-27, P2) PART-HOVER-RED look"): its outline in hover orange, no
             // tint, its own edges as at rest.
@@ -1924,6 +1977,8 @@ pub enum ConnectorLook {
     Rest,
     Hovered,
     Selected,
+    /// The connector its open dialog placed: paler (live mc-infer-1122: #d2e3ed over the face).
+    Placed,
 }
 
 /// Mate connector glyphs, built for each frame's camera (constant screen
@@ -1966,6 +2021,8 @@ const MC_RIM_PX: f32 = 1.3;
 const MC_FILL_REST: ([u8; 3], f32) = ([255, 255, 255], 0.8);
 const MC_FILL_HOVER: ([u8; 3], f32) = ([255, 194, 14], 0.4);
 const MC_FILL_SELECTED: ([u8; 3], f32) = ([255, 194, 14], 0.5);
+/// Live mc-infer-1122 picked-ps: (210,227,237) over that face, white at 0.55.
+const MC_FILL_PLACED: ([u8; 3], f32) = ([255, 255, 255], 0.55);
 /// The rim, the same in every state: live's darkest rim pixels (hover-matrix b3/ps-mc-*: #1d3e52..#26465b at rest, hovered
 /// and selected; its MATE_CONNECTOR_STROKE #002847 drawn soft).
 const MC_RIM: [u8; 4] = [29, 62, 82, 255];
@@ -2017,6 +2074,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
                 ConnectorLook::Rest => MC_FILL_REST,
                 ConnectorLook::Hovered => MC_FILL_HOVER,
                 ConnectorLook::Selected => MC_FILL_SELECTED,
+                ConnectorLook::Placed => MC_FILL_PLACED,
             };
             let c = theme::lin(u32::from(rgb[0]) << 16 | u32::from(rgb[1]) << 8 | u32::from(rgb[2]));
             out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([c[0], c[1], c[2], alpha * self.opacity]).unlit().unpickable().pick_through().ignore_clip().on_top().layer(30));

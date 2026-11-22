@@ -452,6 +452,9 @@ pub struct Viewport {
     /// Every move picks at once, no pause (live's `alwaysPreHighlightOnMouseMove`): only while a sketch creation tool
     /// is active (live2 hover-time-1118); everywhere else a fast move's pick waits for the pause.
     pub pick_on_move: bool,
+    /// A left click held this long or more selects nothing on release (the Part Studio and its sketches, live
+    /// longpress-1122: ≤504 ms selects, ≥533 ms doesn't; the assembly selects at any hold).
+    pub long_press_cancels: Option<Duration>,
     /// A left press on a pick id under this (the model's own geometry) goes to the tool too, read from the pick
     /// buffer at the press: before a hover event marked it (a press right after the pointer got there).
     pub capture_picks_below: Option<u32>,
@@ -804,6 +807,7 @@ impl Viewport {
             box_preview_again: false,
             box_preview_shown: false,
             pick_on_move: false,
+            long_press_cancels: None,
             capture_picks_below: None,
             capture_probe: None,
             tool_hover: false,
@@ -2890,6 +2894,7 @@ impl Viewport {
             // 3, every platform): a Ctrl+click opens the context menu on
             // release and leaves the selection as it is.
             Drag::Pending(MouseButton::Left) if e.modifiers.control => self.context_menu_at(p, e.position, cx),
+            Drag::Pending(MouseButton::Left) if self.long_press_cancels.is_some_and(|d| self.press_held() >= d) => {}
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, e.click_count, cx),
             Drag::Pending(MouseButton::Right) if menu => self.context_menu_at(p, e.position, cx),
             Drag::Box => {
@@ -3564,6 +3569,13 @@ impl Render for Viewport {
                                     }
                                     if !entity.read(cx).last_input_move {
                                         entity.update(cx, |this, _| this.last_input_move = true);
+                                    }
+                                    // Over the graphics' bounds but not over them: something covers them (a menu opened
+                                    // from the feature list reaching over them, live workflow 29: the pointer never
+                                    // crossed the graphics on its way to the menu).
+                                    let covered = { let this = entity.read(cx); !this.pointer_inside && this.bounds.contains(&e.position) };
+                                    if covered != entity.read(cx).covered {
+                                        entity.update(cx, |this, _| this.covered = covered);
                                     }
                                     if entity.read(cx).drag != Drag::None {
                                         entity.update(cx, |this, cx| this.on_mouse_move(e, window, cx));

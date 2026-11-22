@@ -5,7 +5,7 @@
 //! the assembly's (`inference_candidates`, `InferenceMarks`).
 
 use super::PartStudioView;
-use crate::scene_builder::{self, PickKind};
+use crate::scene_builder::{self, PickKind, PickTarget};
 use gpui_kit::*;
 use noshape_model::assembly::eval::{InferencePoint, inference_candidates};
 use noshape_model::partstudio::ConnectorOrigin;
@@ -69,12 +69,20 @@ impl PartStudioView {
         if let Some(i) = self.ui.inference.as_mut() {
             i.locked = locked;
         }
-        self.choose_inference(cx)
+        // Shift keeps the face lit too, wherever the pointer goes (live mc-infer-1122 shift.png).
+        let mut lit = false;
+        if locked && let Some(on) = self.ui.inference.as_ref().map(|i| i.on.clone()) && self.ui.hover_pick.as_ref().is_none_or(|t| t.reference != on) {
+            let kind = if matches!(on, Reference::Edge(_)) { PickKind::Edge } else { PickKind::Face };
+            self.ui.hover_pick = Some(PickTarget { reference: on, kind, anchor: None });
+            lit = self.update_hover(cx);
+        }
+        self.choose_inference(cx) | lit
     }
 
     /// The point the pointer brings the connector to, as the assembly's (live asm-feel3-1118, live ball-1119): over a
     /// face a point within the 47.5 px square around the pointer, else the face's centroid; over an edge an end within
-    /// 15 px, else its midpoint (a circle's centre). Shift (locked points) takes the nearest at any distance.
+    /// 15 px, else its midpoint (a circle's centre). Shift keeps the entity: the same rule on it wherever the pointer is
+    /// (live mc-infer-1122: off the face, its centroid).
     fn choose_inference(&mut self, cx: &App) -> bool {
         use noshape_model::reference::Inference;
         let Some(pointer) = self.ui.pointer else { return false };
@@ -89,7 +97,7 @@ impl PartStudioView {
             _ => false,
         });
         let choice = match &i.on {
-            _ if i.locked || !primary => nearest(&|_| true),
+            _ if !primary => nearest(&|_| true),
             Reference::Face(_) => nearest(&|d| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).or(on_screen.first().map(|_| 0)),
             _ => nearest(&|d| d.length() <= EDGE_END_REACH_PX).or(on_screen.first().map(|_| 0)),
         };

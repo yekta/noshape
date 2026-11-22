@@ -358,6 +358,9 @@ pub struct Instance {
     /// Translucent mode (live: such a part is picked normally; Alt picks
     /// through it).
     pub pick_solid: bool,
+    /// Lines lying in the plane with this normal (a sketch's): in the pick pass their band is raised onto the plane
+    /// where it tilts toward the eye, so the regions on it never take the band's inner side.
+    pub pick_plane: Option<Vec3>,
     /// Added to the geometry's local (1-based) pick ids; 0 keeps them as-is.
     pub pick_base: u32,
     /// The section cap hatch's part id (Onshape: occurrence id + mesh group
@@ -473,6 +476,7 @@ impl Instance {
             pick_through: false,
             pick_behind: false,
             pick_solid: false,
+            pick_plane: None,
             pick_base: 0,
             hatch_id: 0,
             zebra: None,
@@ -561,6 +565,11 @@ impl Instance {
     /// See [`Instance::pick_behind`].
     pub fn pick_behind(mut self) -> Self {
         self.pick_behind = true;
+        self
+    }
+    /// See [`Instance::pick_plane`].
+    pub fn pick_plane(mut self, normal: Vec3) -> Self {
+        self.pick_plane = Some(normal);
         self
     }
     /// See [`Instance::pick_solid`].
@@ -1002,6 +1011,8 @@ pub struct Scene {
     pub hover_outline_rgb: Option<[u8; 3]>,
     /// Whole selected parts carry `SELECTED | BODY | OUTLINE | BAND`: the renderer draws their #FFC04C band.
     pub body_outline: bool,
+    /// The band's sRGB colour when not #FFC04C (the parts a selected feature row made: #FFA90A, live hover-list-1122 p13).
+    pub body_outline_rgb: Option<[u8; 3]>,
     /// No ambient occlusion: Onshape darkens shaded opaque faces only (not Hidden line or Translucent).
     pub no_occlusion: bool,
     pub clip: Option<ClipPlane>,
@@ -1200,13 +1211,14 @@ impl Scene {
             f(&mut h, &i.transform.to_cols_array());
             f(&mut h, &i.color);
             f(&mut h, &[i.ghost, i.ambient, i.line_scale]);
+            f(&mut h, &i.pick_plane.map_or([0.0; 3], |n| n.to_array()));
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
             (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);
             (i.hidden_only, i.over_transparent, i.over_lines, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self, i.outline_through).hash(&mut h);
         }
         self.states.hash(&mut h);
-        (self.hover_outline, self.hover_outline_rgb, self.body_outline, self.no_occlusion, self.clip_selected, self.clip_hovered, self.section_interference).hash(&mut h);
+        (self.hover_outline, self.hover_outline_rgb, self.body_outline, self.body_outline_rgb, self.no_occlusion, self.clip_selected, self.clip_hovered, self.section_interference).hash(&mut h);
         format!("{:?}{:?}{:?}{:?}", self.clip, self.clip_extra, self.compare, self.preview_mix).hash(&mut h);
         h.finish()
     }

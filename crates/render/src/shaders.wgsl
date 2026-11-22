@@ -551,13 +551,14 @@ fn fs_body_mask(i: MeshOut) -> @location(0) vec4<f32> {
     return vec4(1.0, 0.0, select(0.0, 1.0, (st & INSTANCE) != 0u), select(0.0, 1.0, (st & PICKED) != 0u));
 }
 
-/// The mask's g: an outlined instance's selected face, or a face whose boundary is its own line (LINED), where it shows
-/// (depth tested; green written only).
+/// The mask's g: an entity-selected or mate-picked instance's selected face, or a face whose boundary is its own line
+/// (LINED), where it shows (depth tested; green written only). Not a Part Studio part selected through its feature row
+/// (BAND | SELECTED alone): its silhouette is one band all round (live hover-list-1122 p13).
 @fragment
 fn fs_body_face(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
-    let face = (st & (BAND | SELECTED | BODY)) == (BAND | SELECTED) || (st & LINED) != 0u;
+    let face = ((st & (BAND | SELECTED | BODY)) == (BAND | SELECTED) && (st & (INSTANCE | PICKED)) != 0u) || (st & LINED) != 0u;
     if (!face || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     return vec4(0.0, 1.0, 0.0, 1.0);
 }
@@ -617,8 +618,9 @@ const PART_COUNT_ORDER: f32 = 16.0;
 fn fs_section_mask(i: MeshOut, @builtin(front_facing) front: bool) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     if ((inst.params.y & 3u) != 0u || (state_of(i.pick) & HIDDEN) != 0u || clipped(i.world)) { discard; }
-    var own = linear_to_srgb(inst.color.rgb);
-    if ((inst.params.x & 1u) != 0u && i.color.a > 0.0) { own = i.color.rgb; }
+    // The part's color, never a face's own: front and back faces must cancel (a purple face over a blue back face
+    // left an outline round the face, live workflow 28).
+    let own = linear_to_srgb(inst.color.rgb);
     // The part's id nudges its color, so equal colors hatch differently
     // (Onshape: occurrence id + mesh group hash; `Instance::hatch_id`).
     let hid = inst.params.x >> 8u;
@@ -984,9 +986,9 @@ fn silhouette_vertex(index: u32, s: SilhouetteIn) -> LineOut {
     l.style = 32u;
     // A hovered or selected face's silhouette is part of its outline (live behaviours EDGE-HIGHLIGHT-LOOK (d):
     // "lights both of its long edges ... including the silhouette"): the face band its boundary edges get. A whole
-    // part's state isn't drawn here (its outline is its own).
+    // part's state isn't drawn here, nor a part a selected feature row made (their outline is their own).
     let fst = state_of(global_pick(s.pick));
-    let face_lit = (fst & (HOVER | SELECTED)) != 0u && (fst & BODY) == 0u;
+    let face_lit = (fst & (HOVER | SELECTED)) != 0u && (fst & (BODY | BAND)) == 0u;
     return line_vertex(index, l, select(~(HOVER | SELECTED), 0xffffffffu, face_lit), select(0u, OUTLINE, face_lit));
 }
 
@@ -1001,6 +1003,27 @@ fn toward_eye(w: vec3<f32>, px: f32) -> vec3<f32> {
     let per_unit = length((p1.xy / p1.w - p0.xy / p0.w) * g.viewport.xy * 0.5);
     let dir = select(-fwd, normalize(g.camera_pos.xyz - w), persp);
     return w + dir * (px / max(per_unit, 1e-9));
+}
+
+// How much nearer (NDC depth, reverse-Z) the plane through `w` with normal `n` is `off` (NDC) away on screen than at
+// `w`: NDC depth is affine in NDC x, y over a plane. Never negative, and at most 8 px toward the eye per px across (83°).
+fn plane_rise(w: vec3<f32>, n: vec3<f32>, off: vec2<f32>) -> f32 {
+    let u = normalize(cross(n, select(vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), abs(n.z) > 0.9)));
+    let v = cross(n, u);
+    let s = 0.05 * max(length(g.camera_pos.xyz - w), 1e-6);
+    let p0 = g.view_proj * vec4(w, 1.0);
+    let p1 = g.view_proj * vec4(w + u * s, 1.0);
+    let p2 = g.view_proj * vec4(w + v * s, 1.0);
+    if (p0.w <= 0.0 || p1.w <= 0.0 || p2.w <= 0.0) { return 0.0; }
+    let q0 = p0.xyz / p0.w;
+    let d1 = p1.xyz / p1.w - q0;
+    let d2 = p2.xyz / p2.w - q0;
+    let det = d1.x * d2.y - d1.y * d2.x;
+    if (abs(det) < 1e-12) { return 0.0; }
+    let grad = vec2(d1.z * d2.y - d2.z * d1.y, d2.z * d1.x - d1.z * d2.x) / det;
+    let e = g.view_proj * vec4(toward_eye(w, 1.0), 1.0);
+    let per_px = max(e.z / e.w - q0.z, 0.0);
+    return min(max(dot(grad, off), 0.0), 8.0 * length(off * g.viewport.xy * 0.5) * per_px);
 }
 
 fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOut {
@@ -1094,6 +1117,11 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
         off_px += d * ext * half * 0.5;
     }
     c = vec4(c.xy + off_px / half_vp * c.w, c.z, c.w);
+    // A sketch's line in the pick pass (`Instance::pick_plane`): where its plane comes toward the eye across the band,
+    // the band follows it (and keeps its lift), so the regions on the plane don't take the band's inner side at a slant.
+    if (picking && inst.normal_m[3].w > 0.5 && lift > 0.0) {
+        c.z = c.z + plane_rise(wa, inst.normal_m[3].xyz, off_px / half_vp) * c.w;
+    }
 
     if ((l.style & 2u) != 0u || on_top) {
         c.z = c.w; // on top: nearest depth
@@ -1274,7 +1302,13 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
         let lp = g.view_proj * vec4(toward_eye(w, 4.0 * g.viewport.z), 1.0);
         c.z = max(c.z, lp.z / lp.w * c.w);
     }
-    c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
+    let off = uv * (half + 0.75) / (g.viewport.xy * 0.5);
+    c = vec4(c.xy + off * c.w, c.z, c.w);
+    // A sketch's point in the pick pass rises with its plane like the sketch's lines (`Instance::pick_plane`), so their
+    // bands don't take its disc at a slant.
+    if (g.viewport.w > 0.0 && inst.normal_m[3].w > 0.5 && (p.style & 2u) == 0u) {
+        c.z = c.z + plane_rise(w, inst.normal_m[3].xyz, off) * c.w;
+    }
     // Onshape's offsets: points 9 units, faces 27.
     if ((p.style & 2u) != 0u) { c.z = c.w; } else { c = in_front_of_faces(c, 18.0); }
     // params.x bit 2 (Instance::selected_only): only its hovered or selected points.

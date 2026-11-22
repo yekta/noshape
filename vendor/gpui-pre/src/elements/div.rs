@@ -761,6 +761,12 @@ impl Interactivity {
         self.tooltip_show_delay = Some(delay);
     }
 
+    /// NOSHAPE PATCH: this element's tooltip isn't held back by a press on it ([`TooltipPressGate`]): live's
+    /// feature-list row keeps showing its name by the still pointer after a double-click opens its dialog.
+    pub fn tooltip_after_press(&mut self) {
+        self.tooltip_after_press = true;
+    }
+
     /// Block the mouse from all interactions with elements behind this element's hitbox. Typically
     /// `block_mouse_except_scroll` should be preferred.
     ///
@@ -1746,6 +1752,15 @@ pub trait StatefulInteractiveElement: InteractiveElement {
         self.interactivity().tooltip_show_delay(delay);
         self
     }
+
+    /// NOSHAPE PATCH: see [`Interactivity::tooltip_after_press`].
+    fn tooltip_after_press(mut self) -> Self
+    where
+        Self: Sized,
+    {
+        self.interactivity().tooltip_after_press();
+        self
+    }
 }
 
 pub(crate) type MouseDownListener =
@@ -2223,6 +2238,8 @@ pub struct Interactivity {
     pub(crate) hover_listener_mode: HoverListenerMode,
     pub(crate) tooltip_builder: Option<TooltipBuilder>,
     pub(crate) tooltip_show_delay: Option<Duration>,
+    /// NOSHAPE PATCH: see [`Interactivity::tooltip_after_press`].
+    pub(crate) tooltip_after_press: bool,
     pub(crate) window_control: Option<WindowControlArea>,
     pub(crate) hitbox_behavior: HitboxBehavior,
     pub(crate) tab_index: Option<isize>,
@@ -3246,6 +3263,7 @@ impl Interactivity {
                     .tooltip_pressed
                     .get_or_insert_with(Default::default)
                     .clone();
+                tooltip_pressed.set_free(self.tooltip_after_press);
 
                 let tooltip_is_hoverable = tooltip_builder.hoverable;
                 let build_tooltip: Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>> = Rc::new(move |window: &mut Window, cx: &mut App| {
@@ -3815,12 +3833,23 @@ pub struct TooltipPressGate(Rc<Cell<u8>>);
 
 const GATE_HELD: u8 = 1;
 const GATE_BLOCKED: u8 = 2;
+/// A press neither holds nor blocks the tooltip (`Interactivity::tooltip_after_press`).
+const GATE_FREE: u8 = 3;
 
 impl TooltipPressGate {
+    /// Whether presses leave the tooltip alone (`Interactivity::tooltip_after_press`).
+    pub fn set_free(&self, free: bool) {
+        if free {
+            self.0.set(GATE_FREE);
+        } else if self.0.get() == GATE_FREE {
+            self.0.set(0);
+        }
+    }
+
     /// A mouse button went down; `inside`: over the element. True when it was on the element (the tooltip stays
     /// until the release).
     pub fn press(&self, inside: bool) -> bool {
-        if inside && self.0.get() != GATE_BLOCKED {
+        if inside && self.0.get() != GATE_BLOCKED && self.0.get() != GATE_FREE {
             self.0.set(GATE_HELD);
         }
         inside

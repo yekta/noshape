@@ -24,18 +24,22 @@ fn lines(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> Vec<(u32, DV
 }
 
 fn drag(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, pointer: &Pointer, from: DVec2, to: DVec2) {
+    drag_with(cx, window, view, pointer, from, to, Modifiers::default());
+}
+
+fn drag_with(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, pointer: &Pointer, from: DVec2, to: DVec2, modifiers: Modifiers) {
     pointer.move_to(cx, view, from);
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-    vcx.simulate_mouse_down(pointer.window_point(cx, from), gpui_kit::MouseButton::Left, Modifiers::default());
+    vcx.simulate_mouse_down(pointer.window_point(cx, from), gpui_kit::MouseButton::Left, modifiers);
     draw(cx, window);
     for i in 1..=12 {
         let at = from + (to - from) * (i as f64 / 12.0);
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-        vcx.simulate_mouse_move(pointer.window_point(cx, at), Some(gpui_kit::MouseButton::Left), Modifiers::default());
+        vcx.simulate_mouse_move(pointer.window_point(cx, at), Some(gpui_kit::MouseButton::Left), modifiers);
         pointer.frames(cx, view);
     }
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-    vcx.simulate_mouse_up(pointer.window_point(cx, to), gpui_kit::MouseButton::Left, Modifiers::default());
+    vcx.simulate_mouse_up(pointer.window_point(cx, to), gpui_kit::MouseButton::Left, modifiers);
     draw(cx, window);
 }
 
@@ -88,6 +92,17 @@ fn a_box_in_iso_over_the_planes_takes_lines_as_live(cx: &mut TestAppContext) {
     if got != want_all || !model.is_empty() {
         wrong.push(format!("window round it: lines {got:?} (want {want_all:?}), else {model:?}"));
     }
+    // Live sel-gestures-1122: the same box again changes nothing, a Shift box adds (the Ctrl box: skasm's sketch column).
+    for (what, modifiers, want) in [
+        ("the same window again", Modifiers::default(), want_all.clone()),
+        ("a Shift window", Modifiers { shift: true, ..Default::default() }, want_all.clone()),
+    ] {
+        drag_with(cx, window, &view, &pointer, lo - DVec2::splat(25.0), hi + DVec2::splat(25.0), modifiers);
+        let (got, _) = selected(cx, &view);
+        if got != want {
+            wrong.push(format!("{what}: lines {got:?} (want {want:?})"));
+        }
+    }
     clear(cx, &view);
     // Right → left, crossing over the rectangle's right part.
     drag(cx, window, &view, &pointer, hi + DVec2::splat(25.0), DVec2::new(start_x, lo.y - 25.0));
@@ -100,7 +115,8 @@ fn a_box_in_iso_over_the_planes_takes_lines_as_live(cx: &mut TestAppContext) {
 
 /// Live2 "feel (sketch)" (behaviours 39910): with no tool a click on a line adds it (A, then B: both), a click on a
 /// selected line removes it, Shift+click toggles the same way, and Ctrl+click opens the sketch's context menu without
-/// toggling; in iso with the planes behind, through the real pointer.
+/// toggling; Escape keeps the selection, Space clears it (sel-gestures-1122); in iso with the planes behind, through
+/// the real pointer.
 #[gpui::test]
 fn sketch_clicks_toggle_and_ctrl_opens_the_menu_as_live(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -140,6 +156,17 @@ fn sketch_clicks_toggle_and_ctrl_opens_the_menu_as_live(cx: &mut TestAppContext)
     row("Shift+click B", press(cx, on_b, shift), vec![a.0]);
     row("Ctrl+click B", press(cx, on_b, ctrl), vec![a.0]);
     assert!(cx.update(|cx| view.read(cx).context_menu.is_some()), "Ctrl+click opened the sketch's context menu");
+    // Live sel-gestures-1122: Escape keeps the selection (also two), Space clears it.
+    keys(cx, window, &["escape"]);
+    draw(cx, window);
+    row("Escape over the menu", selected(cx, &view).0, vec![a.0]);
+    row("click B", press(cx, on_b, Modifiers::default()), sorted(vec![a.0, b.0]));
+    keys(cx, window, &["escape"]);
+    draw(cx, window);
+    row("Escape with two selected", selected(cx, &view).0, sorted(vec![a.0, b.0]));
+    keys(cx, window, &["space"]);
+    draw(cx, window);
+    row("Space", selected(cx, &view).0, vec![]);
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 

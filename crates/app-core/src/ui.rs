@@ -729,6 +729,8 @@ pub fn with_lazy_side_tooltip(row: Stateful<Div>, anchor: impl Fn() -> Bounds<Pi
         cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true, fade: Some(ROW_TIP_FADE), upright: false }).into()
     })
     .tooltip_show_delay(ROW_TIP_DELAY)
+    // (A press doesn't hold it back: live workflow 10, a double-click opening Extrude 1's dialog leaves its name shown.)
+    .tooltip_after_press()
 }
 
 /// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):

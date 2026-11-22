@@ -12,7 +12,11 @@ use noshape_render::Instance;
 
 impl PartStudioView {
     /// A connector's look from the selection and the hover.
-    fn connector_look(&self, r: &Reference, selection: &[Reference]) -> ConnectorLook {
+    fn connector_look(&self, r: &Reference, selection: &[Reference], cx: &App) -> ConnectorLook {
+        // Its own dialog's connector stays pale, hovered or not (live mc-infer-1122).
+        if matches!(r, Reference::MateConnector { feature, .. } if self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.id == *feature)) {
+            return ConnectorLook::Placed;
+        }
         if selection.contains(r) {
             return ConnectorLook::Selected;
         }
@@ -45,8 +49,8 @@ impl PartStudioView {
     /// The glyphs (per frame) and the lit connectors' owner-part overlays.
     pub(super) fn connector_overlays(&self, selection: &[Reference], cx: &App) -> (Option<std::sync::Arc<scene_builder::ConnectorGlyphs>>, Vec<Instance>) {
         let pick = |r: &Reference| self.built.as_ref().and_then(|b| b.picks.ids_for(r).first().copied()).unwrap_or(0);
-        let glyphs = scene_builder::connector_glyphs(&self.display, |r| self.connector_look(r, selection), pick);
-        let lit: Vec<_> = self.display.connectors.iter().filter(|c| self.connector_look(&c.reference, selection) != ConnectorLook::Rest).collect();
+        let glyphs = scene_builder::connector_glyphs(&self.display, |r| self.connector_look(r, selection, cx), pick);
+        let lit: Vec<_> = self.display.connectors.iter().filter(|c| !matches!(self.connector_look(&c.reference, selection, cx), ConnectorLook::Rest | ConnectorLook::Placed)).collect();
         let up = self.gpu.uploader();
         let owners = lit.iter().filter_map(|c| self.connector_owner(&c.reference, cx)).filter_map(|b| scene_builder::owner_secondary(&self.display, &b, up));
         let origins = lit.iter().filter(|c| self.connector_on_vertex(&c.reference, cx)).map(|c| scene_builder::connector_origin_lit(c.origin, up));

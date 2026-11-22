@@ -1377,6 +1377,14 @@ fn rows() -> Vec<Row> {
             l.click(cx, "part:Part 1", SHIFT);
             expect(l.selected(cx), names(&[]), "selected")
         } },
+        Row { id: "edit / a double-click keeps the row's name tooltip", live: "Extrude 1 double-clicked, the pointer still: its dialog opens and the row's tooltip 'Extrude 1' shows by the pointer (live workflow 10 step 1, qa FEEL-ROW-HOVER-IN-OWN-DIALOG)", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 50);
+            l.double_click(cx, "feature:Extrude 1");
+            crate::ui_script::clear_tooltip();
+            l.wait(cx, 600);
+            let tip = crate::ui_script::shown_tooltip();
+            expect((l.editing(cx), tip.is_some_and(|t| t.starts_with("Extrude 1"))), (Some("Extrude 1".to_string()), true), "(editing, the name's tooltip shown)")
+        } },
     ]
 }
 

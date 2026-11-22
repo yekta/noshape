@@ -281,11 +281,12 @@ pub struct Frame {
 }
 
 /// What a pick id is to [`PickBuffer::pick_reaching`]: an edge (reached by its distance, further over a face), a face,
-/// or anything else.
+/// a sketch line (its pick band reached by its distance, at any slant), or anything else (the pick square).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PickClass {
     Edge,
     Face,
+    Line,
     Other,
 }
 
@@ -388,7 +389,14 @@ impl PickBuffer {
                 if id == 0 {
                     continue;
                 }
-                let kept = if far(id) { dx * dx + dy * dy <= edge_reach2 } else { dx.abs() <= radius && dy.abs() <= radius };
+                // A slanted sketch line's band reached in the square's corner took clicks 9 px off it over a face (live
+                // workflow 36: the face at 7.9 px). Its pixels within ~5.4 px: 7 px off its 5 px band keeps the line at any
+                // slant (live hover-pick-1120), 7.9 px doesn't.
+                let kept = match class(id) {
+                    PickClass::Edge => dx * dx + dy * dy <= edge_reach2,
+                    PickClass::Line => dx * dx + dy * dy <= radius * radius + 4,
+                    _ => dx.abs() <= radius && dy.abs() <= radius,
+                };
                 if !kept {
                     continue;
                 }
@@ -3196,6 +3204,10 @@ impl Renderer {
             if let Some(eye) = lock_eye.filter(|_| inst.reflection.as_ref().is_some_and(|r| r.lock.is_some())) {
                 normal_m.w_axis = eye.extend(0.0);
             }
+            // A line instance's plane (`Instance::pick_plane`) rides there too, with w = 1.
+            if let Some(n) = inst.pick_plane {
+                normal_m.w_axis = n.normalize_or_zero().extend(1.0);
+            }
             let model = match &inst.drawable {
                 Drawable::Mesh(m) => inst.transform * m.0.dequant,
                 _ => inst.transform,
@@ -3458,6 +3470,10 @@ impl Renderer {
         }
         // Selected whole parts: their #FFC04C outline the same way (live2 hl-pixels-1118: 2 device px at any ratio).
         let body_band = req.scene.body_outline;
+        let rgba = |r: f32, g: f32, b: f32, a: f32| [r / 255.0, g / 255.0, b / 255.0, a];
+        let select = globals.select.map(|c| linear_to_srgb(c) as f32 / 255.0);
+        let border = req.scene.body_outline_rgb.map_or(rgba(255.0, 192.0, 76.0, 1.0), |c| rgba(f32::from(c[0]), f32::from(c[1]), f32::from(c[2]), 1.0));
+        let body_rgb = [border, rgba(255.0, 160.0, 51.0, 1.0), [select[0], select[1], select[2], 1.0], rgba(242.0, 195.0, 108.0, 0.85)];
         if body_band && self.body_outline.is_none() {
             self.body_outline = Some(crate::hover_outline::HoverOutline::new(&self.device, COLOR_FORMAT));
         }
@@ -3600,6 +3616,11 @@ impl Renderer {
             let frame = crate::ao::AoFrame { view_proj: Mat4::from_cols_array_2d(&globals.view_proj), width, height, strength: ao_strength, extent: ao_extent, timestamp_writes };
             ao.encode(device, queue, &mut encoder, &tex.depth_sample, color_view, frame);
         }
+        let hover_rgb = match req.scene.hover_outline_rgb {
+            Some(c) => c.map(|v| f32::from(v) / 255.0),
+            None => globals.hover.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb"),
+        };
+        let hover_rgb = [[hover_rgb[0], hover_rgb[1], hover_rgb[2], 1.0]; 4];
         ts.hover_mask = match hover_outline.as_ref().filter(|_| hover_band) {
             Some(band) => {
                 let mask = crate::hover_outline::HoverOutline::mask(device, ts.hover_mask.take(), width, height, msaa);
@@ -3629,15 +3650,15 @@ impl Renderer {
                     pass.set_bind_group(0, bind_color, &[]);
                     pass.set_bind_group(3, &*compare_none, &[]);
                     draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { hover_mask: true, ..Default::default() });
+                    // A preview: the parts are the "with" layer's (live mc-infer-1122: Part 2 hovered in the Mate connector dialog).
+                    if let Some((over, bind_over, _, _)) = compare_frame.as_ref().filter(|_| !comparing) {
+                        draw_lists(&mut pass, over, &req.scene.instances, pipelines, bind_over, DrawMode { hover_mask: true, ..Default::default() });
+                    }
                 }
                 // Live: the silhouette line's two pixels (psui/parthover crops), 2–3 on a slant, at any pixel ratio: its
                 // overlay looks at the ±1 device px neighbours, unscaled (behaviours "viewport shading and highlight
                 // shaders" 4).
-                let rgb = match req.scene.hover_outline_rgb {
-                    Some(c) => c.map(|v| f32::from(v) / 255.0),
-                    None => globals.hover.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb"),
-                };
-                band.encode(device, queue, &mut encoder, &mask, color_view, [[rgb[0], rgb[1], rgb[2], 1.0]; 4], 1.0);
+                band.encode(device, queue, &mut encoder, &mask, color_view, hover_rgb, 1.0);
                 Some(mask)
             }
             None => None,
@@ -3670,14 +3691,16 @@ impl Renderer {
                     pass.set_bind_group(0, bind_color, &[]);
                     pass.set_bind_group(3, &*compare_none, &[]);
                     draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { body_mask: true, ..Default::default() });
+                    // A preview: the selected parts are the "with" layer's (live workflow 19: Mirror's, Subtract's).
+                    if let Some((over, bind_over, _, _)) = compare_frame.as_ref().filter(|_| !comparing) {
+                        draw_lists(&mut pass, over, &req.scene.instances, pipelines, bind_over, DrawMode { body_mask: true, ..Default::default() });
+                    }
                 }
                 // Live's PART_HIGHLIGHT_COLOR_BORDER rgba(255, 192, 76, 1); an instance selected through a face, edge or
                 // vertex #ffa033, beside its selected face that face's boundary colour (live triad-depth-1122 t1); a mate
                 // pick's instance (242,195,108) at 85 % (live workflows-1122 08 s06-s08: (244,204,130) on white, (211,171,98)
                 // over the black line, (220,180,106) over a grey face).
-                let select = globals.select.map(|c| linear_to_srgb(c) as f32 / 255.0);
-                let rgba = |r: f32, g: f32, b: f32, a: f32| [r / 255.0, g / 255.0, b / 255.0, a];
-                band.encode(device, queue, &mut encoder, &mask, color_view, [rgba(255.0, 192.0, 76.0, 1.0), rgba(255.0, 160.0, 51.0, 1.0), [select[0], select[1], select[2], 1.0], rgba(242.0, 195.0, 108.0, 0.85)], 1.0);
+                band.encode(device, queue, &mut encoder, &mask, color_view, body_rgb, 1.0);
                 Some(mask)
             }
             None => None,
@@ -3748,6 +3771,14 @@ impl Renderer {
                 pass.set_bind_group(1, bind_post, &[]);
                 pass.set_bind_group(3, &c.tint, &[]);
                 draw_lists(&mut pass, post, &req.scene.instances, pipelines, bind_post, DrawMode { outline, ..Default::default() });
+            }
+            // The selected parts' band on the "with" layer too, so the mix keeps it whole.
+            if let (false, Some(band), Some(mask)) = (comparing, body_outline.as_ref().filter(|_| body_band), ts.body_mask.as_ref()) {
+                band.encode(device, queue, &mut encoder, mask, &c.over.resolve_view, body_rgb, 1.0);
+            }
+            // A hovered part's too (live mc-infer-1122: Part 2 hovered in the Mate connector dialog, its whole outline).
+            if let (false, Some(band), Some(mask)) = (comparing, hover_outline.as_ref().filter(|_| hover_band), ts.hover_mask.as_ref()) {
+                band.encode(device, queue, &mut encoder, mask, &c.over.resolve_view, hover_rgb, 1.0);
             }
             // Onshape blends the mix onto a WebGL canvas, which is not sRGB:
             // the stored (gamma) values are mixed, so this pass draws

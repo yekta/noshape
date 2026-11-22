@@ -323,6 +323,28 @@ fn box_select_takes_what_live_takes(cx: &mut TestAppContext) {
             let n = cx.update(|cx| view.read(cx).box_ids(corners, crossing, cx).len());
             assert_eq!(n, live, "scale {scale}: {name}");
         }
+        // Live sel-gestures-1122: a plain box and a Shift box add, the same box again changes nothing (no toggle), a Ctrl
+        // box removes.
+        let rect = (a - m, b + m);
+        let boxed = |cx: &mut TestAppContext, modifiers: Modifiers| {
+            cx.update_window(window, |_, w, cx| {
+                view.update(cx, |v, cx| {
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::BoxSelect { ids: Vec::new(), modifiers, crossing: false, rect }, w, cx);
+                })
+            })
+            .unwrap();
+            draw(cx, window);
+            cx.update(|cx| view.read(cx).selection.len())
+        };
+        view.update(cx, |v, _| v.selection.clear());
+        let got = [
+            boxed(cx, Modifiers::default()),
+            boxed(cx, Modifiers::default()),
+            boxed(cx, Modifiers { control: true, ..Default::default() }),
+            boxed(cx, Modifiers { shift: true, ..Default::default() }),
+        ];
+        assert_eq!(got, [18, 18, 0, 18], "scale {scale}: selected after a box, the same box, a Ctrl box, a Shift box");
     }
 }
 
@@ -860,6 +882,42 @@ fn a_modal_closed_over_the_graphics_lights_nothing_until_the_pointer_moves(cx: &
     assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the first move lights the part");
 }
 
+/// Live workflow 29 step 7 (qa FEEL-PLANE-LIT-AFTER-MENU): the pointer went from the feature list onto a cover over the
+/// graphics (Top row's menu) without crossing them; the cover closed by a click or key leaves nothing lit under it.
+#[gpui::test]
+fn a_cover_reached_from_the_list_lights_nothing_after_it_closes(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _, _) = block_part(cx, "hover-after-list-cover");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let mid = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let (lo, hi) = b.bounds.unwrap();
+        v.viewport.read(cx).project((lo + hi) * 0.5).unwrap()
+    });
+    pointer.move_to(cx, &view, mid);
+    assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the part lights under the pointer");
+    let list = pointer.window_point(cx, DVec2::new(-60.0, mid.y));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(list, None, Modifiers::default());
+    pointer.frames(cx, &view);
+    assert!(cx.update(|cx| view.read(cx).hover.is_none()), "nothing lit with the pointer over the list");
+    let run: crate::part_studio::export::RunExport = std::rc::Rc::new(|_, _, _, _| {});
+    cx.update_window(window, |_, w, cx| crate::part_studio::export::open_export_modal("Part Studio 1".into(), false, run, w, cx)).unwrap();
+    pointer.frames(cx, &view);
+    let over = pointer.window_point(cx, mid);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(over, None, Modifiers::default());
+    pointer.frames(cx, &view);
+    keys(cx, window, &["escape"]);
+    for _ in 0..20 {
+        pointer.frames(cx, &view);
+    }
+    assert!(cx.update(|cx| view.read(cx).hover.is_none()), "nothing lit under the still pointer after the cover closed");
+    pointer.move_to(cx, &view, mid + DVec2::new(1.0, 0.0));
+    assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the first move lights the part");
+}
+
 /// Live2 submenu-diag-1119 (qa face-rclick-select-fillet-faces): a click beside an open context menu only closes it:
 /// the plane under it isn't selected (live: selection 0); the next click there selects the plane.
 #[gpui::test]
@@ -1072,9 +1130,11 @@ fn a_hover_after_a_rest_submits_its_frame_without_a_window_redraw(cx: &mut TestA
     assert_eq!(cx.update(|cx| pointer.vp.read(cx).last_layout()), laid_out, "no window redraw before the frame");
 }
 
-/// Live 3d.json (interaction-feel "Click", "Ctrl+click"): in 3D with no tool a click adds what is lit, a click on a
-/// selected face removes it, a click on empty space clears, Shift+click there keeps the selection, and Ctrl+click
-/// opens the menu of what is under the pointer without selecting it; through the real pointer.
+/// Live 3d.json (interaction-feel "Click", "Ctrl+click") and sel-gestures-1122: in 3D with no tool a click adds what is
+/// lit, a click on a selected face removes it, a click on empty space clears, Shift+click there keeps the selection,
+/// Ctrl+click opens the menu of what is under the pointer without selecting it, Shift+click on a face toggles it,
+/// Escape keeps the selection and Space clears it, a press held 0.5 s or more selects nothing (longpress-1122); through
+/// the real pointer.
 #[gpui::test]
 fn clicks_in_3d_add_remove_clear_and_ctrl_opens_the_menu(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -1127,5 +1187,35 @@ fn clicks_in_3d_add_remove_clear_and_ctrl_opens_the_menu(cx: &mut TestAppContext
     row("Shift+click empty space", press(cx, empty, shift), &[&top]);
     row("Ctrl+click the side", press(cx, on_side, ctrl), &[&top]);
     assert!(cx.update(|cx| view.read(cx).context_menu.is_some()), "Ctrl+click opened the context menu");
+    // Live sel-gestures-1122: Escape closes the menu and keeps the selection, also with two; Shift+click toggles; Space
+    // clears.
+    keys(cx, window, &["escape"]);
+    pointer.settle(cx, &view);
+    let selected = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).selection.clone());
+    row("Escape over the menu", selected(cx), &[&top]);
+    row("click the side", press(cx, on_side, Modifiers::default()), &[&top, &side]);
+    keys(cx, window, &["escape"]);
+    row("Escape with two selected", selected(cx), &[&top, &side]);
+    row("Shift+click the top", press(cx, on_top, shift), &[&side]);
+    row("Shift+click the top again", press(cx, on_top, shift), &[&top, &side]);
+    keys(cx, window, &["space"]);
+    row("Space", selected(cx), &[]);
+    // Live longpress-1122: a release selects only when held under ~0.5 s (≤504 ms selects, ≥533 ms doesn't).
+    let clock = std::rc::Rc::new(std::cell::Cell::new(cx.update(|cx| pointer.vp.read(cx).now())));
+    let c = clock.clone();
+    cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_clock(move || c.get())));
+    let hold = |cx: &mut TestAppContext, at: DVec2, ms: u64| {
+        pointer.move_to(cx, &view, at);
+        let win = pointer.window_point(cx, at);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_down(win, gpui_kit::MouseButton::Left, Modifiers::default());
+        clock.set(clock.get() + std::time::Duration::from_millis(ms));
+        vcx.simulate_mouse_up(win, gpui_kit::MouseButton::Left, Modifiers::default());
+        pointer.settle(cx, &view);
+        cx.update(|cx| view.read(cx).selection.clone())
+    };
+    row("hold the top 460 ms", hold(cx, on_top, 460), &[&top]);
+    row("hold the side 600 ms", hold(cx, on_side, 600), &[&top]);
+    row("hold the top 3 s", hold(cx, on_top, 3000), &[&top]);
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

@@ -1175,6 +1175,20 @@ impl PartStudioView {
         self.display.body(id).map(|b| b.face_refs.clone()).unwrap_or_default()
     }
 
+    /// A selected feature row's geometry: the parts it made whole, marked by the feature itself (the builder draws them in
+    /// a selected face's amber inside one silhouette, live hover-list-1122 p13), and what it changed on other parts.
+    fn selected_feature_geometry(&self, f: FeatureId) -> Vec<Reference> {
+        let made: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| !b.hidden && b.id.feature == f && !b.face_refs.is_empty()).collect();
+        if made.is_empty() {
+            return self.feature_geometry(f);
+        }
+        let theirs: std::collections::HashSet<&Reference> = made.iter().flat_map(|b| b.face_refs.iter()).collect();
+        let mut out: Vec<Reference> = self.feature_geometry(f).into_iter().filter(|r| !theirs.contains(r)).collect();
+        out.extend(made.iter().map(|b| Reference::Body(b.id.clone())));
+        out.push(Reference::Feature(f));
+        out
+    }
+
     /// Selection plus the geometry of selected features and parts (for the
     /// graphics-area highlight).
     pub(super) fn highlighted_selection(&self) -> Vec<Reference> {
@@ -1183,12 +1197,13 @@ impl PartStudioView {
             match r {
                 // The part: the builder gives its faces the whole-part amber (live selection/09) and outlines it.
                 Reference::Body(_) => out.push(r.clone()),
-                Reference::Sketch(f) | Reference::Feature(f) => out.extend(self.feature_geometry(*f)),
+                Reference::Sketch(f) => out.extend(self.feature_geometry(*f)),
+                Reference::Feature(f) => out.extend(self.selected_feature_geometry(*f)),
                 _ => out.push(r.clone()),
             }
         }
         for f in &self.selected_features {
-            out.extend(self.feature_geometry(*f));
+            out.extend(self.selected_feature_geometry(*f));
         }
         // An analysis tool's active field highlights its entities (Onshape).
         if let Some(s) = &self.ui.flatten {
@@ -1239,8 +1254,18 @@ impl PartStudioView {
 
     /// Hover target in the graphics area, expanded like the selection.
     pub(super) fn highlighted_hover(&self, cx: &App) -> Vec<Reference> {
+        // A feature row lights the parts the feature made as their part rows do, by the outline only (live hover-list-1122
+        // p01: Extrude 1's row, Part 1's silhouette, its inner edges plain); faces it changed on other parts as faces.
         if let Some(f) = self.row_hovered_feature(cx) {
-            return self.feature_geometry(f);
+            // A selected row hovered changes nothing (p14).
+            if self.selected_features.contains(&f) || self.selection.contains(&Reference::Feature(f)) {
+                return Vec::new();
+            }
+            let made: Vec<&noshape_model::display::BodyDisplay> = self.display.bodies.iter().filter(|b| !b.hidden && b.id.feature == f).collect();
+            let theirs: std::collections::HashSet<&Reference> = made.iter().flat_map(|b| b.face_refs.iter()).collect();
+            let mut out: Vec<Reference> = self.feature_geometry(f).into_iter().filter(|r| !theirs.contains(r)).collect();
+            out.extend(made.iter().map(|b| Reference::Body(b.id.clone())));
+            return out;
         }
         if self.ui.var_hover.is_some() {
             return self.variable_users(cx).into_iter().flat_map(|f| self.feature_geometry(f)).collect();
@@ -1668,7 +1693,7 @@ impl PartStudioView {
         self.ui.pick_filter = Some(key);
         self.ui.pick_unhovered = own_plane;
         self.ui.pick_muted = muted;
-        let class = built.picks.class_fn();
+        let class = built.picks.class_fn(self.opts.editing_sketch);
         self.viewport.update(cx, |vp, _| {
             vp.pick_priority = prio;
             vp.pick_class = class;

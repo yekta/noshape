@@ -113,6 +113,20 @@ impl Matrix {
 
     /// The frame as drawn now, 80 × 80 px centred on `at` (row-major RGB).
     pub fn crop(&self, cx: &mut TestAppContext, at: DVec2) -> Vec<[u8; 3]> {
+        let (w, h, px) = self.frame(cx);
+        let (x0, y0) = (at.x as i32 - 40, at.y as i32 - 40);
+        let mut out = Vec::with_capacity(6400);
+        for y in y0..y0 + 80 {
+            for x in x0..x0 + 80 {
+                let (cx_, cy_) = (x.clamp(0, w as i32 - 1), y.clamp(0, h as i32 - 1));
+                out.push(px[(cy_ * w as i32 + cx_) as usize]);
+            }
+        }
+        out
+    }
+
+    /// The whole frame as drawn now: width, height and its pixels (row-major RGB).
+    pub fn frame(&self, cx: &mut TestAppContext) -> (u32, u32, Vec<[u8; 3]>) {
         self.pointer.frames(cx, &self.view);
         let (scene, camera, style, size, geometry) = cx.update(|cx| {
             let vp = self.view.read(cx).viewport.read(cx);
@@ -124,16 +138,7 @@ impl Matrix {
         // Mate connector glyphs and manipulators are built per frame from the camera.
         r.set_camera_geometry(noshape_render::renderer::SYNC_TARGET, geometry);
         let f = r.render(noshape_render::RenderParams { scene: &scene, camera: &camera, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).expect("a frame");
-        let (x0, y0) = (at.x as i32 - 40, at.y as i32 - 40);
-        let mut out = Vec::with_capacity(6400);
-        for y in y0..y0 + 80 {
-            for x in x0..x0 + 80 {
-                let (cx_, cy_) = (x.clamp(0, f.width as i32 - 1), y.clamp(0, f.height as i32 - 1));
-                let i = ((cy_ * f.width as i32 + cx_) * 4) as usize;
-                out.push([f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]]);
-            }
-        }
-        out
+        (f.width, f.height, f.bgra.as_chunks::<4>().0.iter().map(|p| [p[2], p[1], p[0]]).collect())
     }
 }
 
@@ -1321,4 +1326,547 @@ fn plane_names_keep_their_blue_in_a_section_view(cx: &mut TestAppContext) {
     let sectioned = blue(&crop);
     let mauve = crop.iter().filter(|p| close(**p, 0x8a7581, 20)).count();
     assert!(plain > 20 && sectioned * 10 >= plain * 8 && mauve < 5, "Top's name: {plain} blue px plain, {sectioned} in the section view, {mauve} mauve");
+}
+
+// Section view through Right on the bracket (live workflow 28, qa FEEL-SECTION-PLANE-LABEL-LOOK): the cut part's edges
+// stay 1 px; ours outlined the opened wall and the part in ~3 px dark bands (the back faces' silhouette, which the cut
+// leaves nothing in front of).
+#[gpui::test]
+fn a_cut_parts_edges_stay_thin_in_a_section_view(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let m = matrix_studio_from(cx, "section-thin-edges", starts["bracket"].clone());
+    // The wall's front face purple (workflow 28 steps 18-21: Add appearance to face, C890FF).
+    let p = m.exact(cx, [-10., 25., 20.]).round();
+    approach(cx, &m, p);
+    let face = cx.update(|cx| m.view.read(cx).hover.clone()).expect("the wall's face");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+        v.edit_appearance(crate::part_studio::appearance::EditTarget::Faces(vec![face], None), w, cx);
+        v.set_edit_color([200, 144, 255], w, cx);
+    })).unwrap();
+    cx.update(|cx| m.view.update(cx, |v, cx| v.accept_appearance(cx)));
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+        v.selection.clear();
+        v.section_through(Reference::Plane(DatumPlane::Right), w, cx);
+        v.end_section_dialog(true, w, cx);
+    })).unwrap();
+    m.park(cx);
+    // Each dark pixel's thickness (its shorter run across or down), the 75th percentile: the purple face's top edge and
+    // the cap's edge.
+    let p75 = |crop: &[[u8; 3]]| {
+        let dark = |x: i32, y: i32| (0..80).contains(&x) && (0..80).contains(&y) && crop[(y * 80 + x) as usize].iter().all(|c| *c < 80);
+        let run = |x: i32, y: i32, dx: i32, dy: i32| (1..).take_while(|k| dark(x + k * dx, y + k * dy)).count() + (1..).take_while(|k| dark(x - k * dx, y - k * dy)).count() + 1;
+        let mut thick: Vec<usize> = (0..80).flat_map(|y| (0..80).map(move |x| (x, y))).filter(|&(x, y)| dark(x, y)).map(|(x, y)| run(x, y, 1, 0).min(run(x, y, 0, 1))).collect();
+        thick.sort_unstable();
+        (thick.len(), thick.get(thick.len() * 3 / 4).copied().unwrap_or(0))
+    };
+    let mut wrong = Vec::new();
+    for (name, at) in [("the purple face's top edge", [-10., 25., 30.]), ("the cap's edge", [0., 25., 30.])] {
+        let p = m.exact(cx, at).round();
+        let (n, t) = p75(&m.crop(cx, p));
+        if n <= 20 || t > 2 {
+            wrong.push(format!("{name}: {n} dark px, thickness p75 {t}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+// The bracket (ui-parity start), Sketch 3's rib line in front of the base's top face (live workflow 36 steps 1 / 27, qa
+// FEEL-PICK-SKETCH-LINE-THROUGH-FACE): a click 8 px beside the line takes the face (live's Area 1000 mm²), 6 px the line
+// (live reach-px-1119: over a face an edge takes 6 px in, the face 8).
+#[gpui::test]
+fn a_click_8_px_beside_a_sketch_line_over_a_face_takes_the_face(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let m = matrix_studio_from(cx, "bracket-rib-pick", starts["bracket"].clone());
+    let (a, b, f) = (m.exact(cx, [0., 5., 5.]), m.exact(cx, [0., 25., 25.]), m.exact(cx, [0., 12., 5.]));
+    let along = (b - a).normalize();
+    let foot = a + along * (f - a).dot(along);
+    let out = (f - foot).normalize();
+    let mut wrong = Vec::new();
+    for (px, line) in [(8.0, false), (9.0, false), (6.0, true)] {
+        let p = (foot + out * px).round();
+        approach(cx, &m, p);
+        m.pointer.click(cx, &m.view, p);
+        let sel = cx.update(|cx| m.view.read(cx).selection.clone());
+        let took_line = matches!(sel.as_slice(), [Reference::SketchEntity { .. }]);
+        let took_face = matches!(sel.as_slice(), [Reference::Face(_)]);
+        if (line && !took_line) || (!line && !took_face) {
+            wrong.push(format!("{px} px beside the line: {sel:?}"));
+        }
+        m.reset(cx);
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+// Live hover-list-1122 p01 (list × viewport matrix): Extrude 1's row hovered lights Part 1 as its part row does: the
+// #ffc685 outline round its image, its inner edges plain dark.
+#[gpui::test]
+fn a_feature_rows_hover_outlines_the_part_it_made(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let m = matrix_studio_from(cx, "row-hover-outline", starts["overlap"].clone());
+    let f = cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.id.feature).expect("Part 1"));
+    m.park(cx);
+    m.view.update(cx, |v, cx| {
+        v.ui.list_hover = Some(f);
+        v.refresh_scene(false, cx);
+    });
+    let lit = |p: &[u8; 3]| close(*p, 0xffc685, 40);
+    let mut got = Vec::new();
+    // The front bottom edge is its outline, the front top edge between two of its faces.
+    for (name, at) in [("outline", [20., 0., 0.]), ("inner edge", [20., 0., 10.])] {
+        let p = m.exact(cx, at).round();
+        let crop = m.crop(cx, p);
+        got.push((name, (36..45).flat_map(|y| (36..45).map(move |x| (x, y))).filter(|&(x, y)| lit(&crop[y * 80 + x])).count()));
+    }
+    assert!(got[0].1 >= 3 && got[1].1 == 0, "lit px near (outline, inner edge): {got:?}");
+}
+
+// Live workflow 19 (overlap; qa FEEL-QUERY-PART-PICK-FILL): a part in a dialog's field carries live's orange band round
+// its whole image, through the part in front: Mirror's Part 2 (step 2; ours drew none under the preview), Subtract's
+// Tools Part 2 (step 10; ours stopped at Part 1) and its Targets Part 1 (step 12; ours none).
+#[gpui::test]
+fn a_part_in_a_field_is_banded_through_the_part_in_front(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let m = matrix_studio_from(cx, "field-part-band", starts["overlap"].clone());
+    let parts: Vec<Reference> = cx.update(|cx| m.view.read(cx).display.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect());
+    assert_eq!(parts.len(), 2, "Part 1 and Part 2");
+    let band = |p: &[u8; 3]| close(*p, 0xffc04c, 40);
+    // Part 2's corner (30, 10, 0) lies inside Part 1.
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("mirror", w, cx))).unwrap();
+    let d = cx.update(|cx| m.view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![parts[1].clone()]), cx)));
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let at = m.exact(cx, [30., 10., 0.]).round();
+    let crop = m.crop(cx, at);
+    let near = (36..45).flat_map(|y| (36..45).map(move |x| (x, y))).filter(|&(x, y)| band(&crop[y * 80 + x])).count();
+    let mut wrong = Vec::new();
+    if near < 3 {
+        wrong.push(format!("Mirror's Part 2: {near} band px at its corner, {} in the crop", crop.iter().filter(|p| band(p)).count()));
+    }
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+        v.cancel_edit(w, cx);
+        v.start_feature("booleanBodies", w, cx);
+    }))
+    .unwrap();
+    let d = cx.update(|cx| m.view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("operationType", noshape_model::ParamValue::Enum("SUBTRACTION".into()), cx)));
+    // Part 1's corner (40, 0, 0) at the front.
+    for (step, field, part, corner) in [("10 Tools Part 2", "tools", 1, [30., 10., 0.]), ("12 Targets Part 1", "targets", 0, [40., 0., 0.])] {
+        // The field clicked first (its list takes the keyboard, as a click does), then the part.
+        cx.update_window(m.window, |_, w, cx| d.update(cx, |d, cx| {
+            d.user_focus_query(field);
+            if let Some(h) = d.tab_stop_handle(&format!("q:{field}")) {
+                w.focus(&h, cx);
+            }
+            d.set_value(field, noshape_model::ParamValue::Query(vec![parts[part].clone()]), cx);
+        }))
+        .unwrap();
+        wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+        m.park(cx);
+        let at = m.exact(cx, corner).round();
+        let crop = m.crop(cx, at);
+        let near = (36..45).flat_map(|y| (36..45).map(move |x| (x, y))).filter(|&(x, y)| band(&crop[y * 80 + x])).count();
+        if near < 3 {
+            let why = cx.update(|cx| {
+                let v = m.view.read(cx);
+                let s = v.viewport.read(cx).scene();
+                let banded = s.states.iter().filter(|st| *st & noshape_render::state::BAND != 0).count();
+                (v.display.bodies.iter().map(|b| b.id.clone()).collect::<Vec<_>>(), s.body_outline, banded, v.ui.removed_outline.as_ref().map(|(_, o)| o.is_some()), d.read(cx).active_query.clone(), d.read(cx).status.clone())
+            });
+            wrong.push(format!("step {step}: {near} band px at its corner, {} in the crop; (bodies, body_outline, BAND states, removed outline, active field, status) {why:?}", crop.iter().filter(|p| band(p)).count()));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+// Live's list × viewport matrix, Part Studio (hover-list-1122, user P0): its document (Part 1 block, Part 2 cylinder,
+// Part 3 plate), rows hovered and selected, what the viewport shows. The list's own look is list_feel_tests'.
+#[gpui::test]
+fn the_list_viewport_matrix_matches_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[60, 15], [68, 15]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "15 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 3", "plane": "Top", "shapes": [{ "corner_rectangle": [[80, 0], [100, 20]] }] },
+        { "type": "extrude", "name": "Extrude 3", "params": { "entities": ["Sketch 3 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+    ] });
+    let m = matrix_studio_from(cx, "list-viewport", start);
+    let solids = |cx: &gpui_kit::App| m.view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count();
+    wait_until(cx, m.window, |cx| solids(cx) == 3 && !m.view.read(cx).ui_busy());
+    cx.update(|cx| {
+        let vp = m.view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            vp.camera.target = DVec3::new(0.05, 0.015, 0.01);
+            vp.request_frame(cx);
+        });
+    });
+    m.park(cx);
+    let feature = |cx: &mut TestAppContext, name: &str| cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == name).map(|f| f.id).expect(name));
+    let part = |cx: &mut TestAppContext, name: &str| cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.name == name).map(|b| Reference::Body(b.id.clone())).expect(name));
+    let set = |cx: &mut TestAppContext, f: &dyn Fn(&mut PartStudioView)| {
+        m.view.update(cx, |v, cx| {
+            f(v);
+            v.refresh_scene(false, cx);
+        });
+    };
+    // Pixels near `at` (a square of radius r) within `tol` of a colour; pixels two frames differ in.
+    let near = |frame: &(u32, u32, Vec<[u8; 3]>), at: DVec2, r: i32, rgb: u32, tol: i32| -> usize {
+        let (w, h, px) = frame;
+        let (x0, y0) = (at.x as i32, at.y as i32);
+        (y0 - r..=y0 + r).flat_map(|y| (x0 - r..=x0 + r).map(move |x| (x, y))).filter(|&(x, y)| x >= 0 && y >= 0 && x < *w as i32 && y < *h as i32 && close(px[(y * *w as i32 + x) as usize], rgb, tol)).count()
+    };
+    let changed = |a: &(u32, u32, Vec<[u8; 3]>), b: &(u32, u32, Vec<[u8; 3]>)| a.2.iter().zip(&b.2).filter(|(p, q)| p.iter().zip(q.iter()).any(|(x, y)| x.abs_diff(*y) > 8)).count();
+    // Part 1's front bottom edge is on its silhouette, its front top edge between two of its faces.
+    let p1_outline = m.exact(cx, [20., 0., 0.]).round();
+    let p1_inner = m.exact(cx, [20., 0., 20.]).round();
+    let p1_top = m.exact(cx, [20., 15., 20.]).round();
+    let p2_outline = m.exact(cx, [60., 7., 0.]).round();
+    let p2_top_outline = m.exact(cx, [60., 7., 15.]).round();
+    let p3_top = m.exact(cx, [90., 10., 10.]).round();
+    let (e1, e2, e3, s2, s3) = (feature(cx, "Extrude 1"), feature(cx, "Extrude 2"), feature(cx, "Extrude 3"), feature(cx, "Sketch 2"), feature(cx, "Sketch 3"));
+    let (part1, part2, part3) = (part(cx, "Part 1"), part(cx, "Part 2"), part(cx, "Part 3"));
+    let top_face = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.name == "Part 1").expect("Part 1");
+        let on_top = |&(first, count): &(u32, u32)| b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][2] - 0.02).abs() < 1e-6);
+        b.face_refs.iter().zip(&b.mesh.face_ranges).find(|(_, r)| on_top(r)).map(|(r, _)| r.clone()).expect("Part 1's top face")
+    });
+    let mut wrong = Vec::new();
+
+    // p01: Extrude 1's row: Part 1's silhouette #ffc685, its inner edges plain.
+    set(cx, &|v| v.ui.list_hover = Some(e1));
+    let f = m.frame(cx);
+    let (out, inner) = (near(&f, p1_outline, 4, 0xffc685, 40), near(&f, p1_inner, 3, 0xffc685, 40));
+    if out < 3 || inner > 0 {
+        wrong.push(format!("p01 Extrude 1's row: {out} hover px at Part 1's outline (want ≥ 3), {inner} at its inner edge (want 0)"));
+    }
+    set(cx, &|v| v.ui.list_hover = None);
+    // p03: Part 2's row: its silhouette.
+    let p2 = part2.clone();
+    set(cx, &move |v| v.hover = Some(p2.clone()));
+    let n = near(&m.frame(cx), p2_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p03 Part 2's row: {n} hover px at its outline"));
+    }
+    set(cx, &|v| v.hover = None);
+    // p02: Sketch 2's row (consumed, hidden): its circle lights, Part 2 doesn't.
+    set(cx, &|v| v.ui.list_hover = Some(s2));
+    let f02 = m.frame(cx);
+    let (circle, top) = (near(&f02, p2_outline, 4, 0xffc685, 40), near(&f02, p2_top_outline, 3, 0xffc685, 40));
+    if circle < 3 || top > 0 {
+        let c = f02.2[(p2_outline.y as u32 * f02.0 + p2_outline.x as u32) as usize];
+        let wide = near(&f02, p2_outline, 6, 0xffc685, 60);
+        wrong.push(format!("p02 hidden Sketch 2's row: {circle} hover px on its circle (want ≥ 3; {wide} within 6 px / 60, at it {c:02x?}), {top} on Part 2's top outline (want 0)"));
+    }
+    set(cx, &|v| v.ui.list_hover = None);
+    // p04: the Top plane's row: its outline.
+    set(cx, &|v| v.hover = Some(Reference::Plane(DatumPlane::Top)));
+    let edge = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let vp = v.viewport.read(cx);
+        let pl = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top))?;
+        [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)].into_iter().filter_map(|(u, w)| vp.project(pl.corner(u, w))).find(|s| s.x > 10.0 && s.y > 10.0 && s.x < vp.size().x - 10.0 && s.y < vp.size().y - 10.0)
+    });
+    match edge {
+        Some(edge) if near(&m.frame(cx), edge.round(), 4, 0xffc685, 40) >= 3 => {}
+        Some(_) => wrong.push("p04 the Top plane's row: its outline not lit".to_string()),
+        None => wrong.push("p04: no edge of the Top plane on screen".to_string()),
+    }
+    set(cx, &|v| v.hover = None);
+
+    // p05: Part 1's top face selected; p06-p09: either part's rows hovered draw the part's silhouette, the face stays.
+    let tf = top_face.clone();
+    set(cx, &move |v| v.selection = vec![tf.clone()]);
+    let n = near(&m.frame(cx), p1_top, 2, 0xe4aa38, 30);
+    if n < 20 {
+        wrong.push(format!("p05 Part 1's top face selected: {n} #e4aa38 px"));
+    }
+    for (cell, row, feature, outline) in [("p06 Extrude 2", None, Some(e2), p2_outline), ("p07 Extrude 1", None, Some(e1), p1_outline), ("p08 Part 1", Some(part1.clone()), None, p1_outline), ("p09 Part 2", Some(part2.clone()), None, p2_outline)] {
+        set(cx, &move |v| (v.hover, v.ui.list_hover) = (row.clone(), feature));
+        let f = m.frame(cx);
+        let (out, face) = (near(&f, outline, 4, 0xffc685, 40), near(&f, p1_top, 2, 0xe4aa38, 30));
+        if out < 3 || face < 20 {
+            wrong.push(format!("{cell}'s row with the face selected: {out} hover px at its part's outline (want ≥ 3), {face} selected px on the face (want ≥ 20)"));
+        }
+    }
+    set(cx, &|v| (v.hover, v.ui.list_hover) = (None, None));
+    set(cx, &|v| v.selection.clear());
+    // p10-p12: geometry hovered lights no row.
+    for (cell, at) in [("p10 a face of Part 2", m.exact(cx, [60., 15., 15.]).round()), ("p11 an edge of Part 1", p1_inner), ("p12 a face of Part 3", p3_top)] {
+        m.pointer.move_to(cx, &m.view, at);
+        let (lit, row) = cx.update(|cx| (m.view.read(cx).hover.clone(), m.view.read(cx).row_hovered_feature(cx)));
+        if lit.is_none() || row.is_some() {
+            wrong.push(format!("{cell} hovered: lit {lit:?}, row lit {row:?} (live: no row)"));
+        }
+    }
+    m.park(cx);
+
+    // p13: Extrude 1's row selected: Part 1 in a selected face's amber, one #ffa90a silhouette, inner edges plain.
+    set(cx, &|v| v.selected_features = vec![e1]);
+    m.frame(cx);
+    let f13 = m.frame(cx);
+    let top = near(&f13, p1_top, 2, 0xe4aa38, 30);
+    let (out, inner) = (near(&f13, p1_outline, 4, 0xffa90a, 30), near(&f13, p1_inner, 3, 0xffa90a, 30));
+    if top < 20 || out < 3 || inner > 0 {
+        let c = f13.2[(p1_top.y as u32 * f13.0 + p1_top.x as u32) as usize];
+        wrong.push(format!("p13 Extrude 1 selected: top face {c:02x?} (live #e4aa38), {out} #ffa90a px at the outline (want ≥ 3), {inner} at the inner edge (want 0)"));
+    }
+    // p14: hovering the selected row changes nothing.
+    set(cx, &|v| v.ui.list_hover = Some(e1));
+    let f14 = m.frame(cx);
+    let n = changed(&f13, &f14);
+    if n > 0 {
+        let accent = cx.update(|cx| m.view.read(cx).highlighted_hover(cx));
+        set(cx, &|v| v.ui.list_hover = None);
+        let back = changed(&f13, &m.frame(cx));
+        wrong.push(format!("p14 Extrude 1 selected, its row hovered: {n} px changed (live none); hovered refs {accent:?}, {back} px changed with the hover gone"));
+    }
+    // p15: another row hovered: its part's silhouette.
+    set(cx, &|v| v.ui.list_hover = Some(e2));
+    let n = near(&m.frame(cx), p2_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p15 Extrude 1 selected, Extrude 2's row hovered: {n} hover px at Part 2's outline"));
+    }
+    set(cx, &|v| v.ui.list_hover = None);
+    // p16: nor a face of the part it made.
+    m.pointer.move_to(cx, &m.view, p1_top);
+    let n = changed(&f13, &m.frame(cx));
+    if n > 0 {
+        wrong.push(format!("p16 Extrude 1 selected, Part 1's top face hovered: {n} px changed (live none)"));
+    }
+    m.park(cx);
+
+    // p17: Part 1's row selected: the lighter part amber, the #ffc04c band.
+    let p1 = part1.clone();
+    set(cx, &move |v| {
+        v.selected_features.clear();
+        v.selection = vec![p1.clone()];
+    });
+    let f17 = m.frame(cx);
+    let (top, out) = (near(&f17, p1_top, 2, 0xf0bb58, 24), near(&f17, p1_outline, 4, 0xffc04c, 30));
+    if top < 20 || out < 3 {
+        let c = f17.2[(p1_top.y as u32 * f17.0 + p1_top.x as u32) as usize];
+        wrong.push(format!("p17 Part 1 selected: top face {c:02x?} (live #f0bb58), {out} #ffc04c px at the outline (want ≥ 3)"));
+    }
+    // p18, p19: its row hovered, its face hovered: no change.
+    let p1 = part1.clone();
+    set(cx, &move |v| v.hover = Some(p1.clone()));
+    let n = changed(&f17, &m.frame(cx));
+    if n > 0 {
+        wrong.push(format!("p18 Part 1 selected, its row hovered: {n} px changed (live none)"));
+    }
+    set(cx, &|v| v.hover = None);
+    m.pointer.move_to(cx, &m.view, p1_top);
+    let n = changed(&f17, &m.frame(cx));
+    if n > 0 {
+        wrong.push(format!("p19 Part 1 selected, its top face hovered: {n} px changed (live none)"));
+    }
+    m.park(cx);
+    // p19b: Part 2's row: its silhouette.
+    let p2 = part2.clone();
+    set(cx, &move |v| v.hover = Some(p2.clone()));
+    let n = near(&m.frame(cx), p2_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p19b Part 1 selected, Part 2's row hovered: {n} hover px at its outline"));
+    }
+    set(cx, &|v| v.hover = None);
+    set(cx, &|v| v.selection.clear());
+
+    // p20-p22: Extrude 1 and Extrude 3 selected: both parts amber; Extrude 2's row its silhouette, Extrude 3's nothing.
+    set(cx, &|v| v.selected_features = vec![e1, e3]);
+    m.frame(cx);
+    let f20 = m.frame(cx);
+    let (one, three) = (near(&f20, p1_top, 2, 0xe4aa38, 30), near(&f20, p3_top, 2, 0xda961b, 32));
+    if one < 20 || three < 20 {
+        wrong.push(format!("p20 Extrude 1 + 3 selected: {one} #e4aa38 px on Part 1's top, {three} #da961b px on Part 3's (want ≥ 20)"));
+    }
+    set(cx, &|v| v.ui.list_hover = Some(e2));
+    let n = near(&m.frame(cx), p2_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p21 Extrude 2's row: {n} hover px at Part 2's outline"));
+    }
+    set(cx, &|v| v.ui.list_hover = Some(e3));
+    let n = changed(&f20, &m.frame(cx));
+    if n > 0 {
+        wrong.push(format!("p22 Extrude 3 selected, its row hovered: {n} px changed (live none)"));
+    }
+    set(cx, &|v| v.ui.list_hover = None);
+    // p23, p24: Part 1 and Part 3 selected: both the lighter amber; Part 2's row its silhouette.
+    let (p1, p3) = (part1.clone(), part3.clone());
+    set(cx, &move |v| {
+        v.selected_features.clear();
+        v.selection = vec![p1.clone(), p3.clone()];
+    });
+    let f23 = m.frame(cx);
+    let (one, three) = (near(&f23, p1_top, 2, 0xf0bb58, 24), near(&f23, p3_top, 2, 0xf0bb58, 32));
+    if one < 20 || three < 20 {
+        wrong.push(format!("p23 Part 1 + 3 selected: {one} / {three} #f0bb58 px on their tops (want ≥ 20)"));
+    }
+    let p2 = part2.clone();
+    set(cx, &move |v| v.hover = Some(p2.clone()));
+    let n = near(&m.frame(cx), p2_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p24 Part 2's row: {n} hover px at its outline"));
+    }
+    set(cx, &|v| v.hover = None);
+    set(cx, &|v| v.selection.clear());
+
+    // p25-p27: Extrude 2 suppressed: its row lights nothing; Sketch 2, shown again, lights its circle.
+    m.view.update(cx, |v, cx| v.set_suppressed(vec![e2], true, cx));
+    wait_until(cx, m.window, |cx| solids(cx) == 2 && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let f25 = m.frame(cx);
+    set(cx, &|v| v.ui.list_hover = Some(e2));
+    let n = changed(&f25, &m.frame(cx));
+    if n > 0 {
+        wrong.push(format!("p26 suppressed Extrude 2's row hovered: {n} px changed (live none)"));
+    }
+    set(cx, &|v| v.ui.list_hover = Some(s2));
+    let n = near(&m.frame(cx), p2_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p27 Sketch 2's row (its Extrude suppressed): {n} hover px on its circle"));
+    }
+    set(cx, &|v| v.ui.list_hover = None);
+    m.view.update(cx, |v, cx| v.set_suppressed(vec![e2], false, cx));
+    wait_until(cx, m.window, |cx| solids(cx) == 3 && !m.view.read(cx).ui_busy());
+
+    // p28-p31: rolled back to after Extrude 2: the rows below the bar light nothing, Extrude 1's still its part.
+    let at = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().position(|f| f.id == e2).expect("Extrude 2"));
+    m.view.update(cx, |v, cx| v.set_rollback(Some(at + 1), cx));
+    wait_until(cx, m.window, |cx| solids(cx) == 2 && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let f28 = m.frame(cx);
+    for (cell, row) in [("p29 Extrude 3", e3), ("p30 Sketch 3", s3)] {
+        set(cx, &move |v| v.ui.list_hover = Some(row));
+        let n = changed(&f28, &m.frame(cx));
+        if n > 0 {
+            wrong.push(format!("{cell}'s row below the rollback bar hovered: {n} px changed (live none)"));
+        }
+    }
+    set(cx, &|v| v.ui.list_hover = Some(e1));
+    let n = near(&m.frame(cx), p1_outline, 4, 0xffc685, 40);
+    if n < 3 {
+        wrong.push(format!("p31 Extrude 1's row above the bar: {n} hover px at Part 1's outline"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+// Live mc-infer-1122, the Part Studio Mate connector feature (Part 1 block, Part 2 cylinder): Shift keeps the hovered face
+// (the glyph moves among its points; off it, its centroid; released over the cylinder, the cylinder's top); after its one
+// pick the feature infers no more, the placed connector's disc pale #d2e3ed, Part 1 outlined #ffc04c, and Part 2
+// hovered outlined whole #ffc685 with no glyph.
+#[gpui::test]
+fn the_mate_connector_feature_infers_as_live(cx: &mut TestAppContext) {
+    use noshape_scene::builder::{PickKind as K, PickTarget as T};
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[60, 15], [68, 15]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "15 mm", "operationType": "NEW" } }
+    ] });
+    let m = matrix_studio_from(cx, "mc-infer", start);
+    let solids = |cx: &gpui_kit::App| m.view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count();
+    wait_until(cx, m.window, |cx| solids(cx) == 2 && !m.view.read(cx).ui_busy());
+    cx.update(|cx| {
+        let vp = m.view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            vp.camera.target = DVec3::new(0.035, 0.015, 0.01);
+            vp.request_frame(cx);
+        });
+    });
+    m.park(cx);
+    let top_of = |cx: &mut TestAppContext, part: &str, z: f32| cx.update(|cx| {
+        let v = m.view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.name == part).expect(part);
+        let on = |&(first, count): &(u32, u32)| b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][2] - z).abs() < 1e-6);
+        b.face_refs.iter().zip(&b.mesh.face_ranges).find(|(_, r)| on(r)).map(|(r, _)| r.clone()).expect("its top face")
+    });
+    let (top, cyl_top) = (top_of(cx, "Part 1", 0.02), top_of(cx, "Part 2", 0.015));
+    let part2 = cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 2").map(|b| Reference::Body(b.id.clone())).unwrap());
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("mateConnector", w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    let near_corner = m.exact(cx, [37., 3., 20.]);
+    let (at_top, at_cyl) = (m.exact(cx, [20., 15., 20.]), m.exact(cx, [60., 15., 15.]));
+    let centroid = DVec3::new(0.02, 0.015, 0.02);
+    let mut wrong = Vec::new();
+    // Hover (pointer, the pick under it, Shift) and what the inference chose, once its points came.
+    let hover = |cx: &mut TestAppContext, at: DVec2, face: &Reference, shift: bool| {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+            v.ui.pointer = Some(at);
+            v.ui.hover_raw = Some(T { reference: face.clone(), kind: K::Face, anchor: None });
+            v.rehover(cx);
+            v.update_inference(shift, w, cx);
+            v.refresh_scene(false, cx);
+        }))
+        .unwrap();
+        wait_until(cx, m.window, |cx| m.view.read(cx).inference_choice().is_some());
+        cx.update(|cx| {
+            let v = m.view.read(cx);
+            (v.inference_choice().map(|p| p.frame.origin * 1e3), v.hover.clone())
+        })
+    };
+    let (corner, _) = hover(cx, near_corner, &top, false);
+    if corner.is_none_or(|c| c.distance(DVec3::new(40., 0., 20.)) > 1e-3) {
+        wrong.push(format!("near the corner: {corner:?} (live the corner)"));
+    }
+    let (at_centre, _) = hover(cx, at_top, &top, true);
+    if at_centre.is_none_or(|c| c.distance(centroid * 1e3) > 1e-3) {
+        wrong.push(format!("Shift, at the centroid: {at_centre:?}"));
+    }
+    let (on_cyl, lit) = hover(cx, at_cyl, &cyl_top, true);
+    if on_cyl.is_none_or(|c| c.distance(centroid * 1e3) > 1e-3) || lit.as_ref() != Some(&top) {
+        wrong.push(format!("Shift held over the cylinder: glyph {on_cyl:?} (live the block top's centroid), lit {lit:?} (live the block's top)"));
+    }
+    let (released, lit) = hover(cx, at_cyl, &cyl_top, false);
+    if released.is_none_or(|c| c.distance(DVec3::new(60., 15., 15.)) > 1e-3) || lit.as_ref() != Some(&cyl_top) {
+        wrong.push(format!("Shift released over the cylinder: glyph {released:?} (live its top's centre), lit {lit:?}"));
+    }
+    // The pick at the block top's centroid.
+    hover(cx, at_top, &top, false);
+    m.view.update(cx, |v, cx| v.pick(T { reference: top.clone(), kind: K::Face, anchor: None }, cx));
+    let dialog = cx.update(|cx| m.view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy() && !dialog.read(cx).feature.params.query("ownerPart").is_empty());
+    m.park(cx);
+    let f = m.frame(cx);
+    let near = |frame: &(u32, u32, Vec<[u8; 3]>), at: DVec2, r: i32, rgb: u32, tol: i32| -> usize {
+        let (w, h, px) = frame;
+        let (x0, y0) = (at.x as i32, at.y as i32);
+        (y0 - r..=y0 + r).flat_map(|y| (x0 - r..=x0 + r).map(move |x| (x, y))).filter(|&(x, y)| x >= 0 && y >= 0 && x < *w as i32 && y < *h as i32 && close(px[(y * *w as i32 + x) as usize], rgb, tol)).count()
+    };
+    let p1_outline = m.exact(cx, [20., 0., 0.]).round();
+    let outline = near(&f, p1_outline, 4, 0xffc04c, 30);
+    if outline < 3 {
+        wrong.push(format!("after the pick: {outline} #ffc04c px at Part 1's outline (live its owner outline)"));
+    }
+    let centre = m.exact(cx, [20., 15., 20.]);
+    let wedge = ((m.exact(cx, [21., 15., 20.]) - centre).normalize() + (m.exact(cx, [20., 16., 20.]) - centre).normalize()).normalize();
+    let disc_at = (centre + wedge * 15.0).round();
+    let (pale, tan) = (near(&f, disc_at, 3, 0xd2e3ed, 14), near(&f, disc_at, 3, 0xc2c187, 20));
+    if pale < 10 || tan > 0 {
+        let c = f.2[(disc_at.y as u32 * f.0 + disc_at.x as u32) as usize];
+        wrong.push(format!("the placed connector's disc: {pale} #d2e3ed px, {tan} #c2c187 (at its middle {c:02x?})"));
+    }
+    // Part 1's corner again: no inference; Part 2 hovered: the whole part outlined, no glyph.
+    m.pointer.move_to(cx, &m.view, near_corner.round());
+    let marks = cx.update(|cx| m.view.read(cx).inference_marks().is_some());
+    if marks {
+        wrong.push("after the pick, Part 1's corner hovered: inference marks drawn (live none)".into());
+    }
+    m.pointer.move_to(cx, &m.view, at_cyl.round());
+    let (lit, marks) = cx.update(|cx| (m.view.read(cx).highlighted_hover(cx), m.view.read(cx).inference_marks().is_some()));
+    let filter = cx.update(|cx| dialog.read(cx).active_filter().map(|(q, f, _)| (q.to_string(), f)));
+    let f = m.frame(cx);
+    let (bottom, rim) = (m.exact(cx, [60., 7., 0.]).round(), m.exact(cx, [52., 15., 15.]).round());
+    let (side, cap) = (near(&f, bottom, 4, 0xffc685, 40), near(&f, rim, 4, 0xffc685, 40));
+    if lit != vec![part2.clone()] || marks || side < 3 || cap < 3 {
+        wrong.push(format!("after the pick, Part 2's top hovered: lit {lit:?} (live Part 2), marks {marks}, {side} #ffc685 px at its bottom outline, {cap} at its top; field {filter:?}"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
