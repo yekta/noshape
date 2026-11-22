@@ -887,6 +887,39 @@ fn a_prisms_rounds_are_deleted_by_running_its_sides_on() {
     assert!(close(d.shape.volume().unwrap(), 10.0 * PI * big * big / 4.0, 1e-6), "{}", d.shape.volume().unwrap());
 }
 
+/// c2-gamma-imported's Move face 1 deletes a sheet-metal hat's bends before bending it again: holes through its flanges,
+/// clear of the bends, stay as they are while its sides run on to their corners.
+#[test]
+fn a_prisms_rounds_are_deleted_past_holes_through_its_sides() {
+    let r = 5.0;
+    let l = |a: (f64, f64), b: (f64, f64)| Segment2d::Line { a: DVec2::new(a.0, a.1), b: DVec2::new(b.0, b.1) };
+    let arc = |c: (f64, f64), a0: f64, a1: f64| Segment2d::Arc { center: DVec2::new(c.0, c.1), radius: r, start_angle: a0.to_radians(), end_angle: a1.to_radians() };
+    let rounded = [
+        l((-15.0, -10.0), (15.0, -10.0)),
+        arc((15.0, -5.0), -90.0, 0.0),
+        l((20.0, -5.0), (20.0, 5.0)),
+        arc((15.0, 5.0), 0.0, 90.0),
+        l((15.0, 10.0), (-15.0, 10.0)),
+        arc((-15.0, 5.0), 90.0, 180.0),
+        l((-20.0, 5.0), (-20.0, -5.0)),
+        arc((-15.0, -5.0), 180.0, 270.0),
+    ];
+    let mut plate = extrude(&make_face_2d(&Plane::xy(), &rounded, &[]).unwrap(), DVec3::new(0.0, 0.0, 10.0)).unwrap().shape;
+    for x in [-8.0, 0.0] {
+        let hole = make_cylinder(&Plane::new(DVec3::new(x, -12.0, 5.0), DVec3::Y, DVec3::X), 2.0, 24.0, 2.0 * PI).unwrap();
+        plate = cut(&plate, &hole).unwrap().shape;
+    }
+    let bends: Vec<Shape> = plate.faces().into_iter().filter(|f| matches!(f.face_surface().unwrap(), Surface::Cylinder { radius, .. } if radius > 4.0)).collect();
+    assert_eq!(bends.len(), 4);
+    let d = delete_faces(&plate, &bends).unwrap();
+    assert!(d.shape.is_valid());
+    assert_eq!(d.shape.faces().len(), plate.faces().len() - 4);
+    let holes = d.shape.faces().into_iter().filter(|f| matches!(f.face_surface().unwrap(), Surface::Cylinder { radius, .. } if close(radius, 2.0, 1e-9))).count();
+    assert_eq!(holes, plate.faces().len() - 10);
+    let want = 10.0 * 800.0 - 2.0 * PI * 4.0 * 20.0;
+    assert!(close(d.shape.volume().unwrap(), want, 1e-6), "{} vs {want}", d.shape.volume().unwrap());
+}
+
 #[test]
 fn split_and_section() {
     let b = box10();

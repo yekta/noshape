@@ -11963,7 +11963,7 @@ static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<Top
   const gp_Dir dir = first.Cylinder().Axis().Direction();
   ShapeIMap fm;
   TopExp::MapShapes(solid, TopAbs_FACE, fm);
-  std::vector<TopoDS_Face> caps;
+  std::vector<TopoDS_Face> caps, extra;
   int                      dels = 0;
   for (int i = 1; i <= fm.Extent(); ++i)
   {
@@ -11975,8 +11975,12 @@ static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<Top
       caps.push_back(f);
     else if (a.GetType() == GeomAbs_Plane && std::abs(a.Plane().Axis().Direction().Dot(dir)) < 1e-9 && !d)
       continue;
-    else if (a.GetType() != GeomAbs_Cylinder || !a.Cylinder().Axis().Direction().IsParallel(dir, 1e-9))
+    else if (a.GetType() == GeomAbs_Cylinder && a.Cylinder().Axis().Direction().IsParallel(dir, 1e-9))
+      continue;
+    else if (d)
       return false;
+    else
+      extra.push_back(f);
   }
   if (caps.size() != 2 || dels != (int)del.size())
     return false;
@@ -11991,6 +11995,17 @@ static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<Top
   const gp_Pln p0 = BRepAdaptor_Surface(caps[0]).Plane(), p1 = BRepAdaptor_Surface(caps[1]).Plane();
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  // Other faces (a hole through a side wall) stay as they are: clear of the caps, the rounds and the corners they leave.
+  std::vector<Bnd_Box> extra_box;
+  for (const TopoDS_Face& f : extra)
+  {
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      for (const TopoDS_Shape& g : ef.FindFromKey(x.Current()))
+        if (gone(g) || g.IsSame(caps[0]) || g.IsSame(caps[1]))
+          return false;
+    extra_box.emplace_back();
+    BRepBndLib::Add(f, extra_box.back(), false);
+  }
   // The outline: cap 0's edges in order, each with the side face along it, in the cap's plane coordinates.
   struct Seg
   {
@@ -12045,7 +12060,7 @@ static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<Top
     segs.push_back(sg);
   }
   const int n = (int)segs.size();
-  if (n != fm.Extent() - 2 || n - dels < 3)
+  if (n != fm.Extent() - 2 - (int)extra.size() || n - dels < 3)
     return false;
   for (int i = 0; i < n; ++i)
     for (int j = i + 1; j < n; ++j)
@@ -12153,6 +12168,13 @@ static bool delete_prism_rounds(const TopoDS_Shape& solid, const std::vector<Top
     const TopoDS_Vertex vx[2] = {BRepBuilderAPI_MakeVertex(x0).Vertex(), BRepBuilderAPI_MakeVertex(x1).Vertex()};
     const TopoDS_Edge   pr = shared(p.side, r.side), rq = shared(r.side, q.side);
     if (pr.IsNull() || rq.IsNull())
+      return false;
+    Bnd_Box wedge;
+    BRepBndLib::Add(r.side, wedge, false);
+    wedge.Add(x0);
+    wedge.Add(x1);
+    wedge.Enlarge(tol);
+    if (std::any_of(extra_box.begin(), extra_box.end(), [&](const Bnd_Box& b) { return !wedge.IsOut(b); }))
       return false;
     // The corner edge runs as the round's edge with its first neighbour did.
     auto from0 = [&](const TopoDS_Edge& e) {
