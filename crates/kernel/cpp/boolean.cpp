@@ -2359,10 +2359,84 @@ TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
 // circle, a new circle at the second band's far end (put into that end's cap
 // face), one new seam. The shape unchanged when there's no such pair or the
 // merge doesn't come out valid with the same volume. `vol`: the shape's volume where known (below 0 not yet).
+// One pair's merge (merge_cylinder_bands): the face over both bands, b's far circle and what replaces it.
+struct BandMerge
+{
+  TopoDS_Face              a, b, F;
+  TopoDS_Edge              end;
+  TopoDS_Shape             end_new;
+  std::vector<TopoDS_Edge> far_pieces, gone;
+};
+
+// The merges with one rebuild of the shape; null unless what they changed comes out valid with the same volume.
+// (Only what changed checked and integrated, against the whole shape's twice a pair before (c2-impeller-loft's
+// Extrude Bohrungssitz Ansaugflansch: its B-spline faces, 1 s): the new faces each, the shells as they join; the
+// volume the changed faces' shares after less before, one integral each as the whole shape's.)
+static TopoDS_Shape apply_band_merges(const TopoDS_Shape& s, const std::vector<BandMerge>& ms, HHist& hist, double& vol)
+{
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  for (const BandMerge& m : ms)
+  {
+    rs->Replace(m.a.Oriented(TopAbs_FORWARD), m.F);
+    rs->Remove(m.b);
+    rs->Replace(m.end.Oriented(TopAbs_FORWARD), m.end_new);
+  }
+  const TopoDS_Shape out = rs->Apply(s);
+  if (out.IsNull())
+    return {};
+  ShapeIMap before, after;
+  TopExp::MapShapes(s, TopAbs_FACE, before);
+  TopExp::MapShapes(out, TopAbs_FACE, after);
+  std::vector<TopoDS_Shape> changed;
+  bool                      valid = true;
+  for (TopExp_Explorer x(out, TopAbs_FACE); x.More() && valid; x.Next())
+    if (!before.Contains(x.Current()))
+    {
+      changed.push_back(x.Current());
+      valid = BRepCheck_Analyzer(x.Current()).IsValid();
+    }
+  if (!valid || !shells_valid(out))
+    return {};
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    if (!after.Contains(x.Current()))
+      changed.push_back(x.Current().Reversed());
+  if (vol < 0)
+  {
+    GProp_GProps g0;
+    BRepGProp::VolumeProperties(s, g0);
+    vol = g0.Mass();
+  }
+  const double dv = faces_volume(changed);
+  // (Within the integration's noise: a seam moved round a torus cap reads 2e-7 apart, the PEM FH4 stud's.)
+  if (std::abs(dv) > 1e-6 * std::abs(vol))
+    return {};
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  // ReShape's (the caps it rebuilt), each b onto its new face too.
+  HHist h = rs->History();
+  if (h.IsNull())
+    h = new BRepTools_History();
+  for (const BandMerge& m : ms)
+  {
+    if (h->Modified(m.a).IsEmpty())
+      h->AddModified(m.a, m.F);
+    h->AddModified(m.b, m.F);
+    for (const TopoDS_Edge& e : m.far_pieces)
+      h->AddModified(m.end, e);
+    for (const TopoDS_Edge& e : m.gone)
+      h->Remove(e);
+  }
+  hist->Merge(h);
+  vol += dv;
+  return out;
+}
+
 TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist, double vol = -1)
 {
   ShapeAncMap ef;
   unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  ShapeIMap              busy;
+  std::vector<BandMerge> batch;
   auto cyl_of = [](const TopoDS_Face& f, gp_Cylinder& c) {
     TopLoc_Location                      loc;
     occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(f, loc));
@@ -2425,7 +2499,7 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist, double vol
       continue;
     const TopoDS_Face a = TopoDS::Face(ef(i).First()), b = TopoDS::Face(ef(i).Last());
     gp_Cylinder       ca, cb;
-    if (a.IsSame(b) || !cyl_of(a, ca) || !cyl_of(b, cb))
+    if (a.IsSame(b) || busy.Contains(a) || busy.Contains(b) || !cyl_of(a, ca) || !cyl_of(b, cb))
       continue;
     const double r = ca.Radius();
     if (!ca.Axis().Direction().IsParallel(cb.Axis().Direction(), 1e-12) || std::abs(cb.Radius() - r) > 1e-9 * r
@@ -2590,64 +2664,30 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist, double vol
     }
     if (!on_cap)
       continue;
-    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
-    rs->Replace(a.Oriented(TopAbs_FORWARD), F);
-    rs->Remove(b);
-    if (b_far.size() == 1)
-      rs->Replace(bb.end.Oriented(TopAbs_FORWARD), same ? b_far[0] : TopoDS::Edge(b_far[0].Reversed()));
-    else
-      rs->Replace(bb.end.Oriented(TopAbs_FORWARD), b_new);
-    const TopoDS_Shape out = rs->Apply(s);
-    if (out.IsNull())
+    BandMerge m{a, b, F, bb.end, b_far.size() == 1 ? TopoDS_Shape(same ? b_far[0] : TopoDS::Edge(b_far[0].Reversed())) : TopoDS_Shape(b_new), b_far, {ba.seam, bb.seam}};
+    m.gone.insert(m.gone.end(), ba.ring.begin(), ba.ring.end());
+    // (A pair with a face of one already taken, b's cap among them, waits for the next look.)
+    const ShapeList* at_end = ef.Seek(bb.end);
+    bool             untaken = at_end != nullptr;
+    if (at_end != nullptr)
+      for (ShapeList::Iterator it(*at_end); it.More() && untaken; it.Next())
+        untaken = !busy.Contains(it.Value());
+    if (!untaken)
       continue;
-    // (Only what it changed checked and integrated, against the whole shape's twice a pair before (c2-impeller-loft's
-    // Extrude Bohrungssitz Ansaugflansch: its B-spline faces, 1 s): the new faces each, the shells as they join; the
-    // volume the changed faces' shares after less before, one integral each as the whole shape's.)
-    ShapeIMap before, after;
-    TopExp::MapShapes(s, TopAbs_FACE, before);
-    TopExp::MapShapes(out, TopAbs_FACE, after);
-    std::vector<TopoDS_Shape> changed;
-    bool                      valid = true;
-    for (TopExp_Explorer x(out, TopAbs_FACE); x.More() && valid; x.Next())
-      if (!before.Contains(x.Current()))
-      {
-        changed.push_back(x.Current());
-        valid = BRepCheck_Analyzer(x.Current()).IsValid();
-      }
-    if (!valid || !shells_valid(out))
-      continue;
-    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
-      if (!after.Contains(x.Current()))
-        changed.push_back(x.Current().Reversed());
-    if (vol < 0)
-    {
-      GProp_GProps g0;
-      BRepGProp::VolumeProperties(s, g0);
-      vol = g0.Mass();
-    }
-    const double dv = faces_volume(changed);
-    // (Within the integration's noise: a seam moved round a torus cap reads 2e-7 apart, the PEM FH4 stud's.)
-    if (std::abs(dv) > 1e-6 * std::abs(vol))
-      continue;
-    if (hist.IsNull())
-      hist = new BRepTools_History();
-    // ReShape's (the caps it rebuilt), b onto the new face too.
-    HHist h = rs->History();
-    if (h.IsNull())
-      h = new BRepTools_History();
-    if (h->Modified(a).IsEmpty())
-      h->AddModified(a, F);
-    h->AddModified(b, F);
-    for (const TopoDS_Edge& e : b_far)
-      h->AddModified(bb.end, e);
-    h->Remove(ba.seam);
-    h->Remove(bb.seam);
-    for (const TopoDS_Edge& e : ba.ring)
-      h->Remove(e);
-    hist->Merge(h);
-    // One pair at a time: the shape changed, look again.
-    return merge_cylinder_bands(out, hist, vol + dv);
+    busy.Add(a);
+    busy.Add(b);
+    for (ShapeList::Iterator it(*at_end); it.More(); it.Next())
+      busy.Add(it.Value());
+    batch.push_back(std::move(m));
   }
+  if (batch.empty())
+    return s;
+  // All the pairs with one rebuild, else one at a time; the shape changed, look again.
+  if (const TopoDS_Shape out = apply_band_merges(s, batch, hist, vol); !out.IsNull())
+    return merge_cylinder_bands(out, hist, vol);
+  for (const BandMerge& m : batch)
+    if (const TopoDS_Shape out = apply_band_merges(s, {m}, hist, vol); !out.IsNull())
+      return merge_cylinder_bands(out, hist, vol);
   return s;
 }
 
