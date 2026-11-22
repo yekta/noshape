@@ -56,6 +56,32 @@ fn ellipse_axis_dimension_reads_its_diameter() {
     assert_eq!(values, ["Ø30", "Ø12"], "{st}");
 }
 
+/// query_entities `sketches`: the vertices include the sketches' points, those a feature pattern copied too, with ids
+/// that select them (live c2-constrained-surface: Linear pattern 1's 960 vertices of its sketch copies).
+#[test]
+fn sketch_points_a_pattern_copied_are_vertices() {
+    let mut ctx = Ctx::new();
+    let path = scratch("pattern-sketch-points.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    let sketch = sk["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "point", "points": [[5, 3]] }));
+    let id = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["name"] == "Sketch 1").unwrap()["id"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "feature_add", json!({ "type": "linearPattern", "params": { "patternType": "FEATURE", "instanceFunction": [format!("feature:{id}")], "directionOne": ["plane:right"], "distance": "20 mm", "instanceCount": 3 } }));
+    assert_eq!(p["feature_status"]["status"], "Ok", "{p}");
+    let none = call(&mut ctx, "query_entities", json!({ "kind": "vertices" }));
+    assert_eq!(none["count"], 0, "no part, no vertex without `sketches`: {none}");
+    let all = call(&mut ctx, "query_entities", json!({ "kind": "vertices", "sketches": true }));
+    assert_eq!(all["count"], 3, "{all}");
+    let at = call(&mut ctx, "query_entities", json!({ "kind": "vertices", "sketches": true, "at": [[45, 3, 0]] }));
+    let v = &at["vertices"][0];
+    let xyz: Vec<f64> = v["position"].as_array().unwrap().iter().map(num).collect();
+    assert!(xyz.iter().zip([45.0, 3.0, 0.0]).all(|(a, b)| (a - b).abs() < 1e-9), "the second copy: {v}");
+    let ids: std::collections::BTreeSet<&str> = all["vertices"].as_array().unwrap().iter().filter_map(|v| v["id"].as_str()).collect();
+    assert_eq!(ids.len(), 3, "each copy's point its own id: {all}");
+    assert!(ids.iter().all(|i| i.starts_with("entity:")) && ids.contains(v["id"].as_str().unwrap()), "{all}");
+}
+
 /// sketch_get `at`: only the regions holding a sketch point, or a model
 /// point projected onto the sketch plane (Front: sketch y is model Z).
 #[test]

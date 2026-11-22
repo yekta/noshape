@@ -5219,7 +5219,7 @@ impl<'a> Translator<'a> {
                 let near = r["vertices"][0]["position"].as_array().is_some_and(|c| (0..3).all(|i| (c[i].as_f64().unwrap_or(f64::NAN) * k - p[i]).abs() < 1e-6));
                 match pick(&r, "vertices").filter(|_| near) {
                     Some(v) => Ok(v),
-                    None => self.sketch_point_at(p).or_else(|| pick(&r, "vertices")).ok_or_else(|| format!("{id}: no vertex of ours at {:?} mm", mm(p))),
+                    None => self.sketch_point_at(p).or_else(|| self.sketch_copy_point_at(p)).or_else(|| pick(&r, "vertices")).ok_or_else(|| format!("{id}: no vertex of ours at {:?} mm", mm(p))),
                 }
             }
             "BODY" => {
@@ -5263,6 +5263,16 @@ impl<'a> Translator<'a> {
             }
         }
         None
+    }
+
+    /// A point of a sketch a feature pattern copied at `p` (model, m), within 1e-6 m (c2-constrained-surface: Linear
+    /// pattern 1's 960 vertices).
+    fn sketch_copy_point_at(&mut self, p: [f64; 3]) -> Option<String> {
+        let r = self.call("query_entities", json!({ "kind": "vertices", "sketches": true, "at": [mm(p)] })).ok()?;
+        let k = per_unit(&r["units"]);
+        let v = &r["vertices"][0];
+        let on = v["position"].as_array().is_some_and(|c| (0..3).all(|i| (c[i].as_f64().unwrap_or(f64::NAN) * k - p[i]).abs() < 1e-6));
+        v["id"].as_str().filter(|id| on && id.starts_with("entity:")).map(str::to_string)
     }
 
     /// A line or arc of one of our sketches with its (arc length) midpoint at `mid` (model, m) and live's length,

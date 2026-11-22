@@ -7101,6 +7101,7 @@ Examples:
 | `at` | array of array of number or string |  | Points (workspace units): the closest entity to each, in order (replaces `near` / `limit`). |
 | `limit` | integer |  | At most this many results (default 200). |
 | `context` | boolean |  | The shown Assembly context's instances instead of the parts. |
+| `sketches` | boolean |  | Vertices: the sketches' points too (`entity:…` ids), those a pattern copied included (live's vertices of a feature pattern's sketch copies). |
 
 #### query_datums
 

@@ -45,6 +45,7 @@ pub fn ops() -> Vec<Op> {
                 opt("at", json!({ "type": "array", "items": { "type": "array", "items": { "type": ["number", "string"] }, "minItems": 3, "maxItems": 3 }, "minItems": 1 }), "Points (workspace units): the closest entity to each, in order (replaces `near` / `limit`)."),
                 opt("limit", json!({ "type": "integer", "minimum": 1 }), "At most this many results (default 200)."),
                 opt("context", json!({ "type": "boolean", "default": false }), "The shown Assembly context's instances instead of the parts."),
+                opt("sketches", json!({ "type": "boolean", "default": false }), "Vertices: the sketches' points too (`entity:…` ids), those a pattern copied included (live's vertices of a feature pattern's sketch copies)."),
             ],
             mutates: false,
             destructive: false,
@@ -602,6 +603,16 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             }
             _ => return Err(OpError::param("kind", "faces, edges or vertices")),
+        }
+    }
+    if kind == "vertices" && a.bool_or("sketches", false)? && of.is_empty() && a.opt_str("part")?.is_none() {
+        for sk in &r.context.sketches {
+            for e in sk.sketch.entities() {
+                let noshape_sketch::Geometry::Point { pos } = e.geometry else { continue };
+                let p = sk.frame.to_world(pos);
+                let v = json!({ "id": refs::to_id(&Reference::SketchEntity { sketch: sk.feature, entity: e.id.0 }), "sketch": sk.name, "position": pt(p, k) });
+                out.push((near.map(|q| q.distance(p)).unwrap_or(0.0), p, v, None));
+            }
         }
     }
     if !of.is_empty() && !of_found {
