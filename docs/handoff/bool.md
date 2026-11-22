@@ -38,13 +38,13 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    (on bandbatch dfbc7eef1; rebase on main once the stack lands): PROBE_SAMEARG print in get_sedge, T1
    bool_patterns::precise_parts_fused_with_a_far_tolerant_pin (case d596e8faa25b6a23, gamma clips + pin 1 m away,
    OCCT 448 faces), run pt-probe.sh (vibex8) -> pt-probe.out.
-   06:45 PROBE_SAMEARG: get_sedge's same-argument joins are all 0 apart (an edge seen from its two faces): NOT the
+   06:29 PROBE_SAMEARG: get_sedge's same-argument joins are all 0 apart (an edge seen from its two faces): NOT the
    culprit. In the far case object + 6 + 17 + 23 are still SEPARATE arguments meeting each other at 4.9 um, so the
    cross-argument sites matter too: split_params regroup (~4376: two split points within `tol` along a curve -> one
    vertex group; use the band of the two vertices' args), arc->line (~5101), lies_on / same_surface / plane_plane /
    cyl_cyl / intervals_on. Next: add arg_tol + band() in Ctx, env switches per site, find which one makes the far T1
    pass, then do them all properly (stage A within-arg, stage B cross-arg). A PROBE_NM port (bool-hat brep) shows the
-   unbalanced edges. In flight at 06:45: wclip 6329aaae + ruling 1d8788b5 CHECKING; bandbatch knurls unit
+   unbalanced edges. In flight at 06:29: wclip 6329aaae + ruling 1d8788b5 CHECKING; bandbatch knurls unit
    bool-kn-bandbatch (vibe2 -> kn-bandbatch.out); usdvol gate vibex7 (chain-bool-usdvol.out).
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
