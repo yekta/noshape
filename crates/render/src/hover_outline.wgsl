@@ -6,6 +6,8 @@
 
 struct U {
     color: vec4<f32>,        // sRGB hover colour
+    instance: vec4<f32>,     // sRGB, an instance selected through an entity (mask b)
+    face: vec4<f32>,         // sRGB, beside a selected face seen (mask g)
     p: vec4<f32>,            // width, height (device px), band reach (device px)
 };
 
@@ -28,15 +30,24 @@ fn fs_hover_outline(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32>
     // In the band when a pixel on the other side of the boundary lies within reach (the window's edge doesn't count).
     // Ends in a return: D3D's DXC rejects a function whose last statement is `discard` ("control may reach end of
     // non-void function"), which Vulkan and Metal accept.
+    // The band's colour: beside a selected face seen, its boundary's; an entity-selected instance's outline its own
+    // (live triad-depth-1122 t1: #ffa033 round the part, #ffa90a along the selected face).
+    let own = textureLoad(mask, p, 0);
     var band = false;
-    for (var dy = -n; dy <= n && !band; dy++) {
+    var face = own.g > 0.0;
+    var instance = own.b > 0.0;
+    for (var dy = -n; dy <= n; dy++) {
         for (var dx = -n; dx <= n; dx++) {
             if (f32(dx * dx + dy * dy) > r * r) { continue; }
             let q = p + vec2(dx, dy);
             if (any(q < vec2(0)) || any(q >= size)) { continue; }
-            if ((textureLoad(mask, q, 0).r > 0.0) != inside) { band = true; break; }
+            let m = textureLoad(mask, q, 0);
+            if ((m.r > 0.0) != inside) { band = true; }
+            face = face || m.g > 0.0;
+            instance = instance || m.b > 0.0;
         }
     }
     if (!band) { discard; }
-    return u.color;
+    if (face) { return u.face; }
+    return select(u.color, u.instance, instance);
 }

@@ -5,13 +5,15 @@
 
 use bytemuck::{Pod, Zeroable};
 
-/// The mask's format: coverage only.
-pub(crate) const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
+/// The mask's format: coverage (r), a selected face seen (g), an instance selected through an entity (b).
+pub(crate) const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct BandUniform {
     color: [f32; 4],
+    instance: [f32; 4],
+    face: [f32; 4],
     params: [f32; 4],
 }
 
@@ -94,11 +96,13 @@ impl HoverOutline {
         HoverMask { size: (width, height, msaa), msaa: msaa_view, resolved }
     }
 
-    /// The band over `target` (the resolved color): `color` sRGB, `radius` device px.
+    /// The band over `target` (the resolved color), `radius` device px: `colors` sRGB, the band's, an entity-selected
+    /// instance's (mask b) and beside a selected face (mask g).
     #[allow(clippy::too_many_arguments)]
-    pub fn encode(&self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, mask: &HoverMask, target: &wgpu::TextureView, color: [f32; 3], radius: f32) {
+    pub fn encode(&self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, mask: &HoverMask, target: &wgpu::TextureView, colors: [[f32; 3]; 3], radius: f32) {
         let (width, height, _) = mask.size;
-        let u = BandUniform { color: [color[0], color[1], color[2], 1.0], params: [width as f32, height as f32, radius, 0.0] };
+        let c = |k: usize| [colors[k][0], colors[k][1], colors[k][2], 1.0];
+        let u = BandUniform { color: c(0), instance: c(1), face: c(2), params: [width as f32, height as f32, radius, 0.0] };
         queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(&u));
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("hover-outline"),

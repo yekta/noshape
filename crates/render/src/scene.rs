@@ -721,8 +721,8 @@ pub mod state {
     /// With SELECTED on faces: an entity a mate dialog picked, live's yellow (229,183,37 on a lit top face) rather than a
     /// selected face's amber (live feel cov-1120 A2).
     pub const PICKED: u32 = 4096;
-    /// With OUTLINE on faces: an assembly instance selected through a face, edge or vertex, its silhouette #ffa033
-    /// (2 px; the selected face's own boundary drawn over it, live triad-depth-1122 t1).
+    /// With BAND on faces: an assembly instance selected through a face, edge or vertex, its band #ffa033 (2 px over
+    /// its silhouette line; beside its selected face that face's #ffa90a boundary, live triad-depth-1122 t1).
     pub const INSTANCE: u32 = 8192;
 }
 

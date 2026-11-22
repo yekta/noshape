@@ -314,9 +314,9 @@ fn edge_band_over_triad(cx: &mut TestAppContext) {
 }
 
 /// Live triad-depth-1122 t1 (hover matrix batch 4: "#ffa033 once selected"): a face selected selects its instance too,
-/// the part keeping its own colour inside a 2 px #ffa033 silhouette (here along the right face's back edge); where the
-/// silhouette runs along the selected face, the face's own #ffa90a boundary (live (255,169,10) on the top's back edge).
-/// Before, no outline.
+/// the part keeping its own colour inside a 2 px #ffa033 band over its dark silhouette line (here along the right
+/// face's back edge); where it runs along the selected face, the face's own #ffa90a boundary (live (255,169,10) ×3 on
+/// the top's back edge). Before, no outline and no boundary.
 #[gpui::test]
 fn entity_selected_instance_outlined(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -324,13 +324,16 @@ fn entity_selected_instance_outlined(cx: &mut TestAppContext) {
     let side = m.screen(cx, [40., 30., 10.]);
     let back = m.screen(cx, [20., 30., 20.]);
     let before = m.crop(cx, side);
-    assert!(!shows(&before, 0xffa033, 3.0), "no outline at rest");
+    let dark = |c: &[u8; 3]| c.iter().all(|&v| v < 60);
+    assert!(!shows(&before, 0xffa033, 3.0) && between(&before, 0.0, 3.0).any(|c| dark(&c)), "no outline at rest, the dark silhouette line");
     let p = m.screen(cx, FACE);
     m.click(cx, p);
     m.park(cx);
     let crop = m.crop(cx, side);
     dump("entity_selected_instance_outlined", &crop);
     assert!(between(&crop, 0.0, 3.0).filter(|c| close(*c, 0xffa033, 12)).count() >= 2, "the silhouette #ffa033");
+    // Over the silhouette line, as live's (255,160,51) ×2 where the dark line was.
+    assert!(!between(&crop, 0.0, 3.0).any(|c| dark(&c)), "the dark line under the band");
     assert!(!shows(&crop, 0xffc04c, 3.0), "not a whole part's #ffc04c");
     let crop = m.crop(cx, back);
     dump("entity_selected_instance_outlined_face", &crop);

@@ -1061,14 +1061,16 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             inst.outline_through = true;
         }
     }
-    // An instance selected through a face, edge or vertex: its silhouette #ffa033, 2 px, its fill its own (live
-    // triad-depth-1122 t1, e1: the part grey with an orange outline; hover matrix batch 4).
+    // An instance selected through a face, edge or vertex: a #ffa033 band over its silhouette line, 2 px, through the
+    // parts in front, its fill its own (live triad-depth-1122 t1, t2, e1: the part grey with an orange outline; hover
+    // matrix batch 4).
     for (p, _) in &h.selected_entities {
         if h.selected_tops.contains(&p[0]) {
             continue;
         }
         for &id in built.picks.faces_of(p[0]) {
-            scene.add_flag(id, state::OUTLINE | state::INSTANCE);
+            scene.add_flag(id, state::BAND | state::INSTANCE);
+            scene.body_outline = true;
         }
     }
     for top in &h.selected_tops {
@@ -1103,6 +1105,13 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     };
     for (p, r) in &h.selected_entities {
         mark(p, r, state::SELECTED, &mut scene, &mut pts, &mut sel_pts);
+    }
+    // A selected face's boundary: a 2 device px #ffa90a line, as a Part Studio's (live triad-depth-1122 t1).
+    for (p, r) in &h.selected_entities {
+        for id in built.picks.boundary_ids(p, r) {
+            let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
+            scene.add_flag(id, if own { state::SELECTED } else { state::SELECTED | state::OUTLINE });
+        }
     }
     if let Some((p, r)) = &h.hover_entity {
         mark(p, r, state::HOVER, &mut scene, &mut pts, &mut sel_pts);

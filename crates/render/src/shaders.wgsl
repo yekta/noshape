@@ -139,8 +139,6 @@ const FACE_PICKED: vec3<f32> = vec3<f32>(0.887, 0.534, 0.021);
 // Its boundary (state PICKED | OUTLINE on the edges): live #FFC20E (qa asm-mate-preview-0bc7: (255,194,14)).
 const PICKED_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.5395, 0.0044);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
-// An instance selected through an entity (state INSTANCE): #ffa033.
-const INSTANCE_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.3515, 0.0331);
 
 // ---------------------------------------------------------------- background
 
@@ -522,7 +520,6 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
     // Hovered, not selected: drawn inside the part's image instead (`fs_hover_mask`, hover_outline.wgsl).
     if (hover_outlined(st)) { discard; }
     if ((st & BODY) != 0u) { return enc(vec4(BODY_OUTLINE, 1.0)); }
-    if ((st & INSTANCE) != 0u) { return enc(vec4(INSTANCE_OUTLINE, 1.0)); }
     return enc(vec4(g.select.rgb, 1.0));
 }
 
@@ -542,13 +539,22 @@ fn fs_hover_mask(i: MeshOut) -> @location(0) vec4<f32> {
 }
 
 /// The mask of the whole selected parts' images (state BAND; depth ignored: their outline shows through the parts in
-/// front, live2 11-14).
+/// front, live2 11-14), b set for an instance selected through an entity (state INSTANCE).
 @fragment
 fn fs_body_mask(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & BAND) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
-    return vec4(1.0);
+    return vec4(1.0, 0.0, select(0.0, 1.0, (st & INSTANCE) != 0u), 1.0);
+}
+
+/// The mask's g: an outlined instance's selected face where it shows (depth tested; green written only).
+@fragment
+fn fs_body_face(i: MeshOut) -> @location(0) vec4<f32> {
+    load_inst(i.slot);
+    let st = state_of(i.pick);
+    if ((st & (BAND | SELECTED | BODY)) != (BAND | SELECTED) || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    return vec4(0.0, 1.0, 0.0, 1.0);
 }
 
 // Depth of outlined parts only (no color): see mesh_outline_depth.
