@@ -22,6 +22,14 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   before the Booleans) and test features_c::zz_khcut (ZZ_KH=<prefix>: faces, validity per face, cut/common per
   tool): bin/kh-dump.sh -> logs/kh-dump1.out. NEVER commit those two (git checkout the files before landing).
   Live per-feature data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.
+  Fillet 1: the cut tool's contact edges stray 0.087 / 0.132 mm off the body between the 64 sections (a 2.1 mm step
+  on the free-form handle): OCCT's cut is invalid, self-intersecting, two slivers; fuzzy 1e-6..1e-4 no good. Probe
+  ZZ_N=<n> (uncommitted) sets the section count: bin/kh-n.sh 128 256 -> logs/kh-n1.out. Our Handle in: 206033.639
+  mm3 2/3/2 vs live 205332.687 2/1/1 (told core 10:2x).
+  Fillet 2 (live 414 ms): main's ball path builds tools of 0.021 mm3 (the sections' 15.4 mm3: the balls are wrong,
+  refused as inside out), then frame_at fails. On cli-cusp (frame_at retries + one-side fallback + convexity split) it
+  regenerates in 10.1 s (vibex7 busy) to 18/37/21 (live 11/27/18): ~9 sliver faces < 2 mm2, from a 7 um chain edge
+  piece among others. Count faces: query_entities kind faces/edges/vertices after feature_rollback.
 - SCISSOR (asm 07:18 main 207/239). Doc vibex7 ~/agents/blend-keep/scissor.noshape. One feature: bin/sc-main2.sh <cli>
   <tab> "<F>" <out> "<env>" (prints only the last 50 lines of the block; grep ~/tmp/blend/sc2/prof-<tab>.txt for
   more). Probe CLI blend-cusp -> vibex7 ~/tmp/blend/cli-cusp (bin/sc-cusp5.sh builds + runs 3; sc-cusp6.sh first
