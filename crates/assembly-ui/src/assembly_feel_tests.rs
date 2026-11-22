@@ -292,6 +292,9 @@ fn a_box_takes_whole_instances_as_live(cx: &mut TestAppContext) {
             v.ui.box_touched.iter().map(|id| v.assembly(cx).unwrap().instances.iter().find(|i| i.id == *id).unwrap().name.clone()).collect::<Vec<_>>()
         });
         assert_eq!(outlined, vec!["Part 1 <1>".to_string()], "the touched instance outlined while the crossing box is dragged");
+        // (#FFC20E, its hover silhouette's: qa fu-asm-crossing-mid, ours was the row hover's peach.)
+        let rgb = cx.update(|cx| view.read(cx).viewport.read(cx).scene().hover_outline_rgb);
+        assert_eq!(rgb, Some([0xff, 0xc2, 0x0e]), "outlined in #FFC20E");
     });
     assert_eq!(selected(cx), vec!["Part 1 <1>".to_string()], "a crossing box over half a part takes the whole instance");
     assert!(cx.update(|cx| view.read(cx).ui.box_touched.is_empty()), "no outline once the box is released");
@@ -915,6 +918,12 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     wait_until(cx, window, &view, |v, _| v.infer.is_some());
     settle(cx, window, &view);
     assert_eq!(picked_faces(cx, &view), 1, "the re-hovered pick still filled yellow");
+    // ... with no points of its own (live 2-hover-fc, qa 496a).
+    let (px, w) = frame_pixels(cx, window, &view);
+    let (x, y) = ((corner.x * scale).round() as usize, (corner.y * scale).round() as usize);
+    let i = (y * w + x) * 4;
+    let c = [px[i + 2], px[i + 1], px[i]];
+    assert!(!c.iter().all(|v| *v >= 235), "no corner dot on the re-hovered pick: rgb {c:?}");
 }
 
 /// Live mc-infer-1122 reach-asm-corner (qa FEEL-MC-VERTEX-FROM-FACE-ASM): brought onto a corner across its face, the
@@ -976,6 +985,88 @@ fn picked_faces(cx: &mut TestAppContext, view: &Entity<AssemblyView>) -> usize {
         let picked = noshape_render::state::SELECTED | noshape_render::state::PICKED;
         (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & picked == picked && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count()
     })
+}
+
+/// Live mc-infer-1122 asm-shift (qa FEEL-MC-SHIFT-NEAREST-ASM r4): Shift held over one part's top keeps it while the
+/// pointer goes to the other part's top; released there, that top lights at once (a modifiers change, or a move with
+/// Shift up at the same point). The hover reads the keyboard's Shift: a move's hover comes before its PointerMove.
+#[gpui::test]
+fn releasing_shift_over_another_face_lights_it_at_once(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "shift-release", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx))).unwrap();
+    settle(cx, window, &view);
+    let centre = |cx: &mut TestAppContext, name: &str| {
+        let (lo, hi) = screen_box(cx, &view, name);
+        (lo + hi) * 0.5
+    };
+    let infer_on = |cx: &mut TestAppContext, name: &str| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let id = v.assembly(cx).unwrap().instances.iter().find(|i| i.name == name).unwrap().id;
+            v.infer.as_ref().is_some_and(|((p, _), _, _)| p[0] == id)
+        })
+    };
+    let shift = Modifiers { shift: true, ..Default::default() };
+    let (a, b) = (centre(cx, "Part 1 <1>"), centre(cx, "Part 2 <1>"));
+    for release_by_move in [false, true] {
+        move_to(cx, window, &view, a + DVec2::new(0.0, 400.0));
+        move_to(cx, window, &view, a);
+        wait_until(cx, window, &view, |v, _| v.infer.is_some());
+        assert!(infer_on(cx, "Part 1 <1>"), "Part 1's top under the pointer");
+        let bw = at_window(cx, &view, b);
+        // (The workspace forwards a modifiers change to the view wherever the focus is: `modifiers_changed`.)
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_modifiers_change(shift);
+        cx.update(|cx| view.update(cx, |v, cx| v.modifiers_changed(shift, cx)));
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_move(bw, None, shift);
+        settle(cx, window, &view);
+        assert!(infer_on(cx, "Part 1 <1>"), "Shift: Part 1's top kept over Part 2");
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        if release_by_move {
+            vcx.simulate_mouse_move(bw, None, Modifiers::default());
+        } else {
+            vcx.simulate_modifiers_change(Modifiers::default());
+            cx.update(|cx| view.update(cx, |v, cx| v.modifiers_changed(Modifiers::default(), cx)));
+        }
+        settle(cx, window, &view);
+        assert!(infer_on(cx, "Part 2 <1>"), "released (by a move: {release_by_move}): Part 2's top at once");
+        assert!(cx.update(|cx| !view.read(cx).infer_locked), "unlocked");
+    }
+}
+
+/// Live asm/mate-edit-look-1122 a4: an edited mate's moving part takes the selected look (no preview edges), the other
+/// part the picks' band.
+#[gpui::test]
+fn an_edited_mates_moving_part_is_amber_and_the_other_banded(cx: &mut TestAppContext) {
+    use noshape_render::state;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "mate-edit-look");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let id = v.result.mates[0].id;
+        v.edit_mate(id, w, cx);
+    }))
+    .unwrap();
+    settle(cx, window, &view);
+    let (moving, other) = cx.update(|cx| {
+        let v = view.read(cx);
+        let moving = v.mate_preview_top(cx).unwrap();
+        let other = v.assembly(cx).unwrap().instances.iter().find(|i| i.id != moving).unwrap().name.clone();
+        assert!(v.scene_options(cx).preview_tops.is_empty(), "no preview edges while editing");
+        (moving, other)
+    });
+    assert!(part_banded(cx, &view, &other), "the other part banded");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let faces = built.picks.faces_of(moving);
+        assert!(!faces.is_empty() && faces.iter().all(|f| scene.states[*f as usize] & state::SELECTED != 0), "the moving part amber");
+    });
 }
 
 /// Whether instance `name`'s faces carry a mate pick's band (`BAND | PICKED`), and the band pass is on.

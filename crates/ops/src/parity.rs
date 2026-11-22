@@ -2489,9 +2489,11 @@ impl<'a> Translator<'a> {
                                 self.import_bodies.insert(texts[n].clone(), found.clone());
                             }
                             // (Once each, as live's union: asm-infento-subs 1dc32b's Extrude 42 named the five pieces of a
-                            // split cap that read as one face of ours, five identical prisms fused, 20 s.)
+                            // split cap that read as one face of ours, five identical prisms fused, 20 s. Not a sketch
+                            // region: each query is one region of live's, and the regions found by the bodies count
+                            // them (c2-fan-blade-sweep's Extrude 1: J7O and J7K both read as our stale region 0,4,13).)
                             for e in found {
-                                if !ids.contains(&e) {
+                                if !ids.contains(&e) || e.starts_with("region:") {
                                     ids.push(e);
                                 }
                             }

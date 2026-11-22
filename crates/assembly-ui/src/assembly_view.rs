@@ -1205,7 +1205,10 @@ impl AssemblyView {
         o.xray_tops = self.placing.iter().flatten().copied().collect();
         // So does the part a mate's preview moves (live feel cov-1120 A2: a Fastened block sunk into the other, its
         // edges a thin amber box through it).
-        o.preview_tops.extend(self.mate_preview_top(cx));
+        // (An edited mate's moving part takes the selected look instead: live asm/mate-edit-look-1122.)
+        if self.mate.as_ref().is_some_and(|s| s.editing.is_none()) {
+            o.preview_tops.extend(self.mate_preview_top(cx));
+        }
         o.xray_tops.extend(o.preview_tops.iter().copied());
         o.tangent_edges = self.ui.tangent_edges;
         o.graphics = self.ui.graphics;
@@ -1367,7 +1370,7 @@ impl AssemblyView {
         let pattern_pick = self.pattern.as_ref().and_then(|p| p.active.map(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| (*a).clone())));
         let tops: Vec<InstanceId> = if pattern_pick.is_some() { Vec::new() } else { self.selected.iter().copied().filter(|t| !self.ui.entity_sel.iter().any(|(p, _)| p[0] == *t)).collect() };
         let Some(built) = &self.built else { return };
-        let mut h = Highlights { selected_tops: tops, selected_entities: self.ui.entity_sel.clone(), ..Default::default() };
+        let mut h = Highlights { selected_tops: tops, selected_entities: self.ui.entity_sel.clone(), entities_only: pattern_pick.is_some(), ..Default::default() };
         if let Some(Some(c)) = &pattern_pick {
             let mut path = c.path.clone();
             path.push(c.instance);
@@ -1477,7 +1480,7 @@ impl AssemblyView {
         if let Some(top) = self.ui.list_hover {
             h.hover_tops.push(top);
         }
-        h.hover_tops.extend(self.ui.box_touched.iter().copied());
+        h.crossing_tops.extend(self.ui.box_touched.iter().copied());
         h.selected_tops.extend(self.ui.step_hover.iter().copied());
         if let Some(m) = &self.ui.measure {
             h.selected_entities.extend(m.iter().cloned());
@@ -1551,7 +1554,7 @@ impl AssemblyView {
             }
         }
         // A part's own Part Studio mate connectors, on the part that owns them (live hover-matrix-1121 as2, qa
-        // FEEL-ASM-PS-MC-MISSING): hovered, the part outlined too; clicked, selected as its entity.
+        // FEEL-ASM-PS-MC-MISSING): hovered or selected, the part outlined in tan; clicked, selected as its entity.
         let mut seen = HashSet::new();
         for o in &self.result.occurrences {
             if o.hidden || !seen.insert(o.path.clone()) {
@@ -1563,8 +1566,9 @@ impl AssemblyView {
                 let key = (o.path.clone(), c.reference.clone());
                 let hl = hovered_overlay == Some(OverlayPick::Connector(i));
                 let look = if self.ui.entity_sel.contains(&key) { ConnectorLook::Selected } else if hl { ConnectorLook::Hovered } else { ConnectorLook::Rest };
-                if hl {
-                    h.hover_part = Some(o.path.clone());
+                if look != ConnectorLook::Rest {
+                    h.mc_owner = Some(o.path.clone());
+                    h.mc_owner_selected = look == ConnectorLook::Selected;
                 }
                 h.connectors.push((t.mul(&Frame::from_axes(c.origin, c.z, c.x)), size * 0.9, look, 1.0));
                 overlay_connectors.push(OverlayConnector::Part(key));
@@ -1657,13 +1661,21 @@ impl AssemblyView {
                     }
                     h.picked_entities.extend(entity_of(c));
                 }
+                // An existing mate edited (live asm/mate-edit-look-1122 a4): the moving part amber (the selected look,
+                // its outline through the other), the other part's silhouette banded, one triad at the mate's origin.
+                cs if s.editing.is_some() && cs.len() >= 2 => {
+                    h.triads.extend(self.result.connector_world(cs[0], &units).map(|frame| Triad { frame, size, strong: false }));
+                    let moving = self.mate_preview_top(cx);
+                    for c in cs.iter().filter(|c| !c.is_origin()) {
+                        if moving == Some(c.instance) {
+                            h.selected_tops.push(c.instance);
+                        } else {
+                            h.picked_parts.push(std::iter::once(c.instance).chain(c.path.iter().copied()).collect());
+                        }
+                    }
+                }
                 cs => chosen.extend(cs.iter().map(|c| (*c).clone())),
             }
-        }
-        if let Some(p) = &self.pattern {
-            chosen.extend(p.axis.iter().cloned());
-            chosen.extend(p.axis2.iter().cloned());
-            chosen.extend(p.axis3.iter().cloned());
         }
         if let Some(Some(src)) = &self.snap {
             chosen.push(src.clone());
@@ -1690,6 +1702,8 @@ impl AssemblyView {
             && let Some(((_, entity), occ, cands)) = &self.infer
             && let Some(o) = self.result.occurrences.get(*occ)
             && (self.infer_locked || self.hover.as_ref().is_some_and(|h| h.occ == *occ))
+            // (A pick re-hovered later: its yellow only, no outline or points: live mc-infer-1122 2-hover-fc.)
+            && (self.manip_click.is_some() || !h.picked_entities.iter().any(|(p, r)| *p == o.path && r == entity))
         {
             // Live (qa5/asm-041, assembly/31-*): a hovered face is outlined
             // (no fill), an edge or vertex highlighted; its inference points
@@ -3422,9 +3436,31 @@ impl AssemblyView {
         Some(o.transform.transform_point3(c.origin))
     }
 
+    /// The keyboard's modifiers changed: from the view's own listener, or the workspace's (gpui sends the event along the
+    /// focused element's path only, and the focus may be outside the view while the pointer is in its graphics).
+    pub fn modifiers_changed(&mut self, modifiers: Modifiers, cx: &mut Context<Self>) {
+        // A Control tap cycles the dragged connector in snap mode
+        // (Control on a Mac too: live's Control-only keys).
+        let ctrl = modifiers.control;
+        if ctrl && !self.ctrl_down {
+            self.cycle_snap_source(cx);
+        }
+        self.ctrl_down = ctrl;
+        // Shift (hold) locks mate inference to the hovered entity.
+        if modifiers.shift != self.infer_locked {
+            self.infer_locked = modifiers.shift;
+            if self.update_inference(cx) || self.pick_mode(cx).is_some() {
+                self.refresh_scene(false, cx);
+            }
+        }
+    }
+
     fn on_viewport_event(&mut self, _: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev {
             ViewportEvent::Hover(id) => {
+                // Shift as the keyboard has it now: a move's hover comes before its PointerMove (qa FEEL-MC-SHIFT-NEAREST-ASM:
+                // held, the move onto another part took it; released, the lock stayed).
+                self.infer_locked = window.modifiers().shift;
                 if self.drag.as_ref().is_some_and(|d| d.started) {
                     return;
                 }
@@ -7868,22 +7904,7 @@ impl AssemblyView {
                 this.refresh_scene(false, cx);
                 cx.notify();
             }))
-            .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| {
-                // A Control tap cycles the dragged connector in snap mode
-                // (Control on a Mac too: live's Control-only keys).
-                let ctrl = ev.modifiers.control;
-                if ctrl && !this.ctrl_down {
-                    this.cycle_snap_source(cx);
-                }
-                this.ctrl_down = ctrl;
-                // Shift (hold) locks mate inference to the hovered entity.
-                if ev.modifiers.shift != this.infer_locked {
-                    this.infer_locked = ev.modifiers.shift;
-                    if this.update_inference(cx) || this.pick_mode(cx).is_some() {
-                        this.refresh_scene(false, cx);
-                    }
-                }
-            }))
+            .on_modifiers_changed(cx.listener(|this, ev: &ModifiersChangedEvent, _, cx| this.modifiers_changed(ev.modifiers, cx)))
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_tool_search(window, cx)))
             .on_action(cx.listener(Self::on_cancel))
             .on_action(cx.listener(Self::on_accept))

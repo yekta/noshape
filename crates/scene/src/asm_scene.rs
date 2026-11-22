@@ -583,6 +583,17 @@ pub struct Highlights {
     /// Instances hovered as a whole (their row in the list): outlined in hover orange, no tint, their edges as at
     /// rest (live asm/feel-1117 c-a-rowhover; the Part Studio's hovered part).
     pub hover_tops: Vec<noshape_model::assembly::InstanceId>,
+    /// Instances a crossing box touches while dragged: outlined in #FFC20E, as a hovered part (live psui/sel-gestures-1122
+    /// asm box crossing mid, qa FEEL-ASM-CROSSING-OUTLINE).
+    pub crossing_tops: Vec<noshape_model::assembly::InstanceId>,
+    /// The part whose own mate connector is hovered or selected: banded as a mate pick's part (live hover-matrix-1121
+    /// as2-mc-*: #dab46b..#e9c177, qa FEEL-ASM-MC-LOOK).
+    pub mc_owner: Option<InstancePath>,
+    /// That connector selected: no #ffa033 instance band on its part.
+    pub mc_owner_selected: bool,
+    /// The selected entities are a dialog field's pick (a pattern's axis or direction): no instance band, the entity
+    /// alone lit (live workflows-1123 04 / 05, qa FEEL-ASM-PATTERN-PICK-LOOK).
+    pub entities_only: bool,
     pub hover_entity: Option<(InstancePath, Reference)>,
     /// A hovered vertex under a mate field's white corner mark: its disc depth-tested, the mark over its middle (live
     /// hover-matrix-1121 b5-fastened-vertex).
@@ -1129,7 +1140,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     // parts in front, its fill its own (live triad-depth-1122 t1, t2, e1: the part grey with an orange outline; hover
     // matrix batch 4).
     for (p, _) in &h.selected_entities {
-        if h.selected_tops.contains(&p[0]) {
+        if h.entities_only || h.selected_tops.contains(&p[0]) || (h.mc_owner_selected && h.mc_owner.as_ref().is_some_and(|o| o[0] == p[0])) {
             continue;
         }
         for &id in built.picks.faces_of(p[0]) {
@@ -1219,11 +1230,19 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         }
     }
     // The silhouette in #FFC20E, the hovered face's edges in the hover colour (live2 asm-feel2 (c)).
-    if let Some(p) = &h.hover_part {
+    let crossing: Vec<InstancePath> = h.crossing_tops.iter().map(|t| vec![*t]).collect();
+    for p in h.hover_part.iter().chain(&crossing) {
         for id in built.picks.faces_at(p) {
             scene.add_flag(id, state::HOVER | state::OUTLINE);
             scene.hover_outline = true;
             scene.hover_outline_rgb = Some([0xff, 0xc2, 0x0e]);
+        }
+    }
+    // A part's own mate connector hovered or selected: the part banded as a mate pick's, (242,195,108) at 85 %.
+    if let Some(p) = h.mc_owner.as_ref().filter(|_| !scene.hover_outline) {
+        for id in built.picks.faces_at(p) {
+            scene.add_flag(id, state::BAND | state::PICKED);
+            scene.body_outline = true;
         }
     }
     for d in &h.dots {
@@ -1433,6 +1452,12 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         // its ~12 px middle; hovered the same ring blue (#6087bd..#85a3d0).
         let (color, style) = if chl { (CENTER_HOVER, PointSprite::STROKE_RING | PointSprite::SOFT_CORE) } else { (edge, PointSprite::STROKE_RING) };
         op.points.push(PointSprite { position: o, color, pick_id: cid, size: 18.0, style: LineSegment::ON_TOP | style, _pad: 0 });
+        // Over the selected edges' band (below): idle it shows through a fifth, hovered it lies over the band (live
+        // as2-edge-selected_s / selhover_f, qa FEEL-ASM-RING-OVER-BAND).
+        if !h.selected_entities.is_empty() {
+            let a = if chl { 255 } else { 51 };
+            sel_pts.points.push(PointSprite { position: o, color: [color[0], color[1], color[2], a], pick_id: 0, size: 18.0, style: LineSegment::ON_TOP | style, _pad: 0 });
+        }
         scene.set_state(cid, 0);
     }
     if let Some((o, dir, size, rotation)) = h.step_arrow

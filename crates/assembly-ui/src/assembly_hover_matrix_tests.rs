@@ -279,12 +279,13 @@ cells! {
     face_hovered_other_selected: FACE, State::HoveredOtherSelected => |c| {
         assert!(!shows(&c, 0xffc685, 12.0) && !shows(&c, 0xe5a222, 12.0));
     }
-    // The part's own Mate connector 1: drawn at rest, hovered its disc #ffe79f, selected #ffe187 with the ring.
+    // The part's own Mate connector 1: drawn at rest, hovered its disc #ffe79f, selected #ffe187 with the ring; either
+    // way its part outlined in tan (#dab46b..#e9c177), not the hover's #ffc20e (qa FEEL-ASM-MC-LOOK).
     mc_hovered: MC, State::Hovered => |c| {
-        assert!(shows(&c, 0xffe79f, 14.0));
+        assert!(shows(&c, 0xffe79f, 14.0) && shows(&c, 0xe2ba70, 40.0) && !shows(&c, 0xffc20e, 40.0));
     }
     mc_selected: MC, State::Selected => |c| {
-        assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0xf5f5f6, 16)));
+        assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0xf5f5f6, 16)) && shows(&c, 0xe2ba70, 40.0));
     }
     mc_selected_hovered: MC, State::SelectedHovered => |c| {
         assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0x85a3d0, 24)));
@@ -311,6 +312,24 @@ fn edge_band_over_triad(cx: &mut TestAppContext) {
     let line: Vec<[u8; 3]> = (11..36).flat_map(|d| [at(d as f64), at(-(d as f64))]).collect();
     // The band's 78 % core lets the shaft's white tint it, as live's (246,179,54); the shaft's own white never shows.
     assert!(line.iter().all(|c| c[0] >= 190 && c[2] <= 70 && !close(*c, 0xf7f7f8, 40)), "the band along the edge, over the shaft: {line:?}");
+}
+
+/// Live as2-edge-selhover_f (qa FEEL-ASM-RING-OVER-BAND): the hovered centre ring lies over the selected edge's band,
+/// its blue where it crosses the edge (before, the band ran over it in orange).
+#[gpui::test]
+fn hovered_centre_ring_over_band(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix(cx, "hovered_centre_ring_over_band");
+    let p = m.screen(cx, EDGE);
+    m.click(cx, p);
+    m.hover(cx, p);
+    let along = (m.screen(cx, [EDGE[0] + 5.0, EDGE[1], EDGE[2]]) - p).normalize();
+    let crop = m.crop(cx, p);
+    dump("hovered_centre_ring_over_band", &crop);
+    let at = |d: f64| crop[((40.0 + along.y * d).round() as usize) * 80 + (40.0 + along.x * d).round() as usize];
+    let ring: Vec<[u8; 3]> = [-8.0, -7.0, -6.0, 6.0, 7.0, 8.0].into_iter().map(at).collect();
+    let blue = |cs: &[[u8; 3]]| cs.iter().any(|c| c[2] > c[0] + 40);
+    assert!(blue(&ring[..3]) && blue(&ring[3..]), "the blue ring over the band on both sides: {ring:?}");
 }
 
 /// Live triad-depth-1122 t1 (hover matrix batch 4: "#ffa033 once selected"): a face selected selects its instance too,

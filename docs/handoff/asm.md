@@ -5,26 +5,28 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 17:41 UTC) — RESUME HERE
-- db8b1ef0 LANDED as 440a5c94 (17:14); qa told (cells + the new P0s it already covers).
-- LOCAL, NOT QUEUED: f028bfc94 (rebased on main 17:3x) + uncommitted docs/TICKETS.md (qa's new rows marked fixed). Code:
-  FIXED-GLYPH (ground_glyph_at: frame x = the face connector's x; asm_scene GroundGlyph redrawn in px from live's
-  BaseR_hold unprojected: box 26x12 px at x 10..36 over 5 diagonal strokes, halo, from 8 px past the pointer),
-  PICKED-REHOVER (view `under` needs manip_click; asm_scene no longer drops hovered picks), VERTEX-FROM-FACE
-  (`infer_vertex_glyph`), CAP-MARKER-HIDDEN (scene builder InferenceMarks drawn twice: on_top + depth-tested; psui told
-  their twin row is covered), SELECT-OTHER-FACE (face_under by raycast_hit), FEEL-ASM-CTRL (viewport: Ctrl press skips
-  press_on_capture_pick; assembly sets ctrl_boxes also over a hovered part w/o triad handle).
-- RUNNING: sg5.sh on vibex7 (clippy app-core/scene/assembly-ui + full assembly-ui lib + scene lib) -> /root/asm-scratch/sg5.log.
-  Last partial run: all 6 new/changed tests green except Ctrl+click (fixed since, untested). NEXT: read sg5.log; if green,
-  commit TICKETS, `git diff --name-only origin/main -- crates | xargs touch -c`, land. app-core changed: run ops e2e too?
-  (land queue runs T0 when app is affected.)
-- RUNNING: lc-ab.sh on vibex8 (infento least_change A/B: A = skip off, B = HEAD; asm-open-times x2) -> /root/asm-scratch/lc-ab.log;
-  it waits behind qa's ui-parity slot. Report A vs B "assembly: evaluated in" to the lead.
-- triad-feel-1122: checked again, ours as live (ring snap window 0.4x5 = 2 deg at usual radii, arrow 0.1 mm at 13.2 /
-  15.7 px/mm); no change. dx's e52b091a still only queue/dx-open-e52b091a at 17:00 (re-measure display key after it lands).
+## State (2026-11-22 22:05 UTC) — RESUME HERE
+- QUEUED (land.sh 22:05): one commit: fan-blade P1 (parity.rs keeps repeated `region:` ids; vibex6 48/53, impeller 27
+  = baseline, sm-rocker 28/28, duct 19/19); SHIFT release (window.modifiers on hover + workspace forwards
+  ModifiersChanged to active_assembly); mate-edit look; PICKED-REHOVER; CROSSING #FFC20E; RING-OVER-BAND (a copy of the
+  centre ring in sel_pts over the band: idle alpha 51, hovered 255); MC-LOOK part (Highlights.mc_owner /
+  mc_owner_selected: the owner gets BAND|PICKED, live's tan = the mate pick band); PATTERN-PICK-LOOK
+  (Highlights.entities_only: no instance band; pattern axes no longer push triads). assembly-ui 183/183 + clippy clean.
+- RUNNING vibex7 (queued in its slot): lc-t.sh timings (A ~/tmp/asm/app 20:09, B app-b 19:45) -> /root/asm-scratch/
+  lc-t.log; A1: evaluated 63.2 s cold, 21.3 s, 13.9 s. Report A vs B to the lead.
+- OPEN MC-LOOK: selected + hovered live's centre ring blue (probably the triad's centre ring takes the hover; ours the
+  connector), and with a face selected the hovered connector keeps the face's #ffa90a (ours #ffc20e).
+- qa workflows-1123 rows (TICKETS 452-464): P0 FEEL-ASM-SELECT-SAME-CONFIG-TRIAD (wf07 s25 inserted instance selected:
+  no triad); P1 PATTERN-PREVIEW-LATE, SECOND-DIRECTION-EMPTY, INSERT-OK-KEEPS-SELECTION, INSERT-LAST-VIEWED-TOAST;
+  P2 UIS-MATE-PATTERN-ROW (assembly_behaviors.rs:1906 marks the pattern row instance:), ASM-INSERT-FILTER-BUTTONS
+  (2 in live, 3 ours). Evidence /root/qa-scratch/tickets/wf23-*.png.
+- MARKER-LOOK: skasm's stack is on main now (InferenceMark::new); add the circle-centre grey inner ring.
+- EDGE-BEFORE-VERTEX: probe first; shared chooser (tell skasm). FIXED-GLYPH-AA: software MSAA off -> lead decision.
+- qa 18:3x ≠: TYRES (~1.6 m off), wf25 s28 Gear dialog yellow, wf08 s07 quadrant fill.
+- rb.sh after a rebase: touch -c the files main changed (git diff --name-only HEAD~60 HEAD -- crates), else stale.
 - Next after: first frame from StudioDisplay rows; infento parity rerun; xdev-subs / pinslot reruns; bjr Fastened 3/4;
-  pinslot Revolute 5; tvc 41/43; keyboard BOM 15/16. Cleanup: /root/asm-scratch/solver.rs.keep, asm-base worktree,
-  vibex7 ops-bis/ops-1120/ops-bt/ops-mc, vibex8 ops-subs/ops-mc/ops-tc/cli-tc, local branch asm-rb-check.
+  pinslot Revolute 5; tvc 41/43; keyboard BOM 15/16. dx's e52b091a re-measure. Cleanup: /root/asm-scratch/solver.rs.keep,
+  asm-base worktree, vibex7 ops-bis/ops-1120/ops-bt/ops-mc, vibex8 ops-subs/ops-mc/ops-tc/cli-tc, branch asm-rb-check.
 
 ## State (2026-11-20 18:50 UTC)
 

@@ -2559,6 +2559,11 @@ impl Render for Workspace {
                 if !ev.modifiers.control {
                     this.switcher_commit(window, cx);
                 }
+                // (gpui sends it along the focus path only: the assembly's Shift lock and Control tap follow the
+                // keyboard with the focus anywhere, qa FEEL-MC-SHIFT-NEAREST-ASM.)
+                if let Some(a) = this.active_assembly() {
+                    a.update(cx, |a, cx| a.modifiers_changed(ev.modifiers, cx));
+                }
             }))
             // Alt+T: Tab manager (search and open tabs).
             .on_action(cx.listener(|this, _: &TabManager, window, cx| this.toggle_tab_manager(window, cx)))

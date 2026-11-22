@@ -3881,3 +3881,24 @@ fn isolate_shows_internal_geometry(cx: &mut TestAppContext) {
     isolate(cx);
     assert!(!ticked(cx) && knob(cx, false) == 0.6 && knob(cx, true) == 0.0, "a new Isolate: unticked, both kept");
 }
+
+/// Live workflows-1123 04 s5-9 / 05 s5 (qa FEEL-ASM-PATTERN-PICK-LOOK): an entity picked into a pattern's direction
+/// lights alone: no #ffa033 band on its part (ours outlined all of Part 1, and drew the pick's triad).
+#[gpui::test]
+fn a_pattern_direction_pick_lights_only_its_entity(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "pattern-pick-look");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.open_pattern(super::PatternDialogKind::Linear, w, cx);
+            let part = v.assembly(cx).unwrap().instances[0].id;
+            let p = v.pattern.as_mut().unwrap();
+            p.active = Some(0);
+            p.axis = Some(noshape_model::assembly::MateConnectorRef { instance: part, ..noshape_model::assembly::MateConnectorRef::origin() });
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let banded = cx.update(|cx| view.read(cx).viewport.read(cx).scene().body_outline);
+    assert!(!banded, "no instance band for a pattern field's pick");
+}
