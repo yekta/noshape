@@ -5292,19 +5292,9 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool val
     TopoDS_Wire wa0, wb0;
     if (!one_wire(a0, wa0) || !one_wire(b0, wb0))
       continue;
-    // On a copy from here (the second's edges get curves on the new face).
-    BRepBuilderAPI_Copy cp(s, false, false);
-    const TopoDS_Shape  c     = cp.Shape();
-    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
-    auto                image = [&](const TopoDS_Shape& x) {
-      TopoDS_Shape y = cp.ModifiedShape(x);
-      return x.Orientation() == y.Orientation() ? y : y.Reversed();
-    };
-    const TopoDS_Face a = TopoDS::Face(image(a0)), b = TopoDS::Face(image(b0));
-    TopoDS_Wire       wa, wb;
-    one_wire(a, wa);
-    one_wire(b, wb);
-    std::vector<TopoDS_Edge> ea = ordered(a, wa), eb = ordered(b, wb);
+    // (Decided on the part itself; copied only to build the face (the whole part's copy, 37 ms on
+    // c2-wire-clip-imported's, was made for each pair looked at).)
+    std::vector<TopoDS_Edge> ea = ordered(a0, wa0), eb = ordered(b0, wb0);
     auto shared = [&](const TopoDS_Edge& e, const std::vector<TopoDS_Edge>& other) {
       return std::any_of(other.begin(), other.end(), [&](const TopoDS_Edge& x) { return x.IsSame(e); });
     };
@@ -5340,12 +5330,12 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool val
       continue;
     // a's surface and its u range; b's edges as lines (u fixed) and circles
     // (v fixed) on it.
-    cyl_of(a, ca);
+    cyl_of(a0, ca);
     TopLoc_Location                 la;
-    const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a, la);
+    const occ::handle<Geom_Surface> ga = BRep_Tool::Surface(a0, la);
     double                          u0, u1, v0, v1;
-    BRepTools::UVBounds(a, u0, u1, v0, v1);
-    const double tol = std::max(BRep_Tool::Tolerance(a), BRep_Tool::Tolerance(b));
+    BRepTools::UVBounds(a0, u0, u1, v0, v1);
+    const double tol = std::max(BRep_Tool::Tolerance(a0), BRep_Tool::Tolerance(b0));
     auto         uv  = [&](const gp_Pnt& p) {
       double u, v;
       ElSLib::Parameters(ca, p, u, v);
@@ -5358,10 +5348,8 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool val
         u -= 2 * M_PI;
       return u >= u0 - 1e-9 && u <= u1 + 1e-9;
     };
-    TopoDS_Face TF;
-    BRep_Builder B;
-    B.MakeFace(TF, ga, la, BRep_Tool::Tolerance(a));
-    bool ok = true;
+    std::vector<occ::handle<Geom2d_Curve>> on_a;
+    bool                                   ok = true;
     for (const TopoDS_Edge& e : from_b)
     {
       BRepAdaptor_Curve cc(e);
@@ -5394,10 +5382,27 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool val
         ok = false;
       if (!ok)
         break;
-      B.UpdateEdge(e, c2, TF, tol);
+      on_a.push_back(c2);
     }
     if (!ok)
       continue;
+    // On a copy from here (the second's edges get curves on the new face).
+    BRepBuilderAPI_Copy cp(s, false, false);
+    const TopoDS_Shape  c     = cp.Shape();
+    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
+    auto                image = [&](const TopoDS_Shape& x) {
+      TopoDS_Shape y = cp.ModifiedShape(x);
+      return x.Orientation() == y.Orientation() ? y : y.Reversed();
+    };
+    const TopoDS_Face a = TopoDS::Face(image(a0)), b = TopoDS::Face(image(b0));
+    for (std::vector<TopoDS_Edge>* l : {&ea, &eb, &own_a, &from_b})
+      for (TopoDS_Edge& e : *l)
+        e = TopoDS::Edge(image(e));
+    TopoDS_Face  TF;
+    BRep_Builder B;
+    B.MakeFace(TF, ga, la, BRep_Tool::Tolerance(a));
+    for (size_t k = 0; k < from_b.size(); ++k)
+      B.UpdateEdge(from_b[k], on_a[k], TF, tol);
     // As a's TShape has them (a's orientation in the shell undone).
     const bool  flip = a.Orientation() == TopAbs_REVERSED;
     TopoDS_Wire W;
