@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 15:29 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 16:53 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -12,29 +12,29 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - ORDER: knifehandle Fillet 2 (the tip end, below) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end ->
   scissor 2d82a0 F13 (tool dumps vibex7 ~/tmp/blend/sc2/f13tool-*.brep; body dump: cli-cusp rebuilt with ZZ_BODYDUMP,
   committed WIP 429750f98 in blend-cusp).
-- FILLET 2 (11-22 15:20): main fails "could not orient a face at the edge" near the blade's tip. blend10 branch
-  blend-khtip, WIP 4ae309ba3 (never land: ZZ_* probes, ZZJ debug, kernel debug lines). Done there: a run-on over
-  free-form faces only skips closed_run_on's corner path; where a face's own-part wall doesn't cut it across, the
-  whole surface does; the direct build by the run-on tools runs only then -> Fillet 3 passes (6/12/8). Fillet 2
-  regenerates through the Boolean (valid, 30.60-30.67 mm3 off, band ok) at 13/41/30 (8 sections) or 13/35/24
-  (ZZ_NMIN 24/48; long rounds 235.6/235.8 mm2, at 96 236.45 = live's 236.448) vs live 11/27/18; ~1 in 6 runs the
-  Boolean gives 2 solids. Chain: edges 0/2 long (+-y), 4/9 the tip's short edges, run on past the tip.
-  FOUND 15:00 (bin/kh-j.sh, logs/kh-j1.out): the joint sections ARE shared (junction -> tangency_ball, contacts
-  (-216.127,+-0.162,41.843) top, g (-216.400,+-0.761,41.282) on the crease between the blade side p and the tip
-  side qf). The earlier "end sections square to their own edges" was wrong. The direct build's "two blends' section"
-  is the tip round's blend face trimmed partway up that shared arc, at (-216.298,-0.743,41.494), on the crease p/qf.
-  The Boolean ends the long rounds there too (x -216.298..15.4). So below that point the joint arc lies against qf,
-  not p: the ball tangent to p at g is the wrong ball for that part of the arc. Section count doesn't move it
-  (ZZ_NMIN 8/32/96, logs/kh-n2.out).
-  The other mode, "an invalid solid", is the run-on's last section: a 7 um sliver cap 0.0013 mm2 at x -217.43
-  (the top contact stays on the top face's extension, so off() never holds), kept flipped. Carrying that section
-  straight on 9 um until off the part removes the cap, but then the direct build says "a tool's side off a face of its
-  edge" and the Boolean splits into 3-5 solids: dropped.
-  Tried 15:25 (WIP 1c3e5d9e5, ZZ_OWNJ=1: the tip round starts on its own ball, tangent to qf): direct build "a piece with no
-  point inside", Boolean unchanged 13/41/30. NEXT: the long/tip boundary must follow where the side contact meets the
-  crease p/qf (a ball pivoting on the crease between p's and qf's normals fills it); or make share_end_curve accept
-  the tip's arc as part of the long one's, ending on the crease. Then the cap: end the run-on loft on a vertex.
-  Tools: bin/kh-j.sh (ZZJ joint balls), kh-n2.sh / kh-n3.sh (ZZ_NMIN, faces), kh-stride.sh, kh-topo.sh.
+- FILLET 2 (11-22 16:50): main fails "could not orient a face at the edge" near the blade's tip. blend10 branch
+  blend-khtip, WIP fe15f494e (never land: ZZ_* probes, ZZJ/ZZC/ZZT/ZZB debug, kernel ZZ prints, ZZ face print in
+  features_c.rs). Live (vibex8 live.jsonl line 11): tip rounds JSK/JSO 0.595 mm2 x -217.435..-216.127; the joint edge
+  JSF/JSZ is the PARTIAL arc (0.75 mm) from the top contact to the crease p/qf at x -216.29, where the long rounds
+  (JSC/JSG, x -216.291..15.4) end too; each tip round ends on a 0.214 mm edge (KSVB/KSdB, z 42.30, x ~-217.36) where
+  it meets the top face JSi: no cap. Done in fe15f494e:
+  (1) blend_direct share_end_curve also accepts one face's end arc lying along part of the other's from a shared end
+  (the tip run-on piece is pre-trimmed at the crease, the long tool face whole): "two blends' section" is gone.
+  (2) The cap: no ball fits past x -217.43 (ZZB: the fit flips ~1.4 r between two places, ZZ_BALLTOL doesn't help).
+  ZZ_CARRY=m0.04 (the last run-on section moved 40 um) removed the cap only when moved along the noisy last step,
+  which lifts it (z 0.095); along the section's plane normal (fe15f494e) the cap stays (0.0009 mm2, flipped). Adding a
+  section instead (a0.0x), or 80 um -> "a tool's side off a face of its edge". ZZ_TIPV (end on a vertex): wrong.
+  (3) Left after the cap: the -y crease edge p/qf, kept below (-216.095,-0.763,41.135) (piece of an input edge,
+  EmptyCopied + Range in split_face ~line 681), fails BRepCheck InvalidCurveOnSurface + SameParameter flag; the +y one
+  is fine; the input is valid. FixSameParameter and ShapeFix_Shape don't fix it. My own pcurve sampling (zz_dev)
+  reads 0.1-0.2 mm off on the INPUT's crease edges too while BRepCheck passes them: probably p and qf share one
+  surface after Split 1 (pick of the wrong pcurve); don't trust zz_dev there.
+  NEXT: (a) which face context fails for that edge (print_check: add the context face's area), compare its pcurves
+  with the input edge's; (b) the cap: end the run-on tool past where its round crosses the top face JSi (lift / carry
+  the last section until its arc is above JSi, or cut the tool by JSi's surface), as live's 0.214 mm end edge. The
+  Boolean fallback stays 13/35/24 at ZZ_NMIN 24 (13/41/30 at 8), the extra 2 faces / 8 edges / 6 vertices exactly
+  the two caps; ~1 in 6 runs 2 solids (OCCT Boolean run in parallel, boolean.cpp bop_parallel).
+  Tools: bin/kh-carry.sh (variants line at its end; logs kh-carry..6), kh-part.sh, kh-tipv.sh, kh-j.sh, kh-topo.sh.
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
 - KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
