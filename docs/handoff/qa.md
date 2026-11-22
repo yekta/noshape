@@ -43,23 +43,14 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   hat15 / dock UI-script rounds + cold / reopen + rotate / pan / zoom, block baseline) -> nightly/lat-<mmdd>.txt; (3) the
   QUIT-ABORT-DOCK guard (qa-asm-a x5) -> nightly/quit-<mmdd>.txt. Failures and a crash append to /tmp/lead/qa-alerts. Log:
   suites/window-0200-<mmdd>.log. Skip a night: touch nightly/skip-<mmdd>. Runs alone (no slot: the window must be quiet).
-  Restarted 11-17 07:31: the lead's $HOME fix of the CLI pair (11-17's row INVALID: `~` after a comma isn't expanded, 1 of
-  84 timed) and a guard: < 90 % of the docs timed or < 6 opens -> alert, no SCORE row. Earlier, 03:33: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
-  `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
 - 11-22 06:57 suites/1122-0657-17157c2f (green 17157c2f, all stages vibex8 via slot, unit qa-suites): ui 2099/2230 (LOADED, peak 27); models stage running 11:5x. Unit qa-uip-rerun (bin/uip-rerun.sh <suite> tmp/uip-rerun.txt) reruns the 50 non-FS new failures + fs-open on vibex8 :481 once <suite>/status exists -> <suite>/uip-rerun.log. THEN: re-score uip with `run.py --compare-only --out <suite>/uip` (FS version now normalized: 77 FS scenarios match), suites-diff vs last run, file the still-failing ones as P0s (candidates: psui plane/sketch-entity menus 0102516b3, routing Points 88f31a8d2; asm face menu; studios drawing tab menu row 7; skasm gusset/bend titles + 4 sketch; 9 not-run), SCORE 11-22 row, lead report. Skip live-re-recorded: asm-root-menu-unfix-all(-mated), drw-custom-table-*, drw-export-formats, drw-note-format-lists, drw-table-cell-menu.
 - FS VERSION (lead 11-22 11:4x, pushed 11:5x): ui-parity run.py fs_version_line(): "FeatureScript NNNN;" + std imports' version compared as <v>, except fs-open, where live reads LIVE_FS_VERSION (3132) and ours must match (a difference = studios ticket); bump LIVE_FS_VERSION when live's std moves. README "Comparison".
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
   suites of the newest green, each through `~/bin/slot`: ui + models on **vibex7**, assemblies / exchange (suites-rest) on
   **vibex6** beside them since 11-17 04:51 (vibex7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
-  qa-suites-redo-0227 (QA_REDO), done 07:07: models 85/126 1233/1585 (5 better, none worse), assemblies 5/24 1614/1709
-  664/755 (scissor-lift BOM 59 -> 57: P0 to asm), exchange 58/74. The models report.json is written beside the corpus
-  snapshot (~/tmp/qa/report.json): qa-suites.sh copies it from there since 07:15 (lost since 11-16's snapshot change).
   Results suites/<mmdd-hhmm-sha>/; host overrides QA_UI_HOST / QA_SPEED_HOST / QA_SUITES_HOST.
-  1117-0627-827a23a6 compared 11:20 (report scp'd by hand: the run began before the 07:15 path fix; next runs fetch it).
 - **qa-cut-0415 / qa-cut-1615** timers: bin/cut-verdict.sh (cut-check.sh: newest green's compat vs the baseline) -> one GO /
   NO-GO line in /tmp/lead/qa-alerts and compat/cut-<mmdd-hhmm>.txt. Add the verdict as a "Release blockers" section in TICKETS.md.
-  Fixed 11-17 04:25: cut-check waits for the loop's run under vibe5.lock (two runs at once gave "Text file busy" and a void GO);
-  cut-verdict says NO VERDICT unless the green's compat file has COMPAT-DONE, 4 USERDOCS lines and no Traceback. Ticket documents
   are listed, not blocking, in the script, but read them: a ticket doc's wrong geometry is a HOLD (11-17 f197).
 - **qa-index-daily** (lead 11-20): bin/index-daily.sh "<since>": every 30 min, the first full suite run of the day (suites/<run>/index.json +
   a models score) -> one "Parity index" row in docs/parity/SCORE.md (bin/index-row.py; header order = index.json's areas), pushed, and a
@@ -69,8 +60,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   ~/qa/rel/noshape-green (green 35baa32f since 11-17 03:34; refresh by copying a newer app to that path), seeds from ~/qa/fzseed.next,
   results ~/qa/fz*-result.txt. fzrun.sh kills the app's own `--reopen` restarts after each run. Pause: touch
   ~/tmp/qa-fz-pause-61; it also idles 01:50-04:05 every night (the window runs alone). App refreshed to green f7c318a5 11-17 10:08.
-  w7-quiet.sh end (local bin/ copy, scp'd each night) now recreates the transient unit with systemd-run when `start` fails:
-  the stopped unit was gone, so the fuzz was down 11-17 02:01-10:08.
 
 ## Release checks (per release; lead cuts 05:00 / 17:00)
 0r. DONE 09:32: corpus c2-loft-paths-guides + knifehandle re-saved on main 4e852218d (old copies vibex7 ~/qa/corpus-old-1122/); core: knifehandle 12 s = the now-reachable chain (Fillet 1 fails slowly, its speed queue). tablet-stand Sketch 3 alert stays open until skasm's stable naming. Recheck psui 6d72a4e3 MEASURE-PANEL-POSITION (drag by title, kept across close/reopen/restart, default bottom-right) by hand when green has it.
