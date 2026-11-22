@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 20:25 UTC.
+Updated 2026-11-22 21:11 UTC.
 
 ## In flight
 
@@ -35,46 +35,32 @@ crates/drawing land (drawing-ui alone: not needed).
 - COMMITTED 18717c50d: FS squiggle tooltip under the line in live's look + completion kinds #666 (ui_tests 10/10);
   Restore to Main… ignores Enter (gpui-component `Dialog::enter_confirms`; history feel_tests 14/14); TICKETS rows
   P1 DRW-DIM-HIDDEN-VERTEX-SNAP, P2 UIP-ANNOTATION-STALE-POS. Clippy clean.
-- UNCOMMITTED: the title-block fix. CAUSE (probe data): DWG NO.'s title cell rect is y 14.605-20.32 mm but the row's
-  top FormatLine is at 22.23: (240, 20) is 7.9 px under the line, inside Select's 8 px line reach, and only a
-  TitleBlock best yielded to a cell. FIX in build.rs `hit_reach`: inside a title cell a FormatLine best yields when its
-  raw distance (d - 0.25 tol bias) exceeds the distance to the cell's nearest edge (a line on the cell's own edge
-  keeps its reach). Tests in drawing-ui feel.rs: `the_dwg_no_title_cell_is_lit_8_px_under_its_line_not_the_line`
-  (±2 px sweep; FAILED before the fix at +0.75..+2 px), `a_double_click_in_a_title_cell_by_its_line_edits_the_field`,
-  `..._right_after_opening_edits_the_field`.
-- RUNNING 20:24: x218.sh (task bbk8w6qny): vibex7 drawing_ui_tests:: + noshape-drawing drawing:: + clippy drawing /
-  drawing-ui + FULL ops e2e (crates/drawing changed) + app build; then vibex8 x210r.sh (insert-row, cell-menu,
-  title-block-dblclick). Green → commit "studios: drawing: a title cell wins over the row's line past its edge (live
-  drw-title-block-dblclick); tests" and land.
-- App-only gap found by our drag scenario run 2 (x216): Esc mid view drag does NOT put the view back in the app (Front
-  81,81 → 91.1,71 kept after release); the feel test `a_dragged_view_moves_alone_until_release_and_esc_puts_it_back`
-  calls `cancel()` directly, so the key path is untested. Esc is app-core actions.rs `KeyBinding("escape", Cancel,
-  doc)` → drawing_view.rs on_action Cancel → cancel() (sets view_drag_cancelled). Suspect the key never reaches the
-  Drawing context during the held drag in the app (or another capture_key_down eats it: note selected before, count 2).
-  Next: bind the keymap in a test or instrument the app. Also ours moved an unselected note on press-drag (live
-  didn't, one run only: leave).
-  Drag run 2 otherwise: Right dim placed (208.4, 102.7); 1.575 drag 2 snapped to y 102.5 (the Right dim's height).
-- Then land all: commit, fetch, rebase, `git diff --stat origin/main...HEAD`, drop the "[ ]" VS-NAME-FOCUS-BOX
-  duplicate in TICKETS (fixed c2e9546c3), land.sh. Full ops e2e already ran for 3806ff953.
+- COMMITTED 6e764f4f6 (not queued): documents page (live docs-page-gaps-1122): app-core OsMenu `documents_list()` +
+  `arrows_leave(f)`, app-core `with_user_tip`; start page menus 12 px #666 / 167 wide / no shadow, ↓/↑ close the doc
+  menu and move the selection, "Click to open <name>." tips, folder tile hover (white, shadow, underline, Trash pill),
+  `ThumbPopover` 302x183. start-ui `start_` tests 32/32 + clippy clean (x222).
+- UNCOMMITTED, verified: title-block fix in crates/drawing build.rs `hit_reach` + 3 feel tests (sweep inside the cell
+  only); drawing-ui tests, clippy, FULL ops e2e green (x218), app scenarios title-block-dblclick 4/4, insert-row 12/12,
+  cell-menu 31/31 (x221, fresh app; x218's 2/4 was a stale binary).
+- UNCOMMITTED, failing (same feel.rs): (a) drawing_tools.rs `annotation_drag_overlay` / `dimension_marks(skip)` /
+  `plus_marks` (live drw-drag-feel T: red ✕ on the dragged text, others' + marks, inference line; cleared on release)
+  + test `a_dragged_dimension_text_shows_its_x_…`: failed "held on the other's height" because SETUP's dimension comes
+  first in the sheet; now drags dims[1] (the fixture's). (b) `a_dragged_view_moves_alone_…_esc_puts_it_back` now sends
+  a real "escape" (binding Cancel in "Drawing && !Input", as line ~2009's test) and FAILS: the release commits the move.
+  This reproduces the app gap. Diagnostic asserts added (drag discriminant, view_drag_cancelled, focus before/after the
+  key). RUNNING 21:15: task breljp1kj/b3udizn18 (x222r.sh: drawing_ui_tests::feel:: + start_ + clippy); read with grep.
+  cancel() (drawing_tools.rs ~114) sets view_drag_cancelled only when drag is MoveViews; on_key (~2181) doesn't touch
+  escape; the only Cancel handler is drawing_view.rs ~2628.
+- Then: fix the Esc path, commit drawing (title fix + drag marks + Esc), fetch, rebase, diff --stat, drop the "[ ]"
+  VS-NAME-FOCUS-BOX duplicate in TICKETS, land.sh (3806ff953, c1b5a6a07, 991e634b3, 18717c50d, 6e764f4f6, drawing).
+  Read test logs only with grep / tail -40 (lead 21:15: context).
+- drw-drag-feel-1122 gaps left (ours vs live, x216 shots ~/agents/studios-keep/shots-drw-drag-feel on vibex8):
+  R: a radial's text dragged inside the hole: live draws a leader from outside, arrow on the circle pointing in; ours
+  an arrow from the text outward (crates/drawing radial layout). V: during a view drag live draws the view's dimension
+  orange too; ours black. L (leader end re-attach #CC925C over an edge) and N (note text hover no tan box) not checked.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.
-- QUEUE after the land (pages under /root/onshape-research/live/studios/):
-  1. drw-drag-feel-1122: compare x216's drag shots (~/agents/studios-keep/shots-drw-drag-feel on vibex8) with live's
-     pngs (dim-text-drag, radial-and-view-drag, leader-anchor-drag, note-drag). Scratch kit fixed: Right dim clicked at
-     [20,10,*] (off the hidden vertex), radial locator "0.197" (our state text; drawn "R.197"), later drags pressed at
-     sheet points (1.575 after drag 1 at (95.8, 98.6), after drag 2 ~(141, 103.3); radial after drag 1 (82.5, 161.8)).
-     Seen in run 1: during a text drag inside the extension lines ours flips arrows outside; check live's rules.
-     Gaps to check: red + / mark on other dimensions and red ✕ at the dragged text, pink dotted guide snap (3 px),
-     radial leader from outside when the text is inside the hole, leader end re-attach (#CC925C), view drag colours.
-  2. docs-page-gaps-1122 (not started): "Click to open <name>." tooltips on document names and folder tiles (above,
-     #D0DBE5 bold small, fade from ~47 ms), folder tile hover (white + soft shadow, underlined name, Share/Trash pill),
-     thumbnail popover 302 x 183 above the icon with an arrow, document menu look (167 wide, 22 px rows, 12 px #666,
-     hover #DEF1FB / #333), ↓ closes the menu and moves the list selection. start_window.rs `doc_menu` ~2952.
-  3. DRW-DIM-HIDDEN-VERTEX-SNAP fix (check how HLR marks the edge-on hole circle before filtering snaps).
-  FS and history pages: everything else on them already matches (find prefill, bracket box, AC band/typed colour,
-  change-row tooltip #D0DBE5 + fade, change-row menu without Restore). Not done: AC list mouse-hover / wheel checks.
-- Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. FS snippet
-  rounded corners, Esc.
+- QUEUE: DRW-DIM-HIDDEN-VERTEX-SNAP fix; the drag gaps above; FS / VS / history pages: everything else matches.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
