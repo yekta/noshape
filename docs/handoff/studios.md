@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 22:31 UTC.
+Updated 2026-11-22 22:26 UTC.
 
 ## In flight
 
