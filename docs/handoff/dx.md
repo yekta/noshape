@@ -13,48 +13,26 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 13:5x 11-22 (read first): b14 GREEN (drawing 268, ops e2e 293), LAND QUEUED; next: apply hover-B.patch
-- Commits 2495c10ce "dx: agent API: ..." + dcf8e18c8 "dx: drawings: detail labels and multi-part section hatches as
-  live", rebased by hand on main 13:2x (land.sh conflict: ops/drawing.rs format_edits `offset` + my `sketch`; e2e.rs
-  paste test + my dialog test; both sides kept). RUNNING b14 (task b5cxn5jim, /root/dx-scratch/b14.sh -> b14.out,
-  AGENT_API.md.b14): check, scene, FULL drawing lib, coverage regen, FULL ops e2e. Green -> if AGENT_API.md.b14
-  differs from docs/AGENT_API.md, cp + commit "dx: agent API docs regenerated"; commit this handoff; land
-  (NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh), report <=5 lines, message asm (roster.md id): re-measure
-  the infento display key.
-- Hover edits (B below) set aside in /root/dx-scratch/hover-B.patch (git apply after the land queues).
-## Earlier 12:55 notes (B = hover cells, still current)
+## STATE 14:5x 11-22 (read first)
+- LANDED e52b091a as f09411c5 14:40 (agent API batch, detail label / multi-part hatch rules). asm re-measures the
+  infento display key + cached/cold opens on vibex8 (told; waits for their numbers).
 - !! /root/dx-scratch/env.sh does `cd /root/projects/noshape-wt/dx` : scripts must `. env.sh; cd
   /root/projects/noshape-wt/dx-open`. ssh remote ~ paths in quotes.
-- COMMITTED fe448d324 "dx: agent API: ..." (64 files; b12 green: ops e2e 288/288, coverage regen = docs/AGENT_API.md,
-  scene drawing_tools, drawing label tests). Not landed yet.
-- UNCOMMITTED A, crates/drawing (build.rs, views.rs, tests.rs), live dx hatch-1122 (behaviours.md "dx hatch order +
-  detail label gap"): detail label top 0.1 r + h/2 under the circle (drawn profile keeps 5.3); section through
-  several parts: SourceModel.part_order (body -> (studio tab, place among the studio's parts)),
-  ViewGeometry.section_part_bodies, build::section_part_hatches (last part in Part Studio order turned, alternating
-  back; a part's later copies turned at 0.7x, first copy not), per part spacing = auto_hatch_spacing (diag/9, /13
-  for a cut in pieces as wf23). 5 regions (A0: 0,145,100,10,90) not modelled. Tests:
-  section_hatch_angles_follow_the_part_studio_order, a_section_through_several_parts_hatches_each_its_own_way,
-  a_detail_label_hangs_under_its_whole_circle.
-- b13 GREEN 13:0x (A only): check clean, drawing lib 268/268, ops e2e 288/288. Was: b13.sh check
-  drawing+noshape+ops, FULL drawing lib, FULL ops e2e. Covers A only (B was edited after its sync).
-- UNCOMMITTED B, crates/drawing-ui, annotation cells of live's drawing hover matrix
-  (/root/onshape-research/live/studios/drw-hover-1122/index.md; audit with file:line in
-  /root/dx-scratch/hover-audit-1122.md, items 1-11). DONE, untested: 1 selected dimension tan under the pointer
-  (drawing_view.rs `tan_dim`), 2 hovered/selected annotation lines keep their dashes (push_annotation_look uses
-  sheet::dash), 5+7 a selected note = orange box, black text, no change on hover (`boxed_kind` in dims), 6 hovered
-  note shows its grips in tan (drawing_extra.rs note_grips_of + `sets` loop in note_grip_overlay), 9 a table with a
-  clicked cell shows only the blue cell (lit_tables + table_grip_overlay skip cell_sel's table).
-  OPEN: 3+4 centerline lights with the Dimension tool (orange, 8 px) and Note tool (hourglass #ffac7f, 8 px)
-  (pick.rs:140-156, line_pick); 8 text hover box 0.5h padding + 7 px exclusive reach (font.rs text_box,
-  pick.rs:38 SELECT_TEXT_REACH_PX, build.rs:320, drawing_launcher.rs:52) -> dim 16 px below centre, note 12 below /
-  14 right; 10 table hover grips (3: black dot top-right, tan square bottom edge, tan dot bottom-right; rule unclear);
-  11 SELECT_LINE_REACH_PX 7 -> 8 affects views/edges too = tell studios, don't change alone.
-  Each needs a drawing-ui test (crates/drawing-ui/src/drawing_ui_tests; GPUI keys "secondary-").
-- NEXT: commit A now (green). Then b14 = check -p noshape-drawing-ui --tests + drawing-ui tests (hover/note/table/centerline
-  filters) + ops e2e if drawing changed again. Green -> commit A "dx: drawings: detail labels and multi-part
-  section hatches as live", B "dx: drawings: annotation hover and selection looks as live (notes, tables,
-  dimensions, centerlines)", read diff --stat, land (NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh), report
-  <=5 lines to the lead, message asm (roster.md id) to re-measure the infento display key. Then items 3,4,8,10.
+- UNCOMMITTED, annotation cells of live's drw-hover-1122 matrix (audit /root/dx-scratch/hover-audit-1122.md):
+  studios' main already did items 1 (selected dim tan under the pointer), 5/7 (selected note boxed), 6 (hovered
+  note grips; drwm-3 says orange, kept), 9 (cell-selected table) from drwm-2/3/4b. Mine, on the tree:
+  2 lit centerline stays dashed (drawing_view tinted_lines -> (index, line), tinted_pieces via sheet::dash);
+  3 smart Dimension lights a centerline within 8 px (pick.rs TOOL_CENTERLINE_REACH_PX 9 exclusive, is_centerline,
+  hovered_centerline in line_pick, Dimension only) and dimensions it;
+  8 (box only) hover/selected text box = glyphs + 0.4 h above/below, 0.5 h at the ends (drawing_view hover_box from
+  text_box); reach NOT changed (studios' D1 tests measure from text_box; live 1122 fits <8 px from the bigger box);
+  10 a hovered unselected table shows the selected grips (drawing_extra table_grip_overlay).
+  Tests (feel.rs): a_lit_centerline_stays_dashed, the_dimension_tool_lights_a_centerline_from_8_px,
+  the_hover_box_pads_the_glyphs_as_live, a_hovered_table_shows_its_grips.
+  b17 GREEN (check clean, drawing-ui lib 168/168, scene drawing_tools 11/11): committed + land.sh (see --status).
+- Open, to the lead / studios: 4 Note tool on a centerline (hourglass #ffac7f at 8 px = a leader attached to a
+  centerline: needs a model reference, not there); 8 reach from the live-sized box (<8 px) vs studios' D1 tests;
+  11 no-tool centerline reach live 7 px (ours lit at 6: SELECT_LINE_REACH_PX 7 exclusive is shared with views/edges).
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

@@ -65,6 +65,8 @@ pub const SELECT_LINE_REACH_PX: f64 = 8.0;
 /// drw-hover-1122).
 pub const SELECT_FORMAT_REACH_PX: f64 = 9.0;
 pub const SELECT_TEXT_REACH_PX: f64 = 9.0;
+/// The Dimension tool lights a centerline 8 px off it, not 9 (live drw-hover-1122).
+pub const TOOL_CENTERLINE_REACH_PX: f64 = 9.0;
 /// Select's hover reach (screen px) from a note's leader: it lights the note at 8 px, not at 10 (live2 batch 1, 11-18
 /// 16:15; 11-13 had 10 / 12).
 pub const SELECT_LEADER_REACH_PX: f64 = 9.0;
@@ -148,7 +150,17 @@ impl<'a> SheetPick<'a> {
             Tool::Centermark => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &is_circle)).or(hover.filter(|h| self.built.and_then(|b| b.picks.get(*h as usize)).is_some_and(|t| !matches!(t, PickTarget::Edge { .. })))),
             Tool::EdgeCenterline { .. } => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))).or(hover),
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
-            Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
+            // The smart dimension also takes a centerline, lit within 8 px (live drw-hover-1122), the nearer of the two.
+            Tool::Dimension { kind: DimTool::Linear, .. } => {
+                let near = |reach: f64, accept: &dyn Fn(&PickTarget) -> bool| self.built.and_then(|b| b.nearest_where(self.cursor, accept)).filter(|(_, d)| *d < reach);
+                let edge = near(tol, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. } | PickTarget::SketchEntity(_)));
+                let line = near(self.tol_mm(TOOL_CENTERLINE_REACH_PX), &|t: &PickTarget| self.is_centerline(t));
+                match (edge, line) {
+                    (Some(e), Some(l)) => Some(if l.1 < e.1 { l.0 } else { e.0 }),
+                    (e, l) => e.or(l).map(|(k, _)| k).or(hover),
+                }
+            }
+            Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
             Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note | Tool::Datum { anchor: None } => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
             // both it and a geometric tolerance also take a dimension (live
@@ -169,6 +181,7 @@ impl<'a> SheetPick<'a> {
             // The smart dimension also dimensions drawing sketch geometry (SK7).
             (Tool::Dimension { kind: DimTool::Linear, .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. } | PickTarget::SketchEntity(_)) => Some(h),
+                Some(t) if self.is_centerline(t) => Some(h),
                 _ => None,
             },
             // Radial and diameter also take a centermark (help D13).
@@ -510,6 +523,9 @@ impl<'a> SheetPick<'a> {
         if let Some(p) = self.thread_line_near(self.hover) {
             return Some(p);
         }
+        if let Some(p) = self.hovered_centerline() {
+            return Some(p);
+        }
         let Some((view, me)) = self.hovered_edge() else { return self.silhouette_line_pick() };
         // A circle seen edge-on: the segment it projects to, end to end across its diameter (live2 errors-1119-asmdrw:
         // Dimension on a pin's edge-on circle gives a linear .394, not a diameter).
@@ -706,6 +722,25 @@ impl<'a> SheetPick<'a> {
 
     pub fn pick_sheet(&self, p: &PickedPoint) -> Option<[f64; 2]> {
         Some(self.placement(p.view)?.to_sheet(p.p))
+    }
+
+    /// A 2 point or edge to edge centerline (not a circle's).
+    fn is_centerline(&self, t: &PickTarget) -> bool {
+        let PickTarget::Annotation(id) = t else { return false };
+        self.current_sheet().annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Centerline { .. }))
+    }
+
+    /// The hovered centerline as a line between its ends (the Dimension tool's hover).
+    fn hovered_centerline(&self) -> Option<Pick> {
+        if !matches!(self.tool, Tool::Dimension { .. }) {
+            return None;
+        }
+        let built = self.built?;
+        let PickTarget::Annotation(id) = built.picks.get(self.hover? as usize)? else { return None };
+        let a = built.resolved.annotations.iter().find(|a| a.id == *id)?;
+        let AnnotationKind::Centerline { view, a: pa, b: pb } = &a.kind else { return None };
+        let r = |slot: u8| a.refs.iter().find(|x| x.slot == slot).map(|x| x.point.clone());
+        Some(Pick::Line { a: PickedPoint { view: *view, p: *pa, r: r(0) }, b: PickedPoint { view: *view, p: *pb, r: r(1) } })
     }
 
     /// The axis under the cursor: a centerline annotation, an automatic

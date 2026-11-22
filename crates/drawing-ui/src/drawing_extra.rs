@@ -1595,7 +1595,9 @@ impl DrawingEditor {
         let k = 1.0 / self.zoom.max(1e-6);
         const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
         let hovered = self.hovered_table();
-        for s in &self.selection {
+        // A hovered table shows them too (live drw-hover-1122 h-tablecell).
+        let extra = hovered.filter(|h| !self.selection.contains(&Sel::Table(*h))).map(Sel::Table);
+        for s in self.selection.iter().chain(extra.iter()) {
             let Sel::Table(id) = s else { continue };
             // A selected cell takes them off until the table is hovered (live drwm-4b b3, b4).
             if self.cell_sel.is_some_and(|c| c.table == *id) && hovered != Some(*id) {

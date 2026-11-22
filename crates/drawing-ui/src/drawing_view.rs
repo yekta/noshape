@@ -2127,7 +2127,7 @@ impl DrawingEditor {
     /// `#cc925c` (live dsel3), its text black.
     /// An annotation's lines drawn in its hover / selection colour. A hovered balloon tints only itself: its leaders
     /// stay black with their arrowheads (live workflow 23 step 24).
-    pub(crate) fn tinted_lines<'a>(&self, built: &'a BuiltSheet, picks: &[u32], colour: u32) -> Vec<&'a noshape_model::drawing::sheet::Polyline2> {
+    pub(crate) fn tinted_lines<'a>(&self, built: &'a BuiltSheet, picks: &[u32], colour: u32) -> Vec<(usize, &'a noshape_model::drawing::sheet::Polyline2)> {
         let g = &built.geometry;
         let balloon = picks.first().and_then(|p| match self.sel_of_pick(*p) {
             Some(Sel::Annotation(id)) => built.resolved.annotations.iter().find(|a| a.id == id && matches!(a.kind, AnnotationKind::Balloon { .. })),
@@ -2137,11 +2137,18 @@ impl DrawingEditor {
             Some(a) if colour == DRAWING_HOVER => g.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, _, p)| p.points.as_slice()).collect(),
             _ => Vec::new(),
         };
-        g.lines.iter().filter(|l| picks.contains(&l.pick) && !leaders.contains(&l.points.as_slice())).collect()
+        g.lines.iter().enumerate().filter(|(_, l)| picks.contains(&l.pick) && !leaders.contains(&l.points.as_slice())).collect()
+    }
+
+    /// The tinted lines as drawn: a centerline stays dashed (live drw-hover-1122).
+    pub(crate) fn tinted_pieces(&self, built: &BuiltSheet, picks: &[u32], colour: u32) -> Vec<(noshape_model::drawing::sheet::LineStyle, Vec<[f64; 2]>)> {
+        let g = &built.geometry;
+        self.tinted_lines(built, picks, colour).into_iter().flat_map(|(li, l)| {
+            noshape_model::drawing::sheet::dash(&l.points, l.closed, &g.line_pen(li).1, g.line_dash_phase(li)).into_iter().map(move |p| (l.style, p))
+        }).collect()
     }
 
     fn push_annotation_look(&self, scene: &mut Scene, built: &BuiltSheet, picks: &[u32], colour: u32) {
-        use noshape_model::drawing::font;
         use noshape_model::drawing::sheet::GripKind;
         use noshape_render::{LineData, LineSegment, MeshData, PointData, PointSprite};
         let ink = [(colour >> 16) as u8, (colour >> 8) as u8, colour as u8, 255];
@@ -2149,9 +2156,9 @@ impl DrawingEditor {
         const ORIGIN: [u8; 4] = [0x90, 0xce, 0xf1, 255];
         let g = &built.geometry;
         let mut lines = LineData::default();
-        for l in self.tinted_lines(built, picks, colour) {
-            let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
-            for w in l.points.windows(2) {
+        for (style, piece) in self.tinted_pieces(built, picks, colour) {
+            let width = drawing_scene::px_width(style, self.zoom).max(LIT_LINE_PX);
+            for w in piece.windows(2) {
                 lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: ink, pick_id: 0, width, style: LineSegment::ON_TOP });
             }
         }
@@ -2168,7 +2175,7 @@ impl DrawingEditor {
             m.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
         };
         for t in g.texts.iter().filter(|t| picks.contains(&t.pick)) {
-            quad(&mut boxes, font::text_box(t), -0.5);
+            quad(&mut boxes, hover_box(t), -0.5);
         }
         let mut points = PointData::default();
         let r = 6.0 / self.zoom.max(1e-6);
@@ -2757,4 +2764,18 @@ mod view_frame_tests {
         assert!((px(c[1] - a[1]) - 76.0).abs() < 1.0, "Front: {} px tall", px(c[1] - a[1]));
         assert!(((a[1] + c[1]) / 2.0 - 5.0).abs() < 1e-9, "Front: its geometry centred");
     }
+}
+
+/// The box a hovered or selected annotation's text is drawn on: the glyphs with 0.4 h above and below and 0.5 h at each
+/// end (live drw-hover-1122: a 24 px box on 13 px "1.575", 59 x 24 px on 45 x 12 px "NOTE"); the pick box
+/// (font::text_box) pads them 0.15 h with 0.3 h more below.
+pub(crate) fn hover_box(t: &noshape_model::drawing::sheet::Text2) -> [[f64; 2]; 4] {
+    let b = noshape_model::drawing::font::text_box(t);
+    let unit = |p: [f64; 2], q: [f64; 2]| {
+        let l = (q[0] - p[0]).hypot(q[1] - p[1]).max(1e-12);
+        [(q[0] - p[0]) / l, (q[1] - p[1]) / l]
+    };
+    let (u, v, h) = (unit(b[0], b[1]), unit(b[0], b[3]), t.height);
+    let at = |p: [f64; 2], du: f64, dv: f64| [p[0] + (u[0] * du + v[0] * dv) * h, p[1] + (u[1] * du + v[1] * dv) * h];
+    [at(b[0], -0.35, 0.05), at(b[1], 0.35, 0.05), at(b[2], 0.35, 0.25), at(b[3], -0.35, 0.25)]
 }

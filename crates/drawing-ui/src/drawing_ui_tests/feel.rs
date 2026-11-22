@@ -1152,6 +1152,48 @@ fn a_click_on_a_bom_cell_opens_the_cell_panel_and_a_double_click_adds_nothing(cx
     assert_eq!(cx.update(|cx| editor.read(cx).cell_sel.map(|c| (c.table, c.a))), Some((id, (1, 0))), "an empty click keeps the cell");
 }
 
+/// Live drw-hover-1122 h-tablecell: a hovered table that isn't selected shows the selected one's grips (its anchor
+/// corner black, the other corners tan, the resize squares); the pointer away, none.
+#[gpui::test]
+fn a_hovered_table_shows_its_grips(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-table-hover-grips");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.update(cx, |e, cx| {
+        let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+        let view = e.current_sheet().views[0].id;
+        let kind = noshape_model::drawing::TableKind::Bom { view, structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: true, source: None };
+        e.edit_sheet("BOM table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [60.0, 200.0])));
+        e.selection.clear();
+        id
+    }));
+    draw(cx, window);
+    let cell = cx.update(|cx| {
+        let l = editor.read(cx).built.as_ref().expect("built").table_layout(id).expect("the BOM laid out");
+        let first = l.title as usize + 1;
+        [(l.xs[0] + l.xs[1]) / 2.0, (l.ys[first] + l.ys[first + 1]) / 2.0]
+    });
+    let grips = |cx: &mut TestAppContext| cx.update(|cx| {
+        let mut o = crate::drawing_scene::Overlay::default();
+        editor.read(cx).table_grip_overlay(&mut o);
+        (o.dots.iter().filter(|(_, c)| *c == [0, 0, 0, 255]).count(), o.dots.len(), o.tinted.len())
+    });
+    let hover = |cx: &mut TestAppContext, s: [f64; 2]| {
+        use gpui_kit::MouseMoveEvent;
+        let at = at_window(cx, &editor, s);
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx))).unwrap();
+        draw(cx, window);
+        cx.update(|cx| editor.read(cx).hovered_table())
+    };
+    assert_eq!(hover(cx, cell), Some(id), "the table lit");
+    let (black, dots, squares) = grips(cx);
+    assert_eq!((black, dots), (1, 4), "one black anchor dot, three tan corners");
+    assert!(squares > 0, "its resize squares");
+    let away = empty_sheet_point(cx, window, &editor);
+    assert_eq!(hover(cx, away), None, "the pointer away");
+    assert_eq!(grips(cx), (0, 0, 0), "the pointer away: none");
+}
+
 /// Live2 bomsel-1118 (tables-1118 d3): the BOM table tool places the table on one click (no ✓); the panel closes and
 /// the table stays selected.
 #[gpui::test]
@@ -1993,6 +2035,87 @@ fn a_crop_spline_is_drawn_open_and_closes_within_6_px_of_its_first_point(cx: &mu
     let p = px(cx, 3.0);
     click_sheet(cx, window, &editor, p);
     assert!(cx.update(|cx| editor.read(cx).crop_dlg.as_ref().is_some_and(|d| d.pending.is_some())), "the click on the first point ends it");
+}
+
+/// Live drw-hover-1122: a hovered or selected centerline keeps its dashes in tan / orange, as many pieces as drawn plain.
+#[gpui::test]
+fn a_lit_centerline_stays_dashed(cx: &mut TestAppContext) {
+    use crate::drawing_view::{DRAWING_HOVER, DRAWING_SELECTED};
+    use noshape_model::drawing::{Annotation, AnnotationKind};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-centerline-dashed");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.update(cx, |e, cx| {
+        let view = e.built.as_ref().and_then(|b| b.placements.first().copied()).expect("a view").id;
+        let id = e.current_sheet().next_annotation_id();
+        e.edit_sheet("Centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view, a: [-20.0, 0.0], b: [20.0, 0.0] }, ..Default::default() }));
+        id
+    }));
+    real_sheet(cx, window, &editor);
+    let (plain, hovered, selected) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.clone().expect("built");
+        let picks = e.picks_of(Sel::Annotation(id));
+        let g = &b.geometry;
+        let plain: usize = g.lines.iter().enumerate().filter(|(_, l)| picks.contains(&l.pick)).map(|(i, l)| noshape_model::drawing::sheet::dash(&l.points, l.closed, &g.line_pen(i).1, g.line_dash_phase(i)).len()).sum();
+        (plain, e.tinted_pieces(&b, &picks, DRAWING_HOVER).len(), e.tinted_pieces(&b, &picks, DRAWING_SELECTED).len())
+    });
+    assert!(plain > 2, "the centerline is dashed: {plain} pieces");
+    assert_eq!(hovered, plain, "hovered: the same dashes");
+    assert_eq!(selected, plain, "selected: the same dashes");
+}
+
+/// Live drw-hover-1122: a hovered or selected annotation's text sits on a box 0.5 h wider at each end and 0.4 h taller
+/// above and below than its glyphs, turned with it.
+#[test]
+fn the_hover_box_pads_the_glyphs_as_live() {
+    use noshape_model::drawing::font::text_width;
+    use noshape_model::drawing::sheet::{Anchor, Text2};
+    let t = Text2 { pos: [10.0, 20.0], height: 12.0, text: "NOTE".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 };
+    let b = crate::drawing_view::hover_box(&t);
+    let w = text_width("NOTE", 12.0);
+    let near = |p: [f64; 2], q: [f64; 2]| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9;
+    assert!(near(b[0], [4.0, 15.2]) && near(b[2], [16.0 + w, 36.8]), "{b:?}");
+    let r = crate::drawing_view::hover_box(&Text2 { angle: std::f64::consts::FRAC_PI_2, ..t });
+    assert!(near(r[0], [14.8, 14.0]), "turned with the text: {r:?}");
+}
+
+/// Live drw-hover-1122: with the Dimension tool a centerline lights 8 px off it, not 10, and a click on it starts its
+/// dimension.
+#[gpui::test]
+fn the_dimension_tool_lights_a_centerline_from_8_px(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Annotation, AnnotationKind};
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-centerline-dim");
+    real_sheet(cx, window, &editor);
+    // A line across the first view's middle.
+    let (view, a, b) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().and_then(|b| b.placements.first().copied()).expect("a view");
+        let g = e.geoms.get(&pl.id).expect("its geometry");
+        let lo = g.edges.iter().flat_map(|x| x.points.iter()).fold([f64::MAX; 2], |m, p| [m[0].min(p[0]), m[1].min(p[1])]);
+        let hi = g.edges.iter().flat_map(|x| x.points.iter()).fold([f64::MIN; 2], |m, p| [m[0].max(p[0]), m[1].max(p[1])]);
+        let mid_y = (lo[1] + hi[1]) / 2.0;
+        (pl.id, [lo[0] + (hi[0] - lo[0]) * 0.3, mid_y], [lo[0] + (hi[0] - lo[0]) * 0.7, mid_y])
+    });
+    let id = cx.update(|cx| editor.update(cx, |e, cx| {
+        let id = e.current_sheet().next_annotation_id();
+        e.edit_sheet("Centerline", cx, |s| s.annotations.push(Annotation { id, kind: AnnotationKind::Centerline { view, a, b }, ..Default::default() }));
+        e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: vec![] }, cx);
+        id
+    }));
+    draw(cx, window);
+    let (mid, k) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.placement(view).expect("placed");
+        let (p, q) = (pl.to_sheet(a), pl.to_sheet(b));
+        ([(p[0] + q[0]) / 2.0, (p[1] + q[1]) / 2.0], 1.0 / e.zoom)
+    });
+    assert_eq!(lit_at(cx, window, &editor, [mid[0], mid[1] + 8.0 * k]), Some(Sel::Annotation(id)), "8 px: the centerline");
+    assert_ne!(lit_at(cx, window, &editor, [mid[0], mid[1] + 10.0 * k]), Some(Sel::Annotation(id)), "10 px: not the centerline");
+    click_at(cx, window, &editor, [mid[0], mid[1] + 1.0 * k], Modifiers::default());
+    assert!(cx.update(|cx| editor.read(cx).pending_annotation().is_some()), "a dimension of the centerline being placed");
 }
 
 /// Live2 ann-1118: the 2 point centerline frames a view's vertex in the Note tool's hollow orange square, lit 9 px off it
@@ -3427,7 +3550,7 @@ fn a_hovered_balloon_keeps_its_leader_black(cx: &mut TestAppContext) {
         let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. })).expect("the balloon");
         let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(a.id)));
         let leader: Vec<Vec<[f64; 2]>> = b.geometry.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, _, p)| p.points.clone()).collect();
-        let lines = |c: u32| e.tinted_lines(&b, &picks, c).into_iter().map(|l| l.points.clone()).collect::<Vec<_>>();
+        let lines = |c: u32| e.tinted_lines(&b, &picks, c).into_iter().map(|(_, l)| l.points.clone()).collect::<Vec<_>>();
         let (hovered, selected) = (lines(DRAWING_HOVER), lines(DRAWING_SELECTED));
         let ring = hovered.iter().any(|l| l.len() > 8);
         (hovered, selected, leader, ring)
