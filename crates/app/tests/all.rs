@@ -3,3 +3,4 @@
 
 mod cli_mode;
 mod no_onshape_assets;
+mod quit_signal;

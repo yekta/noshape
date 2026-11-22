@@ -57,6 +57,9 @@ pub struct DocModel {
     pub comparing: bool,
     /// The link of the notice shown last ([`DocModel::info_with_link`]).
     notice_link: Option<NoticeLink>,
+    /// Commits the pending edit when the app quits (Quit, logout, shutdown, SIGTERM): Drop alone misses it while
+    /// anything else (a background task) still holds the model.
+    quit_commit: Option<Subscription>,
 }
 
 /// What the window shows, read on demand outside the document's update (see
@@ -119,7 +122,7 @@ impl DocModel {
         session.forget_undo();
         let studio_cache = crate::derived::StudioCache::default();
         let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator(studio_cache.clone())));
-        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
+        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None, quit_commit: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice), gone after
@@ -286,6 +289,12 @@ impl DocModel {
         let tab_name = self.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         if let Err(e) = self.pending.note(&mut self.session, tab, || format!("{tab_name} :: {description}")) {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
+        }
+        if self.quit_commit.is_none() {
+            self.quit_commit = Some(cx.on_app_quit(|this, cx| {
+                this.flush_pending(cx);
+                async {}
+            }));
         }
         cx.emit(DocEvent::TabChanged(tab));
         cx.notify();

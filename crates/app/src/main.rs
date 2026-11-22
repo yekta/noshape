@@ -30,6 +30,10 @@ mod help_menu;
 mod system_check;
 mod agent_setup;
 mod updates;
+#[cfg(unix)]
+mod quit_signals;
+#[cfg(test)]
+mod quit_tests;
 #[cfg(test)]
 mod start_links_tests;
 #[cfg(test)]
@@ -603,6 +607,8 @@ fn main() {
             noshape_kernel::exit_now(0);
         })
         .detach();
+        #[cfg(unix)]
+        quit_signals::install(cx);
         let g2 = gpu.clone();
         cx.on_action(move |_: &actions::NewDocument, cx| {
             let _ = &g2;
