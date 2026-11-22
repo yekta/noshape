@@ -1,39 +1,44 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 08:19 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 09:43 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-22 08:19 UTC)
+## Now (11-22 09:43 UTC)
 
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
-- LANDED fb4ce0ee as ea4c04d7 (04:44): scissor 2d82a0 Fillet 13 runs joined per connected run, convex->concave refused.
-- KNIFEHANDLE Fillet 1: a7bf86f2c (Frame.air: a convex round on a free-form face puts its corner in the air) LANDING
-  from blend10 / blend-khair. Gate: suites SAME (189 docs, geometry; 9 docs "slower" = load noise: the fix side ran
-  under my builds at load 11; the change is two surface-type queries per section station), userdocs ALL-SAME.
-  Open after core's knifehandle (ed773d89) lands: topology 6/14/12 vs live 6/10/7, speed 6.4 s vs 204 ms.
-- SCISSOR (asm 07:18 on main: 207/239; fed22d regression gone, no bisect): failing for me 2d82a0 Fillet 13, 9cbb0e
-  Fillet 23 (+2/6/18/19), 665cf3 Fillet 4 (+1/2/5), fed22d Fillet 4/5/24/25. Doc: vibex7 ~/agents/blend-keep/
-  scissor.noshape (lasting; ~/tmp copies are pruned). One feature with blend debug: bin/sc-main2.sh <cli> <tab> "<F>"
-  <out> "<env>" (work dir ~/tmp/blend/sc2). Probe CLI: blend-cusp -> vibex7 ~/tmp/blend/cli-cusp (bin/sc-cusp5.sh
-  builds it and runs all three).
-  - 2d82a0 F13 (blend-cusp, uncommitted): runs split at convexity flips (scan 256 stations, bisect; 6 pieces); a
-    split end whose station can't orient vanishes (section stepped inward). Lofts all valid now, but the CUT leaves
-    only tool-sized pieces (solids 1.8 / 1.6 / 0.002 mm3 of a 22549 mm3 part): cut tools inside out? ZZ_SOLIDS prints
-    each tool's centre in tool / body -> next.
-  - 9cbb0e F23: "could not orient a face at the edge" (then "Unfilleted edge overlapped by fillet."); blend-cusp now
-    retries the orientation at 7.3x and 0.137x the step (a step landing on another face's boundary decided nothing).
-  - 665cf3 F4: "a concave edge's rolling ball" (main's ball path refuses concave edges): try ZZ_CBALL.
-- SUSPENSION Fillet 3 (asm-suspension 805e29; live 53/98/46, 393486.60): sections path with ZZ_NOTIP valid, 89/260/153,
-  -55 mm3. Exact concave balls (ZZ_CBALL): the 6 concave tools are valid; the torus tools fuse fine alone; the union
-  fails ("lost one of its parts") with tools 2 or 5 (the +y vanishing lofts; their -y mirrors 0/3 fuse fine)
-  (bin/zzfusem.sh, logs/zzfusem.out; dumps vibex7 ~/tmp/blend/sb-b*.brep, body susp-b2.brep). Next: tool 2 alone
-  (bin/zzfuseb2.sh: ZZG grid, plain vs reversed).
-- blend-cusp env switches: ZZ_NOTIP, ZZ_CBALL, ZZ_FLIPMAP, ZZ_ORIENTDBG, ZZ_SOLIDS, ZZ_BALLDUMP, ZZ_TOOLDUMP, ZZ_SECDIST.
+- KNIFEHANDLE (core -> blend 09:3x: the fillets are mine; Loft 1 builds on main since 11-21). Main parity 07:19: model
+  13.8 s vs live 1.0; Fillet 1 10.4 s, fails (live 200 ms OK); Fillet 2 fails; Fillet 3 1381 ms (live 12); Chamfer 1
+  470 (live 35); Blade 7/15/10 vs live 11/27/18, first off at Sweep 2 (not mine: told lead 09:42 to fix Sweep first).
+  Fillet 1 fix a7bf86f2c (Frame.air) QUEUED 8f6dc228 from blend10 (checking since 09:27). After it lands: parity on
+  main, NOSHAPE_PARITY_ONLY=c2-surf-workshop-knifehandle parity::parity_models; qa's copy vibex7 ~/qa/corpus (09:32).
+  Quick list: bin/kh-list.sh <cli> <prefix> (vibex8 ~/tmp/blend/kh, kh.noshape there; cli-khfix is pre-Loft-fix).
+  Fillet 2 on the old CLI: "a rolling balls' tool inside out", then sections "could not orient a face at the edge".
+- SCISSOR (asm 07:18 main 207/239). Doc vibex7 ~/agents/blend-keep/scissor.noshape. One feature: bin/sc-main2.sh <cli>
+  <tab> "<F>" <out> "<env>" (prints only the last 50 lines of the block; grep ~/tmp/blend/sc2/prof-<tab>.txt for
+  more). Probe CLI blend-cusp -> vibex7 ~/tmp/blend/cli-cusp (bin/sc-cusp5.sh builds + runs 3; sc-cusp6.sh first
+  failing per studio). blend-cusp is uncommitted on 5a299e6fc: commit it as WIP before anything else.
+  - 2d82a0 F13: runs split at convexity flips (4 cut + 2 fuse pieces, lofts valid). ZZONE (each cut tool alone):
+    tool 0 OK, tool 1 -> bigger invalid body, tool 2 -> 2 solids, tool 3 -> EMPTY. Far points classify Outside (not
+    globally inverted): look at tools 1-3 (ZZ_TOOLDUMP=<prefix>) for self-intersection / twisted sections.
+  - 9cbb0e F23: ZZO shows all 4 probes Outside at a point on a planar face (n -y). blend-cusp frame_at now falls back
+    to the face's outward normal when the side along the face is known (untested effect; still fails F23).
+  - 665cf3 F1: OK on cli-cusp (main fails): find which switch did it, compare topology with live. F4: "a run-on
+    round's middle lost to the faces past its end" (ZZ_RUNON prints the cells).
+  - 9cbb0e F2: OK with ZZ_CBALL (1565 ms; compare topology/volume with live). fed22d F4: with ZZ_CBALL 24 valid ball
+    tori, still "Failed to fillet selections." (2602 ms): grep the tail of ~/tmp/blend/sc2/prof-fed22d.txt.
+  - Watch: the frame fallback made other earlier 2d82a0 features print "the result is not one valid solid": check
+    every earlier feature's status vs main before landing anything from blend-cusp.
+- SUSPENSION Fillet 3: ZZ_CBALL + packed vanishing stations >= 0.05 r (was 1e-3 r: a near-point end crossed itself) ->
+  ONE VALID SOLID 61/146/87, 393419.692 mm3 (live 53/98/46, 393486.602; -0.017 %). Live faces: 19 torus, 14 cylinder,
+  8 plane, 4 sphere, 8 OTHER (4 x 25.287, 4 x 29.602 mm2). zz_susp now prints ZZF <type> <area> <centre> per face
+  (logs/zzsusp18.out) -> find the 8 extra faces. Then a clean land branch (ZZ_CBALL + 0.05 r without the probes).
+- blend-cusp env switches: ZZ_NOTIP, ZZ_CBALL, ZZ_FLIPMAP, ZZ_ORIENTDBG, ZZ_SOLIDS (+ZZONE), ZZ_BALLDUMP, ZZ_TOOLDUMP,
+  ZZ_SECDIST, ZZ_RUNON.
 - RINGS Fillet 1 landed 18f929e78 (open: 10.4 mm leaves a 0.774 mm2 bore island).
 - isaac-ball a04711 Chamfer 1 / Fillet 1: wait on bool's Extrude 14. Halter faces: parked (61 vs 39; archive).
 - Agent ids: only from /root/lead-scratch/roster.md.
