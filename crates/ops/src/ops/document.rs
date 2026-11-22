@@ -557,7 +557,7 @@ fn tab_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         for (k, v) in &values {
             store.set_meta(&key(k), Some(v.as_bytes()).filter(|b| !b.is_empty())).map_err(io)?;
         }
-        store.set_meta(&key("tab_not_revision_managed"), Some(&b"1"[..]).filter(|_| meta.not_revision_managed)).map_err(io)?;
+        store.set_meta(&key("tab_not_revision_managed"), meta.not_revision_managed.then_some(&b"1"[..])).map_err(io)?;
         store.set_meta(&key("tab_item_meta"), Some(serde_json::to_string(&meta).unwrap_or_default().as_bytes())).map_err(io)?;
     }
     if let Some(name) = new_name
