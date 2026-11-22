@@ -29,8 +29,18 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   refused every two-profile path loft (halfway section added to the path's 7; centripetal sections). Loft 3 33 edges as
   live; loft-paths-guides 16 -> 17/29; other 4 path-loft docs same; loft tests pass. After it lands: TICKETS
   LOFT3-EDGES / LOFT-PATHS-TOPOLOGY rows.
+- **ORDERS (lead 11-22 02:1x), while lands queue:** 1) Mirror 1 DONE: live's two 0.069 / 0.072 mm
+  edges (x 0, y -254.03, z +-50.8, kept to Loft 5) are its A/mirror seam ending short of the cylinder end; ours is the
+  exact one. Row in parity.rs LIVE_SLIVER_EDGES (DECISIONS 11-15). With Loft 3/4 (core-th) on top: loft-paths-guides
+  29/29, matches to the end (vibex8 03:15). Speed left: Loft 3 376 ms (live 69), Mirror 1 720 (60), Loft 4/5 ~650-700.
+  2) isaac open 135-140 s vs live 27 s: no saved doc
+  existed; .is1.sh (ssh vibex8 bash -s) rebuilds it via parity_assemblies into vibex8 ~/agents/core-keep/isaac/save,
+  then big_assembly_perf::suite_assembly_open_profile -> isaac/prof.log (top studios / features). Lands 02:40:
+  ed773d89 FAILED 02:28 on a flaky part-studio-ui export-dialog test (shared export_solid.json; not ours), re-queued as
+  75dec34f; 4866d14d retest of 4; 07cad3ef batch of 4; f10fbdb6 (core-sj) queued.
+- **Hosts (lead 11-22 01:4x):** 02:00-04:00 UTC keep off vibex7 (qa's speed window): vibex8 or the Mac (NOSHAPE_RB_HOST=mac). vibex7 core-keep cleaned to 1.6 GB 01:41.
 - **Lands to watch (11-21 23:25):** 45fb8d24 LANDED 23:21 as 1ca9f153. ed773d89 + 05b06fe3e checking (batch of 4 at
-  23:21); f10fbdb6 re-queued on its own; 4866d14d (Loft 4) queued 23:43. Then land core-cache's handoff commits. Report at queue empty or a failed land.
+  23:21); f10fbdb6 FAILED 01:18 on main's red prefs test (dx images library, main RED d4a3bbfe4 01:05): re-queued 01:40 from core-sj (branch core-derived); 4866d14d (Loft 4) queued 23:43. Then land core-cache's handoff commits. Report at queue empty or a failed land.
 - **FACE BLEND 1 (core-cache):** QUEUED 1a5b61c3: sides on two solid parts are fused first (live joins Thicken 1's
   slabs: 1 part, 14 faces; test a_face_blend_across_overlapping_parts_joins_them). On top: face blend's plain rolling
   ball uses fillet_checked (unchecked k::fillet skipped finish_blend_faces, so its blend faces stayed B-splines; live

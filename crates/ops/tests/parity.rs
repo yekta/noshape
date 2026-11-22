@@ -147,6 +147,11 @@ const LIVE_SLIVER_EDGES: &[LiveSliverEdges] = &[
     // 5 ppm). Referenced by no later feature; Boolean 1 fuses Part 3 into Part 1 and live keeps it to the end (JdZ).
     LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Extrude 4", part: "Part 3", edges: 1, vertices: 1 },
     LiveSliverEdges { doc: "c2-impeller-loft", from_feature: "Boolean 1", part: "Part 1", edges: 1, vertices: 1 },
+    // core 11-22: Mirror 1 fuses Loft 2 with its mirror image; the two meet along x = 0, where the loft's end matches the
+    // cylinder. Live ends that seam 0.069 / 0.072 mm short of the cylinder's end (y -254.03, z +-50.8) and goes on by a
+    // second edge; ours, the exact intersection, runs into the cylinder end's vertex. Faces and volume as live; referenced
+    // by no later feature; live keeps both to the end (Loft 5).
+    LiveSliverEdges { doc: "c2-loft-paths-guides", from_feature: "Mirror 1", part: "Part 1", edges: 2, vertices: 2 },
 ];
 
 /// Imports live fails on a good file (PARITY-SUITES.md "Live's failed imports"; lead 11-17, parity, not shortcomings): in a
