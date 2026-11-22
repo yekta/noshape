@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-22 04:38)
+# QA handoff (agent qa; current state only, updated 2026-11-22 04:42)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -72,7 +72,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
    (first skasm commit since 01:53; check the green has 94f6df34's subjects). Recheck: sketch-dimension-variable (uip-rerun +
    by hand), OFFSET-EDIT-SCALES-SKETCH (free circle, O, Enter, 3: no scaling), SMM-EXTRUDE-CLOSED-PROFILE, SKETCH-SLOT-ON-ARC,
    SKETCH-DXF-EXPORT-POLYLINES (R14, LINE/CIRCLE/ARC/SPLINE on MODELSKETCH_VISIBLE, no construction / points). Night ui suite started 02:00:01 on vibex8 (a06ec927);
-   vibex8 ~/.slot-quiet until 04:00 (timer qa-vibex8-unquiet removes it); core's .dbg.sh + skasm's uip4 build queued there, told.
+   Quiet holds end at 04:00 sharp (lead 11-22 04:4x: vibex8 hold blocked builds to 04:41): nightpm-remote.sh and w7-quiet.sh each start a 04:00 remover (only a "qa" hold).
    Lead 02:0x: once 69bcf1791 is green (waiter qa-wait-studios-drwdlg) spot 5 drawing dialogs vs live/drawing 1047-lnk-front-props,
    1037-lnk-move-to-sheet-dialog, 710-hole-table-dialog, 508-datum-target-tab, 1358-dk-export-default (all 1919x1079); dx STEP
    torus export (qa-wait-dx-torus) and hex-bookcase DXF counts vs live (qa-wait-dx-hexdxf; dx ba3d6cc1 determinism land). Pre-release 05:00 (lead 02:0x): GO 02:25 on a06ec927, vibe2
