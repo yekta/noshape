@@ -5068,6 +5068,9 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
 
     d.open(cx, false);
     d.pick(cx, "ex-format", "STEP");
+    let tops: Vec<f32> = ["ex-latest", "ex-custom-units", "ex-tol", "ex-mbd", "ex-individual", "ex-hidden"].into_iter().map(|id| f32::from(d.bounds(cx, id).unwrap_or_else(|| panic!("no {id}")).origin.y)).collect();
+    let gaps: Vec<f32> = [(0, 1), (1, 2), (2, 3), (4, 5)].into_iter().map(|(a, b)| tops[b] - tops[a]).collect();
+    assert_eq!(gaps, vec![31., 31., 31., 39.], "STEP's checkboxes under Version 31 px apart, under Options 39 (live wf39)");
     d.press(cx, "ex-tol");
     d.press(cx, "ex-latest");
     d.pick(cx, "ex-version", "AP214");

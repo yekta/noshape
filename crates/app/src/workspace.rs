@@ -2318,18 +2318,18 @@ fn file_tab_menu(menu: crate::os_menu::OsMenu, view: &Entity<Workspace>, id: Tab
     if file_kind == Some(FileKind::Image) {
         menu = menu.item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.select_thumbnail(id, cx)))).separator();
     }
-    menu = menu.item(I::new("Move to document…").on_click(move |_, w, cx| dd::move_to_document(d3.clone(), vec![id], w, cx))).separator();
+    // Move to document…, Export…, Release… and Download are one group (live wf39).
+    menu = menu.item(I::new("Move to document…").on_click(move |_, w, cx| dd::move_to_document(d3.clone(), vec![id], w, cx)));
     // A CAD file converts to another format (live document/94).
     if file_kind == Some(FileKind::Cad) {
         let v7 = view.clone();
-        menu = menu.item(I::new("Export…").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.export_file(id, w, cx)))).separator();
+        menu = menu.item(I::new("Export…").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.export_file(id, w, cx))));
     }
     menu.when(noshape_ops::release_settings::managed_workflows(), |m| {
             m.item(I::new("Release…").on_click(move |_, w, cx| {
                 let items = crate::release_dialog::tab_items(d4.read(cx), id);
                 crate::release_dialog::open_release_candidate(d4.clone(), items, w, cx)
             }))
-            .separator()
         })
         .item(I::new("Download").on_click(move |_, w, cx| {
             let doc = v5.read(cx).doc.clone();

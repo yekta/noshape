@@ -29,6 +29,9 @@ const LABEL_MT: f32 = 4.;
 const FIELD_MT: f32 = 5.;
 const CHECK_MT: f32 = 9.;
 const CHECK_GAP: f32 = 12.;
+/// Between a format's own checkboxes (STEP's four under Version: 31 px apart, live wf39); under Options they keep `CHECK_GAP`.
+const FORMAT_CHECK_GAP: f32 = 4.;
+const OPTION_CHECKS: [&str; 3] = ["ex-individual", "ex-single-link", "ex-hidden"];
 const LABEL_AFTER_CHECK: f32 = 4.;
 
 impl PartStudioView {
@@ -515,12 +518,12 @@ fn open_modal(base: String, assembly: bool, parts_only: bool, cad_file: bool, ru
                     body.child(div().pt(px(6.)).text_size(px(13.33)).child(text))
                 }
                 Row::Check { id, label, on, disabled: true, .. } => {
-                    let mt = if prev_check { CHECK_GAP } else { CHECK_MT };
+                    let mt = check_mt(prev_check, id);
                     prev_check = true;
                     body.child(div().mt(px(mt)).child(modal_checkbox_disabled(id, label, on)))
                 }
                 Row::Check { id, label, on, set, .. } => {
-                    let mt = if prev_check { CHECK_GAP } else { CHECK_MT };
+                    let mt = check_mt(prev_check, id);
                     prev_check = true;
                     body.child(div().mt(px(mt)).child(modal_checkbox(id, label, on).on_click(move |_, w, _| {
                         set(&mut st.borrow_mut(), !on);
@@ -590,6 +593,14 @@ pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) ->
 /// `#e5e5e5` box, 1 px `#d4d4d4`, a white check; the label as an enabled one's.
 fn modal_checkbox_disabled(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
     checkbox_row(id, label, on, true)
+}
+
+fn check_mt(prev_check: bool, id: &str) -> f32 {
+    match (prev_check, OPTION_CHECKS.contains(&id)) {
+        (false, _) => CHECK_MT,
+        (true, true) => CHECK_GAP,
+        (true, false) => FORMAT_CHECK_GAP,
+    }
 }
 
 fn checkbox_row(id: &'static str, label: &'static str, on: bool, disabled: bool) -> Stateful<Div> {

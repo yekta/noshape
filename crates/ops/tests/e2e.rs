@@ -5164,6 +5164,9 @@ fn export_store_file_in_a_new_tab() {
     let o = order(&mut ctx);
     let ps = o.iter().position(|t| t == "Part Studio 1").unwrap();
     assert_eq!(o[ps + 1], "Part Studio 1.x_t", "{o:?}");
+    // IGES is ".iges" (live wf39).
+    call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "IGES", "options": "store" }));
+    assert!(order(&mut ctx).contains(&"Part Studio 1.iges".to_string()), "{:?}", order(&mut ctx));
     // Download and store: the file too.
     let file = scratch("stored.step");
     let r = call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": file.to_str().unwrap(), "options": "download_and_store" }));

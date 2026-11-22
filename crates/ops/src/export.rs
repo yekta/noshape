@@ -71,7 +71,7 @@ impl PartFormat {
             Self::Parasolid => "x_t",
             Self::Acis => "sat",
             Self::Step => "step",
-            Self::Iges => "igs",
+            Self::Iges => "iges",
             Self::Pvz => "pvz",
             Self::Jt => "jt",
             Self::Rhino => "3dm",
