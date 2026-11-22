@@ -358,3 +358,55 @@ fn a_selected_sketch_region_is_a_pale_fill_inside_an_orange_outline() {
     assert!(sel_edge.contains(&SELECT), "the orange outline: {:?}", sel_edge.iter().map(|&c| hex(c)).collect::<Vec<_>>());
     assert!(hov == rest && hov_edge.contains(&HOVER), "hovered: no fill ({} vs {}), the light outline: {:?} (rest {:?})", hex(hov), hex(rest), hov_edge.iter().map(|&c| hex(c)).collect::<Vec<_>>(), rest_edge.iter().map(|&c| hex(c)).collect::<Vec<_>>());
 }
+
+/// Live mc-reach-1122 R5: a hovered circular edge is drawn whole, its back half hidden behind the part included (an
+/// Ø20 × 20 cylinder in the isometric view, its bottom rim hovered).
+#[test]
+fn a_hovered_rim_shows_its_hidden_back_half() {
+    const HOVER: [u8; 3] = [0xFF, 0xC6, 0x85];
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, 0.01);
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let regen = |ps: &PartStudio| Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let key = regen(&ps).display.sketches[0].regions[0].key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("20 mm")));
+    ps.features.push(ex);
+    let display = regen(&ps).display;
+    let b = &display.bodies[0];
+    let rim = b.edge_refs.iter().enumerate().find(|(i, _)| b.mesh.edges[*i].len() > 2 && b.mesh.edges[*i].iter().all(|p| p[2].abs() < 1e-6)).map(|(_, e)| e.clone()).expect("the bottom rim");
+    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let up = r.uploader();
+    let (w, h) = (400u32, 400u32);
+    let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, ..Default::default() }, &mut GpuCache::default(), &up);
+    let mut cam = noshape_render::Camera::default();
+    cam.set_view(noshape_render::StandardView::Isometric);
+    cam.fit_box(glam::DVec3::new(-0.01, -0.01, 0.0), glam::DVec3::new(0.01, 0.01, 0.02), w as f64 / h as f64);
+    // The rim's far point, behind the cylinder: the eye looks along (-1, 1, -1).
+    let back = cam.project(glam::DVec3::new(-0.01, 0.01, 0.0) * std::f64::consts::FRAC_1_SQRT_2, glam::DVec2::new(w as f64, h as f64), 1.0).unwrap();
+    let mut lit_behind = |hover: Option<&Reference>| {
+        let scene = builder::with_highlights(&built, &display, &[], hover, &[], Vec::new(), Default::default(), &up);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        let (x, y) = (back.x.round() as i32, back.y.round() as i32);
+        (-2..=2).flat_map(|dy| (-2..=2).map(move |dx| (x + dx, y + dy))).any(|(x, y)| {
+            let o = ((y as u32 * w + x as u32) * 4) as usize;
+            close([f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]], HOVER, 24)
+        })
+    };
+    assert!(!lit_behind(None), "at rest: the back half hidden");
+    assert!(lit_behind(Some(&rim)), "hovered: the back half drawn over the cylinder");
+}

@@ -93,8 +93,7 @@ impl PartStudioView {
             return false;
         }
         i.choice = choice;
-        let corner = |r: &Reference| matches!(r, Reference::Implicit { inference: noshape_model::reference::Inference::Vertex, .. });
-        let marks = points.iter().map(|p| scene_builder::InferenceMark { origin: p.frame.origin, x: p.frame.x(), z: p.frame.z(), corner: corner(&p.reference) });
+        let marks = points.iter().map(|p| scene_builder::InferenceMark::new(p.frame.origin, p.frame.x(), p.frame.z(), &p.reference));
         // A vertex: its white corner mark; its connector glyph only reached from its face or edge (live mc-infer-1122
         // reach-ps-corner d=6..0, qa FEEL-MC-VERTEX-FROM-FACE).
         let vertex = matches!(i.on, Reference::Vertex(_));

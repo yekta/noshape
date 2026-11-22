@@ -5,10 +5,10 @@
 use crate::reference::{Inference, Reference};
 use glam::DVec2;
 
-/// Over a face, how near (px, in x and in y: a square) the pointer brings the connector to a corner or another point.
-pub const FACE_REACH_PX: f64 = 47.5;
-/// Over a face, how near (px) the pointer brings it to an edge's midpoint.
-pub const MIDPOINT_REACH_PX: f64 = 41.5;
+/// Over a face, how near (px, in x and in y: a square) the pointer brings the connector to a marker, whatever the zoom
+/// (live's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX; mc-reach-1122 R1-R3: a corner swept along the screen's x from
+/// 50 px, an edge midpoint swept at 30 degrees from 58 px, 50 px in x).
+pub const FACE_REACH_PX: f64 = 50.0;
 /// Over an edge, how near (px) the pointer brings it to an end; else it sits at the midpoint (a circle's centre).
 pub const EDGE_END_REACH_PX: f64 = 15.0;
 
@@ -19,8 +19,9 @@ pub struct OnScreen<'a> {
     pub points: Vec<(&'a Reference, Option<DVec2>)>,
 }
 
-/// The chosen point's index, as live (asm/feel-1117 reach-corner-strip, asm-feel3-1118, mc-infer-1122): over a planar
-/// face a point within the square around the pointer, else the face's centroid (a cylinder's side at its axis
+/// The chosen point's index, as live (asm/feel-1117 reach-corner-strip, asm-feel3-1118, mc-infer-1122, mc-reach-1122):
+/// over a planar face the nearest point (the centroid too) of those within the square around the pointer, else the
+/// face's centroid (a cylinder's side at its axis
 /// midpoint at any height); over an edge its midpoint (a circle's centre) unless an end is within 15 px. `entered`:
 /// the pointer has just come onto the entity, so the face's centroid (its points from the next move on: live2
 /// place-1118 21:05). Shift locks the entity, not the point: the same rule wherever the pointer is (mc-infer-1122
@@ -33,7 +34,7 @@ pub fn choose(s: &OnScreen, pointer: DVec2, entered: bool) -> Option<usize> {
     }
     let best = match s.on {
         Reference::Face(_) if entered => None,
-        Reference::Face(_) => near.filter(|(_, r, d)| d.x.abs().max(d.y.abs()) <= face_reach(r)).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
+        Reference::Face(_) => near.filter(|(.., d)| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
         _ => near.filter(|(.., d)| d.length() <= EDGE_END_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
     };
     Some(best.map_or(0, |(i, ..)| i))
@@ -53,13 +54,6 @@ fn is_primary(r: &Reference) -> bool {
         Reference::Implicit { inference: Inference::Centroid | Inference::MidAxis, on } => matches!(**on, Reference::Face(_)),
         Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
         _ => false,
-    }
-}
-
-fn face_reach(r: &Reference) -> f64 {
-    match r {
-        Reference::Implicit { inference: Inference::Midpoint, .. } => MIDPOINT_REACH_PX,
-        _ => FACE_REACH_PX,
     }
 }
 
@@ -83,7 +77,8 @@ mod tests {
     }
 
     /// A face's centroid at the origin, a corner 67 px off and an edge midpoint 40 px off (the Part Studio's view in
-    /// mc-infer-1122); the centroid competes as one of the points.
+    /// mc-infer-1122); the centroid competes as one of the points. Zoomed in (mc-reach-1122 R1-R3) a marker takes the
+    /// connector within 50 px in x and y however far the centroid is.
     #[test]
     fn a_face_takes_a_point_in_its_square_else_its_centroid() {
         let (face, edge) = (Reference::Face(face()), Reference::Edge(edge()));
@@ -91,9 +86,15 @@ mod tests {
         let s = OnScreen { on: &face, points: vec![(&c, Some(DVec2::ZERO)), (&k, Some(DVec2::new(60.0, 30.0))), (&m, Some(DVec2::new(0.0, 40.0)))] };
         assert_eq!(choose(&s, DVec2::new(10.0, 5.0), false), Some(0), "far from both: the centroid");
         assert_eq!(choose(&s, DVec2::new(60.0, 30.0), true), Some(0), "just entered: the centroid");
-        assert_eq!(choose(&s, DVec2::new(40.0, 20.0), false), Some(1), "the corner within 47.5 px in x and y");
+        assert_eq!(choose(&s, DVec2::new(40.0, 20.0), false), Some(1), "the corner within 50 px in x and y");
         assert_eq!(choose(&s, DVec2::new(5.0, 10.0), false), Some(0), "the midpoint 30 px off, the centroid nearer");
         assert_eq!(choose(&s, DVec2::new(0.0, 30.0), false), Some(2), "the midpoint 10 px off, the centroid 30");
+        let zoomed = OnScreen { on: &face, points: vec![(&c, Some(DVec2::ZERO)), (&k, Some(DVec2::new(245.0, 0.0))), (&m, Some(DVec2::new(-212.0, 122.5)))] };
+        assert_eq!(choose(&zoomed, DVec2::new(195.0, 0.0), false), Some(1), "4x: the corner 50 px off");
+        assert_eq!(choose(&zoomed, DVec2::new(193.0, 0.0), false), Some(0), "4x: the corner 52 px off: the centroid");
+        let toward_mid = |d: f64| DVec2::new(-212.0, 122.5) * (1.0 - d / 245.0);
+        assert_eq!(choose(&zoomed, toward_mid(56.0), false), Some(2), "4x: the midpoint 56 px off at 30 degrees");
+        assert_eq!(choose(&zoomed, toward_mid(60.0), false), Some(0), "4x: the midpoint 60 px off: the centroid");
     }
 
     #[test]

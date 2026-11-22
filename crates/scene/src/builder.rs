@@ -1458,6 +1458,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();
+    let mut hidden_hover = LineData::default();
     let sel_color = theme::lin(if error { theme::viewport::ERROR } else { theme::viewport::SELECTION });
     let hov_color = theme::lin(theme::viewport::PREHIGHLIGHT);
     // Onshape outlines hovered and selected faces (their boundary edges
@@ -1697,6 +1698,19 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
             h => mark(h, state::HOVER, &mut scene),
         }
+        // A hovered closed edge (a circle's rim) drawn whole, its hidden back half too, tool open or not (live
+        // mc-reach-1122 R5).
+        if matches!(h, Reference::Edge(_)) {
+            for b in display.bodies.iter().filter(|b| !b.hidden) {
+                let Some(pl) = b.edge_refs.iter().position(|e| e == h).and_then(|k| b.mesh.edges.get(k)) else { continue };
+                if pl.len() > 2 && pl.first() == pl.last() {
+                    hidden_hover.push_polyline(pl, lin_to_u8(hov_color), 0, 5.0, 0);
+                }
+            }
+        }
+    }
+    if !hidden_hover.segments.is_empty() {
+        scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&hidden_hover))).per_primitive_color().unpickable().hidden_only().ignore_clip().layer(HIGHLIGHT_LINES_LAYER));
     }
     let _t = noshape_render::perf::scope("s.wh_after_marks");
     // A face's boundary edges: a solid 2 device px line, not the band of an
@@ -2167,29 +2181,50 @@ pub struct InferenceMarks {
     glyph: ConnectorGlyphs,
 }
 
-/// One inference point: its origin, X and Z (the plane its mark lies in), and whether it is a corner (a vertex:
-/// the bigger mark).
+/// One inference point: its origin, X and Z (the plane its mark lies in) and its mark's shape.
 #[derive(Clone, Copy, Debug)]
 pub struct InferenceMark {
     pub origin: DVec3,
     pub x: DVec3,
     pub z: DVec3,
-    pub corner: bool,
+    pub shape: MarkShape,
+}
+
+/// Live (psui/hole-mc-1851/4, asm/mc-infer-1122 ps-frontc): a corner's mark is a ~12 px disc, an edge midpoint's a
+/// ~7 px square, the other points' (a cap's centre) an ~8 px disc, all lying in the point's plane (ellipses and
+/// rhombi at an angle), white with a thin grey rim.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MarkShape {
+    Corner,
+    Midpoint,
+    Point,
+}
+
+impl InferenceMark {
+    /// The mark of the inference point `of` at `origin` in the plane of `x` and `z`.
+    pub fn new(origin: DVec3, x: DVec3, z: DVec3, of: &Reference) -> Self {
+        use noshape_model::reference::Inference;
+        let shape = match of {
+            Reference::Implicit { inference: Inference::Vertex, .. } => MarkShape::Corner,
+            Reference::Implicit { inference: Inference::Midpoint, on } if matches!(**on, Reference::Edge(_)) => MarkShape::Midpoint,
+            _ => MarkShape::Point,
+        };
+        Self { origin, x, z, shape }
+    }
 }
 
 impl From<(DVec3, DVec3, DVec3)> for InferenceMark {
     fn from((origin, x, z): (DVec3, DVec3, DVec3)) -> Self {
-        Self { origin, x, z, corner: false }
+        Self { origin, x, z, shape: MarkShape::Point }
     }
 }
 
-/// Live (psui/hole-mc-1851/4): a corner's mark is a ~12 px disc, an edge midpoint's (and the other points') ~8 px,
-/// both lying in the point's plane (ellipses at an angle), white with a thin grey rim.
 const MARK_CORNER_PX: f64 = 6.0;
 const MARK_POINT_PX: f64 = 4.0;
+const MARK_MIDPOINT_PX: f64 = 3.5;
 
 impl InferenceMarks {
-    /// `points`: each point's mark (an `(origin, x, z)` is a non-corner one); `chosen` the one under the pointer.
+    /// `points`: each point's mark (an `(origin, x, z)` a plain point's); `chosen` the one under the pointer.
     pub fn new<P: Into<InferenceMark>>(points: impl IntoIterator<Item = P>, chosen: Option<usize>) -> Arc<Self> {
         let mut marks = Vec::new();
         let mut items = Vec::new();
@@ -2209,7 +2244,16 @@ impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
         Some(noshape_render::camera_geometry::key_of("InferenceMarks", &(&self.marks, &self.glyph.items, &self.glyph.picks)))
     }
 
+    /// In a feature preview's top layer (compare::POST), with the lit edges drawn again over the preview: the glyph's
+    /// Z axis along a hovered edge stays solid over the edge's band (live mc-infer-1122 ps-emid, qa
+    /// FEEL-MC-PS-EDGE-TRIAD-HIDDEN).
     fn build(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
+        self.instances(view, up).into_iter().map(|i| i.compare_layer(noshape_render::scene::compare::POST)).collect()
+    }
+}
+
+impl InferenceMarks {
+    fn instances(&self, view: &noshape_render::camera_geometry::View, up: &Uploader) -> Vec<Instance> {
         let mut out = noshape_render::camera_geometry::CameraGeometry::build(&self.glyph, view, up);
         if self.marks.is_empty() {
             return out;
@@ -2222,21 +2266,26 @@ impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
             let Some(px) = view.world_per_px(mk.origin) else { continue };
             let (z, x) = (mk.z.normalize_or_zero(), mk.x.normalize_or_zero());
             let y = z.cross(x);
-            let r = px * if mk.corner { MARK_CORNER_PX } else { MARK_POINT_PX };
             // 30 px toward the eye: over the face, its edge lines and the faces' depth bias (at 3 px the white disc
             // lost to the face: hollow rings, live2 asm-dialogs-1119 hz), with no shift on screen.
             let o = mk.origin - view.camera.forward().normalize_or_zero() * (30.0 * px);
-            let at = |k: usize| {
-                let a = k as f64 / N as f64 * std::f64::consts::TAU;
-                o + x * (r * a.cos()) + y * (r * a.sin())
+            let outline: Vec<DVec3> = match mk.shape {
+                MarkShape::Midpoint => {
+                    let h = px * MARK_MIDPOINT_PX;
+                    [(1.0, 1.0), (-1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].iter().map(|(a, b)| o + x * (h * a) + y * (h * b)).collect()
+                }
+                shape => {
+                    let r = px * if shape == MarkShape::Corner { MARK_CORNER_PX } else { MARK_POINT_PX };
+                    (0..N).map(|k| k as f64 / N as f64 * std::f64::consts::TAU).map(|a| o + x * (r * a.cos()) + y * (r * a.sin())).collect()
+                }
             };
-            let base = m.positions.len() as u32;
+            let (base, n) = (m.positions.len() as u32, outline.len() as u32);
             m.positions.push(f(o));
-            m.positions.extend((0..N).map(|k| f(at(k))));
-            for k in 0..N as u32 {
-                m.indices.extend([base, base + 1 + k, base + 1 + (k + 1) % N as u32]);
+            m.positions.extend(outline.iter().map(|q| f(*q)));
+            for k in 0..n {
+                m.indices.extend([base, base + 1 + k, base + 1 + (k + 1) % n]);
             }
-            let ring: Vec<[f32; 3]> = (0..=N).map(|k| f(at(k % N))).collect();
+            let ring: Vec<[f32; 3]> = outline.iter().chain(outline.first()).map(|q| f(*q)).collect();
             rim.push_polyline(&ring, [0x9f, 0x9f, 0x9f, 255], 0, 1.0, 0);
         }
         let n = m.positions.len();
@@ -2507,19 +2556,26 @@ mod pick_priority_tests {
 
 #[cfg(test)]
 mod inference_mark_tests {
-    use super::{InferenceMark, InferenceMarks};
+    use super::{InferenceMark, InferenceMarks, MarkShape};
     use glam::DVec3;
+    use noshape_model::reference::{FeatureId, Inference, Reference, Role, TopoName};
+    use std::sync::Arc;
 
-    /// The point under the pointer becomes the connector glyph, the others marks; a plain (origin, x, z) is a
-    /// non-corner mark (MC-INFERENCE-DOTS: corners ~12 px, other points ~8 px).
+    /// The point under the pointer becomes the connector glyph, the others marks: corners discs, edge midpoints
+    /// squares, a plain (origin, x, z) a point's disc (MC-INFERENCE-DOTS, FEEL-MC-MARKER-SHAPES).
     #[test]
     fn the_chosen_point_is_the_glyph_and_corners_keep_their_kind() {
-        let p = |x: f64, corner| InferenceMark { origin: DVec3::new(x, 0.0, 0.0), x: DVec3::X, z: DVec3::Z, corner };
-        let m = InferenceMarks::new([p(0.0, true), p(1.0, false), p(2.0, true)], Some(1));
+        let face = || Arc::new(TopoName::Face { feature: FeatureId(1), role: Role::CapEnd(None) });
+        let edge = Reference::Edge(TopoName::Edge { faces: [face(), face()], ordinal: 0 });
+        let at = |on: &Reference, inference| Reference::Implicit { on: Box::new(on.clone()), inference };
+        let p = |x: f64, r: &Reference| InferenceMark::new(DVec3::new(x, 0.0, 0.0), DVec3::X, DVec3::Z, r);
+        let (corner, mid) = (at(&edge, Inference::Vertex), at(&edge, Inference::Midpoint));
+        let m = InferenceMarks::new([p(0.0, &corner), p(1.0, &mid), p(2.0, &mid), p(3.0, &corner)], Some(1));
         assert_eq!(m.glyph.items.len(), 1);
-        assert_eq!(m.marks.iter().map(|k| (k.origin.x, k.corner)).collect::<Vec<_>>(), vec![(0.0, true), (2.0, true)]);
+        let shapes = m.marks.iter().map(|k| (k.origin.x, k.shape)).collect::<Vec<_>>();
+        assert_eq!(shapes, vec![(0.0, MarkShape::Corner), (2.0, MarkShape::Midpoint), (3.0, MarkShape::Corner)], "an edge midpoint a square (live ps-frontc)");
         let plain = InferenceMarks::new([(DVec3::ZERO, DVec3::X, DVec3::Z)], None);
-        assert!(!plain.marks[0].corner);
+        assert_eq!(plain.marks[0].shape, MarkShape::Point);
     }
 }
 

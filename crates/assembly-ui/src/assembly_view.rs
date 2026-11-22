@@ -1705,8 +1705,7 @@ impl AssemblyView {
                 .iter()
                 .map(|p| {
                     let w = t.mul(&p.frame);
-                    let corner = matches!(&p.reference, Reference::Implicit { inference: Inference::Vertex, .. });
-                    crate::scene_builder::InferenceMark { origin: w.origin, x: w.x(), z: w.z(), corner }
+                    crate::scene_builder::InferenceMark::new(w.origin, w.x(), w.z(), &p.reference)
                 })
                 .collect();
             // A vertex's own point: its white corner mark over the vertex's hover disc, no connector glyph (live
@@ -1758,7 +1757,7 @@ impl AssemblyView {
             self.ui.inference_marks = None;
             Vec::new()
         } else {
-            let key: Vec<u64> = marks.iter().flat_map(|m| [m.origin.x, m.origin.y, m.origin.z, m.x.x, m.x.y, m.x.z, m.z.x, m.z.y, m.z.z, f64::from(u8::from(m.corner))]).map(f64::to_bits).chain([chosen.map_or(u64::MAX, |c| c as u64)]).collect();
+            let key: Vec<u64> = marks.iter().flat_map(|m| [m.origin.x, m.origin.y, m.origin.z, m.x.x, m.x.y, m.x.z, m.z.x, m.z.y, m.z.z, f64::from(m.shape as u8)]).map(f64::to_bits).chain([chosen.map_or(u64::MAX, |c| c as u64)]).collect();
             let fresh = self.ui.inference_marks.as_ref().filter(|(k, _)| *k == key).map(|(_, m)| m.clone());
             let m = fresh.unwrap_or_else(|| {
                 let m = crate::scene_builder::InferenceMarks::new(marks.iter().copied(), chosen);

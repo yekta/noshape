@@ -4034,8 +4034,7 @@ impl AssemblyView {
             .iter()
             .map(|p| {
                 let w = t.mul(&p.frame);
-                let corner = matches!(&p.reference, Reference::Implicit { inference: Inference::Vertex, .. });
-                crate::scene_builder::InferenceMark { origin: w.origin, x: w.x(), z: w.z(), corner }
+                crate::scene_builder::InferenceMark::new(w.origin, w.x(), w.z(), &p.reference)
             })
             .collect();
         let chosen = (0..marks.len()).min_by(|a, b| marks[*a].origin.distance(spot).total_cmp(&marks[*b].origin.distance(spot)))?;

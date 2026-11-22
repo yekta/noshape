@@ -1279,11 +1279,11 @@ fn two_selected_instances_have_lives_list_menu(cx: &mut TestAppContext) {
     .unwrap();
 }
 
-/// Live asm/feel-1117 (reach-corner-strip) and asm-feel3-1118: over a planar face the preview connector jumps to a dot
-/// within a 47.5 px square around the pointer (a corner 3 px away; kept at (25, 46) and (47, 40), lost at (26, 48) and
-/// (49, 42)), else it sits at the face's centroid; Shift locks the face and keeps the rule (mc-infer-1122).
+/// Live asm/feel-1117 (reach-corner-strip), asm-feel3-1118 and mc-reach-1122 R1-R3: over a planar face the preview
+/// connector jumps to a dot within a 50 px square around the pointer (live's pick radius; a corner lit at 50 px, lost at
+/// 52 at every zoom), else it sits at the face's centroid; Shift locks the face and keeps the rule (mc-infer-1122).
 #[gpui::test]
-fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mut TestAppContext) {
+fn a_faces_connector_takes_a_dot_within_a_50_px_square_else_its_centroid(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
     let (window, view) = pattern_assembly(cx, "face-centroid");
     cx.update_window(window, |_, w, cx| {
@@ -1311,7 +1311,7 @@ fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mu
             v.update_inference(cx);
             assert!(matches!(cands[v.infer_choice.expect("a choice")].reference, Reference::Implicit { inference: Inference::Vertex, .. }), "the next move: the corner");
             let corner_ix = cands.iter().position(|c| c.frame.origin == corner).unwrap();
-            for (off, kept) in [((25.0, 46.0), true), ((47.0, 40.0), true), ((26.0, 48.0), false), ((49.0, 42.0), false)] {
+            for (off, kept) in [((25.0, 49.0), true), ((50.0, 40.0), true), ((26.0, 52.0), false), ((52.0, 42.0), false)] {
                 v.pointer = at(v, corner, cx) + glam::DVec2::from(off);
                 v.update_inference(cx);
                 assert_eq!(v.infer_choice != Some(corner_ix), !kept, "the corner at {off:?}: kept {kept}");
@@ -1319,8 +1319,8 @@ fn a_faces_connector_takes_a_dot_within_a_48_px_square_else_its_centroid(cx: &mu
             // From the corner straight toward the centroid until every dot is out of the square.
             let dots: Vec<glam::DVec2> = cands.iter().skip(1).map(|c| at(v, c.frame.origin, cx)).collect();
             let (c0, c1) = (at(v, corner, cx), at(v, cands[0].frame.origin, cx));
-            let far = (0..=100).map(|i| c0 + (c1 - c0) * (i as f64 / 100.0)).find(|p| dots.iter().all(|d| (*d - *p).abs().max_element() > 48.0));
-            let Some(far) = far else { panic!("the face is too small on screen for a point 48 px from every dot") };
+            let far = (0..=100).map(|i| c0 + (c1 - c0) * (i as f64 / 100.0)).find(|p| dots.iter().all(|d| (*d - *p).abs().max_element() > 50.0));
+            let Some(far) = far else { panic!("the face is too small on screen for a point 50 px from every dot") };
             v.pointer = far;
             v.update_inference(cx);
             assert_eq!(v.infer_choice, Some(0), "the centroid");

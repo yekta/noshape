@@ -3,28 +3,31 @@
 Updated 2026-11-22 18:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (20:4x, compaction)
-- LANDED 09b4b72b (the whole 11-22 stack). QUEUED d2b509fc (20:2x): assembly + Part Studio take the shared chooser
-  (assembly::inference::choose; Part Studio passes entered=false: its points come after the pointer is on the entity,
-  psui's the_mate_connector_feature_infers_as_live wants the corner on the first hover); Trim-on-circle test (live sk3:
-  already as live); a level near a model edge's midpoint -> HORIZONTAL + VERTICAL to a point MIDPOINT on the used edge
-  (WOKEN_EDGE_MID, live lenbox E; wf05 step 11 test updated); Extend preview past the boundary, snap only with the
-  pointer on it, picked line SELECTION orange once snapped (extend_crossed; live mc-reach-1122 R6). Case B of R6 (click
-  2 mm off the line past the boundary drops the pick) not done: no clear rule.
-- asm will move EDGE_END_REACH_PX / the vertex pick in assembly/inference.rs for qa's FEEL-MC-EDGE-BEFORE-VERTEX-ASM
-  after d2b509fc lands (shared: the Part Studio twin moves with it).
-- COMMITTED (20:3x, not queued): VERTEX-FROM-FACE (part-studio inference.rs takes vertices, glyph via
-  assembly::inference::vertex_glyph; assembly_view.rs calls the same fn; test a_vertex_reached_from_its_face_keeps_the_
-  connector_glyph). Green on vibex8 (clippy, psui 26 + asm-ui 12 tests). Land after d2b509fc lands.
-- MC left (Part Studio):
-  EDGE-TRIAD-HIDDEN (Z on top), PS-VERTEX-LOOK (white disc, orange rim), MARKER-SHAPES (midpoint squares in scene
-  InferenceMarks), CAP-MARKER-HIDDEN (check asm's on-top dots from 3900b9e1), re-score SHIFT-NEAREST + PICKED-OWNER
-  (psui's batch landed), MARKER-REACH + EDGE-PICK-RADIUS wait on live R1-R5.
-- c2-constrained-surface (P2, after the P0s): refs now translate except the patterned sketch points: live's 960
-  vertices are Linear pattern 1's sketch copies (feature pattern of Sketch 1+2, centred 4 -> 7 instances; ours makes
-  them: pattern.rs copy_sketches, ids mix(pattern, sketch, code)|1<<62). The translator (ops/src/parity.rs
-  sketch_point_at) only searches sketch features; needs an op exposing the copies' points (SketchEntity{copy, entity})
-  + e2e test. Run: ut3t.sh c2-constrained-surface on vibex8 (via ~/bin/slot).
+## NEXT (20:4x, second compaction)
+- d2b509fc still CHECKING (since 20:22). After it lands: rebase --onto origin/main d2b509fc3 (local), land 0bf992280 +
+  6f76109c7 (handoffs) + 49d48df96 (VERTEX-FROM-FACE) + the UNCOMMITTED work below (grep TICKETS dup rows, diff --stat).
+- UNCOMMITTED (tests running on vibex8: ~/tmp/skasm/rr.sh -> /root/skasm-scratch/rr.log; read with tail/grep only):
+  * scene builder.rs: InferenceMark { shape: MarkShape (Corner / Midpoint / Point) } + InferenceMark::new(origin, x,
+    z, &Reference); edge midpoints drawn as 3.5 px half-side squares (FEEL-MC-MARKER-SHAPES). Call sites: part-studio
+    inference.rs, assembly_view.rs (~1709), assembly_panels.rs (~4038) (tell asm: their highlight-marks block).
+  * InferenceMarks::build -> compare::POST (drawn in a preview's top layer, over the lit edges redrawn there:
+    FEEL-MC-PS-EDGE-TRIAD-HIDDEN; also CAP-MARKER-HIDDEN with a preview).
+  * assembly/inference.rs: one FACE_REACH_PX 50 square for every marker, MIDPOINT_REACH_PX + face_reach removed;
+    test adds the 4x zoom rows (live mc-reach-1122 R1-R3: live's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX 50).
+    EDGE_END_REACH stays asm's (FEEL-MC-EDGE-BEFORE-VERTEX-ASM): tell asm the reach change after it lands.
+  * with_highlights: a hovered closed edge's polyline drawn again hidden_only (5 px, hover colour, layer
+    HIGHLIGHT_LINES_LAYER): live R5. GPU test edge_looks::a_hovered_rim_shows_its_hidden_back_half (new).
+  * TICKETS: CAP-MARKER-HIDDEN, EDGE-TRIAD-HIDDEN, PS-VERTEX-LOOK (by 49d48df96), MARKER-SHAPES, PS-MARKER-REACH,
+    PS-EDGE-PICK-RADIUS marked fixed, to verify. Edge reach NOT changed (7 px over a face stays: reach-px-1119 and R4's
+    block edge light at 7; only the rim stayed on the side face at 7) -> mention to the lead.
+  Commit subject idea: "skasm: mate connector inference as live: midpoint marks squares, glyph over lit edges in a
+  preview, one 50 px marker reach, a hovered rim drawn whole (live mc-reach-1122 R1-R5)".
+- S4 (Extend/Trim on circles) is done by what's queued: live's S4 is a line extended to a line + Trim pieces on a
+  circle; Extend of an arc keeps the old two-pick path (no live capture of an arc extend).
+- Left after this: re-score SHIFT-NEAREST + PICKED-OWNER (psui's batch landed); c2-constrained-surface (P2: op for
+  the pattern's sketch copies' points + e2e; ut3t.sh c2-constrained-surface on vibex8 via ~/bin/slot).
+- Report to the lead when the queue is empty (<=5 lines).
+- Context: never cat task output files or logs whole; tail -40 / grep.
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::

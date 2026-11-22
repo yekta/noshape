@@ -1672,7 +1672,7 @@ fn a_routing_curves_multiple_ball_snaps_to_a_faces_inference_point(cx: &mut Test
 }
 
 /// Live ball-1119 (studios, lead 11-21): dragged by the real pointer, Multiple's ball snaps as mate-connector placement
-/// (live asm-feel3-1118): over a face it takes the point within the 47.5 px square around the pointer, here the face's
+/// (live asm-feel3-1118): over a face it takes the point within the 50 px square around the pointer, here the face's
 /// corner 45 px off, else the face's centroid, and the triad turns to that point's frame; as the GPU's pick and the
 /// points come, with no further move. (Ours took the point nearest where the drag began.)
 #[gpui::test]
