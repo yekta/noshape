@@ -286,18 +286,18 @@ fn stl_with_a_fold_is_a_solid() {
     assert!((v - 1e-6).abs() < 1e-10, "volume {v}");
 }
 
-/// Triangles join only across an edge exactly two of them use; where three or more meet, the pieces split, and a
-/// triangle repeated is read once (live stl-split-1121: c2-duct-multipart's STL 9 surfaces, c2-bottle-split's 148).
-/// Two closed cubes side by side: the shared x = 1 squares (other diagonals) and both open boxes are four surfaces;
-/// with the same triangles there, three (the repeated square once).
+/// Closed meshes touching along edges or over faces are the model's solids (lead 11-22, DECISIONS: live's import makes
+/// sheets of them, c2-bottle-split's two halves 148, its failure): at an edge three or more triangles use, each joins the
+/// one met first turning into its inside, each once. What can't close splits as live's import does (stl-split-1121:
+/// joined only across edges two triangles use, a repeated triangle read once).
 #[test]
-fn mesh_pieces_split_where_more_than_two_triangles_meet() {
-    // A unit cube at x0, without its face at x = `skip_x`.
+fn mesh_pieces_close_into_solids_and_split_only_where_open() {
+    // A box from `lo` to `hi`, without its faces at x = `skip_x`.
     let v = |x: f64, y: f64, z: f64| [x, y, z];
-    let cube = |x0: f64, skip_x: Option<f64>| {
+    let boxed = |lo: [f64; 3], hi: [f64; 3], skip_x: Option<f64>| {
         let mut t = Vec::new();
-        let c = [v(x0, 0.0, 0.0), v(x0 + 1.0, 0.0, 0.0), v(x0 + 1.0, 1.0, 0.0), v(x0, 1.0, 0.0), v(x0, 0.0, 1.0), v(x0 + 1.0, 0.0, 1.0), v(x0 + 1.0, 1.0, 1.0), v(x0, 1.0, 1.0)];
-        let quads = [([0, 3, 2, 1], None), ([4, 5, 6, 7], None), ([0, 1, 5, 4], None), ([2, 3, 7, 6], None), ([1, 2, 6, 5], Some(x0 + 1.0)), ([3, 0, 4, 7], Some(x0))];
+        let c = [v(lo[0], lo[1], lo[2]), v(hi[0], lo[1], lo[2]), v(hi[0], hi[1], lo[2]), v(lo[0], hi[1], lo[2]), v(lo[0], lo[1], hi[2]), v(hi[0], lo[1], hi[2]), v(hi[0], hi[1], hi[2]), v(lo[0], hi[1], hi[2])];
+        let quads = [([0, 3, 2, 1], None), ([4, 5, 6, 7], None), ([0, 1, 5, 4], None), ([2, 3, 7, 6], None), ([1, 2, 6, 5], Some(hi[0])), ([3, 0, 4, 7], Some(lo[0]))];
         for (q, at) in quads {
             if at.is_some() && at == skip_x {
                 continue;
@@ -307,6 +307,7 @@ fn mesh_pieces_split_where_more_than_two_triangles_meet() {
         }
         t
     };
+    let cube = |x0: f64, skip_x: Option<f64>| boxed([x0, 0.0, 0.0], [x0 + 1.0, 1.0, 1.0], skip_x);
     let read = |tris: &[[[f64; 3]; 3]], tag: &str| {
         let mut stl = String::from("solid two\n");
         for t in tris {
@@ -323,16 +324,37 @@ fn mesh_pieces_split_where_more_than_two_triangles_meet() {
         let _ = std::fs::remove_file(&path);
         s
     };
+    let solids = |s: &noshape_kernel::Shape, want: usize, volume: f64, what: &str| {
+        assert_eq!(s.count(ShapeType::Solid), want, "{what}");
+        let v = volume_properties(s).unwrap().mass;
+        assert!((v - volume).abs() < 1e-9, "{what}: volume {v}");
+    };
     // Each cube closed with its own face on x = 1 (two coincident squares, opposite ways, other diagonals).
     let mut tris = cube(0.0, None);
     tris.extend(cube(1.0, None));
-    let s = read(&tris, "a");
-    assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 4), "two open boxes and two squares");
-    // The second cube's square as the first's two triangles, turned the other way: read once.
+    solids(&read(&tris, "a"), 2, 2.0, "two cubes over a face");
+    // Without those faces: one box.
+    let mut tris = cube(0.0, Some(1.0));
+    tris.extend(cube(1.0, Some(1.0)));
+    solids(&read(&tris, "b"), 1, 2.0, "one box of two cubes");
+    // The second cube's square as the first's two triangles, turned the other way.
     let mut tris = cube(0.0, None);
     let shared: Vec<[[f64; 3]; 3]> = tris.iter().filter(|t| t.iter().all(|p| p[0] == 1.0)).map(|t| [t[0], t[2], t[1]]).collect();
     tris.extend(cube(1.0, Some(1.0)));
     tris.extend(shared);
-    let s = read(&tris, "b");
-    assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 3), "two open boxes and the square once");
+    solids(&read(&tris, "c"), 2, 2.0, "the shared square repeated");
+    // A cube inside a taller box, its bottom the box's own triangles the same way (c2-duct-multipart: parts written
+    // over each other, their faces repeated).
+    let mut tris = cube(0.0, None);
+    tris.extend(boxed([0.0, 0.0, 0.0], [1.0, 1.0, 2.0], None));
+    solids(&read(&tris, "d"), 2, 3.0, "a cube inside a box");
+    // Open: three squares on one edge are three surfaces; an open box one.
+    let sq = |p: [f64; 3]| vec![[v(0.0, 0.0, 0.0), v(0.0, 0.0, 1.0), p], [v(0.0, 0.0, 1.0), [p[0], p[1], 1.0], p]];
+    let mut tris = sq(v(1.0, 0.0, 0.0));
+    tris.extend(sq(v(0.0, 1.0, 0.0)));
+    tris.extend(sq(v(-1.0, 0.0, 0.0)));
+    let s = read(&tris, "e");
+    assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 3), "three squares on an edge");
+    let s = read(&cube(0.0, Some(1.0)), "f");
+    assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 1), "an open box");
 }

@@ -606,8 +606,10 @@ fn read_step_assembly(path: &Path) -> anyhow::Result<Option<PvzAssembly>> {
     use noshape_kernel as k;
     // Only files with assembly usages are read for their product tree (the
     // others are read once, as parts).
+    // An assembly of one instance is read as parts too: live imports it as a
+    // Part Studio only, the part where the instance was (live/dx/one-part-asm-1122).
     const NAUO: &[u8] = b"NEXT_ASSEMBLY_USAGE_OCCURRENCE";
-    if !std::fs::read(path)?.windows(NAUO.len()).any(|w| w.eq_ignore_ascii_case(NAUO)) {
+    if std::fs::read(path)?.windows(NAUO.len()).filter(|w| w.eq_ignore_ascii_case(NAUO)).count() < 2 {
         return Ok(None);
     }
     let Some((a, nesting)) = k::read_step_assembly_nested(path, k::LengthUnit::Meter)? else { return Ok(None) };

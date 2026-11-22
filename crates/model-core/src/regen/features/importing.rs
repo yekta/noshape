@@ -275,7 +275,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     // pieces make a mesh part; the open pieces of a file's part whose mesh doesn't
     // close become surfaces grouped in a closed composite part. A file without
     // parts (STL) makes each open piece a surface of its own (live stl-split-1121:
-    // the duct's 9 "Surface N" sheets, no composite).
+    // "Surface N" sheets, no composite).
     let mut open_groups: Vec<(Vec<k::Shape>, bool)> = Vec::new();
     for (s, part) in shapes {
         let s = if up { s.transformed(&k::Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::X, angle: std::f64::consts::FRAC_PI_2 })? } else { s };
