@@ -12,11 +12,6 @@ use noshape_model::partstudio::ConnectorOrigin;
 use noshape_model::reference::Reference;
 use std::sync::Arc;
 
-/// How near (px) the pointer brings a hovered face's connector to one of its points, in x and in y (a square).
-const FACE_REACH_PX: f64 = 47.5;
-/// How near (px) the pointer brings a hovered edge's connector to one of its ends.
-const EDGE_END_REACH_PX: f64 = 15.0;
-
 /// The hovered entity's inference points (computed off the UI thread) and the one under the pointer.
 pub(super) struct InferenceHover {
     on: Reference,
@@ -79,28 +74,17 @@ impl PartStudioView {
         self.choose_inference(cx) | lit
     }
 
-    /// The point the pointer brings the connector to, as the assembly's (live asm-feel3-1118, live ball-1119): over a
-    /// face a point within the 47.5 px square around the pointer, else the face's centroid; over an edge an end within
-    /// 15 px, else its midpoint (a circle's centre). Shift keeps the entity: the same rule on it wherever the pointer is
-    /// (live mc-infer-1122: off the face, its centroid).
+    /// The point the pointer brings the connector to: the assembly's choice ([`noshape_model::assembly::inference::choose`],
+    /// live mc-infer-1122: the same in both). Shift keeps the entity: the same rule on it wherever the pointer is. (Not
+    /// the assembly's centroid on entering: the points come after the pointer is on the entity.)
     fn choose_inference(&mut self, cx: &App) -> bool {
-        use noshape_model::reference::Inference;
+        use noshape_model::assembly::inference::{OnScreen, choose};
         let Some(pointer) = self.ui.pointer else { return false };
         let vp = self.vp().read(cx);
         let Some(i) = self.ui.inference.as_mut() else { return false };
         let Some(points) = &i.points else { return false };
-        let on_screen: Vec<(usize, glam::DVec2)> = points.iter().enumerate().filter_map(|(k, p)| vp.project(p.frame.origin).map(|s| (k, s - pointer))).collect();
-        let nearest = |within: &dyn Fn(glam::DVec2) -> bool| on_screen.iter().filter(|(_, d)| within(*d)).min_by(|a, b| a.1.length().total_cmp(&b.1.length())).map(|(k, _)| *k);
-        let primary = points.first().is_some_and(|p| match &p.reference {
-            Reference::Implicit { inference: Inference::Centroid, on } => matches!(**on, Reference::Face(_)),
-            Reference::Implicit { inference: Inference::Midpoint | Inference::CenterRim, on } => matches!(**on, Reference::Edge(_)),
-            _ => false,
-        });
-        let choice = match &i.on {
-            _ if !primary => nearest(&|_| true),
-            Reference::Face(_) => nearest(&|d| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).or(on_screen.first().map(|_| 0)),
-            _ => nearest(&|d| d.length() <= EDGE_END_REACH_PX).or(on_screen.first().map(|_| 0)),
-        };
+        let on_screen = OnScreen { on: &i.on, points: points.iter().map(|p| (&p.reference, vp.project(p.frame.origin))).collect() };
+        let choice = choose(&on_screen, pointer, false);
         if choice == i.choice && i.marks.is_some() {
             return false;
         }
