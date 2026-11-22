@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 08:33 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 08:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -24,7 +24,14 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   output /root/dx-scratch/fo/hex2.out.
 - asm (SPEED-ASM-OPEN): told one cache: display_cache::studio_key(doc, tab, config, fine) shared, StudioDisplay rows
   written only with the Part Studio's own builder/tolerance; asm also feeds AssemblyEvaluator core's result_store.
-- OPEN: DETAIL B label P2 + 3+ part hatch rule wait for live (REQUESTS dx 05:35).
+- LIVE ANSWERED dx 05:35 (behaviours "dx assembly section hatch per part", live/dx/hatch-1122/): ANSI31, one HATCH
+  per region, angle + spacing per INSTANCE. pin-block: block 0 deg (45 deg lines) 3.44 mm, pin 90 deg 2.46 mm, spacing
+  = instance section-bbox diag x 0.7/9 = what we ship (diag/13). 5 instances: 0/145/100/10/90 deg, spacing diag/9
+  except Part 1 <2> (0.7/9): rule unknown -> REQUESTS dx 08:39 (orders, 2-4 instances; when 0.7x). Ours alternates
+  0/90 in part order; repeated instances not split (section_part_ends groups by ProjBody: check instances are bodies).
+- DETAIL label: live DXF pin-block top 3.20 mm under a full r 16.8 mm circle (h 3.05, top-centre); labels-1118 ~5.3
+  under r ~34 (clip border; test a_detail_label_hangs_under_its_whole_circle pins 5.3 for both). No rule from two
+  points -> REQUESTS dx 08:39 (2). Code: build.rs ~2672 `Some((lo, hi)) => (lo, hi, 5.3)`.
 ## STATE 05:55 (earlier) 11-22 (read first)
 TASK (lead 05:1x): watch lands (DONE: 3af018e0 + afd3220a landed 05:29 as 1519a1df, main GREEN 05:42); hex iso
 circles (in test); bottle DXF rerun (DONE 05:2x vibex7: "matches", Front no longer moved, Iso 0.002 in; ARC 18/24,
