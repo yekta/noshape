@@ -806,6 +806,9 @@ pub struct SketchEditor {
     pub extend_from: Option<EntityId>,
     /// Extend on a line: the end picked (the nearer one), which follows the pointer (live 11-18 sketch-tools t4-ext).
     pub extend_end: Option<EntityId>,
+    /// The picked end's preview has snapped onto a boundary since the pick: the picked line then shows selected (live
+    /// mc-reach-1122 R6).
+    extend_crossed: bool,
     /// The draft holds the regeneration's solve of the sketch (taken on opening, or an edit came first): live edits
     /// the geometry it shows, not the stored one an upstream change has since moved.
     pub draft_solved: bool,
@@ -1572,6 +1575,7 @@ impl SketchEditor {
             slot_session: None,
             mirror_axis: None,
             extend_from: None,
+            extend_crossed: false,
             extend_end: None,
             pending_image: None,
             dxf_unit_scale: None,
@@ -2173,6 +2177,9 @@ impl SketchEditor {
         }
         self.pointer_rests &= self.cursor == Some(p);
         self.cursor = Some(p);
+        if self.tool == Tool::Extend && self.extend_end.is_some() {
+            self.extend_crossed |= self.extend_preview(&data.sketch, p).is_some_and(|(_, on)| on.is_some());
+        }
         self.shift_held = shift;
         self.alt_held = alt;
         self.external_snap = None;
@@ -2819,6 +2826,7 @@ impl SketchEditor {
                             self.selection = vec![id];
                             // A line: its nearer end is picked and follows the pointer (live 11-18 sketch-tools).
                             self.extend_end = nearer_line_end(&data.sketch, id, p);
+                            self.extend_crossed = false;
                             return EditOutcome::redraw();
                         }
                         Some(curve) => {
@@ -3051,6 +3059,21 @@ impl SketchEditor {
     }
 
     /// Fillet / chamfer tool click: a corner point, or the first / second curve.
+    /// Extend's preview for the pointer at `p` (live mc-reach-1122 R6): to the pointer's foot, past a boundary too; onto
+    /// the boundary (its curve given) only while the pointer is on it. The click still stops there ([`Self::extend_target`]).
+    pub fn extend_preview(&self, sk: &Sketch, p: DVec2) -> Option<(DVec2, Option<EntityId>)> {
+        let (q, on) = self.extend_target(sk, p)?;
+        let Some(c) = on else { return Some((q, None)) };
+        if sk.distance_to(c, p).is_some_and(|d| d <= self.world_per_px * INFERENCE_PX) {
+            return Some((q, on));
+        }
+        let (line, end) = (self.extend_from?, self.extend_end?);
+        let (s, e) = sk.endpoints(line)?;
+        let a = sk.point(if e == end { s } else { e })?;
+        let d = (sk.point(end)? - a).try_normalize()?;
+        Some((a + d * (p - a).dot(d), None))
+    }
+
     /// Extend (live 11-18 sketch-tools t4-ext, t7): where the picked line end goes for the pointer at `p`: along the
     /// line to the pointer's foot, back over the line too (shorter); past a crossing curve it stops on the first one
     /// (even clicked 42 px beyond it). The place and the curve it stops on.
@@ -6953,7 +6976,8 @@ impl SketchEditor {
             && let Some(id) = self.extend_from
             && data.sketch.entity(id).is_some()
         {
-            let color = crate::palette::rgb8(crate::palette::viewport::QUERY_HOVER);
+            // (Selected orange once the preview snapped onto a boundary: live mc-reach-1122 R6.)
+            let color = crate::palette::rgb8(if self.extend_crossed { crate::palette::viewport::SELECTION } else { crate::palette::viewport::QUERY_HOVER });
             wide.push((data.sketch.tessellate(id, self.world_per_px * 0.25), color, 4.0));
         }
         // Extend (live 11-18 sketch-tools): a hovered line's nearer end marked; once picked, the light-blue extension
@@ -6968,7 +6992,7 @@ impl SketchEditor {
         }
         if self.tool == Tool::Extend
             && let (Some(c), Some(end)) = (self.cursor, self.extend_end)
-            && let (Some((q, on)), Some(b)) = (self.extend_target(&data.sketch, c), data.sketch.point(end))
+            && let (Some((q, on)), Some(b)) = (self.extend_preview(&data.sketch, c), data.sketch.point(end))
         {
             poly(&[b, q], preview_color, false);
             if on.is_some() {
@@ -10489,8 +10513,8 @@ mod tests {
 
     #[test]
     fn extend_picks_the_nearer_end_which_follows_the_pointer_and_stops_on_a_crossing_curve() {
-        // Live 11-18 sketch-tools (t4-ext, t7): a click picks the line's nearer end (the line lit, selected); the end
-        // follows the pointer along the line and stops on a crossing curve, even clicked 42 px past it.
+        // Live 11-18 sketch-tools (t4-ext, t7), mc-reach-1122 R6: a click picks the line's nearer end (the line lit,
+        // selected); the end follows the pointer along the line, and a click past a crossing curve stops it there.
         let (mut ed, mut data) = editor(Tool::Extend);
         let l = data.sketch.add_line(v(0.01, 0.06), v(0.03, 0.06));
         let x = data.sketch.add_line(v(0.05, 0.03), v(0.05, 0.09));
@@ -10499,6 +10523,13 @@ mod tests {
         let end = data.sketch.endpoints(l).unwrap().1;
         assert_eq!(ed.extend_end, Some(end), "the nearer end");
         assert_eq!(ed.extend_target(&data.sketch, v(0.04, 0.065)), Some((v(0.04, 0.06), None)), "short of the crossing: at the pointer's foot");
+        // Live mc-reach-1122 R6: the preview runs past the boundary to the pointer, onto it only while the pointer is on
+        // it; passing over it turns the picked line selected.
+        let (past, _) = ed.extend_preview(&data.sketch, v(0.05 + 42.0 * PX, 0.062)).unwrap();
+        assert!((past - v(0.05 + 42.0 * PX, 0.06)).length() < 1e-9 && !ed.extend_crossed, "jumped past: to the pointer's foot, {past:?}");
+        ed.pointer_move(&mut data, v(0.05 + 2.0 * PX, 0.0605), false, false);
+        assert_eq!(ed.extend_preview(&data.sketch, v(0.05 + 2.0 * PX, 0.0605)).map(|(_, on)| on), Some(Some(x)), "on the boundary: snapped");
+        assert!(ed.extend_crossed, "passed over the boundary");
         click(&mut ed, &mut data, v(0.05 + 42.0 * PX, 0.062));
         assert!((data.sketch.curve(l).unwrap().end_point() - v(0.05, 0.06)).length() < 1e-9, "stopped on the crossing line");
         assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if (a, b) == (end, x))));
