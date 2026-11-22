@@ -5,36 +5,30 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 15:11 UTC) — RESUME HERE
-- LANDED 22f626c1 as ec33215f (14:40); qa told 15:1x.
-- LOCAL, rebased on main (not queued yet): f65ccd02f tyre fix (ASM-OPEN-TYRES-TURNED: `Context::revolve_axes`, implicit.rs
-  `revolve_axis()` Z = -drawn; ScopeRule 19 + `PartStudio::legacy_revolve_axes`; least_change skipped when LM moved
-  nothing; assembly lib 170 + model 606 green on vibex7), b081fd516 UI (sel-gestures-1122: no click toggle, Ctrl+box
-  removes / `Viewport::ctrl_boxes`, crossing box outline `Viewport::box_preview` + `ViewportEvent::BoxTouched` ->
-  `ui.box_touched`; mc-infer-1122: Shift locks the face (face rule, centroid off it), cylinder side MidAxis primary,
-  MIDPOINT_PICK_RADIUS_PX 41.5; qa FEEL-GEAR-DIALOG-MATES-LOOK (relation mates in the shown-mate loop),
-  FEEL-MATE-SECOND-PICK-HOVER (pointer still at `hud`: second pick plain, part outlined), UIS-PATTERN-SECOND-DIRECTION
-  (`field_mark`: field:Direction#1)), tickets commit. Clippy + assembly-ui 175 green on the pre-gear tree.
-- RUNNING (slots held by core's / qa's parity runs): vibex7 sg.log (ops e2e), sg2.log (clippy app-core/assembly-ui +
-  assembly-ui lib on the rebased tree); vibex8 probe8.log (infento probe, legacy vs NOSHAPE_PROBE_NEW_AXES=1, SOLVE ms;
-  instrumentation was synced to vibex8 then reverted locally: /root/asm-scratch/probe-instrumentation.patch eval.rs +
-  assembly_perf.rs parts, plus a temp env switch in partstudio.rs migration; never commit them).
-- UNCOMMITTED: solver.rs test `a_revolute_part_grabbed_on_its_axis_turns_toward_the_pointer` (qa MATE-GEAR-DRAG-TURNS-
-  NOTHING reopened: live wf25 s32 presses at Part 1's front-face centre = Revolute 2's axis, lever ~0, and still turns
-  Part 2 <2> toward the pointer; hypothesis: our LM sees no gain and stops). Run it (assembly --lib) first; if it fails,
-  fix the drag solve for a near-zero lever (turn the lever toward the pull), then the wf25 replay.
-- Slots: vibex7 held by core's parity (started ~14:44, timeout 7000 s), vibex8 by qa's parity (~14:47, 5400 s) and two
-  bool gates. Mac has an empty ~/noshape-host/agents/asm (cold build). My waiting runs start when those end.
-- Then: land (touch -c, diff --stat, cherry), tell core "ScopeRule 19 (legacy_revolve_axes)" and qa the sha.
-- Live triad-feel-1122 compared: ours matches (75x26 box focused/selected and kept, 0.1 mm step, ring free beyond 0.4
-  step = 2 deg, no geometry snap on arrows). Nothing to change.
-- Next: MATE-GEAR-DRAG-TURNS-NOTHING reopened (wf25 step 32: the drag changes no pixel), dx's re-measure once e52b091a is
-  on main (infento display key + cached/cold open, ot2.sh vibex8, ~/agents/asm-keep/asm-open-times.sh), then the list below.
-- Next after: first frame from StudioDisplay rows; infento parity rerun (10800 s); xdev-subs / pinslot reruns, bjr Sub
-  c1e15f Fastened 3/4, pinslot Revolute 5, tvc 41/43, keyboard BOM 15/16.
+## State (2026-11-22 16:31 UTC) — RESUME HERE
+- QUEUED db8b1ef0 at 16:30 (9 commits: tyre fix e5ca1de43 ScopeRule 19 + legacy_revolve_axes (core told), sel-gestures +
+  mc-infer 08a1409a5, tickets, handoffs, 4f4b8d82e gear drag + Origin row hover + row eye, tickets). Never land while it is
+  queued; `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh --status`. When it lands: give qa the sha (cells: tyres /
+  infento Fastened, sel-gestures, mc-infer, wf08 s07/s08, wf25 s28 + s32, wf35 s32-36, hl-a01 eye, hl-a03 origin).
+  Lead told 16:30.
+- Tests before queuing: assembly lib 172 ok, model 606 ok, ops e2e 294 ok, clippy clean; assembly-ui 176/177, the
+  one failure (the_second_pick_outlines..., pointer leaving the viewport) fixed (Hover(None) clears manip_click) and
+  passing alone; the queue runs the rest.
+- Gear drag (MATE-GEAR-DRAG-TURNS-NOTHING): wf25 = Revolute 1 limited ±45°, Gear ratio 2, press on Revolute 2's axis.
+  solve_dragged_only's damped gain check couldn't see a pixel's lever; added `drag_reach` (null space of the mate rows,
+  SVD of the drag rows, scale-free) for groups <= 16 bodies. Tests a_geared_part_grabbed_on_its_axis..., 
+  a_geared_drag_past_a_limit_turns_to_the_limit.
+- NEXT: P0 FEEL-ASM-FIXED-GLYPH reopened (qa 049f: ours a flat screen-aligned icon; live's lies in the face's plane,
+  foreshortened: white box over a hatched band; qa-scratch/tickets/asm-fixed-glyph-049f.png; the glyph drawn at the
+  drag's grab point on a fixed part, 28f5bbbb4 drag feel). Then infento least_change timing (probe5.sh on vibex8, slot
+  busy with qa parity; probe8.log empty), dx's re-measure once e52b091a is on main (still queue/dx-open-e52b091a at
+  16:00), then the list below.
+- live triad-feel-1122 matches ours (ring snap 2° window, arrows 0.1 mm, value box 75x26): nothing to do.
+- Next after: first frame from StudioDisplay rows; infento parity rerun; xdev-subs / pinslot reruns, bjr Fastened 3/4,
+  pinslot Revolute 5, tvc 41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
-  weld/w0-p*.noshape, ~/tmp/asm/q, ~/tmp/asm/app-b + app, vibex8 ~/tmp/asm/infento-saved.noshape (copy); vibe2 ops-tc /
-  ab1120e-*.out; local branch asm-rb-check; /root/asm-scratch/feel_tests_with_probe.rs.
+  weld/w0-p*.noshape, ~/tmp/asm/q, ~/tmp/asm/app-b + app; vibe2 ops-tc / ab1120e-*.out; local branch asm-rb-check;
+  /root/asm-scratch/feel_tests_with_probe.rs, /root/asm-scratch/solver.rs.keep.
 - Infento main: 157/167 occ, 204/206 mates, 64/64 BOM. Scissor main 07:18: 207/239 occ, 16/34 mates, BOM 62/87.
 
 ## State (2026-11-20 18:50 UTC)
