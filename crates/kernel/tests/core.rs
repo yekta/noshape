@@ -695,6 +695,82 @@ fn a_fault_inside_the_c_library_ends_the_process() {
     assert!(crash_inside_kernel(1).is_err());
 }
 
+/// APP-SIGTERM-IGNORED-MAC: a fault (or OCCT's std::terminate) recovered on a thread that blocks SIGTERM, as every
+/// thread made from a macOS GCD worker does, leaves the process ending on SIGTERM. The guards' jumps restored their
+/// saved mask with macOS's sigprocmask, which sets every thread's (abort() too): the app then ignored SIGTERM, so
+/// logout, shutdown and the updater's restart couldn't quit it. Run in a child process (this test's binary again).
+#[cfg(unix)]
+#[test]
+fn a_recovered_fault_leaves_the_process_ending_on_sigterm() {
+    const SIGABRT: i32 = 6;
+    const SIGTERM: i32 = 15;
+    if let Ok(kind) = std::env::var("NOSHAPE_TEST_TERM_AFTER_FAULT") {
+        let kind: u8 = kind.parse().unwrap();
+        std::thread::spawn(move || {
+            block_on_this_thread(&[SIGABRT, SIGTERM]);
+            assert!(crash_inside_kernel(kind).is_err());
+        })
+        .join()
+        .unwrap();
+        println!("recovered");
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    }
+    use std::os::unix::process::ExitStatusExt;
+    // 1: a raised SIGFPE; 2: an OCCT exception through a noexcept frame (std::terminate).
+    for kind in [1, 2] {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "kernel_core::a_recovered_fault_leaves_the_process_ending_on_sigterm", "--nocapture", "--test-threads", "1"])
+            .env("NOSHAPE_TEST_TERM_AFTER_FAULT", kind.to_string())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let mut out = std::io::BufReader::new(child.stdout.take().unwrap());
+        let mut line = String::new();
+        while !line.contains("recovered") {
+            line.clear();
+            if std::io::BufRead::read_line(&mut out, &mut line).unwrap() == 0 {
+                panic!("{kind}: the child ended before its fault was recovered: {:?}", child.wait());
+            }
+        }
+        let term = std::process::Command::new("kill").args(["-TERM", &child.id().to_string()]).status().unwrap();
+        assert!(term.success());
+        let t = std::time::Instant::now();
+        let status = loop {
+            if let Some(s) = child.try_wait().unwrap() {
+                break s;
+            }
+            if t.elapsed().as_secs() > 60 {
+                let _ = child.kill();
+                panic!("{kind}: the child ignored SIGTERM");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        };
+        assert_eq!(status.signal(), Some(SIGTERM), "{kind}: {status:?}");
+    }
+}
+
+/// Blocks `signals` on the calling thread only.
+#[cfg(unix)]
+fn block_on_this_thread(signals: &[i32]) {
+    #[cfg(target_os = "macos")]
+    type SigSet = u32;
+    #[cfg(not(target_os = "macos"))]
+    type SigSet = [u64; 16];
+    unsafe extern "C" {
+        fn pthread_sigmask(how: i32, set: *const SigSet, old: *mut SigSet) -> i32;
+    }
+    let bits = signals.iter().fold(0u64, |b, s| b | 1 << (s - 1));
+    // (SIG_BLOCK: 1 on macOS, 0 on Linux.)
+    #[cfg(target_os = "macos")]
+    let (how, set): (i32, SigSet) = (1, bits as u32);
+    #[cfg(not(target_os = "macos"))]
+    let (how, set): (i32, SigSet) = (0, std::array::from_fn(|k| if k == 0 { bits } else { 0 }));
+    assert_eq!(unsafe { pthread_sigmask(how, &set, std::ptr::null_mut()) }, 0);
+}
+
 /// Onshape's STEP of the G24 corner-blend part (dx I1): its four blends are
 /// rational B-spline patches closing to a point, with no pcurves in the
 /// file. OCCT's projection drifted near the point and each blend lost a

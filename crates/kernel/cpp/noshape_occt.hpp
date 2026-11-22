@@ -52,17 +52,11 @@ struct UnifyScope;   // internal.hpp, the unify
   #include <csetjmp>
   #include <csignal>
   #include <ctime>
-// The crash guards' jumps save the signal mask only on macOS: Linux's on_crash blocks nothing (SA_NODEFER, empty
-// sa_mask), so its jump leaves the mask as it was and skips a syscall a kernel call; macOS's _longjmp out of the
-// handler failed the budget's fault test (CI 11-06). Likely why (Darwin's libc, not checked on a Mac): only its
-// mask-restoring longjmp also clears the thread's on-the-alternate-signal-stack state (the handler runs SA_ONSTACK);
-// after a _longjmp the kernel still thinks the thread is on that stack, so the next fault isn't delivered as the
-// guard expects.
-#ifdef __APPLE__
-  #define NOSHAPE_GUARD_SAVES_MASK 1
-#else
-  #define NOSHAPE_GUARD_SAVES_MASK 0
-#endif
+// The crash guards' jumps never restore a signal mask: on_crash blocks nothing (SA_NODEFER, empty sa_mask), so a jump
+// leaves the thread's mask as it was (and saving it is a syscall on every kernel call). Restoring one on macOS is
+// sigprocmask, which sets every thread's mask there: a jump on a thread made from a GCD worker (most signals blocked)
+// blocked SIGTERM in the whole app (APP-SIGTERM-IGNORED-MAC); std::terminate's abort() did the same, so a guarded
+// terminate jumps without it (common.cpp).
 namespace noshape {
 // Crash guard (qa DRAFT-SEGV-DOC / DOC-POISON): a SIGSEGV, SIGBUS, SIGFPE,
 // SIGILL or SIGABRT (std::terminate: OCCT 8 throws from noexcept code, e.g.
@@ -462,8 +456,8 @@ bool run_guarded(F&& f) noexcept
 #ifdef __linux__
   const BudgetSnapshot budget;
 #endif
-  // (The mask: NOSHAPE_GUARD_SAVES_MASK; saving it is a syscall on every kernel call, 13 % of c2-sm-louver's regeneration.)
-  if (sigsetjmp(env, NOSHAPE_GUARD_SAVES_MASK) != 0)
+  // (The mask not saved: see install_crash_guard's declaration.)
+  if (sigsetjmp(env, 0) != 0)
   {
     crash_guard = outer;
     t_deadline  = deadline;
@@ -558,8 +552,8 @@ static void trycatch_timed(Try&& func, Fail&& fail) noexcept
 #ifdef __linux__
   const noshape::BudgetSnapshot budget;
 #endif
-  // (The mask: NOSHAPE_GUARD_SAVES_MASK.)
-  if (sigsetjmp(env, NOSHAPE_GUARD_SAVES_MASK) != 0)
+  // (The mask not saved: see run_guarded's.)
+  if (sigsetjmp(env, 0) != 0)
   {
     noshape::crash_guard = outer;
     noshape::t_deadline  = deadline;

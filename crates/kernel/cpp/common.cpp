@@ -2634,6 +2634,10 @@ extern "C" int pthread_once(pthread_once_t* o, void (*init)())
 #endif
 
 #ifndef _WIN32
+#ifdef __APPLE__
+// Darwin's private sigreturn (libsystem_kernel; what its longjmp clears the alternate stack state with).
+extern "C" int __sigreturn(void* uctx, int infostyle, uintptr_t token);
+#endif
 namespace noshape {
 
 thread_local sigjmp_buf* crash_guard  = nullptr;
@@ -2722,6 +2726,13 @@ void on_crash(int sig, siginfo_t* info, void* ctx)
       backtrace_symbols_fd(frames, n, 2);
     }
 #endif
+#ifdef __APPLE__
+    // What Darwin's mask-restoring longjmp does besides the mask (not saved: noshape_occt.hpp): the thread off its
+    // alternate signal stack again (the handler runs SA_ONSTACK; left on, the next fault's handler runs on the
+    // faulting stack). libplatform's _sigunaltstack.
+    if (info != nullptr)
+      __sigreturn(nullptr, (int)0x80000000 /* UC_RESET_ALT_STACK */, 0);
+#endif
     siglongjmp(*env, 1);
   }
   // Not in a kernel call: the previous handler, or the default action
@@ -2794,6 +2805,11 @@ void install_crash_guard()
 #endif
     g_previous_terminate = std::set_terminate([] {
       terminating = true;
+      // Inside a guard: its SIGABRT taken here, without abort(): on a thread that blocks SIGABRT (every thread made from
+      // a macOS GCD worker) abort() can't raise it, and glibc's then sets SIGABRT's default action for the process;
+      // macOS's blocks nearly every signal in every thread (sigprocmask).
+      if (crash_guard != nullptr)
+        on_crash(SIGABRT, nullptr, nullptr);
       if (g_previous_terminate != nullptr)
         g_previous_terminate();
       std::abort();
