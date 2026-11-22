@@ -812,7 +812,7 @@ pub fn section_part_hatches(parts: &[Option<(u64, usize)>]) -> Vec<(bool, f64)> 
             return (false, 1.0);
         }
         let rank = distinct.iter().position(|d| d == k).unwrap_or(0);
-        ((distinct.len() - 1 - rank) % 2 == 0, 1.0)
+        ((distinct.len() - 1 - rank).is_multiple_of(2), 1.0)
     }).collect()
 }
 
