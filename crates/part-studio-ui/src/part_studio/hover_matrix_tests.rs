@@ -67,7 +67,12 @@ pub(super) fn matrix_studio_with(cx: &mut TestAppContext, name: &str, connector:
 
 impl Matrix {
     pub fn screen(&self, cx: &mut TestAppContext, mm: [f64; 3]) -> DVec2 {
-        cx.update(|cx| self.view.read(cx).viewport.read(cx).project(DVec3::from(mm) * 1e-3).expect("on screen")).round()
+        self.exact(cx, mm).round()
+    }
+
+    /// Where a model point shows, unrounded (where the ui-parity runner puts the pointer).
+    pub fn exact(&self, cx: &mut TestAppContext, mm: [f64; 3]) -> DVec2 {
+        cx.update(|cx| self.view.read(cx).viewport.read(cx).project(DVec3::from(mm) * 1e-3).expect("on screen"))
     }
 
     /// Nothing selected, the pointer parked over the background.
@@ -646,7 +651,7 @@ fn b3_cell(cx: &mut TestAppContext, dialog: bool, target: [f64; 3], state: State
         cx.update_window(m.window, |_, w, cx| d.update(cx, |d, cx| d.set_expr_text("radius", "1.3 mm", w, cx))).unwrap();
         m.park(cx);
     }
-    let p = m.screen(cx, target);
+    let p = m.exact(cx, target);
     match state {
         State::Hovered => approach(cx, &m, p),
         State::Selected | State::SelectedHovered => {
@@ -745,6 +750,10 @@ fn b3_connector_hovered(cx: &mut TestAppContext) {
     let (_m, c) = b3_cell(cx, false, CONNECTOR, State::Hovered);
     dump("cell-b3_connector_hovered", &c);
     assert!(shows(&c, 0xf4df99, 16.0) && shows(&c, 0xe1ec87, 30.0) && crisp_navy(&c) == 0, "{} crisp navy px", crisp_navy(&c));
+    // Its origin vertex lit under the glyph: a ~10 px #f1fe81 disc round the corner (live ps-mc-hover: 39 px of it
+    // within 5 px of the centre; the owner's three edges meeting there alone gave ours 18).
+    let lit = near_centre(&c, 5.0).filter(|p| close(*p, 0xf1fe81, 16)).count();
+    assert!(lit >= 30, "{lit} lit origin px");
 }
 
 #[gpui::test]
@@ -754,6 +763,8 @@ fn b3_connector_selected(cx: &mut TestAppContext) {
     dump("cell-b3_connector_selected", &c);
     // (Our old owner tint: the whole top face #bed5a8, ~1000 px; the owner edges' blend with the face gives a few.)
     assert!(shows(&c, 0xccc173, 16.0) && count(&c, 0xbed5a8) < 300 && shows(&c, 0x99c0d7, 40.0) && crisp_navy(&c) == 0);
+    let lit = near_centre(&c, 5.0).filter(|p| close(*p, 0xf1fe81, 16)).count();
+    assert!(lit >= 30, "{lit} lit origin px (live ps-mc-selected 39)");
 }
 
 #[gpui::test]
@@ -837,6 +848,24 @@ fn b3_field_edge_picked(cx: &mut TestAppContext) {
     dump("cell-b3_field_edge_picked", &c);
     let (ahead, behind) = arrow_px(cx, &m, &c);
     assert!(shows(&c, 0xffa90a, 3.0) && ahead >= 8 && behind == 0, "arrow px ahead {ahead}, behind {behind}");
+    // The selected edge's 5 px band over the round (live dlg-edge-selected: #FFA90A at both tangent lines, #DDA027..
+    // #FFAF25 between); ours was a 3 px line with the face between it and the tangent lines.
+    let along = screen_dir(cx, &m, EDGE, [5., 0., 0.]);
+    let run = amber_across(&c, along);
+    assert!((4..=6).contains(&run), "{run} amber px across the picked edge (live 4, ours was 3)");
+}
+
+/// Amber pixels (#FFA90A over anything: r ≥ #D0, g #98..#B8, b ≤ #40) on the line through the crop's centre across
+/// `along`, within 6 px.
+fn amber_across(crop: &[[u8; 3]], along: DVec2) -> usize {
+    let n = DVec2::new(-along.y, along.x).normalize();
+    (-6..=6)
+        .filter(|k| {
+            let q = DVec2::new(40.0, 40.0) + n * f64::from(*k);
+            let [r, g, b] = crop[q.y.round() as usize * 80 + q.x.round() as usize];
+            r >= 0xd0 && (0x98..=0xb8).contains(&g) && b <= 0x40
+        })
+        .count()
 }
 
 #[gpui::test]
@@ -1015,3 +1044,4 @@ fn the_line_a_snap_lands_on_is_lit_as_hovered(cx: &mut TestAppContext) {
     }
     assert!(through >= 8 && opaque == 0, "{through} of 13 samples blue through, {opaque} px #ecb78a");
 }
+

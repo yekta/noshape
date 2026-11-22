@@ -2168,6 +2168,13 @@ pub fn owner_secondary(display: &StudioDisplay, body: &noshape_model::BodyId, up
     (!lines.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(12))
 }
 
+/// A lit mate connector's origin vertex: a secondary yellow-green disc ~10 px across under the glyph (live hover-matrix
+/// b3/ps-mc-*: #F1FE81 round the block's corner, hovered and selected).
+pub fn connector_origin_lit(at: DVec3, up: &Uploader) -> Instance {
+    let dot = PointSprite { position: at.as_vec3().into(), color: [0xf2, 0xff, 0x80, 255], pick_id: 0, size: 10.0, style: 1, _pad: 0 };
+    Instance::new(Drawable::Points(up.upload_points(&PointData { points: vec![dot] }))).per_primitive_color().unpickable().ignore_clip().layer(12)
+}
+
 /// A decoded image: width, height, RGBA8 rows.
 type DecodedImage = Arc<(u32, u32, Vec<u8>)>;
 

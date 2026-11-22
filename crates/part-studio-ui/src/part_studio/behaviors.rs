@@ -3703,7 +3703,7 @@ impl PartStudioView {
             .collect()
     }
 
-    pub(super) fn consumed_picks_overlay(&mut self, selection: &[Reference], accent: &[Reference], changed: &[Reference]) -> Vec<noshape_render::Instance> {
+    pub(super) fn consumed_picks_overlay(&mut self, selection: &[Reference], accent: &[Reference], changed: &[Reference], fillet: bool) -> Vec<noshape_render::Instance> {
         use noshape_render::{Drawable, Instance, LineData};
         let (Some(_), Some(before), Some(built)) = (&self.edit, self.ui.preview_before.clone(), &self.built) else {
             self.ui.consumed_lines = None;
@@ -3727,11 +3727,16 @@ impl PartStudioView {
         }
         let mut lines = LineData::default();
         for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
+            // A picked edge Fillet's preview consumed: the selected edge's 5 px band over its round (live b3/dlg-edge-selected:
+            // the 1.3 mm round between its tangent lines, #FFA90A at both, #DDA027..#FFAF25 between); a face's boundary and
+            // another feature's pick (a flange's edge under its wall, bright orange) stay a line.
+            let band = if fillet { noshape_render::LineSegment::CORE | noshape_render::LineSegment::BAND } else { 0 };
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255];
             // The faces' edges in one pass over the bodies, then each body's edges looked up once.
             let faces: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
             let face_edges = crate::scene_builder::faces_edges(&before, &faces);
-            let mut wanted: std::collections::HashSet<&Reference> = refs.iter().filter(|r| !matches!(r, Reference::Face(_))).collect();
+            let edges: std::collections::HashSet<&Reference> = refs.iter().filter(|r| !matches!(r, Reference::Face(_))).collect();
+            let mut wanted = edges.clone();
             wanted.extend(face_edges.iter().flatten().flatten());
             if wanted.is_empty() {
                 continue;
@@ -3739,7 +3744,7 @@ impl PartStudioView {
             for b in before.bodies.iter().filter(|b| !b.hidden) {
                 for (e, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
                     if wanted.contains(e) {
-                        lines.push_polyline(pl, rgba, 0, 3.0, 0);
+                        lines.push_polyline(pl, rgba, 0, 3.0, if edges.contains(e) { band } else { 0 });
                     }
                 }
             }

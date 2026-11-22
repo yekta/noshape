@@ -36,38 +36,49 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (23:58 UTC 11-21): USER P0, the hover × selection look matrix + qa's walk tickets
+## Now (01:09 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
 
-LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (22:45; qa re-score 4/15, matrix 94/125).
-CHECKING: 6e5e17c8 (walks 3-5 + menus). Open there: sk-model-edge + ps-edge menus (REQUESTS psui 21:58: is live's
-1117 'edge' menu the midpoint's?).
-LANDING NOW (qa walk 6, TICKETS "qa, 2026-11-21 22:2x"), tests green on vibe2 (full lib 449+200; then the 5 new tests,
-the dialogs matrix and the b3 cells after the last edits):
-- FEEL-MANIP-DEAD-ZONE: ARROW_DEAD_PX 3 (built-in and std arrows).
-- FEEL-EXTRUDE-DRAG-PREVIEW: feature_dialog set_expr_text updates the field's baseline (the preview used the old one).
-- MENU-SK-SKETCH-PLANE: sketch.rs own_plane_under_pointer (a ray to the own plane's square); its menu, Escape line
-  first with a tool; ui.menu_target lights it.
-- FEEL-PREVIEW-HOVER-LIT: mod.rs preview_hides: a preview-made face, a changed face beyond where it was (CPU ray against
-  ui.preview_before), or a changed face the dialog holds, lights nothing.
-- FEEL-SHELL-RECLICK-REMOVED-FACE: mod.rs held_face_under: a click on the preview's own geometry / nothing takes a
-  held changed face the ray meets as it was (the GPU pick never reached the khaki fill).
-- FEEL-FILLET-ARROW-CLICK (P1): a click on an arrow with no flip changes nothing and focuses no field.
-- FEEL-FILLET-ARROW-DRAG (live 23:48: rate =): toward the edge the radius falls to 0.02414 mm (was len.abs()); a Fillet
-  drag leaves the focus where it was; the stuck 5 mm preview was the baseline bug above.
-NEXT (qa's batch 3 re-score 23:4x): P0 FEEL-ORIGIN-HOVER-EDGE reopened (all 4 origin cells light/select the vertical
-edge, live +x); FEEL-MC-LOOK partly (crisp 1 px navy rim + navy square at the ring's front; disc centre white, live lit
-yellow-green); P0 FEEL-FILLET-PICKED-STRIP (at 1.3 mm live fills the round between its tangent lines, 5 px #FFA90A at
-both, #DDA027..#FFAF25 between; ours a 3 px line). Crops qa-scratch/hm2/cmp-b3psui, qa-scratch/tmp/w6m/.
-SPEED-HEAVY-HOVER (P0, measured 23:2x, local Xvfb :397, scripts /root/psui-scratch/hh: run.sh, var.sh, stages.py,
-prof.sh): the plate (116,812 triangles) on llvmpipe: hover to light 450-600 ms, debug = release (stripped release
-copy /root/psui-scratch/noshape-rel from dx-open). Per hover: pick 130-220 ms (already scissored to a 96 px margin,
-so per-vertex), frame 160-190 ms, window composite 40-90 ms; half resolution cuts the frame ~40 %, no lines changes
-little; 63 % of CPU in llvmpipe's JIT shaders. Matches 11-20's pick_bench finding (the shaded mesh pass is the cost).
-Reported to the lead as "decision needed": DECISIONS 11-16 judges speed on the Mac; options for software GL are a coarse
-mesh there (Part Studio bodies have no coarser levels unless viewing in high quality) or a CPU pick.
+LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (qa re-score 4/15, matrix 94/125).
+CHECKING 6e5e17c8 (walks 3-5 + menus); QUEUED 2bc17f3e (qa walk 6, 7 tickets; qa's re-score unit fires when green).
+Next after this land: sk-model-edge + ps-edge menus; live answered 11-22 01:1x (behaviours "psui walk 5",
+live/psui/walk5-1121/): at (20,0,10) the midpoint lights (tan disc, edge not) and gives the short menu (Confirm | Hide
+Part 1 | Isolate… | Make transparent… | Clear selection | Select | Select other… | Zoom to fit | View normal to sketch
+plane); off it (10,0,10) the edge lights, + Use, Curve/surface analysis…, Add comment, Zoom to selection, Align view
+with vertical axis. Part Studio, face selected: the midpoint joins it; right-click = Extrude 1 part menu + "Add
+appearance to face…".
+IN TREE (to land next; tests: render + part-studio-ui lib on vibe2, run-full4.sh):
+- FEEL-ORIGIN-HOVER-EDGE: renderer.rs pick_reaching's corner rule reaches 3 px (d2 <= 10): the origin glyph (a 5x5
+  pick id under the edges' priority) covers the corner, the edges' nearest pixels were 3 px off. b3_cell aims at
+  `m.exact` (unrounded, as the ui-parity runner); the rounded point hid it.
+- FEEL-CUBE-CORNER-HOVER (walk 7): overlay.rs view_cube::build draws a hovered corner's highlight over the near faces
+  (no white fill: live #B1D9F0 over a gap); test render `the_cubes_near_corner_lights_a_whole_disc` (CPU composite).
+- FEEL-MC-LOOK: builder.rs connector_origin_lit, a 10 px #F2FF80 point under a lit connector whose originQuery is a
+  vertex (connector_look.rs connector_on_vertex); cells check 30+ lit px within 5 px (live 39, ours was 18). The crisp
+  rim / navy block at the ring's front = no MSAA under llvmpipe (style.software), not ours to fix (lead: software GL
+  isn't a target).
+- FEEL-FILLET-PICKED-STRIP: LineSegment::BAND (1024) + CORE: an overlay line drawn as a lit edge's 5 px band, no plain
+  line under the core (shaders.wgsl own_edge); behaviors.rs consumed_picks_overlay uses it for picked edges of a Fillet
+  edit only (a flange's edge under its wall stays the bright 3 px line: sm test, the band's 78% core is dim over the
+  blend). Cell b3_field_edge_picked: 4-6 amber px across (live 4, ours was 3).
+- FEEL-NAMED-VIEW-AFTER-SAVE (walk 7, P1): a saved view is the picked one (part studio view_tools.rs, assembly
+  assembly_view.rs); test sketch_ui_tests a_saved_named_view_is_the_picked_one.
+- qa ask: ui-script "drag" takes "button" right|middle, "moves", "interval_ms" (crates/app/src/ui_script.rs drag_plan,
+  README); right/middle let go right after the last move (a flick). Tell qa when green.
+- TICKETS: tick the 3 batch-3 ones (done) + after a rebase onto main CUBE-CORNER and NAMED-VIEW. NAV-INERTIA /
+  ANIM-LOW-FPS: qa re-ranked them P2 software-GL-only (qa checks the Mac); nothing of ours.
+- FEEL-FILLET-ARROW-DRAG: in 2bc17f3e (queued), qa re-scores when it lands.
+FEEL-NAV-INERTIA / FEEL-NAV-ANIM-LOW-FPS (walk 7): live's client (webgl bundle): animateTo jumps and
+performStopRotationAnimation skips when isInteractiveFramerateBelowThreshold: average of the last 5 draw-loop CPU times
+or rAF intervals > 1000/DETAIL_REDUCTION_THRESHOLD_FPS(20). SwiftShader draws in Chrome's GPU process, so live measures
+itself fast and animates; llvmpipe draws in ours (~100 ms), so ours jumps by the same rule. Proposed no change (lead).
+SPEED-HEAVY-HOVER: lead 00:1x: software GL is NOT a target; re-measure on the Mac, a ticket only if >=2x and >=100 ms
+behind live there. Mac: release app at ~/noshape-host/psui-keep/noshape (built 11-22 03:40 Mac time from this tree),
+plate.noshape, plate-hover.json (F, 18 hovers between the plate and empty), run.sh <n> (NOSHAPE_FRAME_LOG), local
+/root/psui-scratch/mac/stages.py. Run 1 (load 12, not quiet; targets unverified: NOSHAPE_UI_SHOTS doesn't work on
+macOS): hovers that changed the picture took 38-175 ms move-to-present (pick 0-86, frame 6-138 ms on an M6 at 5K).
+Next: a quiet run with verified targets ({"face": [x,y,z]} points from the plate) and live's number on a GPU.
 Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + b3 cells), compare.py oursN live-b1c|live-b2|live-b3 sxsN.
 Later: drop `at_bar` + list matrix row; full1 sketch-constraint-refusals (49) / sketch-entity-copy-paste (12).
-Local disk at 99 % (23:0x): lead told; my scratch trimmed (cli-*, rel/, tab/).
 
 ### Earlier today
 

@@ -79,6 +79,10 @@ impl LineSegment {
     /// A sheet metal bend's centre line in the flat view: 10 px on, 10 off, 5 on, 10 off, the same at every zoom (live
     /// sheetmetal-gaps2).
     pub const CENTER_LINE: u32 = 512;
+    /// With [`Self::CORE`]: drawn as a lit part edge's 5 px band whatever its pick's state, in its own colour, with no
+    /// plain line under the core (a field's pick the feature's preview consumed: live hover-matrix b3/dlg-edge-selected,
+    /// Fillet's round showing through).
+    pub const BAND: u32 = 1024;
 }
 
 impl LineData {

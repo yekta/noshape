@@ -452,6 +452,8 @@ impl PartStudioView {
                 }
             });
         });
+        // Live walk7 7-saved: the select then reads the saved view, its remove button on.
+        self.named_view_picked = Some(name);
     }
 
     pub(super) fn apply_named_view(&mut self, v: &noshape_model::partstudio::NamedView, window: &mut Window, cx: &mut Context<Self>) {

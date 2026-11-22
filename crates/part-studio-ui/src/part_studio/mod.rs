@@ -1518,7 +1518,8 @@ impl PartStudioView {
         }
         self.viewport.update(cx, |vp, cx| vp.set_camera_geometry(manip, cx));
         let changed = self.changed_picks(&selection);
-        extra.extend(self.consumed_picks_overlay(&selection, &accent, &changed));
+        let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
+        extra.extend(self.consumed_picks_overlay(&selection, &accent, &changed, fillet));
         selection.retain(|r| !changed.contains(r));
         extra.extend(self.measure_overlay());
         if !on_handle {

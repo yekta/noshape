@@ -419,10 +419,11 @@ impl PickBuffer {
             (1.0 + distance) * (1.0 - coverage)
         };
         let best = hits.iter().enumerate().max_by(|(_, a), (_, b)| a.1.cmp(&b.1).then_with(|| score(b).total_cmp(&score(a))).then_with(|| b.0.cmp(&a.0)))?;
-        if !far(best.1.0) || best.1.3 > 4 {
+        if !far(best.1.0) || best.1.3 > 10 {
             return Some(best.1.0);
         }
-        // Edges meeting under the pointer (the nearest at most 2 px off, the others within a pixel of it): the one
+        // Edges meeting under the pointer (the nearest at most 3 px off, past a point glyph drawn over their corner, as
+        // the origin's; the others within a pixel of it): the one
         // running most nearly across the screen (live hover-matrix b3: at the block's corners, the origin and a Fillet
         // field's vertex, live lights the edge along x, never the upright one).
         let near = |h: &(u32, i32, u32, i32)| far(h.0) && h.1 == best.1.1 && (f64::from(h.3).sqrt() - f64::from(best.1.3).sqrt()).abs() <= 1.0;

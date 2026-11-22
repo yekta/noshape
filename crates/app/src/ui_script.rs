@@ -781,14 +781,17 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
                                 sleep(cx, 20).await;
                             }
-                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Left, position: a, modifiers: mods, click_count: 1, first_mouse: false }), cx));
+                            let plan = drag_plan(&step);
+                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: plan.button, position: a, modifiers: mods, click_count: 1, first_mouse: false }), cx));
                             pointer = Some(b);
-                            for k in 1..=15 {
-                                let p = a + (b - a) * (k as f32 / 15.0);
-                                let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: Some(MouseButton::Left), modifiers: mods }), cx));
-                                sleep(cx, 30).await;
+                            for k in 1..=plan.moves {
+                                let p = a + (b - a) * (k as f32 / plan.moves as f32);
+                                let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: Some(plan.button), modifiers: mods }), cx));
+                                if k < plan.moves || plan.settle {
+                                    sleep(cx, plan.interval_ms).await;
+                                }
                             }
-                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: MouseButton::Left, position: b, modifiers: mods, click_count: 1 }), cx));
+                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: plan.button, position: b, modifiers: mods, click_count: 1 }), cx));
                             Ok(())
                         }
                         (Err(e), _) | (_, Err(e)) => Err(e),
@@ -1393,9 +1396,40 @@ impl CurrentWorkspace {
 }
 
 
+/// How a document "drag" step moves: its button (`"button"`: "left", "right" or "middle"), `"moves"` (15) and
+/// `"interval_ms"` (30) between them. A left drag waits the interval after its last move too (live's runner); a right or
+/// middle one lets go at once, a flick (qa FEEL-NAV-INERTIA).
+struct DragPlan {
+    button: MouseButton,
+    moves: usize,
+    interval_ms: u64,
+    settle: bool,
+}
+
+fn drag_plan(step: &Value) -> DragPlan {
+    let button = match step["button"].as_str() {
+        Some("right") => MouseButton::Right,
+        Some("middle") => MouseButton::Middle,
+        _ => MouseButton::Left,
+    };
+    DragPlan { button, moves: step["moves"].as_u64().map_or(15, |n| n.clamp(1, 1000) as usize), interval_ms: step["interval_ms"].as_u64().unwrap_or(30), settle: button == MouseButton::Left }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+
+    /// A drag step's button, moves and interval: the left drag as live's runner's unless said; a right one a flick.
+    #[test]
+    fn a_drag_step_takes_its_button_moves_and_interval() {
+        use gpui_kit::MouseButton;
+        let plain = super::drag_plan(&json!({ "do": "drag" }));
+        assert_eq!((plain.button, plain.moves, plain.interval_ms, plain.settle), (MouseButton::Left, 15, 30, true));
+        let flick = super::drag_plan(&json!({ "do": "drag", "button": "right", "moves": 6, "interval_ms": 8 }));
+        assert_eq!((flick.button, flick.moves, flick.interval_ms, flick.settle), (MouseButton::Right, 6, 8, false));
+        let pan = super::drag_plan(&json!({ "do": "drag", "button": "middle", "moves": 0 }));
+        assert_eq!((pan.button, pan.moves), (MouseButton::Middle, 1));
+    }
 
     /// ver-compare-*: comparing, the compare panel's picked row is the selection (a row clicked in the panel); a face
     /// clicked in the graphics stays the selection though its row is picked too (live ver-compare-hover-part s5).

@@ -821,12 +821,19 @@ pub mod view_cube {
         // A hovered piece keeps its own fill under the translucent highlight
         // (live #bce2f7 = #90cef1 at 0.6 over the white face; drawn alone the
         // back frame showed through: qa5 P1-15, (177,217,241)).
-        for s in cube_shapes(rotation) {
+        // A hovered corner's disc is lit over the faces around it (live walk7 corner_frt: at iso the near corner, all but
+        // hidden under the three near faces, a whole disc of the highlight over them and the gaps).
+        let corner = |cell: CubeCell| cell.0.iter().all(|c| *c != 0);
+        let shapes = cube_shapes(rotation);
+        for s in &shapes {
             let poly = place(std::slice::from_ref(&s.poly));
             out.fill(&poly, if s.frame { c.frame } else { c.face }, dpr);
-            if cube.hover == Some(s.cell) {
+            if cube.hover == Some(s.cell) && !corner(s.cell) {
                 out.fill(&poly, c.highlight, dpr);
             }
+        }
+        if let Some(s) = shapes.iter().find(|s| cube.hover == Some(s.cell) && corner(s.cell)) {
+            out.fill(&place(std::slice::from_ref(&s.poly)), c.highlight, dpr);
         }
         for (n, contours) in &cube.face_labels {
             if (inv * CubeCell(*n).dir()).z <= 1e-6 {
@@ -1043,5 +1050,51 @@ mod cube_hover_map {
         let g = grid(1828.0, 167.0);
         eprintln!("best centre ({}, {}): {} agree; at (1828, 167): {} of {}\n{}", best.1, best.2, best.0, agree(&g), covered(&g), g.join("\n"));
         assert!(agree(&g) as f64 >= 0.8 * covered(&g) as f64, "{} of {} clicks agree with live:\n{}", agree(&g), covered(&g), g.join("\n"));
+    }
+
+    /// The view cube at iso drawn with `hover`, composited on the CPU over white: the colour at `p` (pixels from the
+    /// widget's top left).
+    fn cube_pixel(rot: DQuat, hover: Option<CubeCell>, p: DVec2) -> [f32; 3] {
+        let colors = super::CubeColors { face: [1.0, 1.0, 1.0, 1.0], frame: [0.808, 0.859, 0.898, 0.6], highlight: [0.565, 0.808, 0.945, 0.6], label: [0.0, 0.0, 0.0, 0.85], axes: [[0.0; 4]; 3] };
+        let cube = super::ViewCube { origin: [0.0, 0.0], hover, face_labels: Vec::new(), axis_labels: None, colors };
+        let mut out = super::OverlayDraw::default();
+        build(&cube, rot, 1.0, &mut out);
+        let mut c = [1.0f32; 3];
+        for t in out.indices.as_chunks::<3>().0 {
+            let [a, b, d] = t.map(|i| out.vertices[i as usize]);
+            let side = |u: [f32; 2], v: [f32; 2]| (v[0] - u[0]) as f64 * (p.y - u[1] as f64) - (v[1] - u[1]) as f64 * (p.x - u[0] as f64);
+            let (s0, s1, s2) = (side(a.position, b.position), side(b.position, d.position), side(d.position, a.position));
+            if !((s0 >= 0.0 && s1 >= 0.0 && s2 >= 0.0) || (s0 <= 0.0 && s1 <= 0.0 && s2 <= 0.0)) {
+                continue;
+            }
+            let k = a.color;
+            c = [0, 1, 2].map(|i| k[i] + c[i] * (1.0 - k[3]));
+        }
+        c
+    }
+
+    // Live walk7 corner_frt: at iso the near corner hovered shows a whole disc, 14 px across, of the highlight laid over
+    // the faces and the gaps under it (#bce2f7 over white, #b1d9f0 over a gap); ours was lit under the near faces.
+    #[test]
+    fn the_cubes_near_corner_lights_a_whole_disc() {
+        let z = DVec3::new(1.0, -1.0, 1.0).normalize();
+        let y = DVec3::new(-0.408248, 0.408248, 0.816497).normalize();
+        let rot = DQuat::from_mat3(&DMat3::from_cols(y.cross(z), y, z));
+        let corner = Some(CubeCell([1, -1, 1]));
+        let centre = DVec2::from(CENTER);
+        assert_eq!(cube_hit(rot, DVec2::ZERO), corner);
+        let lit = |c: [f32; 3]| (c[0] - 0.737).abs() < 0.02 && (c[1] - 0.886).abs() < 0.02 && (c[2] - 0.969).abs() < 0.02;
+        assert!(lit(cube_pixel(rot, corner, centre)), "{:?}", cube_pixel(rot, corner, centre));
+        for k in 0..24 {
+            // Half a step off the disc's vertices: a point on a seam between two triangles would be counted twice.
+            let p = centre + DVec2::from_angle((k as f64 + 0.5) / 24.0 * std::f64::consts::TAU) * 6.0;
+            let (before, after) = (cube_pixel(rot, None, p), cube_pixel(rot, corner, p));
+            let want = [0, 1, 2].map(|i| colors_highlight(i) * 0.6 + before[i] * 0.4);
+            assert!((0..3).all(|i| (after[i] - want[i]).abs() < 0.01), "at {p}: {after:?}, the highlight over {before:?} is {want:?}");
+        }
+    }
+
+    fn colors_highlight(i: usize) -> f32 {
+        [0.565, 0.808, 0.945][i]
     }
 }

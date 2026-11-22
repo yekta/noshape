@@ -519,7 +519,7 @@ fn a_partial_flanges_edge_is_lit_whole_while_edited(cx: &mut TestAppContext) {
     // stretch under the new wall stays bright orange (it was drawn in the blend, (131,123,85) under the wall).
     draw(cx, window);
     let mix = cx.update(|cx| view.read(cx).viewport.read(cx).scene().preview_mix);
-    let overlay: Vec<u8> = view.update(cx, |v, _| v.consumed_picks_overlay(&edges, &[], &edges).iter().map(|i| i.compare).collect());
+    let overlay: Vec<u8> = view.update(cx, |v, _| v.consumed_picks_overlay(&edges, &[], &edges, false).iter().map(|i| i.compare).collect());
     assert!(mix.is_some(), "the preview blended over the model before it");
     assert!(!overlay.is_empty() && overlay.iter().all(|&c| c == noshape_render::scene::compare::POST), "the whole edge drawn over the blend: {overlay:?}");
 }

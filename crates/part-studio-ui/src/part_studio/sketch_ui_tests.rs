@@ -7385,6 +7385,24 @@ fn sketch_keys_as_lives(cx: &mut TestAppContext) {
     assert!(names.iter().any(|n| n == "Box"), "the sketch kept as Box: {names:?}");
 }
 
+/// Live walk7 7-saved (qa FEEL-NAMED-VIEW-AFTER-SAVE): a view saved with Enter in Named views is then the picked one
+/// (the select reads it, ⊗ on), the name field empty for the next.
+#[gpui::test]
+fn a_saved_named_view_is_the_picked_one(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_from(cx, "named-view-saved", None);
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_named_views(w, cx))).unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).named_views.is_some()), "Named views open");
+    keys(cx, window, &["w", "7", "enter"]);
+    let (picked, typed) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.named_view_picked.clone(), v.named_views.as_ref().map(|(st, _)| st.read(cx).value().to_string()))
+    });
+    assert_eq!((picked.as_deref(), typed.as_deref()), (Some("w7"), Some("")), "the select reads w7, the field empty");
+}
+
 /// Live shortcuts-sk-1118 / sketch-readout-1119: Shift+C in a sketch with no tool on selects the analysed line in the
 /// sketch (orange) and the bottom right reads its Length.
 #[gpui::test]

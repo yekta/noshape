@@ -1016,7 +1016,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // Live (EDGE-HIGHLIGHT-LOOK): a hovered or selected face's boundary is an opaque line 2 device px wide at any
     // pixel ratio; a part edge hovered or selected itself a 5 CSS px band (fs_line).
     let face_band = lit && (st & OUTLINE) != 0u;
-    let own_edge = (l.style & 64u) != 0u && (st & (HOVER | SELECTED)) != 0u && !face_band;
+    let own_edge = (l.style & 64u) != 0u && ((st & (HOVER | SELECTED)) != 0u || (l.style & 1024u) != 0u) && !face_band;
     if (face_band) { width = 2.0 / max(g.viewport.z, 1.0); }
     if (own_edge) { width = 5.0; }
     // The pick pass (`g.viewport.w` > 0), live's footprints (live/feel/3d.json, retaken reach-1118; with the 10 px
@@ -1149,8 +1149,8 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let col = linear_to_srgb(i.color.rgb);
         let rim = max(1.0, 0.6 * dpr);
         if (a > half - rim) { return vec4(col, i.color.a); }
-        // The plain line (1 CSS px, antialiased) under the core.
-        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22;
+        // The plain line (1 CSS px, antialiased) under the core; none under a BAND line (style 1024).
+        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
         let alpha = 0.78 + edge;
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / alpha, alpha * i.color.a);
     }
@@ -1165,7 +1165,7 @@ fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
         let dpr = max(g.viewport.z, 1.0);
         let a = abs(i.across);
         let col = linear_to_srgb(i.color.rgb);
-        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * 0.22;
+        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
         if (a > 2.5 * dpr - max(1.0, 0.6 * dpr)) { return vec4(col, i.color.a); }
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / (0.78 + edge), (0.78 + edge) * i.color.a);
     }

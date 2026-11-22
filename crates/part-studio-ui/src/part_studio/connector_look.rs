@@ -36,18 +36,21 @@ impl PartStudioView {
         self.display.bodies.iter().find(|b| b.face_refs.contains(on) || b.edge_refs.contains(on) || b.vertex_refs.contains(on)).map(|b| b.id.clone())
     }
 
+    /// Whether the connector's origin is a vertex (lit with it, live b3/ps-mc-*).
+    fn connector_on_vertex(&self, r: &Reference, cx: &App) -> bool {
+        let Reference::MateConnector { feature, .. } = r else { return false };
+        self.studio(cx).and_then(|s| s.feature(*feature)).is_some_and(|f| matches!(f.params.query("originQuery").first(), Some(Reference::Vertex(_))))
+    }
+
     /// The glyphs (per frame) and the lit connectors' owner-part overlays.
     pub(super) fn connector_overlays(&self, selection: &[Reference], cx: &App) -> (Option<std::sync::Arc<scene_builder::ConnectorGlyphs>>, Vec<Instance>) {
         let pick = |r: &Reference| self.built.as_ref().and_then(|b| b.picks.ids_for(r).first().copied()).unwrap_or(0);
         let glyphs = scene_builder::connector_glyphs(&self.display, |r| self.connector_look(r, selection), pick);
-        let owners: Vec<Instance> = self
-            .display
-            .connectors
-            .iter()
-            .filter(|c| self.connector_look(&c.reference, selection) != ConnectorLook::Rest)
-            .filter_map(|c| self.connector_owner(&c.reference, cx))
-            .filter_map(|b| scene_builder::owner_secondary(&self.display, &b, self.gpu.uploader()))
-            .collect();
+        let lit: Vec<_> = self.display.connectors.iter().filter(|c| self.connector_look(&c.reference, selection) != ConnectorLook::Rest).collect();
+        let up = self.gpu.uploader();
+        let owners = lit.iter().filter_map(|c| self.connector_owner(&c.reference, cx)).filter_map(|b| scene_builder::owner_secondary(&self.display, &b, up));
+        let origins = lit.iter().filter(|c| self.connector_on_vertex(&c.reference, cx)).map(|c| scene_builder::connector_origin_lit(c.origin, up));
+        let owners: Vec<Instance> = owners.chain(origins).collect();
         (glyphs, owners)
     }
 }

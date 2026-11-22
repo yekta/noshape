@@ -7242,6 +7242,8 @@ impl AssemblyView {
                     asm.named_views.retain(|v| v.name != view.name);
                     asm.named_views.push(view);
                 });
+                // Live walk7 7-saved: the select then reads the saved view, its remove button on.
+                self.ui.named_view_picked = Some(name);
                 st.update(cx, |s, cx| s.set_value("", window, cx));
             }
             Action::Pick(name) => {

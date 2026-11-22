@@ -483,9 +483,12 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   Mac GPU (qa 02:2x, v0.4.65, plate + scissor, frame log qa-scratch/w7/macnav): Shift+5, Shift+7, Shift+1, F each present 34–35
   frames over ~500 ms, the first 3–19 ms after the key; the cube's ArrowRight 20 frames. Ours animates there, as live does.
 - [ ] P0 **FEEL-CUBE-CORNER-HOVER (psui)**: the view cube at iso, pointer on the front-right-top corner (the vertex facing the
+  Software-GL-only: ours jumps only below 20 fps (`view_change_duration`, ba389b093) and animates 500 ms above; qa-w7-macnav
+  checks it on the Mac GPU (frame log per view change).
+- [x] P0 **FEEL-CUBE-CORNER-HOVER (psui)** (fixed psui 11-22 01:2x: the corner's disc drawn over the near faces, render test `the_cubes_near_corner_lights_a_whole_disc`): the view cube at iso, pointer on the front-right-top corner (the vertex facing the
   viewer). Live draws a light-blue disc on the corner. Ours lights nothing there: a 5 × 5 grid of points (±8 px) round the corner
   lights only the neighbouring edges' bands (qa-scratch/tickets/cube-hover-w7.png).
-- [ ] P1 **FEEL-NAMED-VIEW-AFTER-SAVE (psui)**: Named views panel, type "w7" and Enter. Live's select then reads "w7" with the ⊗
+- [x] P1 **FEEL-NAMED-VIEW-AFTER-SAVE (psui)** (fixed psui 11-22 01:2x, Part Studio and assembly; GPUI `a_saved_named_view_is_the_picked_one`): Named views panel, type "w7" and Enter. Live's select then reads "w7" with the ⊗
   delete button enabled (dark, bordered; live/qa/walk7-1121/7-saved.png). Ours reads "Select a view" with ⊗ greyed until a view is
   picked (qa-scratch/tickets/named-view-saved-w7.png, top). (interaction-feel view-tools-1118 called "Select a view" + ⊗ after a save
   "="; live's 11-22 take differs.) The panel, "No views created", the restore, and Shift+5 typing "%" into the focused name field all
@@ -521,7 +524,7 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
 - [x] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
   to remove", click where the top face was. Live takes it out of the field: the field empties, the title turns red, the preview is
   the solid block again, and the inner floor isn't added. Ours leaves the field as it was (s8-shl-reclick-face). psui 11-21 23:5x: the click takes it out of the field; hover matrix test.
-- [ ] P0 **FEEL-FILLET-PICKED-STRIP (psui)** (qa 23:3x, green 9f33d43, batch 3 cells dlg-edge-selected13 / selhover13 /
+- [x] P0 **FEEL-FILLET-PICKED-STRIP (psui)** (fixed psui 11-22 00:4x: a consumed pick is drawn as the selected edge's 5 px band (`LineSegment::BAND`), the round showing through its core, no plain line under it; qa to verify) (qa 23:3x, green 9f33d43, batch 3 cells dlg-edge-selected13 / selhover13 /
   face-otherhover13, hm2/cmp-b3psui): an edge picked in Fillet at live's 1.3 mm. Live fills the round between its two tangent lines:
   5 px, #FFA90A at both tangent lines and #DDA027..#FFAF25 between, the tangent lines #586E7B / #2C363C. Ours draws a 3 px #FFA90A
   line in the middle with the face colour showing on both sides up to darker tangent lines (#2E3A41 / #1F262B). The same with the
@@ -762,7 +765,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   radius manipulator with the edge still sharp; ours also draws the rounded preview (tangent lines, the shaded round). Also with
   the picked edge hovered and with a face hovered. Live b3/dlg-edge-selected_s, dlg-edge-selhover_f, dlg-face-otherhover_f (asked
   live when its preview appears).
-- [ ] P0 **FEEL-ORIGIN-HOVER-EDGE (psui)** (REOPENED qa 23:3x, green 9f33d43: still the vertical edge lit and selected in all four cells (hover, other selected, selected, selected + hovered); live the +x edge; hm2/cmp-b3psui/ours-b3-ps-origin-*; psui's "fixed 11-21: the same corner rule"): the pointer on the origin at the block's corner. Live lights the +x edge through it (5 px
+- [x] P0 **FEEL-ORIGIN-HOVER-EDGE (psui)** (fixed psui 11-22 00:4x: the origin's glyph covers the corner in the pick buffer, so the edges' nearest pixels were 3 px off and the corner rule (2 px) gave way to the fuller vertical edge; it reaches 3 px now, and the b3 cells aim at the unrounded point as the runner does; qa to verify) (REOPENED qa 23:3x, green 9f33d43: still the vertical edge lit and selected in all four cells (hover, other selected, selected, selected + hovered); live the +x edge; hm2/cmp-b3psui/ours-b3-ps-origin-*; psui's "fixed 11-21: the same corner rule"): the pointer on the origin at the block's corner. Live lights the +x edge through it (5 px
   #FFC685), the origin glyph stays a black ring, and a click selects that edge. Ours lights the vertical edge, with its black midpoint
   marker, and a click selects the vertical edge. Also selected + hovered and with the right face selected. Live b3/ps-origin-*.
   The four: qa 18:17, green 4f2cb3ce, live's camera (kit qa-scratch/hm2/gen2 b3-*); ours qa-scratch/hm2/b3-4f2c.png.
@@ -772,6 +775,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   marker, and a click selects the vertical edge. Also selected + hovered and with the right face selected. Live b3/ps-origin-*.
   The four: qa 18:17, green 4f2cb3ce, live's camera (kit qa-scratch/hm2/gen2 b3-*); ours qa-scratch/hm2/b3-4f2c.png.
 - [x] P0 **FEEL-MC-LOOK (psui)** (fixed psui 11-21: the soft rim, no owner tint, and while hovered its owner's selected faces drawn plain as live's ps-mc-otherhover-r; qa to verify): a mate connector on the block's top back right corner, hovered: the disc fill and the owner face's
+- [x] P0 **FEEL-MC-LOOK (psui)** (psui 11-22 00:4x: the origin vertex lit under the glyph, a 10 px #F2FF80 disc (live's yellow-green centre, 39 px of it within 5 px, ours 18 before); the crisp rim and the navy block at the ring's front come from the software renderer (no MSAA under llvmpipe; plain lines get their soft edge from MSAA), soft on a GPU (`crisp_navy` 0 in the cells); qa to verify) (psui 11-21 fix PARTLY verified qa 23:3x, green 9f33d43: the owner tint is gone (selected top #8DB0C5 as live #8EB1C6) and the owner stays plain while hovered. STILL OPEN: the crisp 1 px navy outline on the ring and disc, the navy square at the ring's front, and the disc centre white where live's is lit yellow-green; hm2/cmp-b3psui/ours-b3-ps-mc-*, qa-scratch/tmp/w6m/mc.png): a mate connector on the block's top back right corner, hovered: the disc fill and the owner face's
   yellow-green edges match live (#F4DF99, #E1EC87 / #CDD975), but ours outlines the ring and disc with a crisp 1 px navy #002847
   (≈200 px of an 80 px crop) and draws a navy square at the ring's front; live's rim is soft olive #C2C187 / #CCC18C. Selected: ours
   also tints the owner faces green (#BED5A8 top, #AFC39C side); live leaves them #99C0D7 / #8EB1C6 and only fills the disc #F6DA83.
