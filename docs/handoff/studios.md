@@ -23,23 +23,21 @@ score line "score: N/978"; x184d.sh: drw only + the three hover matrices). Never
 crates/drawing land (drawing-ui alone: not needed).
 - LANDED 155f85da as f4dda516 (11-22 13:07): the drawing P0 stack (hover/select, click_still, balloon leader, Change to
   version, Esc rework, qa walk 9, workflow 09 / 26 batches).
-- COMMITTED, NOT QUEUED (rebased on main 13:08; land once the vibex8 run below is clean): palette halo
-  (`on_palette_dimension`, live drwm d7), FS-DRAG-SELECT-BAND (vendor/gpui-base element.rs, code editor mode only; its
-  crate can't run tests/clippy --all-targets: not a workspace member, benches broken, not ours), the view box rule
-  (scene `view_frame_box` / `in_view_reach`: box 5.5 % of the view's longer side out, Select reach 1 mm past the box;
-  live drw-hover-1122), a cell's Insert ▸ / Duplicate ▸ clears the selection (live drw-table-cells-insert-row s11; test
-  `a_cells_insert_row_below_closes_the_cell_panel`), TICKETS rebuilt from main (union merge doubled 4 rows again).
-  Checked: drawing-ui 167, scene drawing_tools 9, clippy scene + drawing-ui clean. No crates/drawing change (ops e2e not
-  needed).
-- RUNNING: vibex8 drw scenarios with the view box rule (app 13:0x, x184d.sh, out ~/agents/studios-keep/uip1122j).
-  Before it: 371/374. Compare; the insert-row scenario should now pass, or the dialog stays for another reason (the
-  test shows the panel closing).
-- Live's hover x selection matrix (live/studios/drw-hover-1122/index.md): views/edges/sheet are studios', annotations
-  dx's. Ours matches: hover = tan box only, edges unlit; click inside or on an edge = whole view orange; selected +
-  hovered = tan box; Dimension tool lights edges (7 px) / vertices. Not done: sheet border reach in Select is 8 px in
-  live, ours 7 (SELECT_LINE_REACH_PX shared with annotations; 1 px, left).
-- drw-table-cell-menu step 3 (focus after the Custom table's Insert): live reads "field" there but "other" in 5 other
-  recordings of the same click (drw-custom-table-*): live noise; ask live to re-record rather than change ours.
+- QUEUED d1452c9a (11-22 13:58, 12 commits): palette halo (live drwm d7), FS-DRAG-SELECT-BAND (vendor/gpui-base
+  element.rs), the view box rule (scene `view_frame_box` / `in_view_reach`: box 5.5 % of the view's longer side out,
+  Select reach 1 mm past it; live drw-hover-1122), a cell's Insert ▸ / Duplicate ▸ clears the selection, TICKETS.
+  vibex8 drw run on it: 371/374, the same 3 diffs as before (uip1122j).
+- COMMITTED, NOT QUEUED: bcbd54eb2. Select's line reach is now 8 px (lit at 7, not 8), from dx: live drw-hover-1122's
+  centerline lights at 7, not 8, and D1's at 6, not 8. New SELECT_FORMAT_REACH_PX 9: the sheet border lights at 8, not 9
+  (test `the_sheet_border_lights_at_lives_reach`). Checked: drawing-ui 168, scene 9, clippy clean. RUNNING: vibex8 drw
+  run + hover matrices on it (x184e.sh, out ~/agents/studios-keep/uip1122k, log x184e.log). Land if 371/374 holds.
+- drw-table-cells-insert-row step 11 still keeps the Cell panel in the app (the unit test closes it). Our runner moves
+  from Insert to Row Below in 3 steps with 20 ms sleeps, crossing Remove ▸, so ours likely lands in the wrong submenu.
+  Live's runner (4 Playwright steps) may cross Remove ▸ too, and live has no safe triangle (live/psui/submenu-diag-1119),
+  so live's dialog null may come from a missed click. A runner jump was tried and dropped: it would change 49 scenarios
+  on a guess. REQUESTS 13:59 asks live for the menu rects and the row count after step 11. Waiting on it.
+- drw-table-cell-menu step 3 (focus after the Custom table's Insert): live noise (5 of 6 recordings read "other");
+  re-record asked in the same request.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.
 - Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. P2s
