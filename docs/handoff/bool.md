@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 05:53 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 08:26 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -36,13 +36,19 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    - STAGE B a23eae9b3 (worktree bool-ptolb, on A): classification (state_at's coplanar checks, tangent_side, lies_on
      closure, settles, ray_state(band), touching_only clear, apex_on_face). same_surface/lies_on METHODS stay global.
      GATE vibex8 07:43 (unit bool-ptolb-gate, chain-bool-ptolb.out) -> knurls -> land after A.
-   - With A+B: gamma subsets 6,17,23 + 45 / 67 / 87 in place are ours (448 / 369 / 369 faces as OCCT, 230-300 ms);
-     every half/quarter of the 87 tools ours, faces = OCCT's. FULL Boolean 1 still declines ("a face's curves don't
-     close", OCCT 6-7 s on vibex8): needs tools 17-22 + both 44-65 and 66-87. Probe (bool-stages = probe tree on A+B,
-     PROBE_CLOSE / PROBE_FACE, gm-close.sh): clip arg 10's r4 quarter cylinder, a 2.5 um sliver between its ruling
-     and another clip's line 432 taken as on it at face_band (reach 2.55 um, wide only because the pin's box meets
-     the clips'). NEXT (stage C): in-face crossings / bound / c2_of by the curves' own args' band, not the face's
-     reach; then measure gamma Boolean 1.
+   - With A+B: gamma subsets 6,17,23 + 45 / 67 / 87 in place are ours (448 / 369 / 369 faces as OCCT). The FULL
+     Boolean 1 declined "a face's curves don't close": NOT the split band (PROBE_OWNBAND in split_among changed
+     nothing), but the C++ build's pcurves on cylinders: a line was taken as a generator (a 2.5 um chord across a
+     quarter round's rulings: its curve 4 mm along the axis) and an arc as coaxial (a precise clip's arc ~100 um
+     off a cylinder's axis, its ends on it: curve turned 0.01 rad).
+   - STAGE C (worktree bool-ptolc, on B, uncommitted 08:26): build()'s cylinder/cone branch checks each such pcurve
+     against its edge (off_edge, 5 samples > edge tol) and else makes it straight between the edge's points' (u, v)
+     at 1-64 steps, tolerance raised to cover it (chord_pcurve). Gamma FULL Boolean 1 ours: 606 ms vs OCCT 6054 ms
+     on vibex8, 2805 faces / 7332 edges as OCCT, volume 1e-11 off; kernel bool tests 220 pass. T1
+     an_off_axis_arc_and_a_chord_on_a_cylinder_get_curves_on_it_that_follow_them (case 3c7300ba68882d9d: gamma's
+     object + 32 tools, 2.7 MB; no tool can be dropped and keep the failure). Build/test ptolc-t.sh (vibex8) -> commit
+     -> gate after B -> knurls -> land. Probe tree bool-stages (PROBE_NOCHORD switch) and vibex8 $BK/wc/xbin-arc,
+     $BK/gm/rec32: delete after C lands.
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
