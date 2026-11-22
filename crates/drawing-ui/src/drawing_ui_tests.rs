@@ -48,6 +48,11 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
     if let Some(name) = START.take() {
         let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
         noshape_ops::ui_parity::build_start(&mut Ctx::new(), &path, &starts[name]).unwrap();
+        if let Some(f) = SETUP.take() {
+            let mut ctx = Ctx::new();
+            call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+            f(&mut ctx, "Part 1 Drawing 1");
+        }
     } else {
         let mut ctx = Ctx::new();
         call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
@@ -1793,7 +1798,8 @@ fn a_hole_size_cell_lights_its_holes_and_tags(cx: &mut TestAppContext) {
 }
 
 /// Live behaviours "feel coverage (11-20)" D2: a dimension dragged by its text from unselected ends unselected (tan
-/// hover with grips while the pointer is on it), its move one edit; a selected one stays selected.
+/// hover with grips while the pointer is on it), its move one edit; a selected one stays selected and its palette
+/// opens (live drwm-2 d5).
 #[gpui::test]
 fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) {
     use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
@@ -1833,9 +1839,43 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     drag(cx, -30.);
     assert_ne!(place(cx), before, "moved");
     assert!(cx.update(|cx| editor.read(cx).selection.is_empty()), "not selected after the drag");
+    assert!(cx.update(|cx| editor.read(cx).palette.is_none()), "no palette after a drag from unselected");
     cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::Annotation(id)]));
     drag(cx, 20.);
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "a selected one stays selected");
+    assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "live drwm-2 d5: its palette opens on release");
+    // With its palette open: no flip diamonds (layer 21) nor end dots, only the attachment dots (live drwm-2 d5-d7).
+    let diamonds = cx.update(|cx| editor.update(cx, |e, _| e.build_scene().instances.iter().any(|i| i.layer == 21)));
+    assert!(!diamonds, "no diamonds while the palette is open");
+    // Live drwm-5: the dimension is tan while its palette is open, the pointer 25 px off it too; well away, the
+    // palette closes by itself and the dimension is left unselected.
+    let (origin, at) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.bounds.origin, e.palette.as_ref().and_then(|p| p.at).expect("the palette drawn"))
+    });
+    let hover_to = |cx: &mut TestAppContext, x: f32, y: f32| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.on_mouse_move(&MouseMoveEvent { position: origin + Point::new(px(x), px(y)), pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let looks = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let scene = editor.read(cx).build_scene();
+            let has = |c: u32| scene.instances.iter().any(|i| i.layer == -4 && i.color == crate::theme::lin(c));
+            (has(0xccb292), has(0xcc925c))
+        })
+    };
+    hover_to(cx, at[0] + 407. + 25., at[1] + 60.);
+    assert!(cx.update(|cx| editor.read(cx).palette.is_some()), "25 px off the palette: still open");
+    assert_eq!(looks(cx), (true, false), "the dimension tan, not orange");
+    let far = [8f32, 8f32];
+    assert!(at[0] - far[0] > 150. || at[1] - far[1] > 150., "the far point is well away");
+    hover_to(cx, far[0], far[1]);
+    assert!(cx.update(|cx| editor.read(cx).palette.is_none()), "well away: the palette closed");
+    assert!(cx.update(|cx| editor.read(cx).selection.is_empty()), "and the dimension unselected");
+    assert_eq!(looks(cx), (false, false), "drawn black");
 }
 
 /// Live parity-open-1120 dr2 (DRW-MULTI-VIEW-MENU): two views selected, the menu is Show/hide ▸ (hidden lines, shaded
@@ -2154,7 +2194,7 @@ fn a_datum_targets_origin_field_stays_active_once_picked(cx: &mut TestAppContext
 }
 
 /// Live dsel3 / drw-styles-radial s10: a selected dimension's text stays black on an orange (#cc925c) box, not
-/// tinted with the selection colour.
+/// tinted with the selection colour; under the pointer it takes the tan hover look.
 #[gpui::test]
 fn a_selected_dimension_keeps_its_text_black_on_an_orange_box(cx: &mut TestAppContext) {
     use noshape_model::drawing::build::PickTarget;
@@ -2180,6 +2220,18 @@ fn a_selected_dimension_keeps_its_text_black_on_an_orange_box(cx: &mut TestAppCo
     assert!(!text_picks.is_empty(), "the dimension has text");
     assert!(text_picks.iter().all(|p| states.get(*p as usize).is_none_or(|s| s & state::SELECTED == 0)), "its text isn't tinted");
     assert!(boxed, "an orange box behind it");
+    // The pointer on it: the hover look wins, a tan box and no orange one (live drwm-2 d3, drw-styles-radial shot 11).
+    let (tan, orange) = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let id = e.current_sheet().annotations.iter().find(|a| a.kind.is_dimension()).map(|a| a.id).expect("a dimension");
+            e.hover = e.picks_of(Sel::Annotation(id)).first().copied();
+            let scene = e.build_scene();
+            // (The label box: layer -4; the flip diamonds are orange in both looks.)
+            let has = |c: u32| scene.instances.iter().any(|i| i.layer == -4 && i.color == crate::theme::lin(c));
+            (has(crate::drawing_view::DRAWING_HOVER), has(crate::drawing_view::DRAWING_SELECTED))
+        })
+    });
+    assert_eq!((tan, orange), (true, false), "hovered while selected: tan");
 }
 
 /// Live drw-styles-radial s12-s13 (recorder 11-18.1): R.197 clicked, then Styles opened with the pointer on the panel:

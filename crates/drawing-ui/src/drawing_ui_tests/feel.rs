@@ -1001,6 +1001,76 @@ fn a_hovered_table_keeps_its_ink_and_shades_the_cell_under_the_pointer(cx: &mut 
     assert_eq!(tables, vec![(id, Some((0, 0)))], "the table and the cell under the pointer are shaded");
 }
 
+/// Live drwm-4b b1 / b2: a BOM's hovered header goes #e2e2e2 like a hovered row (the body #f1f1f1); a body row
+/// hovered, the header stays #ebebeb.
+#[gpui::test]
+fn a_hovered_bom_header_shades_like_a_row(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-bom-header-hover");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+            let view = e.current_sheet().views[0].id;
+            let kind = noshape_model::drawing::TableKind::Bom { view, structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: true, source: None };
+            e.edit_sheet("BOM table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [60.0, 200.0])));
+            id
+        })
+    });
+    draw(cx, window);
+    // A text of row `r`: its pick and middle (the pointer put there).
+    let row = |cx: &mut TestAppContext, r: usize| {
+        cx.update(|cx| {
+            let b = editor.read(cx).built.clone().expect("built");
+            let l = b.table_layout(id).expect("the BOM laid out");
+            let r = l.title as usize + r;
+            let (lo, hi) = (l.ys[r + 1].min(l.ys[r]), l.ys[r + 1].max(l.ys[r]));
+            b.geometry
+                .texts
+                .iter()
+                .filter(|t| matches!(b.picks.get(t.pick as usize), Some(noshape_model::drawing::build::PickTarget::Table(x)) if *x == id))
+                .map(|t| {
+                    let pts = noshape_model::drawing::font::text_box(t);
+                    let n = pts.len().max(1) as f64;
+                    (t.pick, [pts.iter().map(|p| p[0]).sum::<f64>() / n, pts.iter().map(|p| p[1]).sum::<f64>() / n])
+                })
+                .find(|(_, c)| (lo..=hi).contains(&c[1]))
+                .expect("a text in the row")
+        })
+    };
+    let fills = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let scene = editor.read(cx).build_scene();
+            let has = |c: u32| scene.instances.iter().any(|i| i.layer == -1 && i.color == crate::theme::lin(c));
+            (has(0xe2e2e2), has(0xebebeb), has(0xf1f1f1))
+        })
+    };
+    let hover = |cx: &mut TestAppContext, at: Option<(u32, [f64; 2])>| {
+        cx.update(|cx| editor.update(cx, |e, _| {
+            e.hover = at.map(|(p, _)| p);
+            if let Some((_, c)) = at {
+                e.cursor = c;
+            }
+        }))
+    };
+    let header = row(cx, 0);
+    hover(cx, Some(header));
+    assert_eq!(fills(cx), (true, false, true), "the header hovered: it is the darker row, no #ebebeb header");
+    let body = row(cx, 1);
+    hover(cx, Some(body));
+    assert_eq!(fills(cx), (true, true, false), "a body row hovered: it is darker, the header #ebebeb");
+    // Selected with the pointer away: its frame, no fills (b5); a selected cell: no table look until hovered (b3, b4).
+    cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::Table(id)]));
+    hover(cx, None);
+    assert_eq!(fills(cx), (false, false, false), "selected, the pointer away: the rows white");
+    assert_eq!(cx.update(|cx| editor.read(cx).lit_tables()), vec![(id, None)]);
+    cx.update(|cx| editor.update(cx, |e, _| e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (1, 0) })));
+    assert_eq!(cx.update(|cx| editor.read(cx).lit_tables()), vec![], "a selected cell: no frame");
+    hover(cx, Some(body));
+    let lit = cx.update(|cx| editor.read(cx).lit_tables());
+    assert!(matches!(lit.as_slice(), [(t, Some((1, _)))] if *t == id), "hovered again: its look is back: {lit:?}");
+}
+
 /// Live cferr-bomclk-1118 (b): one click on a BOM cell selects that cell (blue) and opens the floating Cell panel for
 /// its formats, the table still selected; a double-click is the same, the cell not typed in.
 #[gpui::test]
@@ -1044,6 +1114,11 @@ fn a_click_on_a_bom_cell_opens_the_cell_panel_and_a_double_click_adds_nothing(cx
     assert_eq!(one, (Some((id, (1, 0), (1, 0))), vec![Sel::Table(id)], true, true), "one click: the cell, the table, the Cell panel, no editor");
     cx.executor().advance_clock(std::time::Duration::from_millis(600));
     assert_eq!(press(cx, 1..=2), one, "a double-click: the same");
+    // An empty click keeps the cell (live drwm-4b b7, drwm-6 c4c).
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    let away = cx.update(|cx| [editor.read(cx).current_sheet().size.size_mm().0 - 4.6, 19.0]);
+    click_at(cx, window, &editor, away, Modifiers::default());
+    assert_eq!(cx.update(|cx| editor.read(cx).cell_sel.map(|c| (c.table, c.a))), Some((id, (1, 0))), "an empty click keeps the cell");
 }
 
 /// Live2 bomsel-1118 (tables-1118 d3): the BOM table tool places the table on one click (no ✓); the panel closes and
@@ -3118,4 +3193,63 @@ fn a_max_min_pick_on_an_arc_lights_only_the_arc(cx: &mut TestAppContext) {
     draw(cx, window);
     let s = cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].clone());
     assert_eq!(s, json!([{ "kind": "EDGE", "owner": "Front" }]), "the arc and the side's 6 mm edge");
+}
+
+/// Live drw-custom-table-properties s8-s13: the Part faces table placed at (150, 150) over Top's right edge reads EDGE
+/// Top while selected: just placed, after a right-click, while its Custom table properties dialog is open, after Esc.
+#[gpui::test]
+fn a_custom_table_stays_read_selected_through_its_properties(cx: &mut TestAppContext) {
+    START.set(Some("block-drawing-table"));
+    SETUP.set(Some(|ctx, d| {
+        call(ctx, "drawing_custom_table", json!({ "drawing": d, "table": "Part faces", "position": [150, 150] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-custom-table-props");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| editor.read(cx).current_sheet().tables.iter().find(|t| matches!(t.kind, noshape_model::drawing::TableKind::Custom { .. })).map(|t| t.id)).expect("the custom table");
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.selection = vec![Sel::Table(id)];
+        e.placed_table = Some(id);
+        e.redraw(cx);
+    }));
+    draw(cx, window);
+    let read = |cx: &mut TestAppContext| cx.update(|cx| { let e = editor.read(cx); (e.selection.clone(), e.ui_drawing_state(cx)["selection"].clone()) });
+    let placed = read(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| { e.placed_table = None; e.redraw(cx) }));
+    draw(cx, window);
+    let before = read(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.open_custom_props(id, cx)));
+    // Opened from the right-click menu, the menu leaves the selection alone while a dialog is open.
+    assert!(cx.update(|cx| editor.read(cx).dialog_or_mode_open()), "the dialog counts as open");
+    draw(cx, window);
+    let open = read(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    let after = read(cx);
+    let n = |r: &(Vec<Sel>, Value)| (r.0.clone(), r.1.as_array().map_or(0, |a| a.len()));
+    let want = (vec![Sel::Table(id)], 1);
+    assert_eq!((n(&placed), n(&before), n(&open), n(&after)), (want.clone(), want.clone(), want.clone(), want), "{placed:?} {before:?} {open:?} {after:?}");
+}
+
+/// Live drwm-1 (e7; e3, v3): a click in the title block keeps a selected view; under the pointer a selected view
+/// reads EDGE in live's reader (its frame tan, its edges orange), VIEW with the pointer away.
+#[gpui::test]
+fn a_title_block_click_keeps_a_selected_view_and_a_hovered_one_reads_edge(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-title-block-click");
+    real_sheet(cx, window, &editor);
+    let (v, centre, name) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views[0].id;
+        let pl = e.placement(v).expect("placed");
+        (v, [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], e.ui_view_name(v))
+    });
+    cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::View(v)]));
+    let sel = click_at(cx, window, &editor, [200.0, 30.0], Modifiers::default());
+    assert!(sel.contains(&Sel::View(v)), "a title block click keeps the view: {sel:?}");
+    let read = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).ui_state(cx))["drawing"]["selection"].clone();
+    assert!(view_of(&lit_at(cx, window, &editor, centre)) == Some(v), "the view under the pointer");
+    assert_eq!(read(cx), json!([{"kind": "EDGE", "owner": name}]), "hovered: EDGE");
+    let away = cx.update(|cx| [editor.read(cx).current_sheet().size.size_mm().0 - 4.6, 19.0]);
+    assert_eq!(lit_at(cx, window, &editor, away), None);
+    assert_eq!(read(cx), json!([{"kind": "VIEW", "owner": name}]), "the pointer away: VIEW");
 }

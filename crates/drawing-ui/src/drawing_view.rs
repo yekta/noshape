@@ -274,6 +274,7 @@ impl DrawingEditor {
             || self.gdt_dlg.is_some()
             || self.move_sheet.is_some()
             || self.table_props.is_some()
+            || self.custom_tables.dlg.is_some()
             || self.linestyle.is_some()
             || self.hide_edges.is_some()
             || self.replicate_dlg.is_some()
@@ -1749,13 +1750,14 @@ impl DrawingEditor {
                     scene.add_flag(p as u32, state::SELECTED);
                 }
             }
-            if let Some(h) = self.hover.filter(|h| dragged.is_none_or(|d| self.sel_of_pick(*h) != Some(Sel::Annotation(d)))) {
+            let hover = self.hover.filter(|h| dragged.is_none_or(|d| self.sel_of_pick(*h) != Some(Sel::Annotation(d))));
+            // A selected dimension under the pointer takes the hover look (live drwm-2 d3, drw-styles-radial shot 11).
+            let hovered_dim = hover.and_then(|h| self.sel_of_pick(h)).filter(|s| !self.tool_picks_edges() && dims.contains(s));
+            if let Some(h) = hover {
                 let single = self.tool_picks_edges();
                 match self.sel_of_pick(h) {
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
-                    // A selected dimension keeps its selected look under the pointer (live drw-styles-radial s9).
-                    Some(s @ Sel::Annotation(_)) if !single && dims.contains(&s) => {}
                     Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_look(&mut scene, b, &self.picks_of(s), DRAWING_HOVER),
                     // A hovered view keeps its edges and gets the tan frame (push_view_frames).
                     Some(Sel::View(_) | Sel::Edge(..)) if matches!(self.tool, Tool::Select) => {}
@@ -1772,8 +1774,13 @@ impl DrawingEditor {
                     }
                 }
             }
-            for d in &dims {
+            // Its palette open, a dimension keeps the tan hover look wherever the pointer is (live drwm-5 p0, q1a, q2).
+            let palette_dim = self.palette.as_ref().filter(|p| !p.hole).map(|p| Sel::Annotation(p.id));
+            for d in dims.iter().filter(|d| hovered_dim != Some(**d) && palette_dim != Some(**d)) {
                 self.push_annotation_look(&mut scene, b, &self.picks_of(*d), DRAWING_SELECTED);
+            }
+            if let Some(d) = palette_dim.filter(|d| self.tool_picks_edges() || hover.and_then(|h| self.sel_of_pick(h)) != Some(*d)) {
+                self.push_annotation_look(&mut scene, b, &self.picks_of(d), DRAWING_HOVER);
             }
             self.push_view_frames(&mut scene);
             self.push_cut_line_hover(&mut scene);
@@ -1993,18 +2000,17 @@ impl DrawingEditor {
 
     /// The tables hovered (in Select) or selected, each with the row (or a general table's cell) under the pointer.
     pub(crate) fn lit_tables(&self) -> Vec<(u64, Option<(usize, usize)>)> {
-        let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
-            Sel::Table(t) if matches!(self.tool, Tool::Select) => Some(t),
-            _ => None,
-        });
+        let hovered = self.hovered_table();
         let mut out: Vec<(u64, Option<(usize, usize)>)> = Vec::new();
         if let Some(t) = hovered {
             let cell = self.built.as_ref().and_then(|b| b.table_layout(t)).and_then(|l| l.cell_at(self.cursor));
             out.push((t, cell));
         }
+        // A table with a selected cell shows only the cell's outline until hovered (live drwm-4b b3, b4).
         for s in &self.selection {
             if let Sel::Table(t) = s
                 && Some(*t) != hovered
+                && self.cell_sel.is_none_or(|c| c.table != *t)
             {
                 out.push((*t, None));
             }
@@ -2012,8 +2018,16 @@ impl DrawingEditor {
         out
     }
 
+    /// The table under the pointer with no tool.
+    pub(crate) fn hovered_table(&self) -> Option<u64> {
+        self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
+            Sel::Table(t) if matches!(self.tool, Tool::Select) => Some(t),
+            _ => None,
+        })
+    }
+
     /// A hovered or selected table's look (live tables-1118 h-stack, behaviours 1482 / 26614): its ink as it is, rows
-    /// #f1f1f1 and the header #ebebeb under it, the hovered row (a general table's cell) #e2e2e2, and a tan #ccb292
+    /// #f1f1f1 and the header #ebebeb under it, the hovered row or header (a general table's cell) #e2e2e2, and a tan #ccb292
     /// frame round it.
     fn push_table_looks(&self, scene: &mut Scene) {
         use noshape_model::drawing::TableKind;
@@ -2035,12 +2049,15 @@ impl DrawingEditor {
         let (mut rows, mut header, mut lit) = (MeshData::default(), MeshData::default(), MeshData::default());
         let mut frame = LineData::default();
         const TAN: [u8; 4] = [0xcc, 0xb2, 0x92, 255];
+        let hovered = self.hovered_table();
         for (id, cell) in tables {
             let (Some(t), Some(l)) = (self.current_sheet().table(id), b.table_layout(id)) else { continue };
             let n = l.ys.len().saturating_sub(1);
             if n == 0 || l.xs.len() < 2 {
                 continue;
             }
+            // Selected with the pointer away: the frame only, its rows white (live drwm-4b b0, b5).
+            let fills = Some(id) == hovered;
             let (x0, x1) = (l.xs[0], l.xs[l.xs.len() - 1]);
             let row_box = |r: usize| ([x0, l.ys[r + 1]], [x1, l.ys[r]]);
             let first = l.title as usize;
@@ -2052,10 +2069,10 @@ impl DrawingEditor {
             let by_row = !matches!(t.kind, TableKind::General { .. });
             // A merged cell lights every row it spans (live drw-hole-table-cell-panel 13: a size's SIZE cell, A1–A3).
             let lit_rows = cell.map(|(cr, cc)| l.merges.iter().find(|m| m.contains(cr, cc)).map_or(cr..=cr, |m| m.row..=m.row + m.rows - 1));
-            for r in 0..n {
+            for r in (0..n).filter(|_| fills) {
                 let (lo, hi) = row_box(r);
-                // (`cell_at` counts rows under the title row.)
-                let lit_row = by_row && r >= first && lit_rows.as_ref().is_some_and(|rs| rs.contains(&(r - first))) && Some(r) != header_row;
+                // (`cell_at` counts rows under the title row.) A hovered header is lit as a row (live drwm-4b b1).
+                let lit_row = by_row && r >= first && lit_rows.as_ref().is_some_and(|rs| rs.contains(&(r - first)));
                 quad(if lit_row { &mut lit } else if Some(r) == header_row { &mut header } else { &mut rows }, lo, hi);
             }
             if let (false, Some((r, c))) = (by_row, cell.map(|(r, c)| (r + first, c)))
@@ -2129,7 +2146,9 @@ impl DrawingEditor {
             }
             covers.indices.extend_from_slice(&[base, base + 1, base + 2]);
         }
-        for gr in g.grips.iter().filter(|gr| picks.contains(&gr.pick)) {
+        // Its palette open: only the attachment dots, no end dots or flip diamonds (live drwm-2 d5-d7).
+        let editing = self.palette.as_ref().is_some_and(|p| picks.first().is_some_and(|k| self.picks_of(Sel::Annotation(p.id)).contains(k)));
+        for gr in g.grips.iter().filter(|gr| picks.contains(&gr.pick) && (!editing || gr.kind == GripKind::Origin)) {
             let [x, y] = gr.pos;
             match gr.kind {
                 GripKind::Handle => quad(&mut diamonds, [[x - r, y], [x, y - r], [x + r, y], [x, y + r]], 0.6),

@@ -854,17 +854,18 @@ impl FeatureStudioView {
     }
 
     /// Ace's bracket highlight: with the caret beside a bracket (the one before it first), both it and its partner
-    /// framed 1 px rgb(192, 192, 192) (live FEEL-FS-BRACKET-MATCH); none with a selection.
+    /// framed 1 px rgb(192, 192, 192) (live FEEL-FS-BRACKET-MATCH), with a selection too (live fsm-1 f4: `import`
+    /// double-clicked, its `(` and `)` framed).
     fn update_bracket_box(&mut self, cx: &mut Context<Self>) {
-        let (sel, len) = {
+        let (caret, len) = {
             let e = self.editor.read(cx);
-            (e.selected_range(), e.text().len())
+            (e.cursor(), e.text().len())
         };
-        let stamp = (if sel.is_empty() { sel.end } else { usize::MAX }, len);
+        let stamp = (caret, len);
         if self.bracket_box.as_ref().is_some_and(|(_, s)| *s == stamp) {
             return;
         }
-        let pair = sel.is_empty().then(|| crate::fs_lines::bracket_pair(&self.editor.read(cx).value(), sel.end)).flatten();
+        let pair = crate::fs_lines::bracket_pair(&self.editor.read(cx).value(), caret);
         let boxes: Vec<gpui_kit::component::input::RangeDecoration> = pair
             .into_iter()
             .flat_map(|(a, b)| [a, b])

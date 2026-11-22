@@ -18,13 +18,9 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; read `git diff --stat origin
 shots on vibex7 / vibex6 (never vibe2: its slot is the land queue's), shots on vibe2 (rsync tests/ui-parity +
 tools/ui-parity to vibe2:agents/studios/src first). Crate tests on vibex7 / vibex8, every run under `timeout` (lead
 11-20 21:xx: a hung test held a vibex8 slot 43 min). `touch -c` edited files before rb.sh. Full ops e2e before a
-drawing land. vibex8 02:00-04:00 is qa's quiet window. Never `git checkout <file>` over uncommitted work: WIP-commit
+drawing land. vibex7 02:00-04:00 UTC is qa's quiet window (lead 11-22): use vibex8 then. Never `git checkout <file>` over uncommitted work: WIP-commit
 or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `git apply --3way`).
-- LANDED eabacbef (09:53, as a2fe2c5c): the audit's first fixes. LANDED 420d7f79 (10:12, as f33264f9): the documents
-  page's Versions and history page (live 2435: `HistoryPanel::page`, start-ui `StartView::page`, hook
-  `start_hooks::versions_page`, app `files::versions_page`), the deleted-workspace bubble 30 s (`NoticeLink::stays`),
-  documents_list Created by me / `search` / `documents_sort`.
-- LANDED a2074bb2 as 301b1895 (11:19): history_merge strategies + merge_plan; history_create_version at/publish.
+- LANDED 11-21: eabacbef, 420d7f79, a2074bb2 (documents page, versions page, merge strategies).
 - LANDED 04361993 as 3f70f4f2 (16:08): speed pass + live docver-1121 rows + drawing takes + Start version (x129/x130 on vibex7):
   - Speed pass: NO gap >=100 ms and >=2x live. 1000-part drawing: open 19-31 ms, all views 2.7-4.9 s (live 3.7-4.0 s a
     view), Update click 62-85 ms (two sheet assemblies ~20 ms each on the UI thread; bench now holds it to <100 ms, not a
@@ -64,15 +60,7 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     one Esc longer: dialog blanked); drw-centermark-align's expect from live retake 996d6b8a (mark stays);
     ver-compare-hover-part (qa P2 UIP-COMPARE-HOVER-PART): the app reader's Compare override (ui_script.rs
     `comparing_state`) put the panel's row FEATURE over a graphics pick; now the row only when nothing is picked.
-  - Verified on vibe2 (uip1121b, 27 scenarios): 284/298 states.
-- NEXT LAND (tests x150 on vibe2): picked edges summed per view (drw-max-min-fillet-arc s3); run.py maps "Import to
-  Onshape" (6 import scenarios); export selects marked by their label (drw-export-formats "Format"); a hover on a menu
-  row doesn't wheel it into view (`wheel_tries`, drw-note-insert-property s7); Note's colour swatch `button:Color` +
-  `ours_on` (drw-note-format-lists s14/s16); the pressed Detail shape clicked again = Esc (drw-detail-boundary-shapes
-  s3); a right-panel strip button clears the sheet hover, and with Styles open a selected dimension off the pointer
-  reads nothing (drw-styles-radial s12, live (c)); leaving a drawing tab drops what Esc left lit (`esc_kept`,
-  `tab_left`: drw-update-deleted-feature s9, live (a)/(b)).
-  - LANDED e591ac9a as 21da2808 (20:32) holds the above. COMMITTED 7038164b0 (rebased, ops e2e 277/277 on vibex8,
+  - LANDED e591ac9a as 21da2808 (20:32; picked edges per view, Import mapping, wheel_tries, esc_kept/tab_left). COMMITTED 7038164b0 (rebased, ops e2e 277/277 on vibex8,
     not landed): Esc leaves what a tool made hovered, not selected (`update_hover` in `cancel`; `esc_kept` keeps only
     its grips for live's reader until another hover, a press, a tool or leaving the tab); a placed custom table listed;
     max/min to an edge: `MaxMinDimension.b_edge` (resolved, not saved) + sheet.rs `ext_from_edge` start that extension
@@ -86,17 +74,47 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     x3 = live re-takes now on main, centerline-3pt = (k), table-cell-menu s3 = live timing, 2 flaky "no recording");
     ops e2e 277/277 (x166 vibex8). Also in it: `pointer_off` (drawing_view): a rebuild under a palette/menu hovers
     nothing at the last sheet position (hcallout-palette-dual s24 / -tips s40).
+  - QUEUED 60f6ad8d (01:14 11-22, #8; carries e41a7227): APP-VULKAN-SEGV + the DRW-BORDER-DRAG batch.
+  - Uncommitted (01:19): live drwm-2 dimension take as scenario drw-dimension-hover-matrix (+ live/ copy); a selected
+    dimension's text drag opens its palette on release (drawing_tools MoveAnnotation, test extended); hover wins on a
+    selected dimension (drawing_view `hovered_dim`, test in a_selected_dimension_keeps_its_text_black...);
+    drw-export-formats seeds config_files export_drawing.json (PDF, DWG 2018 = index 8: live's account remembers it);
+    drw-custom-table-properties s11: a menu action cleared the selection because `dialog_or_mode_open` missed
+    `custom_tables.dlg` (added; feel test a_custom_table_stays_read_selected_through_its_properties on the real
+    block-drawing-table start; drawing() now applies SETUP after a START too). x174 (vibex7, 01:23) runs: all
+    drawing-ui tests, clippy, app, matrix shots -> ~/agents/studios-keep/shots1122, all drw-* -> uip1122d.
+    FS (live fsm-1 f4): bracket boxes at the caret with a selection too (update_bracket_box uses `cursor()`; test in
+    ace_feel_outdent_...); x176 (vibex8) FS tests + clippy. VS matrix rows (vsm-1) already match.
+    Shots (x174 shots1122): ours matched d1/d3/d4; s10 `{"empty": true}` wasn't a drawing target (added: right margin,
+    [w - 4.6, 19] mm); with the palette open the orange end dots / diamonds now hide (push_annotation_look `editing`).
+    x174 stopped 01:42 (vibex7 off 02:00-04:00 for qa's speed window: use vibex8 then): 144/146 drw run, both known
+    (dimension-hover-matrix s10 = fixed above, centerline-3pt = (k)). x177/x175b/x179 stopped 02:25 (32 min
+    waiting for a vibex8 build slot, both held by blend): one run instead, x180 (vibex8, 02:26: tests, clippy, app,
+    shots1122c of the 3 matrices) then x181 (all drw doc docs ver vs fs rel -> uip1122g).
+    After x177 started : live drwm-1 / drwm-3 takes as
+    drw-edge-view-hover-matrix / drw-note-hover-matrix (+ live/ copies); BOM look per live drwm-4b (shots only): a
+    hovered header lit #e2e2e2 like a row (b1), a selected table away from the pointer has no fills (b0, b5), a selected
+    cell hides the table's frame and grips until hovered (b3, b4) (`hovered_table`, lit_tables, table_grip_overlay;
+    test a_hovered_bom_header_shades_like_a_row). FS: Tab closes the completion list and inserts whitespace, Esc
+    keeps the text (test in the_completion_list_shows_230_ms_after_the_key; x178). Live drwm-6 (answer to 01:51): a selected
+    table's frame is tan (ours already); cells move with each click (ours); an empty click keeps a selected cell (now:
+    table_cell_click; assert in a_click_on_a_bom_cell_opens...).
+    x180 shots1122c: note matrix 32/32; dimension matrix 28/31 (s19-27 palette fields, old); edge/view 20/44: a click in
+    the title block kept the view in live (now: select_click, title_block_rect) and live's reader says EDGE for a
+    selected view under the pointer (tan frame; drawing_ui_state); test a_title_block_click_keeps_a_selected_view...
+    x182 (vibex8): drawing-ui tests + clippy with all of it; x181 runs on x180's binary (before the title block fix). Live drwm-5 (answer to 01:24): the palette's dimension tan (hover look, no
+    grips / diamonds) wherever the pointer is; more than PALETTE_REACH_PX (100) off the palette it closes by itself,
+    keeping changes, dimension unselected (drawing_tools on_mouse_move, `palette_gap`; test extended in
+    a_dimension_dragged_from_unselected_ends_unselected). Live's blue dots left after that = stale paint (its reader reads
+    no selection), not drawn. All of it is in x180/x181.
   - P0 APP-VULKAN-SEGV fixed (committed after e41a7227, landing 01:1x 11-22): ui-parity "no recording" = app segfault
     at start in libvulkan (kernel log: 17 vibex7 / 96 vibex8 since 11-18). gdb (installed on vibex7 with sudo): GPUI
     create_pipelines (set_object_name) on main vs our `shared_device` second instance's vkEnumeratePhysicalDevices
     dlclose on noshape-gpu-init. Fix: `renderer::share_adapter` (render) from app-core gpu.rs spawn_worker for a
     Vulkan GPUI ctx read back. x172 (vibex7): clippy clean, gdb stress 0 segv / 42 starts (old 4 / 17); scenarios 5/7
     (custom-table-properties s11 selection 0 vs 1; export-formats s4 DWG version "2000" vs live "2018").
-  - x169 done: 241/243 (break-view-small-zigzag = the segfault; export-formats = pre-rebase tree).
-  - Expected after landing: drw-custom-table-insert/-delete/-properties s8 fail until live's re-takes (df57f52f, with
-    1336af80) land; table-cell-menu s3 is live's own timing (field vs other at the Insert click across 3 takes).
-  - Waiting on live: (k) 3 point circle centerline at hole centres read [] (drw-centerline-circle-3-point-hole-centres
-    s4); (i) drw-export-formats on PDF (df57f52f) and (g) 648646fa queued: re-run once on main.
+  - table-cell-menu s3 is live's own timing. (k) centerline-3pt s4: live (behaviours "studios (k)") never creates the
+    circle: its Ø8 centre clicks (recorder px ~4 px off centre) don't take. REQUESTS 02:47 asks for an exact-centre click.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
@@ -106,13 +124,8 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
    Regenerate (copy new take outputs into uip-merged first): `drawing_matrix.py --run /root/studios-scratch/uip-merged --ours-menus /root/studios-scratch/menudump.json`
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
-- live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):
-  (1) hovering a BOM row shades it darker grey and draws its part tan in every view; a selected table has a small "︿"
-  chevron centred under it. (2) the BOM tool places on one click (no ✓), panel closes, table stays selected. (3)
-  double-click a BOM cell: blue cell outline + floating Cell panel (Override), focus on its Font select, no in-place
-  typing. (4) Split below (row 1): header + row 1 stay; a second table, header repeated + row 2, ~12 px below, same x
-  and width. (5) the assembly's BOM changed: the sheet waits; ~3.1 s later "Update from this workspace (ctrl+q)"
-  turns enabled (yellow); a click updates (qty 1 -> 2), keeps the split, disables it again; no toast.
+- live2 drawing tables (tables-1118 rows 1-5): checked 11-22 01:50, all in our code and tests (row 5's ~3.1 s wait is
+  live's server, not a target).
 - live VS / FS (live/studios/vs-fs-feel-1117/): VS add-row focus to the next Name, duplicate -> "w_0"; FS
   autocomplete Enter inserts, Tab closes + inserts a tab, Esc keeps text; FS errors while typing (<0.5 s) red x at
   gutter line 1 + squiggle, Ctrl/Cmd+S commits, Commit pales, a fixed error greys ~150 ms, gone ~500 ms. VSFEEL bubble:
@@ -128,25 +141,15 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
 viewport, parts vs connectors) and Drawings (views, edges, dimensions, annotations: hover, click, box, drag), each
 against live with a feel scenario; share psui's pick code (`Viewport::pick_priority`, `AsmPickMap::priority_fn`,
 `PickKind::priority`; psui owns viewport.rs' hover path). 3. Versions / branches / release queue.
-- Drawing feel rows all have a GPUI test now (feel.rs, 11) except the double-click palette (its own test).
-- Assembly already as live (checked 11-17): box select rule, glyph click selects the mate (related rows, mated faces
-  amber, dashed connector line), graphics hover lights no list row, list hover outlines the parts.
 
-## Agents
-Ids live only in /root/lead-scratch/roster.md (lead 11-19): read it before every message_agent; never copy ids
-into notes.
-
+Agent ids: only /root/lead-scratch/roster.md, read before every message_agent; never copied into notes.
 ## Waiting on others
-- live: REQUESTS 09:55 (panel-lists s20-24 shots; revision-table-delete ending on a repaint) and 08:08 (9 rows).
 - Left to others under BRAND-IN-UI-TEXT: Category values "Onshape Part"… and "Import to Onshape" (dx), "Onshape
   default tolerances" (psui), "Onshape images" / "Onshape form library" (skasm).
 
 ## Open (no owner action possible yet)
-- live's drw-hole-callout-palette retake (23:03, q-hcp-shots/record.json) has the same states as the take: kept;
-  the take matches.
 - P0 FEEL-DRW-WHEEL-ZOOM-SLOW waits on qa's quiet re-time (the bench's zoom frame is under a frame; qa's hover in the
   same app was as slow: the host).
-- Release gap list: all done (Release all configurations…, the outdated associated drawing: 11-18).
 
 ## How to run
 Builds and crate tests on the Mac:

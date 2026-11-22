@@ -298,6 +298,23 @@ fn the_completion_list_shows_230_ms_after_the_key(cx: &mut TestAppContext) {
     assert!(!open(cx), "not 210 ms after");
     pause(cx, window, 40);
     assert!(open(cx), "by 250 ms (live fsvs-feel-1118: 232 ms median)");
+    // Live vs-fs-feel-1117: Tab doesn't accept (the list closes, a tab goes in); Esc closes it and keeps the text.
+    let value = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).editor.read(cx).value().to_string());
+    let bare = |s: &str| s.split_whitespace().collect::<String>();
+    let before = value(cx);
+    type_key(cx, window, "tab");
+    pause(cx, window, 300);
+    let after = value(cx);
+    assert!(!open(cx), "Tab closes the list");
+    assert!(after.len() > before.len() && bare(&after) == bare(&before), "Tab inserts only whitespace");
+    type_key(cx, window, "o");
+    pause(cx, window, 250);
+    assert!(open(cx));
+    let before = value(cx);
+    type_key(cx, window, "escape");
+    pause(cx, window, 300);
+    assert!(!open(cx), "Esc closes the list");
+    assert_eq!(value(cx), before, "Esc keeps the typed text");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -432,6 +449,13 @@ fn ace_feel_outdent_triple_click_bracket_boxes_and_wheel(cx: &mut TestAppContext
     select(cx, 3);
     draw(cx, window);
     assert!(boxes(cx).is_empty(), "no bracket beside the caret");
+    // "g" selected, the caret before "(": framed too (live fsm-1 f4, `import` double-clicked).
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.editor.update(cx, |e, cx| {
+        e.focus(w, cx);
+        e.set_selected_range(open - 1..open, cx);
+    }))).unwrap();
+    draw(cx, window);
+    assert_eq!(boxes(cx), vec![open..open + 1, open + 2..open + 3], "a selection ending before a bracket");
     // Triple-click on line 3: that line and its newline, the caret on line 4.
     let line3 = text.find("    if").unwrap();
     let at = cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&(line3 + 4..line3 + 6))).expect("laid out").center();

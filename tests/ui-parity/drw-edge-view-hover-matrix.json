@@ -1,0 +1,280 @@
+{
+  "name": "drw-edge-view-hover-matrix",
+  "about": "live drwm-1: a view edge's hover, selected, hover on selected, a second and third edge, an empty-sheet click; the view's hover, selected, hover on it and on its edge, double-click",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "live 2026-11-21 23:04 (behaviours: drawing / VS / FS hover-select matrix, drwm-1-edge-view)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "hover",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e1-hover"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "empty": true
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e2-selected-away"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e3-hover-on-selected"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e4-hover-other-while-selected"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "empty": true
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e5-click-second"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            0,
+            0,
+            5
+          ]
+        }
+      },
+      "mods": "shift"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "empty": true
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e6-shift-click-third"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          200,
+          30
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "e7-click-empty-sheet"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "v1-hover-inside-view"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "empty": true
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "v2-view-selected-away"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "v3-hover-on-selected-view"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "v4-hover-edge-while-view-selected"
+    },
+    {
+      "do": "dblclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2500
+    },
+    {
+      "do": "shot",
+      "name": "v5-dblclick-view"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

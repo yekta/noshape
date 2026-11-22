@@ -14,6 +14,18 @@ use noshape_scene::drawing_tools as dt;
 
 /// How near (px) a placed table's fixed corner snaps to the border frame's corner (live2 place-1118).
 pub(crate) const TABLE_CORNER_REACH_PX: f64 = 10.0;
+/// How far (px) the pointer goes from a dimension's palette before it closes (live drwm-5: open at 25, closed at 150).
+pub(crate) const PALETTE_REACH_PX: f64 = 100.0;
+/// A dimension palette's size (px; live2 dim-palette-halo: 407 x 133).
+pub(crate) const PALETTE_SIZE_PX: [f64; 2] = [407.0, 133.0];
+
+/// The pointer's distance (px) from the palette whose top-left is `at`.
+fn palette_gap(at: [f32; 2], p: [f64; 2]) -> f64 {
+    let (lo, hi) = ([at[0] as f64, at[1] as f64], [at[0] as f64 + PALETTE_SIZE_PX[0], at[1] as f64 + PALETTE_SIZE_PX[1]]);
+    let dx = (lo[0] - p[0]).max(p[0] - hi[0]).max(0.0);
+    let dy = (lo[1] - p[1]).max(p[1] - hi[1]).max(0.0);
+    dx.hypot(dy)
+}
 
 impl DrawingEditor {
     // ------------------------------------------------------------ tools
@@ -1527,6 +1539,16 @@ impl DrawingEditor {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         self.pointer_off = false;
+        // A dimension's palette closes by itself, keeping its changes, once the pointer is well away from it (live
+        // drwm-5: open 25 px off it, closed 150 px off); the dimension is left unselected.
+        if let Some(d) = self.palette.as_ref().filter(|d| !d.hole)
+            && let Some(at) = d.at
+            && palette_gap(at, lp) > PALETTE_REACH_PX
+        {
+            let id = d.id;
+            self.close_palette(true, cx);
+            self.selection.retain(|s| *s != Sel::Annotation(id));
+        }
         if self.zoom_window_move(lp, cx) {
             return;
         }
@@ -1997,6 +2019,9 @@ impl DrawingEditor {
                     if fresh {
                         self.selection.clear();
                         self.redraw(cx);
+                    } else if orig.kind.is_dimension() {
+                        // A selected dimension's text dragged: its palette opens on release (live drwm-2 d5).
+                        self.open_dim_palette(orig.id, window, cx);
                     }
                 }
             }
@@ -2226,6 +2251,11 @@ impl DrawingEditor {
                 }
             }
             None if armed => {}
+            // A click in the title block isn't on empty sheet: the selection stays (live drwm-1 e7).
+            None if noshape_model::drawing::sheet::title_block_rect(self.current_sheet()).is_some_and(|r| {
+                let c = self.cursor;
+                (r[0]..=r[2]).contains(&c[0]) && (r[1]..=r[3]).contains(&c[1])
+            }) => {}
             None => self.selection.clear(),
         }
         self.status = None;

@@ -1,0 +1,184 @@
+{
+  "name": "drw-note-hover-matrix",
+  "about": "live drwm-3: a note's hover, selected, hover on selected, hover on an edge while selected, drag, hover after the drag, double-click",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "live 2026-11-22 01:01 (behaviours: drawing / VS / FS hover-select matrix, drwm-3-note)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Note"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "type",
+      "text": "TEMP"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          240,
+          190
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "n1-hover"
+    },
+    {
+      "do": "click",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "empty": true
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "n2-selected-away"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "n3-hover-on-selected"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "n4-hover-other-while-selected"
+    },
+    {
+      "do": "drag",
+      "from": {
+        "annotation": "TEMP"
+      },
+      "to": {
+        "sheet_point": [
+          90,
+          70
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "n5-after-drag"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "n6-hover-after-drag"
+    },
+    {
+      "do": "dblclick",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "shot",
+      "name": "n7-dblclick"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

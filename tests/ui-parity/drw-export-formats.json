@@ -5,6 +5,14 @@
   "ticket": "DRAWING-UI-PARITY",
   "source": "studios 2026-11-21 08:58 (drawing matrix shown rows)",
   "start": "block-drawing",
+  "config_files": {
+    "export_drawing.json": {
+      "format": "PDF",
+      "dwg": {
+        "version": 8
+      }
+    }
+  },
   "steps": [
     {
       "do": "rclick",

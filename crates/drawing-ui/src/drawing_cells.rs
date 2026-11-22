@@ -38,6 +38,10 @@ impl DrawingEditor {
     /// block). True when handled. Clicking elsewhere clears the cells.
     pub fn table_cell_click(&mut self, sel: Option<Sel>, shift: bool, cx: &mut Context<Self>) -> bool {
         let Some(Sel::Table(id)) = sel else {
+            // A click on empty sheet keeps a selected cell (live drwm-4b b7, drwm-6 c4c).
+            if sel.is_none() && self.cell_sel.is_some() {
+                return true;
+            }
             self.cell_sel = None;
             return false;
         };

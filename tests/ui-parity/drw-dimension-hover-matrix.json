@@ -1,0 +1,234 @@
+{
+  "name": "drw-dimension-hover-matrix",
+  "about": "live drwm-2: a drawing dimension's hover, selected, hover-on-selected, text drag (inline editor opens) and double-click",
+  "area": "studios",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "live 2026-11-22 00:44 (behaviours: drawing / VS / FS hover-select matrix, drwm-2-dimension)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            25
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1500
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            25
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "d1-hover"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            25
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "empty": true
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "d2-selected-away"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            25
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "d3-hover-on-selected"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "d4-hover-other-while-selected"
+    },
+    {
+      "do": "drag",
+      "from": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            25
+          ]
+        }
+      },
+      "to": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            32,
+            0,
+            35
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "d5-after-drag"
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            32,
+            0,
+            35
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "shot",
+      "name": "d6-hover-after-drag"
+    },
+    {
+      "do": "dblclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            32,
+            0,
+            35
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 2000
+    },
+    {
+      "do": "shot",
+      "name": "d7-dblclick"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

@@ -37,6 +37,11 @@ impl DrawingEditor {
         let pair = |v: &Value| -> Option<[f64; 2]> { Some([v.get(0)?.as_f64()?, v.get(1)?.as_f64()?]) };
         let at = if let Some(p) = t.get("sheet_point") {
             pair(p).ok_or("a sheet point: [x, y] mm")?
+        } else if t.get("empty").is_some() {
+            // Live's empty spot ([1560, 960] px): the sheet's right margin, between the frame and the border, 19 mm up
+            // (live drwm-2 s10, ANSI A at 0.23245 mm/px).
+            let (w, _) = self.current_sheet().size.size_mm();
+            [w - 4.6, 19.0]
         } else if let Some(name) = t.get("view").and_then(Value::as_str) {
             let pl = self.placement(self.view_named(name)?).ok_or("the view isn't built yet")?;
             [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0]
@@ -359,7 +364,11 @@ impl DrawingEditor {
                 Sel::View(id) => {
                     // (Light-framed views read VIEW for the 11-15 recorder too: live2 drw-section-edit-depth-direction.)
                     let framed = !sheet.view(*id).is_some_and(|v| matches!(v.kind, ViewKind::Section { .. } | ViewKind::Auxiliary { .. } | ViewKind::Detail { .. }));
-                    if framed {
+                    // Hovered, its frame is tan with its edges still orange: live's reader says EDGE (drwm-1 e3, e4, v3).
+                    let hovered = self.view_frames().iter().any(|(v, c)| v == id && *c != crate::drawing_view::DRAWING_SELECTED);
+                    if framed && hovered {
+                        selection.push(("EDGE".into(), self.ui_view_name(*id)));
+                    } else if framed {
                         selection.push(("VIEW".into(), self.ui_view_name(*id)));
                     } else {
                         selection.push(("EDGE-".into(), self.ui_view_name(*id)));

@@ -1586,8 +1586,13 @@ impl DrawingEditor {
         let Some(b) = self.built.as_ref() else { return };
         let k = 1.0 / self.zoom.max(1e-6);
         const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
+        let hovered = self.hovered_table();
         for s in &self.selection {
             let Sel::Table(id) = s else { continue };
+            // A selected cell takes them off until the table is hovered (live drwm-4b b3, b4).
+            if self.cell_sel.is_some_and(|c| c.table == *id) && hovered != Some(*id) {
+                continue;
+            }
             let (Some(t), Some(l)) = (self.current_sheet().table(*id), b.table_layout(*id)) else { continue };
             let fixed = l.fixed_corner(t.corner);
             for c in l.corners() {

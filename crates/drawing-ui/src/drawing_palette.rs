@@ -88,7 +88,7 @@ pub struct PaletteDlg {
     /// The tolerance list entry.
     pub tol: &'static str,
     /// Where it opened (editor px); it stays there while the text changes.
-    at: Option<[f32; 2]>,
+    pub(crate) at: Option<[f32; 2]>,
     /// A click went into it: from then on its halo keeps it open (live2 dim-palette-halo).
     touched: bool,
     /// The value box's text at a new precision, set on the next render (live2 drw-dimension-dblclick-precision: an

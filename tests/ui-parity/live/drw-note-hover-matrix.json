@@ -1,0 +1,4276 @@
+{
+  "scenario": "drw-note-hover-matrix",
+  "recorded": "2026-11-22T01:01:51.243Z",
+  "app": {
+    "name": "live",
+    "version": "web runtime 0adacf98979b8345c542",
+    "platform": "linux (Chrome over CDP, software GL)",
+    "viewport": [
+      1919,
+      1079
+    ],
+    "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+  },
+  "live": {
+    "document": "a1e7207bcd206771836609af",
+    "workspace": "6d6324b30f07aa9904363635",
+    "element": "cc077dbdaf3682c89fc4412a",
+    "start": "block-drawing",
+    "startElement": "fec75b9b8f06f7e2fe8fa56f",
+    "runner": "live2 .nstate-uip-1.json"
+  },
+  "start": {
+    "focus": {
+      "kind": "other",
+      "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+      "count": 0,
+      "items": []
+    },
+    "features": {
+      "rows": [],
+      "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+      "undo": false,
+      "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+      "tab": "Part 1 Drawing 1 (6)",
+      "sheet": "Sheet1",
+      "sheets": [
+        "Sheet1"
+      ],
+      "tool": null,
+      "views": [
+        {
+          "name": "Front",
+          "kind": "base",
+          "position": [
+            81,
+            81
+          ],
+          "parent": null,
+          "scale": "1:1",
+          "brokenOut": 0
+        },
+        {
+          "name": "Isometric",
+          "kind": "isometric",
+          "position": [
+            198.4,
+            160.8
+          ],
+          "parent": "Front",
+          "scale": "1:1",
+          "brokenOut": 0
+        },
+        {
+          "name": "Right",
+          "kind": "projected",
+          "position": [
+            198.4,
+            81
+          ],
+          "parent": "Front",
+          "scale": "1:1",
+          "brokenOut": 0
+        },
+        {
+          "name": "Top",
+          "kind": "projected",
+          "position": [
+            81,
+            160.8
+          ],
+          "parent": "Front",
+          "scale": "1:1",
+          "brokenOut": 0
+        }
+      ],
+      "annotations": [],
+      "selection": [],
+      "viewport": {
+        "sheet_px": [
+          378,
+          113,
+          1580,
+          1042
+        ],
+        "sheet_mm": [
+          279.4,
+          215.9
+        ],
+        "mmPerPixel": 0.23245
+      }
+    }
+  },
+  "steps": [
+    {
+      "step": 1,
+      "do": {
+        "do": "click",
+        "on": {
+          "tool": "Note"
+        }
+      },
+      "ok": true,
+      "at": [
+        794,
+        59
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Note",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 231403
+    },
+    {
+      "step": 2,
+      "do": {
+        "do": "click",
+        "on": {
+          "sheet_point": [
+            60,
+            40
+          ]
+        }
+      },
+      "ok": true,
+      "at": [
+        636,
+        870
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "cell-format",
+          "title": "Note",
+          "rect": [
+            636,
+            653,
+            394,
+            160
+          ],
+          "fields": [
+            {
+              "label": "Font",
+              "kind": "select",
+              "value": "Noto Sans ( Note )"
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "0.1200"
+            },
+            {
+              "label": "Bold",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Italic",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Underline",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Strikethrough",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Line spacing",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Horizontal alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "List",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Vertical alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Note order",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert symbol",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert drawing property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert sheet reference property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Text format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Date time format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "on"
+            },
+            {
+              "label": "Border shape",
+              "kind": "select",
+              "value": "Flag (Drawing)"
+            },
+            {
+              "label": "Border size",
+              "kind": "select",
+              "value": "2 Characters"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Note",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 257612
+    },
+    {
+      "step": 3,
+      "do": {
+        "do": "type",
+        "text": "TEMP"
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "cell-format",
+          "title": "Note",
+          "rect": [
+            636,
+            653,
+            394,
+            160
+          ],
+          "fields": [
+            {
+              "label": "Font",
+              "kind": "select",
+              "value": "Noto Sans ( Note )"
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "0.1200"
+            },
+            {
+              "label": "Bold",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Italic",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Underline",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Strikethrough",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Line spacing",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Horizontal alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "List",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Vertical alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Note order",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert symbol",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert drawing property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert sheet reference property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Text format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Date time format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "on"
+            },
+            {
+              "label": "Border shape",
+              "kind": "select",
+              "value": "Flag (Drawing)"
+            },
+            {
+              "label": "Border size",
+              "kind": "select",
+              "value": "2 Characters"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Note",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 283690
+    },
+    {
+      "step": 4,
+      "do": {
+        "do": "click",
+        "on": {
+          "sheet_point": [
+            240,
+            190
+          ]
+        }
+      },
+      "ok": true,
+      "at": [
+        1410,
+        224
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": "Note",
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 309981
+    },
+    {
+      "step": 5,
+      "do": {
+        "do": "key",
+        "key": "Escape"
+      },
+      "ok": true,
+      "pointer": {
+        "at": [
+          931,
+          33
+        ],
+        "hover": [],
+        "element": "div.navbar-document-and-workspace-names.os-row"
+      },
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 336203
+    },
+    {
+      "step": 6,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 1500
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 362745
+    },
+    {
+      "step": 7,
+      "do": {
+        "do": "hover",
+        "on": {
+          "annotation": "TEMP"
+        }
+      },
+      "ok": true,
+      "at": [
+        635,
+        869
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 403679
+    },
+    {
+      "step": 8,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 429602
+    },
+    {
+      "step": 9,
+      "do": {
+        "do": "shot",
+        "name": "n1-hover"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n1-hover.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 454584
+    },
+    {
+      "step": 10,
+      "do": {
+        "do": "click",
+        "on": {
+          "annotation": "TEMP"
+        }
+      },
+      "ok": true,
+      "at": [
+        635,
+        869
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 492081
+    },
+    {
+      "step": 11,
+      "do": {
+        "do": "hover",
+        "on": {
+          "empty": true
+        }
+      },
+      "ok": true,
+      "at": [
+        1560,
+        960
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 518164
+    },
+    {
+      "step": 12,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 544389
+    },
+    {
+      "step": 13,
+      "do": {
+        "do": "shot",
+        "name": "n2-selected-away"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n2-selected-away.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 569359
+    },
+    {
+      "step": 14,
+      "do": {
+        "do": "hover",
+        "on": {
+          "annotation": "TEMP"
+        }
+      },
+      "ok": true,
+      "at": [
+        635,
+        869
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 610378
+    },
+    {
+      "step": 15,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 636817
+    },
+    {
+      "step": 16,
+      "do": {
+        "do": "shot",
+        "name": "n3-hover-on-selected"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n3-hover-on-selected.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 662617
+    },
+    {
+      "step": 17,
+      "do": {
+        "do": "hover",
+        "on": {
+          "view_edge": {
+            "view": "Front",
+            "at": [
+              20,
+              0,
+              10
+            ]
+          }
+        }
+      },
+      "ok": true,
+      "at": [
+        727,
+        672
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 691308
+    },
+    {
+      "step": 18,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 717738
+    },
+    {
+      "step": 19,
+      "do": {
+        "do": "shot",
+        "name": "n4-hover-other-while-selected"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n4-hover-other-while-selected.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                65.3,
+                38.6
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 743864
+    },
+    {
+      "step": 20,
+      "do": {
+        "do": "drag",
+        "from": {
+          "annotation": "TEMP"
+        },
+        "to": {
+          "sheet_point": [
+            90,
+            70
+          ]
+        }
+      },
+      "ok": true,
+      "at": [
+        [
+          635,
+          869
+        ],
+        [
+          765,
+          741
+        ]
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 789478
+    },
+    {
+      "step": 21,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 815165
+    },
+    {
+      "step": 22,
+      "do": {
+        "do": "shot",
+        "name": "n5-after-drag"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n5-after-drag.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 841344
+    },
+    {
+      "step": 23,
+      "do": {
+        "do": "hover",
+        "on": {
+          "annotation": "TEMP"
+        }
+      },
+      "ok": true,
+      "at": [
+        765,
+        740
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 881015
+    },
+    {
+      "step": 24,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 906597
+    },
+    {
+      "step": 25,
+      "do": {
+        "do": "shot",
+        "name": "n6-hover-after-drag"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n6-hover-after-drag.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 933595
+    },
+    {
+      "step": 26,
+      "do": {
+        "do": "dblclick",
+        "on": {
+          "annotation": "TEMP"
+        }
+      },
+      "ok": true,
+      "at": [
+        765,
+        740
+      ],
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "cell-format",
+          "title": "Note",
+          "rect": [
+            766,
+            524,
+            394,
+            160
+          ],
+          "fields": [
+            {
+              "label": "Font",
+              "kind": "select",
+              "value": "Noto Sans ( Note )"
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "0.1200"
+            },
+            {
+              "label": "Bold",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Italic",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Underline",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Strikethrough",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Line spacing",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Horizontal alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "List",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Vertical alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Note order",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert symbol",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert drawing property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert sheet reference property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Text format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Date time format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "on"
+            },
+            {
+              "label": "Border shape",
+              "kind": "select",
+              "value": "Flag (Drawing)"
+            },
+            {
+              "label": "Border size",
+              "kind": "select",
+              "value": "2 Characters"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 972820
+    },
+    {
+      "step": 27,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 2000
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "cell-format",
+          "title": "Note",
+          "rect": [
+            766,
+            524,
+            394,
+            160
+          ],
+          "fields": [
+            {
+              "label": "Font",
+              "kind": "select",
+              "value": "Noto Sans ( Note )"
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "0.1200"
+            },
+            {
+              "label": "Bold",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Italic",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Underline",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Strikethrough",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Line spacing",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Horizontal alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "List",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Vertical alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Note order",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert symbol",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert drawing property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert sheet reference property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Text format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Date time format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "on"
+            },
+            {
+              "label": "Border shape",
+              "kind": "select",
+              "value": "Flag (Drawing)"
+            },
+            {
+              "label": "Border size",
+              "kind": "select",
+              "value": "2 Characters"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 1000425
+    },
+    {
+      "step": 28,
+      "do": {
+        "do": "shot",
+        "name": "n7-dblclick"
+      },
+      "ok": true,
+      "shot": "/root/onshape-research/live/qa/drw-matrix-1121/drwm-3-note-n7-dblclick.png",
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": {
+          "kind": "cell-format",
+          "title": "Note",
+          "rect": [
+            766,
+            524,
+            394,
+            160
+          ],
+          "fields": [
+            {
+              "label": "Font",
+              "kind": "select",
+              "value": "Noto Sans ( Note )"
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "0.1200"
+            },
+            {
+              "label": "Bold",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Italic",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Underline",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Strikethrough",
+              "kind": "toggle",
+              "value": false,
+              "enabled": true
+            },
+            {
+              "label": "Line spacing",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Horizontal alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "List",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Vertical alignment",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Note order",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert symbol",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert drawing property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Insert sheet reference property",
+              "kind": "menu-button",
+              "enabled": true
+            },
+            {
+              "label": "Text format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Date time format",
+              "kind": "menu-button",
+              "enabled": false
+            },
+            {
+              "label": "Text height",
+              "kind": "combo",
+              "value": "on"
+            },
+            {
+              "label": "Border shape",
+              "kind": "select",
+              "value": "Flag (Drawing)"
+            },
+            {
+              "label": "Border size",
+              "kind": "select",
+              "value": "2 Characters"
+            }
+          ]
+        },
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 1027491
+    },
+    {
+      "step": 29,
+      "do": {
+        "do": "key",
+        "key": "Escape"
+      },
+      "ok": true,
+      "pointer": {
+        "at": [
+          931,
+          33
+        ],
+        "hover": [],
+        "element": "div.navbar-document-and-workspace-names.os-row"
+      },
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 1054686
+    },
+    {
+      "step": 30,
+      "do": {
+        "do": "wait",
+        "until": "ms",
+        "ms": 800
+      },
+      "ok": true,
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 1080641
+    },
+    {
+      "step": 31,
+      "do": {
+        "do": "key",
+        "key": "Escape"
+      },
+      "ok": true,
+      "pointer": {
+        "at": [
+          931,
+          33
+        ],
+        "hover": [],
+        "element": "div.navbar-document-and-workspace-names.os-row"
+      },
+      "state": {
+        "focus": {
+          "kind": "other",
+          "tag": "iframe"
+        },
+        "dialog": null,
+        "dialogs": [],
+        "panels": null,
+        "list": null,
+        "selection": {
+          "count": 0,
+          "items": []
+        },
+        "features": {
+          "rows": [],
+          "rollbackAfter": null
+        },
+        "parts": [],
+        "undo": {
+          "undo": false,
+          "redo": false
+        },
+        "message": null,
+        "tooltip": null,
+        "sketch": null,
+        "drawing": {
+          "tab": "Part 1 Drawing 1 (6)",
+          "sheet": "Sheet1",
+          "sheets": [
+            "Sheet1"
+          ],
+          "tool": null,
+          "views": [
+            {
+              "name": "Front",
+              "kind": "base",
+              "position": [
+                81,
+                81
+              ],
+              "parent": null,
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Isometric",
+              "kind": "isometric",
+              "position": [
+                198.4,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Right",
+              "kind": "projected",
+              "position": [
+                198.4,
+                81
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            },
+            {
+              "name": "Top",
+              "kind": "projected",
+              "position": [
+                81,
+                160.8
+              ],
+              "parent": "Front",
+              "scale": "1:1",
+              "brokenOut": 0
+            }
+          ],
+          "annotations": [
+            {
+              "kind": "note",
+              "text": "TEMP",
+              "position": [
+                95.6,
+                68.7
+              ]
+            }
+          ],
+          "selection": [],
+          "viewport": {
+            "sheet_px": [
+              378,
+              113,
+              1580,
+              1042
+            ],
+            "sheet_mm": [
+              279.4,
+              215.9
+            ],
+            "mmPerPixel": 0.23245
+          }
+        }
+      },
+      "t": 1107675
+    }
+  ]
+}
