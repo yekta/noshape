@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 06:50 UTC) — RESUME HERE
+## State (2026-11-22 08:47 UTC) — RESUME HERE
 - LANDING the whole stack in one land.sh (rebased on main 06:4x): f3a8ff93 welding (33829c47 failed only on dx's
   flaky prefs images_library test; dx fixes it order-free), the outline band / triad drag commits, 55f3ff11 followers +
   Replicate seed, e658bb03 assembly config row menu (config_edit_option for assemblies, AGENT_API regenerated, filter
@@ -15,22 +15,35 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   later inserted; `coplanar_tie`); graphics menu Open linked document + Where used for X…; world target), TICKETS.
   Checks on vibex7 (r3..r7-1122.log in /root/asm-scratch): clippy 0, the new tests, ops e2e, coverage, PS
   hover_matrix 71/71, render 16/16. After landing: tell qa the main sha (all the rows above + MANIPULATOR-RING).
-- Scissor on main (ops-main, vibex8 ~/agents/asm-keep/sc-main-1122.out, onerun-t.sh 5400 s) waits in the slot
-  queue: compare fed22d (main 10/24 mates vs 16/34 good) and the parked fillets 9cbb0e Fillet 23 / 665cf3 Fillet 4
-  for blend; bisect the window <14:10 .. 19:26 11-21 if Extrude 18 still fails (notes /root/asm-scratch/notes-1121.md).
+- Scissor on main DONE 07:18 (vibex8 ~/agents/asm-keep/sc-main-1122.out): 207/239 occ, 16/34 mates, BOM 62/87; the
+  fed22d regression is gone (Extrude 18 OK, no bisect). blend told: 9cbb0e Fillet 23 (+2/6/18/19), 665cf3 Fillet 4
+  (+1/2/5), fed22d Fillet 4/5/24/25 still fail.
 - Infento rerun with the welding fix timed out at 7200 s in the mate checks (121 checked, ~32 s each on a loaded
   vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
-- QUEUED a8722d2a (13 commits, 06:5x): don't land again till it lands; then tell qa the sha.
-- ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1) NEXT: live answered (behaviours "asm isolate show internal geometry",
-  live/asm/isolate-1122/): ☐ Show internal geometry above Select transparent geometry, in the assembly AND Part Studio
-  Isolate (app-core isolate_ui.rs, shared); the slider "Adjust opacity" = the transparent parts' opacity (0 hidden,
-  100 opaque), one remembered value per checkbox state, shared by both studios; ticked: the isolated part drawn in
-  front of the transparent ones (they show only as a faint outline through it); unticked: normal depth. Tell psui
-  (Part Studio half) when it lands.
-- Scissor on main started 07:0x in the vibex8 slot (sc-main-1122.out).
-- SPEED-ASM-OPEN: scissor open 78.8 s under perf on vibex8 (beside the scissor run); perf.data in vibex8
-  ~/tmp/asm/speed (perf report --no-children --sort dso,symbol ran past 30 min on the 700 MB binary and was stopped: use
-  `perf report --no-inline -g none --sort symbol` or perf script + a stack collapse).
+- QUEUED a8722d2a (13 commits, 06:5x; checking again since 08:22): don't land again till it lands; then tell qa the sha.
+- ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1) COMMITTED 2b04436c8 (r9-1122.log green; land after a8722d2a):
+  app-core isolate_ui: ☐ Show internal geometry above Select transparent geometry (28 px rows, 220 × 231 as live
+  ps-panel), Isolate's slider a plain line "Adjust opacity"; `isolate_alpha` (0 = not drawn .. 0.9, ticked x0.55);
+  `remembered_knob` / `remember_knob`: one knob per box state, an App global shared by both studios, saved in
+  feature_settings view:isolateOpacity(Internal), start 30 %. Assembly: ui.iso_internal, AsmSceneOptions.front_internal
+  (isolated meshes drawn again over_transparent; dimmed edges hidden_only at 8 %; knob 0 = dimmed not drawn). Part
+  Studio: Isolation.show_internal, the same knob, SceneOptions front_bodies / faint_through_bodies; Isolate's look is
+  now live's (old iso_look Ghost..Hidden kept for Make transparent only). Test isolate_shows_internal_geometry; PS
+  tests 231 px / 30 %. Make transparent unchanged (legend track). Tell psui + qa when it lands (TICKETS row on main
+  line ~432: mark after the land rebase).
+- SPEED-ASM-OPEN IN PROGRESS (lead 07:5x ruling: the assembly open uses stored studio results and regenerates behind,
+  never a stale cache; reuse dx's code, one cache; measure scissor / infento / isaac to first frame and interactive
+  before / after). (1) COMMITTED b61bfc67b (r9 green): AssemblyEvaluator::set_result_store (core's result_store, RegenOptions.store for every
+  studio regen + persist::keep), app-core DocModel uses ops derived::assembly_evaluator_with_store; test
+  part_studio_regenerations_are_kept_across_sessions. (2) display_cache::studio_key in b61bfc67b (PS uses it). Next, after the
+  timings: an after app is building on vibex8 (~/tmp/asm/app-b/noshape, log /root/asm-scratch/build-app-b.log); the assembly reads studio StudioDisplay rows for
+  its first frame when its own row is missing; dx: WRITE a row only if built by the same mesher/tolerance as the PS's
+  for that fine level, else read-only. Before timings: vibex8 ~/agents/asm-keep/asm-open-times.sh (green 604e9158 app
+  at ~/tmp/asm/app/noshape, assembly tab seeded via last-viewed.json; out ot-before.out); isaac needs a saved doc.
+- SPEED-ASM-OPEN profile (perf, vibex8 ~/tmp/asm/speed): the scissor open is the Part Studio regenerations, OCCT
+  geometry (BSplCLib::Bohm 6.8 %, BSplSLib::RationalDerivative 3.7, Extrema_GenExtPS / math_FunctionSetRoot,
+  IntPatch walking, BRepGProp); no mate-solver frames. 2x of live needs the open to show stored studio results
+  (DECISIONS 11-21 display cache, dx) and regenerate behind: decision for the lead.
 - Next: then xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5,
   tvc 41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
