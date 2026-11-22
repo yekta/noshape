@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 23:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 23:39 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -42,8 +42,14 @@ FEEL-PICKED-EDGE-DASHED-UNDER-PREVIEW, FEEL-CORNER-BREAK-VERTEX-PICK (disc only)
 "Top plane outline not lit"): not MSAA (t73 passes at NOSHAPE_PERF_MSAA=4); p04 now samples 28 points along the
 plane's 4 edges and prints viewport size + hover on failure. t72: psui lib 504/505 (the one: my test's 3 px move
 needed `approach`, fixed), scene, render green. t74 (clippy + both tests, ~/tmp/psui/t74.log) → land.sh → watch macOS CI.
+USER P0 (23:3x, lead): Mac mini M6 appearance + union. Live answered (behaviours "psui P0: STEP import colours…").
+TICKETS block "psui, 2026-11-22 23:5x": dx IMPORT-SOLID-COLOUR-ON-EVERY-FACE, core BOOLEAN-UNION-FIRST-TOOL-IDENTITY,
+psui APPEARANCE-PART-UNDER-FACE-COLOURS (test + app check after dx). Both told. t76 (kernel dump_step_colours on
+~/tmp/psui/mm.step on vibex8, log ~/tmp/psui/t76.log) → send dx the per-part face colour counts (live: 152/258, 14/529).
+Render side already as live (display.rs: part props > import colour; a face colour over it).
+Corner break arrow: solid in our render at f5ebb8b3 (dumped): ask qa to re-check after it lands.
 EDIT-BODY-SHADE stays open (ours top (118,127,133), live (132,147,155)).
-Queue: FEEL-CORNER-BREAK-VERTEX-PICK's dashed arrow (ON_TOP arrow, preview blend suspect), P1
+Queue: P1
 CONFIG-FILTER-HELP-STILL-POINTER, P2 FEEL-ROW-TIP-AFTER-DBLCLICK, UIS-LIST-ROW-MENU-ROWS, CUSTOM-FEATURE-ROW-ICON,
 CUSTOM-FEATURE-DIALOG-HELP, UIS-FEATURE-INITIALS (row test-named "feature:…" only, mod.rs ~4770).
 - CONFIG-FILTER-HELP-STILL-POINTER: we have no hover help on the filter box at all (only the funnel's menu,

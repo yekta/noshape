@@ -5,6 +5,24 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## psui, 2026-11-22 23:5x (user P0: Mac mini M6, imported STEP appearance and union; live behaviours "psui P0: STEP import colours…", live/psui/step-colours-1122)
+Live: the STEP import makes part appearances (Main #ececec, Fan #4a4848) and face appearances only for faces with their own
+colour (Main 152/258, Fan 14/529). A part appearance set later turns only the uncoloured faces (Main's 106) and keeps
+every face appearance. A union takes the FIRST tool's name and part appearance and keeps every face appearance; the other
+parts' uncoloured faces take the result's colour. The user's document: /root/lead-scratch/user-docs/macmini-m6.noshape
+(private: a mode-700 copy in your own ~/tmp, never in place or in the repo); the file: Mac-mini-2024.step (ask psui).
+- [ ] P0 **IMPORT-SOLID-COLOUR-ON-EVERY-FACE (dx)**: setting "Mac mini body" to #3B61B4 changes nothing in the
+  viewport (the thumbnail, which skips face colours, is blue). Ours draws a face colour over the part's whenever one is
+  set (as live). Suspect: kernel io.cpp `face_colors` takes every coloured sub-shape label, the solid's own included,
+  so Main's #ececec lands on all 258 faces. Want: only faces with their own STYLED_ITEM (152), the solid's colour as the
+  part appearance alone. psui is confirming with read_step's dump (kernel `dump_step_colours`).
+- [ ] P0 **BOOLEAN-UNION-FIRST-TOOL-IDENTITY (core)**: Boolean 1 (union of the import's 2 parts) gives one part named
+  "root" (the STEP product, not the user's rename) in two colours. Live: the result is the first tool (its name, a
+  rename included, and its part appearance; Fan first gives "Fan" #4a4848), face appearances kept, the other part's
+  uncoloured faces in the result's colour.
+- [ ] P0 **APPEARANCE-PART-UNDER-FACE-COLOURS (psui)**: once dx's fix is in, a test (part appearance over an import with
+  face colours: only uncoloured faces change) and the user's document checked in the app.
+
 ## psui, 2026-11-22 (live psui/manip-feel-1122 + nav-feel-1122; extrude/move-face/fillet follow laws, no snapping, translate values, rotate snaps, view cube hovers/clicks as live)
 - [x] P0 **FEEL-EXTRUDE-ARROW-ANCHOR (psui)** (qa 11-22 17:3x, green dc779d69f, feel1122/manipnav cells vs live psui/{manip-feel,nav-feel}-1122 ex-hover): live puts the Extrude depth arrow at the cap's centroid ((20,15,20) at 1172,485); ours ~13, 17 px off (~(27,9,20): the triangle centre nearest the centroid, region_anchor). Follow law, no-snap and 0.1 mm steps are as live. Ours: tickets/FEEL-EXTRUDE-ARROW-ANCHOR-1122.png. **Done 613b06bb.**
 - [x] P0 **FEEL-MANIP-RELEASED-LOOK (psui)** (qa 11-22 17:3x, green dc779d69f, feel1122/manipnav cells vs live psui/{manip-feel,nav-feel}-1122 ex-released): released with the pointer still on the arrow, live draws the hover look (light fill, blue outline); ours keeps the solid dragged stroke. Ours: tickets/FEEL-MANIP-RELEASED-LOOK-1122.png. **Done b6812aae.**
