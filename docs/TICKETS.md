@@ -341,6 +341,20 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   (Workflow 26 otherwise matches: typed fCuboid text as live, mod+s commits, "My Feature" from Custom features → MF My Feature 1,
   Part 1; ours faster at every step with a real time.)
 
+- [ ] P1 **THREAD-ON-REVOLVED-CYLINDER (core)** (workflow 21 steps 25-29, green b5b414278): Front rectangle 0,0-5,30 revolved
+  about its own left edge (r 5 x 30 cylinder), External thread on its top edge (defaults ANSI 3/8, 16 tpi, Blind 10 mm, Split face):
+  live builds it (message "Exact match for thread size not found.", thread rings drawn); ours: External thread 1 in error, tip
+  "did not regenerate properly: Error regenerating.". Not the helix: the same steps without Helix 1 fail too (hm2/out-wfv/21v-nohelix).
+  The suite's extruded pin threads fine, so it is the revolved face. qa-scratch/tickets/wf21-thread-dlg.png.
+- [ ] P0 **FEEL-HELIX-FACE-PICKED-LOOK (psui)** (workflow 21 steps 20-22): the cylinder face picked into Helix: live tints it
+  faintly, (141,152,137) mid-face; ours fills it tan (182,150,73). The Helix arrow: live from mid-height **down** to a start-point
+  disc at the bottom (the disc stays after Enter); ours points **up** at the top, no start disc (if our helix starts at the top,
+  that part is core's). qa-scratch/tickets/wf21-helix.png (live left).
+- [ ] P1 **PARTS-ROW-OF-PICK (psui)** (workflow 21 steps 14, 20, 27): live's Parts list marks the part a dialog's pick or preview
+  belongs to: the new Part 1 **bold** in the Revolve preview, then a light grey row with a blue underline while its face / edge
+  is in the Helix / thread field. Ours draws the row plain. qa-scratch/tickets/wf21-parts.png.
+  (Workflow 21 otherwise matches: sketch, Revolve, Helix 4 turns committed by Enter, ours faster at every step.)
+
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
 - [ ] P0 **FEEL-DRW-TITLEBLOCK-CLICK (studios)**: the Front view selected (edges orange), click in the title block (sheet (200, 30) mm):
