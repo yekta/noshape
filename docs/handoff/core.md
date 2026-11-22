@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-22 14:42 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 17:11 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -12,12 +12,15 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **Next after VALID-SURFLOFTS-LOFT1: SPEED gamma Move face 1** (bool 11-22 14:5x): c2-gamma-imported's Move face 1
   987 ms ours (vibex8, reopened doc, NOSHAPE_PARITY_SPLIT=1 + NOSHAPE_KERNEL_PROFILE=1), 899 ms in OCCT's defeature;
   live regenerates the whole document in 246 ms. Not a Boolean, so core's.
-- **VALID-SURFLOFTS-LOFT1 (core-rf branch core-sfl, uncommitted):** op_loft's straight_edges_as_lines: a loft's own
-  B-spline edges with collinear poles become Geom_Line (live: Loft 1 = 2 lines + 2 splines), pcurves re-projected
-  (GeomProjLib::Curve2d; a re-ranged old pcurve failed BRepCheck SameParameter on solid lofts), vertex params set.
-  NOSHAPE_LOFT_SPLINE_EDGES=1 turns it off. T1 core::a_loft_between_two_open_curves_has_straight_lines_between_their_ends
-  + all 37 kernel loft tests pass. Running (.lp.sh, vibex7 ~/tmp/core/g): validity on surfaces-lofts-projected
-  (val-lines/val-splines.log), then model suite splines vs lines same binary (run-splines/run-lines.log). Then land.
+- **VALID-SURFLOFTS-LOFT1 QUEUED b646175e (core-rf branch core-sfl):** op_loft's straight_edges_as_lines: a loft's
+  own B-spline edges with collinear poles become Geom_Line in place (history kept), faces' p-curves re-projected
+  (GeomProjLib::Curve2d), p-curves on surfaces no longer the edge's faces dropped first (natural lofts' planes replaced
+  their B-splines: re-ranged, the stale ones grew tolerances to 32 mm, every point OnBoundary, Cuts did nothing), vertex
+  params set. NOSHAPE_LOFT_SPLINE_EDGES=1 keeps the B-splines. Suite same binary: 1984 -> 2015 features, 127 -> 128 docs
+  (impeller 10 -> 27, loft-paths-guides 16 -> 29 = to the end, surfaces-lofts-projected 8 -> 9), none worse; speed
+  interleaved: lines same or faster. Validity: surfaces-lofts-projected 0 invalid, Loft 1 1/4/4 as live. On land: TICKETS
+  [x], tell blend the doc's next first difference is Face blend 2 ERROR "Failed to blend faces" (live OK).
+  Tests core::a_loft_between_two_open_curves..., core::a_solid_loft_between_two_hexagons_is_a_frustum_with_line_sides.
 - **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
   parameter from guide 0, each guide by its own parameter (Pchip through (v_i, t_i)): 21504.09 mm2 vs live 21477.23
   (was 21517.64), P1-P4 width within 0.02 mm, P5-tip +0.38 mm. T1 kernel the_knifehandle_loft_through_six_profiles_has_lives_area.
