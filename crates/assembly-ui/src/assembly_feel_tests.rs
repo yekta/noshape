@@ -1184,3 +1184,93 @@ fn the_triads_ball_snaps_over_a_face_and_the_release_leaves_it_on_the_point(cx: 
     assert!((f.origin - centre).length() < 1e-6, "released snapped, the triad on the face's centre: {:?} for {centre:?}", f.origin);
     assert!((f.rotation.dot(start.rotation)).abs() > 1.0 - 1e-9, "its arrows as before the drag");
 }
+
+/// Part 2 <1> clicked at its top face's centre in live's view of triad-click-1120 (Trimetric at 17.0 px/mm: Part 2's
+/// 20 mm along X 305 px, its 10 mm height 148 px), pressed at live's press point off the triad's centre and dragged
+/// 30 px right in steps: the handle hovered at the press, the box's texts during the drag and after it, the triad's
+/// centre and the part's transform before and after.
+fn triad_drag_as_live(cx: &mut TestAppContext, name: &str, press: DVec2, handle: crate::assembly_scene::ManipHandle) -> (Vec<String>, String, glam::DVec3, glam::DMat4, glam::DMat4) {
+    let path = document(cx, name, |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let part = cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 2 <1>")).unwrap().id);
+    let (lo, hi) = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
+    let top = glam::DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            v.viewport.update(cx, |vp, cx| {
+                let h = vp.size().y;
+                vp.camera.set_view(noshape_render::StandardView::Trimetric);
+                vp.camera.target = top;
+                vp.camera.distance = h / (2.0 * 17.0e3 * (vp.camera.fov_y * 0.5).tan());
+                vp.request_frame(cx);
+            });
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let c = cx.update(|cx| view.read(cx).viewport.read(cx).project(top).unwrap());
+    move_to(cx, window, &view, c);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    let w = at_window(cx, &view, c);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.ui.entity_sel.is_empty());
+    settle(cx, window, &view);
+    let pose = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).result.occurrences.iter().find(|o| o.top() == part).unwrap().transform);
+    let before = pose(cx);
+    let centre = cx.update(|cx| view.read(cx).manipulator(cx).expect("a triad").origin);
+    let from = cx.update(|cx| view.read(cx).viewport.read(cx).project(centre).unwrap()) + press;
+    move_to(cx, window, &view, from);
+    wait_until(cx, window, &view, |v, _| v.manip_hover.is_some());
+    assert_eq!(cx.update(|cx| view.read(cx).manip_hover), Some(handle), "live's press point on {handle:?}");
+    let down = at_window(cx, &view, from);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(down, MouseButton::Left, Modifiers::default());
+    let mut during = Vec::new();
+    for k in 1..=6 {
+        let p = at_window(cx, &view, from + DVec2::new(5.0 * f64::from(k), 0.0));
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, Some(MouseButton::Left), Modifiers::default());
+        frames(cx, window, &view);
+        let text = cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.render_manip_value(cx).and(v.manip_drag_text(cx)))).unwrap();
+        during.extend(text);
+    }
+    let up = at_window(cx, &view, from + DVec2::new(30.0, 0.0));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(up, MouseButton::Left, Modifiers::default());
+    settle(cx, window, &view);
+    let after = cx.update(|cx| {
+        let v = view.read(cx);
+        let st = v.manip_value.as_ref().expect("the value box stays after release").input.read(cx).state().clone();
+        st.read(cx).value().to_string()
+    });
+    (during, after, centre, before, pose(cx))
+}
+
+/// Live triad-click-1120 (3): pressed on the X arrow 52 px off the centre and dragged 30 px right, the part moves
+/// 1.9 mm along X (0.1 mm steps at this zoom), unturned, with a "1.9 mm" box during the drag and after.
+#[gpui::test]
+fn the_triads_x_arrow_drags_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (during, after, _, before, end) = triad_drag_as_live(cx, "triad-x", DVec2::new(50.2, 14.5), crate::assembly_scene::ManipHandle::Axis(0));
+    assert!(!during.is_empty() && during.last().is_some_and(|t| t == "1.9 mm"), "the box during the drag: {during:?}");
+    assert_eq!(after, "1.9 mm", "the box after release");
+    let moved = end.w_axis.truncate() - before.w_axis.truncate();
+    assert!((moved - glam::DVec3::new(1.9e-3, 0.0, 0.0)).length() < 1e-9, "1.9 mm along X: {moved:?}");
+    assert!(end.x_axis.abs_diff_eq(before.x_axis, 1e-12) && end.z_axis.abs_diff_eq(before.z_axis, 1e-12), "unturned");
+}
+
+/// Live triad-click-1120 (3b): pressed on the ring at the Z arrow's tip (91 px above the centre) and dragged 30 px
+/// right, the part turns 15.0° about world Y through the triad's centre (16.8° dragged, 5° steps), with a "15 deg" box
+/// during the drag and after.
+#[gpui::test]
+fn the_triads_z_ring_turns_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (during, after, centre, before, end) = triad_drag_as_live(cx, "triad-ring", DVec2::new(0.0, -91.3), crate::assembly_scene::ManipHandle::Ring(2));
+    assert!(!during.is_empty() && during.last().is_some_and(|t| t == "15 deg"), "the box during the drag: {during:?}");
+    assert_eq!(after, "15 deg", "the box after release");
+    let turn = end * before.inverse();
+    let (s, c) = 15f64.to_radians().sin_cos();
+    assert!(turn.transform_vector3(glam::DVec3::Z).abs_diff_eq(glam::DVec3::new(s, 0.0, c), 1e-9) && turn.transform_vector3(glam::DVec3::Y).abs_diff_eq(glam::DVec3::Y, 1e-9), "15° about world Y: {turn:?}");
+    assert!(turn.transform_point3(centre).abs_diff_eq(centre, 1e-9), "about the triad's centre {centre:?}: {turn:?}");
+}

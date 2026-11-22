@@ -2261,16 +2261,19 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// The box's text during a triad arrow or ring drag (live: the box is there from the start): the dragged distance
+    /// / angle, not yet editable.
+    pub(super) fn manip_drag_text(&self, cx: &App) -> Option<String> {
+        let d = self.drag.as_ref().filter(|d| d.started && !d.no_box && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_))))?;
+        let q = if matches!(d.handle, Some(ManipHandle::Axis(_))) { Quantity::meters(d.value) } else { Quantity::radians(d.value) };
+        Some(noshape_units::format_quantity(q, &self.units(cx)).replace('°', " deg"))
+    }
+
     pub(super) fn render_manip_value(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        // During the drag (live: the box is there from the start), the
-        // dragged distance / angle, not yet editable.
-        let dragging = self.drag.as_ref().filter(|d| d.started && !d.no_box && matches!(d.handle, Some(ManipHandle::Axis(_) | ManipHandle::Ring(_))));
         if self.manip_value.is_none()
-            && let Some(d) = dragging
+            && let Some(text) = self.manip_drag_text(cx)
         {
-            let units = self.units(cx);
-            let q = if matches!(d.handle, Some(ManipHandle::Axis(_))) { Quantity::meters(d.value) } else { Quantity::radians(d.value) };
-            let text = noshape_units::format_quantity(q, &units).replace('°', " deg");
+            let d = self.drag.as_ref()?;
             let pos = self.manip_box_pos(d.handle?, d.plane_point, cx)?;
             let pal = p();
             return Some(
