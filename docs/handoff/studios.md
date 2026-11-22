@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 22:21 UTC.
+Updated 2026-11-22 22:31 UTC.
 
 ## In flight
 
@@ -36,7 +36,10 @@ crates/drawing land (drawing-ui alone: not needed).
   not flagged), FEEL-DRW-PICK-EDGE-STAYS-LIT (pick.rs: Balloon{anchor:Some} / Detail{center:Some} hover None; Detail
   snaps only before the centre), FEEL-DRW-BOM-HOVER-FILL (fills only with the cursor inside; `menu_table` keeps them
   while its menu is open), FEEL-DRW-CALLOUT-SELECTED-LOOK (balloons in the dims look; leaders black when selected).
-  Tests in feel.rs. Then commit, land, mark the tickets.
+  Tests in feel.rs. x229 RUNNING (task b03js7vgz / waiter bq38zvk9a; script x229r.sh: drawing_ui_tests::, scene
+  drawing_tools, clippy drawing-ui + scene); read with tail -40. Also uncommitted, untested: FEEL-FS-COMMIT-DISABLED-HOVER
+  (feature_studio.rs render_commit: clean = ButtonCustomVariant #8aa8d7, hover/active #557fc2, replacing opacity 0.5;
+  needs cargo test -p noshape-feature-studio-ui --lib + clippy). Then commit, land, mark the tickets [x].
 - qa queue left (TICKETS blocks "qa, 2026-11-22 21:4x" and "22:0x"): P0 FEEL-DRW-RELATED-MARKS-BLUE,
   FEEL-DRW-SECTION-EDIT-MARKS, FEEL-DRW-CALLOUT-PLACED-HOVER, FEEL-FS-COMMIT-DISABLED-HOVER (live hovered disabled
   Commit (85,127,194), ours (186,207,229); render_commit in feature_studio.rs ~1765 uses opacity 0.5); P1/P2 rows there.
