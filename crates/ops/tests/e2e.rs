@@ -5356,6 +5356,20 @@ fn paste_sketch_centres_the_copy_on_the_origin() {
     ys.sort_by(f64::total_cmp);
     let (x0, x1, y0, y1) = (xs[0], xs[xs.len() - 1], ys[0], ys[ys.len() - 1]);
     assert!((x0 + 20.0).abs() < 1e-6 && (x1 - 20.0).abs() < 1e-6 && (y0 + 15.0).abs() < 1e-6 && (y1 - 15.0).abs() < 1e-6, "{x0} {x1} {y0} {y1}: {p}");
+    // Live's L (behaviours "skasm paste sketch corners"): its corner mean lands on the origin, its box centre at
+    // (3.28, 1.62).
+    let sk = new_sketch(&mut ctx, "paste_centred.noshape", "plane:front");
+    let corners = [[-16.70, -13.60], [23.26, -13.60], [23.26, -3.23], [-6.56, -3.23], [-6.56, 16.83], [-16.70, 16.83]].map(|[x, y]| [x + 10.0, y + 5.0]);
+    for i in 0..6 {
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [corners[i], corners[(i + 1) % 6]] }));
+    }
+    let p = call(&mut ctx, "sketch_paste", json!({ "sketch": sk, "plane": "plane:top" }));
+    let pts: Vec<[f64; 2]> = p["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "point").map(|e| [num(&e["at"][0]), num(&e["at"][1])]).collect();
+    let n = pts.len() as f64;
+    let mean = pts.iter().fold([0.0, 0.0], |m, q| [m[0] + q[0] / n, m[1] + q[1] / n]);
+    let (lo, hi) = pts.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), q| ([lo[0].min(q[0]), lo[1].min(q[1])], [hi[0].max(q[0]), hi[1].max(q[1])]));
+    assert!(mean[0].abs() < 1e-6 && mean[1].abs() < 1e-6, "{mean:?}: {p}");
+    assert!(((lo[0] + hi[0]) * 0.5 - 3.28).abs() < 0.01 && ((lo[1] + hi[1]) * 0.5 - 1.615).abs() < 0.01, "{lo:?} {hi:?}");
 }
 
 /// Context menus: Copy sketch → Paste sketch on another plane; Export as

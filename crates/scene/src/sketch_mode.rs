@@ -8047,7 +8047,7 @@ pub fn prune_reference_only(data: &mut SketchData) {
 }
 
 /// Paste sketch onto a plane: the copy loses its ties to the Origin and is centred on it (live workflows-1122 29:
-/// a 40 × 30 rectangle drawn from the origin lands at −20..20 × −15..15).
+/// a 40 × 30 rectangle drawn from the origin lands at −20..20 × −15..15), keeping its own constraints.
 pub fn centre_pasted_sketch(data: &mut SketchData) {
     let origin: Vec<EntityId> = data.sketch.entities().filter(|e| is_origin(&data.sketch, e.id)).map(|e| e.id).collect();
     // (A point curves share with the Origin stays theirs.)
@@ -8058,10 +8058,19 @@ pub fn centre_pasted_sketch(data: &mut SketchData) {
     }
     data.sketch.remove_entities(&lone);
     let own: Vec<EntityId> = data.sketch.entities().filter(|e| !e.external).map(|e| e.id).collect();
+    // Live (behaviours "skasm paste sketch corners"): the mean of its line end points lands on the origin (an L's corner
+    // mean, not its box centre or centroid); with no lines, the box centre.
+    let ends: Vec<DVec2> = own.iter().filter_map(|e| match data.sketch.curve(*e) {
+        Some(Curve2::Line { a, b }) => Some([a, b]),
+        _ => None,
+    }).flatten().collect();
     let b = own.iter().filter_map(|e| data.sketch.entity_bbox(*e)).fold(noshape_sketch::BBox::EMPTY, |a, b| a.union(&b));
-    if !b.is_empty() && b.center().length() > 1e-12 && data.sketch.transform(&own, Transform::Translate(-b.center())).is_ok() {
+    let centre = if ends.is_empty() { (!b.is_empty()).then(|| b.center()) } else { Some(ends.iter().sum::<DVec2>() / ends.len() as f64) };
+    if let Some(c) = centre.filter(|c| c.length() > 1e-12)
+        && data.sketch.transform(&own, Transform::Translate(-c)).is_ok()
+    {
         for l in data.dimension_labels.values_mut() {
-            *l = [l[0] - b.center().x, l[1] - b.center().y];
+            *l = [l[0] - c.x, l[1] - c.y];
         }
     }
     prune_exprs(data);
