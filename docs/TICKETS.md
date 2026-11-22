@@ -389,6 +389,25 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   emboss) and builds at the picked point; ours opens with "Select Part Studio…" empty, so Form 1 errors (and the flat view has no
   emboss). Corner relief width likewise: live remembered 3 mm (warns "A corner relief is too small…"), ours 5 mm. Rest of 27 matches
   (Corner 8 mm, Make joint refused, relief notch in the flat view; flat view fit is SM-FLAT-VIEW-FIT).
+- [ ] P0 **FEEL-SECTION-PLANE-LABEL-LOOK (psui)** (workflow 28 steps 24-25, bracket, green b5b414278): Section view, Right picked
+  and after Enter: live keeps the plane labels solid blue (39,94,181) and the part's edges 1 px; ours draws "Right" / "Top" thin
+  and pale mauve (138,117,129; blue 23,82,176 up to step 23) and outlines the wall face and part in thick dark ~3 px edges
+  (tickets/wf28-section.png, wf28-section-zoom.png; live left).
+- [ ] P1 **APPEARANCE-RGB-FIELD-SCROLL (psui)** (workflow 28 steps 18-21): Add appearance to face, click R, mod+a, type 200, Tab:
+  live's R reads "200"; ours "00" (the left-blurred input keeps its scroll; the colour is right, C890FF) (tickets/wf28-rgb-field.png).
+- Workflow 28 note (psui): step 1's right-click on the plate (0,12,5) lands ~7-8 px from Sketch 3's line: live takes the face
+  (Assign material…), ours the line (Edit Sketch 3…), so steps 2-10 miss: at the edge of FEEL-SKETCH-REACH-OUTSIDE's line reach
+  (live 7). Off the line (variant 28v, (10,12,5)) Material = live: Acetal (Delrin), density 0.049. Appearance 1E90FF, face
+  appearance, section result match (tickets/wf28-face-rclick.png).
+- [ ] P1 **MATE-LIMITS-TAB-FOCUS (asm)** (workflow 25 steps 5-11, two-blocks, green b5b414278): Revolute 1, tick Limits, Tab, -45,
+  Tab, 45, Enter: live's Tab goes into the unlabelled min input (underlined) and the limits read -45 / 45 deg, the mate row then
+  shows the limits icon; ours keeps focus on the Limits box, both inputs stay "No minimum" / "No maximum" (tickets/wf25-limits.png,
+  rows s08 / s10 / s13).
+- [ ] P1 **MATE-GEAR-DRAG-TURNS-NOTHING (asm)** (workflow 25 steps 19-32): after Part 2 <2> is inserted and Revolute 2 mates its
+  face (70,10,10) to Part 1's front face (20,0,10), live shows Part 2 <1> / <2> poking out of Part 1 (grey) and the drag of Part 2 <2>
+  turns both (gear 2:1, tilted squares in s32); ours shows no Part 2 outside Part 1 and the drag changes no pixel, with or without
+  the Gear relation (variant 25v-nogear, hm2/out-wfv): placement of Part 2 <2> or the drag pick (tickets/wf25-placement.png,
+  wf25-drag.png). Gear 1 dialog = live (Mate(s) Revolute 1 / 2, ratio 2).
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
