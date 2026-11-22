@@ -71,8 +71,8 @@ impl ImagesLibrary {
     }
 }
 
-/// A document's name and its images at its latest named version (none without one: live builds the library from
-/// versioned images).
+/// A document's name and its images, in its tab order, at its latest named version (none without one: live builds the
+/// library from versioned images).
 fn document_images(path: &Path) -> Option<(String, Vec<LibraryImage>)> {
     let (info, label, mv) = crate::forms_library::latest(path)?;
     if !info.versions.iter().any(|v| v.label == label && v.label != "Current state") {
@@ -80,8 +80,8 @@ fn document_images(path: &Path) -> Option<(String, Vec<LibraryImage>)> {
     }
     let doc = crate::derived::external_snapshot(path, mv).ok()?;
     let images = doc
-        .tabs
-        .iter()
+        .ordered_tabs()
+        .into_iter()
         .filter_map(|t| match &t.content {
             TabContent::File(f) if crate::forms_library::is_image(&f.file_name) => Some(LibraryImage {
                 name: f.file_name.clone(),

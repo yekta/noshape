@@ -138,7 +138,7 @@ pub fn build(kind: Kind, folder: &Path) -> Result<FormsLibrary, Vec<String>> {
             continue;
         };
         let mut forms = Vec::new();
-        for tab in &doc.tabs {
+        for tab in doc.ordered_tabs() {
             let TabContent::PartStudio(ps) = &tab.content else { continue };
             if kind == Kind::Frames {
                 let tagged = ps.features.iter().filter(|f| !f.suppressed && f.type_id == "tag" && f.params.is("tagPurpose", "FRAME")).find_map(|f| f.params.query("sketch").first()?.depends_on());
