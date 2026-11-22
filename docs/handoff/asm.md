@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 15:08 UTC) — RESUME HERE
+## State (2026-11-22 15:11 UTC) — RESUME HERE
 - LANDED 22f626c1 as ec33215f (14:40); qa told 15:1x.
 - LOCAL, rebased on main (not queued yet): f65ccd02f tyre fix (ASM-OPEN-TYRES-TURNED: `Context::revolve_axes`, implicit.rs
   `revolve_axis()` Z = -drawn; ScopeRule 19 + `PartStudio::legacy_revolve_axes`; least_change skipped when LM moved
@@ -19,6 +19,12 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   assembly-ui lib on the rebased tree); vibex8 probe8.log (infento probe, legacy vs NOSHAPE_PROBE_NEW_AXES=1, SOLVE ms;
   instrumentation was synced to vibex8 then reverted locally: /root/asm-scratch/probe-instrumentation.patch eval.rs +
   assembly_perf.rs parts, plus a temp env switch in partstudio.rs migration; never commit them).
+- UNCOMMITTED: solver.rs test `a_revolute_part_grabbed_on_its_axis_turns_toward_the_pointer` (qa MATE-GEAR-DRAG-TURNS-
+  NOTHING reopened: live wf25 s32 presses at Part 1's front-face centre = Revolute 2's axis, lever ~0, and still turns
+  Part 2 <2> toward the pointer; hypothesis: our LM sees no gain and stops). Run it (assembly --lib) first; if it fails,
+  fix the drag solve for a near-zero lever (turn the lever toward the pull), then the wf25 replay.
+- Slots: vibex7 held by core's parity (started ~14:44, timeout 7000 s), vibex8 by qa's parity (~14:47, 5400 s) and two
+  bool gates. Mac has an empty ~/noshape-host/agents/asm (cold build). My waiting runs start when those end.
 - Then: land (touch -c, diff --stat, cherry), tell core "ScopeRule 19 (legacy_revolve_axes)" and qa the sha.
 - Live triad-feel-1122 compared: ours matches (75x26 box focused/selected and kept, 0.1 mm step, ring free beyond 0.4
   step = 2 deg, no geometry snap on arrows). Nothing to change.
