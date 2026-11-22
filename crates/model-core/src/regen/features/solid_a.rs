@@ -421,7 +421,8 @@ const LOFT_INCONSISTENT: &str = "Inconsistent boundary conditions will result in
 fn guide_conditions(ev: &EvalCtx, profiles: &[Shape]) -> FResult<()> {
     for g in ev.params.array("guidesArray") {
         let kind = g.enum_("guideDerivativeType");
-        if kind == "DEFAULT" {
+        // (Unset is None, the default: a guide added through the API without it.)
+        if kind == "DEFAULT" || kind.is_empty() {
             continue;
         }
         let refs = g.query("guideEntities");
@@ -1302,7 +1303,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             let mut each = Vec::new();
             for g in ev.params.array("guidesArray") {
                 if let Some(w) = wires_from(&resolve_curves(ev, g.query("guideEntities"))?)?.into_iter().next() {
-                    each.push((w, g.enum_("guideDerivativeType") != "DEFAULT"));
+                    each.push((w, !matches!(g.enum_("guideDerivativeType"), "DEFAULT" | "")));
                 }
             }
             if let Some(start_normal) = start_normal

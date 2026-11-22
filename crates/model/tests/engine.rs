@@ -412,6 +412,40 @@ fn surface_loft_between_coplanar_open_curves() {
     assert!(near(area, 0.02 * 0.01, 1e-6), "{area}");
 }
 
+/// qa SURFACE-LOFT-GUIDE-FAILS (live workflow 12): a surface Loft between two lines (Top, y -20, and Front, z 20, both x
+/// -10..50 mm) with a guide line on Right meeting each at x 0, mid-length: live builds the surface (here a flat strip,
+/// 60 x 20 sqrt 2 mm).
+#[test]
+fn a_surface_loft_whose_guide_meets_its_profiles_mid_length() {
+    let mut t = T::new();
+    let mut line = |plane: DatumPlane, a: DVec2, b: DVec2| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(a, b).0;
+        let s = t.sketch(Reference::Plane(plane), sk);
+        Reference::SketchEntity { sketch: s, entity: l }
+    };
+    let p1 = line(DatumPlane::Top, DVec2::new(-0.01, -0.02), DVec2::new(0.05, -0.02));
+    let p2 = line(DatumPlane::Front, DVec2::new(-0.01, 0.02), DVec2::new(0.05, 0.02));
+    let g = line(DatumPlane::Right, DVec2::new(-0.02, 0.0), DVec2::new(0.0, 0.02));
+    let item = |id: &str, r: Reference| {
+        let mut v = ParamValues::default();
+        v.set(id, q(vec![r]));
+        v
+    };
+    let loft = t.add(
+        "loft",
+        &[
+            ("bodyType", en("SURFACE")),
+            ("wireProfilesArray", ParamValue::Array(vec![item("wireProfileEntities", p1), item("wireProfileEntities", p2)])),
+            ("addGuides", ParamValue::Bool(true)),
+            ("guidesArray", ParamValue::Array(vec![item("guideEntities", g)])),
+        ],
+    );
+    let res = t.ok();
+    let area: f64 = res.context.bodies.iter().filter(|b| b.id.feature == loft).flat_map(|b| b.shape.faces()).map(|f| f.area().unwrap()).sum();
+    assert!(near(area, 0.06 * 0.02 * 2f64.sqrt(), 1e-6), "{} mm2", area * 1e6);
+}
+
 /// A surface Sweep cuts its path only at its profile's own plane (c2-surf-workshop-mutualtrim's Sweep 1: the profile's
 /// sketch on Plane 1, the path cut where it crossed Top, 3476.71 mm2 of live's 8896.85).
 #[test]
