@@ -763,14 +763,8 @@ impl DrawingEditor {
             overlay.tinted.push((vec![pl.to_sheet(a.p), pl.to_sheet(b.p)], [0xcc, 0xb2, 0x92, 255], 3.0));
         }
         if matches!(self.tool, Tool::Dimension { .. }) {
-            // Orange, about 11 px tall, a red centre (live 1662 (b)).
-            const ORANGE: [u8; 4] = [255, 130, 63, 255];
-            let h = self.tol_mm(5.5);
-            for p in self.woken_plus.iter().chain(self.dimension_pick_marks().iter()) {
-                overlay.tinted.push((vec![[p[0] - h * 0.7, p[1]], [p[0] + h * 0.7, p[1]]], ORANGE, 2.0));
-                overlay.tinted.push((vec![[p[0], p[1] - h], [p[0], p[1] + h]], ORANGE, 2.0));
-                overlay.tinted.push((vec![[p[0] - h * 0.1, p[1]], [p[0] + h * 0.1, p[1]]], [255, 0, 0, 255], 2.0));
-            }
+            let marks: Vec<[f64; 2]> = self.woken_plus.iter().copied().chain(self.dimension_pick_marks()).collect();
+            self.plus_marks(&mut overlay, &marks);
         }
         // Sketch tools: hovering an endpoint wakes it (SK8).
         if matches!(self.tool, Tool::Sketch { .. })
@@ -1672,8 +1666,12 @@ impl DrawingEditor {
             Drag::MoveAnnotation { start, orig, .. } => {
                 self.infer_lines.clear();
                 if !e.modifiers.shift {
-                    // Inference on the dragged annotation's own position.
-                    let offset = sub(orig.position, start);
+                    // Inference on the dragged annotation's own position; a dimension's on its text's middle, which
+                    // is what lines up with the others (live drw-drag-feel-1122 T), taken where it was grabbed.
+                    if self.drag_grab.is_none() {
+                        self.drag_grab = Some(orig.kind.is_dimension().then(|| self.dimension_grab(&orig, start)).flatten().unwrap_or(sub(orig.position, start)));
+                    }
+                    let offset = self.drag_grab.unwrap_or(sub(orig.position, start));
                     let raw = self.cursor;
                     self.cursor = [raw[0] + offset[0], raw[1] + offset[1]];
                     self.infer_placement(Some(orig.id));
@@ -1690,6 +1688,7 @@ impl DrawingEditor {
                         x.position = [x.position[0] + d[0], x.position[1] + d[1]];
                     }
                 }
+                self.annotation_drag_overlay(&a);
                 if let Some(s) = dr.sheets.get_mut(self.sheet)
                     && let Some(x) = s.annotations.iter_mut().find(|x| x.id == a.id)
                 {
@@ -1891,9 +1890,14 @@ impl DrawingEditor {
         if picks.first().is_none_or(|p| matches!(p, Pick::Point(_))) {
             return Vec::new();
         }
+        self.dimension_marks(None)
+    }
+
+    /// Every placed dimension's + marks but `skip`'s: its text's middle and a linear one's second arrow end.
+    fn dimension_marks(&self, skip: Option<u64>) -> Vec<[f64; 2]> {
         let (Some(b), Some(sheet)) = (&self.built, self.drawing.sheets.get(self.sheet)) else { return Vec::new() };
         let mut out = Vec::new();
-        for a in sheet.annotations.iter().filter(|a| a.kind.is_dimension()) {
+        for a in sheet.annotations.iter().filter(|a| a.kind.is_dimension() && Some(a.id) != skip) {
             let mine = self.picks_of(Sel::Annotation(a.id));
             if let Some(t) = b.geometry.texts.iter().find(|t| mine.contains(&t.pick)) {
                 // The box's middle, raised from the descender room to the capitals' middle.
@@ -1908,6 +1912,30 @@ impl DrawingEditor {
             }
         }
         out
+    }
+
+    /// Orange + marks, about 11 px tall, a red centre (live 1662 (b)).
+    fn plus_marks(&self, overlay: &mut Overlay, marks: &[[f64; 2]]) {
+        const ORANGE: [u8; 4] = [255, 130, 63, 255];
+        let h = self.tol_mm(5.5);
+        for p in marks {
+            overlay.tinted.push((vec![[p[0] - h * 0.7, p[1]], [p[0] + h * 0.7, p[1]]], ORANGE, 2.0));
+            overlay.tinted.push((vec![[p[0], p[1] - h], [p[0], p[1] + h]], ORANGE, 2.0));
+            overlay.tinted.push((vec![[p[0] - h * 0.1, p[1]], [p[0] + h * 0.1, p[1]]], [255, 0, 0, 255], 2.0));
+        }
+    }
+
+    /// A placed annotation dragged: the inference line it is held on, a red ✕ at its text, and a dimension's the other
+    /// dimensions' + marks (live drw-drag-feel-1122 T: the marks stay the whole drag and go on release).
+    fn annotation_drag_overlay(&mut self, a: &Annotation) {
+        let mut overlay = Overlay::default();
+        overlay.infer.extend(self.infer_lines.iter().cloned());
+        overlay.crosses.push((a.position, self.tol_mm(5.0)));
+        if a.kind.is_dimension() {
+            let marks = self.dimension_marks(Some(a.id));
+            self.plus_marks(&mut overlay, &marks);
+        }
+        self.overlay = overlay;
     }
 
     /// The Dimension tool still taking picks at the pointer (the click adds one, not places): no placement alignment.
@@ -2031,6 +2059,8 @@ impl DrawingEditor {
                 }
             }
             Drag::MoveAnnotation { orig, fresh, .. } => {
+                self.overlay = Overlay::default();
+                self.drag_grab = None;
                 if let Some(mut p) = self.preview.take() {
                     self.group_callout_on_drop(&orig, &mut p);
                     self.commit("Move annotation", p, cx);
@@ -2393,6 +2423,36 @@ impl DrawingEditor {
     }
 
     /// The annotation `orig` (resolved) dragged from `start` to the cursor.
+    /// Where a dragged dimension's text middle sits from the pointer: as grabbed along its line; across it, as far
+    /// from the line as it is now (the line follows the pointer).
+    fn dimension_grab(&self, orig: &Annotation, start: [f64; 2]) -> Option<[f64; 2]> {
+        let m = self.text_mid(orig.id)?;
+        let g = sub(m, start);
+        let AnnotationKind::LinearDimension { view, a, b, offset, orientation, .. } = &orig.kind else { return Some(g) };
+        let pl = self.placement(*view)?;
+        let (p, q) = (pl.to_sheet(*a), pl.to_sheet(*b));
+        let n = match orientation {
+            DimOrientation::Horizontal => [0.0, 1.0],
+            DimOrientation::Vertical => [1.0, 0.0],
+            DimOrientation::Aligned => {
+                let d = sub(q, p);
+                let l = d[0].hypot(d[1]).max(1e-12);
+                [-d[1] / l, d[0] / l]
+            }
+        };
+        let dot = |u: [f64; 2], v: [f64; 2]| u[0] * v[0] + u[1] * v[1];
+        let across = dot(m, n) - (dot(p, n).max(dot(q, n)) + offset) - dot(g, n);
+        Some([g[0] + n[0] * across, g[1] + n[1] * across])
+    }
+
+    /// The middle of an annotation's (first) text as built.
+    fn text_mid(&self, id: u64) -> Option<[f64; 2]> {
+        let b = self.built.as_ref()?;
+        let picks = self.picks_of(Sel::Annotation(id));
+        let q = noshape_model::drawing::font::text_box(b.geometry.texts.iter().find(|t| picks.contains(&t.pick))?);
+        Some([q.iter().map(|p| p[0]).sum::<f64>() / q.len() as f64, q.iter().map(|p| p[1]).sum::<f64>() / q.len() as f64])
+    }
+
     fn dragged_annotation(&self, orig: &Annotation, start: [f64; 2]) -> Annotation {
         self.pk().dragged_annotation(orig, start)
     }

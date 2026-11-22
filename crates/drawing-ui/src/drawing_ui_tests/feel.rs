@@ -1796,14 +1796,22 @@ fn a_dragged_view_moves_alone_until_release_and_esc_puts_it_back(cx: &mut TestAp
     v.simulate_mouse_move(p, None, Modifiers::default());
     v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
     v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
-    // Esc is the workspace's Cancel action (the app's key context), which runs `cancel`.
-    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    // Esc through a key binding (the app's Cancel action), the button still held.
+    cx.update(|cx| cx.bind_keys([gpui_kit::KeyBinding::new("escape", noshape_app_core::actions::Cancel, Some("Drawing && !Input"))]));
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| (format!("{:?}", std::mem::discriminant(&editor.read(cx).drag)), editor.read(cx).view_drag_cancelled, cx.update_window(window, |_, w, cx| editor.read(cx).focus.is_focused(w)).unwrap_or(false)));
+    let before = state(cx);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_keystrokes("escape");
+    let after = state(cx);
+    assert!(after.1, "Esc marked the drag cancelled: before {before:?}, after {after:?}");
     draw(cx, window);
     assert_ne!(shown(cx, base), Some(b0), "the preview stays while the button is held");
     let mut v = VisualTestContext::from_window(window, cx);
     v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
     draw(cx, window);
-    assert_eq!((pos(cx, base), pos(cx, child)), (b0, c0), "the release puts it back");
+    let rel = cx.update(|cx| { let e = editor.read(cx); (format!("{:?}", std::mem::discriminant(&e.drag)), e.preview.is_some(), e.view_drag_cancelled, e.drawing.sheets[e.sheet].view(base).map(|v| v.position)) });
+    assert_eq!((pos(cx, base), pos(cx, child)), (b0, c0), "the release puts it back: before {before:?} after {after:?} release {rel:?}");
     assert_eq!(shown(cx, base), None, "no preview left");
 }
 
@@ -3655,4 +3663,204 @@ fn a_right_click_beside_a_cells_menu_only_closes_it(cx: &mut TestAppContext) {
     draw(cx, window);
     assert!(cx.update(|cx| crate::os_menu::open_menu(cx).is_none()), "no menu open");
     assert!(cx.update(|cx| editor.read(cx).cell_panel.is_some()), "the Cell panel stays");
+}
+
+/// Live drw-title-block-dblclick s1: a double-click in the DWG NO. cell (sheet (240, 20) mm, 8 px under the cell's top
+/// line) opens the field's Note editor, not the line.
+#[gpui::test]
+fn a_double_click_in_a_title_cell_by_its_line_edits_the_field(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseDownEvent, MouseUpEvent};
+    START.set(Some("block-drawing"));
+    let (window, editor) = drawing(cx, "feel-title-dblclick");
+    real_sheet(cx, window, &editor);
+    let mut lit = Vec::new();
+    for z in [3.0, 3.5, 1084.0 / 279.4, 4.5, 5.0] {
+        cx.update(|cx| editor.update(cx, |e, _| e.zoom = z));
+        draw(cx, window);
+        lit_at(cx, window, &editor, [240.0, 20.0]);
+        lit.push(cx.update(|cx| {
+            let e = editor.read(cx);
+            e.hover.and_then(|h| e.built.as_ref().and_then(|b| b.picks.get(h as usize).cloned()))
+        }));
+    }
+    let tip = lit.clone();
+    cx.update(|cx| editor.update(cx, |e, _| e.zoom = 1084.0 / 279.4));
+    lit_at(cx, window, &editor, [150.0, 8.0]);
+    let at = at_window(cx, &editor, [240.0, 20.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(at, None, Modifiers::default());
+    for n in 1..=2 {
+        v.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n, first_mouse: false });
+        v.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n });
+    }
+    draw(cx, window);
+    let field = cx.update(|cx| match &editor.read(cx).panel {
+        Some(crate::drawing_view::Panel::Note { field, .. }) => field.clone(),
+        _ => None,
+    });
+    let sel = cx.update(|cx| editor.read(cx).selection.clone());
+    assert!(!sel.iter().any(|s| matches!(s, Sel::FormatLine(_))), "the line above isn't taken: {sel:?}, lit {lit:?}");
+    assert!(field.is_some(), "the field's Note editor: lit {lit:?} ({tip:?}), selection {sel:?}");
+}
+
+/// [`a_double_click_in_a_title_cell_by_its_line_edits_the_field`] at once after opening (ui-parity's first step): the
+/// field's editor once the sheet is in, never the line above.
+#[gpui::test]
+fn a_double_click_in_a_title_cell_right_after_opening_edits_the_field(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseDownEvent, MouseUpEvent};
+    START.set(Some("block-drawing"));
+    let (window, editor) = drawing(cx, "feel-title-dblclick-early");
+    cx.update(|cx| editor.update(cx, |e, _| e.zoom = 1084.0 / 279.4));
+    draw(cx, window);
+    let early = cx.update(|cx| editor.read(cx).real_sheet_in());
+    let at = at_window(cx, &editor, [240.0, 20.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(at, None, Modifiers::default());
+    for n in 1..=2 {
+        v.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n, first_mouse: false });
+        v.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: n });
+    }
+    real_sheet(cx, window, &editor);
+    draw(cx, window);
+    let sel = cx.update(|cx| editor.read(cx).selection.clone());
+    let field = cx.update(|cx| match &editor.read(cx).panel {
+        Some(crate::drawing_view::Panel::Note { field, .. }) => field.clone(),
+        _ => None,
+    });
+    assert!(!sel.iter().any(|s| matches!(s, Sel::FormatLine(_))), "the line above isn't taken: {sel:?} (real sheet in at the click: {early})");
+    assert!(field.is_some(), "the field's Note editor (real sheet in at the click: {early}), selection {sel:?}");
+}
+
+/// Live drw-title-block-dblclick: about sheet (240, 20) (8 px under the DWG NO. row's top line, 1.2 px under the top of
+/// the field's area) the cell is lit, never that line.
+#[gpui::test]
+fn the_dwg_no_title_cell_is_lit_8_px_under_its_line_not_the_line(cx: &mut TestAppContext) {
+    START.set(Some("block-drawing"));
+    let (window, editor) = drawing(cx, "feel-title-cell-sweep");
+    real_sheet(cx, window, &editor);
+    let z = 1084.0 / 279.4;
+    cx.update(|cx| editor.update(cx, |e, _| e.zoom = z));
+    draw(cx, window);
+    let mut lines = Vec::new();
+    for k in -8..=4 {
+        let y = 20.0 + f64::from(k) * 0.25 / z;
+        lit_at(cx, window, &editor, [240.0, y]);
+        let pick = cx.update(|cx| {
+            let e = editor.read(cx);
+            e.hover.and_then(|h| e.built.as_ref().and_then(|b| b.picks.get(h as usize).cloned()))
+        });
+        if matches!(pick, Some(noshape_model::drawing::build::PickTarget::FormatLine(_))) {
+            lines.push((f64::from(k) * 0.25, pick));
+        }
+    }
+    assert!(lines.is_empty(), "the line lit at px offsets {lines:?}");
+}
+
+/// Live drw-drag-feel-1122 (T): while a placed dimension's text is dragged, a red ✕ sits on it and every other dimension
+/// shows its + marks; in line with another item's height a pink inference line shows and the text holds on it; the
+/// release clears them all.
+#[gpui::test]
+fn a_dragged_dimension_text_shows_its_x_the_others_marks_and_the_line_it_holds_on(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    // A second dimension, on the first view's shortest straight edge.
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let len = |e: &Value| (num(&e["b"][0]) - num(&e["a"][0])).hypot(num(&e["b"][1]) - num(&e["a"][1]));
+        let edges = g["views"][0]["edges"].as_array().cloned().unwrap_or_else(|| panic!("the first view's edges: {g}"));
+        let short = edges.iter().filter(|e| e["type"] == "line").min_by(|a, b| len(a).total_cmp(&len(b))).expect("a straight edge");
+        let mid = [(num(&short["a"][0]) + num(&short["b"][0])) / 2.0, (num(&short["a"][1]) + num(&short["b"][1])) / 2.0];
+        call(ctx, "drawing_dimension", json!({ "drawing": dw, "picks": [mid], "place": [mid[0] + 25.0, mid[1]] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-dim-drag-marks");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let dims: Vec<u64> = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().filter(|a| a.kind.is_dimension()).map(|a| a.id).collect());
+    assert_eq!(dims.len(), 2, "two dimensions");
+    // (The fixture's own, on the longest edge, came second: that one is dragged.)
+    let dims = [dims[1], dims[0]];
+    let text_mid = |cx: &mut TestAppContext, id: u64| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(id)));
+            let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("its text");
+            let q = noshape_model::drawing::font::text_box(t);
+            [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0]
+        })
+    };
+    let a = text_mid(cx, dims[0]);
+    let other_pos = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|x| x.id == dims[1]).map(|x| x.position)).expect("the other");
+    let p = at_window(cx, &editor, a);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    // Far from everything's x and y first: the ✕ and the others' marks, no line.
+    let far = at_window(cx, &editor, [a[0] - 3.0, a[1] + 31.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(far, Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    let tinted = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).overlay.tinted.len());
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert_eq!(e.overlay.crosses.len(), 1, "a red ✕ on the dragged text: {:?}", e.overlay.crosses);
+    });
+    assert!(tinted(cx) >= 3, "the other dimension's + marks");
+    // Then its text 2 px off the other dimension's text height: held on it, its line shown.
+    let other = text_mid(cx, dims[1]);
+    let near = cx.update(|cx| {
+        let e = editor.read(cx);
+        let g = e.drag_grab.expect("the text's grab, taken on the first move");
+        [other[0] + 60.0 - g[0], other[1] + e.tol_mm(2.0) - g[1]]
+    });
+    let q = at_window(cx, &editor, near);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(!e.overlay.infer.is_empty(), "the inference line");
+        assert!(e.preview.is_some(), "previewed");
+    });
+    let moved = text_mid(cx, dims[0]);
+    assert!((moved[1] - other[1]).abs() < 0.05, "its text held on the other's height: {moved:?} vs {other:?} (positions {other_pos:?})");
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_up(q, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.overlay.crosses.is_empty() && e.overlay.infer.is_empty() && e.overlay.tinted.is_empty(), "the release clears the marks");
+    });
+}
+
+/// Live drw-drag-feel-1122 V: while a view is dragged its dimensions are drawn orange with it; after Esc they aren't.
+#[gpui::test]
+fn a_dragged_views_dimensions_are_orange_with_it(cx: &mut TestAppContext) {
+    use noshape_render::scene::state;
+    use noshape_scene::drawing_tools::Drag;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "view-drag-dims");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let lit = |cancelled: bool, cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            editor.update(cx, |e, _| {
+                let (id, view) = e.current_sheet().annotations.iter().find_map(|a| a.kind.view().filter(|_| a.kind.is_dimension()).map(|v| (a.id, v))).expect("a view's dimension");
+                e.selection = vec![Sel::View(view)];
+                e.hover = None;
+                e.drag = Drag::MoveViews { start: [0.0, 0.0], view, fresh: false };
+                e.preview = Some(e.drawing.clone());
+                e.view_drag_cancelled = cancelled;
+                let picks = e.picks_of(Sel::Annotation(id));
+                let scene = e.build_scene();
+                e.drag = Drag::None;
+                e.preview = None;
+                e.view_drag_cancelled = false;
+                !picks.is_empty() && picks.iter().all(|p| scene.states.get(*p as usize).is_some_and(|s| s & state::SELECTED != 0))
+            })
+        })
+    };
+    assert!(lit(false, cx), "dragged: its dimension orange");
+    assert!(!lit(true, cx), "after Esc: not");
 }

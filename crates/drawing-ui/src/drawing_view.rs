@@ -405,6 +405,8 @@ pub struct DrawingEditor {
     /// Esc pressed while a view is dragged: the preview stays while the button is held, the release puts the view back
     /// (live drawing-feel-1118 C2).
     pub view_drag_cancelled: bool,
+    /// A dragged annotation's inference point less the press point (its text's middle for a dimension).
+    pub drag_grab: Option<[f64; 2]>,
     /// The Projected view tool's parent is drawn picked: the view Insert view just placed (live 2068), until the tool
     /// places a view or ends.
     pub projection_parent_lit: bool,
@@ -810,6 +812,7 @@ impl DrawingEditor {
             aligned: None,
             menu_closed_at: None,
             view_drag_cancelled: false,
+            drag_grab: None,
             projection_parent_lit: false,
             insert_continuation: false,
             hover_snap: None,
@@ -1748,6 +1751,17 @@ impl DrawingEditor {
                     scene.add_flag(p, state::SELECTED);
                 }
             }
+            // A dragged view's dimensions and notes go orange with it (live drw-drag-feel-1122 V).
+            if let Drag::MoveViews { view, .. } = self.drag
+                && self.preview.is_some()
+                && !self.view_drag_cancelled
+            {
+                for a in cur.annotations.iter().filter(|a| a.kind.view() == Some(view) || a.moves_with_view() == Some(view)) {
+                    for p in self.picks_of(Sel::Annotation(a.id)) {
+                        scene.add_flag(p, state::SELECTED);
+                    }
+                }
+            }
             // Edit detail…: the detail's circle stays orange in its parent view until another shape is started (live2
             // drw-detail-id-profile-tips s7–s15).
             if let Some(id) = self.detail_dlg.as_ref().filter(|d| d.view.is_some()).and_then(|d| d.edit) {
@@ -2622,6 +2636,13 @@ impl DrawingEditor {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::on_mouse_up))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::on_mouse_up))
+            // A drag's release where the canvas isn't hovered still ends it: off the canvas, or right after a key
+            // (Esc mid-drag: GPUI counts the pointer as not hovering until it moves again).
+            .on_mouse_up_out(MouseButton::Left, cx.listener(|this, e: &MouseUpEvent, window, cx| {
+                if !matches!(this.drag, Drag::None | Drag::Pending { .. }) {
+                    this.on_mouse_up(e, window, cx);
+                }
+            }))
             .on_scroll_wheel(cx.listener(Self::on_scroll))
             .on_pinch(cx.listener(Self::on_pinch));
         v_flex()

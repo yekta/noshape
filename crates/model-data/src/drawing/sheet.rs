@@ -1630,9 +1630,12 @@ impl SheetGeometry {
                         } else {
                             self.arrow(tip, [-dir[0], -dir[1]], 3.0);
                             self.lines.push(Polyline2 { points: vec![[tip[0] + dir[0] * a_len, tip[1] + dir[1] * a_len], [tip[0] + dir[0] * 2.0 * a_len, tip[1] + dir[1] * 2.0 * a_len]], style: LineStyle::Thin, closed: false, pick });
-                            // Its middle on the middle of the radius to the circle's 0° point (live2 foreshorten-s3: DXF
+                            // Centred where it was dropped (live asbdt-3r-1-inside-3x, drw-drag-feel-1122 R); placed with no
+                            // such point, on the middle of the radius to the circle's 0° point (live2 foreshorten-s3: DXF
                             // MTEXT middle centre at the centre + r/2 in x, whichever side the edge was picked).
-                            self.dim_label([c[0] + r / 2.0, c[1]], 0.0, 0.5, true, &t, dh, pick);
+                            let p = a.position;
+                            let at = if (p[0] - c[0]).hypot(p[1] - c[1]) < r { p } else { [c[0] + r / 2.0, c[1]] };
+                            self.dim_label(at, 0.0, 0.5, true, &t, dh, pick);
                         }
                         continue;
                     }

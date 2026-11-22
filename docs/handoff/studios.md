@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 21:11 UTC.
+Updated 2026-11-22 21:37 UTC.
 
 ## In flight
 
@@ -42,22 +42,22 @@ crates/drawing land (drawing-ui alone: not needed).
 - UNCOMMITTED, verified: title-block fix in crates/drawing build.rs `hit_reach` + 3 feel tests (sweep inside the cell
   only); drawing-ui tests, clippy, FULL ops e2e green (x218), app scenarios title-block-dblclick 4/4, insert-row 12/12,
   cell-menu 31/31 (x221, fresh app; x218's 2/4 was a stale binary).
-- UNCOMMITTED, failing (same feel.rs): (a) drawing_tools.rs `annotation_drag_overlay` / `dimension_marks(skip)` /
-  `plus_marks` (live drw-drag-feel T: red ✕ on the dragged text, others' + marks, inference line; cleared on release)
-  + test `a_dragged_dimension_text_shows_its_x_…`: failed "held on the other's height" because SETUP's dimension comes
-  first in the sheet; now drags dims[1] (the fixture's). (b) `a_dragged_view_moves_alone_…_esc_puts_it_back` now sends
-  a real "escape" (binding Cancel in "Drawing && !Input", as line ~2009's test) and FAILS: the release commits the move.
-  This reproduces the app gap. Diagnostic asserts added (drag discriminant, view_drag_cancelled, focus before/after the
-  key). RUNNING 21:15: task breljp1kj/b3udizn18 (x222r.sh: drawing_ui_tests::feel:: + start_ + clippy); read with grep.
-  cancel() (drawing_tools.rs ~114) sets view_drag_cancelled only when drag is MoveViews; on_key (~2181) doesn't touch
-  escape; the only Cancel handler is drawing_view.rs ~2628.
-- Then: fix the Esc path, commit drawing (title fix + drag marks + Esc), fetch, rebase, diff --stat, drop the "[ ]"
-  VS-NAME-FOCUS-BOX duplicate in TICKETS, land.sh (3806ff953, c1b5a6a07, 991e634b3, 18717c50d, 6e764f4f6, drawing).
-  Read test logs only with grep / tail -40 (lead 21:15: context).
-- drw-drag-feel-1122 gaps left (ours vs live, x216 shots ~/agents/studios-keep/shots-drw-drag-feel on vibex8):
-  R: a radial's text dragged inside the hole: live draws a leader from outside, arrow on the circle pointing in; ours
-  an arrow from the text outward (crates/drawing radial layout). V: during a view drag live draws the view's dimension
-  orange too; ours black. L (leader end re-attach #CC925C over an edge) and N (note text hover no tan box) not checked.
+- UNCOMMITTED (21:37), x224 RUNNING (task bueyo0q1m: drawing lib, model-data drawing::, drawing-ui all, FULL ops e2e,
+  clippy model-data/drawing/drawing-ui/start-ui; read with grep):
+  - drag marks (live drw-drag-feel T): drawing_tools.rs `annotation_drag_overlay`, `dimension_marks(skip)`, `plus_marks`;
+    a dimension's inference now on its text middle (`dimension_grab`, editor field `drag_grab`, reset on release).
+  - Esc mid view drag (live V): root cause GPUI: after a key the pointer counts as not hovering until it moves, so the
+    release never reached `on_mouse_up`. drawing_view.rs adds `on_mouse_up_out` ending any non-Pending drag.
+  - V: a dragged view's dimensions/notes flagged SELECTED (orange) while dragged, not after Esc.
+  - R: model-data sheet.rs: a radius value dropped inside the circle is centred at its position (else r/2 right as
+    before); test extended in crates/drawing tests.rs `ansi_radial_values_dropped_inside_the_circle`.
+  - docs page (live docs-page-gaps-1122 list-row drop): folder list row drop look top/bottom 2 px lines only
+    (`folder_row_drop_style`); Esc ends a row drag and selects the grabbed row (root `capture_key_down`); test
+    `esc_ends_a_row_drag_and_leaves_the_row_selected` (start_ 33/33 x223).
+  - x226: feel:: 91/92 (only the dim text height test failed before `dimension_grab`).
+- Then: commit drawing + start, fetch, rebase, diff --stat, drop the "[ ]" VS-NAME-FOCUS-BOX duplicate in TICKETS,
+  land.sh (3806ff953, c1b5a6a07, 991e634b3, 18717c50d, 6e764f4f6, dc227091f, new). Logs only with grep / tail -40.
+- drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box) not checked.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.
 - QUEUE: DRW-DIM-HIDDEN-VERTEX-SNAP fix; the drag gaps above; FS / VS / history pages: everything else matches.

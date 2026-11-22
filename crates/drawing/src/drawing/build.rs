@@ -343,8 +343,16 @@ impl BuiltSheet {
         {
             return Some(*pick);
         }
-        if best.is_none_or(|(k, _)| matches!(self.picks.get(k as usize), Some(PickTarget::TitleBlock)))
-            && let Some((pick, _)) = self.title_cells.iter().find(|(p, r)| !own(p) && inside(r))
+        // (A format line past the cell's edge, as the row's line over a cell's label band, loses to the cell: live
+        // drw-title-block-dblclick, 7.9 px under DWG NO.'s line. One on the cell's own edge keeps its reach.)
+        let edge = |r: &[f64; 4]| (p[0] - r[0]).min(r[2] - p[0]).min(p[1] - r[1]).min(r[3] - p[1]);
+        let yields = |k: u32, d: f64, r: &[f64; 4]| match self.picks.get(k as usize) {
+            Some(PickTarget::TitleBlock) => true,
+            Some(PickTarget::FormatLine(_)) => d - tol * 0.25 > edge(r) + 1e-6,
+            _ => false,
+        };
+        if let Some((pick, r)) = self.title_cells.iter().find(|(p, r)| !own(p) && inside(r))
+            && best.is_none_or(|(k, d)| yields(k, d, r))
         {
             return Some(*pick);
         }

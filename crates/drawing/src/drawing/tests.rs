@@ -5369,6 +5369,11 @@ fn ansi_radial_values_dropped_inside_the_circle() {
     drawing.sheets[0].annotations.last_mut().unwrap().kind = AnnotationKind::RadialDimension { view: ViewId(2), center: [0.0, 0.0], radius: 0.012, diameter: false, angle: 2.4, dim_line: false, knee: Some(-4.0) };
     let (c, t, _, r) = center(&drawing, 960);
     assert!((t[0] - c[0] - r / 2.0).abs() < 1.0 && (t[1] - c[1]).abs() < 1.0, "r/2 right: {t:?} vs {c:?}, r {r}");
+    // Dropped at a point inside the circle: centred there (live drw-drag-feel-1122 R, asbdt-3r-1-inside-3x).
+    let at = [c[0] - r / 4.0, c[1] + r / 5.0];
+    drawing.sheets[0].annotations.last_mut().unwrap().position = at;
+    let (_, t, _, _) = center(&drawing, 960);
+    assert!((t[0] - at[0]).abs() < 0.6 && (t[1] - at[1]).abs() < 0.6, "where dropped: {t:?} vs {at:?}");
 }
 
 /// Styles panel › Thickness / Pitch scale on a sheet sketch line (SK16): its
