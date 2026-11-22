@@ -93,6 +93,15 @@ const LIVE_SCATTER: &[LiveScatter] = &[
     // core 11-22: the Blade's area, 18,227.2567 mm², against the sum of its six faces' evArea, 18,225.5247. The 4 mm top
     // face is the path spline (238.10967 mm) swept: exactly 952.43867 mm², ours 952.438671, live's evArea 952.4035.
     LiveScatter { doc: "c2-surf-workshop-knifehandle", from_feature: "Sweep 2", readings: &[(18227.256747166535, 18225.524666273184)] },
+    // lead 11-22: live's conic corner break (rho 0.3, R 6) is a C1 cubic B-spline approximation (live/skasm/cb-curves-1122:
+    // its 21 points up to 3.1 µm off the exact conic, the asymmetric one's 1.6 µm off its ellipse); Part 10 with the exact
+    // corner, 8,974.319335 mm³ / 12,437.697394 mm², against live's 8,974.336928 (HIGH) / 12,437.724522. The curvature
+    // corner (magnitude 0.7) is still a circle: G2 quartics / quintics all fit live's points to its 1.6 µm.
+    LiveScatter {
+        doc: "c2-cov2-sm-corner-break-relief-joint",
+        from_feature: "Corner break fillet conic",
+        readings: &[(8974.336928, 8974.319335), (12437.724522, 12437.697394)],
+    },
 ];
 
 /// Imported parts live's STEP importer refits, written next to their evidence (PARITY-SUITES.md): in `docs`, a part whose
@@ -128,6 +137,9 @@ const LIVE_LINES_AS_OTHER: &[LiveLineAsOther] = &[
     // bool 11-15: Boolean Flansch+Gehäuse fuses Part 2 into Part 1; the moved faces' straight edges (x 82.418 mm,
     // y +-40, 4 mm) stay OTHER in live's Part 1.
     LiveLineAsOther { doc: "c2-impeller-loft", from_feature: "Boolean Flansch+Gehäuse", part: "Part 1" },
+    // lead 11-22: a conic / curvature / asymmetric corner break's side face is a B-spline surface in live (cb-curves-1122):
+    // its two straight edges through the thickness read OTHER (Part 10: 12 line / 4 other, ours 14 / 2).
+    LiveLineAsOther { doc: "c2-cov2-sm-corner-break-relief-joint", from_feature: "Corner break fillet conic", part: "Part 10" },
 ];
 
 /// Edges live adds inside a near-tangent sliver, within Parasolid's tolerance, or by a vertex splitting one edge into two
