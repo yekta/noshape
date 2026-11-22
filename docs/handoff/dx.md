@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 05:55 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 06:53 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,7 +13,14 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 05:55 11-22 (read first)
+## STATE 06:53 11-22 (read first)
+- asm's land hit my prefs images_library flake (img-B before img-A): test made order-free, QUEUED 5b8abc89 alone
+  (worktree dx-flake; rm it + vibex7 ~/agents/dx-flake/target after it lands). Cause not found: import/save keep tab order.
+- qa wf39 P2 EXPORT-STORE-DETAILS (uncommitted in dx-open, goes with the drawing land): IGES ext "iges" (export.rs;
+  e2e export_store_file_in_a_new_tab), file tab menu: Move to document…/Export…/Release…/Download one group
+  (workspace.rs), STEP's Version-group checkboxes 31 px apart, Options group 39 (export.rs check_mt; UI test
+  export_dialog_opens_with_the_last_exports_choices). Running vibex7 b03w1sear: drawing lib, that UI test, ops e2e::.
+## STATE 05:55 (earlier) 11-22 (read first)
 TASK (lead 05:1x): watch lands (DONE: 3af018e0 + afd3220a landed 05:29 as 1519a1df, main GREEN 05:42); hex iso
 circles (in test); bottle DXF rerun (DONE 05:2x vibex7: "matches", Front no longer moved, Iso 0.002 in; ARC 18/24,
 LINE 105/114, SPLINE 5/19); qa wf23 P1 DWG-SECTION-HATCH-PER-PART (written, in test) + P2 DETAIL label (live asked).
