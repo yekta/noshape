@@ -25,17 +25,21 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   studio_cache (shared with DocStudios); the app's Part Studio view starts from its snapshot. Serial open of every scissor
   studio 292 -> 170 s (vibex7, same statuses). Test result_keys::a_derived_source_open_as_a_tab_is_regenerated_once.
   The rest of scissor's cost is the Derived chains themselves (173-feature source 51 s, 78-feature 73 s, failing fillets).
-- **LOFT3-EDGES (core-th, branch core-loft3, QUEUED 05b06fe3e; carries f10fbdb6, one core-th result):** natural_loft
-  refused every two-profile path loft (halfway section added to the path's 7; centripetal sections). Loft 3 33 edges as
-  live; loft-paths-guides 16 -> 17/29; other 4 path-loft docs same; loft tests pass. After it lands: TICKETS
-  LOFT3-EDGES / LOFT-PATHS-TOPOLOGY rows.
+- **LANDED 04:08 2d321b28: Loft 3 + Loft 4** (05b06fe3, 4866d14d; core-th target removed on vibex7). TICKETS
+  LOFT3-EDGES / LOFT-PATHS-TOPOLOGY closed (core-cache).
 - **ORDERS (lead 11-22 02:1x), while lands queue:** 1) Mirror 1 DONE: live's two 0.069 / 0.072 mm
   edges (x 0, y -254.03, z +-50.8, kept to Loft 5) are its A/mirror seam ending short of the cylinder end; ours is the
   exact one. Row in parity.rs LIVE_SLIVER_EDGES (DECISIONS 11-15). With Loft 3/4 (core-th) on top: loft-paths-guides
   29/29, matches to the end (vibex8 03:15). Speed left: Loft 3 376 ms (live 69), Mirror 1 720 (60), Loft 4/5 ~650-700.
-  2) isaac open 135-140 s vs live 27 s: no saved doc
-  existed; .is1.sh (ssh vibex8 bash -s) rebuilds it via parity_assemblies into vibex8 ~/agents/core-keep/isaac/save,
-  then big_assembly_perf::suite_assembly_open_profile -> isaac/prof.log (top studios / features). Lands 02:40:
+  2) isaac open PROFILED (vibex7 04:30, load 10-14, release, saved doc
+  vibex7 ~/agents/core-keep/isaac/save, logs prof.log / speed.log there, .is1.sh): real open's first evaluation
+  55.0 s (was 135-140 s in asm's 11-20 run); its 51 studios one after another 106 s. Prewarm already runs them side by
+  side, so the floor is the slowest studio: 00f1d4 18.9 s, de4eff 16.9, a04711 12.9, 7072ea 12.1, d78cbf 11.4 (five
+  near-copies, ~100 features each, 72 s of the 106), Gear Lab 8f5622 5.6 s (custom: not prewarmed), 850efe 4.2.
+  Slowest features: the same few in each copy: Extrude 43 1.2-1.7 s, Extrude 27 1.3-1.6 s, Fillet 6 1.1-1.3 s;
+  failing fillets 12.8 s (a04711 Fillet 1 4.2 s, Fillet 2 2.0; 00f1d4 Fillet 12 2.2; de4eff Fillet 10/11 1.3 each;
+  b29603 Fillet 9 0.9) + 850efe Extrude 8 0.85 s (Error). Next: why Extrude 43 / 27 and Fillet 6 take >1 s.
+  Lands 02:40:
   ed773d89 FAILED 02:28 on a flaky part-studio-ui export-dialog test (shared export_solid.json; not ours), re-queued as
   75dec34f; 4866d14d retest of 4; 07cad3ef batch of 4; f10fbdb6 (core-sj) queued.
 - **Hosts (lead 11-22 01:4x):** 02:00-04:00 UTC keep off vibex7 (qa's speed window): vibex8 or the Mac (NOSHAPE_RB_HOST=mac). vibex7 core-keep cleaned to 1.6 GB 01:41.
@@ -47,19 +51,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   cylinders): surfaces-lofts-projected 3 -> 8/45 (next: Loft 1 = VALID-SURFLOFTS-LOFT1), other 3 blend docs same, face
   blend tests pass (A/B vibex7 ~/agents/core-keep/fb/ab2-*.log). Test wanted: 3 tries (lens, valley, two slabs) didn't
   reproduce a B-spline blend from OCCT.
-- **QUEUED 4866d14d (core-th, ed9b6ef3f on top of 05b06fe3e): LOFT-PATHS Loft 4:**
-  Mirror 1's 65 vs live 67 edges = two 0.07 mm edges live has where Loft 2's top seam meets the cylinder end (x 0,
-  y -254.03, z +-50.8): tolerance sliver, not chased. The real next difference was **Loft 4 failing** ("the loft's sections
-  don't match", on main too): 2 slots (z 50.8 / 88.9) along an arc from the upper slot's tip to the lower's, profiles 18 /
-  55 deg off square to it, so planes square to the path cut the carried slots apart (3 edges). Fix: when cut sections
-  break and the path runs from profile to profile (its ends on the profile wires), the sections are MakePipeShell's
-  carried profiles (Simulate); and along a path the start cap is the one where the path starts (Loft 5's query: Loft 4
-  CAP_FACE isStart = Sketch 9's slot, the 2nd profile); loft_names names caps by their record's arg. Result: Loft 3..5
-  all as live's face counts, edges/vertices -2 only by Mirror 1's sliver; volumes in band (Loft 4 +36461 mm3, live
-  +36435). Kernel test a_loft_along_a_path_from_tip_to_tip_takes_the_profiles_as_carried. A/B 23:39 (vibex7 lp/ab-base.log /
-  ab-new.log): 5 path-loft docs same, loft tests pass (kernel 35, model 29); queued 23:43.
-  NOTE: the parity score stays 17/29 (first difference Mirror 1's sliver); saved docs from older builds keep
-  untranslated refs (re-import to check Loft 5). Scripts lp/q3.py q4.py q5.py; ~/tmp/core/m1.
 - **SURF-INTRO-OFFSET-END:** live (behaviours "core (11-21 20:33) surf-intro", dom/core-surfintro-loft1.txt): Loft 1 pairs
   its profiles BY PARAMETER (as ours), ruled 3x1, 120x2 CPs, knots doubled at 1/64. So our 1 mm2 gap is the profiles'
   own parametrisation (live's projected curves: 64 spans, doubled knots); compare ours with the dump next.

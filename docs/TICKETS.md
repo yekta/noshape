@@ -14,7 +14,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   featurestudio_monitor {part_studio: "Studio 184ad0"}.
 
 ## skasm, 2026-11-21 (Mac parity suite on main 01d8226a + skasm's Corner+Joint)
-- [ ] P2 **LOFT3-EDGES (core)**: c2-loft-paths-guides' first difference is feature 16 "Loft 3" (solid, ADD, profiles JVC and JYC,
+- [x] P2 **LOFT3-EDGES (core)**: (closed core 11-22: 05b06fe3 + 4866d14d, landed 2d321b28; with the Mirror 1 sliver row c2-loft-paths-guides 29/29 as live) c2-loft-paths-guides' first difference is feature 16 "Loft 3" (solid, ADD, profiles JVC and JYC,
   spine JcB = Sketch 7's wire, addSections, trimGuidesByProfiles): "Part 1" 15/37/27 faces/edges/vertices, live 15/33/23 (same 15
   faces; 4 more edges and vertices), then Mirror 1 27/73/53 (live 27/67/47), Loft 4 ERROR "Could not create loft" (live OK) and Loft
   5 34/93/67 (live 38/94/64). Features 0-15 match (Sketches 4 and 6 keep live's stored geometry; their translation is skasm's, it
@@ -2262,7 +2262,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
   with the wrong part (fa6f90cc: 13/33/25 faces/edges/vertices, 5269155 mm³; live 27/67/47, 6325199 mm³). qa-lp-verify runs
   that document alone on the first green with core's revert (vibex6) -> qa-alerts and here.
   qa 01:10 on 0f7610c8 (revert in): lead 01:18: the revert is enough for the cut (core: Mirror 1 back to live's volume).
-- [ ] **P2 LOFT-PATHS-TOPOLOGY (core)**: c2-loft-paths-guides with the revert: Loft 3 20/42/26 faces/edges/vertices (live 15/33/23),
+- [x] **P2 LOFT-PATHS-TOPOLOGY (core)**: (closed with LOFT3-EDGES, 2d321b28: 29/29) c2-loft-paths-guides with the revert: Loft 3 20/42/26 faces/edges/vertices (live 15/33/23),
   then Mirror 1 37/83/51 (live 27/67/47), Extrude 3 43/98/60 (live 33/82/56); 16/29 features match. Older parity gap, not a
   blocker (lp/0f7610c83.out).
 - Green 592b0fc9 vs v0.4.57: hat8, hat15, hat15b, the dock, ticket and authored documents ALL-SAME.
