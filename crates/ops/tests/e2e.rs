@@ -5838,6 +5838,33 @@ fn assembly_configurations() {
     assert_eq!(l["configured"][0]["param"], "suppressed", "{l}");
 }
 
+/// The assembly Configuration panel's row menu (live workflow 24, as the Part Studio's): Duplicate row ("Copy of Lite"
+/// right below it, with its configured values), Set as default, Move up.
+#[test]
+fn assembly_configuration_rows_duplicate_set_default_and_move() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "asm-config-rows.noshape");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }));
+    let b = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }))["instance"].as_str().unwrap().to_string();
+    let input = call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "list" }))["input"].as_str().unwrap().to_string();
+    call(&mut ctx, "config_add_option", json!({ "tab": "Assembly 1", "input": input, "name": "Lite" }));
+    call(&mut ctx, "config_configure", json!({ "tab": "Assembly 1", "instance": b, "param": "suppressed", "input": input }));
+    call(&mut ctx, "config_set_value", json!({ "tab": "Assembly 1", "instance": b, "param": "suppressed", "configuration": "Lite", "value": true }));
+    let copy = call(&mut ctx, "config_edit_option", json!({ "tab": "Assembly 1", "input": input, "option": "Lite", "duplicate": true }))["option"].as_str().unwrap().to_string();
+    let options = |ctx: &mut Ctx| {
+        let l = call(ctx, "config_list", json!({ "tab": "Assembly 1" }));
+        let i = l["inputs"][0].clone();
+        (i["configurations"].as_array().unwrap().iter().map(|o| o["name"].as_str().unwrap().to_string()).collect::<Vec<_>>(), i["default"].clone(), l)
+    };
+    let (names, _, l) = options(&mut ctx);
+    assert_eq!(names, ["Default", "Lite", "Copy of Lite"], "{l}");
+    assert_eq!(l["configured"][0]["values"][&copy], true, "the copy keeps Lite's values: {l}");
+    call(&mut ctx, "config_edit_option", json!({ "tab": "Assembly 1", "input": input, "option": copy, "set_default": true }));
+    assert_eq!(options(&mut ctx).1, json!(copy), "the copy is the default");
+    call(&mut ctx, "config_edit_option", json!({ "tab": "Assembly 1", "input": input, "option": copy, "move": -1 }));
+    assert_eq!(options(&mut ctx).0, ["Default", "Copy of Lite", "Lite"]);
+}
+
 /// Dragging a view (live2 feel/drawing.json followUp F4): the views aligned with it follow across their axes only, and a
 /// projected view dragged across its axis takes its parent along.
 #[test]

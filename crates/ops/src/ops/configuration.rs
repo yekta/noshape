@@ -100,7 +100,7 @@ pub fn ops() -> Vec<Op> {
                 opt("delete", json!({ "type": "boolean" }), "Delete it."),
                 opt("set_default", json!({ "type": "boolean" }), "Set as default."),
                 opt("move", json!({ "type": "integer", "enum": [-1, 1] }), "Move up (-1) / down (1)."),
-                opt("duplicate", json!({ "type": "boolean" }), "Duplicate row under it, with its values (\"Copy of <name>\" in a Part Studio, \"<name> copy\" in a Variable Studio)."),
+                opt("duplicate", json!({ "type": "boolean" }), "Duplicate row under it, with its values (\"Copy of <name>\" in a Part Studio or an assembly, \"<name> copy\" in a Variable Studio)."),
             ],
             mutates: true,
             destructive: false,
@@ -550,9 +550,6 @@ fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return vs::edit_option(ctx, a);
     }
     if asm::is_assembly(ctx, a)? {
-        if let Some(k) = ["set_default", "move", "duplicate"].into_iter().find(|k| a.get(k).is_some()) {
-            return Err(OpError::param(k, "Part Studios and Variable Studios only"));
-        }
         return asm::edit_option(ctx, a);
     }
     let (od, tab) = studio_target(ctx, a)?;

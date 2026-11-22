@@ -2433,7 +2433,7 @@ Examples:
 | `delete` | boolean |  | Delete it. |
 | `set_default` | boolean |  | Set as default. |
 | `move` | one of -1, 1 |  | Move up (-1) / down (1). |
-| `duplicate` | boolean |  | Duplicate row under it, with its values ("Copy of <name>" in a Part Studio, "<name> copy" in a Variable Studio). |
+| `duplicate` | boolean |  | Duplicate row under it, with its values ("Copy of <name>" in a Part Studio or an assembly, "<name> copy" in a Variable Studio). |
 
 #### config_configure
 

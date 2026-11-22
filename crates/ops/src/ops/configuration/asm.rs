@@ -286,6 +286,22 @@ pub(super) fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::Op
     let x = asm(od, tab);
     let input = find_input(x, a.str("input")?, "input")?;
     let option = find_option(x, &input, a.str("option")?, "option")?;
+    // The Configuration panel's row menu (live workflow 24, as the Part Studio's).
+    if a.bool_or("set_default", false)? {
+        return edit(od, tab, config::SET_DEFAULT_OPTION, |x| {
+            asm_config::set_default_option(x, &input, &option);
+            Ok(json!({ "default": option }))
+        });
+    }
+    if let Some(by) = a.get("move").and_then(|v| v.as_i64()) {
+        return edit(od, tab, config::MOVE_OPTION, |x| {
+            asm_config::move_option(x, &input, &option, by as isize);
+            Ok(json!({ "moved": option }))
+        });
+    }
+    if a.bool_or("duplicate", false)? {
+        return edit(od, tab, config::DUPLICATE_OPTION, |x| asm_config::duplicate_option(x, &input, &option).map(|o| json!({ "option": o })).ok_or_else(|| OpError::param("option", "not found")));
+    }
     if a.bool_or("delete", false)? {
         return edit(od, tab, config::DELETE_OPTION, |x| {
             asm_config::delete_option(x, &input, &option);

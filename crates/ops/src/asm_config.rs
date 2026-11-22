@@ -88,6 +88,43 @@ pub fn delete_option(a: &mut Assembly, input: &str, option: &str) {
     }
 }
 
+/// Row › Set as default (live workflow 24's row menu, as the Part Studio's).
+pub fn set_default_option(a: &mut Assembly, input: &str, option: &str) {
+    if let Some(ConfigInput { kind: ConfigInputKind::List { options, default }, .. }) = a.configuration.inputs.iter_mut().find(|i| i.id == input)
+        && options.iter().any(|o| o.id == option)
+    {
+        *default = option.to_string();
+    }
+}
+
+/// Row › Duplicate row: "Copy of <name>" right below it, with its configured values. Returns the new configuration's
+/// id.
+pub fn duplicate_option(a: &mut Assembly, input: &str, option: &str) -> Option<String> {
+    let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = a.configuration.inputs.iter_mut().find(|i| i.id == input) else { return None };
+    let at = options.iter().position(|o| o.id == option)?;
+    let name = format!("Copy of {}", options[at].name);
+    let id = format!("opt{}", rand_id());
+    options.insert(at + 1, noshape_model::configuration::ListOption { id: id.clone(), name });
+    for c in a.configuration.configured.iter_mut().filter(|c| c.input == input) {
+        if let Some(v) = c.values.get(option).cloned() {
+            c.values.insert(id.clone(), v);
+        }
+    }
+    Some(id)
+}
+
+/// Row › Move up (-1) / Move down (1).
+pub fn move_option(a: &mut Assembly, input: &str, option: &str, by: isize) {
+    if let Some(ConfigInput { kind: ConfigInputKind::List { options, .. }, .. }) = a.configuration.inputs.iter_mut().find(|i| i.id == input)
+        && let Some(at) = options.iter().position(|o| o.id == option)
+    {
+        let to = at as isize + by;
+        if to >= 0 && (to as usize) < options.len() {
+            options.swap(at, to as usize);
+        }
+    }
+}
+
 pub const COPY_INPUT: &str = "Copy configuration input";
 
 /// Input ⋯ › Copy: "<name> copy" after the others.

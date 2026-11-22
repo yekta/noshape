@@ -694,15 +694,37 @@ impl AssemblyView {
                                 this.set_active_config(&ia, rka.clone(), window, cx);
                             }
                         }))
+                        // Live workflow 24 (as the Part Studio's, live 1717): Switch to "X" and Delete row (not the current
+                        // row), Set as default (not the default), Duplicate row, Move up / down by position.
                         .when(is_list, |d| {
+                            let ri = rows.iter().position(|(k, _)| k == rk).unwrap_or(0);
+                            let n = rows.len();
+                            let is_default = matches!(&input.kind, ConfigInputKind::List { default, .. } if default == rk);
+                            let row_name = rname.clone();
                             d.os_context_menu(move |m, _, _| {
-                                let (v, a, b) = (vr.clone(), da.clone(), db.clone());
-                                m.item(crate::os_menu::OsMenuItem::new("Delete").icon_name("menu-delete").on_click(move |_, _, cx| {
-                                    let (a, b) = (a.clone(), b.clone());
-                                    v.update(cx, |this, cx| {
-                                        this.edit(noshape_ops::config::DELETE_OPTION, cx, |asm| noshape_ops::asm_config::delete_option(asm, &a, &b));
+                                type OptEdit = Rc<dyn Fn(&mut noshape_model::assembly::Assembly, &str, &str)>;
+                                let op = |label: &str, undo: &'static str, f: OptEdit| {
+                                    let (v, a, b) = (vr.clone(), da.clone(), db.clone());
+                                    crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, _, cx| {
+                                        let (a, b, f) = (a.clone(), b.clone(), f.clone());
+                                        v.update(cx, |this, cx| this.edit(undo, cx, |asm| f(asm, &a, &b)));
                                     })
-                                }))
+                                };
+                                let mv = |by: isize| -> OptEdit { Rc::new(move |asm, a, b| noshape_ops::asm_config::move_option(asm, a, b, by)) };
+                                let (vs, sa, sb) = (vr.clone(), da.clone(), db.clone());
+                                m.when(!active, |m| {
+                                    m.item(crate::os_menu::OsMenuItem::new(format!("Switch to \"{row_name}\"")).on_click(move |_, w, cx| {
+                                        let (a, b) = (sa.clone(), sb.clone());
+                                        vs.update(cx, |this, cx| this.set_active_config(&a, b, w, cx));
+                                    }))
+                                })
+                                .when(!is_default, |m| m.item(op("Set as default", noshape_ops::config::SET_DEFAULT_OPTION, Rc::new(noshape_ops::asm_config::set_default_option))))
+                                .item(op("Duplicate row", noshape_ops::config::DUPLICATE_OPTION, Rc::new(|asm, a, b| {
+                                    noshape_ops::asm_config::duplicate_option(asm, a, b);
+                                })))
+                                .when(ri > 0, |m| m.item(op("Move up", noshape_ops::config::MOVE_OPTION, mv(-1))))
+                                .when(ri + 1 < n, |m| m.item(op("Move down", noshape_ops::config::MOVE_OPTION, mv(1))))
+                                .when(!active, |m| m.item(op("Delete row", noshape_ops::config::DELETE_OPTION, Rc::new(noshape_ops::asm_config::delete_option)).icon_name("menu-delete")))
                             })
                         });
                     for (k, (ci, c)) in columns.iter().enumerate() {
@@ -1035,7 +1057,7 @@ impl AssemblyView {
                     .child(gpui_kit::base::input::input_frame(
                         div()
                             .relative()
-                            .h(px(24.))
+                            .h(px(30.))
                             .border_1()
                             .border_color(pal.border_strong)
                             .rounded(px(2.))
@@ -1047,7 +1069,8 @@ impl AssemblyView {
                 None => div().flex_1().into_any_element(),
             };
             let kinds = [("cfg-filter-list", "list"), ("cfg-filter-checkbox", "checkbox"), ("cfg-filter-variable", "configuration variable")];
-            let mut row = h_flex().h(px(34.)).gap(px(6.)).px(px(4.)).child(crate::ui::glyph("filter", 16., pal.text)).child(filter_el);
+            // (44 px with a 30 px box, as the Part Studio's: live workflow 24 s20.)
+            let mut row = h_flex().h(px(44.)).gap(px(6.)).px(px(4.)).child(crate::ui::glyph("filter", 16., pal.text)).child(filter_el);
             for (k, (icon, what)) in kinds.into_iter().enumerate() {
                 let only = self.ui.cfg_only_kinds[k];
                 row = row.child(
