@@ -3375,3 +3375,30 @@ fn a_dimension_placed_on_an_edge_leaves_no_dots_on_its_ends(cx: &mut TestAppCont
     assert!(cx.update(|cx| editor.read(cx).overlay.marks.is_empty()), "no discs on the edge's ends");
     assert_eq!(points(cx), before, "no dots drawn on the edge's ends");
 }
+
+/// Live workflow 23 step 24: a hovered balloon tints only itself (its ring and text box); its leader keeps its ink and
+/// arrowhead, not the tan overlay.
+#[gpui::test]
+fn a_hovered_balloon_keeps_its_leader_black(cx: &mut TestAppContext) {
+    use crate::drawing_view::{DRAWING_HOVER, DRAWING_SELECTED};
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        call(ctx, "drawing_callout", json!({ "drawing": dw, "anchor": [200, 160], "position": [230, 185], "text": "1" }));
+    }));
+    let (window, editor) = drawing(cx, "feel-balloon-hover-leader");
+    real_sheet(cx, window, &editor);
+    let (hovered, selected, leader, ring) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. })).expect("the balloon");
+        let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(a.id)));
+        let leader: Vec<Vec<[f64; 2]>> = b.geometry.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, _, p)| p.points.clone()).collect();
+        let lines = |c: u32| e.tinted_lines(&b, &picks, c).into_iter().map(|l| l.points.clone()).collect::<Vec<_>>();
+        let (hovered, selected) = (lines(DRAWING_HOVER), lines(DRAWING_SELECTED));
+        let ring = hovered.iter().any(|l| l.len() > 8);
+        (hovered, selected, leader, ring)
+    });
+    assert_eq!(leader.len(), 1, "one leader");
+    assert!(ring, "the ring tinted: {hovered:?}");
+    assert!(!hovered.contains(&leader[0]), "hovered: the leader as it is");
+    assert!(selected.contains(&leader[0]), "selected: the leader orange as before");
+}

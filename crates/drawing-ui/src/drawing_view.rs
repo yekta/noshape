@@ -2118,6 +2118,21 @@ impl DrawingEditor {
     /// `#90cef1` dots, dimension-line ends as `#cc925c` dots and flip
     /// handles as `#cc925c` diamonds. A selected dimension's is the same in
     /// `#cc925c` (live dsel3), its text black.
+    /// An annotation's lines drawn in its hover / selection colour. A hovered balloon tints only itself: its leaders
+    /// stay black with their arrowheads (live workflow 23 step 24).
+    pub(crate) fn tinted_lines<'a>(&self, built: &'a BuiltSheet, picks: &[u32], colour: u32) -> Vec<&'a noshape_model::drawing::sheet::Polyline2> {
+        let g = &built.geometry;
+        let balloon = picks.first().and_then(|p| match self.sel_of_pick(*p) {
+            Some(Sel::Annotation(id)) => built.resolved.annotations.iter().find(|a| a.id == id && matches!(a.kind, AnnotationKind::Balloon { .. })),
+            _ => None,
+        });
+        let leaders: Vec<&[[f64; 2]]> = match balloon {
+            Some(a) if colour == DRAWING_HOVER => g.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, _, p)| p.points.as_slice()).collect(),
+            _ => Vec::new(),
+        };
+        g.lines.iter().filter(|l| picks.contains(&l.pick) && !leaders.contains(&l.points.as_slice())).collect()
+    }
+
     fn push_annotation_look(&self, scene: &mut Scene, built: &BuiltSheet, picks: &[u32], colour: u32) {
         use noshape_model::drawing::font;
         use noshape_model::drawing::sheet::GripKind;
@@ -2127,7 +2142,7 @@ impl DrawingEditor {
         const ORIGIN: [u8; 4] = [0x90, 0xce, 0xf1, 255];
         let g = &built.geometry;
         let mut lines = LineData::default();
-        for l in g.lines.iter().filter(|l| picks.contains(&l.pick)) {
+        for l in self.tinted_lines(built, picks, colour) {
             let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
             for w in l.points.windows(2) {
                 lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: ink, pick_id: 0, width, style: LineSegment::ON_TOP });
