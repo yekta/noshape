@@ -1064,8 +1064,8 @@ fn import_foreign_mesh_parts() {
     assert!(info.closed && info.members.len() == 2 && comp.name == "Composite part 1", "{info:?} {}", comp.name);
 }
 
-/// An STL's open pieces are surfaces of their own, without a composite (live stl-split-1121: the duct's STL is 9
-/// "Surface N" sheets).
+/// An STL's open pieces are surfaces of their own, without a composite (live stl-split-1121: "Surface N" sheets; a mesh
+/// that closes is a solid, DECISIONS 11-22).
 #[test]
 fn an_stl_s_open_pieces_are_surfaces() {
     let dir = std::env::temp_dir().join(format!("noshape-featb-stlopen-{}", std::process::id()));

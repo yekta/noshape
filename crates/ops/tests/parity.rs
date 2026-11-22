@@ -187,13 +187,14 @@ const LIVE_IMPORT_FAILURES: &[LiveImportFailure] = &[
 ];
 
 /// Live's imports of its own mesh files that make sheets of a good mesh (lead 11-17, as [`LIVE_IMPORT_FAILURES`]: parity,
-/// not shortcomings): the exchange suite holds ours, and live's import of ours, to the model's solids instead (its
-/// Parasolid's parts, each volume within its area times [`LIVE_STL_CHORD_MM`]).
+/// not shortcomings; it stands, lead 11-22 in DECISIONS, though live's split is known exactly, stl-split-1121): the
+/// exchange suite holds ours, and live's import of ours, to the model's solids instead (its Parasolid's parts, each
+/// volume within its area times [`LIVE_STL_CHORD_MM`]).
 const LIVE_MESH_SHEETS: &[&str] = &[
     // dx 11-17: the bottle's two solid halves touch along edges; live's import of its STL / OBJ / 3MF makes 148 sheet
     // bodies, ours the model's 2 solids.
     "c2-bottle-split",
-    // dx 11-17: live 9 sheet bodies; ours 2 solids for the model's 4 (its parts overlap: a difference still counted).
+    // dx 11-17: live 9 sheet bodies; ours the model's 4 solids (its parts overlap: their faces repeated).
     "c2-duct-multipart",
 ];
 

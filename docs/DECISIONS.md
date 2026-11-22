@@ -37,6 +37,10 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 
 - 11-18 Duplicate workspace names are allowed, as live. The store keys workspaces by id; ops take a workspace (`branch`)
   by id, or by name when it is unique; an ambiguous name is an error naming the parameter and listing the matching ids.
+- 11-22 (lead) An STL (OBJ, 3MF) mesh that closes imports as the model's solids, even where live's import makes sheets
+  of it (c2-bottle-split 148, c2-duct-multipart 9: live failing at the job; the 11-17 ruling stands). Live's split
+  (each triangle once, joined only across edges two triangles use) applies only to what can't close. The exchange
+  suite scores those rows against the model.
 
 ## Geometry and speed
 - 11-07 Every crates/brep or Boolean change passes bool's gate: every corpus + parity56 at 0 OCCT differences.

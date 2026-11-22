@@ -184,6 +184,100 @@ bool mesh_valid(const TopoDS_Shape& s)
   return true;
 }
 
+// Connected pieces of the triangles `only` (all when empty), each its triangles' indices in file order. Two triangles
+// join across an edge only they use. Where three or more meet (solids touching along edges: c2-bottle-split's two
+// halves; over faces, their triangles repeated: c2-duct-multipart's), with `pair` each joins the one met first turning
+// about the edge into its inside that runs the edge the other way, each taken once (a tie to the nearest in the file:
+// a file writes a part's triangles together); without, none join there.
+static std::vector<std::vector<int>> mesh_pieces(const std::vector<gp_Pnt>& pts, const std::vector<std::array<int, 3>>& tris, std::vector<int> only, bool pair)
+{
+  if (only.empty() && pair)
+  {
+    only.resize(tris.size());
+    std::iota(only.begin(), only.end(), 0);
+  }
+  std::map<int, int> parent;
+  for (int k : only)
+    parent[k] = k;
+  std::function<int(int)> find = [&](int x) { return parent[x] == x ? x : parent[x] = find(parent[x]); };
+  std::map<std::pair<int, int>, std::vector<int>> by_edge; // undirected edge -> triangles
+  for (int k : only)
+    for (int j = 0; j < 3; ++j)
+    {
+      const int a = tris[(size_t)k][j], c = tris[(size_t)k][(j + 1) % 3];
+      by_edge[{std::min(a, c), std::max(a, c)}].push_back(k);
+    }
+  for (const auto& [e, ts] : by_edge)
+  {
+    if (ts.size() <= 2)
+    {
+      for (size_t i = 1; i < ts.size(); ++i)
+        parent[find(ts[i])] = find(ts[0]);
+      continue;
+    }
+    if (!pair)
+      continue;
+    const gp_Dir axis(gp_Vec(pts[(size_t)e.first], pts[(size_t)e.second]));
+    struct Around
+    {
+      double angle;
+      int    side; // +1: the normal turns the way the angle grows
+      bool   forward;
+    };
+    std::vector<Around> around;
+    gp_Dir              x0, y0;
+    for (size_t i = 0; i < ts.size(); ++i)
+    {
+      const auto& t     = tris[(size_t)ts[i]];
+      const int   other = t[0] != e.first && t[0] != e.second ? t[0] : t[1] != e.first && t[1] != e.second ? t[1] : t[2];
+      gp_Vec      w(pts[(size_t)e.first], pts[(size_t)other]);
+      w -= gp_Vec(axis) * w.Dot(gp_Vec(axis));
+      if (i == 0)
+        x0 = gp_Dir(w), y0 = axis.Crossed(x0);
+      const gp_Vec n  = gp_Vec(pts[(size_t)t[0]], pts[(size_t)t[1]]).Crossed(gp_Vec(pts[(size_t)t[0]], pts[(size_t)t[2]]));
+      const double an = std::atan2(w.Dot(gp_Vec(y0)), w.Dot(gp_Vec(x0)));
+      int          j  = 0;
+      while (t[(size_t)j] != e.first)
+        ++j;
+      around.push_back({an < 0 ? an + 2 * M_PI : an, n.Dot(gp_Vec(axis).Crossed(w)) > 0 ? 1 : -1, t[(size_t)((j + 1) % 3)] == e.second});
+    }
+    std::vector<bool> taken(ts.size(), false);
+    for (size_t i = 0; i < ts.size(); ++i)
+    {
+      if (taken[i])
+        continue;
+      double best = 1e300;
+      size_t with = i;
+      for (size_t j = 0; j < ts.size(); ++j)
+      {
+        if (j == i || taken[j] || around[j].forward == around[i].forward)
+          continue;
+        // Into the inside: against the normal; a triangle on the same half-plane (touching faces) comes last.
+        double d = std::fmod((around[j].angle - around[i].angle) * -around[i].side + 4 * M_PI, 2 * M_PI);
+        if (d < 1e-9)
+          d += 2 * M_PI;
+        if (d < best - 1e-9 || (d < best + 1e-9 && std::abs(ts[j] - ts[i]) < std::abs(ts[with] - ts[i])))
+          best = std::min(best, d), with = j;
+      }
+      if (with != i)
+      {
+        taken[i] = taken[with] = true;
+        parent[find(ts[with])] = find(ts[i]);
+      }
+    }
+  }
+  std::map<int, std::vector<int>> pieces;
+  for (int k : only)
+    pieces[find(k)].push_back(k);
+  std::vector<std::vector<int>> out;
+  for (auto& [root, ks] : pieces)
+  {
+    std::sort(ks.begin(), ks.end());
+    out.push_back(std::move(ks));
+  }
+  return out;
+}
+
 std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>> tris, double weld)
 {
   std::vector<gp_Pnt> pts;
@@ -194,48 +288,53 @@ std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector
                               return gp_Vec(pts[t[0]], pts[t[1]]).Crossed(gp_Vec(pts[t[0]], pts[t[2]])).SquareMagnitude() <= 0;
                             }),
              tris.end());
-  // Each triangle once (two parts touching over a face repeat its triangles: c2-duct-multipart's STL, 74 for live's 61).
-  {
-    std::set<std::array<int, 3>> seen;
-    tris.erase(std::remove_if(tris.begin(), tris.end(),
-                              [&seen](const std::array<int, 3>& t) {
-                                std::array<int, 3> k = t;
-                                std::sort(k.begin(), k.end());
-                                return !seen.insert(k).second;
-                              }),
-               tris.end());
-  }
-  // Connected pieces: two triangles join across an edge only those two use; where three or more meet the pieces split
-  // (live's import: c2-bottle-split's STL 148 surfaces, c2-duct-multipart's 9).
-  std::vector<int> parent(tris.size());
-  std::iota(parent.begin(), parent.end(), 0);
-  std::function<int(int)> find = [&](int x) { return parent[x] == x ? x : parent[x] = find(parent[x]); };
-  std::map<std::pair<int, int>, std::vector<int>> by_edge; // undirected edge -> triangles
-  for (size_t k = 0; k < tris.size(); ++k)
-    for (int j = 0; j < 3; ++j)
-    {
-      const int a = tris[k][j], c = tris[k][(j + 1) % 3];
-      by_edge[{std::min(a, c), std::max(a, c)}].push_back((int)k);
-    }
-  for (const auto& [e, ts] : by_edge)
-    if (ts.size() == 2)
-      parent[find(ts[1])] = find(ts[0]);
-  std::map<int, std::vector<std::array<int, 3>>> pieces;
-  for (size_t k = 0; k < tris.size(); ++k)
-    pieces[find((int)k)].push_back(tris[k]);
-  std::vector<MeshPiece> out;
-  for (const auto& [root, ts] : pieces)
-  {
-    // Closed: every edge used an even number of times (Onshape's cone import has edges at the apex shared by four
-    // slivers, two each way; a mesher's fold covers a few edges twice the same way, and live still reads a solid:
-    // exchange suite, cf-sheet-metal-model-plus' STL).
+  // The model's solids where the mesh closes (lead 11-22, DECISIONS: live's 148 sheets of c2-bottle-split's two solid
+  // halves are its failure), then live's split of what can't close (c497ac8c7: each triangle once, joined only across
+  // edges two of them use; live stl-split-1121).
+  auto closed = [](const std::vector<std::array<int, 3>>& ts) {
+    // Every edge used an even number of times (Onshape's cone import has edges at the apex shared by four slivers, two
+    // each way; a mesher's fold covers a few edges twice the same way, and live still reads a solid: exchange suite,
+    // cf-sheet-metal-model-plus' STL).
     std::map<std::pair<int, int>, int> uses;
     for (const auto& t : ts)
       for (int j = 0; j < 3; ++j)
         ++uses[{std::min(t[j], t[(j + 1) % 3]), std::max(t[j], t[(j + 1) % 3])}];
-    const bool closed = std::all_of(uses.begin(), uses.end(), [](const auto& u) { return u.second % 2 == 0; });
-    out.push_back({mesh_face(pts, ts), closed});
+    return std::all_of(uses.begin(), uses.end(), [](const auto& u) { return u.second % 2 == 0; });
+  };
+  std::vector<std::pair<int, std::vector<std::array<int, 3>>>> found; // (first triangle in the file, triangles)
+  std::vector<int> open;
+  for (const auto& piece : mesh_pieces(pts, tris, std::vector<int>(), true))
+  {
+    std::vector<std::array<int, 3>> ts;
+    for (int k : piece)
+      ts.push_back(tris[(size_t)k]);
+    if (closed(ts))
+      found.push_back({piece.front(), std::move(ts)});
+    else
+      open.insert(open.end(), piece.begin(), piece.end());
   }
+  {
+    std::sort(open.begin(), open.end());
+    std::set<std::array<int, 3>> seen;
+    open.erase(std::remove_if(open.begin(), open.end(),
+                              [&](int k) {
+                                std::array<int, 3> t = tris[(size_t)k];
+                                std::sort(t.begin(), t.end());
+                                return !seen.insert(t).second;
+                              }),
+               open.end());
+  }
+  for (const auto& piece : mesh_pieces(pts, tris, open, false))
+  {
+    std::vector<std::array<int, 3>> ts;
+    for (int k : piece)
+      ts.push_back(tris[(size_t)k]);
+    found.push_back({piece.front(), std::move(ts)});
+  }
+  std::sort(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+  std::vector<MeshPiece> out;
+  for (const auto& [first, ts] : found)
+    out.push_back({mesh_face(pts, ts), closed(ts)});
   return out;
 }
 

@@ -8296,6 +8296,39 @@ fn step_assembly_import_matches_live() {
     assert_eq!(asm["instances"].as_array().unwrap().len(), 3, "{asm}");
 }
 
+/// A STEP assembly of one instance imports as a Part Studio only, the part
+/// where the instance was (live/dx/one-part-asm-1122; qa
+/// DX-STEP-ASM-IMPORTS-AS-PART-STUDIO): ours exported and live's own file.
+#[test]
+fn step_assembly_of_one_instance_imports_as_a_part_studio() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("one_inst_asm.noshape").to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].clone();
+    let inst = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_transform", json!({ "instance": inst, "translation": [10, 0, 0] }));
+    let file = scratch("one_inst_asm.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Assembly 1", "format": "STEP", "file": file.to_str().unwrap() }));
+    assert_eq!(std::fs::read_to_string(&file).unwrap().matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 1, "the assembly kept, as live's");
+    let check = |ctx: &mut Ctx, file: &std::path::Path, studio: &str| {
+        let r = call(ctx, "import_files", json!({ "files": [file.to_str().unwrap()] }));
+        let tabs: Vec<(String, String)> = r["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| (t["name"].as_str().unwrap().to_string(), t["kind"].as_str().unwrap().to_string())).collect();
+        assert_eq!(tabs, [(studio.to_string(), "Part Studio".to_string())], "{r}");
+        let parts = call(ctx, "query_parts", json!({ "tab": studio }));
+        assert_eq!(parts["parts"].as_array().unwrap().len(), 1, "{parts}");
+        let b = &parts["parts"][0]["bounding_box"];
+        let got: Vec<f64> = (0..3).map(|i| num(&b["min"][i])).chain((0..3).map(|i| num(&b["max"][i]))).collect();
+        assert!(got.iter().zip([10.0, 0.0, 0.0, 30.0, 10.0, 5.0]).all(|(a, w)| (a - w).abs() < 1e-3), "where the instance was: {got:?}");
+    };
+    // Named after the file, as any part import.
+    check(&mut ctx, &file, "one_inst_asm");
+    let Some(live) = live_sample("dx-one-part-asm.step") else { return };
+    check(&mut ctx, &live, "dx-one-part-asm");
+}
+
 /// Two different parts with the same name (common in STEP files: "Part",
 /// "Body", "SOLID"): each imported instance gets its own part's geometry,
 /// not the first part of that name.
