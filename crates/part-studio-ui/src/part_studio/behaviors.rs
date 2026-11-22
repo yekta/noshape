@@ -643,6 +643,8 @@ pub struct UiState {
     pub sm_flat_hover: Option<usize>,
     /// The Other joints row whose Type or Style list is open: its rip lit (live workflows-1123 03 s23).
     pub sm_joint_open: Option<usize>,
+    /// Enter pressed in a Bends cell's editor: its commit moves the box down a row.
+    pub sm_edit_enter: bool,
     /// The bend (index into the model's bends) whose line is selected in the
     /// flat view: Shift+C analyses it (live request 1622).
     pub sm_flat_bend: Option<usize>,
@@ -1038,6 +1040,7 @@ impl UiState {
             sm_hover: None,
             sm_flat_hover: None,
             sm_joint_open: None,
+            sm_edit_enter: false,
             sm_flat_bend: None,
             flat_backdrop: None,
             sm_select_other: None,

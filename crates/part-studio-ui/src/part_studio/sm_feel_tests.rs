@@ -160,6 +160,27 @@ fn rows() -> Vec<Row> {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).joint_edges().len())).ok_or("no flat view")?;
             expect((!lit.is_empty() && lit.iter().all(|r| matches!(r, Reference::Face(_))), flat > 0), (true, true), "(the rip's faces lit in 3D, its edges on the flat)")
         } },
+        Row { id: "table / Enter in a Radius cell moves the box down", live: "double-click Bend A's Radius, select all, 4, Enter: the box (2 px #1651b0) moves to Bend B's Radius, not editing, and no bend stays lit (live workflows-1123 02 s19-23)", gap: false, check: |s, cx| {
+            let at = s.bounds(cx, "sm-cell-0-0-2").ok_or("no Radius cell")?.center();
+            let mut vcx = gpui_kit::VisualTestContext::from_window(s.window, cx);
+            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+            for n in [1, 2] {
+                vcx.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: NONE, click_count: n, first_mouse: false });
+                vcx.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: NONE, click_count: n });
+            }
+            s.frames(cx);
+            if cx.update(|cx| s.view.read(cx).ui.sm_edit) != Some((0, 2)) {
+                return Err("no editor after the double-click".into());
+            }
+            s.keys(cx, "secondary-a 4 enter");
+            wait_until(cx, s.window, |cx| !s.view.read(cx).ui_busy());
+            s.frames(cx);
+            let got = cx.update(|cx| {
+                let v = s.view.read(cx);
+                (v.ui.sm_edit, v.ui.sm_cell.map(|c| (c.0, c.2)), v.ui.sm_cell.is_some_and(|c| c.1 != 0), v.sm_hover_refs().is_empty())
+            });
+            expect(got, (None, Some((0, 2)), true, true), "(editing, the box's table and column, on another row, nothing lit)")
+        } },
         Row { id: "table / a joint's Style list open lights its rip", live: "clicking Joint C's Style cell lights the rip in the 3D and flat views while its list is open (live workflows-1123 03 s23)", gap: false, check: |s, cx| {
             s.press(cx, "sm-cell-0-0-0", MouseButton::Right)?;
             let label = cx

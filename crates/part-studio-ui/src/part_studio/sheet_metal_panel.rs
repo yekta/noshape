@@ -587,6 +587,7 @@ impl PartStudioView {
         let Some((0, row, col @ (2 | 5))) = self.ui.sm_cell else { return false };
         self.ui.sm_edit = Some((row, col));
         self.ui.sm_edit_focus = true;
+        self.ui.sm_edit_enter = false;
         cx.notify();
         true
     }
@@ -696,6 +697,14 @@ impl PartStudioView {
         let Some(model) = self.sheet_metal_context(&models) else { return };
         let Some(data) = self.sm_model_data(model) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
+        // Enter (live workflows-1123 02 s23): the box moves to the next row's cell, not editing, and nothing stays lit (the
+        // table redrawn: no row hovered until the pointer moves).
+        if std::mem::take(&mut self.ui.sm_edit_enter) {
+            let order = bend_row_order(&data, &self.sm_stored_order(model, cx));
+            let next = order.iter().position(|&i| i == row).and_then(|p| order.get(p + 1)).copied().unwrap_or(row);
+            self.ui.sm_cell = Some((0, next, col));
+            self.ui.sm_hover = None;
+        }
         let field = if col == 2 { noshape_ops::sheetmetal::BendField::Radius } else { noshape_ops::sheetmetal::BendField::KFactor };
         let Some(mut copy) = self.studio(cx).cloned() else { return };
         if noshape_ops::sheetmetal::edit_bend(&mut copy, model, &data, row, field, &text, &units) {
@@ -850,9 +859,6 @@ impl PartStudioView {
                         })
                     })
                 })
-                // Live (sm-092, sm-094): a 2 px #1651b0 outline on the
-                // selected cell, or round the row from its "#".
-                .when(at.is_some_and(|a| selected == Some(a) && a.2 > 0), |d| d.border_2().border_color(gpui_kit::rgb(0x1651b0)))
                 .w(px(w))
                 .h(px(34.))
                 .flex_none()
@@ -864,6 +870,9 @@ impl PartStudioView {
                 .border_r_1()
                 .border_b_1()
                 .border_color(grid)
+                // Live (sm-092, sm-094, workflows-1123 02 s19/s23): a 2 px #1651b0 outline on the selected cell, or round
+                // the row from its "#" (after the grid lines: their grey had taken the outline's colour).
+                .when(at.is_some_and(|a| selected == Some(a) && a.2 > 0), |d| d.border_2().border_color(gpui_kit::rgb(0x1651b0)))
                 .bg(fill)
                 .when(bold, |d| d.font_weight(FontWeight::BOLD))
                 .child(div().truncate().child(text))
@@ -956,8 +965,12 @@ impl PartStudioView {
                                 cx.notify();
                             });
                         }
+                        if e.keystroke.key == "enter" {
+                            v.update(cx, |this, _| this.ui.sm_edit_enter = true);
+                        }
                     })
-                    .child(gpui_kit::component::input::Input::new(st).appearance(false).text_size(px(13.33)).pl(px(1.)))
+                    // (Centred as the cell's value: live workflows-1123 02 s20-22.)
+                    .child(gpui_kit::component::input::Input::new(st).appearance(false).text_size(px(13.33)).text_center())
                     .into_any_element();
             }
             let v = edit_view.clone();
@@ -967,6 +980,7 @@ impl PartStudioView {
                         v.update(cx, |this, cx| {
                             this.ui.sm_edit = Some((row, col));
                             this.ui.sm_edit_focus = true;
+                            this.ui.sm_edit_enter = false;
                             cx.notify();
                         });
                     }
