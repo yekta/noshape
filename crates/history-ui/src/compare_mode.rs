@@ -603,7 +603,8 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
                     None => c.flex_1(),
                 };
                 c.when(show, |c| {
-                    c.child(svg().path(crate::history_hooks::feature_icon(&r.type_id)).size(px(16.)).flex_none().text_color(pal.text))
+                    // The feature list's own colour icons (live workflows-1123 18 s24).
+                    c.child(crate::assets::icon(&crate::history_hooks::feature_icon(&r.type_id), 16., cx))
                         .child(div().min_w_0().truncate().text_color(if shown { rgb(0x000000) } else { rgb(0xaaaaaa) }).child(crate::ui::user_text(r.name.clone())))
                 })
             };
@@ -632,7 +633,8 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
                         .flex()
                         .justify_center()
                         .font_weight(FontWeight::BOLD)
-                        .text_size(px(15.))
+                        // Live workflows-1123 18 s24: the ">" 11 px tall beside 13 px names.
+                        .text_size(px(22.))
                         .children(mark.map(|(m, c)| div().text_color(rgb(c)).child(m)))
                         .children(moved_glyph.map(|g| crate::os_ui::glyph(g, 14., rgb(if on { 0xffffff } else { MARK_GOLD })))),
                 )

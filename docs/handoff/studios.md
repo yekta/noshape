@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 22:45 UTC.
+Updated 2026-11-22 22:58 UTC.
 
 ## In flight
 
@@ -32,16 +32,20 @@ crates/drawing land (drawing-ui alone: not needed).
   radius value dropped inside, folder list-row drop look, Esc ends a row drag, table Insert ▸ fix, TICKETS dup row.
   3806ff953 (dx's hover cells) DROPPED in the rebase: dx landed its own (52cfbc549). Not in dx's: the Note tool's leader
   on a centerline (live drw-hover-1122): recheck on main.
-- UNCOMMITTED, tested (x230-x234 green: drawing_ui_tests 158, scene drawing_tools, feature-studio-ui lib, clippy):
+- QUEUED 442cec4e (22:52; 16 commits incl. 323f69d3's stack, which was CHECKING) = 5a7f5a640, tested (x230-x237 green: drawing_ui_tests 158, scene drawing_tools, feature-studio-ui lib, clippy):
   every qa workflows-1123 P0 (both blocks): SELECTED-VIEW-LABEL, PICK-EDGE-STAYS-LIT, BOM-HOVER-FILL, CALLOUT-SELECTED-LOOK,
   FS-COMMIT-DISABLED-HOVER, RELATED-MARKS-BLUE (cut_line_looks CutLook::Related + push_related_marks; detail circle blue
   unless `circle_pick`; callout lights its edge; selection_handles dots removed), SECTION-EDIT-MARKS (frame, filled dots,
   overlay cleared on close, `hidden_texts` hides the cutting letters), CALLOUT-PLACED-HOVER (`placed_callout` +
   `placed_callout_guides`); P1 DRW-SELECTION-AFTER-ACTION. TICKETS marked [x]. tested in x237 (159 green):
   DRW-MOVED-VIEW-PROPS (`apart_from_parent`: Suppress ticked+greyed, rotation editable; orientation dropdown left).
-  Then commit, fetch, rebase, diff --stat, land.
 - DRW-VIEWPROPS-ENTER-APPLIES held: conflicts with live2 drw-view-properties-scale-typed; REQUESTS studios 22:43 asks live.
-- qa P1/P2 left: HIST-COMPARE-FEATURE-HIGHLIGHT / -PARAMS-PANEL / -FEATURE-ICONS, HIST-DELETE-BRANCH-DROPS-MERGE,
+- QUEUED (stacked on 442cec4e) HIST-COMPARE-FEATURE-ICONS (compare_mode.rs: rows use crate::assets::icon (colour) not svg
+  mask; marks 22 px, measured 11 px ">" in wf23-18-compare.png). x238 green (history-ui lib 17 + clippy).
+- HIST-COMPARE-FEATURE-HIGHLIGHT (next): compare_graphics.rs `scene` builds both sides greyed; the selected row
+  (compare_mode state `selected`, via a part_studio_hooks getter) must light that feature's bodies orange see-through:
+  needs a feature -> bodies map from each side's StudioDisplay.
+- qa P1/P2 left: HIST-COMPARE-PARAMS-PANEL (the dialog's own layout in each column),
   DRW-SECTION-DETAIL-VIEW-PROPS-ROWS, DRW-DETAIL-CONNECTED-OPTIONS, DRW-DETAIL-PREVIEW-LOOK, DRW-SECTION-PREVIEW-IN-PARENT,
   the 22:0x P2s.
 - drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box) not checked.
