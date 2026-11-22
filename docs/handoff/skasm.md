@@ -1,27 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 06:15 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 07:58 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 06:15 UTC)
-- LANDED 585a2064 (f78f42fa, 05:29): hem-jog curve_ends, scissor mappings, walk 3-5 feel P0s, handoffs.
-- TO LAND (worktree, checks green on vibex7/vibex8 unless noted):
-  - P0 FEEL-BEND-FACE-PICKED-LOOK: behaviors.rs consumed_picks_overlay draws a filled face's edges whole (a hidden_only
-    clone; lines can't use on_top), its fill on_top. Test sm::a_bends_filled_face_is_outlined_whole (GPU) green.
-  - P0 SKETCH-USE-VERTEX-OTHER-SKETCH: the Select click picks another shown sketch's point itself
-    (sketch.rs other_sketch_point_at, 5 px) before the model edge / hover. Test u_on_another_sketchs_vertex_projects_it.
-  - P1 SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME (wip-0450.patch). bend_keeps_flat_length / hem T2 green.
-  - P0 SKETCH-TRIM-SHORT-END: Trim picks with trim_pick_at (a lone point, else the nearest curve in reach), also in
-    hover. Test trim_takes_a_short_end_near_its_end_point (fixed: iso view, the horizontal line is the shorter).
-  - P1 SKETCH-OFFSET-DEFAULT-SIDE: no region -> right of the first curve's direction; a placement click commits the
-    preview as is. Scene test a_click_in_space_places_the_offset_as_previewed.
-  - P1 SKETCH-MIRROR-LINE-LOOK: mirror line MIRROR_LINE 0xbdc764 2 px, no hover band, not drawn as selected.
-    Open: the source plain after the mirror click (UI hover persists; same as psui's FEEL-HOVER-AFTER-MODAL).
-  - P1 PASTE-SKETCH-CENTRED (half): sketch_mode::centre_pasted_sketch (Origin ties dropped, box centre to the
-    Origin) from ops studio::paste_sketches_onto; e2e paste_sketch_centres_the_copy_on_the_origin. The corner dots
-    after deselecting: REQUESTS skasm 05:57 (live's rule: pasted corners unshared, or all unconsumed corners dotted?).
-  - P1 EXTRA-UNFOLD-REFOLD-TOOLS: Unfold / Refold .hidden(); feature_add refuses Unfold / Refold / Rip (e2e).
-- App replays pending (vibe2 ~/tmp/skasm/wf): wf05 label width, wf11 Bend face, wf12 Use vertex, wf22, wf29.
+## In flight (11-22 07:58 UTC)
+- QUEUED 408ac79d (checking since 07:19, batch of 4): FEEL-BEND-FACE-PICKED-LOOK (filled face outlined whole),
+  SKETCH-USE-VERTEX-OTHER-SKETCH (other_sketch_point_at, 5 px), SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME,
+  SKETCH-TRIM-SHORT-END (trim_pick_at), SKETCH-OFFSET-DEFAULT-SIDE, SKETCH-MIRROR-LINE-LOOK (MIRROR_LINE 0xbdc764),
+  PASTE-SKETCH-CENTRED (centre_pasted_sketch; corner dots wait on REQUESTS skasm 05:57), EXTRA-UNFOLD-REFOLD-TOOLS.
+- TO LAND after it (worktree, clippy + tests green on vibex8 07:56):
+  - 8b31621ae / 36d0ed547: ui.sketch_hover_held_at: a mirrored entity and a chain's end after Esc stay plain under the
+    still pointer until it moves (wf22 s11, s35). Tests a_mirrored_entity_is_plain_until_the_pointer_moves,
+    esc_ending_a_chain_leaves_its_end_plain_until_the_pointer_moves.
+  - b2d4f1303 P2 CORNER-RELIEF-TOO-SMALL-WARN: a Square - Sized relief narrower than the bend allowance warns
+    SHEET_METAL_CORNER_UNDER_SIZED (custom host sheetmetal.rs corner_reliefs). T2 an_under_sized_corner_relief_warns.
+- App replays on vibe2 (~/tmp/skasm/wf, binary ~/tmp/skasm/noshape 07:56 incl. all above): wf22, 29, 12 running.
+- Closed, no app change: FORM-REMEMBERED (runner seed; qa seeded, 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0
+  wf32: live swallowed the press after a drag = lost input, DECISIONS 11-07; Esc keeps a sketch selection, behaviours
+  189 / 32552; told qa to change the workflow).
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
@@ -44,8 +40,6 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   corner in iso / normal view with 1-3 glyphs; wf11 flat camera + face). Live wf13 iso: 1 glyph centred (-3,-39) from
   the corner, a pair (-60,-19) / (-38,-19); behaviours 22938 normal view: fixed (-27,-27)..(-8,-8). Ours: box top-left
   (-27-22k, -26) (sketch.rs ~4580).
-- P2 FORM-REMEMBERED-PART-STUDIO (wf27): live's account remembered the last Form (Circle emboss) and corner relief 3 mm;
-  check Form's partStudio / relief params go through app-core feature_settings (REMEMBER_PREVIOUS_VALUE). Lead: P2.
 
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
