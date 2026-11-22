@@ -399,7 +399,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   only Large's cell) can't be done (tickets/wf24-config-row-menu.png). P2: the assembly's configuration table sits 11 px higher than
   live's (rows at y 259 / 293 vs 270 / 305; tickets/wf24-config-table.png). Steps 12-19 = live (BOM, the "No assembly features are
   configured…" message, Configure suppression toast).
-- [x] closed (qa 11-22 07:1x, green 17157c2fa; skasm: a runner gap, not the app) P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10):
+- [x] closed (qa 11-22 07:06, green 17157c2fa; skasm: a runner gap, not the app) P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10):
   qa's workflow runner now seeds live's account memory (hm2/wf/<name>.remembered -> feature_settings.json + NOSHAPE_UI_REMEMBERED=1, as
   run.py remembered_settings): Form opens on Circle emboss and builds, Corner opens on 3 mm. What still differs is the next two tickets.
 - [ ] P2 **CORNER-RELIEF-TOO-SMALL-WARN (skasm)** (workflow 27 step 19, sm-box, seeded, green 17157c2fa): Corner 1 on Flange 1's vertex
