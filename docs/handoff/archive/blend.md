@@ -1484,3 +1484,14 @@ Next: equal-radius rounds whose spines meet (cylinder axis through the torus' ce
 - SUSPENSION tip cap (ZZ_TIPCAP=1, blend-cusp 429750f98, logs/zzsusp25): a ruled loft from the last ball section to
   the vanishing point is valid (8.6e-5 mm3) and fuses, but then the tools' union "lost one of its parts" -> 89/260/153.
   Ruled out.
+- KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
+  through Chamfer 1; core lands a LIVE_SCATTER 9.5e-5 so the pair reports Fillet 2 first). Fillet 1 fix a7bf86f2c
+  LANDED 390a776a (10:02). Main + fix (blend10, vibex8 ~/tmp/blend/cli-kh 10:10): everything Ok but Fillet 2 (718 ms,
+  error) and Fillet 1 (7852 ms, error). Live: Fillet 1 Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767 (a 4.5 mm
+  CONIC rho 0.5 round of the face's closed edge, 138.6 mm); Fillet 2 Blade 7/15/10 -> 11/27/18 (0.6 mm CONIC rho 0.5,
+  two edges, 472 mm chain). Ours Fillet 1: "the rolling balls jump along the edge", then a 64-section closed loft
+  (valid, 881 mm3) whose cut is INVALID; time: Boolean 4.0 s (OCCT edge-face 1.8 s), face_project_point_near 1.7 s
+  (1975 calls), min_distance 1.0 s. Probe (parked patch): ZZ_KHDUMP=<prefix> (body + cut/add tools
+  before the Booleans) and test features_c::zz_khcut (ZZ_KH=<prefix>: faces, validity per face, cut/common per
+  tool): bin/kh-dump.sh -> logs/kh-dump1.out. 
+  Live per-feature data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.

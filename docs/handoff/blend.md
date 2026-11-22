@@ -1,46 +1,50 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 17:56 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 20:26 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-22 12:35 UTC)
+## Now (11-22 20:26 UTC)
 
-- ORDER: knifehandle Fillet 2 (the tip end, below) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end ->
-  scissor 2d82a0 F13 (tool dumps vibex7 ~/tmp/blend/sc2/f13tool-*.brep; body dump: cli-cusp rebuilt with ZZ_BODYDUMP,
-  committed WIP 429750f98 in blend-cusp).
-- FILLET 2 (11-22 17:56): PASSES 11/27/18 (live 11/27/18, removed volume in band, long rounds 236.452 mm2) via the
-  direct build in 3/3 variants. blend10 branch blend-khtip, WIP 06adcaa9d (never land as is). Real changes there:
-  (1) share_end_curve accepts a partial shared arc (joint); (2) split_face: each part-edge piece gets
-  ShapeFix_Edge().FixSameParameter(piece) (input crease's pcurve strays 38 um near the tip, BRepCheck missed it);
-  (3) ZZ_DROPSHORT probe -> make real: in split_face's drop loop, a cut whose two ends merged into one vertex
-  (shorter than snap, the end section 13 um over the tip edge) is left out; (4) ZZ_THINCAP probe -> make real: in the
-  blend pieces loop, a planar blend piece with 2A/P below the sewing tolerance (cap 6 um vs 52 um) is not sewn (the
-  sewing closes it): use the sew tolerance (approx.empty() ? 10*tol : 1e-4*size), maybe 4*2A/P < it; restrict to
-  tools' end caps. Probes already stripped from blend_section.rs (rolling_ball back to base, stride floor r/16 fixed)
-  and most of blend_direct.cpp; LEFT to strip: the ZZ prints in the two-blends'-section failure branch (~line 1833,
-  restore base), ZZ_DROPSHORT/ZZ_THINCAP env gates (make real), the ZZ face print in features_c.rs (~line 5008), and
-  check includes (ShapeAnalysis_Curve used by share_end_curve, ShapeFix_Edge used). Decide: the k::fuse_all Boolean
-  fallback in blend_section.rs (flaky, ~1 in 6 two solids) - drop it unless Fillet 3 / features tests need it.
-  Checked (logs/kh-thin2.out): 5/5 repeats pass; the 0.106 mm largest tolerance is there without THINCAP too (not
-  from the cap drop; look at it later). Then gate (features tests, knifehandle, scissor, parity via slot), git diff
-  --stat origin/main...HEAD, land. Tools: bin/kh-thin.sh, kh-thin2.sh, kh-faces.sh, kh-stride2..6.sh, kh-rep.sh.
+- ORDER: knifehandle Chamfer 1 (below; blocks Fillet 2 in the doc) -> land Fillet 2 + Chamfer 1 -> knifehandle Fillet 1
+  -> c2-surfaces-lofts-projected's Face blend 2 (core 11-22: feature 9 ERROR "Failed to blend faces", live OK, 8 -> 9/45
+  after core's Loft 1 fix e3e73b362) -> Suspension's cusp end -> scissor 2d82a0 F13.
+- Impeller bisect (qa, Part 3 invalid since 0.4.65): NOT blend's. qa's bisect-imp.log: 724b9cd2c, 10f9551f8, 16edb8de9,
+  8ed464f26 (my 11-21 trio), 39b98642f, dc58aff96 all valid; the break is after dc58aff96 (bool/core/skasm commits).
+- FILLET 2: blend10 branch blend-khtip = ab2805df1 (squashed real commit on d8000e10d, debug code stripped, probes made
+  real: short merged-vertex cut dropped only when its middle is also within snap (closed rim circles were dropped:
+  4 chamfer/tori tests broke, fixed), flat blend piece with 2A/P < sew_tol not sewn, fuse_all fallback dropped) +
+  b8cf1cb2a WIP (Chamfer 1 test + data + overlap fix, UNTESTED). Fillet 2 test 5/5; the 4 tests pass; g++-13 kernel
+  build OK. NOT LANDED: in the real doc Fillet 2 gets the wrong input because CHAMFER 1 IS A NO-OP (main too):
+  propagation then runs the blade's whole outline (6 edges, 974 mm) and errors in 25 s on blend-khtip vs 0.4 s on main.
+- CHAMFER 1 (my bug, on main too; test features_c::an_offset_angle_chamfer_of_a_blades_bottom_edges_as_live, data
+  knifehandle-chamfer1-input.brep = our Blade after Move face 2, 6/12/8, 10679.15 mm3): OFFSET_ANGLE 1.5 mm 26 deg on
+  the two 247.649 mm bottom edges; live 7/15/10, 10423.841 mm3 (-255.887). The bottom face is 1.39 mm wide: live's two
+  bevels meet in a ridge, the face gone. Ours: two loft tools (13 and 16 sections), each valid; cut together -> body
+  UNCHANGED yet status Ok (the unchanged check only retries for closed tools). cut1 (-y) alone -> clean 7/15/10, -139;
+  cut0 (+y) alone -> 10 faces with slivers (its contact edge 0.089 mm off the flank; it has no run-on at its ends,
+  cut1 runs 3 mm on at both). WIP b8cf1cb2a: if a multi-tool cut leaves the part unchanged, cut one tool at a time.
+  NEXT: build + run the test; find why cut0 has no run-on (probe ZZRUN in blend12 prints the run-on decision per end:
+  bin cmd in logs/kh-ch1-run.out, rerun it); then maybe more sections on free-form flanks; consider erroring when a
+  cut leaves the part unchanged. Then the doc run (bin/kh-f1dump2.sh style CLI on kh.noshape) must show Chamfer 1
+  7/15/10 and Fillet 2 OK; then gate: features tests, g13 (bin/g13.sh), pair (bin/kh-gate.sh: base wt blend-rgate,
+  detached main, reset it to the new base first), land.
+- Probe worktree blend12 (branch blend-khf1 on ab2805df1, never land): ZZ_KHDUMP (sections' body/tools), ZZ_SBDUMP
+  (each section_blend call's body + edges, ZZSB timing), ZZRUN, zz_khcut / zz_khchain tests (ZZ_KH / ZZ_BREP).
+  Doc copy: vibex7 ~/agents/blend-keep/kh.noshape; dumps vibex7 ~/tmp/blend/kh1 (s-sb0..3: Fillet 3, Chamfer 1,
+  Fillet 2, Fillet 1 inputs), ~/tmp/blend/ch1 (Chamfer 1 tools). Main CLI on the doc: bin/kh-maincli.sh (Fillet 3 Ok
+  716 ms, Chamfer 1 Ok 395 (no-op), Fillet 2 Error 401, Fillet 1 Error 3658).
+- Old Fillet 2 notes: the 0.106 mm largest tolerance predates the cap drop (look later); tip rounds 0.653 mm2 vs live
+  0.595 (in band).
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
-- KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
-  through Chamfer 1; core lands a LIVE_SCATTER 9.5e-5 so the pair reports Fillet 2 first). Fillet 1 fix a7bf86f2c
-  LANDED 390a776a (10:02). Main + fix (blend10, vibex8 ~/tmp/blend/cli-kh 10:10): everything Ok but Fillet 2 (718 ms,
-  error) and Fillet 1 (7852 ms, error). Live: Fillet 1 Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767 (a 4.5 mm
-  CONIC rho 0.5 round of the face's closed edge, 138.6 mm); Fillet 2 Blade 7/15/10 -> 11/27/18 (0.6 mm CONIC rho 0.5,
-  two edges, 472 mm chain). Ours Fillet 1: "the rolling balls jump along the edge", then a 64-section closed loft
-  (valid, 881 mm3) whose cut is INVALID; time: Boolean 4.0 s (OCCT edge-face 1.8 s), face_project_point_near 1.7 s
-  (1975 calls), min_distance 1.0 s. Probe (parked patch): ZZ_KHDUMP=<prefix> (body + cut/add tools
-  before the Booleans) and test features_c::zz_khcut (ZZ_KH=<prefix>: faces, validity per face, cut/common per
-  tool): bin/kh-dump.sh -> logs/kh-dump1.out. 
-  Live per-feature data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.
+- KNIFEHANDLE FILLET 1 (live: Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767, a 4.5 mm CONIC rho 0.5 round of the
+  closed 140.75 mm edge, ~200 ms). Ours: "the rolling balls jump along the edge", then a 64-section closed loft whose
+  cut is INVALID (3.7-5 s). Live data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl. Its input:
+  vibex7 ~/tmp/blend/kh1/s-sb3.brep (main 11-22 19:23), make it a test input.
   Fillet 1: the cut tool's contact edges stray 0.087 / 0.132 mm off the body between the 64 sections (a 2.1 mm step
   on the free-form handle): OCCT's cut is invalid, self-intersecting, two slivers; fuzzy 1e-6..1e-4 no good. Probe
   ZZ_N=<n> sets the section count (probe parked: blend-scratch/parked/kh-probe.patch, git apply on blend10; ZZ_KHDUMP +
