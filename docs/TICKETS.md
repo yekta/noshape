@@ -287,6 +287,32 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-22 01:4x (USER P0 walk 8, lead: feature list / tree, Measure + Mass properties, mate dialog flow; green 50772462b / 04389f02d, ui-script cells on vibe2, kit qa-scratch/hm2/walk8 gen9.py, shots out-w8*; live behaviours "qa walk 8" 01:17–01:35, live/qa/walk8-1122/ + featurelist-feel, measure-mass-1118, asm/feel-1117)
+
+- [ ] P1 **FEEL-DIALOG-FINAL-BUTTON (psui)**: double-click Extrude 2 with Extrude 3 after it. Live's footer has a small 49 × 22
+  secondary button "Final" to the right of the history slider (before "?"), tooltip "Preview Part Studio up to the rollback bar";
+  pressed it turns rgb(234,234,234) with a blue focus ring, the slider greys out and the later features + Part 3 show
+  (live/qa/walk8-1122 9a/9b, part-studio/2381). Ours draws a "☐ Final" checkbox to the left of the slider with the tooltip "Preview
+  the finished model instead of rolling back to this feature" (feature_dialog.rs `dlg-final`; out-w8/w8-a-dblclick-feature/02.png).
+- [ ] P1 **FEEL-RENAME-INPUT-LOOK (psui)**: Extrude 1 › right-click › Rename. Live's inline box is square, a 1 px #1651B0 border,
+  178 × 24 from x 62 to the list's right edge, the name all selected (featurelist-feel/D1-rename-input.png). Ours is rounded with a
+  2 px light-blue #9EC9FF focus ring and ends ~10 px short of the edge (out-w8/w8-a-rename/03.png). Enter, Tab, a canvas click
+  (commit) and Escape (restores) all behave as live.
+- Matched (the other ~50 cells): row hover tint + "Extrude 1 <- Sketch 1" tooltip + lit part; click toggles, Escape keeps, empty canvas
+  clears; Shift ranges (from the top incl. Origin and planes with nothing selected); Ctrl+click's 2-feature menu (items and place)
+  and Ctrl+click on parts; double-click opens the dialog at live's place; F2 does nothing; a refused reorder turns the row red with
+  the ⚠ icon, Ctrl+Z undoes; the rollback bar's hover colour + "Rollback bar" tip, release (grey italic rows), its one-item menu
+  "Roll to end"; row menus at rest, above and below a rolled-back bar; suppress / unsuppress look, the suppressed row's menu, two
+  suppressed in one Ctrl+Z. Measure: point / length / diameter (rim and cylinder alone) / area / min dist / min-max-centre dist /
+  perp lines and planes angles / nothing for 3 vertices, the value tooltip 40.00000 and click precision, the bottom-right "["
+  panel. Mass properties: the panel and its Override boxes, add / remove a part, Escape keeps the selection, the button again
+  keeps it open, "[" swaps it for an empty Measure panel, rolled back it opens empty and fills on a pick (32000 mm³). Mate dialog:
+  M, one pick, two picks (amber face #e5b726 vs live #e5b825, preview outline #ffc20e as live, HUD), Q −90° / 180°, A 180° and
+  back, Escape after one or two picks keeps nothing, Enter commits, a third pick replaces Part 2's connector (title red, as live's
+  11-22 take; behaviours E1's "second pick on the same instance refused" is superseded).
+- Not compared: held drags (the drag pill, drop line, Escape mid-drag): the ui-script drag always releases. The chip × in Mate
+  connectors (the runner doesn't find that ×). A/Q/Offset timing (live 155 / 707–853 / 145 ms on software GL; judged on GPUs).
+
 ## qa, 2026-11-22 00:2x (USER P0 walk 7, lead: viewport navigation as a user feels it; green a597c1393, real xdotool input + a 60 fps grab on local Xvfb, kit qa-scratch/w7; live 11-22 00:05 behaviours "qa walk 7 navigation", live/qa/walk7-1121/)
 
 Both sides render in software here (live SwiftShader, repainting every 0.4–1.1 s at load 20; ours llvmpipe with read-back, ~10 fps
