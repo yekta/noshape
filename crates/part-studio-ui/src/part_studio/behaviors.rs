@@ -173,7 +173,7 @@ pub(super) const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
 pub(super) const SELECT_OTHER_EMPTY_H: f32 = 83.;
 
 /// Consumed dialog picks: (picks, accent picks, before-model, lines).
-pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Vec<noshape_render::Instance>);
+pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, Option<Reference>, usize, Vec<noshape_render::Instance>);
 
 /// View state for the behaviors above.
 /// A removed part's outline's key: the model before the feature (by address) and the part's faces.
@@ -216,6 +216,9 @@ pub struct UiState {
     /// Where an entity was just mirrored or a chain ended by Esc: nothing hovers until the pointer leaves it (live
     /// workflow 22 steps 11 and 35: drawn plain under the still pointer).
     pub sketch_hover_held_at: Option<DVec2>,
+    /// Where a feature dialog was accepted: nothing hovers until the pointer moves (live workflows-1123 03 steps 12-14:
+    /// after Enter the bend under the still pointer drawn plain).
+    pub hover_held_at: Option<DVec2>,
     /// Outside sketch mode, the GPU's hover pick and what the shown sketches' reach made of it
     /// (`shown_sketch_hover_id`), resolved again as the pointer moves.
     pub shown_sketch_gpu_hover: Option<(Option<u32>, Option<u32>)>,
@@ -835,6 +838,7 @@ impl UiState {
             hover_raw: None,
             sketch_gpu_hover: None,
             sketch_hover_held_at: None,
+            hover_held_at: None,
             shown_sketch_gpu_hover: None,
             alt_held: false,
             hover_pick: None,
@@ -3788,31 +3792,41 @@ impl PartStudioView {
             self.ui.consumed_lines = None;
             return Vec::new();
         };
-        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_)) && (built.consumed(r) || changed.contains(r))).cloned().collect() };
+        let missing = |refs: &[Reference]| -> Vec<Reference> { refs.iter().filter(|r| matches!(r, Reference::Edge(_) | Reference::Face(_) | Reference::Vertex(_)) && (built.consumed(r) || changed.contains(r))).cloned().collect() };
         let (mut sel, mut acc) = (missing(selection), missing(accent));
         // Hovering its chip lights the pick the query-hover yellow-green
         // #f2ff80, consumed or not (live: qa4 round 5 s7, CHIP-HOVER).
         let hov: Vec<Reference> = self.ui.query_hover.iter().filter(|h| sel.contains(h) || acc.contains(h)).cloned().collect();
         sel.retain(|r| !hov.contains(r));
         acc.retain(|r| !hov.contains(r));
+        // A hovered face next to a picked edge: the edge's band over the face's boundary line (live b3/dlg-face-otherhover13).
+        let lit_face = self.hover.clone().filter(|h| matches!(h, Reference::Face(_)));
         let key = Arc::as_ptr(&before) as usize;
-        if let Some((s, a, h, k, inst)) = &self.ui.consumed_lines
+        if let Some((s, a, h, f, k, inst)) = &self.ui.consumed_lines
             && *s == sel
             && *a == acc
             && *h == hov
+            && *f == lit_face
             && *k == key
         {
             return inst.to_vec();
         }
         // A picked face's outline is drawn whole on top, also where the model before the feature hides it (live
         // workflows-1122 11 s12: Bend's face to bend, the plate's underside, outlined all round through the plate).
-        let (mut lines, mut outlines) = (LineData::default(), LineData::default());
+        let (mut lines, mut outlines, mut discs) = (LineData::default(), LineData::default(), noshape_render::PointData::default());
         for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
             // A picked edge Fillet's preview consumed: the selected edge's 5 px band over its round (live b3/dlg-edge-selected:
             // the 1.3 mm round between its tangent lines, #FFA90A at both, #DDA027..#FFAF25 between); a face's boundary and
             // another feature's pick (a flange's edge under its wall, bright orange) stay a line.
             let band = if fillet { noshape_render::LineSegment::CORE | noshape_render::LineSegment::BAND } else { 0 };
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255];
+            // A picked vertex the preview takes away (Corner break's corner): its disc where it was (live workflows-1123 03
+            // steps 16-20).
+            for b in before.bodies.iter().filter(|b| !b.hidden) {
+                for (_, p) in b.vertex_refs.iter().zip(&b.mesh.vertices).filter(|(v, _)| refs.contains(v)) {
+                    discs.points.extend(crate::scene_builder::vertex_disc(*p, rgba));
+                }
+            }
             // The faces' edges in one pass over the bodies, then each body's edges looked up once.
             let faces: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
             let face_edges = crate::scene_builder::faces_edges(&before, &faces);
@@ -3824,7 +3838,9 @@ impl PartStudioView {
             for b in before.bodies.iter().filter(|b| !b.hidden) {
                 for (e, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
                     if edges.contains(e) {
-                        lines.push_polyline(pl, rgba, 0, 3.0, band);
+                        let beside = |f: &Arc<noshape_model::reference::TopoName>| lit_face.as_ref().is_some_and(|h| matches!(h, Reference::Face(n) if n == &**f));
+                        let over = matches!(e, Reference::Edge(noshape_model::reference::TopoName::Edge { faces, .. }) if band != 0 && faces.iter().any(beside));
+                        lines.push_polyline(pl, rgba, 0, 3.0, band | if over { noshape_render::LineSegment::OVER_LIT_FACE } else { 0 });
                     } else if outlined.contains(e) {
                         outlines.push_polyline(pl, rgba, 0, 3.0, 0);
                     }
@@ -3869,7 +3885,7 @@ impl PartStudioView {
             }
             inst.push(i);
         }
-        for (lines, whole) in [(&lines, false), (&outlines, true)] {
+        for lines in [&lines, &outlines] {
             if lines.segments.is_empty() {
                 continue;
             }
@@ -3877,13 +3893,19 @@ impl PartStudioView {
             if post {
                 i.compare = noshape_render::scene::compare::POST;
             }
-            // (Its hidden stretches drawn again: the whole outline.)
-            if whole {
-                inst.push(i.clone().hidden_only());
+            // (Its hidden stretches drawn again: a face's whole outline; an edge where the new wall's faces meet it solid,
+            // not dashed (qa FEEL-PICKED-EDGE-DASHED-UNDER-PREVIEW: each copy took about half its pixels).)
+            inst.push(i.clone().hidden_only());
+            inst.push(i);
+        }
+        if !discs.points.is_empty() {
+            let mut i = Instance::new(Drawable::Points(self.gpu.uploader().upload_points(&discs))).per_primitive_color().unpickable().ignore_clip().over_lines().layer(20);
+            if post {
+                i.compare = noshape_render::scene::compare::POST;
             }
             inst.push(i);
         }
-        self.ui.consumed_lines = Some((sel, acc, hov, key, inst.clone()));
+        self.ui.consumed_lines = Some((sel, acc, hov, lit_face, key, inst.clone()));
         inst
     }
 

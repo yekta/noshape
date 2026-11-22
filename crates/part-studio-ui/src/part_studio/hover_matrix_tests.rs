@@ -784,6 +784,10 @@ fn b3_connector_hovered(cx: &mut TestAppContext) {
     // within 5 px of the centre; the owner's three edges meeting there alone gave ours 18).
     let lit = near_centre(&c, 5.0).filter(|p| close(*p, 0xf1fe81, 16)).count();
     assert!(lit >= 30, "{lit} lit origin px");
+    // The blue z-axis drawn over that disc down to the centre (qa FEEL-MC-AXIS-UNDER-DISC: live 17 px of it show, ours
+    // 11 under the disc).
+    let blue: Vec<usize> = (0..=42).filter(|y| (34..=46).any(|x| close(c[y * 80 + x], 0x0000d0, 60))).collect();
+    assert!(blue.len() >= 15 && blue.last().is_some_and(|&y| y >= 38), "z-axis rows {blue:?} (live 17, down to the centre)");
 }
 
 #[gpui::test]
@@ -916,6 +920,10 @@ fn b3_field_face_hovered_edge_picked(cx: &mut TestAppContext) {
     let picked = (edge.y as usize - 2..=edge.y as usize + 2).any(|y| close(c[y * 80 + edge.x as usize], 0xffa90a, 24));
     // (#b28a5d: the muted boundary gave ~80; the preview's tangent line beside the band blends to a few, live 9.)
     assert!(picked && count(&c, 0xffc685) > 150 && count(&c, 0xb28a5d) < 50, "{} #ffc685, {} #b28a5d", count(&c, 0xffc685), count(&c, 0xb28a5d));
+    // The band over the hovered face's boundary line beside it: its core #ffaf25, 78 % over #ffc685 (qa
+    // FEEL-FILLET-FACE-OVER-PICKED: ours the core #dd9f26 over the face with the 1 px line over the band).
+    let column: Vec<[u8; 3]> = (edge.y as usize - 4..=edge.y as usize + 4).map(|y| c[y * 80 + edge.x as usize]).collect();
+    assert!(column.iter().any(|p| close(*p, 0xffaf25, 10)) && !column.iter().any(|p| close(*p, 0xdd9f26, 10)), "across the band {column:02x?}");
 }
 
 // Select other on the top face (live uip/select-other-row-click-1..4, qa FEEL-SELECT-OTHER-LOOK): no point is drawn where
@@ -1601,16 +1609,20 @@ fn the_list_viewport_matrix_matches_live(cx: &mut TestAppContext) {
     set(cx, &|v| v.ui.list_hover = None);
     // p04: the Top plane's row: its outline.
     set(cx, &|v| v.hover = Some(Reference::Plane(DatumPlane::Top)));
-    let edge = cx.update(|cx| {
+    // Points along its four edges on screen: the viewport's size (and so which edges parts hide) differs by platform.
+    let (size, edge) = cx.update(|cx| {
         let v = m.view.read(cx);
         let vp = v.viewport.read(cx);
-        let pl = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top))?;
-        [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)].into_iter().filter_map(|(u, w)| vp.project(pl.corner(u, w))).find(|s| s.x > 10.0 && s.y > 10.0 && s.x < vp.size().x - 10.0 && s.y < vp.size().y - 10.0)
+        let Some(pl) = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top)) else { return (vp.size(), Vec::new()) };
+        let along = [-0.75, -0.5, -0.25, 0.0, 0.25, 0.5, 0.75];
+        let uw = along.iter().flat_map(|&t| [(t, -1.0), (t, 1.0), (-1.0, t), (1.0, t)]);
+        (vp.size(), uw.filter_map(|(u, w)| vp.project(pl.corner(u, w))).filter(|s| s.x > 10.0 && s.y > 10.0 && s.x < vp.size().x - 10.0 && s.y < vp.size().y - 10.0).collect::<Vec<_>>())
     });
-    match edge {
-        Some(edge) if near(&m.frame(cx), edge.round(), 4, 0xffc685, 40) >= 3 => {}
-        Some(_) => wrong.push("p04 the Top plane's row: its outline not lit".to_string()),
-        None => wrong.push("p04: no edge of the Top plane on screen".to_string()),
+    let f04 = m.frame(cx);
+    let lit = edge.iter().map(|e| near(&f04, e.round(), 4, 0xffc685, 40)).collect::<Vec<_>>();
+    if !lit.iter().any(|&n| n >= 3) {
+        let hover = cx.update(|cx| m.view.read(cx).hover.clone());
+        wrong.push(format!("p04 the Top plane's row: its outline not lit (viewport {size:?}, hover {hover:?}; hover px at {} points along its edges: {lit:?})", edge.len()));
     }
     set(cx, &|v| v.hover = None);
 
@@ -1979,4 +1991,30 @@ fn a_hidden_selected_faces_outline_shows_through_the_part(cx: &mut TestAppContex
     let (t0, t1) = (at(&before, top), at(&after, top));
     let same = t0.iter().zip(t1).all(|(&a, b)| (i32::from(a) - i32::from(b)).abs() <= 3);
     assert!(n0 == 0 && n1 >= 40 && same, "orange px round the hidden back edge: {n0} before, {n1} selected (live: its line through the top); the top's fill {t0:?} → {t1:?} (live: unchanged)");
+}
+
+/// Qa FEEL-HOVER-DISC-AFTER-COMMIT (workflows-1123 03 steps 12-14): Enter commits the dialog with the pointer still on an
+/// edge's midpoint; live lights nothing there until the pointer moves (ours kept the midpoint's pale disc).
+#[gpui::test]
+fn nothing_lights_under_the_still_pointer_after_enter(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "hover-held-after-enter");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    draw(cx, m.window);
+    let p = m.exact(cx, EDGE);
+    approach(cx, &m, p);
+    m.pointer.click(cx, &m.view, p);
+    let mid = m.exact(cx, MID);
+    approach(cx, &m, mid);
+    let before = cx.update(|cx| m.view.read(cx).hover.clone());
+    assert!(before.is_some(), "the midpoint lit before Enter");
+    gpui_kit::VisualTestContext::from_window(m.window, cx).simulate_keystrokes("enter");
+    wait_until(cx, m.window, |cx| m.view.read(cx).edit.is_none() && !m.view.read(cx).ui_busy());
+    for _ in 0..4 {
+        m.pointer.frames(cx, &m.view);
+    }
+    let after = cx.update(|cx| m.view.read(cx).hover.clone());
+    assert!(after.is_none(), "lit under the still pointer after Enter: {after:?}");
+    approach(cx, &m, mid + DVec2::new(0.0, -3.0));
+    assert!(cx.update(|cx| m.view.read(cx).hover.is_some()), "nothing lit once the pointer moved");
 }

@@ -2016,6 +2016,8 @@ impl PartStudioView {
         // Versions and history › Compare lights nothing under the pointer (live fc-1120 (10)).
         let id = id.filter(|_| crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none());
         let id = id.filter(|id| !self.preview_hides(*id, vp, cx));
+        // Held after a dialog's Enter until the pointer moves.
+        let id = id.filter(|_| self.ui.hover_held_at.is_none());
         let gpu = id;
         let id = self.shown_sketch_hover_id(id, cx);
         self.ui.shown_sketch_gpu_hover = self.sketch.is_none().then_some((gpu, id));
@@ -2439,6 +2441,10 @@ impl PartStudioView {
         match ev {
             ViewportEvent::PointerMove { position, modifiers } => {
                 self.ui.pointer = Some(*position);
+                if self.ui.hover_held_at.is_some_and(|h| h.distance(*position) > 0.5) {
+                    self.ui.hover_held_at = None;
+                    vp.update(cx, |v, _| v.say_hover_again());
+                }
                 if self.update_inference(modifiers.shift, window, cx) {
                     self.refresh_scene(false, cx);
                 }
@@ -3142,6 +3148,11 @@ impl PartStudioView {
         // Nothing stays selected after a feature is accepted (Onshape).
         self.selected_features.clear();
         self.ui.query_hover = None;
+        // Nothing under the still pointer lights until it moves (live workflows-1123 03 steps 12-14).
+        if let Some(p) = self.ui.pointer.filter(|_| self.viewport.read(cx).pointer_inside()) {
+            self.ui.hover_held_at = Some(p);
+            (self.hover, self.ui.hover_pick, self.ui.hover_raw, self.ui.midpoint_armed) = (None, None, None, None);
+        }
         self.sync_manipulator(cx);
         let feature = e.dialog.read(cx).feature.clone();
         let type_id = feature.type_id.clone();
@@ -4817,10 +4828,13 @@ impl PartStudioView {
             Some(e) => e.dialog.read(cx).active_refs().contains(&r),
             None => self.selection.contains(&r),
         };
-        // In a dialog, the part a field's face or edge belongs to (live workflow 21, qa PARTS-ROW-OF-PICK: Helix's face).
+        // In a dialog, the part a field's face or edge belongs to (live workflow 21, qa PARTS-ROW-OF-PICK: Helix's face); not
+        // a sheet metal part's, whose picks live resolves to the Sheet metal model (workflows-1123 01-03, qa
+        // PARTS-ROW-OF-PICK-SHEET-METAL).
+        let sheet_metal = || self.context.iter().chain(self.ui.before_context.as_ref()).any(|c| c.sheet_metal.contains_key(&b.id));
         let related = !selected
             && match &self.edit {
-                Some(e) => e.dialog.read(cx).active_refs().iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of_input(s).as_ref() == Some(&b.id)),
+                Some(e) => e.dialog.read(cx).active_refs().iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of_input(s).as_ref() == Some(&b.id)) && !sheet_metal(),
                 None => self.selection.iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of(s).as_ref() == Some(&b.id)) || self.selected_features.contains(&b.id.feature),
             };
         (selected, related)

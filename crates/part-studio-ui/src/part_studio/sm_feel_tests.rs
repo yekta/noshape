@@ -546,6 +546,46 @@ fn a_flanges_picked_edge_is_bright_orange_under_its_wall(cx: &mut TestAppContext
     assert!(off.is_empty(), "the picked edge not bright orange at:\n{}", off.join("\n"));
 }
 
+/// Qa FEEL-PICKED-EDGE-DASHED-UNDER-PREVIEW (workflows-1123 01 step 12, 03 step 11): the picked edge solid orange where
+/// the preview's new wall starts on it; ours dashed (the wall's faces meet the edge: half its pixels lost the depth
+/// test). Every device px along the middle 80 % of the edge, across it ±3 px.
+#[gpui::test]
+fn a_flanges_picked_edge_is_solid_along_its_wall(cx: &mut TestAppContext) {
+    let Some(_gpu) = super::feel::gpu_pointer() else { return };
+    RENDERING.set(true);
+    const SELECT: [i32; 3] = [0xFF, 0xA9, 0x0A];
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [20, 0, 2]"] } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-flange-edge-solid", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let flange = cx.update(|cx| view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Flange 1").map(|f| f.id))).expect("Flange 1");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(flange, w, cx))).unwrap();
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        !v.ui_busy() && v.ui.preview_before.is_some() && v.display.feature_state(flange).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+    });
+    let (px, w) = super::sketch_hover::settled_frame(cx, window, &view);
+    let scale = w as f64 / cx.update(|cx| view.read(cx).viewport.read(cx).size().x).round();
+    let rgb = |x: i32, y: i32| -> Option<[i32; 3]> {
+        let o = (y.max(0) as usize * w + x.max(0) as usize) * 4;
+        px.get(o..o + 3).map(|b| [b[2] as i32, b[1] as i32, b[0] as i32])
+    };
+    let screen = |cx: &mut TestAppContext, x: f64| cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(x, 0.0, 0.002))).map(|s| glam::DVec2::new(s.x, s.y) * scale).expect("the edge on screen");
+    let (a, b) = (screen(cx, 0.006), screen(cx, 0.054));
+    let n = glam::DVec2::new(a.y - b.y, b.x - a.x).normalize();
+    let steps = (b - a).length().round() as i32;
+    let gaps: Vec<String> = (0..=steps)
+        .map(|k| a + (b - a) * (f64::from(k) / f64::from(steps.max(1))))
+        .filter(|p| !(-3..=3).any(|j| rgb((p.x + n.x * f64::from(j)).round() as i32, (p.y + n.y * f64::from(j)).round() as i32).is_some_and(|c| (0..3).all(|i| (c[i] - SELECT[i]).abs() <= 24))))
+        .map(|p| format!("({:.0}, {:.0}) {:?}", p.x, p.y, rgb(p.x.round() as i32, p.y.round() as i32)))
+        .collect();
+    assert!(gaps.is_empty(), "{} of {} px along the picked edge not bright orange (live solid): {}", gaps.len(), steps + 1, gaps.join(", "));
+}
+
 /// Live feel S1 (qa FEEL-SM-PARTIAL-FLANGE-MANIP): editing a partial flange, its picked edge is lit whole, as it was
 /// before the flange (ours lit only the piece the flange leaves).
 #[gpui::test]
@@ -664,4 +704,64 @@ fn a_bends_face_clicked_again_stays_in_its_field(cx: &mut TestAppContext) {
     pointer.frames(cx, &view);
     pointer.click(cx, &view, p);
     assert_eq!(faces(cx), 1, "the face kept after the click");
+}
+
+/// Qa FEEL-CORNER-BREAK-VERTEX-PICK (workflows-1123 03 steps 16-20): editing a Corner break, its picked vertex keeps a
+/// saturated orange disc where the corner was, though the preview has rounded it away (ours none).
+#[gpui::test]
+fn a_corner_breaks_picked_vertex_keeps_its_disc(cx: &mut TestAppContext) {
+    let Some(_gpu) = super::feel::gpu_pointer() else { return };
+    RENDERING.set(true);
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalCornerBreak", "name": "Corner break 1", "params": { "entities": ["vertex through [0, 0, 2]"], "blendType": "FILLET", "radius": "4 mm" } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-corner-break-disc", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Corner break 1").map(|f| f.id))).expect("Corner break 1");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        !v.ui_busy() && v.ui.preview_before.is_some() && v.display.feature_state(id).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
+    });
+    let (px, w) = super::sketch_hover::settled_frame(cx, window, &view);
+    let scale = w as f64 / cx.update(|cx| view.read(cx).viewport.read(cx).size().x).round();
+    let s = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.0, 0.0, 0.002))).expect("the corner on screen") * scale;
+    let r = (6.0 * scale).ceil() as i32;
+    let orange = (-r..=r)
+        .flat_map(|dy| (-r..=r).map(move |dx| (dx, dy)))
+        .filter_map(|(dx, dy)| {
+            let o = (((s.y.round() as i32 + dy).max(0) as usize) * w + (s.x.round() as i32 + dx).max(0) as usize) * 4;
+            px.get(o..o + 3).map(|b| [b[2], b[1], b[0]])
+        })
+        .filter(|c| c[0] >= 0xf0 && (0x98..=0xc8).contains(&c[1]) && c[2] <= 0x70)
+        .count();
+    assert!(orange as f64 >= 20.0 * scale * scale, "{orange} saturated orange px round the picked corner (live an 11 px disc)");
+}
+
+/// Qa PARTS-ROW-OF-PICK-SHEET-METAL (workflows-1123 01 s3-14, 02 s4-5, 03 s10-21): a sheet metal edge in a dialog field
+/// leaves the Part 1 row plain in live (its picks resolve to the Sheet metal model); ours marked it related.
+#[gpui::test]
+fn a_sheet_metal_pick_leaves_its_part_row_plain(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-parts-row-plain", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let edge = v.display.bodies.iter().find_map(|b| b.edge_refs.first().cloned());
+        v.start_feature("sheetMetalFlange", w, cx);
+        let d = v.edit.as_ref().expect("the Flange dialog").dialog.clone();
+        d.update(cx, |d, cx| d.set_value("edges", noshape_model::ParamValue::Query(edge.into_iter().collect()), cx));
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let rows: Vec<(String, (bool, bool))> = cx.update(|cx| {
+        let v = view.read(cx);
+        v.display.bodies.iter().map(|b| (b.name.clone(), v.part_row_flags(b, cx))).filter(|(_, f)| *f != (false, false)).collect()
+    });
+    assert!(rows.is_empty(), "part rows marked (selected, related) with a sheet metal edge in Flange's field: {rows:?}");
 }

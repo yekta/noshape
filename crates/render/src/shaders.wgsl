@@ -1204,6 +1204,9 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let rim = max(1.0, 0.6 * dpr);
         if (a > half - rim) { return vec4(col, i.color.a); }
         // The plain line (1 CSS px, antialiased) under the core; none under a BAND line (style 1024).
+        // Over a hovered face's boundary line (style 4096, LineSegment::OVER_LIT_FACE): the core at 78 % over that line's
+        // #ffc685, uniform #ffaf25 (live b3/dlg-face-otherhover13).
+        if ((i.style & 4096u) != 0u) { return vec4(col * 0.78 + linear_to_srgb(g.hover.rgb) * 0.22, i.color.a); }
         let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
         let alpha = 0.78 + edge;
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / alpha, alpha * i.color.a);

@@ -1592,8 +1592,21 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
             None => draw(pass, &lists.silhouettes, &pipelines.silhouette),
         }
         draw(pass, &lists.points, &pipelines.point);
-        draw(pass, &lists.lines_over_points, &pipelines.line);
-        draw(pass, &lists.points_over_lines, &pipelines.point);
+        // Lines and points over the lines, in layer order: a lit sketch's band, then its points, then a lit vertex's
+        // disc, then a mate connector's axes over that disc (live hover matrix b3-ps-mc-hover).
+        let (lo, po) = (&lists.lines_over_points[..], &lists.points_over_lines[..]);
+        let (mut a, mut b) = (0, 0);
+        while a < lo.len() || b < po.len() {
+            if b == po.len() || (a < lo.len() && instances[lo[a]].layer <= instances[po[b]].layer) {
+                let n = lo[a..].iter().take_while(|&&i| b == po.len() || instances[i].layer <= instances[po[b]].layer).count();
+                draw(pass, &lo[a..a + n], &pipelines.line);
+                a += n;
+            } else {
+                let n = po[b..].iter().take_while(|&&i| a == lo.len() || instances[i].layer < instances[lo[a]].layer).count();
+                draw(pass, &po[b..b + n], &pipelines.point);
+                b += n;
+            }
+        }
         draw(pass, &lists.over_lines, &pipelines.mesh_transparent);
         // Outlined see-through parts, last (their depth would hide what
         // is behind them).

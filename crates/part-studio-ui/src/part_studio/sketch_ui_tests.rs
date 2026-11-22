@@ -3452,7 +3452,7 @@ fn a_shelled_face_is_highlighted_as_before(cx: &mut TestAppContext) {
     let changed = cx.update(|cx| view.read(cx).changed_picks(&[top.clone(), bottom.clone()]));
     assert_eq!(changed, vec![top], "the removed top face, not the bottom");
     // Live 11-01: the removed face filled khaki at half (the opening and the rim) under its outline.
-    let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.4.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
+    let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.5.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
     // (The outline twice: as drawn, and its hidden-only clone, so the face's edges show whole: qa FEEL-BEND-FACE-PICKED-LOOK.)
     assert_eq!(drawn, Some(vec![(true, 0.47), (false, 1.0), (false, 1.0)]), "the removed face's fill, then its outline");
 }
@@ -3525,7 +3525,7 @@ fn an_extrudes_picked_face_is_tinted_under_its_preview(cx: &mut TestAppContext) 
         v.ui.preview_before.is_some() && v.edit.as_ref().and_then(|e| v.display.feature_state(e.dialog.read(cx).feature.id)).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Ok)
     });
     draw(cx, window);
-    let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.4.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
+    let drawn = cx.update(|cx| view.read(cx).ui.consumed_lines.as_ref().map(|c| c.5.iter().map(|i| (matches!(i.drawable, noshape_render::Drawable::Mesh(_)), i.color[3])).collect::<Vec<_>>()));
     // (The outline as drawn and its hidden-only clone, as a Bend's filled face: qa FEEL-BEND-FACE-PICKED-LOOK.)
     assert_eq!(drawn, Some(vec![(true, 0.5), (false, 1.0), (false, 1.0)]), "the picked face's tint, then its outline");
 }

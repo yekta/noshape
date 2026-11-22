@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 21:41 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 23:25 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,45 +33,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## Now (21:41 UTC 11-22)
-Batch 1 LANDED 613b06bb (19:59). TICKETS ticked in the tree (uncommitted, goes with batch 2): EXTRUDE-ARROW-ANCHOR,
-PS-LONGPRESS-SELECTS, QUERY-PART-PICK-FILL, PICK-SKETCH-LINE-THROUGH-FACE, PLANE-LIT-AFTER-MENU, SECTION-PLANE-LABEL-LOOK.
-Lead told the hover matrix score (ours 94/94; qa's last 100/125, ask qa to rescore after batch 2).
-
-Batch 2: applied uncommitted in the tree (backup /root/psui-scratch/batch2.patch; full test script run-t60.sh:
-clippy, features_a, app-core, scene, render, part-studio-ui). Covers qa P0s:
-- nav-anim-1122: view changes are time-based at any fps (`view_change_duration` removed); nav matrix row "a view change is time-based".
-- NAV-N-CENTRE: `Viewport::animate_to_direction_centred`; N row checks (20,15).
-- PLANE-LABEL-NORMAL-VIEW: plane names 20 px on screen (client PLANE_TEXT_HEIGHT_PX). `Instance::pixel_sized`; render
-  `upload_instances(scene, camera, h)` scales by `pixel_world`; builder PLANE_NAME_*. Test hover_matrix
-  `a_plane_name_keeps_its_screen_size_at_any_zoom`; the section-plane-names test locates the label by px.
-- MANIP-DRAG-DECIMALS (angles 7 decimals) + FILLET-DRAG-FOCUS (qa new P0: Radius focused during and after the drag).
-- TRIAD-RELEASE-FOCUS, TRANSFORM-PLANE-HANDLE (qa new P0), TRANSFORM-TRIAD-LOOK:
-  - Transform triad uses the client constants: shaft 60, head 30/r10, planes 20-45 px. Routing's full triad unchanged.
-  - Second plane diagonals are hit segments (appended last). No focus on release. Moved part opaque in its own colour.
-  - Tests: dialogs_feel `the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus`; sketch_ui transform ghost test.
-- MANIP-RELEASED-LOOK: `end_manip_drag` sets manip_hover + refresh. Dialogs row "an arrow drag lights nothing" checks it.
-- TRANSFORM-CHIP-RED: Rotate's axis errors faulty ["axis"] (model-core pattern.rs). features_a transform test.
-- ROLLBACK-CLAMP-HOVER: default rows take RollbackDrag moves (`ui.rollback_drop_dg`). List row "held over Top".
-- interaction-feel.md rows for all of the above; this handoff.
-t60 (vibex8): clippy clean, features_a 130, app-core 116, scene 212+6, render 17+68; part-studio-ui 490/494.
-Live answered 19:58 (box-hover-1122, multi-part-menu-1122, sel-see-through-1122); added on top, uncommitted:
-- PS-BOX-DRAG-HOVER: `Viewport::box_plane` (the plane hovered at the press stays lit through the box, out at release; new
-  `PickClass::Plane`; box_ids never takes planes). Test feel `a_box_from_a_plane_keeps_that_plane_lit_to_the_release`: PASSES.
-- PS-MULTI-PART-MENU: menus.rs several-parts branch (live's 26 rows less Add comment); coverage "partStudio:Check
-  interference…". Test sketch_ui `two_parts_faces_give_the_two_parts_menu`: PASSES.
-- PS-SELECTED-SEE-THROUGH: builder `selected_edge`: part edge lines drawn again `selected_only().on_top()`. Test hover_matrix
-  `a_hidden_selected_faces_outline_shows_through_the_part`: PASSES. List × viewport matrix (p04) passes again (t62).
-- interaction-feel.md rows for the three.
-Fixed after t63: plane names weren't drawn because frustum culling tested the unscaled (pixel-unit) box; pixel-sized
-instances now skip the cull (renderer.rs). Plane-name test passes (t64). Triad XY-square test passes (Isometric for the
-drag). EDIT-BODY-SHADE: test dropped (ours top (118,127,133), live (132,147,155); preview mix 1 gives 97, 0 gives 166:
-the gap is not the mix alone); ticket stays open. Probes removed. coverage "partStudio:Check interference…" added.
-t65 (vibex8): clippy clean (+ops), features_a 130, app-core 116, scene 212, render 17+68, part-studio-ui 497/497, ops
-coverage 11. Scene edge_looks failed: the see-through copy doubled a seen selected edge's band; the copy is now
-`hidden_only` (drawn only where hidden). t66: scene 212+6, hover matrix 96/96 + list 4/4. Committed and landing batch 2.
-Next: land result → tick PS-BOX-DRAG-HOVER, PS-MULTI-PART-MENU, PS-SELECTED-SEE-THROUGH + batch 2's tickets → hover
-matrix score to lead (96/96), qa rescore.
+## Now (23:25 UTC 11-22)
+Batch 1 LANDED 613b06bb; batch 2 LANDED b6812aae (live's box-hover / multi-part-menu / see-through in it).
+Batch 3 (commit "psui: a picked edge solid and bright under the preview…", rebased on 5e634b35e): FEEL-MC-AXIS-UNDER-DISC,
+FEEL-FILLET-FACE-OVER-PICKED (#ffaf25 via `LineSegment::OVER_LIT_FACE` on consumed_picks_overlay's band),
+FEEL-PICKED-EDGE-DASHED-UNDER-PREVIEW, FEEL-CORNER-BREAK-VERTEX-PICK (disc only), FEEL-HOVER-DISC-AFTER-COMMIT
+(`ui.hover_held_at`), PARTS-ROW-OF-PICK-SHEET-METAL; and the macOS CI P0 (run 45071676527: list × viewport p04
+"Top plane outline not lit"): not MSAA (t73 passes at NOSHAPE_PERF_MSAA=4); p04 now samples 28 points along the
+plane's 4 edges and prints viewport size + hover on failure. t72: psui lib 504/505 (the one: my test's 3 px move
+needed `approach`, fixed), scene, render green. t74 (clippy + both tests, ~/tmp/psui/t74.log) → land.sh → watch macOS CI.
+EDIT-BODY-SHADE stays open (ours top (118,127,133), live (132,147,155)).
+Queue: FEEL-CORNER-BREAK-VERTEX-PICK's dashed arrow (ON_TOP arrow, preview blend suspect), P1
+CONFIG-FILTER-HELP-STILL-POINTER, P2 FEEL-ROW-TIP-AFTER-DBLCLICK, UIS-LIST-ROW-MENU-ROWS, CUSTOM-FEATURE-ROW-ICON,
+CUSTOM-FEATURE-DIALOG-HELP, UIS-FEATURE-INITIALS (row test-named "feature:…" only, mod.rs ~4770).
+- CONFIG-FILTER-HELP-STILL-POINTER: we have no hover help on the filter box at all (only the funnel's menu,
+  config_panel.rs CONFIG_FILTER_COMMANDS); live: 'Filter inputs' tooltip, then a 'Supported filters' popover. To build.
+- FEEL-SKETCH-INF-END-DOT: lead deciding whether it counts; sketch_mode is skasm's (tell skasm first).
+- asm (lead ruling): software draws 1x while moving, 4x after 150 ms quiet (worker `Settle`, pipelines_alt); tests
+  calling Renderer::render stay 1x. asm sends the sha: rebase, re-run render + hover_matrix.
+- PS-RAIL-STOPWATCH-WARNING: the red badge is the software-renderer performance error (workspace.rs rail-performance,
+  `perf_error`, live's own badge); replays run on llvmpipe. Tell qa: environment, not a bug.
 
 Open qa P0s (TICKETS "psui, 2026-11-22 …"):
 - TRANSFORM-ROTATE-EDGE-SENSE: the sense matches live (qa amended); only the preview look is left (batch 2's opaque moved

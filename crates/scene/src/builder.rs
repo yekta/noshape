@@ -1891,7 +1891,7 @@ pub fn query_region(display: &StudioDisplay, r: &Reference, up: &Uploader) -> Op
 /// A hovered or selected vertex (live hover-matrix-1121, vertex-hovered / -selected), in the Part Studio and the
 /// assembly alike: an 11 px disc of the colour, see-through (the edges meeting there show through it) inside an opaque
 /// rim.
-pub(crate) fn vertex_disc(position: [f32; 3], rgb: [u8; 4]) -> [PointSprite; 2] {
+pub fn vertex_disc(position: [f32; 3], rgb: [u8; 4]) -> [PointSprite; 2] {
     [(184, 0), (190, PointSprite::RING)].map(|(alpha, style)| PointSprite { position, color: [rgb[0], rgb[1], rgb[2], alpha], pick_id: 0, size: 11.0, style: LineSegment::ON_TOP | style, _pad: 0 })
 }
 
@@ -2132,12 +2132,15 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
             l.push_polyline(&inner, rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
             l.push_polyline(&[f(o), f(at(ro, 0.0))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
             l.push_polyline(&[f(o), f(at(ro, std::f64::consts::FRAC_PI_2))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
-            // Axes: Z up from the centre, X / Y ticks outside the ring.
-            let axis = |hex: u32| fade(theme::rgb8(hex));
-            l.push_polyline(&[f(o), f(o + z * (18.0 * px))], axis(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)), 0, 3.0, LineSegment::ON_TOP);
-            l.push_polyline(&[f(o + x * (19.5 * px)), f(o + x * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X)), 0, 2.5, LineSegment::ON_TOP);
-            l.push_polyline(&[f(o + y * (19.5 * px)), f(o + y * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y)), 0, 2.5, LineSegment::ON_TOP);
             out.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().layer(31));
+            // Axes: Z up from the centre, X / Y ticks outside the ring; over a lit owner vertex's disc, which covers the
+            // rim's centre (live b3/ps-mc-hover: the blue axis whole down to the centre).
+            let axis = |hex: u32| fade(theme::rgb8(hex));
+            let mut a = LineData::default();
+            a.push_polyline(&[f(o), f(o + z * (18.0 * px))], axis(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)), 0, 3.0, LineSegment::ON_TOP);
+            a.push_polyline(&[f(o + x * (19.5 * px)), f(o + x * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X)), 0, 2.5, LineSegment::ON_TOP);
+            a.push_polyline(&[f(o + y * (19.5 * px)), f(o + y * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y)), 0, 2.5, LineSegment::ON_TOP);
+            out.push(Instance::new(Drawable::Lines(up.upload_lines(&a))).per_primitive_color().unpickable().ignore_clip().over_lines().layer(31));
         }
         out
     }

@@ -85,6 +85,9 @@ impl LineSegment {
     pub const BAND: u32 = 1024;
     /// An explode line: 26 px on, 5.5 off, 3 on, 5.5 off, the same at every zoom (live workflow 24 s09).
     pub const EXPLODE_LINE: u32 = 2048;
+    /// With CORE | BAND: the core opaque at 78 % over the hover colour, uniform #ffaf25 for a picked edge's band over a
+    /// hovered face's boundary line (live b3/dlg-face-otherhover13).
+    pub const OVER_LIT_FACE: u32 = 4096;
 }
 
 impl LineData {
