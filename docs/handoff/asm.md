@@ -5,52 +5,30 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 14:11 UTC) — RESUME HERE
-- QUEUED 22f626c1 at 13:17 (8 commits: 3fd2746a0 store pairs, 18f6bc731 triad unlit (hover-list-1122), 4b36e7406 drag feel
-  (ground glyph + Undo greyed), 22f626c18 TICKETS, handoffs; handoff 4e775ed88 local after it). Check
-  `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh --status` (the 09:27 a8722d2a failure there is old). Never land while
-  it is queued. When it lands: tell qa the sha (hover-list and drag-feel cells, FEEL-ASM-TRIAD-STILL-POINTER,
-  FEEL-ASM-DRAG-UNDO, FEEL-ASM-FIXED-GLYPH). Lead told 13:2x (drag feel queued, tyre bug found).
-- UNCOMMITTED IN THE WORKTREE (ASM-OPEN-TYRES-TURNED + least_change speed); last run rv3 (vibex7) had all solver tests and
-  606 model tests green; the revolve test was being fixed:
-  - Cause: live's revolved face frame Z points AGAINST the revolve's axis as drawn (behaviours "core (2026-10-26)
-    evSurfaceDefinition coordSystem of cylinder faces" (5)/(f)); our kernel's surfaces run either way (torus along the
-    axis, cylinder against it). The tyre's torus MID_AXIS connector was -X in part coords, live +X -> Fastened 24 pi off.
-  - Fix: `Context::revolve_axes` (FeatureId, drawn axis, before Opposite) pushed in revolve.rs (solid and surface paths);
-    implicit.rs `revolve_axis()` follows a face's name (Split/Generated) to Side(_) of a recorded revolve, then Z = -drawn
-    for every inference on that face. ScopeRule 19 + `PartStudio::legacy_revolve_axes` (old saved studios keep the old
-    frames; the parity translator's fresh studios get the new rule; ~/tmp/asm/infento-saved.noshape is rule 18 = legacy,
-    so re-translate it to verify). Test assembly::tests::a_revolved_faces_connectors_point_against_the_axis_as_drawn
-    (torus + cylinder -Z for an axis drawn up; a legacy torus +Z) - NOT yet run in its final form.
-  - least_change: skipped when LM moved no part more than 1e-6 of the scale (solver.rs at the LM call; infento's 11-15 s).
-    A whole-group skip at start residual < 1e-6*scale broke 5 solver tests (relations/gear/slider move ~1e-6): reverted.
-  - Next: run rv.sh (assembly lib + model all) via rb.sh vibex7; then the infento probe on a re-translated doc (probe
-    patch /root/asm-scratch/probe-instrumentation.patch, probe4.sh: MATE/INST/CONN prints, NOSHAPE_PROBE_MATES=197,216);
-    ops tests (e2e assembly) before land; commit "asm: ..." touching model-data/model-core (tell core: ScopeRule 19).
-- LIVE P0 CAPTURES FOR ME (after the tyre land):
-  - live/asm/mc-infer-1122/index.md: implicit connector inference in Fastened/Revolute = Part Studio feature: face
-    corner discs + edge-midpoint squares in the face plane, glyph at centroid / edge midpoint (Z along edge) / circle
-    centre / cylinder axis midpoint with both cap-centre markers; vertex straight from empty space: no glyph; glyph 37 px
-    constant size, disc #c2c187 rim #1d4159, 90 deg notch, triad Z #0000d0 17 px, X #cd0000 11, Y #049505 8; marker reach
-    grows with zoom (27/12 px PS, 60/50 px asm at 4.6x), edge pick 6 px; Shift locks the face; markers one frame after
-    the outline; after the first pick the face fills #e5b725, placed connector small pale, part outline thin yellow,
-    inference continues on every part.
-  - live/psui/sel-gestures-1122/index.md (assembly column): a click on a selected face/instance stays selected (ours:
-    select_entity toggles - assembly_view.rs click_select -> select_entity(t, !additive): make it never toggle);
-    Shift+click no change on a selected one; Ctrl+window REMOVES (ours: BoxSelect treats secondary as additive; PS uses
-    control||platform -> remove); a box over the selection again: no change; crossing box outlines the touched instance
-    #ffc20e while dragging (check ours); drag from empty with a selection moves it (ours has it: update_capture
-    selection_drag); Ctrl+click opens the menu (app-core has it). Ctrl+box with a selection needs the viewport to box
-    instead of the selection drag when Ctrl is held (app-core tool_captures_left).
-- dx asked (14:0x): once dx's e52b091a is on main, re-measure the infento display key + cached/cold open (ot2.sh on
-  vibex8, ~/agents/asm-keep/asm-open-times.sh) and tell dx if key or time moved. Not landed at 14:00.
-- SPEED-ASM-OPEN timings reported 12:5x (reopen Isaac 36 -> 7 s, infento 13 s, scissor 144 -> 53 s; cached first frame
-  0.7-1.8 s).
-- Next after: first frame from studio StudioDisplay rows (dx: same mesher/tolerance only); infento parity rerun (10800 s);
-  xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5, tvc 41/43, keyboard BOM 15/16.
+## State (2026-11-22 15:08 UTC) — RESUME HERE
+- LANDED 22f626c1 as ec33215f (14:40); qa told 15:1x.
+- LOCAL, rebased on main (not queued yet): f65ccd02f tyre fix (ASM-OPEN-TYRES-TURNED: `Context::revolve_axes`, implicit.rs
+  `revolve_axis()` Z = -drawn; ScopeRule 19 + `PartStudio::legacy_revolve_axes`; least_change skipped when LM moved
+  nothing; assembly lib 170 + model 606 green on vibex7), b081fd516 UI (sel-gestures-1122: no click toggle, Ctrl+box
+  removes / `Viewport::ctrl_boxes`, crossing box outline `Viewport::box_preview` + `ViewportEvent::BoxTouched` ->
+  `ui.box_touched`; mc-infer-1122: Shift locks the face (face rule, centroid off it), cylinder side MidAxis primary,
+  MIDPOINT_PICK_RADIUS_PX 41.5; qa FEEL-GEAR-DIALOG-MATES-LOOK (relation mates in the shown-mate loop),
+  FEEL-MATE-SECOND-PICK-HOVER (pointer still at `hud`: second pick plain, part outlined), UIS-PATTERN-SECOND-DIRECTION
+  (`field_mark`: field:Direction#1)), tickets commit. Clippy + assembly-ui 175 green on the pre-gear tree.
+- RUNNING (slots held by core's / qa's parity runs): vibex7 sg.log (ops e2e), sg2.log (clippy app-core/assembly-ui +
+  assembly-ui lib on the rebased tree); vibex8 probe8.log (infento probe, legacy vs NOSHAPE_PROBE_NEW_AXES=1, SOLVE ms;
+  instrumentation was synced to vibex8 then reverted locally: /root/asm-scratch/probe-instrumentation.patch eval.rs +
+  assembly_perf.rs parts, plus a temp env switch in partstudio.rs migration; never commit them).
+- Then: land (touch -c, diff --stat, cherry), tell core "ScopeRule 19 (legacy_revolve_axes)" and qa the sha.
+- Live triad-feel-1122 compared: ours matches (75x26 box focused/selected and kept, 0.1 mm step, ring free beyond 0.4
+  step = 2 deg, no geometry snap on arrows). Nothing to change.
+- Next: MATE-GEAR-DRAG-TURNS-NOTHING reopened (wf25 step 32: the drag changes no pixel), dx's re-measure once e52b091a is
+  on main (infento display key + cached/cold open, ot2.sh vibex8, ~/agents/asm-keep/asm-open-times.sh), then the list below.
+- Next after: first frame from StudioDisplay rows; infento parity rerun (10800 s); xdev-subs / pinslot reruns, bjr Sub
+  c1e15f Fastened 3/4, pinslot Revolute 5, tvc 41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
-  weld/w0-p*.noshape, ~/tmp/asm/q, ~/tmp/asm/app-b + app; vibe2 ops-tc / ab1120e-*.out; local branch asm-rb-check;
-  /root/asm-scratch/feel_tests_with_probe.rs.
+  weld/w0-p*.noshape, ~/tmp/asm/q, ~/tmp/asm/app-b + app, vibex8 ~/tmp/asm/infento-saved.noshape (copy); vibe2 ops-tc /
+  ab1120e-*.out; local branch asm-rb-check; /root/asm-scratch/feel_tests_with_probe.rs.
 - Infento main: 157/167 occ, 204/206 mates, 64/64 BOM. Scissor main 07:18: 207/239 occ, 16/34 mates, BOM 62/87.
 
 ## State (2026-11-20 18:50 UTC)
