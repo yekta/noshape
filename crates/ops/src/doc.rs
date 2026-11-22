@@ -236,6 +236,9 @@ pub struct Ctx {
     /// The documents folder `document_create` defaults to: `noshape_scene::documents_dir` when `None` (a test's own
     /// folder otherwise).
     pub documents: Option<PathBuf>,
+    /// Rebuilding a saved Onshape document's features (the parity translator): feature_add takes std's Rip, Unfold
+    /// and Refold, which Onshape offers no tool for but keeps building in older documents.
+    pub saved_features: bool,
 }
 
 pub use crate::window::UiRequest;

@@ -1459,7 +1459,10 @@ impl<'a> Translator<'a> {
             if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
                 eprintln!("TRACE feature_add {args}");
             }
-            match self.call("feature_add", args.clone()) {
+            self.ctx.saved_features = true;
+            let r = self.call("feature_add", args.clone());
+            self.ctx.saved_features = false;
+            match r {
                 Ok(r) => break r,
                 Err(e) => {
                     let v: Value = serde_json::from_str(&e).unwrap_or(Value::Null);

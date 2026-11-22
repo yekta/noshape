@@ -11750,6 +11750,23 @@ fn an_extrude_in_the_flat_cuts_and_adds() {
 /// in one, or a model-space Extrude of a flat region, is an error; Add partly past the flat's free edge adds a tab; Remove
 /// wholly off the flat cuts nothing (an info).
 #[test]
+fn a_saved_documents_unfold_refold_and_rip_are_added() {
+    // No tool makes them (qa EXTRA-UNFOLD-REFOLD-TOOLS), but a saved Onshape document's still build (c2-cov-sm-rip,
+    // c2-cov-sm-unfold-refold): the translator adds them.
+    let mut ctx = Ctx::new();
+    let path = scratch("saved-unfold.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    ctx.saved_features = true;
+    for (ty, name) in [("sheetMetalUnfold", "Unfold 1"), ("sheetMetalRefold", "Refold 1"), ("sheetMetalRip", "Rip 1")] {
+        let r = call(&mut ctx, "feature_add", json!({ "type": ty }));
+        assert_eq!(r["name"], name, "{r}");
+    }
+    ctx.saved_features = false;
+    let e = try_call(&mut ctx, "feature_add", json!({ "type": "sheetMetalRip" })).unwrap_err();
+    assert!(e.message.starts_with("Onshape has no"), "{}", e.to_json());
+}
+
+#[test]
 fn an_extrude_in_the_flat_takes_flat_regions_only() {
     let mut ctx = Ctx::new();
     let sk = new_sketch(&mut ctx, "sheet-metal-flat-extrude-2.noshape", "plane:top");
