@@ -23,28 +23,24 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 1. LANDED 06:34: wclip 6a0389fbf, ruling 61e4c748b. Stack arcpart/seambatch/bandbatch rebased on main, QUEUED 06:3x as
    b240ce47 (worktree bool-bandbatch; gates + knurls clean). usdvol: gate vibex7 running (chain-bool-usdvol.out) ->
    knurls -> land. bool-ptol must be rebased onto main (`git rebase --onto origin/main dfbc7eef1`) once b240ce47 lands.
-2. Then P1 BOOL-PER-PAIR-TOL (lead 06:2x: gamma Boolean 1 ~24 s cold vs live's doc ~0.25 s; mixed-tolerance imports
-   common): per-pair tolerances in crates/brep, STAGED (data model first: each entity's own tolerance carried in
-   BrepBody / the Boolean; then classification / merging by the pair's two), each stage through the full gate.
-   Two-stage fuse tried 06:15 and FAILS (bool-stages worktree, uncommitted; repro PROBE_FAR=1 PROBE_SUBSET=6,17,23,45
-   PROBE_RUST=1 on vibex8 BK/gm/rec/f68f43939fd850eb: a far 2.45 um pin still breaks the 0.2 um junctions).
-   PLAN (survey 06:3x): Body already has vertex_tol/edge_tol/face_tol (lib.rs:267) and GFace/GEdge.arg, Pool.pair is
-   per-entity. Global `tol` sites: get_sedge (boolean.rs ~6135 arcs GREY*tol, ~6158 others 100*tol; joins two edges
-   of ONE argument between the same vertices: suspected culprit, runs even with no contact), arc->line ~5101,
-   split_params regroup ~4376, own-edge split ~6348, seams ~5309/5329/5348/6642; cross-arg: plane_plane, cyl_cyl,
-   same_surface, lies_on, intervals_on ~1789, boxes_meet GREY*tol; C++ build() gives every out vertex max(tol, own).
-   Stage A: arg_tol Vec in Ctx + band(a,b); within-argument sites. Stage B: cross-argument sites. Worktree bool-ptol
-   (on bandbatch dfbc7eef1; rebase on main once the stack lands): PROBE_SAMEARG print in get_sedge, T1
-   bool_patterns::precise_parts_fused_with_a_far_tolerant_pin (case d596e8faa25b6a23, gamma clips + pin 1 m away,
-   OCCT 448 faces), run pt-probe.sh (vibex8) -> pt-probe.out.
-   06:29 PROBE_SAMEARG: get_sedge's same-argument joins are all 0 apart (an edge seen from its two faces): NOT the
-   culprit. In the far case object + 6 + 17 + 23 are still SEPARATE arguments meeting each other at 4.9 um, so the
-   cross-argument sites matter too: split_params regroup (~4376: two split points within `tol` along a curve -> one
-   vertex group; use the band of the two vertices' args), arc->line (~5101), lies_on / same_surface / plane_plane /
-   cyl_cyl / intervals_on. Next: add arg_tol + band() in Ctx, env switches per site, find which one makes the far T1
-   pass, then do them all properly (stage A within-arg, stage B cross-arg). A PROBE_NM port (bool-hat brep) shows the
-   unbalanced edges. In flight at 06:29: wclip 6329aaae + ruling 1d8788b5 CHECKING; bandbatch knurls unit
-   DONE 06:3x 0 diff x5 (copies deleted): bandbatch READY to land after ruling (rebase --onto e6e55ac74 cbab7cfe5); usdvol gate vibex7 (chain-bool-usdvol.out).
+2. P1 BOOL-PER-PAIR-TOL (lead 06:2x, DECISIONS 17157c2fa: gamma Boolean 1 ~24 s cold vs live ~0.25 s), STAGED, each
+   stage through the full gate + knurls. Two-stage fuse FAILED (bool-stages worktree, uncommitted, drop it).
+   FOUND 07:0x (worktree bool-ptol, uncommitted, on dfbc7eef1; rebase `--onto origin/main dfbc7eef1` once b240ce47
+   lands): the T1 bool_patterns::precise_parts_fused_with_a_far_tolerant_pin (case d596e8faa25b6a23: gamma's object +
+   clips 6/17/23 (0.2 um) + pin 45 (2.45 um) moved 1 m; OCCT 448 faces, 4.757e-4 m3) is non-manifold at the global band
+   4.9 um AND at 4.4e-7, passes at 4e-7: clip/clip junctions 11-25 um apart need the clips' own band. Per-pair code in
+   boolean.rs: Ctx.arg_tol (each arg's half: own max tol + fuzzy; the most tolerant / tolerance-less args 0.5*tol, so
+   equal-tolerance inputs are unchanged), Ctx.arg_reach (widest band with args whose boxes meet), helpers own_band(a),
+   band(f,g), edge_band(e,f), args_band(a,b), face_band(f), reach_band(a). STAGE A (construction) = sections
+   (plane_*/cyl_*/section_from/section_cut/nurbs/touch/generator/edges_piercing/round_apart/occt_sections/apart),
+   edges on faces (edge_in_face/edge_crossing/arc_*/edge_over_free_face/in_face_from), single-face bound/c2_of/
+   intervals_on/projected_*/boundary_tol + in-face crossings (face_band), arc->line + cylinder seam th0/rulings
+   (own_band), split_params regroup (band passed per seg: section band / face_band / args_band(own, who)), get_sedge
+   arc/other joins (SEdge.band, max of both). The decisive two were get_sedge's GREY*tol arc join and the rest
+   together; with all of A the T1 passes (07:0x, PROBE runs on vibex8 pt-probe2.sh). STAGE B (classification, still
+   global tol): ray_state, lies_on, same_surface, kept_by, clear_inside, apex_on_face, boolean_in's 100*tol `clear`,
+   symmetry/moved_pair, C++ build() vertex tol (max(tol, own)) and pcurve eps. Next: T1 on stage A without switches,
+   then the full gate (vibe2 if free -g >= 15, else vibex8) + knurls, land; then stage B; then measure gamma Boolean 1.
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
