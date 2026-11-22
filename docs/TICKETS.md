@@ -12,6 +12,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (object + precise tools, then the tolerant ones) fails too: the precise tools fused into one body, then fused with a
   1.5-2.45 um pin moved 1 m away, is still non-manifold (bool 11-22 06:15, vibex8 /root/bool-scratch/gm-stages3.out,
   branch bool-stages): the band reaches inside one argument. Fix: per-pair tolerances (each pair by its own two).
+
 ## studios, 2026-11-22 (ui-parity "no recording" runs on vibex7)
 
 - [x] P0 **APP-VULKAN-SEGV (studios)**: the app segfaults at start in libvulkan.so.1 (+0x237ce, "segfault at 7") on Linux
@@ -363,7 +364,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P1 **EXTRUDE-ARROW-GONE-WITH-VARIABLE (psui)**: workflow 15 step 18 (vs-vars, Extrude 1 edit, Depth "#depth" Enter): live keeps the depth arrow on the 25 mm preview; ours drops the arrow once Depth is a variable (it was there while typing) (tickets/wf15-arrow-variable.png). The block regenerates 25 mm tall as live; the #depth list (25 mm, New variable…) matches.
 - [x] P1 **VS-NAME-FOCUS-BOX (studios)**: workflow 15 steps 2/4/8/10 (Variable Studio 1, click the empty Name row, type depth, Enter): live draws the Name input with a **blue focus box**, and after Enter puts the box on the next empty Name row; ours takes the typing but shows only a caret, no box (the Value cell's box matches) (tickets/wf15-vs-name-focus.png rows 2/4). Same look as psui's CONFIG-NAME-FOCUS-BOX in the configuration table.
   **Fixed (studios 11-22):** the focused empty Name cell outlined blue (test `the_focused_add_row_name_is_outlined`).
-- [ ] P0 **FEEL-HOVER-AFTER-MODAL (psui)**: workflow 16 steps 8 and 16 (doc-versions: Create in "Create workspace from Prototype", Merge in "Merging changes into Main from B1"; the pointer stays where the button was, over the Front plane): ours lights the **Front plane as hovered** the moment the modal closes; live lights nothing until the pointer moves (tickets/wf16-hover-after-modal.png, step 7 dialog / step 8 after Create). Also workflow 17 step 6: Export closes and ours lights the Top plane under the still pointer; live nothing. The version, branch, suppress, switch and merge results and the merge toast match live.
+- [x] fixed (psui 11-22: nothing lit until the pointer moves) P0 **FEEL-HOVER-AFTER-MODAL (psui)**: workflow 16 steps 8 and 16 (doc-versions: Create in "Create workspace from Prototype", Merge in "Merging changes into Main from B1"; the pointer stays where the button was, over the Front plane): ours lights the **Front plane as hovered** the moment the modal closes; live lights nothing until the pointer moves (tickets/wf16-hover-after-modal.png, step 7 dialog / step 8 after Create). Also workflow 17 step 6: Export closes and ours lights the Top plane under the still pointer; live nothing. The version, branch, suppress, switch and merge results and the merge toast match live.
 - [x] P2 **HISTORY-BRANCH-FILTER (studios)**: same workflow: once the document has a second workspace (B1), live's Versions and history panel adds a **filter ▾ button** right of the search box; ours has only the search box (tickets/wf16-history-filter.png).
   **Fixed (studios 11-22 09:01):** the funnel ▾ (43 x 28, "Filter branches") once a second workspace exists, the box 276 px; the four items, the current one bold; Show current branch with "Branched from … on …" and its link; blue while filtered; gone with the second workspace.
 - [ ] P0 **SKETCH-USE-VERTEX-OTHER-SKETCH (skasm)**: workflow 12 steps 9–12 (curves, after Sweep 1: Sketch 4 on Right, click Sketch 2's line end vertex (-10, -20, 0), u; Sketch 3's end vertex (-10, 0, 20), u): live projects each selected vertex **at once** into a point on the line where it crosses the plane (hollow points at (0, -20) and (0, 20)); ours selects the vertex but u only switches the Use tool on/off and **no point is made** (sketch entities stay empty). The guide line drawn next (steps 13–15) is then not tied to the profiles (blue, one Horizontal) and the Loft with that guide (steps 18–24) **fails** (Loft 1 in error, the guide red); live's gives Surfaces (1) (tickets/wf12-use-vertex.png, wf12-loft-guide.png). u on a selected model edge works (verified e3368b77).
@@ -507,9 +508,8 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [x] P0 **FEEL-DRW-BALLOON-HOVER-LEADER (studios)** (workflow 23 step 24, pin-block-asm-drawing, green b5b414278): balloon 2 hovered
   after Esc (attached to Section A-A's edge): live tints only the balloon (tan ring + fill), its leader stays black with a filled black
   arrowhead at the edge; ours draws the whole leader tan and thin, with no arrowhead (tickets/wf23-hatch-balloon.png, bottom; live left).
-- [x] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (fixed dx 11-22, queued: each part of a section its own hatch, 45 / 135 deg alternating in part order, spacing = the part's box diagonal / 13 as live s05's pixels; 3+ parts and repeated instances asked of live, REQUESTS dx 05:35; the DETAIL B label P2 stays open, waits for that answer) (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
   **Fixed (studios 11-22 05:43):** a hovered balloon's leaders stay out of the tan hover overlay: black, with the arrowhead (selected unchanged).
-- [ ] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
+- [x] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (fixed dx 11-22, queued: each part of a section its own hatch, 45 / 135 deg alternating in part order, spacing = the part's box diagonal / 13 as live s05's pixels; 3+ parts and repeated instances asked of live, REQUESTS dx 05:35; the DETAIL B label P2 stays open, waits for that answer) (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
   the opposite angle and closer spacing than the block, so adjacent parts read apart; ours hatches both at the same angle and spacing
   (tickets/wf23-hatch-balloon.png, top). Also P2: "DETAIL B SCALE 2:1" sits at y 11.2 mm vs live 14.0. The rest of 23 = live:
   views, section A-A, detail B 2:1, .787, BOM rows 1 / 2, balloons 1 / 2 at the same spots (tickets/wf23-sheet.png).
@@ -737,19 +737,13 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
 - [x] P0 **FEEL-MANIP-DEAD-ZONE (psui)**: a 2 px press-drag on the Extrude arrow sets Depth 25 → 25.6 mm. Live: nothing for the
   first 2–3 px, then at 3–4 px the value jumps to the full distance from the press (same 11-13 capture). interaction-feel lists it as
   not yet in the matrix. psui 11-21 23:5x: 3 px dead zone (ARROW_DEAD_PX), dialogs matrix row.
-- [ ] P0 **DRW-BORDER-DRAG (studios)** (live answered 22:54, behaviours "qa walk 6", qa/walk6-1121/walk6-5-border-*): block-drawing,
-  the sheet's left inner border line (x ≈ 9.6 mm). Hover (tan, grips), click and the selected look once the pointer leaves (orange,
-  grips) match live. **A press-drag from it 50 mm right moves the line in live**, where it stays selected. Ours leaves it in place
-  (selected-looking), and the ui-script state lists nothing selected. qa-scratch/tickets/drw-border-lit-w6.png (ours).
-- [x] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
-  not yet in the matrix.
 - [x] P0 **DRW-BORDER-DRAG (studios)** (live answered 22:54, behaviours "qa walk 6", qa/walk6-1121/walk6-5-border-*): block-drawing,
   the sheet's left inner border line (x ≈ 9.6 mm). Hover (tan, grips), click and the selected look once the pointer leaves (orange,
   grips) match live. **A press-drag from it 50 mm right moves the line in live**, where it stays selected. Ours leaves it in place
   (selected-looking), and the ui-script state lists nothing selected. qa-scratch/tickets/drw-border-lit-w6.png (ours).
   **Fixed (studios 11-22):** the line drags alone and stays selected; the frame's other lines, zone letters and ticks stay
   (`FormatLineEdit.offset`, saved; ops `drawing_format_line` `move`; test `the_sheet_border_line_drags`).
-- [ ] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
+- [x] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
   on the translucent preview's front face lights nothing in live. Ours draws that face's outline thin orange (s8-ext-arrow-click 03,
   the pointer still on the picked top face inside the preview). psui 11-21 23:5x: hover follows the model before the feature; hover matrix test.
 - [x] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
