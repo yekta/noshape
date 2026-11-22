@@ -355,6 +355,21 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   is in the Helix / thread field. Ours draws the row plain. qa-scratch/tickets/wf21-parts.png.
   (Workflow 21 otherwise matches: sketch, Revolve, Helix 4 turns committed by Enter, ours faster at every step.)
 
+- [ ] P0 **SKETCH-TRIM-SHORT-END (skasm)** (workflow 22 steps 12-13, green b5b414278): Top sketch, vertical line x 0 (y -10..30),
+  horizontal line y 5 from x -5 to 25, m, click the 5 mm stub left of the crossing at (-3, 5): live removes it (the line now starts
+  on the vertical line, COINCIDENT added; a hover preview first). Ours: no hover reaction, the click trims nothing; the same with a
+  hover + 500 ms first (hm2/out-wfv/22v-trim). qa-scratch/tickets/wf22-trim-offset.png (rows 11-13), wf22v-trim.png.
+- [ ] P1 **SKETCH-OFFSET-DEFAULT-SIDE (skasm)** (workflow 22 steps 15-18): o, click the horizontal line at (18, 5): live previews the
+  copy 5 mm on the **lower** side (arrow down); the placement click at (18, 14) then gives **5 mm**, the copy below (live: "the side
+  opposite the placement click"). Ours previews above and takes the click's distance: 8.68666 mm, copy above. Everything after
+  differs from there (step 36's second Mirror pick hits our copy; live's hits nothing). wf22-trim-offset.png rows 16-18.
+- [ ] P1 **SKETCH-MIRROR-LINE-LOOK (skasm)** (workflow 22 steps 34-35): the picked mirror line: live yellow-green (189,199,100), no
+  hover band; ours yellow (247,220,79) under an orange hover band. After the first mirrored entity live draws the mirror line black
+  again and the source plain; ours keeps the line yellow and the source peach. wf22-mirror.png.
+  Also step 11 (Escape after a line): ours lights the endpoint under the still pointer, live plain (as FEEL-HOVER-AFTER-MODAL).
+  Step 26 is FEEL-TEXT-BOX-PREVIEW (queued). Otherwise 22 matches: lines, spline finished by the double-click, text "NS", mirror
+  constraints; ours faster at every step.
+
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
 - [ ] P0 **FEEL-DRW-TITLEBLOCK-CLICK (studios)**: the Front view selected (edges orange), click in the title block (sheet (200, 30) mm):
