@@ -395,3 +395,30 @@ fn the_sketch_tools_matrix_matches_live(cx: &mut TestAppContext) {
     eprintln!("sketch tools matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
+
+/// Qa 11-22 (SKETCH-TRIM-SHORT-END, live workflows-1122 22 s12–13): Trim clicked on a 20 px stub beyond a crossing,
+/// 7 px from the line's end (in a point's reach): live trims the stub; ours took the used end, which Trim leaves, and
+/// did nothing.
+#[gpui::test]
+fn trim_takes_a_short_end_near_its_end_point(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "st-trim-stub", Tool::Line);
+    for (a, b) in [((400., 200.), (400., 400.)), ((380., 300.), (600., 300.))] {
+        click(cx, window, &view, a);
+        click(cx, window, &view, b);
+        keys(cx, window, &["escape"]);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    }
+    let lengths = |cx: &mut TestAppContext| {
+        let mut l = cx.update(|cx| line_lengths(&view.read(cx).sketch_data(cx).unwrap()));
+        l.sort_by(f64::total_cmp);
+        l
+    };
+    let before = lengths(cx);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Trim, w, cx))).unwrap();
+    click(cx, window, &view, (387., 300.));
+    let after = lengths(cx);
+    assert_eq!(after.len(), 2, "{after:?}");
+    // (The view is isometric: the horizontal line is the shorter one in the plane.)
+    assert!((after[1] - before[1]).abs() < 1e-9, "the vertical line kept: {before:?} → {after:?}");
+    assert!((after[0] / before[0] * 220.0 - 200.0).abs() < 1.0, "the horizontal line 220 → 200 px: {before:?} → {after:?}");
+}

@@ -7895,3 +7895,30 @@ fn the_s_toolbar_is_175_by_62_at_the_pointer(cx: &mut TestAppContext) {
     let (x, y) = (f32::from(b.origin.x - vp.x), f32::from(b.origin.y - vp.y));
     assert!((w - 175.0).abs() < 0.6 && (h - 62.0).abs() < 0.6 && (x - 310.0).abs() < 0.6 && (y - 170.0).abs() < 0.6, "{w} × {h} at ({x}, {y}) in the viewport");
 }
+
+/// Qa 11-22 (SKETCH-USE-VERTEX-OTHER-SKETCH, live workflows-1122 12 s9–12): in a sketch on Right, Select on another
+/// sketch's line end, then u: live projects it at once into a point (ours only switched the Use tool on, no point).
+#[gpui::test]
+fn u_on_another_sketchs_vertex_projects_it(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "line": [[-10, -20], [10, -20]] }] },
+    ] });
+    let (window, view) = part_studio_from(cx, "use-other-vertex", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.sketches.is_empty());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![Reference::Plane(DatumPlane::Right)];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    let (window, view) = sketch_in_tool(cx, window, view, Tool::Select);
+    let end = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(-0.010, -0.020, 0.0))).expect("the line end on screen");
+    click(cx, window, &view, (end.x, end.y));
+    keys(cx, window, &["u"]);
+    let points = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).count());
+    assert_eq!(points, 1, "the line end projected into a point");
+}

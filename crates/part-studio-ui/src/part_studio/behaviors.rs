@@ -1300,6 +1300,8 @@ impl PartStudioView {
             Some(r @ Reference::Body(_)) => vec![r.clone()],
             // Else mid-draw the open sketch's entity under the pointer isn't recoloured.
             Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch && ed.mid_draw()) => Vec::new(),
+            // (Nor the Mirror tool's waiting line: live workflows-1122 22 s34, no hover band.)
+            Some(Reference::SketchEntity { sketch, entity }) if self.sketch.as_ref().is_some_and(|ed| ed.feature == *sketch && ed.shown_mirror_line() == Some(noshape_sketch::EntityId(*entity))) => Vec::new(),
             // A sketch curve under a region field pre-highlights its region.
             Some(r @ Reference::SketchEntity { .. }) => {
                 let filter = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()).map(|(_, f, _)| f);
@@ -3732,7 +3734,9 @@ impl PartStudioView {
         {
             return inst.to_vec();
         }
-        let mut lines = LineData::default();
+        // A picked face's outline is drawn whole on top, also where the model before the feature hides it (live
+        // workflows-1122 11 s12: Bend's face to bend, the plate's underside, outlined all round through the plate).
+        let (mut lines, mut outlines) = (LineData::default(), LineData::default());
         for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
             // A picked edge Fillet's preview consumed: the selected edge's 5 px band over its round (live b3/dlg-edge-selected:
             // the 1.3 mm round between its tangent lines, #FFA90A at both, #DDA027..#FFAF25 between); a face's boundary and
@@ -3743,15 +3747,16 @@ impl PartStudioView {
             let faces: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
             let face_edges = crate::scene_builder::faces_edges(&before, &faces);
             let edges: std::collections::HashSet<&Reference> = refs.iter().filter(|r| !matches!(r, Reference::Face(_))).collect();
-            let mut wanted = edges.clone();
-            wanted.extend(face_edges.iter().flatten().flatten());
-            if wanted.is_empty() {
+            let outlined: std::collections::HashSet<&Reference> = face_edges.iter().flatten().flatten().collect();
+            if edges.is_empty() && outlined.is_empty() {
                 continue;
             }
             for b in before.bodies.iter().filter(|b| !b.hidden) {
                 for (e, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
-                    if wanted.contains(e) {
-                        lines.push_polyline(pl, rgba, 0, 3.0, if edges.contains(e) { band } else { 0 });
+                    if edges.contains(e) {
+                        lines.push_polyline(pl, rgba, 0, 3.0, band);
+                    } else if outlined.contains(e) {
+                        outlines.push_polyline(pl, rgba, 0, 3.0, 0);
                     }
                 }
             }
@@ -3788,16 +3793,23 @@ impl PartStudioView {
         }
         if !mesh.indices.is_empty() {
             let (tint, alpha) = if shell { (crate::theme::lin(0xbcb36e), 0.47) } else { (crate::theme::lin(0x998f52), 0.5) };
-            let mut i = Instance::new(Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([tint[0], tint[1], tint[2], alpha]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
+            let mut i = Instance::new(Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([tint[0], tint[1], tint[2], alpha]).unlit().unpickable().ignore_clip().on_top().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
             if post {
                 i.compare = noshape_render::scene::compare::POST;
             }
             inst.push(i);
         }
-        if !lines.segments.is_empty() {
-            let mut i = Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&lines))).per_primitive_color().unpickable().layer(12);
+        for (lines, whole) in [(&lines, false), (&outlines, true)] {
+            if lines.segments.is_empty() {
+                continue;
+            }
+            let mut i = Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(lines))).per_primitive_color().unpickable().layer(12);
             if post {
                 i.compare = noshape_render::scene::compare::POST;
+            }
+            // (Its hidden stretches drawn again: the whole outline.)
+            if whole {
+                inst.push(i.clone().hidden_only());
             }
             inst.push(i);
         }

@@ -193,12 +193,19 @@ fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
     })
 }
 
-/// The clear margin round a constraint glyph's 20 px tile that still hovers it (live2 sktools-1118: lit to 14 px from
-/// its centre, off at 15–16).
 /// The line being drawn's length in the sketch plane: cap height (px) and colour (live sk/inference-*-at: small, the
 /// rubber band's light blue).
 const PREVIEW_TEXT_PX: f64 = 9.0;
 const PREVIEW_TEXT_COLOR: u32 = 0x449ccd;
+/// A line's active on-the-fly box in the sketch plane: 24 px high, 5 px side padding, 1 px border and 14 px text in
+/// `#788188` on white at 80 % (live workflow 05: (235,241,245) over the face's (155,187,206)).
+const OTF_BOX_TEXT_PX: f64 = PREVIEW_TEXT_PX * 14.0 / 13.0;
+const OTF_BOX_COLOR: u32 = 0x788188;
+const OTF_BOX_FILL_ALPHA: f32 = 0.8;
+/// A point of another shown sketch, picked by a Select click in a sketch (a shown sketch point's ~10 px hover disc).
+const OTHER_SKETCH_POINT_REACH_PX: f64 = 5.0;
+/// The clear margin round a constraint glyph's 20 px tile that still hovers it (live2 sktools-1118: lit to 14 px from
+/// its centre, off at 15–16).
 const GLYPH_MARGIN: f32 = 4.0;
 /// The margin while it is hovered: a slide holds it to 16 px (a jump there lights nothing).
 const GLYPH_HOLD_MARGIN: f32 = 6.0;
@@ -817,6 +824,9 @@ impl PartStudioView {
         if ed.tool.draws() {
             return None;
         }
+        if ed.tool == Tool::Trim {
+            return self.trim_pick_at(p, cx);
+        }
         let r = ed.world_per_px * 10.0;
         let data = self.sketch_data(cx)?;
         let screen = ed.screen_metric();
@@ -850,6 +860,11 @@ impl PartStudioView {
         let (o, d) = vp.ray(vp.pointer_position());
         let Some(p) = ed.plane_point(o, d) else { return id };
         let pick_of = |e: noshape_sketch::EntityId| built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }).first().copied();
+        // Trim lights the curve, also within a curve end's reach (live workflows-1122 22 s13: 2 mm, 7 px, from a line's
+        // end in iso, the end piece lit and trimmed); a point only when it stands alone.
+        if ed.tool == Tool::Trim {
+            return self.trim_pick_at(p, cx).and_then(pick_of).or_else(|| id.filter(|i| own(*i).is_none()));
+        }
         // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes. The
         // open sketch's region is the one under the pointer now, not the GPU's (a pick made mid-sweep, qa
         // USER-HOVER-STAYS-LIT: the loop stayed lit with the pointer at rest outside it).
@@ -869,6 +884,24 @@ impl PartStudioView {
         // plane from 7 px out in iso).
         let sketch_own = |i: u32| own(i).is_some() || built.picks.get(i).is_some_and(|t| matches!(&t.reference, Reference::SketchRegion { sketch, .. } if *sketch == ed.feature));
         near.and_then(pick_of).or_else(|| self.sketch_region_pick_at(p)).or_else(|| vp.pick_at_pointer_without(&sketch_own).flatten())
+    }
+
+    /// What Trim takes at plane point `p`: a lone point in reach, else the nearest curve in reach.
+    fn trim_pick_at(&self, p: DVec2, cx: &App) -> Option<noshape_sketch::EntityId> {
+        let ed = self.sketch.as_ref()?;
+        let d = self.sketch_data(cx)?;
+        let sk = &d.sketch;
+        let screen = ed.screen_metric();
+        let in_reach = sk.entities().filter(|e| d.text_of_entity(e.id).is_none() && self.in_sketch_reach(e.id, p, cx));
+        let (points, curves): (Vec<_>, Vec<_>) = in_reach.map(|e| e.id).partition(|e| sk.point(*e).is_some());
+        if let Some(q) = points.into_iter().find(|q| sk.users_of_point(*q).is_empty()) {
+            return Some(q);
+        }
+        let dist = |e: noshape_sketch::EntityId| match &screen {
+            Some(m) => sk.screen_distance_to(e, p, m),
+            None => sk.distance_to(e, p),
+        };
+        curves.into_iter().filter_map(|e| Some((dist(e)?, e))).min_by(|a, b| a.0.total_cmp(&b.0)).map(|x| x.1)
     }
 
     /// The GPU's hover pick outside sketch mode, held to live's reach for the shown sketches (live2 11-18 hover-p0
@@ -1379,7 +1412,10 @@ impl PartStudioView {
                 // the last place: qa FEEL-DIM-TWO-POINTS-ZERO, a line's end at the origin took the line, "0 mm").
                 let near = self.sketch_pick_at(hit, cx);
                 let is_point = |e: &noshape_sketch::EntityId| self.sketch_data(cx).is_some_and(|d| d.sketch.point(*e).is_some());
+                let trim = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Trim);
                 let hovered = match (hovered, near) {
+                    // (Trim: what its hover lights, never a used end left lit by the tool before.)
+                    _ if trim => near,
                     (Some(e), Some(q)) if q != e && is_point(&q) && !is_point(&e) => Some(q),
                     (h, q) => h.or(q),
                 };
@@ -1428,7 +1464,10 @@ impl PartStudioView {
                     // Picked at the click itself: the hover pick can lag a quick
                     // move (qa: 4 of 10 clicks missed the edge).
                     // (The Origin too: live session-1118, a corner then the Origin selected, i makes them coincident.)
-                    let model = self.model_edge_at(*position, cx).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Origin)));
+                    // Another sketch's point or curve too (live workflow 12: Sketch 2's line end, then u, projects it).
+                    let own = self.sketch.as_ref().map(|s| s.feature);
+                    let other_sketch = |r: &Reference| matches!(r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != own);
+                    let model = self.other_sketch_point_at(*position, cx).or_else(|| self.model_edge_at(*position, cx)).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Origin) || other_sketch(r)));
                     // A plane: selected on release unless the press becomes a box (live2 Part 2).
                     let plane = self.hover.clone().filter(|r| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !self.is_own_sketch_plane(r, cx));
                     if let Some(ed) = &mut self.sketch {
@@ -1565,7 +1604,8 @@ impl PartStudioView {
         let f = ed.feature;
         let data = self.sketch_data(cx);
         selection.clear();
-        selection.extend(ed.selection.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
+        let mirror_line = ed.shown_mirror_line();
+        selection.extend(ed.selection.iter().filter(|e| Some(**e) != mirror_line).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         selection.extend(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() }));
         selection.extend(ed.model_selection.iter().cloned());
         accent.clear();
@@ -1586,7 +1626,67 @@ impl PartStudioView {
             out.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().ignore_clip().layer(31));
         }
         out.extend(self.preview_length_in_plane(ed, &data, &units, cx));
+        out.extend(self.otf_box_in_plane(ed, &data, &units, cx));
         out
+    }
+
+    /// A line's active on-the-fly length box, lying in the sketch plane upright along its x axis (left to right on
+    /// screen): a white box with a grey border and grey text, foreshortened with the face in a 3D view (live workflow
+    /// 05, SKETCH-LENGTH-LABEL-IN-PLANE). The input that replaces it while typing stays on the screen.
+    fn otf_box_in_plane(&self, ed: &SketchEditor, data: &SketchData, units: &noshape_units::UnitPrefs, cx: &App) -> Vec<Instance> {
+        use noshape_model::drawing::font;
+        use noshape_model::drawing::sheet::{Anchor, Text2};
+        if !ed.otf_active_in_plane(data) || self.ui_ref().is_some_and(|u| u.otf_input.is_some()) {
+            return Vec::new();
+        }
+        let labels = ed.otf_labels(data, units);
+        let Some((i, (pos, value, _))) = ed.otf_boxes(data, units).into_iter().enumerate().find(|(_, b)| b.2) else { return Vec::new() };
+        let text = labels.get(i).cloned().unwrap_or(value);
+        let frame = ed.frame;
+        let cam = &self.viewport.read(cx).camera;
+        let n = if frame.normal.dot(-cam.forward()) >= 0.0 { frame.normal } else { -frame.normal };
+        let u = if frame.x.dot(cam.right()) < 0.0 { -frame.x } else { frame.x };
+        let v = n.cross(u);
+        let wpp = ed.world_per_px;
+        let centre = frame.to_world(pos) + n * (0.5 * wpp);
+        // As wide as the screen box (the UI font's width; the drawing font's text is narrower).
+        let half_w = (crate::sketch_mode::label_width_px(&text) * 14.0 / 16.0 + 12.0) * 0.5 * wpp;
+        let t = Text2 { pos: [0.0, 0.0], height: OTF_BOX_TEXT_PX * wpp, text, angle: 0.0, anchor: Anchor::Center, pick: 0 };
+        let (pts, idx) = font::text_fill(&t);
+        if idx.is_empty() {
+            return Vec::new();
+        }
+        let half_h = 12.0 * wpp;
+        let f32v = |p: glam::DVec3| [p.x as f32, p.y as f32, p.z as f32];
+        let mut fill = noshape_render::MeshData::default();
+        let mut ink = noshape_render::MeshData::default();
+        let mut quad = |m: &mut noshape_render::MeshData, (x0, y0, x1, y1): (f64, f64, f64, f64)| {
+            let base = m.positions.len() as u32;
+            for (x, y) in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)] {
+                m.positions.push(f32v(centre + u * x + v * y));
+                m.normals.push(f32v(n));
+                m.pick_ids.push(0);
+            }
+            m.indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+        };
+        quad(&mut fill, (-half_w, -half_h, half_w, half_h));
+        for side in [(-half_w, -half_h, half_w, -half_h + wpp), (-half_w, half_h - wpp, half_w, half_h), (-half_w, -half_h, -half_w + wpp, half_h), (half_w - wpp, -half_h, half_w, half_h)] {
+            quad(&mut ink, side);
+        }
+        let base = ink.positions.len() as u32;
+        for p in &pts {
+            ink.positions.push(f32v(centre + u * p[0] + v * p[1]));
+            ink.normals.push(f32v(n));
+            ink.pick_ids.push(0);
+        }
+        ink.indices.extend(idx.iter().map(|k| k + base));
+        let up = self.gpu.uploader();
+        let mut white = noshape_scene::palette::lin(0xffffff);
+        white[3] = OTF_BOX_FILL_ALPHA;
+        vec![
+            Instance::new(Drawable::Mesh(up.upload_mesh(&fill))).with_color(white).unlit().unpickable().ignore_clip().on_top().layer(33),
+            Instance::new(Drawable::Mesh(up.upload_mesh(&ink))).with_color(noshape_scene::palette::lin(OTF_BOX_COLOR)).unlit().unpickable().ignore_clip().on_top().layer(34),
+        ]
     }
 
     /// The line being drawn's length, lying in the sketch plane along the line, beside its middle: small light blue text
@@ -2210,6 +2310,21 @@ impl PartStudioView {
 
     /// The model edge under a viewport point, picked geometrically (6 px):
     /// an edge at the nearest hit's depth.
+    /// Another shown sketch's point within a point's reach of `position`, the nearest.
+    fn other_sketch_point_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
+        let own = self.sketch.as_ref().map(|s| s.feature);
+        let vp = self.vp().read(cx);
+        let at = |p: [f32; 3]| vp.project(DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).map(|s| (s - position).length());
+        self.display
+            .sketches
+            .iter()
+            .filter(|s| Some(s.feature) != own)
+            .flat_map(|s| s.points.iter().filter(|p| !p.external && !p.handle).filter_map(move |p| Some((at(p.position)?, Reference::SketchEntity { sketch: s.feature, entity: p.entity }))))
+            .filter(|(d, _)| *d <= OTHER_SKETCH_POINT_REACH_PX)
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|x| x.1)
+    }
+
     fn model_edge_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
         let vp = self.vp().read(cx);
         let (o, d) = vp.ray(position);
@@ -4760,6 +4875,8 @@ impl PartStudioView {
         let otf_input = self.ui_ref().and_then(|u| u.otf_input.as_ref().map(|(st, _)| st.clone()));
         let otf_invalid = self.ui_ref().is_some_and(|u| u.otf_invalid);
         let otf_labels = ed.otf_labels(&data, &units);
+        // A line's length box lies in the sketch plane (`otf_box_in_plane`).
+        let in_plane_box = ed.otf_active_in_plane(&data);
         for (i, (pos, value, active)) in ed.otf_boxes(&data, &units).into_iter().enumerate() {
             let value = otf_labels.get(i).cloned().unwrap_or(value);
             let Some((x, y)) = project(pos) else { continue };
@@ -4795,6 +4912,9 @@ impl PartStudioView {
             if !active {
                 let w = crate::sketch_mode::label_width_px(&value) as f32 * 13.0 / 14.0;
                 out.push(div().absolute().left(px(x - w * 0.5)).top(px(y - 9.0)).text_size(px(13.)).text_color(rgb(0x449ccd)).whitespace_nowrap().child(value).into_any_element());
+                continue;
+            }
+            if in_plane_box {
                 continue;
             }
             let est_w = crate::sketch_mode::label_width_px(&value) as f32 * 14.0 / 16.0 + 12.0;

@@ -920,6 +920,12 @@ fn offset_goes_in(sk: &Sketch, ids: &[EntityId]) -> bool {
     let Some(q) = r.created.iter().filter_map(|e| tmp.curve(*e)).map(|c| c.closest(mid).1).min_by(|x, y| (*x - mid).length().total_cmp(&(*y - mid).length())) else { return false };
     let dir = q - mid;
     let regions: Vec<_> = sk.regions().into_iter().filter(|r| r.entities().contains(&first)).collect();
+    // Bounding no region: to the right of the first curve's direction (live workflows-1122 22 s16: the line drawn
+    // left to right, its copy below).
+    if regions.is_empty() {
+        let t = c.tangent((t0 + t1) * 0.5);
+        return dir.dot(DVec2::new(t.y, -t.x)) < 0.0;
+    }
     let inside = |p: DVec2| regions.iter().any(|r| r.contains(p));
     inside(mid + dir) && !inside(mid - dir)
 }
@@ -2295,6 +2301,12 @@ impl SketchEditor {
         self.mirror_axis.is_some()
     }
 
+    /// The Mirror tool's line while it waits selected for the entities to mirror (drawn in its own look, not as a
+    /// selection or hover).
+    pub fn shown_mirror_line(&self) -> Option<EntityId> {
+        self.mirror_axis.filter(|a| self.tool == Tool::Mirror && self.selection.contains(a))
+    }
+
     /// No click of the current tool placed yet.
     pub fn clicks_empty(&self) -> bool {
         self.clicks.is_empty()
@@ -2832,20 +2844,10 @@ impl SketchEditor {
                 // While previewing, the picked curves stay selected (live: orange) and a click picks under the pointer.
                 let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
-                    // Live (ui-parity sketch-offset-key): a click away from the curves places the previewed offset
-                    // through the pointer, on its side, and opens its distance box.
+                    // Live (workflows-1122 22 s18, ui-parity sketch-offset-key): a click away from the curves places
+                    // the offset as previewed, whatever the click's side and distance, and opens its distance box.
                     if self.offset_pending.is_none() {
                         return EditOutcome::none();
-                    }
-                    if let Some((mid, n)) = self.offset_frame(&data.sketch) {
-                        let want = (p - mid).dot(n);
-                        let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(&data.sketch) { -1.0 } else { 1.0 };
-                        if want.abs() > self.world_per_px {
-                            if (want < 0.0) != (sign < 0.0) {
-                                self.offset_flip = !self.offset_flip;
-                            }
-                            self.offset_distance = want.abs();
-                        }
                     }
                     // (Placed by a click the tool ends: live's tool is none after it.)
                     let out = self.commit_offset(data);
@@ -4450,6 +4452,14 @@ impl SketchEditor {
                 Some((self.otf_label(data, f, units, i == o.active), noshape_units::format_quantity(Quantity::new(v, dim), units), i == o.active))
             })
             .collect()
+    }
+
+    /// The active box is a Line tool's length: it lies in the sketch plane, foreshortened with it in a 3D view (live
+    /// workflow 05, qa SKETCH-LENGTH-LABEL-IN-PLANE; other tools' boxes not seen in a 3D view yet).
+    pub fn otf_active_in_plane(&self, data: &SketchData) -> bool {
+        let Some(f) = self.otf.as_ref().and_then(|o| o.fields.get(o.active)) else { return false };
+        matches!(self.tool, Tool::Line | Tool::MidpointLine)
+            && matches!(f.kind, ConstraintKind::Length { curve, .. } if matches!(data.sketch.curve(curve), Some(Curve2::Line { .. })))
     }
 
     /// Where a value sits (sketch coordinates of its centre): its label, or
@@ -6882,6 +6892,12 @@ impl SketchEditor {
                 points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
             }
         }
+        // Mirror: its line yellow-green while it waits selected for the entities (live workflows-1122 22 s34:
+        // (189, 199, 100), no hover band); unlit once something is mirrored (s35).
+        if let Some(axis) = self.shown_mirror_line() {
+            let color = crate::palette::rgb8(crate::palette::viewport::MIRROR_LINE);
+            wide.push((data.sketch.tessellate(axis, self.world_per_px * 0.25), color, 2.0));
+        }
         // Extend: the curve picked first, lit yellow-green (live 12e).
         if self.tool == Tool::Extend
             && let Some(id) = self.extend_from
@@ -7311,7 +7327,6 @@ impl SketchEditor {
 
     pub fn picked(&self, data: Option<&SketchData>) -> Vec<EntityId> {
         let mut v: Vec<EntityId> = self.picks.iter().map(|p| p.0).collect();
-        v.extend(self.mirror_axis);
         if let Some(data) = data {
             for cid in self.selected_constraints.iter().chain(self.hover_constraint.iter()) {
                 if let Some(e) = use_glyph_entity(*cid) {
@@ -11895,18 +11910,21 @@ mod tests {
     }
 
     #[test]
-    fn a_click_in_space_places_the_offset_through_the_pointer() {
+    fn a_click_in_space_places_the_offset_as_previewed() {
         let (mut ed, mut d) = editor(Tool::Offset);
-        d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
-        click(&mut ed, &mut d, v(0.0075, 0.0));
+        d.sketch.add_line(v(-0.005, 0.005), v(0.025, 0.005));
+        click(&mut ed, &mut d, v(0.018, 0.005));
         assert!(ed.offset_pending.is_some(), "picking the line previews its offset");
-        // Live (ui-parity sketch-offset-key): the click 5 mm below makes the offset there and opens its distance box.
-        click(&mut ed, &mut d, v(0.0075, -0.005));
+        // Live (workflows-1122 22 s16–18): previewed right of the line's direction, below; the click 9 mm above makes it
+        // there, 5 mm below, and opens its distance box.
+        let (tmp, created) = ed.offset_result(&d.sketch).unwrap();
+        assert!(tmp.curve(created[0]).unwrap().start_point().y < 0.005, "previewed below");
+        click(&mut ed, &mut d, v(0.018, 0.014));
         assert_eq!(count(&d, EntityKind::Line), 2);
         let cid = ed.dim_edit.as_ref().expect("its distance box").constraint;
         assert!(matches!(d.sketch.constraint(cid).map(|c| &c.kind), Some(ConstraintKind::Distance { value, .. }) if (*value - 0.005).abs() < 1e-9));
-        let below = d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y + 0.005).abs() < 1e-9);
-        assert!(below, "on the pointer's side");
+        let below = d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).any(|c| c.start_point().y.abs() < 1e-9);
+        assert!(below, "as previewed, 5 mm below");
         // The picked line clicked again: no offset, nothing previewed (live ui-parity sketch-offset).
         let (mut ed, mut d) = editor(Tool::Offset);
         d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
@@ -12968,6 +12986,22 @@ mod tests {
             let along = at.dot(side);
             assert!(along > 0.010 + 14.0 * PX, "{rim:?}: box at {at:?}");
             assert!((at - side * along).length() < 1e-9, "{rim:?}: box off the axis {at:?}");
+        }
+    }
+
+    /// Live workflow 05 (qa SKETCH-LENGTH-LABEL-IN-PLANE): a Line's length box lies in the sketch plane; a circle's Ø
+    /// and a rectangle's boxes stay on the screen (not seen in a 3D view yet).
+    #[test]
+    fn only_a_line_length_box_lies_in_the_plane() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.010, 0.010));
+        click(&mut ed, &mut d, v(0.030, 0.015));
+        assert!(ed.otf_active_in_plane(&d), "line length box");
+        for tool in [Tool::Circle, Tool::CornerRect] {
+            let (mut ed, mut d) = editor(tool);
+            click(&mut ed, &mut d, v(0.010, 0.010));
+            click(&mut ed, &mut d, v(0.030, 0.025));
+            assert!(!ed.otf_boxes(&d, &UnitPrefs::default()).is_empty() && !ed.otf_active_in_plane(&d), "{tool:?}");
         }
     }
 

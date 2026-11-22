@@ -523,3 +523,54 @@ fn a_partial_flanges_edge_is_lit_whole_while_edited(cx: &mut TestAppContext) {
     assert!(mix.is_some(), "the preview blended over the model before it");
     assert!(!overlay.is_empty() && overlay.iter().all(|&c| c == noshape_render::scene::compare::POST), "the whole edge drawn over the blend: {overlay:?}");
 }
+
+/// Qa 11-22 (FEEL-BEND-FACE-PICKED-LOOK, live workflows-1122 11 s12): Bend's line picked from Sketch 2 fills Sheet
+/// metal face to bend with the plate's face on the sketch plane (std onBendChange) and makes it the active field; live
+/// outlines that face whole in the selection orange over the preview (ours lit only its front edge).
+#[gpui::test]
+fn a_bends_filled_face_is_outlined_whole(cx: &mut TestAppContext) {
+    let Some(_gpu) = super::feel::gpu_pointer() else { return };
+    RENDERING.set(true);
+    const SELECT: [i32; 3] = [0xFF, 0xA9, 0x0A];
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sm-bend-face-px", Some(starts["plate-bend"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let line = cx.update(|cx| {
+        let v = view.read(cx);
+        let sk = v.display.sketches.iter().find(|s| v.studio(cx).and_then(|st| st.features.iter().find(|f| f.id == s.feature)).is_some_and(|f| f.name == "Sketch 2")).expect("Sketch 2");
+        Reference::SketchEntity { sketch: sk.feature, entity: sk.curves.first().expect("the line").entity }
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sheetMetalBend", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Bend dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("bendReference")));
+    cx.update(|cx| view.update(cx, |v, cx| v.pick(noshape_scene::builder::PickTarget { reference: line, kind: noshape_scene::builder::PickKind::SketchCurve, anchor: None }, cx)));
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        !v.ui_busy() && v.ui.preview_before.is_some() && v.edit.as_ref().is_some_and(|e| !e.dialog.read(cx).feature.params.query("face").is_empty())
+    });
+    let state = cx.update(|cx| dialog.read(cx).active_query.clone());
+    assert_eq!(state.as_deref(), Some("face"), "Sheet metal face to bend active once filled");
+    let (px, w) = super::sketch_hover::settled_frame(cx, window, &view);
+    let scale = w as f64 / cx.update(|cx| view.read(cx).viewport.read(cx).size().x).round();
+    let rgb = |x: i32, y: i32| -> Option<[i32; 3]> {
+        let o = (y.max(0) as usize * w + x.max(0) as usize) * 4;
+        px.get(o..o + 3).map(|b| [b[2] as i32, b[1] as i32, b[0] as i32])
+    };
+    let mut off = Vec::new();
+    let sides = [(glam::DVec3::new(0.0, 0.0, 0.0), glam::DVec3::new(0.060, 0.0, 0.0)), (glam::DVec3::new(0.0, 0.0, 0.0), glam::DVec3::new(0.0, 0.040, 0.0)), (glam::DVec3::new(0.0, 0.040, 0.0), glam::DVec3::new(0.060, 0.040, 0.0)), (glam::DVec3::new(0.060, 0.0, 0.0), glam::DVec3::new(0.060, 0.040, 0.0))];
+    for (a, b) in sides {
+        for k in 1..10 {
+            let p = a + (b - a) * (k as f64 / 10.0);
+            let Some(s) = cx.update(|cx| view.read(cx).viewport.read(cx).project(p)) else { continue };
+            let (x, y) = ((s.x * scale).round() as i32, (s.y * scale).round() as i32);
+            let r = (3.0 * scale).ceil() as i32;
+            let near = (-r..=r).flat_map(|dy| (-r..=r).map(move |dx| (dx, dy))).filter_map(|(dx, dy)| rgb(x + dx, y + dy)).any(|c| (0..3).all(|i| (c[i] - SELECT[i]).abs() <= 24));
+            if !near {
+                off.push(format!("({:.0}, {:.0}) mm: {:?}", p.x * 1e3, p.y * 1e3, rgb(x, y)));
+            }
+        }
+    }
+    assert!(off.is_empty(), "the face to bend's outline not orange at:\n{}", off.join("\n"));
+}
