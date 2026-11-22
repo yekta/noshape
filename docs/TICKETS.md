@@ -69,6 +69,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   mates 197 / 216 read π off the saved poses (our connector frames vs live's). The same group spends 11-15 s in
   least_change. Test: assembly::tests::a_revolved_faces_connectors_point_against_the_axis_as_drawn.
 
+- [ ] P0 **IMPELLER-SHELL-INVALID (bool)** (qa 11-22 18:4x, bisect on the suite-saved c2-impeller-loft (17157c2f run), `query_parts {"check": true}` per build): Part 3 is invalid (78/160/78 faces/edges/vertices) from feature 43 "Fillet Flansch zum Stroemungskanal" on, since **13d44f9db** (bool, 11-21 10:52, shell.cpp: Shell normals on a free-form face by Newton steps from the last foot; the corner three-offset solve given up after 12 steps). Its parent ec2e52f99 and every commit tested before it are valid; 0.4.64 valid, 0.4.65 / 0.4.66 / v0.4.67 invalid (not new in v0.4.67). Repro: vibex7 ~/tmp/qa/imp-17157.noshape, /root/qa-scratch/bin/validity.py <doc> <cli>.
+
 ## qa 11-22 18:3x: asm's 440a5c94e (queued db8b1ef09) checked on green 9ae39c2f4
 - = FEEL-ASM-CTRL, Ctrl+window half: the selected instance leaves the selection (1 -> 0), nothing moves (feel1122/fieldsel/sbs/fu-asm-b6-ctrl-result.png). The Ctrl+click menu half is still ≠ (no menu), waiting for asm's next land.
 - = FEEL-ASM-ORIGIN-ROW-HOVER (hl-a03: the light orange disc on the origin) and FEEL-ASM-ROW-EYE-ICON (hl-a01: a bold ~15 px eye), hm2/out-af-440a.
