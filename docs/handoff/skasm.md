@@ -1,29 +1,33 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 14:09 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 15:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 14:09 UTC)
-- QUEUED cad1ad91 (13:5x, carries 94a986b1 = c572df92 rebased: sk/* hover combined states, SMFlatOp per live
-  smflat-1122, BEND-FACE-RECLICK-EMPTIES, tablet-stand names, flat orientation 47bfb052, SKETCH-LENGTH-LABEL residual
-  df6391b5a, + the saved Rip / Unfold / Refold fix). Rebase note: asm took params.x bit 4 (on_top lines, 80a580be3);
-  unlit_only is bit 7 (128), over_lines bit 5, psui's on_top silhouettes 64 (not on main yet). Watcher: background loop on
-  land.sh --status. If it fails: fix forward.
-- Regression of mine fixed (in cad1ad91): 3db660b89's feature_add refusal of Rip / Unfold / Refold also stopped the parity
-  translator (c2-cov-sm-rip, c2-cov-sm-unfold-refold: live builds them via std). Ctx::saved_features (set by the
-  translator around feature_add) lets them through; e2e a_saved_documents_unfold_refold_and_rip_are_added. Both docs 5/5, 6/6.
-- UNCOMMITTED: parity.rs query_with last-resort qClosestTo(qCreatedBy(F, VERTEX), vector(..)) -> ours at that point
-  (c2-cov2-curves Fit spline start / end curvature: "no live geometry for Ib"). Full suite on vibex6 running, log
-  /root/skasm-scratch/suite-1122b.log; baseline suite-1122.log (13:52: 128/188 docs, 2014/2680 features). No doc worse:
-  commit + land.
-- Model suite 13:52: no document's first difference is a sketch any more (loft-paths-guides 29/29). Remaining firsts are
-  others' (fillet / loft / boolean / fill) or mine in sheet metal: cov2-sm-hem-jog (flat collision INFO), cov2-sm-corner-break
-  model F, sm-loft-basic (apex), cov2-frame-corners Trim group 66 vs 64 edges; c2-constrained-surface (qCompressed vertices
-  query, Sketch 2 DISTANCE).
-- Asked live (REQUESTS 12:32 "length box side and model-edge midpoint vs a crossing"); adjust to the answer.
-- Lead 13:2x: when live's selection-gesture capture lands (box select both directions in sketch, Shift/Ctrl, empty click),
-  its sketch side is mine. Not filed yet at 14:09.
-- psui's f8b0a2d8 fixes a_closed_sketchs_lit_end_goes_with_it (broken by my Esc hold 438a9d313): nothing for me.
+## In flight (11-22 15:05 UTC): P0 sketch column of live psui/sel-gestures-1122 (lead)
+- Split with psui: psui has the Part Studio + assembly columns, the box's look and the sketch rows in
+  sketch_box_feel_tests.rs (Esc over the menu / with two keeps, Space clears, same window = no change, Shift window adds;
+  they dropped "Ctrl window removes" for me). Long press: live longpress-1122 = a release selects only if held < ~0.5 s
+  (<= 504 ms selects, >= 533 nothing), same on a sketch line. psui adds app-core Viewport `long_press_cancels:
+  Option<Duration>` (Part Studio 520 ms) for Drag::Pending(Left) clicks only; sketch picks via ToolDown/ToolUp
+  (press_on_capture_pick / tool_captures_left) are mine once psui's change is on main.
+- Done in my tree (landing): sketch_gesture_feel_tests.rs (mod sketch_gesture in sketch_ui_tests.rs; ~/tmp/skasm/sg.sh on
+  vibex6): boxes as live (window right part -> 1 line; window round it + circle; Ctrl window removes; crossing + circle ->
+  circle + 3) and ` over a sketch line -> "Edge of Sketch 1" first, "Face of Sketch 1" behind. Fixes: sketch-mode ` and the
+  sketch menu's Select other… open the shared panel (sketch.rs sketch_select_other: the open sketch's curves/points first,
+  its regions at the plane's depth, its own plane skipped; choosing one toggles ed.selection / selected_regions); the
+  labeler names a feature being created; a sketch box's Ctrl comes from ToolUp's modifiers (control || platform), and
+  Ctrl+press on nothing lit starts the box (ui.sketch_ctrl_press: unmoved release opens the menu, as before on a lit
+  entity at press). part-studio-ui 478/478, then all sketch tests 426/426 with the Ctrl change. Live lists "Face of Sketch 3" twice (unknown why; we list it once).
+  A circle centred level with the Origin adds a construction Origin point a window takes: not asked of live yet.
+- CI 45022206585 (Windows): e2e paste_sketch_centres_the_copy_on_the_origin reused paste_centred.noshape for its second
+  sketch: now paste_centred_l.noshape (same batch).
+- QUEUED 13f38500 (carries cad1ad91: saved Rip/Unfold/Refold via Ctx::saved_features, qClosestTo vertices); 94a986b1
+  LANDED 14:40 as 32578a95. Watcher polls land.sh --status for 13f38500.
+- Model suite 14:2x (vibex6, suite-1122b.log): 130/188 docs, 2021/2680 features; no doc's first difference is a sketch.
+- REQUESTS: 12:32 length box side + midpoint vs crossing (live, open); 14:30 c2-constrained-surface refs (live, open).
+- After the gesture cells: my SM firsts: cov2-frame-corners (Trim group Part 12 66 vs 64 edges; End cap circle offset
+  kernel signal 11; Gusset parts on +y, live -y: gusset is std gusset.fs via LOGIC_ONLY + frames.rs gusset), cov2-sm-hem-jog
+  flat collision INFO, sm-loft-basic apex, cov2-sm-corner-break model F.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
