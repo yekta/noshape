@@ -39,8 +39,9 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    arc/other joins (SEdge.band, max of both). The decisive two were get_sedge's GREY*tol arc join and the rest
    together; with all of A the T1 passes (07:0x, PROBE runs on vibex8 pt-probe2.sh). STAGE B (classification, still
    global tol): ray_state, lies_on, same_surface, kept_by, clear_inside, apex_on_face, boolean_in's 100*tol `clear`,
-   symmetry/moved_pair, C++ build() vertex tol (max(tol, own)) and pcurve eps. Next: T1 on stage A without switches,
-   then the full gate (vibe2 if free -g >= 15, else vibex8) + knurls, land; then stage B; then measure gamma Boolean 1.
+   symmetry/moved_pair, C++ build() vertex tol (max(tol, own)) and pcurve eps. 07:12 stage A alone (no switches)
+   passes the T1; committed 8811a09de on bool-ptol (on dfbc7eef1); gate unit bool-ptol-gate (ptol-gate.sh, vibe2) ->
+   chain-bool-ptol.out; then knurls, rebase, land; then stage B; then measure gamma Boolean 1.
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
