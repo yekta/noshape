@@ -160,6 +160,29 @@ fn rows() -> Vec<Row> {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).joint_edges().len())).ok_or("no flat view")?;
             expect((!lit.is_empty() && lit.iter().all(|r| matches!(r, Reference::Face(_))), flat > 0), (true, true), "(the rip's faces lit in 3D, its edges on the flat)")
         } },
+        Row { id: "table / a joint's Style list open lights its rip", live: "clicking Joint C's Style cell lights the rip in the 3D and flat views while its list is open (live workflows-1123 03 s23)", gap: false, check: |s, cx| {
+            s.press(cx, "sm-cell-0-0-0", MouseButton::Right)?;
+            let label = cx
+                .update(|cx| s.view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_else(|| crate::os_menu::open_labels(cx)))
+                .into_iter()
+                .find(|l| l.ends_with(" to rip"))
+                .ok_or("no Convert row")?;
+            s.press(cx, &format!("menu:{label}"), MouseButton::Left)?;
+            wait_until(cx, s.window, |cx| !s.view.read(cx).ui_busy());
+            s.frames(cx);
+            s.press(cx, "sm-joint-style-0", MouseButton::Left)?;
+            s.frames(cx);
+            let away = s.bounds(cx, "menu:Butt joint - Direction 1").ok_or("no Style list")?.center();
+            gpui_kit::VisualTestContext::from_window(s.window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: away, pressed_button: None, modifiers: NONE });
+            s.frames(cx);
+            let lit = cx.update(|cx| (s.view.read(cx).ui.sm_hover, s.view.read(cx).sm_hover_refs()));
+            let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).joint_edges().len())).ok_or("no flat view")?;
+            let open = cx.update(|cx| (s.view.read(cx).ui.sm_joint_open, crate::os_ui::dropdown_open("sm-joint-style-0", cx)));
+            if !(!lit.1.is_empty() && lit.1.iter().all(|r| matches!(r, Reference::Face(_))) && flat > 0) {
+                return Err(format!("on the list: hover {:?}, lit {:?}, flat edges {flat}, open {open:?}", lit.0, lit.1.len()));
+            }
+            Ok(())
+        } },
         Row { id: "flange / no manipulator", live: "the Flange dialog shows a preview wall and no length arrow", gap: false, check: |s, cx| {
             cx.update_window(s.window, |_, w, cx| s.view.update(cx, |v, cx| v.start_feature("sheetMetalFlange", w, cx))).unwrap();
             s.frames(cx);

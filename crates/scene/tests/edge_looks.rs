@@ -261,6 +261,33 @@ fn a_failing_feature_leaves_the_hovered_part_unred() {
     assert!(flags(&top).iter().all(|f| f & state::ACCENT != 0 && f & state::ERROR == 0), "the hovered part's face isn't: {:?}", flags(&top));
 }
 
+/// qa SM-TABLE-BEND-LIT-LOOK (live workflows-1123 02 s19): a Sheet metal table row hovered lights its bend's faces as
+/// hovered in the graphics (the pale orange fill and outline), not in the accent's amber that darkened the bend's
+/// underside to brown.
+#[test]
+fn a_hovered_table_rows_faces_take_the_hover_look() {
+    let r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    use noshape_render::scene::state;
+    let display = block();
+    let (_, top) = top_front(&display);
+    let up = r.uploader();
+    let mut cache = GpuCache::default();
+    let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
+    let flags = |faces_hovered: bool| {
+        let scene = builder::with_highlights(&built, &display, &[], None, std::slice::from_ref(&top), Vec::new(), builder::Highlighting { faces_hovered, ..Default::default() }, &up);
+        built.picks.ids_for(&top).iter().map(|&id| scene.states[id as usize]).collect::<Vec<u32>>()
+    };
+    let (row, other) = (flags(true), flags(false));
+    assert!(!row.is_empty() && row.iter().all(|f| f & state::HOVER != 0 && f & state::ACCENT == 0), "a row's face: {row:?}");
+    assert!(other.iter().all(|f| f & state::ACCENT != 0 && f & state::HOVER == 0), "other accents keep theirs: {other:?}");
+}
+
 /// A rebuild reuses each unchanged body's pick targets (the cache keyed by its mesh): the same ids for the same
 /// references; a body whose names changed over the same mesh (an earlier feature renamed) gets its new names.
 #[test]

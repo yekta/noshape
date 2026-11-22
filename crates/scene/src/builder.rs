@@ -1458,11 +1458,14 @@ pub struct Highlighting {
     pub untinted_parts: bool,
     /// A sketch's row hovered: its curves take the hover band, as hovered in the graphics (live hover-list-1122 p02, p27).
     pub curves_hovered: bool,
+    /// A Sheet metal table row or a flat view bend hovered: its faces lit as hovered in the graphics, the pale orange
+    /// fill and outline (live workflows-1123 02 s19, qa SM-TABLE-BEND-LIT-LOOK), not the accent's amber.
+    pub faces_hovered: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
-    let Highlighting { error, dialog, untinted_parts, curves_hovered } = mode;
+    let Highlighting { error, dialog, untinted_parts, curves_hovered, faces_hovered } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, body_outline_rgb: None, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
@@ -1591,7 +1594,8 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
             continue;
         }
-        let lit = if curves_hovered && matches!(r, Reference::SketchEntity { .. }) { state::HOVER } else { state::ACCENT };
+        let hovered = (curves_hovered && matches!(r, Reference::SketchEntity { .. })) || (faces_hovered && matches!(r, Reference::Face(_)));
+        let lit = if hovered { state::HOVER } else { state::ACCENT };
         mark(r, lit, &mut scene);
     }
     // A whole selected part: Onshape's lighter part amber (live #c09039 …

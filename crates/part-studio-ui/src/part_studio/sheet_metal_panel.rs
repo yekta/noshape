@@ -603,6 +603,10 @@ impl PartStudioView {
         if self.right_panel != Some(super::config_panel::RightPanel::SheetMetal) {
             return Vec::new();
         }
+        // Live workflows-1123 03 s23 (qa SM-TABLE-JOINT-LIT): a joint's Style list open lights its rip, wherever the pointer.
+        if let Some(row) = self.ui.sm_joint_open {
+            return self.sm_rip_refs(row);
+        }
         match self.ui.sm_hover {
             Some((0, row, _)) => self.sm_bend_refs(row),
             // Live 11-17 sm-feel-1117: a joint row hovered lights its rip.
@@ -1035,7 +1039,7 @@ impl PartStudioView {
                     }
                     m
                 }))
-                .child(select_cell(style).id(("sm-joint-style", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-style-{i}")), true, move |mut m, _, _| {
+                .child(select_cell(style).debug_selector(move || format!("sm-joint-style-{i}")).id(("sm-joint-style", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-style-{i}")), true, move |mut m, _, _| {
                     for (label, key) in RIP_STYLES {
                         let v = v2.clone();
                         m = m.item(OsMenuItem::new(label).checked(label == style).on_click(move |_, _, cx| v.update(cx, |this, cx| this.sm_edit_rip(i, RipEdit::Style(key), cx))));
@@ -1098,18 +1102,29 @@ impl PartStudioView {
         let hovered = match self.ui.sm_hover {
             Some((0, row, _)) => Some(row),
             _ => self.ui.sm_flat_hover,
-        };
-        // Live 11-17 sm-feel-1117: a joint row hovered lights its rip's edges on the flat too.
-        let joint = match self.ui.sm_hover {
-            Some((1, row, _)) => bodies.first().and_then(|(b, _)| self.context.as_ref()?.body(b)).map(|body| {
+        }
+        .filter(|_| self.ui.sm_joint_open.is_none());
+        // A joint's Type or Style list open lights its rip (live workflows-1123 03 s23): noticed here, as the lists open
+        // and close, and the 3D scene lit after this frame.
+        let open = (0..joints.len()).find(|i| ["sm-joint-type", "sm-joint-style"].iter().any(|k| crate::os_ui::dropdown_open(&format!("{k}-{i}"), cx)));
+        if open != self.ui.sm_joint_open {
+            self.ui.sm_joint_open = open;
+            cx.defer_in(window, |this, _, cx| this.refresh_scene(false, cx));
+        }
+        // Live 11-17 sm-feel-1117: a joint row hovered lights its rip's edges on the flat too (its list open too).
+        let joint_row = self.ui.sm_joint_open.or(match self.ui.sm_hover {
+            Some((1, row, _)) => Some(row),
+            _ => None,
+        });
+        let joint = joint_row.and_then(|row| {
+            bodies.first().and_then(|(b, _)| self.context.as_ref()?.body(b)).map(|body| {
                 let faces = self.sm_rip_refs(row).into_iter().filter_map(|r| match r {
                     Reference::Face(n) => body.faces.iter().position(|f| **f == n).and_then(|i| body.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()),
                     _ => None,
                 });
                 (row, faces.collect())
-            }),
-            _ => None,
-        };
+            })
+        });
         // An open sketch on a face of the flat's part: the face's box on the
         // flat, with a margin, and the sketch's name at its top-left (live
         // request 1605, g-4).

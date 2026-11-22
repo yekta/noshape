@@ -641,6 +641,8 @@ pub struct UiState {
     pub sm_hover: Option<(u8, usize, usize)>,
     /// The bend (index into the model's bends) whose zone is under the pointer in the flat view.
     pub sm_flat_hover: Option<usize>,
+    /// The Other joints row whose Type or Style list is open: its rip lit (live workflows-1123 03 s23).
+    pub sm_joint_open: Option<usize>,
     /// The bend (index into the model's bends) whose line is selected in the
     /// flat view: Shift+C analyses it (live request 1622).
     pub sm_flat_bend: Option<usize>,
@@ -1035,6 +1037,7 @@ impl UiState {
             sm_bends_scroll: ScrollHandle::new(),
             sm_hover: None,
             sm_flat_hover: None,
+            sm_joint_open: None,
             sm_flat_bend: None,
             flat_backdrop: None,
             sm_select_other: None,
