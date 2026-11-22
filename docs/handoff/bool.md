@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 09:38 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 10:58 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -19,45 +19,43 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (lead 11-22 06:2x)
-1. LANDED: wclip 6a0389fbf, ruling 61e4c748b, arcpart/seambatch/bandbatch 604e9158 (07:19). usdvol f0929e9df: gate on
-   vibex7 (unit bool-usdvol-gate, chain-bool-usdvol.out) queued since 05:42 behind vibex7's cargo slots (other agents'
-   suites) -> knurls (kn-run.sh vibex7 kn-usdvol) -> land.
-2. P1 BOOL-PER-PAIR-TOL (DECISIONS 17157c2fa), STAGED. Ctx.arg_tol (each arg's half: own max tol + fuzzy; the most
-   tolerant / tolerance-less args 0.5*tol, so equal-tolerance inputs are unchanged), Ctx.arg_reach (widest band with
+## NEXT (lead 11-22 06:2x; state 11-22 10:58 UTC)
+1. QUEUED: per-pair stage A 0b4f5ad47 as a13ddb27 (09:47; gate + knurls 0 diff x5 clean), usdvol f0929e9df as 6322eeca
+   (10:58; gate vibex7: replay +0 -0, suite 129 -> 129, shells 6 -> 6, crate tests pass, speed lines noise (main's
+   rounds 57-67% apart); knurls vibex7 0 diff x5, copies deleted). Check `land.sh --status`; then rm the worktrees'
+   targets (bool-ptol, bool-usdvol) on their hosts.
+2. P1 BOOL-PER-PAIR-TOL (DECISIONS 17157c2fa), STAGED. Ctx.arg_tol (each arg's half), Ctx.arg_reach (widest band with
    args whose boxes meet); helpers own_band / band(f,g) / edge_band / args_band / face_band / reach_band.
-   - STAGE A 0b4f5ad47 (worktree bool-ptol, on main cd36b8456): construction bands (see code). GATE DONE 09:00 vibe2:
-     replay 3114 -> 3114 (+0 -0), differing 2 -> 2, suite 130 -> 130 (features 1997/2668 both), shells 6 -> 6, speed
-     0.99-1.05x, crate tests pass; "2 documents changed" = noise (dogbone identical text; cf-surface-pattern flips
-     384/385/386 edges across 14 earlier gates). KNURLS running vibe2 09:29 (unit bool-kn-ptol, out
-     /root/bool-scratch/kn-ptol.out + vibe2 ~/tmp/bool/kn-ptol/kn.out; delete k-main/k-br there after) -> LAND from
-     bool-ptol.
-   - STAGE B a23eae9b3 (worktree bool-ptolb, on A): classification (state_at's coplanar checks, tangent_side, lies_on
-     closure, settles, ray_state(band), touching_only clear, apex_on_face). same_surface/lies_on METHODS stay global.
-     GATE vibex8 07:43 (unit bool-ptolb-gate, chain-bool-ptolb.out): queued behind qa's ui-parity shards holding
-     vibex8's suite slot since 07:02 -> knurls -> land after A.
-   - With A+B: gamma subsets 6,17,23 + 45 / 67 / 87 in place are ours (448 / 369 / 369 faces as OCCT). The FULL
-     Boolean 1 declined "a face's curves don't close": NOT the split band (PROBE_OWNBAND in split_among changed
-     nothing), but the C++ build's pcurves on cylinders: a line was taken as a generator (a 2.5 um chord across a
-     quarter round's rulings: its curve 4 mm along the axis) and an arc as coaxial (a precise clip's arc ~100 um
-     off a cylinder's axis, its ends on it: curve turned 0.01 rad).
-   - STAGE C a75a7c9f9 (worktree bool-ptolc, on B; kernel bool tests 222 pass on vibex8): build()'s cylinder/cone branch checks each such pcurve
-     against its edge (off_edge, 5 samples > edge tol) and else makes it straight between the edge's points' (u, v)
-     at 1-64 steps, tolerance raised to cover it (chord_pcurve). Gamma FULL Boolean 1 ours: 606 ms vs OCCT 6054 ms
-     on vibex8, 2805 faces / 7332 edges as OCCT, volume 1e-11 off; kernel bool tests 220 pass. T1
-     an_off_axis_arc_and_a_chord_on_a_cylinder_get_curves_on_it_that_follow_them (case 3c7300ba68882d9d: gamma's
-     object + 32 tools, 2.7 MB; no tool can be dropped and keep the failure). NEXT: gate (ptol-gate.sh copy, first free
-     host) -> knurls -> land after B. Probe tree bool-stages (PROBE_NOCHORD switch) and vibex8 $BK/wc/xbin-arc,
-     $BK/gm/rec32: delete after C lands.
-3. SPEED-STANDOFFS (lead 09:2x: profile now). Live whole doc 176 ms (TICKETS). Main cd36b8456 on vibe2 (loaded),
-   kernel profile: Revolve 2 541 ms (boolean 280: brep 207, build 72; unify 260: usd.volume 172 = usdvol's fix),
-   Boolean 1 339 (brep 198, unify 117), Boolean 2 238 (brep 137, unify 74). Stage timers (bool-stages probe tree:
-   PROBE_BREP_TIMES marks in boolean_in + PROBE_PAIR_NS per face_pair kind; st-brep2.sh on vibex8, cases BK/st/rec
-   330d / de7a / e714): brep 112-146 ms quiet = OCCT ahead sections (src.ahead, IntTools_FaceFace) 35-64 ms + the
-   SEQUENTIAL face_pair loop 45-96 ms, ALL in nurbs_pair (14-20 B-spline pairs, 2.5-6 ms each; plane/cyl pairs ~0,
-   face_pair's edge part 1.5-13 ms) + pieces 8-14, classify 3-8, places/crossings ~15. NEXT: timers inside
-   nurbs_pair (occt_sections wait vs clear_inside vs rim edge_over_free_face vs section()), then run the per-pair
-   work in parallel or cache it. perf is not allowed on the hosts (perf_event_paranoid 4, no sudo): in-code timers.
+   - STAGE B a23eae9b3 (worktree bool-ptolb, on A): classification, 6 sites. BROKEN: stage C's gate (vibe2, C on B on
+     A; run dir vibe2 ~/agents/bool-gate/runs/bool-ptolc-a75a7c9f9-1122-100805) FAIL: shells 26db61e922965935 (ours 44
+     faces vs OCCT 37) and a237eca5d7832a0e (shell failed), and shfall ce16a730f6abf890 newly taken but history
+     differs (main declined "two edges leave a vertex in one direction"). Same with C switched off (PROBE_NOCHORD) ->
+     B. Bisected (probe tree switch PROBE_B=<site>, sh-b.sh, cases vibex8 ~/tmp/bool/shc): ONLY site 5 = state_at's
+     coplanar check, `let tol = cx.args_band(arg, cx.solids[t].arg)` (bool-ptolb boolean.rs ~7111): with cx.tol
+     there both shells match OCCT. BUT gamma's Boolean 1 needs site 5 (PROBE_B=5: declines "a piece's point on
+     another solid's face" -> OCCT). NEXT: a band for site 5 that keeps both: try band(f, g) per coplanar face g
+     (the pair's band, as plane_plane paired them), or max of args_band and the piece's boundary edges' bands (a
+     piece's boundary can come from a third, looser argument's edges); check with sh-b.sh (2 shells) + gm-b5.sh
+     (gamma full, vibex8) + ce16a730f6abf890 (shfall corpus); amend B, rebase C, gate C only (it covers A+B+C).
+     B's own gate on vibex8 (unit bool-ptolb-gate, chain-bool-ptolb.out) still running: read it for anything else.
+   - STAGE C a75a7c9f9 (worktree bool-ptolc, on B): pcurves of chords / off-axis arcs on cylinders (off_edge +
+     chord_pcurve in build()); gamma FULL Boolean 1 ours 606 ms vs OCCT 6054 ms (vibex8), 2805/7332 as OCCT. T1
+     an_off_axis_arc_and_a_chord_on_a_cylinder_get_curves_on_it_that_follow_them (case 3c7300ba68882d9d, 2.7 MB).
+     Gate rerun after B's fix -> knurls -> land A, B, C in order.
+3. SPEED-STANDOFFS. Live whole doc 176 ms. Main on vibe2 (loaded): Revolve 2 541 ms (brep 207, unify 260 of which
+   usd.volume 172 = usdvol, queued), Boolean 1 339 (brep 198, unify 117), Boolean 2 238 (brep 137, unify 74).
+   brep on vibex8 (cases BK/st/rec 330d / de7a / e714, st-brep*.sh, probe tree bool-stages, PROBE_BREP_TIMES):
+   OCCT ahead sections 49-61 ms (src.sections later 0.3-0.6 ms: all prefetched) + the pair loop 40-73 ms, all
+   nurbs_pair: same-surface pairs' edge_over_free_face 21-58 ms, of it stretches_over's 257 samples per edge
+   (free::surface_distance -> uv_of: a Newton projection each, memoised per point under one Mutex per face) 16-64
+   ms, free::projected 3-9 ms; occt_sections' boundaries_meet + seeded (copied tools) 11-20 ms; rims 0-17 ms.
+   Tried (probe tree, diff saved /root/bool-scratch/stages-probe-1122-1100.diff, PROBE_NOAHEAD switch): (a) samples
+   in parallel runs of 33 inside stretches_over: ~1.5x only; (b) all same-surface pairs' samples ahead in one
+   par_map_each (free_samples cache keyed (e, f, t0, t1 bits), samples_on / free_path / path_at helpers): pair loop
+   48-73 -> 19-45 ms but the ahead pass takes 14-24 ms (uvs Mutex contention): net 10-30 ms a Boolean, under the
+   100 ms bar alone. Next ideas: projections seeded from the previous sample's (u, v) without the shared cache in
+   samples_on; seeded sections ahead too; then unify (the bigger share after usdvol). Probe tree also carries the
+   PROBE_B switches: drop with it.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
 ## In flight (11-21 21:35 UTC)
