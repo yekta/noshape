@@ -786,6 +786,20 @@ fn rows_within(clip: Option<(f32, f32, f32)>, margin: f32) -> (f32, f32) {
     (((a - top - margin) / 100.).floor() * 100., ((b - top + margin) / 100.).ceil() * 100.)
 }
 
+/// Deleted workspaces merged into a live one: their merged change still shows on a lane of its own (live workflows-1123 19
+/// s21: "Merge from B1" and B1's change row with its yellow line after B1 is deleted).
+fn merged_deleted(graph: &VersionGraph) -> Vec<BranchId> {
+    let branch = |b: BranchId| graph.branches.iter().find(|x| x.id == b);
+    let of = |mv: MicroversionId| graph.microversions.iter().find(|m| m.id == mv).map(|m| m.branch);
+    let mut out: Vec<BranchId> = Vec::new();
+    for m in graph.microversions.iter().filter(|m| m.parents.len() >= 2 && branch(m.branch).is_some_and(|b| !b.deleted)) {
+        if let Some(b) = of(m.parents[1]).filter(|b| branch(*b).is_some_and(|x| x.deleted) && !out.contains(b)) {
+            out.push(b);
+        }
+    }
+    out
+}
+
 fn build_rows(graph: &VersionGraph, lanes: &[BranchId], start: (String, String)) -> Vec<Row> {
     let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
     let lane_of = |mv: MicroversionId| info.get(&mv).and_then(|m| lanes.iter().position(|b| *b == m.branch)).unwrap_or(0);
@@ -805,15 +819,16 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId], start: (String, String))
         rows.push(Row { kind: RowKind::Start, mv: root.id, lane: 0, time: root.created, name, author: root.author.clone(), key: "start".into(), changes: vec![], description });
     }
     // Where branches meet (live 2383): each merge's point in its workspace and the source's point it took, as rows
-    // of their own unless a version or the start is there already.
+    // of their own unless a version or the start is there already; a version made on the merge keeps the merge's row
+    // under it (live workflows-1123 19 s21: "Merged" over "Merge from B1").
     let mut shown: HashSet<MicroversionId> = rows.iter().filter(|r| !matches!(r.kind, RowKind::Workspace(_))).map(|r| r.mv).collect();
     let live_branch = |b: BranchId| graph.branches.iter().any(|x| x.id == b && !x.deleted);
     for m in graph.microversions.iter().filter(|m| m.parents.len() >= 2 && live_branch(m.branch)) {
-        if shown.insert(m.id) {
+        if shown.insert(m.id) || rows.iter().any(|r| r.mv == m.id && r.kind == RowKind::Version) {
             rows.push(Row { kind: RowKind::Merge, mv: m.id, lane: lane_of(m.id), time: m.created, name: m.description.clone(), author: m.author.clone(), key: format!("m{}", m.id), changes: vec![], description: String::new() });
         }
         let src = m.parents[1];
-        if let Some(s) = info.get(&src).filter(|s| live_branch(s.branch)) && shown.insert(src) {
+        if let Some(s) = info.get(&src).filter(|s| lanes.contains(&s.branch)) && shown.insert(src) {
             rows.push(Row { kind: RowKind::Merged, mv: src, lane: lane_of(src), time: s.created, name: s.description.clone(), author: s.author.clone(), key: format!("s{}", src), changes: vec![], description: String::new() });
         }
     }
@@ -825,7 +840,9 @@ fn build_rows(graph: &VersionGraph, lanes: &[BranchId], start: (String, String))
     };
     rows.sort_by(|a, b| b.time.cmp(&a.time).then(rank(a.kind).cmp(&rank(b.kind))));
     let stops: HashSet<MicroversionId> = rows.iter().filter(|r| !matches!(r.kind, RowKind::Workspace(_))).map(|r| r.mv).collect();
-    for r in rows.iter_mut().filter(|r| r.kind != RowKind::Start) {
+    // (A version on a merge: the changes are the merge row's.)
+    let merges: HashSet<MicroversionId> = rows.iter().filter(|r| r.kind == RowKind::Merge).map(|r| r.mv).collect();
+    for r in rows.iter_mut().filter(|r| r.kind != RowKind::Start && !(r.kind == RowKind::Version && merges.contains(&r.mv))) {
         let mut cur = Some(r.mv);
         while let Some(mv) = cur {
             if (mv != r.mv && stops.contains(&mv)) || r.changes.len() >= 200 {
@@ -1340,13 +1357,15 @@ impl Render for HistoryPanel {
         let current_name = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Main".into());
         let mut lanes: Vec<BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
         lanes.sort_by_key(|b| !graph.branches.iter().any(|x| x.id == *b && x.is_default));
+        let live_lanes = lanes.len();
+        lanes.extend(merged_deleted(&graph));
         let start = session.store.start_version().unwrap_or_else(|_| ("Start".into(), String::new()));
         let rows = self.rows.get_or_insert_with(|| Rc::new(build_rows(&graph, &lanes, start).into_iter().map(Rc::new).collect())).clone();
         let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
         let q = self.applied_query.trim().to_lowercase();
         let paged = self.page.is_some();
         // Filter branches shows only while the document has a second workspace (live hist-filter-1122).
-        let branch_button = lanes.len() > 1 && !paged;
+        let branch_button = live_lanes > 1 && !paged;
         if !branch_button {
             self.branch_filter = BranchFilter::All;
             self.branch_menu_open = false;

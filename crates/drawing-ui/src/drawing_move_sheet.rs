@@ -237,6 +237,9 @@ impl DrawingEditor {
         let Some(d) = self.table_props.take() else { return };
         if !accept {
             self.set_table_corner(d.table, d.original, cx);
+        } else {
+            // ✓ leaves nothing selected (qa workflows-1123 10 s12).
+            self.selection.clear();
         }
         cx.notify();
     }

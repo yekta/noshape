@@ -210,8 +210,9 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                 // -remove-from-group, drw-view-hide-auto-centermarks, drw-dimension-foreshorten 11-15).
                 // (Split Hole table below: the part split off, live2 drw-hole-table-split; Split custom table below: the
                 // original, live drw-custom-table-split s13.)
-                // (Add node / Remove node keep the note: live2 drw-leader-add-node s11, drw-leader-remove-node s14.)
-                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten" | "Split Hole table below" | "Split custom table below" | "Add node" | "Remove node");
+                // (Add node / Remove node keep the note: live2 drw-leader-add-node s11, drw-leader-remove-node s14; Group
+                // annotation its callouts: qa workflows-1123 10 s23.)
+                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Group annotation" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten" | "Split Hole table below" | "Split custom table below" | "Add node" | "Remove node");
                 let paste = label.as_ref() == "Paste";
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
@@ -553,6 +554,12 @@ pub struct DrawingEditor {
     pub menu_at: [f64; 2],
     /// A right-click menu of the drawing's own (the canvas', a sheet tab's) while it is open: in live's drawing iframe.
     pub frame_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
+    /// The table a right-click menu was opened on (hovered while the menu is up).
+    pub menu_table: Option<u64>,
+    /// The detail view last picked by its circle in the parent (its grips show while selected) rather than by its body.
+    pub circle_pick: Option<ViewId>,
+    /// The callout just placed with the Callout tool and the pointer where the click was.
+    pub placed_callout: Option<(u64, [f64; 2])>,
     /// The Sheets panel's reference row under the pointer (its key): live's hover popup of its name and version.
     pub sheets_ref_hover: Option<String>,
     /// The reference row last right-clicked and where (its hover outlasts the menu while the pointer stays there).
@@ -863,6 +870,9 @@ impl DrawingEditor {
             datum_target_letter: None,
             menu_at: [0.0; 2],
             frame_menu: None,
+            menu_table: None,
+            circle_pick: None,
+            placed_callout: None,
             sheets_ref_hover: None,
             sheets_ref_menu_at: None,
             ordinate_extending: None,
@@ -1538,7 +1548,7 @@ impl DrawingEditor {
             m.indices = idx;
             (!m.indices.is_empty()).then(|| up.upload_mesh(&m))
         });
-        let (ink, red) = drawing_scene::sheet_text(&built, &dangling);
+        let (ink, red) = drawing_scene::sheet_text(&built, &dangling, &self.hidden_texts(&built));
         self.texts = [ink, red].map(|m| (!m.indices.is_empty()).then(|| up.upload_mesh(&m)));
         let lin = |c: [u8; 3]| crate::theme::lin(((c[0] as u32) << 16) | ((c[1] as u32) << 8) | c[2] as u32);
         let (cf, ct) = drawing_scene::sheet_colored(&built);
@@ -1618,7 +1628,6 @@ impl DrawingEditor {
 
     fn rebuild_overlay(&mut self) {
         let mut overlay = self.overlay.clone();
-        overlay.points.extend(self.selection_handles());
         self.note_grip_overlay(&mut overlay);
         self.format_line_grip_overlay(&mut overlay);
         self.leader_overlay(&mut overlay);
@@ -1743,11 +1752,13 @@ impl DrawingEditor {
             // A selected dimension or note keeps its text black on an orange box, its lines orange with its grips (live
             // dsel3, drw-styles-radial s10, drwm-3 n2): drawn by push_annotation_look, not tinted.
             let cur = &self.drawing.sheets[self.sheet];
-            let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && (a.kind.is_dimension() || matches!(a.kind, AnnotationKind::Note { .. }))))).collect();
+            let dims: Vec<Sel> = self.selection.iter().copied().filter(|s| !placing && matches!(s, Sel::Annotation(id) if dragged != Some(*id) && cur.annotations.iter().any(|a| a.id == *id && (a.kind.is_dimension() || matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. }))))).collect();
             let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
             let lit_parent = self.lit_parent().map(Sel::View);
             for s in self.selection.iter().chain(self.panel_highlight.iter()).chain(self.lit_tool_edge().iter()).chain(boxed).chain(lit_parent.iter()).filter(|s| !matches!(s, Sel::ViewLabel(_) | Sel::Table(_) | Sel::CutLine(_)) && !(placing && matches!(s, Sel::Annotation(_))) && dragged.is_none_or(|d| **s != Sel::Annotation(d)) && !dims.contains(s)) {
-                for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p)) {
+                // A selected view's label stays black under its frame (live workflows-1123 08 s15-20, 09 s10-11).
+                let label = |p: &u32| matches!(s, Sel::View(_)) && matches!(b.picks.get(*p as usize), Some(PickTarget::ViewLabel(_)));
+                for p in self.picks_of(*s).into_iter().filter(|p| !datums.contains(p) && !label(p)) {
                     scene.add_flag(p, state::SELECTED);
                 }
             }
@@ -1800,6 +1811,9 @@ impl DrawingEditor {
             }
             if let Some(d) = palette_dim.filter(|d| self.tool_picks_edges() || hover.and_then(|h| self.sel_of_pick(h)) != Some(*d)) {
                 self.push_annotation_look(&mut scene, b, &self.picks_of(d), DRAWING_HOVER);
+            }
+            if let Some(id) = self.placed_callout_lit() {
+                self.push_annotation_look(&mut scene, b, &self.picks_of(Sel::Annotation(id)), DRAWING_SELECTED);
             }
             self.push_view_frames(&mut scene);
             self.push_cut_line_hover(&mut scene);
@@ -1920,30 +1934,48 @@ impl DrawingEditor {
         let mut lit = Vec::new();
         let mut grips = Vec::new();
         let mut ink = noshape_render::MeshData::default();
-        let Some(b) = self.built.as_ref() else { return CutLineLooks { lit, grips, ink } };
+        let mut related = Vec::new();
+        let mut blue = noshape_render::MeshData::default();
+        let Some(b) = self.built.as_ref() else { return CutLineLooks { lit, grips, ink, related, blue } };
         let hovered = self.hovered_cut_line().filter(|_| matches!(self.tool, Tool::Select));
         // The hovered cutting line tinted with its grips; a selected view's cutting lines show their grips alone while
         // the pointer is over it (live2 drw-tools-1119 centermark-sel: none once it moves away).
         let selected = |w: ViewId| self.selection.contains(&Sel::View(w)) && self.placement(w).is_some_and(|pl| (pl.min[0]..=pl.max[0]).contains(&self.cursor[0]) && (pl.min[1]..=pl.max[1]).contains(&self.cursor[1]));
         // A cutting line selected on its own: tinted as hovered (live2 drw-tools-1119 centermark-sel case 2).
         let chosen = |w: ViewId| hovered == Some(w) || self.selection.contains(&Sel::CutLine(w));
-        let lines: Vec<(ViewId, bool)> = b.resolved.views.iter().filter(|w| b.resolved.section_points(w.id).is_some()).filter_map(|w| if chosen(w.id) { Some((w.id, true)) } else { b.resolved.parent_of(w.id).is_some_and(selected).then_some((w.id, false)) }).collect();
+        // The section view hovered or selected: its cutting line, arrows and letters light blue, no grips (qa workflows-1123
+        // 08 s4-6).
+        let shown = self.view_under_pointer().filter(|_| matches!(self.tool, Tool::Select));
+        let lit_view = |w: ViewId| shown == Some(w) || (matches!(self.tool, Tool::Select) && self.selection.contains(&Sel::View(w)));
+        let lines: Vec<(ViewId, CutLook)> = b.resolved.views.iter().filter(|w| b.resolved.section_points(w.id).is_some()).filter_map(|w| match () {
+            _ if chosen(w.id) => Some((w.id, CutLook::Tint)),
+            _ if lit_view(w.id) => Some((w.id, CutLook::Related)),
+            _ => b.resolved.parent_of(w.id).is_some_and(selected).then_some((w.id, CutLook::Grips)),
+        }).collect();
         let mut dot = |p: [f64; 2], color: [u8; 4]| grips.push((p, color));
-        let mut tri = |pts: &[[f64; 2]], idx: &[u32]| {
-            let base = ink.positions.len() as u32;
+        let tri = |m: &mut noshape_render::MeshData, pts: &[[f64; 2]], idx: &[u32]| {
+            let base = m.positions.len() as u32;
             for p in pts {
-                ink.positions.push([p[0] as f32, p[1] as f32, 0.5]);
-                ink.normals.push([0.0, 0.0, 1.0]);
-                ink.pick_ids.push(0);
+                m.positions.push([p[0] as f32, p[1] as f32, 0.5]);
+                m.normals.push([0.0, 0.0, 1.0]);
+                m.pick_ids.push(0);
             }
-            ink.indices.extend(idx.iter().map(|i| base + i));
+            m.indices.extend(idx.iter().map(|i| base + i));
         };
         let len = |pts: &[[f64; 2]]| pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
-        for (v, tint) in lines {
+        for (v, look) in lines {
             let mine = |pick: u32| b.picks.get(pick as usize) == Some(&PickTarget::SectionLine(v));
-            if tint {
-                lit.extend(b.picks.iter().enumerate().filter(|(_, t)| **t == PickTarget::SectionLine(v)).map(|(i, _)| i as u32));
+            let picks = b.picks.iter().enumerate().filter(|(_, t)| **t == PickTarget::SectionLine(v)).map(|(i, _)| i as u32);
+            match look {
+                CutLook::Tint => lit.extend(picks),
+                CutLook::Related => related.extend(picks),
+                CutLook::Grips => {}
             }
+            let (tint, mesh) = match look {
+                CutLook::Tint => (true, &mut ink),
+                CutLook::Related => (true, &mut blue),
+                CutLook::Grips => (false, &mut ink),
+            };
             let Some(line) = b.geometry.lines.iter().filter(|l| mine(l.pick)).max_by(|l, m| len(&l.points).total_cmp(&len(&m.points))) else { continue };
             let (Some(&first), Some(&last)) = (line.points.first(), line.points.last()) else { continue };
             // Live2 recheck-1119: the arrows and letters tan, a tan grip at both ends of each arrow (the line's end and
@@ -1951,7 +1983,7 @@ impl DrawingEditor {
             for (ti, t) in b.geometry.texts.iter().enumerate().filter(|(_, t)| mine(t.pick)) {
                 if tint {
                     let (pts, idx) = font::text_fill_font(t, b.geometry.text_font(ti));
-                    tri(&pts, &idx);
+                    tri(mesh, &pts, &idx);
                 }
                 let end = if (t.pos[0] - first[0]).hypot(t.pos[1] - first[1]) <= (t.pos[0] - last[0]).hypot(t.pos[1] - last[1]) { first } else { last };
                 let d = [t.pos[0] - end[0], t.pos[1] - end[1]];
@@ -1959,30 +1991,57 @@ impl DrawingEditor {
                 let sight = [d[0] / l, d[1] / l];
                 let reach = (l - 1.1 * t.height).max(0.0);
                 let tip = [end[0] + sight[0] * reach, end[1] + sight[1] * reach];
-                dot(end, TAN);
-                dot(tip, TAN);
+                if look != CutLook::Related {
+                    dot(end, TAN);
+                    dot(tip, TAN);
+                }
                 let near = |p: &[f64; 2]| views::dist_to_segment(*p, end, tip) <= reach * 0.3;
                 for f in b.geometry.fills.iter().filter(|f| tint && f.points.len() >= 3 && f.points.iter().all(near)) {
                     let idx: Vec<u32> = (1..f.points.len() as u32 - 1).flat_map(|i| [0, i, i + 1]).collect();
-                    tri(&f.points, &idx);
+                    tri(mesh, &f.points, &idx);
                 }
             }
             let drawn = &b.resolved;
-            if let Some(pl) = drawn.parent_of(v).and_then(|p| self.placement(p))
+            if look != CutLook::Related
+                && let Some(pl) = drawn.parent_of(v).and_then(|p| self.placement(p))
                 && let Some((_, at)) = drawn.view(v).and_then(|w| w.cut_anchor.as_ref())
             {
                 dot(pl.to_sheet(*at), [0x90, 0xce, 0xf1, 255]);
             }
         }
-        CutLineLooks { lit, grips, ink }
+        CutLineLooks { lit, grips, ink, related, blue }
+    }
+
+    /// The picks whose texts aren't drawn: Edit section… open, its cutting line's letters (live workflows-1123 08 s7-9).
+    pub(crate) fn hidden_texts(&self, built: &BuiltSheet) -> HashSet<u32> {
+        let Some(editing) = self.section_edit.as_ref().map(|e| PickTarget::SectionLine(e.view)) else { return HashSet::new() };
+        built.picks.iter().enumerate().filter(|(_, t)| **t == editing).map(|(i, _)| i as u32).collect()
+    }
+
+    /// The callout just placed while the pointer stays on the click (2 px): drawn lit, its ring orange on a box with its
+    /// anchor dot, as live does (qa workflows-1123 10 s16, s18).
+    pub(crate) fn placed_callout_lit(&self) -> Option<u64> {
+        let (id, at) = self.placed_callout?;
+        let near = (self.cursor[0] - at[0]).hypot(self.cursor[1] - at[1]) <= self.tol_mm(2.0);
+        (matches!(self.tool, Tool::Balloon { anchor: None }) && near).then_some(id)
+    }
+
+    /// The view under the pointer in Select, picked by its body, an edge or its label (not its cutting line or detail
+    /// circle in the parent).
+    pub(crate) fn view_under_pointer(&self) -> Option<ViewId> {
+        match self.built.as_ref()?.picks.get(self.hover? as usize)? {
+            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::ViewLabel(v) | PickTarget::BrokenOut { view: v, .. } => Some(*v),
+            _ => None,
+        }
     }
 
     fn push_cut_line_hover(&self, scene: &mut Scene) {
         use noshape_render::{LineSegment, PointData, PointSprite};
-        let CutLineLooks { lit, grips: marks, ink } = self.cut_line_looks();
+        let CutLineLooks { lit, grips: marks, ink, related, blue } = self.cut_line_looks();
         for i in lit {
             scene.add_flag(i, state::HOVER);
         }
+        self.push_related_marks(scene, &related, &blue);
         if marks.is_empty() {
             return;
         }
@@ -2024,6 +2083,12 @@ impl DrawingEditor {
                 frames.push((*v, DRAWING_SELECTED));
             }
         }
+        // Edit section… open: the section framed orange (live workflows-1123 08 s7-9).
+        if let Some(v) = self.section_edit.as_ref().map(|e| e.view)
+            && !frames.iter().any(|f| f.0 == v)
+        {
+            frames.push((v, DRAWING_SELECTED));
+        }
         frames
     }
 
@@ -2062,6 +2127,8 @@ impl DrawingEditor {
             Sel::Table(t) if matches!(self.tool, Tool::Select) => Some(t),
             _ => None,
         })
+        // Its right-click menu open, the table stays hovered (live workflows-1123 10 s8).
+        .or(self.menu_table.filter(|_| self.pointer_off))
     }
 
     /// A hovered or selected table's look (live tables-1118 h-stack, behaviours 1482 / 26614): its ink as it is, rows
@@ -2095,8 +2162,11 @@ impl DrawingEditor {
                 continue;
             }
             // Selected with the pointer away: the frame only, its rows white (live drwm-4b b0, b5).
-            let fills = Some(id) == hovered;
             let (x0, x1) = (l.xs[0], l.xs[l.xs.len() - 1]);
+            // Only with the pointer on the table: its corner dot just outside it fills nothing (live workflows-1123 10 s6-7).
+            let (y0, y1) = l.ys.iter().fold((f64::MAX, f64::MIN), |(a, b), y| (a.min(*y), b.max(*y)));
+            let c = self.cursor;
+            let fills = Some(id) == hovered && (self.pointer_off || (c[0] >= x0 && c[0] <= x1 && c[1] >= y0 && c[1] <= y1));
             let row_box = |r: usize| ([x0, l.ys[r + 1]], [x1, l.ys[r]]);
             let first = l.title as usize;
             let header_row = match &t.kind {
@@ -2148,7 +2218,8 @@ impl DrawingEditor {
             _ => None,
         });
         let leaders: Vec<&[[f64; 2]]> = match balloon {
-            Some(a) if colour == DRAWING_HOVER => g.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, _, p)| p.points.as_slice()).collect(),
+            // Hovered or selected, its leaders keep their ink (live workflow 23 s24, workflows-1123 10 s20-22).
+            Some(a) if colour == DRAWING_HOVER || colour == DRAWING_SELECTED => g.leader_paths.iter().filter(|(id, ..)| *id == a.id).map(|(_, _, p)| p.points.as_slice()).collect(),
             _ => Vec::new(),
         };
         g.lines.iter().enumerate().filter(|(_, l)| picks.contains(&l.pick) && !leaders.contains(&l.points.as_slice())).collect()
@@ -2720,6 +2791,16 @@ pub(crate) struct CutLineLooks {
     pub lit: Vec<u32>,
     pub grips: Vec<([f64; 2], [u8; 4])>,
     pub ink: noshape_render::MeshData,
+    /// A hovered or selected section view's line in its parent, drawn light blue with `blue` over its arrows and letters.
+    pub related: Vec<u32>,
+    pub blue: noshape_render::MeshData,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum CutLook {
+    Tint,
+    Related,
+    Grips,
 }
 
 /// The camera a frame was rendered for.

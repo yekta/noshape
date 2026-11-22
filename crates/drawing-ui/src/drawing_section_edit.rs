@@ -70,6 +70,7 @@ impl DrawingEditor {
         });
         let up_to = depth_ref.is_some();
         self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0), exclude_on: !exclude.is_empty(), exclude, exclude_picking: false, panel_focus: cx.focus_handle(), check_focused: false });
+        self.geometry_dirty = true;
         if depth.is_some() || up_to {
             self.toggle_edit_depth(depth, window, cx);
             if let Some(e) = &mut self.section_edit {
@@ -241,9 +242,9 @@ impl DrawingEditor {
     pub fn section_edit_overlay(&self, overlay: &mut crate::drawing_scene::Overlay) {
         let Some(e) = &self.section_edit else { return };
         let Some(pl) = self.placement(e.parent) else { return };
-        let r = self.tol_mm(9.0);
+        // The points it passes through: filled orange dots (live workflows-1123 08 s7-9).
         for p in &e.cuts {
-            overlay.marks.push((pl.to_sheet(*p), crate::drawing_scene::SnapMark::Circle, r));
+            overlay.dots.push((pl.to_sheet(*p), [0xcc, 0x92, 0x5c, 255]));
         }
         if let Some(s) = self.snap_at(self.cursor).filter(|s| s.view == e.parent) {
             let mut sheet = self.current_sheet().clone();
@@ -260,6 +261,9 @@ impl DrawingEditor {
     pub fn close_section_edit(&mut self, accept: bool, cx: &mut Context<Self>) {
         let dr = if accept { self.section_edited() } else { None };
         self.section_edit = None;
+        self.geometry_dirty = true;
+        // Its dots go with it, not at the next pointer move (qa workflows-1123 08 s11-22).
+        self.overlay = crate::drawing_scene::Overlay::default();
         self.set_preview(None, cx);
         if let Some(dr) = dr {
             self.commit("Edit section", dr, cx);

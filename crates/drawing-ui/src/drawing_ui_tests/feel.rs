@@ -629,7 +629,9 @@ fn a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange(cx: &mut T
         cx.update(|cx| {
             let e = editor.read(cx);
             let scene = e.build_scene();
-            let picks = e.picks_of(Sel::View(pl.id));
+            // (Its label stays black: qa workflows-1123 08.)
+            let label = |p: &u32| matches!(e.built.as_ref().and_then(|b| b.picks.get(*p as usize)), Some(noshape_model::drawing::build::PickTarget::ViewLabel(_)));
+            let picks: Vec<u32> = e.picks_of(Sel::View(pl.id)).into_iter().filter(|p| !label(p)).collect();
             (picks.iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| s & flag != 0)).count(), picks.len())
         })
     };
@@ -1094,6 +1096,24 @@ fn a_hovered_bom_header_shades_like_a_row(cx: &mut TestAppContext) {
     cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::Table(id)]));
     hover(cx, None);
     assert_eq!(fills(cx), (false, false, false), "selected, the pointer away: the rows white");
+    // On its corner dot just outside it (live workflows-1123 10 s6-7): white; its right-click menu open (s8): filled.
+    let corner = cx.update(|cx| {
+        let built = editor.read(cx).built.clone().expect("built");
+        let l = built.table_layout(id).expect("laid out");
+        [l.xs[l.xs.len() - 1] + 0.4, l.ys.iter().fold(f64::MIN, |a, y| a.max(*y)) + 0.4]
+    });
+    hover(cx, Some((header.0, corner)));
+    assert_eq!(fills(cx), (false, false, false), "on the corner dot: the rows white");
+    cx.update(|cx| editor.update(cx, |e, _| {
+        e.hover = None;
+        e.menu_table = Some(id);
+        e.pointer_off = true;
+    }));
+    assert_eq!(fills(cx), (false, true, true), "its menu open: the table's fills");
+    cx.update(|cx| editor.update(cx, |e, _| {
+        e.menu_table = None;
+        e.pointer_off = false;
+    }));
     assert_eq!(cx.update(|cx| editor.read(cx).lit_tables()), vec![(id, None)]);
     cx.update(|cx| editor.update(cx, |e, _| e.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: (1, 0), b: (1, 0) })));
     assert_eq!(cx.update(|cx| editor.read(cx).lit_tables()), vec![], "a selected cell: no frame");
@@ -2812,6 +2832,21 @@ fn a_cutting_line_hovered_frames_its_section_blue_and_its_body_does_not_drag(cx:
     let section = cx.update(|cx| editor.read(cx).current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Section { .. })).map(|v| v.id)).expect("the section placed");
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Select, cx)));
     draw(cx, window);
+    // The section view hovered, then selected: its cutting line, arrows and letters light blue, no grips (qa
+    // workflows-1123 08 s4-6).
+    let centre = cx.update(|cx| editor.read(cx).placement(section).map(|pl| [(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0])).expect("placed");
+    let related = |cx: &mut TestAppContext| cx.update(|cx| {
+        let l = editor.read(cx).cut_line_looks();
+        (l.related.len(), l.blue.indices.len(), l.lit.len(), l.grips.len())
+    });
+    assert_eq!(view_of(&lit_at(cx, window, &editor, centre)), Some(section), "the section under the pointer");
+    let (lines, ink, lit, grips) = related(cx);
+    assert!(lines > 0 && ink > 0 && lit == 0 && grips == 0, "hovered: blue line and arrows, no tan, no grips ({lines}, {ink}, {lit}, {grips})");
+    click_at(cx, window, &editor, centre, Modifiers::default());
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    let (lines, ink, lit, grips) = related(cx);
+    assert!(lines > 0 && ink > 0 && lit == 0 && grips == 0, "selected: the same ({lines}, {ink}, {lit}, {grips})");
+    cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
     // A point on the cutting line's longest stroke, a quarter along (clear of its cut point).
     let on_line = cx.update(|cx| {
         let e = editor.read(cx);
@@ -2897,6 +2932,20 @@ fn the_callout_tool_lights_an_edge_within_the_pickbox(cx: &mut TestAppContext) {
             assert_eq!(lit == edge, lights, "{} px off the edge: lit {lit:?}", sign * px);
         }
     }
+    // Placed with the pointer still on it: drawn lit (qa workflows-1123 10 s16); not once the pointer moves away.
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    let at = [mid[0] + 20.0, mid[1] + 20.0];
+    click_at(cx, window, &editor, at, Modifiers::default());
+    let placed = cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. })).map(|a| a.id));
+    assert!(placed.is_some(), "the callout placed");
+    assert_eq!(cx.update(|cx| editor.read(cx).placed_callout_lit()), placed, "under the pointer: lit");
+    lit_at(cx, window, &editor, [at[0] + 15.0, at[1]]);
+    assert_eq!(cx.update(|cx| editor.read(cx).placed_callout_lit()), None, "the pointer away: plain");
+    // A second one placed in line with it: the guide through both stays while the pointer does (s18).
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    click_at(cx, window, &editor, [at[0], at[1] + 15.0], Modifiers::default());
+    let guides = cx.update(|cx| editor.read(cx).infer_lines.clone());
+    assert!(guides.iter().any(|(p, q)| (p[0] - q[0]).abs() < 1e-6 && (p[1] - q[1]).abs() > 5.0), "a vertical guide through both: {guides:?}");
 }
 
 /// ui-parity drw-copy-annotation-drag (qa 11-19 regression): Alt+drag on a selected note, pressed on its end where its
@@ -3472,7 +3521,9 @@ fn a_just_placed_view_is_lit_under_the_pointer(cx: &mut TestAppContext) {
         cx.update(|cx| {
             let e = editor.read(cx);
             let scene = e.build_scene();
-            let picks = e.picks_of(Sel::View(v));
+            // (Its label stays black: qa workflows-1123 08.)
+            let label = |p: &u32| matches!(e.built.as_ref().and_then(|b| b.picks.get(*p as usize)), Some(noshape_model::drawing::build::PickTarget::ViewLabel(_)));
+            let picks: Vec<u32> = e.picks_of(Sel::View(v)).into_iter().filter(|p| !label(p)).collect();
             (picks.iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| s & flag != 0)).count(), picks.len())
         })
     };
@@ -3566,7 +3617,30 @@ fn a_hovered_balloon_keeps_its_leader_black(cx: &mut TestAppContext) {
     assert_eq!(leader.len(), 1, "one leader");
     assert!(ring, "the ring tinted: {hovered:?}");
     assert!(!hovered.contains(&leader[0]), "hovered: the leader as it is");
-    assert!(selected.contains(&leader[0]), "selected: the leader orange as before");
+    assert!(!selected.contains(&leader[0]), "selected: the leader black too (live workflows-1123 10 s20-22)");
+    assert!(selected.iter().any(|l| l.len() > 8), "selected: the ring orange");
+    let (edges, dots) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. })).map(|a| a.id).expect("the balloon");
+        let (edges, dots) = e.leader_touches(a);
+        (edges.len(), dots.len())
+    });
+    assert!(edges > 0 && dots == 1, "the edge its leader is on lit blue with the anchor dot (live workflows-1123 10 s19-22): {edges}, {dots}");
+    // Selected: its number black on an orange box (the selected dimension's look), not orange ink.
+    let (boxed, text_lit) = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let id = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Balloon { .. })).map(|a| a.id).expect("the balloon");
+            e.selection = vec![Sel::Annotation(id)];
+            e.hover = None;
+            let b = e.built.clone().expect("built");
+            let picks = e.picks_of(Sel::Annotation(id));
+            let scene = e.build_scene();
+            let texts: Vec<u32> = b.geometry.texts.iter().filter(|t| picks.contains(&t.pick)).map(|t| t.pick).collect();
+            let lit = texts.iter().any(|p| scene.states.get(*p as usize).is_some_and(|s| s & noshape_render::scene::state::SELECTED != 0));
+            (scene.instances.iter().any(|i| i.layer == -4 && i.color == crate::theme::lin(DRAWING_SELECTED)), lit)
+        })
+    });
+    assert_eq!((boxed, text_lit), (true, false), "an orange box behind a black number");
 }
 
 /// A 2 × 2 general table with its top-left cell clicked (the Cell panel open) and right-clicked (the cells' menu open).
@@ -3863,4 +3937,123 @@ fn a_dragged_views_dimensions_are_orange_with_it(cx: &mut TestAppContext) {
     };
     assert!(lit(false, cx), "dragged: its dimension orange");
     assert!(!lit(true, cx), "after Esc: not");
+}
+
+/// Live workflows-1123 08 s15-20, 09 s10-11: a selected detail view's label ("DETAIL A SCALE …") stays black under its
+/// orange frame; its geometry is drawn selected.
+#[gpui::test]
+fn a_selected_views_label_stays_black(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_render::scene::state;
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let front = g["views"].as_array().and_then(|v| v.iter().find(|v| v["orientation"] == "front").cloned()).expect("Front");
+        call(ctx, "drawing_detail_view", json!({ "drawing": dw, "parent": front["id"], "center": [0, 0], "radius": 8, "position": [300, 200] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-selected-view-label");
+    draw(cx, window);
+    let (label, rest) = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let detail = e.current_sheet().views.iter().find(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. })).map(|v| v.id).expect("the detail");
+            e.selection = vec![Sel::View(detail)];
+            e.hover = None;
+            let b = e.built.clone().expect("built");
+            let scene = e.build_scene();
+            let lit = |p: u32| scene.states.get(p as usize).is_some_and(|s| s & state::SELECTED != 0);
+            let picks = e.picks_of(Sel::View(detail));
+            let (labels, others): (Vec<u32>, Vec<u32>) = picks.into_iter().partition(|p| matches!(b.picks.get(*p as usize), Some(PickTarget::ViewLabel(_))));
+            assert!(!labels.is_empty(), "the detail has a label");
+            (labels.iter().any(|p| lit(*p)), others.iter().any(|p| lit(*p)))
+        })
+    });
+    assert_eq!((label, rest), (false, true), "the label black, the view selected");
+    // Selected by its body: its circle and leader in the parent light blue, no grips (live asbv-14/15, qa workflows-1123
+    // 09 s21); picked by the circle: the grips, not blue (asbv-8).
+    let marks = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = editor.read(cx);
+        let mut o = crate::drawing_scene::Overlay::default();
+        e.detail_circle_overlay(&mut o);
+        (e.detail_marks_lit().len(), o.dots.len())
+    });
+    assert_eq!(marks(cx), (1, 0), "selected by its body: blue, no grips");
+    cx.update(|cx| editor.update(cx, |e, _| {
+        let detail = e.current_sheet().views.iter().find(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. })).map(|v| v.id);
+        e.circle_pick = detail;
+    }));
+    assert_eq!(marks(cx), (0, 2), "picked by its circle: its grips");
+}
+
+/// Live workflows-1123 09 s6: the Detail view tool lights the edge under the pointer until the centre is placed; then
+/// nothing under it lights or snaps while the radius is set.
+#[gpui::test]
+fn after_the_detail_centre_nothing_under_the_pointer_lights(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-detail-centre-unlit");
+    draw(cx, window);
+    let (view, on_edge) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.geometry.lines.iter().find_map(|l| match b.picks.get(l.pick as usize) {
+            Some(PickTarget::Edge { view, .. }) if l.points.len() >= 2 => Some((*view, l.points[0])),
+            _ => None,
+        }).expect("an edge")
+    });
+    let off = [on_edge[0] + 40.0, on_edge[1] + 40.0];
+    cx.update(|cx| editor.update(cx, |e, _| e.tool = Tool::Detail { parent: Some(view), center: None, radius: None }));
+    lit_at(cx, window, &editor, on_edge);
+    assert!(cx.update(|cx| editor.read(cx).hover_snap.is_some()), "before the centre: the edge snaps");
+    lit_at(cx, window, &editor, off);
+    cx.update(|cx| editor.update(cx, |e, _| e.tool = Tool::Detail { parent: Some(view), center: Some(on_edge), radius: None }));
+    assert_eq!(lit_at(cx, window, &editor, on_edge), None, "after it: nothing lit");
+    assert!(cx.update(|cx| editor.read(cx).hover_snap.is_none()), "no snap disc");
+}
+
+/// Qa workflows-1123 10 s12: Table properties ✓ leaves nothing selected; ✕ keeps the table selected.
+#[gpui::test]
+fn table_properties_ok_clears_the_selection(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-table-props-ok");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+            let view = e.current_sheet().views[0].id;
+            let kind = noshape_model::drawing::TableKind::Bom { view, structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: true, source: None };
+            e.edit_sheet("BOM table", cx, |s| s.tables.push(noshape_model::drawing::Table::new(id, kind, [60.0, 200.0])));
+            id
+        })
+    });
+    draw(cx, window);
+    let close = |cx: &mut TestAppContext, ok: bool| cx.update(|cx| editor.update(cx, |e, cx| {
+        e.selection = vec![Sel::Table(id)];
+        e.open_table_props_corner(id, cx);
+        e.close_table_props(ok, cx);
+        e.selection.clone()
+    }));
+    assert_eq!(close(cx, false), vec![Sel::Table(id)], "✕: still selected");
+    assert!(close(cx, true).is_empty(), "✓: nothing selected");
+}
+
+/// Qa workflows-1123 11 s13: a projected view moved to another sheet is apart from its parent (View properties: Suppress
+/// alignment ticked and greyed, its rotation editable); one on its parent's sheet is not.
+#[gpui::test]
+fn a_view_moved_off_its_parents_sheet_is_apart_from_it(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-moved-view-apart");
+    real_sheet(cx, window, &editor);
+    let child = cx.update(|cx| {
+        let e = editor.read(cx);
+        e.current_sheet().views.iter().find(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Projected { .. })).map(|v| v.id).expect("a projected view")
+    });
+    assert!(!cx.update(|cx| editor.read(cx).apart_from_parent(child)), "on its parent's sheet: aligned");
+    // (The moved view is a new one, selected on the new sheet.)
+    let moved = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.selection = vec![Sel::View(child)];
+        e.move_selected_views(child, None, cx);
+        e.selection.iter().find_map(|s| s.as_view())
+    }));
+    let moved = moved.expect("moved and selected");
+    assert!(cx.update(|cx| editor.read(cx).apart_from_parent(moved)), "on another sheet: apart");
 }

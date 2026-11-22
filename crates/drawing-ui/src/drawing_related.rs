@@ -86,17 +86,15 @@ impl DrawingEditor {
         let Some(b) = &self.built else { return (edges, dots) };
         // Resolved: the points follow the model as drawn.
         let Some(a) = b.resolved.annotations.iter().find(|a| a.id == id) else { return (edges, dots) };
+        // A callout lights the edge its leader is on too, not a face region's boundary (qa workflows-1123 10 s19-22).
         let ends: Vec<(ViewId, [f64; 2], bool)> = match &a.kind {
             AnnotationKind::Note { style, .. } => style.leaders.iter().filter_map(|l| Some((l.view?, l.point, true))).collect(),
             AnnotationKind::Balloon { view, anchor, callout, .. } if !callout.free => vec![(*view, *anchor, false)],
             _ => Vec::new(),
         };
-        for (v, p, with_edge) in ends {
+        for (v, p, region) in ends {
             let (Some(g), Some(pl)) = (self.geoms.get(&v), self.placement(v)) else { continue };
             dots.push(pl.to_sheet(p));
-            if !with_edge {
-                continue;
-            }
             // Leaders snap onto the edge (view units, meters).
             let n0 = edges.len();
             for (i, e) in g.edges.iter().enumerate() {
@@ -108,7 +106,8 @@ impl DrawingEditor {
             }
             // A leader inside a face region: the region's whole boundary,
             // its holes too (live drawing/427-428).
-            if edges.len() == n0
+            if region
+                && edges.len() == n0
                 && let Some((outer, holes)) = self.pk().view_region_at(v, pl.to_sheet(p))
             {
                 let loops: Vec<&Vec<[f64; 2]>> = std::iter::once(&outer).chain(holes.iter()).collect();
@@ -226,6 +225,30 @@ impl DrawingEditor {
         }
     }
 
+    /// A hovered or selected section or detail view's marks in its parent, light blue: the cutting line (`lines`, `ink`
+    /// over its arrows and letters) or the detail circle and its leader (live asbv-14/15, qa workflows-1123 08 s4-6, 09
+    /// s16-21).
+    pub(crate) fn push_related_marks(&self, scene: &mut Scene, lines: &[u32], ink: &noshape_render::MeshData) {
+        let Some(b) = &self.built else { return };
+        let details = self.detail_marks_lit();
+        let mut picks = lines.to_vec();
+        picks.extend(b.picks.iter().enumerate().filter(|(_, t)| matches!(t, PickTarget::DetailCircle(v) if details.contains(v))).map(|(i, _)| i as u32));
+        let up = self.gpu.uploader();
+        let mut data = LineData::default();
+        for (style, piece) in self.tinted_pieces(b, &picks, 0x90cef1) {
+            let width = drawing_scene::px_width(style, self.zoom).max(LIT_LINE_PX);
+            for w in piece.windows(2) {
+                data.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
+            }
+        }
+        if !data.segments.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&data))).per_primitive_color().unpickable().layer(18));
+        }
+        if !ink.indices.is_empty() {
+            scene.instances.push(Instance::new(Drawable::Mesh(up.upload_mesh(ink))).with_color(crate::theme::lin(0x90cef1)).unlit().unpickable().layer(19));
+        }
+    }
+
     pub fn push_related_highlights(&self, scene: &mut Scene) {
         let Some(b) = &self.built else { return };
         // The selected hatch regions: a yellow outline with a pale halo (live request 1682, "the yellow surround"); the
@@ -277,6 +300,7 @@ impl DrawingEditor {
         if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| dragged.is_none_or(|d| *s != Sel::Annotation(d))) {
             anns.push(a);
         }
+        anns.extend(self.placed_callout_lit());
         let (row_callouts, row_geometry) = self.table_row_highlight();
         if anns.is_empty() && row_callouts.is_empty() && row_geometry.is_empty() {
             return;

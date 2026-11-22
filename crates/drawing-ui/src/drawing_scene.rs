@@ -148,10 +148,10 @@ fn run_on(a: [f64; 2], b: [f64; 2], d: f64) -> [[f64; 2]; 2] {
 }
 
 /// Sheet texts as filled glyphs (Onshape's sheet text is a filled sans
-/// font): (ink, dangling) meshes, picked with the text's pick id.
-pub fn sheet_text(built: &BuiltSheet, dangling_picks: &HashSet<u32>) -> (MeshData, MeshData) {
+/// font): (ink, dangling) meshes, picked with the text's pick id; the texts of the `hidden` picks left out.
+pub fn sheet_text(built: &BuiltSheet, dangling_picks: &HashSet<u32>, hidden: &HashSet<u32>) -> (MeshData, MeshData) {
     let (mut ink, mut red) = (MeshData::default(), MeshData::default());
-    for (ti, t) in built.geometry.texts.iter().enumerate() {
+    for (ti, t) in built.geometry.texts.iter().enumerate().filter(|(_, t)| !hidden.contains(&t.pick)) {
         // Colored texts go to [`sheet_colored`].
         if t.text.trim().is_empty() || font::text_is_stroked(t, built.geometry.text_font(ti)) || built.geometry.text_color(ti).is_some() {
             continue;

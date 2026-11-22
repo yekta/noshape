@@ -728,7 +728,8 @@ impl DrawingEditor {
             | Tool::CircleCenterline { .. }
             | Tool::Balloon { anchor: None }
             | Tool::Section { p0: None, .. }
-            | Tool::Detail { radius: None, .. }
+            // (Its centre placed, nothing snaps or lights while the radius is set: live workflows-1123 09 s6.)
+            | Tool::Detail { center: None, .. }
             | Tool::JoggedSection { done: false, .. }
             | Tool::AlignedSection { b: None, .. }
             | Tool::Ordinate { .. }
@@ -1399,7 +1400,9 @@ impl DrawingEditor {
                     }
                     self.group_callout_on_drop(&a, &mut d);
                     self.commit("Callout", d, cx);
+                    self.placed_callout = Some((a.id, self.cursor));
                     self.tool = Tool::Balloon { anchor: None };
+                    self.placed_callout_guides(a.id);
                     self.datum_on = None;
                 }
             }
@@ -1414,6 +1417,7 @@ impl DrawingEditor {
         self.glyph_selected = None;
         self.esc_kept.clear();
         self.pointer_off = false;
+        self.menu_table = None;
         if self.placed_table.take().is_some() {
             cx.notify();
         }
@@ -1547,6 +1551,7 @@ impl DrawingEditor {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         self.pointer_off = false;
+        self.menu_table = None;
         if self.click_still.is_some_and(|c| c != self.cursor) {
             self.click_still = None;
             self.redraw(cx);
@@ -1775,6 +1780,8 @@ impl DrawingEditor {
                         self.infer_placement(None);
                     } else if !e.modifiers.shift && self.placing_table() {
                         self.infer_table_placement();
+                    } else if let Some(id) = self.placed_callout_lit() {
+                        self.placed_callout_guides(id);
                     }
                     self.update_preview(cx);
                 }
@@ -1957,6 +1964,18 @@ impl DrawingEditor {
         let Some(p) = self.snap_at(self.cursor).and_then(|s| self.placement(s.view).map(|pl| pl.to_sheet(s.p))) else { return };
         if !self.woken_points.iter().any(|w| (w[0] - p[0]).abs() < 1e-9 && (w[1] - p[1]).abs() < 1e-9) {
             self.woken_points.push(p);
+        }
+    }
+
+    /// The guides through a just-placed callout to an annotation it lines up with, one per axis (live workflows-1123 10
+    /// s18: the dotted magenta line through callouts 1 and 2).
+    pub fn placed_callout_guides(&mut self, id: u64) {
+        let Some(sheet) = self.drawing.sheets.get(self.sheet) else { return };
+        let Some(at) = sheet.annotations.iter().find(|a| a.id == id).map(|a| a.position) else { return };
+        for axis in [0, 1] {
+            if let Some(p) = sheet.annotations.iter().filter(|a| a.id != id).map(|a| a.position).find(|p| (p[axis] - at[axis]).abs() < 1e-6) {
+                self.infer_lines.push((p, at));
+            }
         }
     }
 
@@ -2263,6 +2282,7 @@ impl DrawingEditor {
     fn select_click(&mut self, pick: Option<u32>, m: Modifiers, cx: &mut Context<Self>) {
         let armed = std::mem::take(&mut self.copy_armed);
         self.click_still = Some(self.cursor);
+        self.circle_pick = self.detail_circle_of(pick);
         if self.linestyle_click(cx) || self.hide_edges_click(cx) || self.section_edit_click(cx) || self.replicate_click(cx) {
             return;
         }
@@ -2547,6 +2567,11 @@ impl DrawingEditor {
             return;
         }
         self.menu_at = self.local(position);
+        self.menu_table = pick.and_then(|p| match self.sel_of_pick(p) {
+            Some(Sel::Table(t)) => Some(t),
+            _ => None,
+        });
+        self.circle_pick = self.detail_circle_of(pick);
         let entries = self.context_menu_entries(pick, cx);
         // The pointer is on the menu now: the canvas hover drops, so a selected leader shows orange, not tan (live2
         // drw-leader-add-node s10); a rebuild under the menu or the palette it opens hovers nothing there

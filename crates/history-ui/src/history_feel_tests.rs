@@ -558,3 +558,41 @@ fn the_restore_dialog_ignores_enter_and_closes_on_esc(cx: &mut TestAppContext) {
     assert!(!shown(cx), "Esc closes it");
     assert_eq!(head(cx), before, "still nothing restored");
 }
+
+/// Live workflows-1123 19 s21: B1 merged into Main, a version "Merged" made there, then B1 deleted: Main's history keeps
+/// "Merge from B1" under "Merged" and B1's merged change on a lane of its own.
+#[test]
+fn a_deleted_merged_workspace_keeps_its_merge_rows() {
+    let dir = std::env::temp_dir().join(format!("noshape-history-deleted-merge-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("merge.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    let mut ctx = noshape_ops::Ctx::new();
+    let mut call = |tool: &str, args: serde_json::Value| noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+    call("document_create", json!({ "path": path.to_str().unwrap() }));
+    call("variable_create", json!({ "name": "a", "value": "1 mm" }));
+    call("history_create_version", json!({ "name": "V1" }));
+    call("history_create_branch", json!({ "name": "B1", "version": "V1" }));
+    call("history_switch_branch", json!({ "branch": "B1" }));
+    call("variable_create", json!({ "name": "b", "value": "2 mm" }));
+    call("history_switch_branch", json!({ "branch": "Main" }));
+    call("history_merge", json!({ "branch": "B1" }));
+    call("history_create_version", json!({ "name": "Merged" }));
+    call("history_delete_branch", json!({ "branch": "B1" }));
+    let session = crate::session::Session::open(&path).unwrap();
+    let graph = session.store.graph().unwrap();
+    let mut lanes: Vec<noshape_store::BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
+    let live = lanes.len();
+    lanes.extend(super::merged_deleted(&graph));
+    assert_eq!(lanes.len(), live + 1, "B1 keeps a lane");
+    let rows = super::build_rows(&graph, &lanes, ("Start".into(), String::new()));
+    let kinds: Vec<(super::RowKind, String)> = rows.iter().map(|r| (r.kind, r.name.clone())).collect();
+    let at = |k: super::RowKind| rows.iter().position(|r| r.kind == k);
+    let (merged, merge, change) = (rows.iter().position(|r| r.kind == super::RowKind::Version && r.name == "Merged"), at(super::RowKind::Merge), at(super::RowKind::Merged));
+    assert!(merged.is_some() && merge.is_some() && change.is_some(), "Merged, the merge row and B1's change: {:?}", kinds.iter().map(|k| &k.1).collect::<Vec<_>>());
+    assert!(merged < merge && merge < change, "in that order");
+    assert_eq!(rows[change.unwrap()].lane, live, "B1's change on its own lane");
+    assert!(rows[merged.unwrap()].changes.is_empty(), "the version shows no changes of its own");
+}

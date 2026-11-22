@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 22:26 UTC.
+Updated 2026-11-22 22:45 UTC.
 
 ## In flight
 
@@ -32,17 +32,18 @@ crates/drawing land (drawing-ui alone: not needed).
   radius value dropped inside, folder list-row drop look, Esc ends a row drag, table Insert ▸ fix, TICKETS dup row.
   3806ff953 (dx's hover cells) DROPPED in the rebase: dx landed its own (52cfbc549). Not in dx's: the Note tool's leader
   on a centerline (live drw-hover-1122): recheck on main.
-- UNCOMMITTED, x229 running (qa workflows-1123 08-10 P0s): FEEL-DRW-SELECTED-VIEW-LABEL (a selected view's label pick
-  not flagged), FEEL-DRW-PICK-EDGE-STAYS-LIT (pick.rs: Balloon{anchor:Some} / Detail{center:Some} hover None; Detail
-  snaps only before the centre), FEEL-DRW-BOM-HOVER-FILL (fills only with the cursor inside; `menu_table` keeps them
-  while its menu is open), FEEL-DRW-CALLOUT-SELECTED-LOOK (balloons in the dims look; leaders black when selected).
-  Tests in feel.rs. x229 RUNNING (task b03js7vgz / waiter bq38zvk9a; script x229r.sh: drawing_ui_tests::, scene
-  drawing_tools, clippy drawing-ui + scene); read with tail -40. Also uncommitted, untested: FEEL-FS-COMMIT-DISABLED-HOVER
-  (feature_studio.rs render_commit: clean = ButtonCustomVariant #8aa8d7, hover/active #557fc2, replacing opacity 0.5;
-  needs cargo test -p noshape-feature-studio-ui --lib + clippy). Then commit, land, mark the tickets [x].
-- qa queue left (TICKETS blocks "qa, 2026-11-22 21:4x" and "22:0x"): P0 FEEL-DRW-RELATED-MARKS-BLUE,
-  FEEL-DRW-SECTION-EDIT-MARKS, FEEL-DRW-CALLOUT-PLACED-HOVER, FEEL-FS-COMMIT-DISABLED-HOVER (live hovered disabled
-  Commit (85,127,194), ours (186,207,229); render_commit in feature_studio.rs ~1765 uses opacity 0.5); P1/P2 rows there.
+- UNCOMMITTED, tested (x230-x234 green: drawing_ui_tests 158, scene drawing_tools, feature-studio-ui lib, clippy):
+  every qa workflows-1123 P0 (both blocks): SELECTED-VIEW-LABEL, PICK-EDGE-STAYS-LIT, BOM-HOVER-FILL, CALLOUT-SELECTED-LOOK,
+  FS-COMMIT-DISABLED-HOVER, RELATED-MARKS-BLUE (cut_line_looks CutLook::Related + push_related_marks; detail circle blue
+  unless `circle_pick`; callout lights its edge; selection_handles dots removed), SECTION-EDIT-MARKS (frame, filled dots,
+  overlay cleared on close, `hidden_texts` hides the cutting letters), CALLOUT-PLACED-HOVER (`placed_callout` +
+  `placed_callout_guides`); P1 DRW-SELECTION-AFTER-ACTION. TICKETS marked [x]. tested in x237 (159 green):
+  DRW-MOVED-VIEW-PROPS (`apart_from_parent`: Suppress ticked+greyed, rotation editable; orientation dropdown left).
+  Then commit, fetch, rebase, diff --stat, land.
+- DRW-VIEWPROPS-ENTER-APPLIES held: conflicts with live2 drw-view-properties-scale-typed; REQUESTS studios 22:43 asks live.
+- qa P1/P2 left: HIST-COMPARE-FEATURE-HIGHLIGHT / -PARAMS-PANEL / -FEATURE-ICONS, HIST-DELETE-BRANCH-DROPS-MERGE,
+  DRW-SECTION-DETAIL-VIEW-PROPS-ROWS, DRW-DETAIL-CONNECTED-OPTIONS, DRW-DETAIL-PREVIEW-LOOK, DRW-SECTION-PREVIEW-IN-PARENT,
+  the 22:0x P2s.
 - drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box) not checked.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.

@@ -150,6 +150,9 @@ impl<'a> SheetPick<'a> {
             Tool::Centermark => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &is_circle)).or(hover.filter(|h| self.built.and_then(|b| b.picks.get(*h as usize)).is_some_and(|t| !matches!(t, PickTarget::Edge { .. })))),
             Tool::EdgeCenterline { .. } => self.built.and_then(|b| b.hit_where(self.cursor, reach6, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }))).or(hover),
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
+            // Once a callout's anchor or a detail's centre is placed nothing under the pointer lights (live workflows-1123
+            // 09 s6, 10 s15/s17).
+            Tool::Balloon { anchor: Some(_) } | Tool::Detail { center: Some(_), .. } => None,
             // The smart dimension also takes a centerline, lit within 8 px (live drw-hover-1122), the nearer of the two.
             Tool::Dimension { kind: DimTool::Linear, .. } => {
                 let near = |reach: f64, accept: &dyn Fn(&PickTarget) -> bool| self.built.and_then(|b| b.nearest_where(self.cursor, accept)).filter(|(_, d)| *d < reach);

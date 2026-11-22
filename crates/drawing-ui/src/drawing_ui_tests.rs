@@ -1181,6 +1181,19 @@ fn edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus(cx: &
     draw(cx, window);
     let open = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).section_edit.is_some());
     assert!(open(cx), "Edit section open");
+    // Live workflows-1123 08 s7-9: the section framed orange, its cut point a filled orange dot (no ring).
+    let (framed, dots, rings) = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.update_preview(cx);
+        (e.view_frames().contains(&(section, crate::drawing_view::DRAWING_SELECTED)), e.overlay.dots.len(), e.overlay.marks.iter().filter(|m| m.1 == crate::drawing_scene::SnapMark::Circle).count())
+    }));
+    assert!(framed && dots > 0 && rings == 0, "editing: framed {framed}, {dots} dots, {rings} rings");
+    let letters = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        let hidden = e.hidden_texts(b);
+        b.geometry.texts.iter().filter(|t| hidden.contains(&t.pick)).count()
+    });
+    assert!(letters(cx) > 0, "editing: the cutting line's letters hidden");
     let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("se-depth-row").expect("the Section depth row");
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(gpui_kit::point(row.origin.x + px(16.), row.center().y), Modifiers::default());
     draw(cx, window);
@@ -1194,6 +1207,8 @@ fn edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus(cx: &
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
     draw(cx, window);
     assert!(!open(cx), "after a click on its header Esc closes it");
+    assert!(cx.update(|cx| editor.read(cx).overlay.dots.is_empty()), "closed: its dots gone (qa workflows-1123 08 s11-22)");
+    assert_eq!(letters(cx), 0, "closed: the letters back");
 }
 
 /// live2 asm-feel (6), section-q (2): Angular with Cut angle unticked takes three clicks. The first (a view corner)

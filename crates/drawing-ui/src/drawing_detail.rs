@@ -14,6 +14,7 @@ use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::{ViewId, views};
 
 /// Detail view dialog state.
@@ -240,15 +241,40 @@ impl DrawingEditor {
     /// dashed, light blue #90CEF1 while the view is selected and tan #CCB292
     /// on hover, with the resize arrows beside the grip, the grip an orange
     /// dot and the centre a blue one.
+    /// The detail view whose circle in the parent pick `pick` is.
+    pub fn detail_circle_of(&self, pick: Option<u32>) -> Option<ViewId> {
+        match self.built.as_ref()?.picks.get(pick? as usize)? {
+            PickTarget::DetailCircle(v) => Some(*v),
+            _ => None,
+        }
+    }
+
+    /// The detail views whose circle and leader in the parent are drawn light blue: hovered by their body, edges or label,
+    /// or selected other than by the circle (live asbv-14/15, qa workflows-1123 09 s16-21).
+    pub fn detail_marks_lit(&self) -> Vec<ViewId> {
+        if !matches!(self.tool, Tool::Select) {
+            return Vec::new();
+        }
+        let shown = self.view_under_pointer();
+        self.current_sheet()
+            .views
+            .iter()
+            .filter(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. }))
+            .filter(|v| self.circle_pick != Some(v.id) && (shown == Some(v.id) || self.selection.contains(&Sel::View(v.id))))
+            .map(|v| v.id)
+            .collect()
+    }
+
     pub fn detail_circle_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
         const BLUE: [u8; 4] = [144, 206, 241, 255];
         const TAN: [u8; 4] = [204, 178, 146, 255];
         const ORANGE: [u8; 4] = [204, 146, 92, 255];
         const CENTRE: [u8; 4] = [0, 136, 204, 255];
-        let hovered = self.hover.and_then(|h| self.sel_of_pick(h));
+        // The circle itself hovered or picked: its grips (live asbv-7/8); the view picked by its body: light blue, no grips.
+        let hovered = self.detail_circle_of(self.hover);
         for v in self.current_sheet().views.iter().filter(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. })) {
-            let selected = self.selection.contains(&Sel::View(v.id));
-            if !selected && hovered != Some(Sel::View(v.id)) {
+            let selected = self.selection.contains(&Sel::View(v.id)) && self.circle_pick == Some(v.id);
+            if !selected && hovered != Some(v.id) {
                 continue;
             }
             let Some((c, r, g)) = self.detail_grip(v.id) else { continue };

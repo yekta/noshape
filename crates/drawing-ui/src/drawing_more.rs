@@ -395,22 +395,6 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ section line handles
 
-    /// Sheet positions of the cutting line points of selected section views.
-    pub fn selection_handles(&self) -> Vec<[f64; 2]> {
-        if !matches!(self.tool, Tool::Select) {
-            return vec![];
-        }
-        let sheet = self.drawn_sheet();
-        let mut out = Vec::new();
-        for s in &self.selection {
-            let Some(v) = s.as_view() else { continue };
-            let (Some(pts), Some(parent)) = (sheet.section_points(v), sheet.parent_of(v)) else { continue };
-            let Some(pl) = self.placement(parent) else { continue };
-            out.extend(pts.iter().map(|p| pl.to_sheet(*p)));
-        }
-        out
-    }
-
     /// The sheet as built: section lines where their model points put them
     /// (live 1625).
     pub fn drawn_sheet(&self) -> &noshape_model::drawing::Sheet {

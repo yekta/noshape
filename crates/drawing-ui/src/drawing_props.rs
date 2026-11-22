@@ -800,6 +800,12 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// A child view on another sheet than its parent's (Move to sheet: linked to it).
+    pub fn apart_from_parent(&self, id: ViewId) -> bool {
+        let sheet = self.current_sheet();
+        sheet.parent_of(id).is_some_and(|p| p.link().is_some() || sheet.view(p).is_none())
+    }
+
     pub fn render_view_props(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         // Live drawing/177 + dom/drawing-flat-view-properties.txt (help images
         // viewproperties-new-01 for child views): a 295 px dialog; a 28 px
@@ -833,6 +839,9 @@ impl DrawingEditor {
         let doc_name = self.doc.read(cx).name();
         let parent = sheet.parent_of(props.view);
         let has_parent = parent.is_some();
+        // Moved to another sheet than its parent's: no longer aligned with it, Suppress alignment ticked and greyed, its
+        // rotation editable (qa workflows-1123 11 s13).
+        let apart = self.apart_from_parent(props.view);
         let parent_is_section = parent.and_then(|p| sheet.view(p)).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }));
         let parent_cut_row = parent_is_section && multi.is_none() && matches!(v.kind, ViewKind::Projected { .. });
         let has_children = sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(props.view));
@@ -1040,7 +1049,7 @@ impl DrawingEditor {
         rows.push(row("Scale", h_flex().h(px(26.)).border_b_1().border_color(line).text_color(field_ink).child(div().flex_1().child(Input::new(&props.scale_input).appearance(false).xsmall().text_size(px(13.33)))).child(scale_menu).into_any_element()));
         let check = |id: &'static str, t: &'static str, on: bool, f: fn(&mut ViewProps, bool), cx: &mut Context<Self>| {
             // A rotated view can't be re-aligned with its parent (help H:views).
-            let locked = id == "vp-unaligned" && on && v.rotation.abs() > 1e-9;
+            let locked = id == "vp-unaligned" && on && (apart || v.rotation.abs() > 1e-9);
             div()
                 .pl(px(5.))
                 .py(px(4.))
@@ -1055,7 +1064,7 @@ impl DrawingEditor {
         // Child views: Suppress alignment with parent; projected views of a
         // section view: Apply parent view section cut (help H:views).
         if has_parent && multi.is_none() && !matches!(v.kind, ViewKind::Detail { .. }) {
-            rows.push(check("vp-unaligned", "Suppress alignment with parent", props.unaligned, |p, on| p.unaligned = on, cx));
+            rows.push(check("vp-unaligned", "Suppress alignment with parent", props.unaligned || apart, |p, on| p.unaligned = on, cx));
         }
         // Live request 1630: under Suppress alignment, projected views only.
         if multi.is_none() && matches!(v.kind, ViewKind::Projected { .. }) {
@@ -1064,7 +1073,7 @@ impl DrawingEditor {
         // Rotation angle (0–360) with the reverse-direction button: editable
         // only without parent and children, or with the parent alignment
         // suppressed (help H:views).
-        let can_rotate = (!has_parent || props.unaligned) && !has_children && multi.is_none();
+        let can_rotate = (!has_parent || props.unaligned || apart) && !has_children && multi.is_none();
         let rev = props.rot_reverse;
         let angle = if can_rotate {
             field(&props.rotation)

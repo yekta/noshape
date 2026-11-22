@@ -9,7 +9,7 @@
 use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
 use crate::theme::p;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState, HighlightStyleResolver, Input, InputEvent, InputHighlighter, InputState, Position, TabSize};
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -1766,6 +1766,9 @@ impl FeatureStudioView {
     fn render_commit(&self, cx: &mut Context<Self>) -> AnyElement {
         // Onshape: pale (Bootstrap disabled look) while there is nothing to commit.
         let clean = !self.uncommitted(cx);
+        // Pale #8aa8d7 (live document/70: the primary blue at 50%); with the pointer on it (a commit just clicked) darker,
+        // (85,127,194) (live workflows-1123 13 s6, 14 s7).
+        let pale = clean.then(|| ButtonCustomVariant::new(cx).color(rgb(0x8aa8d7).into()).foreground(rgb(0xffffff).into()).hover(rgb(0x557fc2).into()).active(rgb(0x557fc2).into()).shadow(false));
         let anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
         let probe = anchor.clone();
         h_flex()
@@ -1780,8 +1783,7 @@ impl FeatureStudioView {
                     .rounded_l(px(5.25))
                     .rounded_r(px(0.))
                     .child(div().text_size(px(14.)).child("Commit"))
-                    // Live document/70: #8aa8d7 = the primary blue at 50%.
-                    .when(clean, |b| b.opacity(0.5))
+                    .when_some(pale, |b, v| b.custom(v))
                     .tooltip("Commit Feature Studio (cmd+s/ctrl+s)").map(|d| crate::ui_script::mark(d, || "button:Commit Feature Studio".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit(cx))),
             )
@@ -1795,7 +1797,7 @@ impl FeatureStudioView {
                     .rounded_r(px(5.25))
                     .rounded_l(px(0.))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., gpui_kit::rgb_static(0xffffff)))
-                    .when(clean, |b| b.opacity(0.5))
+                    .when_some(pale, |b, v| b.custom(v))
                     .map(|d| crate::ui_script::mark(d, || "caret:Commit Feature Studio".into()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         // Live fs-commit-menu: with nothing to commit the ▾ is disabled, no menu.
