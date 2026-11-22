@@ -5,7 +5,8 @@
 
 use bytemuck::{Pod, Zeroable};
 
-/// The mask's format: coverage (r), a selected face seen (g), an instance selected through an entity (b).
+/// The mask's format: coverage (r), a selected or lined face seen (g), an instance selected through an entity (b), a mate
+/// pick's instance (a).
 pub(crate) const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 #[repr(C)]
@@ -14,6 +15,7 @@ struct BandUniform {
     color: [f32; 4],
     instance: [f32; 4],
     face: [f32; 4],
+    picked: [f32; 4],
     params: [f32; 4],
 }
 
@@ -59,7 +61,7 @@ impl HoverOutline {
             fragment: Some(wgpu::FragmentState {
                 module: &module,
                 entry_point: Some("fs_hover_outline"),
-                targets: &[Some(wgpu::ColorTargetState { format: color_format, blend: None, write_mask: wgpu::ColorWrites::COLOR })],
+                targets: &[Some(wgpu::ColorTargetState { format: color_format, blend: Some(wgpu::BlendState::ALPHA_BLENDING), write_mask: wgpu::ColorWrites::COLOR })],
                 compilation_options: Default::default(),
             }),
             primitive: Default::default(),
@@ -99,10 +101,9 @@ impl HoverOutline {
     /// The band over `target` (the resolved color), `radius` device px: `colors` sRGB, the band's, an entity-selected
     /// instance's (mask b) and beside a selected face (mask g).
     #[allow(clippy::too_many_arguments)]
-    pub fn encode(&self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, mask: &HoverMask, target: &wgpu::TextureView, colors: [[f32; 3]; 3], radius: f32) {
+    pub fn encode(&self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder, mask: &HoverMask, target: &wgpu::TextureView, colors: [[f32; 4]; 4], radius: f32) {
         let (width, height, _) = mask.size;
-        let c = |k: usize| [colors[k][0], colors[k][1], colors[k][2], 1.0];
-        let u = BandUniform { color: c(0), instance: c(1), face: c(2), params: [width as f32, height as f32, radius, 0.0] };
+        let u = BandUniform { color: colors[0], instance: colors[1], face: colors[2], picked: colors[3], params: [width as f32, height as f32, radius, 0.0] };
         queue.write_buffer(&self.uniform, 0, bytemuck::bytes_of(&u));
         let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("hover-outline"),

@@ -1172,6 +1172,11 @@ fn another_documents_part_pins_its_reference(cx: &mut TestAppContext) {
     // (Live2 context-create-version-update, Professional: Where used… right after Export….)
     assert_eq!(menu.get(at("Export…") + 1).map(String::as_str), Some("Where used…"), "{menu:?}");
     assert!(!menu.iter().any(|l| l == "Release…"), "no Release… with a new company's managed workflows off: {menu:?}");
+    // Qa ASM-FACE-MENU-ROWS (live workflow 40): its graphics menu has Open linked document and Where used for Part 1…
+    // right after Replace Part 1 <1>….
+    let menu = cx.update(|cx| labels(&view.read(cx).instance_menu(p1, true, cx)));
+    let at = |l: &str| menu.iter().position(|x| x == l).unwrap_or_else(|| panic!("{l} in {menu:?}"));
+    assert_eq!((at("Open linked document"), at("Where used for Part 1…")), (at("Replace Part 1 <1>…") + 1, at("Replace Part 1 <1>…") + 2), "{menu:?}");
     cx.update(|cx| {
         view.update(cx, |v, cx| {
             v.edit("Pin reference", cx, |a| noshape_ops::assembly::set_reference_pinned(a, p1, true));
@@ -1369,6 +1374,47 @@ fn a_typed_limit_turns_the_new_mates_preview_into_range(cx: &mut TestAppContext)
     assert_eq!(cx.update(|cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).to_mate(cx).unwrap().limits[0].1.min.as_ref().unwrap().text.clone()), "30 deg");
     limit(true, "60", true, cx);
     assert!((angle(cx) - 30.0).abs() < 1e-6, "stays at 30°");
+}
+
+/// Qa MATE-LIMITS-TAB-FOCUS (live workflow 25 s05-s12): Limits ticked, Tab goes into the unlabelled minimum box,
+/// "-45", Tab on to the maximum, "45", Enter: the limits read -45 / 45 deg.
+#[gpui::test]
+fn tab_from_a_ticked_limits_goes_into_its_boxes(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    let path = pattern_document(cx, "limit-tab");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            let dialog = v.mate.as_ref().unwrap().dialog.clone();
+            dialog.update(cx, |d, cx| d.tick_limits(cx));
+            v.focus_from_viewport(w, cx);
+            v.ui.checkbox_focus = Some("Limits");
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let boxes = vcx.update(|_, cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).limit_boxes("rz"));
+    let focused = |vcx: &mut gpui_kit::VisualTestContext, max: bool| vcx.update(|w, cx| (if max { &boxes.1 } else { &boxes.0 }).read(cx).focus_handle(cx).is_focused(w));
+    vcx.simulate_keystrokes("tab");
+    assert!(focused(&mut vcx, false), "Tab from Limits: the minimum box");
+    vcx.simulate_input("-45");
+    vcx.simulate_keystrokes("tab");
+    assert!(focused(&mut vcx, true), "Tab on: the maximum box");
+    vcx.simulate_input("45");
+    vcx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let m = v.mate.as_ref().expect("Enter on new values keeps the dialog").dialog.read(cx).to_mate(cx).unwrap();
+        let (_, l) = m.limits.iter().find(|(k, _)| k == "rz").expect("the rotation limits");
+        assert_eq!((l.min.as_ref().map(|e| e.text.as_str()), l.max.as_ref().map(|e| e.text.as_str())), (Some("-45 deg"), Some("45 deg")));
+    });
 }
 
 /// qa P1 (ASM-LIMIT-TYPED-NO-PREVIEW), live mate limits r1-r4 (11-18): in an edited Revolute a typed limit turns the

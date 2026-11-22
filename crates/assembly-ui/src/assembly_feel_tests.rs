@@ -591,6 +591,25 @@ fn esc_keeps_the_selection_and_an_empty_graphics_click_clears_it(cx: &mut TestAp
     assert_eq!(taken(cx), 0, "an empty graphics click clears it");
 }
 
+/// UIS-WORLD-TARGET: live's workflow scenarios aim at a model point `{"world": [x, y, z]}` (mm, assembly
+/// coordinates), on empty space or a manipulator; it shows where the same point of the model does.
+#[gpui::test]
+fn a_ui_script_world_target_is_a_model_point(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (_window, view) = mated_blocks(cx, "world-target");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (lo, hi) = v.result.instance_bounds(v.result.solved.placements[0].0).unwrap();
+        let c = (lo + hi) * 0.5e3;
+        let world = v.ui_target_point(&json!({ "world": [c.x, c.y, c.z] }), cx).unwrap();
+        assert_eq!(world, v.ui_target_point(&json!({ "vertex": [c.x, c.y, c.z] }), cx).unwrap());
+        let (lo, hi) = v.result.instance_bounds(v.result.solved.placements[1].0).unwrap();
+        let d = (lo + hi) * 0.5e3;
+        assert_ne!(world, v.ui_target_point(&json!({ "world": [d.x, d.y, d.z] }), cx).unwrap(), "another point elsewhere");
+        assert!(v.ui_target_point(&json!({ "world": [1.0] }), cx).unwrap_err().contains("world"), "a short point named");
+    });
+}
+
 /// Live selother-ball-1119: Select other (`) with the pointer over the background off a part's silhouette edge lists
 /// "Edge of Part 1 <1>" and the part out to 8 px, the face behind that edge and the part from 9 to 11 px, and nothing
 /// from 12 px.
@@ -698,9 +717,12 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
     settle(cx, window, &view);
     assert!(cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors().len() == 1)), "the first connector picked");
+    // Live workflows-1122 08 s06: with the pointer still on it the picked face shows plain, its part outlined.
+    assert_eq!(picked_faces(cx, &view), 0, "the pick under the pointer unfilled");
+    assert!(part_banded(cx, &view, "Part 1 <1>"), "its part outlined");
     move_to(cx, window, &view, on_top + DVec2::new(400.0, 200.0));
     settle(cx, window, &view);
-    assert!(cx.update(|cx| view.read(cx).viewport.read(cx).scene().hover_outline), "its instance outlined");
+    assert!(part_banded(cx, &view, "Part 1 <1>"), "its part outlined");
     // Live2 recheck-1119 asm2 (2): the picked face stays filled yellow with the pointer away (its connector at 20 %).
     cx.update(|cx| {
         let v = view.read(cx);
@@ -709,6 +731,101 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
         let selected = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & picked == picked && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count();
         assert_eq!(selected, 1, "the picked face filled the picks' yellow (live feel cov-1120 A2), not a selection's amber");
     });
+}
+
+/// The faces a mate dialog's picks fill yellow.
+fn picked_faces(cx: &mut TestAppContext, view: &Entity<AssemblyView>) -> usize {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let picked = noshape_render::state::SELECTED | noshape_render::state::PICKED;
+        (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & picked == picked && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count()
+    })
+}
+
+/// Whether instance `name`'s faces carry a mate pick's band (`BAND | PICKED`), and the band pass is on.
+fn part_banded(cx: &mut TestAppContext, view: &Entity<AssemblyView>, name: &str) -> bool {
+    use noshape_render::state;
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let id = v.assembly(cx).unwrap().instances.iter().find(|i| i.name == name).unwrap().id;
+        let faces = built.picks.faces_of(id);
+        scene.body_outline && !faces.is_empty() && faces.iter().all(|f| scene.states[*f as usize] & (state::BAND | state::PICKED) == state::BAND | state::PICKED)
+    })
+}
+
+/// Qa FEEL-MATE-SECOND-PICK-HOVER (live workflows-1122 08 s07 / s08): Fastened, Part 1's top then Part 2's (live picks
+/// the other way round; here the narrower part moves, clear of the other's silhouette). With the pointer still on the
+/// second pick its face shows plain and its part has live's 2 px (242,195,108) 85 % band over the silhouette line (no
+/// black line left); with the pointer away the face fills the picks' yellow.
+#[gpui::test]
+fn the_second_pick_outlines_its_part_and_shows_plain_under_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mate-second", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let top_of = |cx: &mut TestAppContext, name: &str| {
+        let (lo, hi) = screen_box(cx, &view, name);
+        (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2)
+    };
+    for name in ["Part 1 <1>", "Part 2 <1>"] {
+        let at = top_of(cx, name);
+        move_to(cx, window, &view, at + DVec2::new(300.0, 300.0));
+        settle(cx, window, &view);
+        move_to(cx, window, &view, at);
+        wait_until(cx, window, &view, |v, _| v.infer.is_some());
+        settle(cx, window, &view);
+        let click = at_window(cx, &view, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
+        settle(cx, window, &view);
+    }
+    assert!(cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors_complete())), "both connectors picked");
+    assert_eq!(picked_faces(cx, &view), 0, "Part 2's top unfilled under the pointer (live s07)");
+    assert!(part_banded(cx, &view, "Part 2 <1>"), "Part 2 outlined");
+    // Part 2's left silhouette edge (its leftmost corners, one above the other): the band over the line.
+    let (a, b) = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = v.assembly(cx).unwrap().instances.iter().find(|i| i.name == "Part 2 <1>").unwrap().id;
+        let o = v.result.occurrences.iter().find(|o| o.top() == id).unwrap();
+        let vp = v.viewport.read(cx);
+        let mut ps: Vec<DVec2> = o.mesh.positions.iter().map(|p| o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64))).filter_map(|p| vp.project(p)).collect();
+        ps.sort_by(|a, b| a.x.total_cmp(&b.x));
+        let x0 = ps[0].x;
+        let side: Vec<DVec2> = ps.into_iter().filter(|p| p.x < x0 + 0.5).collect();
+        (side.iter().copied().min_by(|a, b| a.y.total_cmp(&b.y)).unwrap(), side.iter().copied().max_by(|a, b| a.y.total_cmp(&b.y)).unwrap())
+    });
+    assert!(b.y - a.y > 8.0, "a vertical silhouette edge: {a:?} {b:?}");
+    let scale = cx.update_window(window, |_, w, _| f64::from(w.scale_factor())).unwrap();
+    let (px, w) = frame_pixels(cx, window, &view);
+    let y = ((a.y + b.y) * 0.5 * scale).round() as usize;
+    let x0 = (a.x * scale).round() as usize;
+    let row: Vec<[u8; 3]> = (x0 - 4..=x0 + 4).map(|x| { let i = (y * w + x) * 4; [px[i + 2], px[i + 1], px[i]] }).collect();
+    // Live: (244,204,130) on white, (211,171,98) over the black line, (220,180,106) over a face.
+    let amber = |c: &[u8; 3]| c[0] >= 200 && (160..=215).contains(&c[1]) && (85..=140).contains(&c[2]);
+    assert!(row.iter().filter(|c| amber(c)).count() >= 2, "2 px of the band across the edge: {row:?}");
+    assert!(!row.iter().any(|c| c.iter().all(|&v| v < 60)), "no black line left: {row:?}");
+    let away = top_of(cx, "Part 2 <1>") + DVec2::new(400.0, 200.0);
+    move_to(cx, window, &view, away);
+    settle(cx, window, &view);
+    assert_eq!(picked_faces(cx, &view), 1, "Part 2's top filled the picks' yellow with the pointer away (live s08)");
+    assert!(part_banded(cx, &view, "Part 2 <1>"), "Part 2 still outlined");
 }
 
 /// Interaction-feel "Toolbar's place" and "Toolbar's grip" (live2 REQUESTS 18:20, place-1118): the mate toolbar's top
@@ -1273,4 +1390,128 @@ fn the_triads_z_ring_turns_as_live(cx: &mut TestAppContext) {
     let (s, c) = 15f64.to_radians().sin_cos();
     assert!(turn.transform_vector3(glam::DVec3::Z).abs_diff_eq(glam::DVec3::new(s, 0.0, c), 1e-9) && turn.transform_vector3(glam::DVec3::Y).abs_diff_eq(glam::DVec3::Y, 1e-9), "15° about world Y: {turn:?}");
     assert!(turn.transform_point3(centre).abs_diff_eq(centre, 1e-9), "about the triad's centre {centre:?}: {turn:?}");
+}
+
+/// Qa EXPLODE-DRAG-NO-STEP-DIALOG / FEEL-EXPLODE-PICKED-INSTANCE-LOOK (live workflow 24 s03-s10): editing an exploded
+/// view, a click on Part 2's top face selects the whole part; its hovered Z arrow keeps the hollow stroke, slate edged
+/// with a (117, 152, 200) core; dragged up, the "Explode step" dialog opens (the runner sees it and its Distance) with
+/// the arrow on the moved part; a committed 30 mm names it "Explode step 1".
+#[gpui::test]
+fn an_explode_drag_opens_its_step_dialog_with_the_arrow_on_the_moved_part(cx: &mut TestAppContext) {
+    use noshape_render::state;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "explode-drag", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let part = cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == "Part 2 <1>")).unwrap().id);
+    let (lo, hi) = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
+    let top = glam::DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            v.add_exploded_view(cx);
+            v.viewport.update(cx, |vp, cx| {
+                let h = vp.size().y;
+                vp.camera.set_view(noshape_render::StandardView::Trimetric);
+                vp.camera.target = top;
+                vp.camera.distance = h / (2.0 * 17.0e3 * (vp.camera.fov_y * 0.5).tan());
+                vp.request_frame(cx);
+            });
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    assert!(cx.update(|cx| view.read(cx).explode_edit), "editing Explode 1");
+    let c = cx.update(|cx| view.read(cx).viewport.read(cx).project(top).unwrap());
+    move_to(cx, window, &view, c);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, c), Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.selected.is_empty());
+    settle(cx, window, &view);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert_eq!((v.selected.clone(), v.ui.entity_sel.len()), (vec![part], 0), "the instance taken, no face");
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let faces = built.picks.faces_of(part);
+        assert!(!faces.is_empty() && faces.iter().all(|f| scene.states[*f as usize] & state::SELECTED != 0), "every face of the part lit");
+    });
+    // The Z arrow's shaft, hovered.
+    let (f, size) = cx.update(|cx| (view.read(cx).manipulator(cx).expect("a triad"), view.read(cx).manip_size(cx)));
+    let shaft = cx.update(|cx| view.read(cx).viewport.read(cx).project(f.origin + f.z() * size * 0.4).unwrap());
+    move_to(cx, window, &view, shaft);
+    wait_until(cx, window, &view, |v, _| v.manip_hover.is_some());
+    assert_eq!(cx.update(|cx| view.read(cx).manip_hover), Some(crate::assembly_scene::ManipHandle::Axis(2)), "the Z arrow hovered");
+    move_to(cx, window, &view, shaft + DVec2::new(0.0, 0.5));
+    let (px, w) = frame_pixels(cx, window, &view);
+    let scale = cx.update_window(window, |_, w, _| f64::from(w.scale_factor())).unwrap();
+    let near = |rgb: [i32; 3]| {
+        let mut n = 0;
+        let (sx, sy) = ((shaft.x * scale) as i32, (shaft.y * scale) as i32);
+        for y in (sy - 30)..(sy + 30) {
+            for x in (sx - 30)..(sx + 30) {
+                let i = (y as usize * w + x as usize) * 4;
+                let p = [i32::from(px[i + 2]), i32::from(px[i + 1]), i32::from(px[i])];
+                n += usize::from((0..3).all(|k| (p[k] - rgb[k]).abs() <= 8));
+            }
+        }
+        n
+    };
+    assert!(near([117, 152, 200]) > 0 && near([0x3e, 0x94, 0xff]) == 0, "live's hollow hover, not a filled blue: {} / {}", near([117, 152, 200]), near([0x3e, 0x94, 0xff]));
+    // Dragged 40 px up the arrow.
+    let up = cx.update(|cx| view.read(cx).viewport.read(cx).project(f.origin + f.z() * size).unwrap() - shaft).normalize();
+    drag(cx, window, &view, shaft, shaft + up * 40.0);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.step_edit.is_some(), "the step's dialog open");
+        let dialogs = v.ui_state(cx)["dialogs"].clone();
+        assert!(dialogs.as_array().is_some_and(|d| d.iter().any(|d| d["title"] == "Explode step" && d["fields"].as_array().is_some_and(|f| f.iter().any(|f| f["label"] == "Distance")))), "the runner sees it: {dialogs}");
+        let moved = glam::DVec3::from(v.assembly(cx).unwrap().exploded_views[0].steps[0].translation);
+        let arrow = v.manipulator(cx).expect("the step's arrow").origin;
+        assert!(moved.z > 1e-3 && (arrow - (f.origin + moved)).length() < 1e-9, "the arrow on the moved part: {arrow:?}, moved {moved:?} from {:?}", f.origin);
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let value = v.step_edit.as_ref().unwrap().value.clone();
+            value.update(cx, |q, cx| {
+                q.state().clone().update(cx, |s, cx| s.set_value("30", w, cx));
+                q.commit_now(w, cx);
+            });
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.step_edit.is_some(), "Enter on a new value keeps the dialog");
+        assert_eq!(v.step_edit_title(cx), "Explode step 1", "named once a value is in");
+    });
+}
+
+/// Lead's ruling on qa MATE-GEAR-DRAG-TURNS-NOTHING (live workflow 25): where two instances' faces lie flush in one
+/// plane, the pick goes to the free, later inserted one (live's press took the flush Part 2 there), whichever is drawn.
+#[gpui::test]
+fn a_flush_faces_pick_goes_to_the_later_free_instance(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "flush-pick", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        // Part 2 (60 × 20 × 10) over Part 1 (40 × 20 × 10): their tops in one plane.
+        call(ctx, "assembly_transform", json!({ "instance": "Part 2 <1>", "translation": ["-100 mm", 0, 0] }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let id = |cx: &mut TestAppContext, name: &str| cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == name)).unwrap().id);
+    let (p1, p2) = (id(cx, "Part 1 <1>"), id(cx, "Part 2 <1>"));
+    let on_both = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.02, 0.01, 0.01)).unwrap());
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let part1 = v.raycast(on_both, &[p2], cx).expect("Part 1's top under the point");
+        assert_eq!(part1.path[0], p1);
+        let t = v.coplanar_tie(part1, on_both, cx);
+        assert_eq!((t.path[0], t.kind), (p2, crate::scene_builder::PickKind::Face), "the flush tie goes to Part 2");
+    });
+    move_to(cx, window, &view, on_both);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    assert_eq!(cx.update(|cx| view.read(cx).hover.as_ref().map(|h| h.path[0])), Some(p2), "hovered: Part 2");
 }

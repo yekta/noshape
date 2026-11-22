@@ -3957,6 +3957,58 @@ impl AssemblyView {
         best.map(|(t, b)| (b, o + d * t))
     }
 
+    /// A face picked where another instance's face lies in the same plane, facing the same way (parts sitting flush
+    /// inside each other): the pick goes to the instance a drag can move, a free one before a fixed one, then the
+    /// later inserted (lead's ruling on qa MATE-GEAR-DRAG-TURNS-NOTHING: live z-fights there, and its press on
+    /// workflow 25's flush Part 2 <2> took Part 2). The drawing is left as it is.
+    pub(super) fn coplanar_tie(&self, t: AsmPickTarget, position: DVec2, cx: &App) -> AsmPickTarget {
+        if t.kind != PickKind::Face {
+            return t;
+        }
+        let Some(asm) = self.assembly(cx) else { return t };
+        let (o, d) = self.viewport.read(cx).ray(position);
+        // Where and how the ray meets a face of occurrence `oi`: (distance, world normal).
+        let face_hit = |oi: usize, face: &Reference| -> Option<(f64, DVec3)> {
+            let occ = self.result.occurrences.get(oi)?;
+            let fi = occ.face_refs.iter().position(|r| r == face)?;
+            let &(start, count) = occ.mesh.face_ranges.get(fi)?;
+            let inv = occ.transform.inverse();
+            let (lo, ld) = (inv.transform_point3(o), inv.transform_vector3(d));
+            let m = &occ.mesh;
+            let pos = |i: u32| m.positions.get(i as usize).map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).unwrap_or_default();
+            m.indices.get(start as usize..(start + count) as usize)?.as_chunks::<3>().0.iter().find_map(|tri| {
+                let (a, b, c) = (pos(tri[0]), pos(tri[1]), pos(tri[2]));
+                ray_triangle(lo, ld, a, b, c).map(|tt| (tt, occ.transform.transform_vector3((b - a).cross(c - a)).normalize_or_zero()))
+            })
+        };
+        let Some((t0, n0)) = face_hit(t.occ, &t.reference) else { return t };
+        let p0 = o + d * t0;
+        let rank = |top: InstanceId| {
+            let i = asm.instances.iter().position(|i| i.id == top);
+            (i.is_some_and(|i| !asm.instances[i].fixed), i)
+        };
+        let mut best = (rank(t.path[0]), t);
+        // Only occurrences of other instances whose box holds the point.
+        for (oi, occ) in self.result.occurrences.iter().enumerate() {
+            if occ.hidden || occ.top() == best.1.path[0] || !matches!(occ.kind, BodyKind::Solid | BodyKind::Surface) || rank(occ.top()) <= best.0 {
+                continue;
+            }
+            if occ.world_bounds().is_none_or(|(lo, hi)| !(p0.cmpge(lo - DVec3::splat(1e-6)).all() && p0.cmple(hi + DVec3::splat(1e-6)).all())) {
+                continue;
+            }
+            for r in &occ.face_refs {
+                if let Some((tt, n)) = face_hit(oi, r)
+                    && (tt - t0).abs() < 1e-7
+                    && n.dot(n0) > 1.0 - 1e-6
+                {
+                    best = (rank(occ.top()), AsmPickTarget { path: occ.path.clone(), reference: r.clone(), kind: PickKind::Face, occ: oi, anchor: None });
+                    break;
+                }
+            }
+        }
+        best.1
+    }
+
     /// [`model_hit`] over this view's shown occurrences, for the viewport's press (`capture_probe`).
     pub(super) fn capture_probe(&self) -> std::rc::Rc<dyn Fn(DVec3, DVec3) -> bool> {
         let (result, isolate) = (self.result.clone(), self.isolate.clone());
@@ -4315,6 +4367,7 @@ impl AssemblyView {
             view: i,
             step: k,
             created,
+            named: !created,
             rotation,
             instances: step.instances.clone(),
             specify: false,
@@ -4345,7 +4398,12 @@ impl AssemblyView {
             q
         });
         let sub = cx.subscribe_in(&value, window, |this: &mut Self, _, ev: &QuantityEvent, _, cx| match ev {
-            QuantityEvent::Committed(_) => this.reapply_display(cx),
+            QuantityEvent::Committed(_) => {
+                if let Some(s) = &mut this.step_edit {
+                    s.named = true;
+                }
+                this.reapply_display(cx);
+            }
             QuantityEvent::Enter => this.accept_step_edit(cx),
             _ => {}
         });
@@ -4445,13 +4503,22 @@ impl AssemblyView {
         })
     }
 
+    /// "Explode step" for a step just dragged, its name once a value is committed or when editing one.
+    pub(super) fn step_edit_title(&self, cx: &App) -> String {
+        let Some(s) = &self.step_edit else { return String::new() };
+        if !s.named {
+            return "Explode step".into();
+        }
+        self.explode_view(cx).and_then(|v| v.steps.get(s.step).map(|st| st.display_name(s.step))).unwrap_or_default()
+    }
+
     /// The 220 px "Explode step" dialog (live 805 / 810 / 813,
     /// dom/explode-step-dialog-edit.html).
     pub(super) fn render_step_edit(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let Some(s) = &self.step_edit else { return div().into_any_element() };
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let title = if s.created { "Explode step".to_string() } else { self.explode_view(cx).and_then(|v| v.steps.get(s.step).map(|st| st.display_name(s.step))).unwrap_or_default() };
+        let title = self.step_edit_title(cx);
         let (rotation, specify, lines, active) = (s.rotation, s.specify, s.lines, s.active);
         let invalid = s.instances.is_empty();
         let red = gpui_kit::rgb(0xbd3039);
@@ -4554,7 +4621,10 @@ impl AssemblyView {
             body = body.child(div().mx(px(3.)).my(px(4.)).child(crate::os_ui::query_box("se-direction", if rotation { "Axis" } else { "Direction" }, active == 1, dir_rows).on_click(Self::step_edit_activate(1, cx))));
         }
         body = body
-            .child(crate::os_ui::param_row_plain(if rotation { "Rotation angle" } else { "Distance" }, value))
+            .child({
+                let label = if rotation { "Rotation angle" } else { "Distance" };
+                crate::ui_script::mark(crate::os_ui::param_row_plain(label, value), move || format!("field:{label}"))
+            })
             .child(crate::os_ui::checkbox("se-lines", "Explode lines", lines).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.step_edit {
                     s.lines = !s.lines;
@@ -4581,7 +4651,7 @@ impl AssemblyView {
                     .bg(rgb(0xffffff))
                     .border_b_1()
                     .border_color(rgb(0xd7d7d7))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).map(|d| if s.created { d.child(title) } else { d.child(crate::ui::user_text(title)) }))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(if invalid { red } else { pal.text }).map(|d| if s.named { d.child(crate::ui::user_text(title)) } else { d.child(title) }))
                     .child(
                         div()
                             .id("se-ok")

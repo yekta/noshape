@@ -83,6 +83,8 @@ impl LineSegment {
     /// plain line under the core (a field's pick the feature's preview consumed: live hover-matrix b3/dlg-edge-selected,
     /// Fillet's round showing through).
     pub const BAND: u32 = 1024;
+    /// An explode line: 26 px on, 5.5 off, 3 on, 5.5 off, the same at every zoom (live workflow 24 s09).
+    pub const EXPLODE_LINE: u32 = 2048;
 }
 
 impl LineData {
@@ -719,11 +721,16 @@ pub mod state {
     /// (`Scene::body_outline`, hover_outline.rs) instead of the pushed-out back faces (live2 hl-pixels-1118).
     pub const BAND: u32 = 2048;
     /// With SELECTED on faces: an entity a mate dialog picked, live's yellow (229,183,37 on a lit top face) rather than a
-    /// selected face's amber (live feel cov-1120 A2).
+    /// selected face's amber (live feel cov-1120 A2). With BAND on faces: the instance of a pick, its band (242,195,108)
+    /// at 85 % over its silhouette line (live workflows-1122 08 s06-s08).
     pub const PICKED: u32 = 4096;
     /// With BAND on faces: an assembly instance selected through a face, edge or vertex, its band #ffa033 (2 px over
     /// its silhouette line; beside its selected face that face's #ffa90a boundary, live triad-depth-1122 t1).
     pub const INSTANCE: u32 = 8192;
+    /// On faces whose boundary is drawn as its own line (a mate dialog's picked face, the face hovered while picking):
+    /// the band (BAND, PICKED instances) leaves that boundary to the line (live workflows-1122 08 s07 / s08: the 4 px
+    /// #ffc685 or #FFC20E line over the instance's amber).
+    pub const LINED: u32 = 16384;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

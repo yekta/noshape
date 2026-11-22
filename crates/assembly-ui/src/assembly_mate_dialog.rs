@@ -742,6 +742,49 @@ impl MateDialog {
         }
     }
 
+    /// The box a Tab goes to: from a ticked checkbox (`checkbox`) Limits' first minimum or Offset's first shown offset;
+    /// from a limit box the next shown one.
+    pub fn tab_target(&self, checkbox: Option<&str>, window: &Window, cx: &App) -> Option<Entity<InputState>> {
+        if self.use_limits {
+            let boxes: Vec<&Entity<InputState>> = limit_keys(self.mate_type).iter().filter_map(|k| self.limits.get(k)).flat_map(|(lo, hi)| [lo, hi]).collect();
+            if let Some(k) = boxes.iter().position(|b| b.read(cx).focus_handle(cx).is_focused(window)) {
+                return boxes.get(k + 1).map(|b| (*b).clone());
+            }
+        }
+        match checkbox? {
+            "Limits" if self.use_limits => limit_keys(self.mate_type).first().and_then(|k| self.limits.get(k)).map(|(lo, _)| lo.clone()),
+            "Offset" if self.use_offset => {
+                let (ox, oy, oz, orot) = offset_axes(self.mate_type);
+                let k = [ox, oy, oz, orot].iter().position(|on| *on)?;
+                Some(self.offsets[k].read(cx).state().clone())
+            }
+            _ => None,
+        }
+    }
+
+    /// Commits the focused limit box as its blur does, before a Tab moves on from it.
+    pub fn commit_focused_limit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let focused = self.limits.iter().flat_map(|(k, (lo, hi))| [(*k, lo.clone()), (*k, hi.clone())]).find(|(_, b)| b.read(cx).focus_handle(cx).is_focused(window));
+        if let Some((key, b)) = focused {
+            self.limit_event(&b, limit_dim(key), &InputEvent::Blur, window, cx);
+        }
+    }
+
+    /// A limit key's minimum and maximum boxes.
+    #[cfg(test)]
+    pub fn limit_boxes(&self, key: &str) -> (Entity<InputState>, Entity<InputState>) {
+        self.limits[key].clone()
+    }
+
+    /// Ticks Limits as its checkbox's click does.
+    #[cfg(test)]
+    pub fn tick_limits(&mut self, cx: &mut Context<Self>) {
+        self.use_limits = true;
+        cx.emit(MateDialogEvent::CheckboxFocused("Limits"));
+        cx.emit(MateDialogEvent::Changed);
+        cx.notify();
+    }
+
     /// Ticks Limits and types `text` into a limit box, as a user does; `enter` then presses Enter.
     #[cfg(test)]
     pub fn type_limit(&mut self, key: &str, max: bool, text: &str, enter: bool, window: &mut Window, cx: &mut Context<Self>) {

@@ -89,6 +89,9 @@ impl AssemblyView {
             w
         } else if t.get("origin").is_some() {
             DVec3::ZERO
+        } else if let Some(p) = t.get("world") {
+            // A model point on empty space or a manipulator (live's workflow scenarios).
+            mm(p).ok_or("world: a model point [x, y, z] mm")?
         } else if let Some(p) = ["face", "edge", "vertex"].iter().find_map(|k| t.get(*k)) {
             let local = mm(p).ok_or("a model point: [x, y, z] mm")?;
             match t.get("instance").and_then(Value::as_str) {
@@ -588,7 +591,7 @@ impl AssemblyView {
     }
 
     /// The assembly's other open dialogs as the suite records them, in live's field format (as the mate dialog's):
-    /// Mate connector, Group, the patterns / Mirror / Replicate, the relations, Replace instance, Insert.
+    /// Mate connector, Group, the patterns / Mirror / Replicate, Explode step, the relations, Replace instance, Insert.
     fn other_dialogs(&self, cx: &App) -> Vec<Value> {
         let mut out = Vec::new();
         let labeler = self.labeler(cx);
@@ -723,6 +726,20 @@ impl AssemblyView {
                 };
             // ✓ turns on once the dialog has been changed, complete or not (live asm-linear-pattern-third-direction).
             out.push(dialog(s.name.clone(), complete, complete || s.touched, fields));
+        }
+        if let Some(s) = &self.step_edit {
+            let instances: Vec<String> = s.instances.iter().filter_map(|i| names.get(i).cloned()).collect();
+            let empty = instances.is_empty();
+            let mut fields = vec![choice(if s.rotation { "Rotation" } else { "Translation" }), query("Instances", instances, s.active == 0, empty), check(if s.rotation { "Specify axis" } else { "Specify direction" }, s.specify)];
+            if s.specify {
+                fields.push(query(if s.rotation { "Axis" } else { "Direction" }, s.direction.iter().map(&entity).collect(), s.active == 1, false));
+            }
+            fields.push(number(json!(if s.rotation { "Rotation angle" } else { "Distance" }), quantity(&s.value)));
+            fields.push(check("Explode lines", s.lines));
+            if s.lines {
+                fields.push(query("Edges, vertices, or faces", s.line_refs.iter().map(&entity).collect(), s.active == 2, false));
+            }
+            out.push(dialog(self.step_edit_title(cx), !empty, !empty, fields));
         }
         if let Some((editing, ids)) = &self.ui.group {
             let title = match editing {

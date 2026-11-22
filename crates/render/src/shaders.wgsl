@@ -63,6 +63,7 @@ const NO_PICK: u32 = 1024u;
 const BAND: u32 = 2048u;
 const PICKED: u32 = 4096u;
 const INSTANCE: u32 = 8192u;
+const LINED: u32 = 16384u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -539,21 +540,23 @@ fn fs_hover_mask(i: MeshOut) -> @location(0) vec4<f32> {
 }
 
 /// The mask of the whole selected parts' images (state BAND; depth ignored: their outline shows through the parts in
-/// front, live2 11-14), b set for an instance selected through an entity (state INSTANCE).
+/// front, live2 11-14), b set for an instance selected through an entity (state INSTANCE), a for a mate pick's (PICKED).
 @fragment
 fn fs_body_mask(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
     if ((st & BAND) == 0u || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
-    return vec4(1.0, 0.0, select(0.0, 1.0, (st & INSTANCE) != 0u), 1.0);
+    return vec4(1.0, 0.0, select(0.0, 1.0, (st & INSTANCE) != 0u), select(0.0, 1.0, (st & PICKED) != 0u));
 }
 
-/// The mask's g: an outlined instance's selected face where it shows (depth tested; green written only).
+/// The mask's g: an outlined instance's selected face, or a face whose boundary is its own line (LINED), where it shows
+/// (depth tested; green written only).
 @fragment
 fn fs_body_face(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
-    if ((st & (BAND | SELECTED | BODY)) != (BAND | SELECTED) || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    let face = (st & (BAND | SELECTED | BODY)) == (BAND | SELECTED) || (st & LINED) != 0u;
+    if (!face || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
     return vec4(0.0, 1.0, 0.0, 1.0);
 }
 
@@ -1140,6 +1143,11 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     if ((i.style & 512u) != 0u) {
         let t = fract(i.along / (35.0 * g.viewport.z)) * 35.0;
         if ((t > 10.0 && t < 20.0) || t > 25.0) { discard; }
+    }
+    // An explode line: 26 px on, 5.5 off, 3 on, 5.5 off.
+    if ((i.style & 2048u) != 0u) {
+        let t = fract(i.along / (40.0 * g.viewport.z)) * 40.0;
+        if ((t > 26.0 && t < 31.5) || t > 34.5) { discard; }
     }
     // Inferred direction over a rubber band: 4 px on / 4 off from 1.25 px.
     if ((i.style & 16u) != 0u && fract((i.along / g.viewport.z - 1.25) / 8.0) >= 0.5) { discard; }

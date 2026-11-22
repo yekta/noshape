@@ -1437,7 +1437,7 @@ impl AssemblyView {
             if graphics && let InstanceSource::Part { body, .. } = &inst.source {
                 let pname = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
                 let body = body.clone();
-                edit.push(item(format!("Where used for {pname}…"), move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(tab, body.clone()))));
+                edit.push(icon_item(format!("Where used for {pname}…"), "menu-where-used", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(tab, body.clone()))));
             }
         }
         // From another document: "Open linked document" (bundle `switchToImageOwner`), opening the referenced version;
@@ -1469,6 +1469,18 @@ impl AssemblyView {
                     let _ = handle.update(cx, |_, window, cx| window.defer(cx, move |window, cx| crate::actions::request_activate_tab(tab, window, cx)));
                 }
             }));
+        }
+        // The graphics menu: after Replace…, as live workflow 40 (a linked document's Part 1 <1>: Open linked
+        // document, Where used for Part 1…).
+        if graphics {
+            edit.extend(open_linked.take());
+            if let Some(wu) = where_used.take() {
+                let pname = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
+                edit.push(match wu {
+                    MenuEntry::Item { act, .. } => MenuEntry::Item { label: format!("Where used for {pname}…"), icon: Some("menu-where-used"), disabled: false, act },
+                    other => other,
+                });
+            }
         }
         // A configured assembly: "Configure suppression" (live 199).
         if !multi && self.can_configure_suppression(top, cx) {

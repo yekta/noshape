@@ -8,6 +8,7 @@ struct U {
     color: vec4<f32>,        // sRGB hover colour
     instance: vec4<f32>,     // sRGB, an instance selected through an entity (mask b)
     face: vec4<f32>,         // sRGB, beside a selected face seen (mask g)
+    picked: vec4<f32>,       // sRGB and alpha, a mate pick's instance (mask a)
     p: vec4<f32>,            // width, height (device px), band reach (device px)
 };
 
@@ -36,6 +37,7 @@ fn fs_hover_outline(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32>
     var band = false;
     var face = own.g > 0.0;
     var instance = own.b > 0.0;
+    var picked = own.a > 0.0;
     for (var dy = -n; dy <= n; dy++) {
         for (var dx = -n; dx <= n; dx++) {
             if (f32(dx * dx + dy * dy) > r * r) { continue; }
@@ -45,9 +47,12 @@ fn fs_hover_outline(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32>
             if ((m.r > 0.0) != inside) { band = true; }
             face = face || m.g > 0.0;
             instance = instance || m.b > 0.0;
+            picked = picked || m.a > 0.0;
         }
     }
-    if (!band) { discard; }
+    // Beside a face whose boundary is its own line (a mate pick's, live workflows-1122 08 s07 / s08), the line stays.
+    if (!band || (face && !instance)) { discard; }
     if (face) { return u.face; }
-    return select(u.color, u.instance, instance);
+    if (instance) { return u.instance; }
+    return select(u.color, u.picked, picked);
 }

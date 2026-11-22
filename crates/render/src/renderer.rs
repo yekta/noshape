@@ -3623,7 +3623,7 @@ impl Renderer {
                     Some(c) => c.map(|v| f32::from(v) / 255.0),
                     None => globals.hover.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb"),
                 };
-                band.encode(device, queue, &mut encoder, &mask, color_view, [rgb; 3], 1.0);
+                band.encode(device, queue, &mut encoder, &mask, color_view, [[rgb[0], rgb[1], rgb[2], 1.0]; 4], 1.0);
                 Some(mask)
             }
             None => None,
@@ -3658,9 +3658,12 @@ impl Renderer {
                     draw_lists(&mut pass, &lists, &req.scene.instances, pipelines, &bind_inst, DrawMode { body_mask: true, ..Default::default() });
                 }
                 // Live's PART_HIGHLIGHT_COLOR_BORDER rgba(255, 192, 76, 1); an instance selected through a face, edge or
-                // vertex #ffa033, beside its selected face that face's boundary colour (live triad-depth-1122 t1).
-                let select: [f32; 3] = globals.select.map(|c| linear_to_srgb(c) as f32 / 255.0)[..3].try_into().expect("rgb");
-                band.encode(device, queue, &mut encoder, &mask, color_view, [[1.0, 192.0 / 255.0, 76.0 / 255.0], [1.0, 160.0 / 255.0, 51.0 / 255.0], select], 1.0);
+                // vertex #ffa033, beside its selected face that face's boundary colour (live triad-depth-1122 t1); a mate
+                // pick's instance (242,195,108) at 85 % (live workflows-1122 08 s06-s08: (244,204,130) on white, (211,171,98)
+                // over the black line, (220,180,106) over a grey face).
+                let select = globals.select.map(|c| linear_to_srgb(c) as f32 / 255.0);
+                let rgba = |r: f32, g: f32, b: f32, a: f32| [r / 255.0, g / 255.0, b / 255.0, a];
+                band.encode(device, queue, &mut encoder, &mask, color_view, [rgba(255.0, 192.0, 76.0, 1.0), rgba(255.0, 160.0, 51.0, 1.0), [select[0], select[1], select[2], 1.0], rgba(242.0, 195.0, 108.0, 0.85)], 1.0);
                 Some(mask)
             }
             None => None,

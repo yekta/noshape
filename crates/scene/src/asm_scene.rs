@@ -585,6 +585,9 @@ pub struct Highlights {
     /// Entities a mate dialog picked: filled yellow (`state::PICKED`), their boundary #FFC20E (live feel cov-1120 A2:
     /// (229,183,37) inside (255,194,14), qa asm-mate-preview-0bc7; a selected face is amber inside 3 px #ffa90a).
     pub picked_entities: Vec<(InstancePath, Reference)>,
+    /// The parts a mate dialog's picks are on (the moving one left out once both are in): a 2 px (242,195,108) band at
+    /// 85 % over the silhouette line, through the parts in front (live workflows-1122 08 s06-s08).
+    pub picked_parts: Vec<InstancePath>,
     /// The hovered part's occurrence: its silhouette in the hover colour, no tint (live2 asm-feel (3b): only that
     /// part, inside a subassembly too).
     pub hover_part: Option<InstancePath>,
@@ -1121,14 +1124,35 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             scene.add_flag(id, state::QUERY);
         }
     }
-    for (p, r) in &h.picked_entities {
+    // A face whose boundary line the picks' band leaves alone.
+    let line_faces = |(p, r): &(InstancePath, Reference), scene: &mut Scene| {
+        for id in built.picks.ids_for(p, r) {
+            scene.add_flag(id, state::LINED);
+        }
+    };
+    for p in &h.picked_parts {
+        for id in built.picks.faces_at(p) {
+            scene.add_flag(id, state::BAND | state::PICKED);
+            scene.body_outline = true;
+        }
+    }
+    // A pick under the pointer shows the hover look alone: no fill, its boundary #ffc685 (live workflows-1122 08 s06 /
+    // s07: the picked face plain while the pointer stays on it, yellow once it leaves).
+    let hovered = |e: &(InstancePath, Reference)| h.hover_outline.as_ref() == Some(e) || h.hover_entity.as_ref() == Some(e);
+    for e @ (p, r) in h.picked_entities.iter().filter(|e| !hovered(e)) {
         mark(p, r, state::SELECTED | state::PICKED, &mut scene, &mut pts, &mut sel_pts);
         for id in built.picks.boundary_ids(p, r) {
             scene.add_flag(id, state::HOVER | state::OUTLINE | state::PICKED);
         }
+        if !h.picked_parts.is_empty() {
+            line_faces(e, &mut scene);
+        }
     }
     // A solid 2 device px line, not the band of an edge hovered itself (live2 asm-dialogs-1119 hz: outlined once).
-    if let Some((p, r)) = &h.hover_outline {
+    if let Some(e @ (p, r)) = &h.hover_outline {
+        if !h.picked_parts.is_empty() {
+            line_faces(e, &mut scene);
+        }
         for id in built.picks.boundary_ids(p, r) {
             let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
             scene.add_flag(id, if own { state::HOVER } else { state::HOVER | state::OUTLINE });
@@ -1229,7 +1253,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         }
     }
     for (a, b) in &h.trails {
-        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
+        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::EXPLODE_LINE | LineSegment::ON_TOP });
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
@@ -1274,6 +1298,8 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
         const CENTER_HOVER: [u8; 4] = [0x60, 0x87, 0xbd, 255];
         const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
+        // A hovered explode handle keeps its hollow stroke, slate edged with a blue core (live workflow 24 s04).
+        const EXPLODE_HOVER: ([u8; 4], [u8; 4]) = ([92, 114, 131, 255], [117, 152, 200, 255]);
         // While a handle is dragged the others fade to a faint grey (live manip-feel-1118 m9).
         const FAINT: u8 = 60;
         let size = *size;
@@ -1284,7 +1310,8 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let stroke = |ol: &mut LineData, pts: &[DVec3], closed: bool, id: u32, hl: bool| {
             let n = pts.len();
             let segs = if closed { n } else { n.saturating_sub(1) };
-            for (w, c) in [(4.0, if hl { HOVER } else { edge }), (core_w, if hl { HOVER } else { core })] {
+            let (hover_edge, hover_core) = if h.explode_triad { EXPLODE_HOVER } else { (HOVER, HOVER) };
+            for (w, c) in [(4.0, if hl { hover_edge } else { edge }), (core_w, if hl { hover_core } else { core })] {
                 for i in 0..segs {
                     ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: id, width: w, style: LineSegment::ON_TOP });
                 }

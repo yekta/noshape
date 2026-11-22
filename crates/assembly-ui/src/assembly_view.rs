@@ -401,6 +401,8 @@ pub struct StepEdit {
     pub view: usize,
     pub step: usize,
     pub created: bool,
+    /// A value committed in it: the dialog takes the step's name (live workflow 24 s09: "Explode step 1").
+    pub named: bool,
     pub rotation: bool,
     pub instances: Vec<InstanceId>,
     /// ☐ Specify direction / axis and the picked direction (its Z).
@@ -1432,7 +1434,11 @@ impl AssemblyView {
                     path.extend(c.path.iter().copied());
                     match moving {
                         Some(top) if path[0] == top => {}
-                        Some(_) => h.picked_entities.push((path, e)),
+                        // The part it sits on outlined as the first pick's was (live workflows-1122 08 s07 / s08).
+                        Some(_) => {
+                            h.picked_parts.push(path.clone());
+                            h.picked_entities.push((path, e));
+                        }
                         None => h.selected_entities.push((path, e)),
                     }
                 }
@@ -1607,8 +1613,8 @@ impl AssemblyView {
         self.ui.overlay_mates = overlay_mates;
         // Dialog connectors + inference preview.
         let mut chosen: Vec<MateConnectorRef> = Vec::new();
-        // A mate dialog's first pick alone: its connector at 20 % (disc and axes), its entity selected yellow and its
-        // whole instance outlined (live2 asm-dialogs-1119 hz row 2, recheck-1119 asm2 (2)).
+        // A mate dialog's first pick alone: its connector at 20 % (disc and axes), its entity selected yellow and its part
+        // outlined (live2 asm-dialogs-1119 hz row 2, recheck-1119 asm2 (2); the band's colour live workflows-1122 08 s06).
         let mut first_pick: Vec<Frame> = Vec::new();
         if let Some(s) = &self.mate {
             let d = s.dialog.read(cx);
@@ -1631,7 +1637,7 @@ impl AssemblyView {
                 [c] if !d.connectors_complete() => {
                     first_pick.extend(self.result.connector_world(c, &units));
                     if !c.is_origin() {
-                        h.hover_tops.push(c.instance);
+                        h.picked_parts.push(std::iter::once(c.instance).chain(c.path.iter().copied()).collect());
                     }
                     h.picked_entities.extend(entity_of(c));
                 }
@@ -1691,6 +1697,16 @@ impl AssemblyView {
             // hover-matrix-1121 b5-fastened-vertex, qa FEEL-ASM-MATE-VERTEX).
             chosen = self.infer_choice.filter(|_| !matches!(entity, Reference::Vertex(_)));
             h.hover_vertex_open = matches!(entity, Reference::Vertex(_));
+        }
+        // A mate dialog's picked face under the pointer keeps the hover look after its click, and once both picks are in
+        // (live workflows-1122 08 s06 / s07: plain, its boundary lit; yellow once the pointer leaves).
+        if self.mate.is_some()
+            && h.hover_outline.is_none()
+            && let Some(t) = &self.hover
+            && matches!(t.reference, Reference::Face(_))
+            && h.picked_entities.iter().any(|(p, r)| *p == t.path && *r == t.reference)
+        {
+            h.hover_outline = Some((t.path.clone(), t.reference.clone()));
         }
         // A dragged section base on geometry: the snapped entity in orange
         // and the mate-connector glyph at the point (live: unsnapped, the
@@ -1894,10 +1910,21 @@ impl AssemblyView {
             && *tids == ids
             && let Some(p) = self.result.solved.placement(ids[0])
         {
-            return Some(placement_to_frame(&p).mul(local));
+            // (On the part where an exploded view shows it: live workflow 24 s05-s09.)
+            let moved = self.exploded_move(ids[0]).unwrap_or_default();
+            return Some(moved.mul(&placement_to_frame(&p).mul(local)));
         }
         let center = bb.map(|(a, b)| (a + b) * 0.5).or_else(|| self.result.solved.placement(ids[0]).map(|p| DVec3::from(p.translation)))?;
         Some(Frame::new(center, glam::DQuat::IDENTITY))
+    }
+
+    /// The move an exploded view shows an instance with: its displayed frame over its mated one.
+    fn exploded_move(&self, id: InstanceId) -> Option<Frame> {
+        self.explode?;
+        let o = self.result.occurrences.iter().find(|o| o.top() == id && o.flex.is_none())?;
+        let p = self.result.solved.placement(id)?;
+        let mated = noshape_model::assembly::eval::frame_matrix(&placement_to_frame(&p)) * o.inner;
+        Some(noshape_model::assembly::eval::matrix_frame(&(o.transform * mated.inverse())))
     }
 
     // ------------------------------------------------------------ editing
@@ -3395,7 +3422,8 @@ impl AssemblyView {
                 let changed_overlay = manip != self.manip_hover || ov != self.hover_overlay;
                 self.manip_hover = manip;
                 self.hover_overlay = ov;
-                let t = if overlay.is_some() { None } else { self.pick(*id) };
+                let at = self.viewport.read(cx).pointer_position();
+                let t = if overlay.is_some() { None } else { self.pick(*id).map(|t| self.coplanar_tie(t, at, cx)) };
                 // A section cap under the pointer lights every cap of its plane; leaving the graphics keeps it.
                 let cap = id.and_then(noshape_render::section_cap_of_pick).filter(|_| self.ui.section.as_ref().is_some_and(|s| !s.planes.is_empty()));
                 let left = id.is_none() && !self.viewport.read(cx).pointer_inside();
@@ -3636,7 +3664,7 @@ impl AssemblyView {
                 }
                 // What is under the press, also before the pick buffer's hover caught up (a press right after the
                 // pointer got there: asm-drag-free-part).
-                let under = self.hover.clone().or_else(|| self.pick(self.viewport.read(cx).pick_under_pointer().flatten())).or_else(|| self.raycast(*position, &[], cx));
+                let under = self.hover.clone().or_else(|| self.pick(self.viewport.read(cx).pick_under_pointer().flatten())).or_else(|| self.raycast(*position, &[], cx)).map(|t| self.coplanar_tie(t, *position, cx));
                 // (Its click, when it doesn't drag, is on that too.)
                 if self.hover.is_none() {
                     self.hover = under.clone();
@@ -3810,7 +3838,8 @@ impl AssemblyView {
                         && let Some(f) = d.triad_preview
                         && let Some(p) = self.result.solved.placement(d.ids[0])
                     {
-                        self.triad = Some((d.ids.clone(), placement_to_frame(&p).inverse().mul(&f)));
+                        let shown = self.exploded_move(d.ids[0]).unwrap_or_default().mul(&placement_to_frame(&p));
+                        self.triad = Some((d.ids.clone(), shown.inverse().mul(&f)));
                     }
                     self.refresh_scene(false, cx);
                     cx.notify();
@@ -4047,7 +4076,9 @@ impl AssemblyView {
             self.clear_selection();
         } else {
             // A pattern's Instances field takes the whole instance (live 63: Part 2 <1> lit whole, an INSTANCE selected).
-            let instances_field = self.pattern.as_ref().is_some_and(|p| p.active.is_none());
+            // So does a click while an exploded view is being edited (live workflow 24 s03: an INSTANCE, the part lit
+            // whole).
+            let instances_field = self.pattern.as_ref().is_some_and(|p| p.active.is_none()) || (self.explode_edit && self.step_edit.is_none());
             match target {
                 Some(t) if instances_field => self.select_target(Some(t), true, cx),
                 Some(t) if matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex) => self.select_entity(t, !additive),
@@ -4144,7 +4175,8 @@ impl AssemblyView {
         let [top] = self.selected[..] else { return };
         let (Some(hit), Some(p)) = (self.ray_hit(position, |path| path[0] == top, cx), self.result.solved.placement(top)) else { return };
         let world = Frame::new(hit, glam::DQuat::IDENTITY);
-        self.triad = Some((vec![top], placement_to_frame(&p).inverse().mul(&world)));
+        let shown = self.exploded_move(top).unwrap_or_default().mul(&placement_to_frame(&p));
+        self.triad = Some((vec![top], shown.inverse().mul(&world)));
     }
 
     /// Where the pointer's ray first meets the shown occurrences whose path passes `keep` (world).
@@ -7716,12 +7748,39 @@ impl AssemblyView {
 }
 
 impl AssemblyView {
+    /// A Tab in the mate dialog from a ticked checkbox or a limit box: the next box takes the keyboard.
+    fn mate_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(dialog) = self.mate.as_ref().map(|m| m.dialog.clone()) else { return false };
+        let Some(st) = dialog.read(cx).tab_target(self.ui.checkbox_focus, window, cx) else { return false };
+        dialog.update(cx, |d, cx| d.commit_focused_limit(window, cx));
+        self.ui.checkbox_focus = None;
+        // As a browser's Tab into a field: its text selected, so typing replaces "No minimum".
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        cx.notify();
+        true
+    }
+
     /// The assembly's actions and modifier handling, on its root and on the
     /// front layer the workspace draws over it (`front_host`), so they reach
     /// it from a focused field in either.
     fn with_actions(&self, root: Div, cx: &mut Context<Self>) -> Div {
         root
             .on_action(cx.listener(|this, _: &InsertInstance, window, cx| this.toggle_insert(window, cx)))
+            // Tab from a mate dialog's ticked Limits or Offset goes into its first box, and on through the limit
+            // boxes (live workflow 25 s07 / s09: the unlabelled min input, then the max).
+            .on_action(cx.listener(|this, _: &DialogTab, window, cx| {
+                if !this.mate_tab(window, cx) {
+                    cx.propagate();
+                }
+            }))
+            .on_action(cx.listener(|this, _: &FocusNavbar, window, cx| {
+                if !this.mate_tab(window, cx) {
+                    cx.propagate();
+                }
+            }))
             .on_action(cx.listener(|this, _: &FastenMate, window, cx| this.start_mate(MateType::Fastened, window, cx)))
             .on_action(cx.listener(|this, _: &ToggleMates, _, cx| this.toggle_mates(cx)))
             .on_action(cx.listener(|this, _: &ToggleShowMatesMode, _, cx| this.toggle_show_mates_mode(cx)))
