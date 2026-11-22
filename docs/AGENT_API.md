@@ -4579,9 +4579,9 @@ Examples:
 
 #### drawing_format_line
 
-Delete a format line or move it to another format layer (edits the document (one undoable history entry)).
+Delete, drag or re-layer a format line (edits the document (one undoable history entry)).
 
-Right-click a line of the sheet's format (frame, zone divider, title block line; live: each is selected alone) at `point` (sheet mm, within 2 mm): `delete` (Delete: the template no longer draws it on this sheet) or `layer` (Move to ▸ "Border frame", "Border zones" or "Title block": its color and thickness follow that layer's). Not with Formats locked. drawing_get's `format_edits` lists the edited lines. One edit ("Delete" / "Move to").
+Right-click a line of the sheet's format (frame, zone divider, title block line; live: each is selected alone) at `point` (sheet mm, within 2 mm): `delete` (Delete: the template no longer draws it on this sheet) `layer` (Move to ▸ "Border frame", "Border zones" or "Title block": its color and thickness follow that layer's) or `move` (drag it by [dx, dy] sheet mm; the zone letters and ticks stay). Not with Formats locked. drawing_get's `format_edits` lists the edited lines (`offset`: how far it was dragged). One edit ("Delete" / "Move to" / "Move").
 
 Examples:
 
@@ -4598,6 +4598,7 @@ Examples:
 | `point` | array of number | required | On the format line (sheet mm). |
 | `delete` | boolean |  | Delete it. |
 | `layer` | one of `Border frame`, `Border zones`, `Title block` |  | Move it to this format layer. |
+| `move` | array of number |  | Drag it by [dx, dy] (sheet mm). |
 
 #### drawing_title_field
 
