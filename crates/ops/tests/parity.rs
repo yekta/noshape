@@ -37,6 +37,8 @@ struct ModelResult {
     features_ms: Option<f64>,
     /// Our slowest features in it (name, ms).
     slowest: Vec<(String, f64)>,
+    /// The features the Regeneration times panel listed (their names).
+    timed: Vec<String>,
     /// Features at least ×10 and 50 ms slower than live's own time for them:
     /// (name, ours ms, live ms).
     slow_features: Vec<(String, f64, f64)>,
@@ -474,7 +476,7 @@ fn an_in_context_reference_live_lists_is_no_part() {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, differing: Vec::new(), untranslated: Vec::new(), regen_ms: None, wall_ms: 0.0, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, differing: Vec::new(), untranslated: Vec::new(), regen_ms: None, wall_ms: 0.0, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), timed: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = live_refs(live, refs);
     // Live's sketch bodies at the final state (sketches.json, live 2267) under both.
@@ -632,6 +634,8 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     }
     // Live's regeneration time of each feature, by our feature id.
     let live_times: std::collections::HashMap<String, f64> = live.iter().find_map(|l| l["per_feature_ms"].as_object()).into_iter().flatten().filter_map(|(id, ms)| Some((t.ours(id)?.to_string(), ms.as_f64()?))).collect();
+    // (The studio the features went into: an Import's own tab, not the document's first, empty one: c2-gamma-imported.)
+    let studio = t.tab().map_or(json!({}), |tab| json!({ "tab": tab }));
     drop(t);
     // Our full regeneration: the document reopened, its features listed (their regeneration times), its parts queried.
     let mut fresh = Ctx::new();
@@ -639,10 +643,10 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::by_tool_name(tool).is_some_and(|op| noshape_ops::registry::run(ctx, op, &args).is_ok());
     let opened = run(&mut fresh, "document_open", json!({ "path": path.to_str().unwrap() }));
     res.open_ms = t0.elapsed().as_secs_f64() * 1000.0;
-    let list = opened.then(|| noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({})))).flatten();
+    let list = opened.then(|| noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut fresh, op, &studio))).flatten();
     res.list_ms = t0.elapsed().as_secs_f64() * 1000.0 - res.open_ms;
     let t_query = std::time::Instant::now();
-    if opened && run(&mut fresh, "query_parts", json!({})) {
+    if opened && run(&mut fresh, "query_parts", studio.clone()) {
         let wall_ms = t0.elapsed().as_secs_f64() * 1000.0;
         res.wall_ms = wall_ms;
         res.regen_ms = Some((wall_ms, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
@@ -702,6 +706,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
                 }
             }
             let mut times: Vec<(String, f64)> = list.value["features"].as_array().into_iter().flatten().filter_map(|f| Some((f["name"].as_str()?.to_string(), f["regen_ms"].as_f64()?))).collect();
+            res.timed = times.iter().map(|t| t.0.clone()).collect();
             times.sort_by(|a, b| b.1.total_cmp(&a.1));
             res.slowest = times.into_iter().take(3).filter(|t| t.1 >= 1.0).collect();
         }
@@ -5954,6 +5959,9 @@ fn an_import_feature_imports_lives_file() {
     let live = vec![json!({ "index": 0, "status": "OK", "parts": [{ "name": "Part 1", "bodyType": "SOLID", "faces": 3, "edges": 2, "vertices": 0 }] })];
     let r = run_model("import-feature", &features, &live, "");
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+    // Its regeneration is timed in the import's Part Studio, not the document's first, empty one (c2-gamma-imported
+    // read 0 ms).
+    assert_eq!(r.timed, ["Import 1"], "{:?}", r.regen_ms);
 }
 
 /// qSketchRegion(…, true) leaves out every region inside another's hole,

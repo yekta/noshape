@@ -388,6 +388,11 @@ impl<'a> Translator<'a> {
         Ok(t)
     }
 
+    /// The Part Studio tab the features went into (an Import's own, or `open_in`'s); `None`: the document's first.
+    pub fn tab(&self) -> Option<&str> {
+        self.tab.as_deref()
+    }
+
     /// Another Part Studio of the document open in `ctx` (an assembly's
     /// sources): a new tab `name` the features go into (the document's units
     /// are the first studio's).
