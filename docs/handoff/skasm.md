@@ -1,32 +1,36 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 15:41 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 17:09 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 15:41 UTC), UNCOMMITTED in agent/skasm
-- cov2-frame-corners (my SM firsts, item 1), crates/model-core/src/regen/features/frames.rs; trace with
-  ~/tmp/skasm/ut3x.sh <doc> on vibex6 (/root/skasm-scratch/bin/ut3x.sh, release ops --test all, log
-  /root/skasm-scratch/fc-run.log). c2-cov2-frame-corners-trim-endcap-gusset 17/23 -> 22/23 so far:
-  - Trim group: k::unify_edges after the cut (names through ev.name_result): Part 12 64 edges as live. MATCHES.
-  - End cap circle: the signal 11 was k::offset_wire_2d on a lone circle; now the circle is built at radius + grow (no
-    wire offset; err_at offsetDistance if <= 0), manipulator base moved back by grow. Radius as std
-    generateProfileCircle: farthest point of the second-largest loop (box diagonal) when there are more, else the outer.
-    MATCHES.
-  - Gusset offset: std getOffsetDirection = the LAST edge's tangent for every gusset (`along`, first of refs.rev()).
-    Gusset offset flipped MATCHES.
-  - Gusset aligned flips (last diff, Part 19 y 12.86..22.86 vs live 22.86..32.86): JUST EDITED, NOT RUN: std
-    getAlignedOffset = first edge's line meets the alignment edge's line (closest point, `aligned` vector); extrude from
-    there back towards the edge middle, Flip away (s0 = s_al if away else s_al - th, away = (s_al >= 0) == flip).
-    Next: rerun ut3x.sh on the doc, then fr.sh (clippy model-core+ops, model sheetmetal_frames + std_oracle, ops lib
-    ui_parity::tests) on vibex6, commit "skasm: …" and land.
-- qa P2 UIS-ASM-START-FIRST-INSTANCE (same batch, crates/ops/src/ui_parity.rs build_assembly): name = made["instance"]
-  (inst:N of the one inserted; made["instances"] is the whole assembly's list). Test
-  a_starts_instances_each_take_their_own_place (Part 1 x3: <2> at z 10, <3> fixed). Not run yet (fr.sh). Mark the
-  TICKETS row fixed when landing (grep for duplicate rows first).
-- QUEUED 0cc55505: sketch gesture cells (sketch_gesture_feel_tests.rs: boxes, Ctrl window removes, ` = shared
-  Select other panel with the sketch's curves first, regions + planes by depth, own plane skipped; Ctrl+press on nothing
-  starts a box, unmoved release opens the menu, ui.sketch_ctrl_press) + CI 45022206585 e2e scratch name
-  (paste_centred_l.noshape). Watcher task polls land.sh --status for 0cc55505. 13f38500 LANDED 15:17.
+## In flight (11-22 17:09 UTC), UNCOMMITTED in agent/skasm until the run below passes, then commit + land
+- corner-break model F (c2-cov2-sm-corner-break-relief-joint 23/37 -> 30/37): build_part refuses only curved BENDS;
+  sheetmetal.rs arc_band (pulled_face pulls a curved rip by its clearance along the arc) + rips_pulled (a rolled wall's
+  arc rips cut). T2 sheetmetal_frames a_curved_rip_is_pulled_back_by_the_clearance.
+- Corner break in the flat (sm_flat.rs; live per-feature volumes in /root/parity/models/c2-cov2-sm-corner-break-relief-
+  joint/live.jsonl, Part 9 = plate 600..700, Part 10 = 800..900, T 1.5): Break::Chamfer / ChamferAngle / FilletWidth
+  (all = live, 34/37) and Conic(first, second, rho) (asymmetric: ellipse quadrant w = sin θ/2; conic w = rho/(1-rho);
+  offsets -> along-side (a1 + a2 cos θ)/sin θ), Corner::{Arc, Conic, Line}, the conic a rational Bezier (make_bspline).
+  First side = n·(d1×d2) > 0; live's flipped R4/9 at (800,60) runs 9 along x = 800 (first). Our test plate's normal
+  runs the other way (its first side at (0,40) is y = 40). T2 corner_break_chamfers_take_their_distances_on_lives_sides,
+  corner_break_conic_and_asymmetric_fillets. Asymmetric within 1e-6 of live (0.0028 mm² corner area); conic 0.0117 mm²
+  off (2e-6 of the part, fails); curvature (mag 0.7) still a circle (wrong): REQUEST "skasm 17:08 corner break conic /
+  curvature" for live's curves. Quartic/quintic Bezier fits miss live's centroid (0.804 vs 0.785).
+- RUN 17:1x: clippy 0, 115 T2 pass, SM docs 311/325 (nothing else changed); conic now 0.018 mm³ off live (its 2 straight
+  edges live counts as other), committed + landing.
+- The paste_sketch fix 0af3b2150 is cherry-picked onto the release (lead 17:0x).
+- QUEUED ab6987cc (16:32): closed straight hems at a corner unfold off their own edges (rolled_strip tests the axis by
+  the edge's curve ends; a closed corner's shared vertex is off the hem line): cov2-sm-hem-jog no false flat collision
+  INFO; T2 sheetmetal_std closed_straight_hems_unfold_off_their_edges. SM docs (26): 23/26 match, nothing worse.
+  hem-jog left: Part 1 29/56/29 vs live 29/61/34 at the closed corner (live: 2 mitre planes + 4 spline faces,
+  behaviours "skasm (11-21 19:26)"), optional.
+- FAILED b1998f3d (16:48, handoff rebase conflict; the same commit rides under ab6987cc's job): BEND-FACE-RECLICK-EMPTIES fixed again (held_face_under: kept wherever the preview has ANY
+  face at the held face's depth, face_depths; a Flange before the Bend renames the plate's face); sm_feel test now with
+  Flange 1 + the field clicked, fails on 049f4e313. TICKETS row "fixed again ... to verify".
+- LANDED 16:21 0cc55505 (sketch gesture cells + CI e2e scratch name) as 04cc09dc; 16:26 3af78749 (frames: trim group
+  unify, end cap circle at offset radius, gusset offset/aligned as std: cov2-frame-corners 23/23; UIS-ASM-START-FIRST-
+  INSTANCE fixed) as a21fba49.
+- Report to the lead when the queue is empty: 0cc55505/3af78749 landed, b1998f3d + ab6987cc results, model F state.
 - Sketch long press: live = a release selects only if held < ~0.5 s (<= 504 ms selects, >= 533 nothing), same on a
   sketch line. psui adds app-core Viewport `long_press_cancels` (Part Studio 520 ms) for Drag::Pending(Left) clicks;
   sketch ToolDown/ToolUp picks (press_on_capture_pick / tool_captures_left) are mine once psui's change is on main.
@@ -34,9 +38,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   Origin adds a construction Origin point a window box takes (not asked of live).
 - Model suite 14:2x (vibex6, suite-1122b.log): 130/188 docs, 2021/2680 features; no doc's first difference is a sketch.
 - REQUESTS: 12:32 length box side + midpoint vs crossing (live, open); 14:30 c2-constrained-surface refs (live, open).
-- After the gesture cells: my SM firsts: cov2-frame-corners (Trim group Part 12 66 vs 64 edges; End cap circle offset
-  kernel signal 11; Gusset parts on +y, live -y: gusset is std gusset.fs via LOGIC_ONLY + frames.rs gusset), cov2-sm-hem-jog
-  flat collision INFO, sm-loft-basic apex, cov2-sm-corner-break model F.
+- SM firsts left: corner-break model F (in flight), sm-loft-basic apex (archive "Loft apex 11-21"), hem-jog corner counts.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline

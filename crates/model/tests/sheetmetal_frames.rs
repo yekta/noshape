@@ -546,6 +546,127 @@ fn convert_box_with_bends_and_joints() {
     assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "An internal edge cannot be used to create a joint."));
 }
 
+/// Corner break chamfers by two offsets and by an offset and angle on a plate on Top (live
+/// c2-cov2-sm-corner-break-relief-joint's Plate D: 4 / 8, opposite, take 8 along the y = 0 side; 6 mm at 30° runs
+/// 6 mm along the x side, 3.464 mm along the other).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_break_chamfers_take_their_distances_on_lives_sides() {
+    let mut s = plate();
+    let r = s.ok();
+    let v = vertex_at(&r, 0, DVec3::new(mm(60.0), 0.0, mm(2.0)));
+    s.add("sheetMetalCornerBreak", move |p| {
+        p.set("entities", ParamValue::Query(vec![v]));
+        p.set("blendType", en("CHAMFER"));
+        p.set("chamferType", en("TWO_OFFSETS"));
+        p.set("width1", expr("4 mm"));
+        p.set("width2", expr("8 mm"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let v = vertex_at(&r, 0, DVec3::new(mm(60.0), mm(40.0), mm(2.0)));
+    s.add("sheetMetalCornerBreak", move |p| {
+        p.set("entities", ParamValue::Query(vec![v]));
+        p.set("blendType", en("CHAMFER"));
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", expr("6 mm"));
+        p.set("angle", expr("30 deg"));
+    });
+    let r = s.ok();
+    let side = 6.0 * 30f64.to_radians().tan();
+    for p in [(52.0, 0.0), (60.0, 4.0), (60.0, 34.0), (60.0 - side, 40.0)] {
+        vertex_at(&r, 0, DVec3::new(mm(p.0), mm(p.1), mm(2.0)));
+    }
+    let expected = (60.0 * 40.0 - 16.0 - 3.0 * side) * 2.0;
+    assert!(near(volume(&r, 0) * 1e9, expected, 1e-6), "{} vs {expected}", volume(&r, 0) * 1e9);
+}
+
+/// Corner breaks with conic and asymmetric fillets are rational conics about the corner (live c2-cov2-sm-corner-break-
+/// relief-joint: R 4 / other 9 flipped at a plate's (800, 60) corner runs 9 along x = 800 and takes 7.7229 mm²; a quarter
+/// ellipse takes 7.7257, within 1e-6 of the part).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_break_conic_and_asymmetric_fillets() {
+    let mut s = plate();
+    let r = s.ok();
+    let v = vertex_at(&r, 0, DVec3::new(0.0, mm(40.0), mm(2.0)));
+    s.add("sheetMetalCornerBreak", move |p| {
+        p.set("entities", ParamValue::Query(vec![v]));
+        p.set("blendType", en("FILLET"));
+        p.set("radius", expr("4 mm"));
+        p.set("isAsymmetric", ParamValue::Bool(true));
+        p.set("otherRadius", expr("9 mm"));
+        p.set("flipAsymmetric", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let v = vertex_at(&r, 0, DVec3::new(mm(60.0), 0.0, mm(2.0)));
+    s.add("sheetMetalCornerBreak", move |p| {
+        p.set("entities", ParamValue::Query(vec![v]));
+        p.set("blendType", en("FILLET"));
+        p.set("crossSection", en("CONIC"));
+        p.set("radius", expr("6 mm"));
+        p.set("rho", expr("0.3"));
+    });
+    let r = s.ok();
+    // This plate's first side at (0, 40) is y = 40 (its chamfers: 8 along y = 0 at (60, 0)).
+    for p in [(9.0, 40.0), (0.0, 36.0), (54.0, 0.0), (60.0, 6.0)] {
+        vertex_at(&r, 0, DVec3::new(mm(p.0), mm(p.1), mm(2.0)));
+    }
+    // The conic's corner area at w = rho / (1 - rho) = 3/7, numerically.
+    let expected = (60.0 * 40.0 - 36.0 * (1.0 - std::f64::consts::FRAC_PI_4) - 10.253184624) * 2.0;
+    assert!(near(volume(&r, 0) * 1e9, expected, 1e-4), "{} vs {expected}", volume(&r, 0) * 1e9);
+}
+
+/// A box with an R 15 vertical corner converted, its top excluded, one bend at the front's foot (corner-break model F):
+/// the floor and the rolled corner stop the minimal clearance short of their arc rip (live: Part 6 15/31/18,
+/// 15956.448 mm³, box max x 1099.98, y 59.98).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_curved_rip_is_pulled_back_by_the_clearance() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(1000.0, 0.0), (1100.0, 0.0), (1100.0, 60.0), (1000.0, 60.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = s.regen();
+    let key = r.display.sketches[0].regions[0].key.clone();
+    s.add("extrude", move |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+        p.set("depth", expr("40 mm"));
+    });
+    let r = s.ok();
+    let corner = edge_at(&r, 0, DVec3::new(mm(1100.0), mm(60.0), mm(20.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![corner]));
+        p.set("radius", expr("15 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let top = b.shape.faces().iter().position(|f| (f.centroid().unwrap().z - mm(40.0)).abs() < 1e-9).map(|i| Reference::Face((*b.faces[i]).clone())).expect("the top");
+    let body = b.id.clone();
+    let foot = edge_at(&r, 0, DVec3::new(mm(1050.0), 0.0, 0.0));
+    s.add("sheetMetalStart", move |p| {
+        p.set("process", en("CONVERT"));
+        p.set("partToConvert", ParamValue::Query(vec![Reference::Body(body)]));
+        p.set("facesToExclude", ParamValue::Query(vec![top]));
+        p.set("bends", ParamValue::Query(vec![foot]));
+        set_model(p, "1.6 mm", "2.3 mm");
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 3, "floor with front; back with the corner and right; left");
+    let main = (0..3).find(|&i| r.context.sheet_metal.get(&r.context.bodies[i].id).unwrap().bends.len() == 1).expect("the bent part");
+    let b = &r.context.bodies[main];
+    let bb = b.shape.bounding_box(false).unwrap();
+    assert!(near(bb.max.x, mm(1099.98), 1e-6) && near(bb.max.y, mm(59.98), 1e-6), "{:?}", bb.max);
+    assert_eq!(b.faces.len(), 15);
+    assert!(near(volume(&r, main) * 1e9, 15956.448, 1e-3), "{}", volume(&r, main) * 1e9);
+    // The rolled corner stops as far above the floor (live Part 7: 14 faces, 9900.876 mm³, z from 0.02).
+    let corner = (0..3).find(|&i| near(volume(&r, i) * 1e9, 9900.876, 1.0)).expect("the part with the rolled corner");
+    let b = &r.context.bodies[corner];
+    assert!(near(b.shape.bounding_box(false).unwrap().min.z, mm(0.02), 1e-6));
+    assert_eq!(b.faces.len(), 14);
+    assert!(near(volume(&r, corner) * 1e9, 9900.876, 1e-3), "{}", volume(&r, corner) * 1e9);
+}
+
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn corner_break_and_relief_and_tab() {

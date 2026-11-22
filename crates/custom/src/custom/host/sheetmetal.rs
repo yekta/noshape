@@ -855,7 +855,11 @@ fn pulled_face(face: &Shape, topo: &Topo, l: &Loop, n: DVec3, offset: &[f64], fr
     let m = l.pts.len();
     let mut strips = Vec::new();
     for (k, &off) in offset.iter().enumerate().take(m) {
-        if off <= TOL || l.curved[k] {
+        if off <= TOL {
+            continue;
+        }
+        if l.curved[k] {
+            strips.extend(arc_band(&topo.edges[l.side[k]], off)?);
             continue;
         }
         let (a, b) = (l.pts[k], l.pts[(k + 1) % m]);
@@ -893,6 +897,27 @@ fn pulled_face(face: &Shape, topo: &Topo, l: &Loop, n: DVec3, offset: &[f64], fr
         return Ok(base);
     }
     Ok(k::boolean(k::BooleanOp::Cut, &[base], &strips, &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal wall failed: {e}")))?.shape)
+}
+
+/// The band within `off` of arc `edge`, between its ends' radii: a curved rip's pull-back (corner-break model F's
+/// fillet arcs: live's plate stops 0.02 mm short of the rolled corner).
+fn arc_band(edge: &Shape, off: f64) -> FResult<Option<Shape>> {
+    let Ok(k::Curve::Circle { center, radius, .. }) = edge.edge_curve() else { return Ok(None) };
+    let i = edge.edge_info().map_err(|e| fe(e.to_string()))?;
+    let mid = edge.point_at((i.first_param + i.last_param) * 0.5).map_err(|e| fe(e.to_string()))?;
+    let at = |p: DVec3, r: f64| center + (p - center).normalize_or_zero() * r;
+    let (lo, hi) = ((radius - off).max(radius * 0.5), radius + off);
+    let edges = [
+        k::make_arc_3pts(at(i.start, lo), at(mid, lo), at(i.end, lo)),
+        k::make_line(at(i.end, lo), at(i.end, hi)),
+        k::make_arc_3pts(at(i.end, hi), at(mid, hi), at(i.start, hi)),
+        k::make_line(at(i.start, hi), at(i.start, lo)),
+    ]
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|e| fe(e.to_string()))?;
+    let w = k::make_wire(&edges).map_err(|e| fe(e.to_string()))?;
+    Ok(Some(k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?))
 }
 
 /// Definition edge `e` is an arc leaving `at` along `dir` (either way).
@@ -1781,7 +1806,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         // from its face less the strips, as a curved one.
         let turned = (0..m).any(|k| (sides[k].1 - sides[k].0).dot(l.pts[(k + 1) % m] - l.pts[k]) <= TOL * TOL);
         if turned || l.curved.iter().any(|c| *c) {
-            if l.curved.iter().zip(&l.side).any(|(c, e)| *c && (def.bends.contains_key(e) || def.rips.contains(e))) {
+            if l.curved.iter().zip(&l.side).any(|(c, e)| *c && def.bends.contains_key(e)) {
                 return Err(fe("Curved sheet metal joints are not supported yet"));
             }
             let free = |j: usize| !def.bends.contains_key(&l.side[j]) && !def.rips.contains(&l.side[j]);
@@ -2101,8 +2126,8 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 wall_flats.push((fi, topo.faces[fi].clone()));
                 continue;
             }
-            let face = trimmed_walls.get(&fi).unwrap_or(&topo.faces[fi]);
-            name_keys.extend(rolled_bend(&topo, fi, face, front, back, &mut solids, &mut pieces)?);
+            let face = rips_pulled(def, &topo, fi, trimmed_walls.get(&fi).unwrap_or(&topo.faces[fi]))?;
+            name_keys.extend(rolled_bend(&topo, fi, &face, front, back, &mut solids, &mut pieces)?);
             if let Some(st) = def.rolled.get(&fi).and_then(|r| rolled_strip(&topo, fi, *r)) {
                 strips.push(st);
             }
@@ -2442,6 +2467,28 @@ fn span_of(topo: &Topo, e: usize, flat: usize) -> Option<Shape> {
         [one] => Some(one.clone()),
         _ => None,
     }
+}
+
+/// Curved wall `fi` less the clearance along its arc rips (corner-break model F's rolled corner: live's stops 0.02 mm
+/// above the floor).
+fn rips_pulled(def: &Definition, topo: &Topo, fi: usize, face: &Shape) -> FResult<Shape> {
+    let mut face = face.clone();
+    for e in (0..topo.edges.len()).filter(|e| def.rips.contains(e) && topo.edge_faces[*e].contains(&(fi as u32))) {
+        let Ok(k::Curve::Circle { center, axis, .. }) = topo.edges[e].edge_curve() else { continue };
+        let off = rip_offset(def, topo, e, fi);
+        if off <= TOL {
+            continue;
+        }
+        let axis = axis.normalize_or_zero();
+        let big = face.bounding_box(false).map_err(|e| fe(e.to_string()))?.diagonal() * 2.0;
+        let end = k::make_plane_face(&k::Plane::new(center - axis * off, axis, axis.any_orthonormal_vector()), -big, big, -big, big).map_err(|e| fe(e.to_string()))?;
+        let slab = k::extrude(&end, axis * (2.0 * off)).map_err(|e| fe(e.to_string()))?.shape;
+        let cut = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&face), &[slab], &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+        if let [one] = cut.faces().as_slice() {
+            face = one.clone();
+        }
+    }
+    Ok(face)
 }
 
 /// Shape `s` between the planes square to `dir` at `from` and `len` further on.

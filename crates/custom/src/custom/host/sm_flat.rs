@@ -3,7 +3,7 @@
 //! applied in the flat, i.e. to the definition sheet's corner behind each
 //! picked part vertex or edge (they share its association attribute). The
 //! corner's two straight sides are cut back and joined by a tangent arc
-//! (fillet, `radius`) or a line (equal-offsets chamfer, `width`).
+//! (fillet, `radius`) or a line (chamfer: `width`, `width1`/`width2` or `width` at `angle`).
 //! Corners of a planar definition face's loops are supported (a wall's free
 //! corner, a hole's corner); a corner at a bend's end is live's "Invalid input
 //! selections.".
@@ -28,11 +28,30 @@ fn fe(e: impl ToString) -> FeatureError {
     FeatureError::new(e.to_string())
 }
 
-/// How a corner is broken.
+/// How a corner is broken. A chamfer's first side is the one the turn to the other is counter-clockwise from about
+/// the definition face's normal; Opposite direction swaps them (live c2-cov2-sm-corner-break-relief-joint, a plate on
+/// Top: two offsets 4 / 8, opposite, take 8 along the y = 0 side at (700, 0); an offset-angle chamfer's 6 mm runs along
+/// the x = 700 side at (700, 60)).
 #[derive(Clone, Copy)]
 enum Break {
     Fillet(f64),
-    Chamfer(f64),
+    /// An asymmetric or conic fillet: the distances along the first and the second side at a square corner (live's
+    /// radius and other radius, flipped onto the first side by Flip: R 4 / 9 at (800, 60) runs 9 along x = 800), and the
+    /// conic's rho (none: elliptical).
+    Conic(f64, f64, Option<f64>),
+    /// A fillet whose tangent points lie this far apart (live's Width control: 8 mm at a square corner, R 5.657).
+    FilletWidth(f64),
+    /// The distances along the first and the second side.
+    Chamfer(f64, f64),
+    /// The distance along one side (the second with `true`) and the angle from it.
+    ChamferAngle(f64, f64, bool),
+}
+
+/// The curve across a broken corner: a fillet's arc of this radius, a conic of this weight about the corner, a chamfer.
+enum Corner {
+    Arc(f64),
+    Conic(f64),
+    Line,
 }
 
 fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -41,9 +60,30 @@ fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let def = def_arg(i, &a, 2)?;
     let picks = evaluate_refs(i, &cx, def.get("entities"))?;
     let how = if def_enum(&def, "crossSection").as_deref() == Some("CHAMFER") {
-        Break::Chamfer(def_length_opt(&def, "width").ok_or_else(|| i.error("sheetMetalApplyInFlat: a chamfer needs width"))?)
+        let length = |i: &mut Interp, key: &str| def_length_opt(&def, key).ok_or_else(|| i.error(format!("sheetMetalApplyInFlat: a chamfer needs {key}")));
+        let opposite = def_bool(&def, "oppositeDirection", false);
+        match def_enum(&def, "chamferType").as_deref() {
+            Some("TWO_OFFSETS") => {
+                let (a, b) = (length(i, "width1")?, length(i, "width2")?);
+                if opposite { Break::Chamfer(b, a) } else { Break::Chamfer(a, b) }
+            }
+            Some("OFFSET_ANGLE") => Break::ChamferAngle(length(i, "width")?, def_angle(i, &def, "angle")?, opposite),
+            _ => {
+                let w = length(i, "width")?;
+                Break::Chamfer(w, w)
+            }
+        }
+    } else if def_enum(&def, "blendControlType").as_deref() == Some("WIDTH") {
+        Break::FilletWidth(def_length_opt(&def, "width").ok_or_else(|| i.error("sheetMetalApplyInFlat: a fillet needs width"))?)
     } else {
-        Break::Fillet(def_length_opt(&def, "radius").ok_or_else(|| i.error("sheetMetalApplyInFlat: a fillet needs radius"))?)
+        let r = def_length_opt(&def, "radius").ok_or_else(|| i.error("sheetMetalApplyInFlat: a fillet needs radius"))?;
+        let other = if def_bool(&def, "isAsymmetric", false) { def_length_opt(&def, "otherRadius") } else { None };
+        let rho = if def_enum(&def, "crossSection").as_deref() == Some("CONIC") { def_number(&def, "rho") } else { None };
+        match (other, rho) {
+            (None, None) => Break::Fillet(r),
+            (Some(o), _) if def_bool(&def, "flipAsymmetric", false) => Break::Conic(o, r, rho),
+            (o, _) => Break::Conic(r, o.unwrap_or(r), rho),
+        }
     };
     // The definition corners behind the picks: (definition body, vertex point).
     let corners: Vec<(BodyId, DVec3)> = {
@@ -123,10 +163,15 @@ fn break_corner(f: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
     let size = |w: &Shape| w.bounding_box(false).map_or(0.0, |b| b.diagonal());
     let wires = f.wires();
     let Some(outer) = wires.iter().max_by(|a, b| size(a).total_cmp(&size(b))).cloned() else { return Ok(None) };
+    let normal = |s: &Shape| -> FResult<DVec3> {
+        let [u0, u1, v0, v1] = s.uv_bounds().map_err(fe)?;
+        s.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)
+    };
+    let n = normal(f)?;
     let mut loops: Vec<Shape> = Vec::with_capacity(wires.len());
     let mut broken = false;
     for w in &wires {
-        match (broken, broken_loop(w, v, how)?) {
+        match (broken, broken_loop(w, v, n, how)?) {
             (false, Some(nw)) => {
                 broken = true;
                 loops.push(nw);
@@ -139,11 +184,6 @@ fn break_corner(f: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
     }
     let k = wires.iter().position(|w| w.is_same(&outer)).unwrap_or(0);
     let outer = loops.remove(k);
-    let normal = |s: &Shape| -> FResult<DVec3> {
-        let [u0, u1, v0, v1] = s.uv_bounds().map_err(fe)?;
-        s.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)
-    };
-    let n = normal(f)?;
     let mut face = k::make_face(&k::Plane::new(pl.origin, n, pl.unit_x()), &outer, &loops).map_err(fe)?;
     if normal(&face)?.dot(n) < 0.0 {
         face = face.reversed().map_err(fe)?;
@@ -152,8 +192,8 @@ fn break_corner(f: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
 }
 
 /// Loop `wire` with its corner at `v` broken, if `v` is one of its corners between two straight sides (its other
-/// edges kept as they are: a corner broken before stays).
-fn broken_loop(wire: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
+/// edges kept as they are: a corner broken before stays). `n`: the face's normal.
+fn broken_loop(wire: &Shape, v: DVec3, n: DVec3, how: Break) -> FResult<Option<Shape>> {
     let edges = wire.edges();
     let mut lines: Vec<(DVec3, DVec3, bool)> = Vec::with_capacity(edges.len());
     for e in &edges {
@@ -175,23 +215,56 @@ fn broken_loop(wire: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
     if theta < 1e-6 || theta > std::f64::consts::PI - 1e-6 {
         return Ok(None);
     }
-    let reach = match how {
-        Break::Fillet(r) => r / (theta * 0.5).tan(),
-        Break::Chamfer(w) => w,
+    // Side 1 (towards `prev`) comes first when the turn from it to side 2 is counter-clockwise about `n`.
+    let one_first = n.dot(d1.cross(d2)) > 0.0;
+    let firsts = |a: f64, b: f64| if one_first { (a, b) } else { (b, a) };
+    // The distances along sides 1 and 2, and the corner's curve.
+    let fillet = |r: f64| {
+        let t = r / (theta * 0.5).tan();
+        (t, t, Corner::Arc(r))
+    };
+    let (r1, r2, curve) = match how {
+        Break::Fillet(r) => fillet(r),
+        Break::FilletWidth(w) => fillet(w / (2.0 * (theta * 0.5).cos())),
+        // Offsets a1 / a2 from sides 2 / 1, the distances along them at a square corner; a circle's weight without rho.
+        Break::Conic(a, b, rho) => {
+            let (a1, a2) = firsts(a, b);
+            let w = match rho {
+                Some(rho) if rho <= 0.0 || rho >= 1.0 => return err("Rho must be between 0 and 1"),
+                Some(rho) => rho / (1.0 - rho),
+                None => (theta * 0.5).sin(),
+            };
+            let (s, c) = theta.sin_cos();
+            ((a1 + a2 * c) / s, (a2 + a1 * c) / s, Corner::Conic(w))
+        }
+        Break::Chamfer(a, b) => {
+            let (x, y) = firsts(a, b);
+            (x, y, Corner::Line)
+        }
+        // The chamfer line leaves the distance's side at the angle: it meets the other side at d sin a / sin(θ + a).
+        Break::ChamferAngle(d, angle, second) => {
+            if (theta + angle).sin() <= 1e-9 {
+                return err("The corner break is larger than the corner's sides");
+            }
+            let other = d * angle.sin() / (theta + angle).sin();
+            let (x, y) = if second { firsts(other, d) } else { firsts(d, other) };
+            (x, y, Corner::Line)
+        }
     };
     // A side may be taken whole: two breaks of half its length meet on it (c2-sm-side-cuts-tab's Corner break 1: R21 on
     // a 42 mm edge, live OK).
-    if reach > prev.distance(v) + TOL || reach > next.distance(v) + TOL {
+    if r1 > prev.distance(v) + TOL || r2 > next.distance(v) + TOL {
         return err("The corner break is larger than the corner's sides");
     }
-    let (p1, p2) = (v + d1 * reach, v + d2 * reach);
-    let corner = match how {
-        Break::Fillet(r) => {
+    let (p1, p2) = (v + d1 * r1, v + d2 * r2);
+    let corner = match curve {
+        Corner::Arc(r) => {
             let bis = (d1 + d2).normalize();
             let centre = v + bis * (r / (theta * 0.5).sin());
             k::make_arc_3pts(p1, centre - bis * r, p2).map_err(fe)?
         }
-        Break::Chamfer(_) => k::make_line(p1, p2).map_err(fe)?,
+        Corner::Conic(w) => k::make_bspline(&[p1, v, p2], Some(&[1.0, w, 1.0]), &[0.0, 1.0], &[3, 3], 2, false).map_err(fe)?,
+        Corner::Line => k::make_line(p1, p2).map_err(fe)?,
     };
     let mut out: Vec<Shape> = Vec::with_capacity(edges.len() + 1);
     for (j, e) in edges.iter().enumerate() {
