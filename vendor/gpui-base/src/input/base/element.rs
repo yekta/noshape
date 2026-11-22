@@ -964,6 +964,10 @@ impl<M: InputModeKind> TextElement<M> {
 
         let active_id = state.active_selection().id;
         let mut paths = Vec::new();
+        // A code editor paints every selected line but the last to its full width (Ace's "line" selection style).
+        let full_width = state
+            .is_code_editor()
+            .then(|| bounds.size.width - last_layout.line_number_width);
 
         for selection in state.selections.iter() {
             let is_active = selection.id == active_id;
@@ -1021,15 +1025,52 @@ impl<M: InputModeKind> TextElement<M> {
                 }
             }
             if start < range.end {
-                paths.extend(Self::layout_match_range(
-                    start..range.end,
-                    last_layout,
-                    bounds,
-                ));
+                match full_width {
+                    Some(w) => paths.extend(Self::layout_full_line_range(start..range.end, w, last_layout, bounds)),
+                    None => paths.extend(Self::layout_match_range(start..range.end, last_layout, bounds)),
+                }
             }
         }
 
         paths
+    }
+
+    /// A range's highlight with each of its rows but the last widened to `width` (Ace's full-line selection).
+    fn layout_full_line_range(
+        range: Range<usize>,
+        width: Pixels,
+        last_layout: &LastLayout,
+        bounds: &Bounds<Pixels>,
+    ) -> Option<Path<Pixels>> {
+        let corners = Self::full_line_corners(&range, width, last_layout)?;
+        let points = frame_outline_points(&corners);
+        let origin = bounds.origin + point(last_layout.line_number_width, px(0.));
+        let mut builder = gpui::PathBuilder::fill();
+        builder.move_to(origin + *points.first()?);
+        for point in points.iter().skip(1) {
+            builder.line_to(origin + *point);
+        }
+        builder.close();
+        builder.build().ok()
+    }
+
+    fn full_line_corners(
+        range: &Range<usize>,
+        width: Pixels,
+        last_layout: &LastLayout,
+    ) -> Option<Vec<Corners<Point<Pixels>>>> {
+        let mut corners = Self::layout_range_corners(range, last_layout)?;
+        let last = corners.len() - 1;
+        for c in &mut corners[..last] {
+            let right = c.top_right.x.max(width);
+            c.top_right.x = right;
+            c.bottom_right.x = right;
+        }
+        Some(corners)
+    }
+
+    fn spans_lines(text: &Rope, a: usize, b: usize) -> bool {
+        a != b && text.offset_to_point(a.min(b)).row != text.offset_to_point(a.max(b)).row
     }
 
     /// Calculate the visible range of lines in the viewport.
@@ -3104,15 +3145,17 @@ impl<M: InputModeKind> Element for TextElement<M> {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let (focus_handle, show_cursor, disabled, selected_range, editor_style, editor_paddings) = {
+        let (focus_handle, show_cursor, disabled, selected_range, editor_style, editor_paddings, multi_line) = {
             let state = self.state.read(cx);
+            let sel = *state.active_selection();
             (
                 state.focus_handle.clone(),
                 state.show_cursor(window, cx),
                 state.disabled,
-                *state.active_selection(),
+                sel,
                 state.editor_style.clone(),
                 state.editor_paddings,
+                state.is_code_editor() && Self::spans_lines(&state.text, sel.start, sel.end),
             )
         };
         let focused = focus_handle.is_focused(window);
@@ -3149,7 +3192,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 .iter()
                 .zip(prepaint.last_layout.visible_buffer_lines.iter())
             {
-                let is_active = prepaint.current_row == Some(buffer_line);
+                // (A selection over several lines drops the band, as Ace's "line" selection style.)
+                let is_active = !multi_line && prepaint.current_row == Some(buffer_line);
                 let p = point(input_bounds.origin.x, origin.y + offset_y);
                 let height = line_height * lines.len() as f32;
                 // Paint the current line background
@@ -3728,6 +3772,26 @@ mod tests {
         fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
             div().size_full().child(self.0.clone())
         }
+    }
+
+    /// Live Feature Studio (FS-DRAG-SELECT-BAND): a selection over two lines paints the first to the full width,
+    /// the last to the selection's end.
+    #[gpui::test]
+    fn a_multi_line_selection_runs_to_the_full_width_but_on_its_last_line(cx: &mut TestAppContext) {
+        let text = "abc\nde\nf";
+        let (editor, window) = decoration_editor(cx, text, false);
+        let mut cx = VisualTestContext::from_window(window.into(), cx);
+        cx.update(|window, cx| {
+            window.draw(cx).clear(cx);
+            let state = editor.read(cx);
+            let layout = state.last_layout.as_ref().unwrap();
+            let c = TextElement::<EditorMode>::full_line_corners(&(1..5), px(200.), layout).unwrap();
+            assert_eq!(c.len(), 2);
+            assert_eq!(c[0].top_right.x, px(200.));
+            assert!(c[1].top_right.x < px(50.), "{:?}", c[1]);
+            assert!(TextElement::<EditorMode>::spans_lines(&state.text, 1, 5));
+            assert!(!TextElement::<EditorMode>::spans_lines(&state.text, 0, 3));
+        });
     }
 
     fn decoration_editor(
