@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 10:30 UTC.
+Updated 2026-11-22 12:26 UTC.
 
 ## In flight
 
@@ -21,22 +21,29 @@ vibex8 with `rb.sh bash -c true`, then `ssh vibex8 "bash -s" < script` (x184b.sh
 score line "score: N/978"; x184d.sh: drw only + the three hover matrices). Never vibe2. Every run under `timeout`;
 `touch -c` edited files before rb.sh; two rb.sh runs on one host share a target dir (one waits). Full ops e2e before a
 crates/drawing land (drawing-ui alone: not needed).
-- QUEUED 155f85da (11-22 10:2x, 25 commits): APP-VULKAN-SEGV, DRW-BORDER-DRAG, the Esc rework, live drwm-1..7
-  hover/select, qa walk 9, workflow 09 P0s (just-placed view lit, no dots on a placed dimension), balloon leader black
-  when hovered, workflow 26 FS batch, DRW-TAB-MENU-CHANGE-TO-VERSION, DRW-TITLEBLOCK-EDIT-BOX, FEEL-DRW-VIEW-FRAME-PAD,
-  HISTORY-BRANCH-FILTER (history-ui funnel), click_still (a click inside a view keeps its selection frame until the
-  pointer moves; a click on its edge keeps the tan hover frame: live's 75 view_edge clicks read EDGE), regenerated
-  AGENT_API.md, TICKETS rebuilt from main (a union merge had doubled psui/dx rows). Checked: drawing-ui 166, FS 29,
-  ops e2e 278, clippy clean; hover matrices 104/107 (3 = the palette below). Check `land.sh --status`.
-- UNCOMMITTED: the dimension palette's halo (40 px left of it) swallowed a click on its own dimension's text beside it,
-  closing an untouched palette (live drw-dimension-hover-matrix d7 keeps it). Fix: `on_palette_dimension` in
-  drawing_palette.rs lets that click through to the sheet; test a_dimension_dragged_from_unselected_ends_unselected
-  (double-click through the window, asserts the text is inside the halo). Run x193 then land.
+- QUEUED 155f85da (11-22 10:29, 25 commits; CHECKING since 11:58 in a batch of 4): APP-VULKAN-SEGV, DRW-BORDER-DRAG,
+  the Esc rework, live drwm-1..7 hover/select, qa walk 9, workflow 09 P0s (just-placed view lit, no dots on a placed
+  dimension), balloon leader black when hovered, workflow 26 FS batch, DRW-TAB-MENU-CHANGE-TO-VERSION,
+  DRW-TITLEBLOCK-EDIT-BOX, FEEL-DRW-VIEW-FRAME-PAD, HISTORY-BRANCH-FILTER, click_still (a click inside a view keeps its
+  selection frame until the pointer moves; on its edge the tan hover frame: live's 75 view_edge clicks read EDGE),
+  regenerated AGENT_API.md, TICKETS rebuilt from main (a union merge had doubled psui/dx rows). Checked: drawing-ui 166,
+  FS 29, ops e2e 278, clippy clean. A background wait polled `land.sh --status`; check it first.
+- COMMITTED, NOT QUEUED (land after 155f85da lands: fetch, rebase, read the diff stat, land.sh): d73da02db palette halo
+  (`on_palette_dimension`: a click on the palette's own dimension beside it passes the 40 px halo; live drwm d7),
+  b1cb11340 FS-DRAG-SELECT-BAND (vendor/gpui-base element.rs: code editor mode paints a multi-line selection full width
+  but on its last line and drops the active-line band; checked in a shot), 0488d9adb TICKETS. gpui-base is not a
+  workspace member: its unit tests can't run and `clippy -p gpui-base --all-targets` fails on its benches (not ours).
+- vibex8 scenario run (app 10:50 with both fixes, x184d.sh, out ~/agents/studios-keep/uip1122j): hover matrices 3/3,
+  107/107; all drw 371/374 scenarios, 3869/3877 states. Left: drw-centerline-circle-3-point-hole-centres (Ø8, decision
+  below), drw-table-cell-menu (step 3 focus field/other), drw-table-cells-insert-row (step 11 the Cell dialog stays).
+  uip-mine.sh now lives in ~/agents/studios-keep on vibex8 (~/tmp copy was pruned).
+- Next: live is capturing the drawing hover x selection matrix; its view/edge/sheet cells are studios'. Then the two
+  table scenarios above; FEEL-VS-CHIP-ON-CLICK (P2).
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre (behaviours "studios (k)
   follow-up"), Ø5 centres take: looks like live refusing a valid pick; ours takes it. Decision needed from the lead
   (copy or record as live's failure); not changed.
 - Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. P2s
-  VS-CHIP-ON-CLICK, FS-DRAG-SELECT-BAND (vendored GPUI tooltip / editor patches); FS snippet rounded corners, Esc.
+  VS-CHIP-ON-CLICK (vendored GPUI tooltip patch); FS snippet rounded corners, Esc.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
