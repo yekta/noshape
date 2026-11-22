@@ -1231,7 +1231,7 @@ impl WrappedCut {
 /// (`ext`: how far the relief reaches past the bend-allowance square), and
 /// the wall and both flanges lose the relief's rectangle. Returns the bend
 /// clips (edge, vertex, distance) and the cutters by wall.
-/// Also whether a sized round relief is smaller than its corner (live: no relief, WARNING SHEET_METAL_CORNER_UNDER_SIZED).
+/// Also whether a sized relief is smaller than its corner (live: no relief, WARNING SHEET_METAL_CORNER_UNDER_SIZED).
 fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &BendList, setbacks: &BTreeMap<usize, f64>) -> FResult<(Clips, Clips, Cuts, Vec<WrappedCut>, bool)> {
     let mut under_sized = false;
     let mut clips = Vec::new();
@@ -1379,6 +1379,8 @@ fn corner_reliefs(def: &Definition, topo: &Topo, outlines: &[Outline], bends: &B
                 continue;
             }
             if x1 < 0.0 || x2 < 0.0 {
+                // (Live workflow 27, sm-box: a 3 mm Square - Sized relief at Flange 1's corner warns.)
+                under_sized |= style == "SIZED_RECTANGLE";
                 continue;
             }
             let (a, b) = (s2 + x2, s1 + x1);
