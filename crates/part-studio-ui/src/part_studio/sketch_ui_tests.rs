@@ -6855,9 +6855,10 @@ fn a_line_ending_on_a_lit_model_edge_lands_on_it(cx: &mut TestAppContext) {
     assert!(perpendicular, "the direction inferred kept");
 }
 
-/// Live workflow 05 step 11 (qa SKETCH-LENGTH-LABEL-IN-PLANE): a line drawn level toward a lit model edge, the pointer
-/// on the edge's midpoint 2 px off the level: live shows horizontal and coincident and ends the line where the level
-/// meets the edge (exactly 20 there), not at the edge's midpoint.
+/// Live workflow 05 step 11 and lenbox-1122 E (behaviours "skasm length box side"): a line drawn level toward a lit
+/// model edge, the pointer on the edge's midpoint 2 px off the level: live shows horizontal and vertical (no diamond) and
+/// ends the line on the level straight across from the midpoint, HORIZONTAL and VERTICAL to the edge's midpoint, not
+/// at the midpoint.
 #[gpui::test]
 fn a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it(cx: &mut TestAppContext) {
     let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "level-onto-edge-midpoint", Tool::Line);
@@ -6882,8 +6883,7 @@ fn a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it(cx: &m
         })
     })
     .unwrap();
-    assert_eq!(icons.last().copied(), Some("coincident"), "on the edge, not its midpoint: {icons:?}");
-    assert!(icons.len() == 2 && matches!(icons[0], "horizontal" | "vertical"), "{icons:?}");
+    assert!(icons.len() == 2 && icons.contains(&"horizontal") && icons.contains(&"vertical"), "the level and the midpoint's alignment: {icons:?}");
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
@@ -6893,16 +6893,22 @@ fn a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it(cx: &m
     })
     .unwrap();
     draw(cx, window);
-    let (start, end, midpoint) = cx.update(|cx| {
+    let (start, end, midpoint, aligned) = cx.update(|cx| {
         let data = view.read(cx).sketch_data(cx).unwrap();
         let line = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.external && !e.construction).map(|e| e.id).max().unwrap();
         let (start, end) = data.sketch.endpoints(line).unwrap();
         let midpoint = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Midpoint { point, .. } if point == end));
-        (data.sketch.point(start).unwrap(), data.sketch.point(end).unwrap(), midpoint)
+        let mids: Vec<_> = data.sketch.constraints().filter_map(|c| match c.kind { noshape_sketch::ConstraintKind::Midpoint { point, curve } if data.sketch.entity(curve).is_some_and(|e| e.external) => Some(point), _ => None }).collect();
+        let aligned = data.sketch.constraints().any(|c| match c.kind {
+            noshape_sketch::ConstraintKind::Vertical { a, b: Some(b) } | noshape_sketch::ConstraintKind::Horizontal { a, b: Some(b) } => (a == end && mids.contains(&b)) || (b == end && mids.contains(&a)),
+            _ => false,
+        });
+        (data.sketch.point(start).unwrap(), data.sketch.point(end).unwrap(), midpoint, aligned)
     });
     // (Against the display mesh's f32 edge; the start where its click landed.)
     assert!((end - a).perp_dot(along).abs() < 1e-6 && (end - start).dot(along).abs() < 1e-9, "where the level meets the edge: {start:?} -> {end:?}");
     assert!(!midpoint && (end - mid).length() > wpp, "not the edge's midpoint: {end:?}, midpoint {mid:?}");
+    assert!(aligned, "aligned with a point at the edge's midpoint");
 }
 
 /// User P0 11-14 (hat15, a chain on a face): the next segment square to the previous one, ending where that square

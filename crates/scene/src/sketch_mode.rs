@@ -429,6 +429,9 @@ const WOKEN_POINT: EntityId = EntityId(u32::MAX - 4);
 /// Stand for the midpoints of lines woken while drawing ([`SketchEditor::woken_mids`]) in an inference's alignments until
 /// the click makes a point there.
 const WOKEN_MIDS: [EntityId; 4] = [EntityId(u32::MAX - 5), EntityId(u32::MAX - 6), EntityId(u32::MAX - 7), EntityId(u32::MAX - 8)];
+/// Stands for a model edge's midpoint a level crosses ([`SketchEditor::woken_edge_mid`]) in an inference's alignment
+/// until the click makes a point there.
+const WOKEN_EDGE_MID: EntityId = EntityId(u32::MAX - 9);
 /// Trim: crossings this close to a chain's corner don't count (live sktools-1118 ~1 px, recheck b5b664aa 0.6 px).
 const TRIM_CORNER_PX: f64 = 1.5;
 /// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
@@ -832,6 +835,9 @@ pub struct SketchEditor {
     /// The point outside the sketch woken last: snapped onto while drawing (an external vertex snap; live 11-17
     /// sketch-snap-1117, Sketch 2's point then offers its horizontal / vertical alignment, as a point of the sketch does).
     pub woken_point: Option<(noshape_model::reference::Reference, DVec2)>,
+    /// A model edge's midpoint the pointer is on while a level crosses near it: the edge, the midpoint and (once the
+    /// click used the edge) its curve in the sketch.
+    woken_edge_mid: Option<(noshape_model::reference::Reference, DVec2, Option<EntityId>)>,
     /// Press position of a drawing tool (press-drag-release placement).
     press: Option<DVec2>,
     /// A press on the Line chain's last point: released there it ends the chain, dragged it keeps the rubber band.
@@ -1582,6 +1588,7 @@ impl SketchEditor {
             edge_seen: None,
             woken_edge: None,
             woken_point: None,
+            woken_edge_mid: None,
             press: None,
             chain_end_press: None,
             tangent_mode: false,
@@ -1665,6 +1672,7 @@ impl SketchEditor {
         self.edge_acquiring = None;
         self.woken_edge = None;
         self.woken_point = None;
+        self.woken_edge_mid = None;
         self.press = None;
         self.chain_end_press = None;
         self.tangent_mode = false;
@@ -2033,12 +2041,18 @@ impl SketchEditor {
     /// align-mid-1118: `<new line>.endSnap0`, MIDPOINT, HORIZONTAL from the new end to it; it follows the line).
     fn link_woken_mids(&mut self, sk: &mut Sketch, inference: Option<Inference>) -> Option<Inference> {
         let mut inf = inference?;
-        let mids: Vec<(EntityId, DVec2)> = self.woken_mid_points(sk).collect();
+        let mut mids: Vec<(EntityId, DVec2)> = self.woken_mid_points(sk).collect();
+        // (A model edge's midpoint: its used curve's, live lenbox-1122 E.)
+        mids.extend(self.woken_edge_mid.as_ref().filter(|w| w.2.is_some()).map(|w| (WOKEN_EDGE_MID, w.1)));
         for (k, at) in mids {
             if !inf.constraints.iter().any(|c| matches!(c, AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == k)) {
                 continue;
             }
-            let Some(line) = WOKEN_MIDS.iter().position(|x| *x == k).and_then(|i| self.woken_mids.get(i).copied()) else { continue };
+            let line = match k {
+                WOKEN_EDGE_MID => self.woken_edge_mid.as_ref().and_then(|w| w.2),
+                _ => WOKEN_MIDS.iter().position(|x| *x == k).and_then(|i| self.woken_mids.get(i).copied()),
+            };
+            let Some(line) = line else { continue };
             let q = sk.add_point(at);
             let _ = sk.add_constraint(ConstraintKind::Midpoint { point: q, curve: line });
             for c in &mut inf.constraints {
@@ -2366,6 +2380,16 @@ impl SketchEditor {
             return;
         }
         let distance = |q: DVec2| self.cursor.map(|c| (c - q).length()).unwrap_or(0.0);
+        // A level near a model edge's midpoint: the end where it crosses the midpoint's vertical (or horizontal), aligned
+        // with the midpoint, not on the edge (live lenbox-1122 E: HORIZONTAL + VERTICAL to the midpoint, no diamond).
+        if let ExternalSnap::Edge { position: mid, midpoint: true, reference, .. } = &snap
+            && let Some(combined) = self.level_onto_midpoint(*mid)
+        {
+            self.woken_edge_mid = Some((reference.clone(), *mid, None));
+            self.inference = Some(combined);
+            self.external_snap = None;
+            return;
+        }
         // (A parallel doesn't meet a model edge: live2 combo parEdge, Lb woken, the end only on the edge.) The crossing
         // beats the edge's midpoint too: on the edge then, not at its middle (live workflow 05 step 11: horizontal and
         // coincident over the left edge's midpoint, the segment exactly 20).
@@ -2385,6 +2409,21 @@ impl SketchEditor {
         };
         self.inference = Some(Inference { kind, position, entity: None, reference: None, constraints: Vec::new(), distance: distance(position), priority: 0 });
         self.external_snap = Some(snap);
+    }
+
+    /// The level inference (a horizontal or vertical line from the anchor) carried to the vertical (horizontal) through
+    /// `mid`, aligned with it, where that is within reach of the pointer.
+    fn level_onto_midpoint(&self, mid: DVec2) -> Option<Inference> {
+        let i = self.inference.as_ref().filter(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::HorizontalLine | AutoConstraint::VerticalLine)))?;
+        let (a, dir) = zone_line(i)?;
+        let horizontal = dir.y.abs() < 1e-9;
+        if !horizontal && dir.x.abs() >= 1e-9 {
+            return None;
+        }
+        let x = if horizontal { DVec2::new(mid.x, a.y) } else { DVec2::new(a.x, mid.y) };
+        let mut combined = self.crossing_in_reach(i, x)?;
+        combined.constraints.push(if horizontal { AutoConstraint::VerticalWith(WOKEN_EDGE_MID) } else { AutoConstraint::HorizontalWith(WOKEN_EDGE_MID) });
+        Some(combined)
     }
 
     /// A direction inference `i` (from the tool's anchor) carried onto the line through `on` along `tangent`: where
@@ -2558,6 +2597,12 @@ impl SketchEditor {
 
     /// The click takes the woken model edge's perpendicular or an end's alignment: the edge is used in `sk` as `id`.
     pub fn link_woken_edge(&mut self, sk: &Sketch, id: EntityId) {
+        if self.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| auto_target(c) == Some(WOKEN_EDGE_MID)))
+            && let Some(w) = &mut self.woken_edge_mid
+        {
+            w.2 = sk.curve(id).is_some().then_some(id);
+            return;
+        }
         if sk.point(id).is_some() {
             if let Some(inf) = &mut self.inference {
                 for c in &mut inf.constraints {
@@ -2584,6 +2629,9 @@ impl SketchEditor {
         let i = self.inference.as_ref()?;
         if i.constraints.iter().any(|c| auto_target(c) == Some(WOKEN_POINT)) {
             return self.woken_point.as_ref().map(|w| &w.0);
+        }
+        if i.constraints.iter().any(|c| auto_target(c) == Some(WOKEN_EDGE_MID)) {
+            return self.woken_edge_mid.as_ref().map(|w| &w.0);
         }
         let woken = |e: EntityId| e == WOKEN_EDGE || WOKEN_EDGE_ENDS.contains(&e);
         i.constraints.iter().any(|c| auto_target(c).is_some_and(woken)).then(|| self.woken_edge.as_ref().map(|w| &w.0))?
@@ -7180,6 +7228,7 @@ impl SketchEditor {
                 .filter_map(|c| match c {
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN => Some(DVec2::ZERO),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == WOKEN_POINT => self.woken_point.as_ref().map(|w| w.1),
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == WOKEN_EDGE_MID => self.woken_edge_mid.as_ref().map(|w| w.1),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_MIDS.contains(p) => self.woken_mid_points(&data.sketch).find(|(k, _)| k == p).map(|(_, q)| q),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_EDGE_ENDS.contains(p) => {
                         self.woken_edge.as_ref().map(|w| if *p == WOKEN_EDGE_ENDS[0] { w.1 } else { w.2 })
