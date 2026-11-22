@@ -400,7 +400,8 @@ impl Bench {
 
     /// Screen px along `dir` (x right, y up on the sketch).
     fn along(&self, dir: (f64, f64)) -> DVec2 {
-        (self.ex * dir.0 + self.ey * dir.1).normalize()
+        // (A row probed at its target has no direction: (0, 0).)
+        (self.ex * dir.0 + self.ey * dir.1).normalize_or_zero()
     }
 
     fn events(&self, cx: &mut TestAppContext, evs: &[ViewportEvent]) {

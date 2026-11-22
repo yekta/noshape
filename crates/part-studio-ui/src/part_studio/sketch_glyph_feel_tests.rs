@@ -306,7 +306,9 @@ fn a_hovered_line_shows_all_its_constraints(cx: &mut TestAppContext) {
     })), "some edge's constraint is drawn on another line with Show constraints on");
     let pointer = Pointer::new(cx, window, &view);
     for (line, mine) in edges {
-        pointer.move_to(cx, &view, DVec2::new(30.0, 30.0));
+        // (Over empty graphics below the rectangle, so the last line lets go and its linger ends before the next.)
+        pointer.move_to(cx, &view, DVec2::new(200.0, 520.0));
+        assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), None, "nothing lit off the rectangle");
         cx.executor().advance_clock(GLYPH_LINGER + std::time::Duration::from_millis(50));
         cx.run_until_parked();
         // (Read after the clock moved: the new sketch's view turns normal to its plane meanwhile.)

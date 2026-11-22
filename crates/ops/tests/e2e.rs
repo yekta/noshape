@@ -428,7 +428,8 @@ fn show_code_reads_as_lives_capture() {
     let mut ctx = Ctx::new();
     call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
     call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
-    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    // (Live's rectangle is four chained lines made by REST, r0-r3, not a corner rectangle: its edges run round.)
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "line", "points": [[0, 0], [40, 0], [40, 30], [0, 30], [0, 0]] }));
     call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "circle", "points": [[60, 15], [65, 15]] }));
     let regions = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"].clone();
     let region = |at: f64| regions.as_array().unwrap().iter().find(|r| (r["area"].as_f64().unwrap_or(0.0) - at).abs() < 1.0).unwrap_or(&regions[0])["id"].as_str().unwrap().to_string();
@@ -3728,7 +3729,7 @@ fn coincident_on_one_point_is_a_no_op() {
     let v = call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "coincident", "entities": [corner, "origin"] }));
     assert_eq!(v["added"], json!([]), "{v}");
     assert!(v["message"].as_str().unwrap().contains("already coincident"), "{v}");
-    let shared = lines[3]["end_point"].as_str().unwrap().to_string();
+    let shared = lines[3]["start_point"].as_str().unwrap().to_string();
     let v = call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "coincident", "entities": [corner, shared] }));
     assert_eq!(v["added"], json!([]), "{v}");
     assert_eq!(call(&mut ctx, "history_list", json!({}))["history"].as_array().unwrap().len(), n0, "no edit");

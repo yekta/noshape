@@ -6588,6 +6588,16 @@ fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWi
     (window, view, edge, pick, a, b)
 }
 
+/// The block's centre on the sketch plane (its first corner sits on the origin, so the origin can't tell an edge's inside).
+fn block_centre(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> DVec2 {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let body = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let sum = body.mesh.positions.iter().fold(glam::DVec3::ZERO, |s, p| s + glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+        v.sketch.as_ref().unwrap().frame.to_local(sum / body.mesh.positions.len() as f64)
+    })
+}
+
 /// A sketch-plane point on screen (viewport-local).
 fn on_screen(cx: &mut TestAppContext, view: &Entity<PartStudioView>, q: DVec2) -> DVec2 {
     cx.update(|cx| {
@@ -6605,7 +6615,7 @@ fn a_line_ending_on_a_lit_model_edge_lands_on_it(cx: &mut TestAppContext) {
     let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "line-onto-model-edge", Tool::Line);
     let along = (b - a).normalize();
     let inward = {
-        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let centre = block_centre(cx, &view);
         let n = along.perp();
         if (centre - a).dot(n) > 0.0 { n } else { -n }
     };
@@ -6715,7 +6725,7 @@ fn a_square_to_the_last_segment_crossing_a_lit_model_edge_takes_and_shows_both(c
     let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "square-onto-model-edge", Tool::Line);
     let along = (b - a).normalize();
     let inward = {
-        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let centre = block_centre(cx, &view);
         let n = along.perp();
         if (centre - a).dot(n) > 0.0 { n } else { -n }
     };
@@ -6778,7 +6788,7 @@ fn a_point_dragged_onto_a_model_edge_lands_on_it(cx: &mut TestAppContext) {
     let (window, view, _edge, _pick, a, b) = sketch_on_top_face(cx, "drag-onto-model-edge", Tool::Point);
     let along = (b - a).normalize();
     let inward = {
-        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let centre = block_centre(cx, &view);
         let n = along.perp();
         if (centre - a).dot(n) > 0.0 { n } else { -n }
     };
