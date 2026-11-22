@@ -408,6 +408,15 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   turns both (gear 2:1, tilted squares in s32); ours shows no Part 2 outside Part 1 and the drag changes no pixel, with or without
   the Gear relation (variant 25v-nogear, hm2/out-wfv): placement of Part 2 <2> or the drag pick (tickets/wf25-placement.png,
   wf25-drag.png). Gear 1 dialog = live (Mate(s) Revolute 1 / 2, ratio 2).
+- [ ] P0 **FEEL-DRW-BALLOON-HOVER-LEADER (studios)** (workflow 23 step 24, pin-block-asm-drawing, green b5b414278): balloon 2 hovered
+  after Esc (attached to Section A-A's edge): live tints only the balloon (tan ring + fill), its leader stays black with a filled black
+  arrowhead at the edge; ours draws the whole leader tan and thin, with no arrowhead (tickets/wf23-hatch-balloon.png, bottom; live left).
+- [ ] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
+  the opposite angle and closer spacing than the block, so adjacent parts read apart; ours hatches both at the same angle and spacing
+  (tickets/wf23-hatch-balloon.png, top). Also P2: "DETAIL B SCALE 2:1" sits at y 11.2 mm vs live 14.0. The rest of 23 = live:
+  views, section A-A, detail B 2:1, .787, BOM rows 1 / 2, balloons 1 / 2 at the same spots (tickets/wf23-sheet.png).
+- Workflow 30 (undo/redo storm, block) = live at all 51 steps: ten undos back to the start, ten redos to the post-edit state, every
+  edit incl. appearance FF0000 and rename one step, colours to the level; ours settles 0.1-0.8 s per step vs live 0.5-2.6 s.
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
