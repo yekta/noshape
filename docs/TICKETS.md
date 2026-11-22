@@ -305,6 +305,11 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
 - [ ] P0 **FEEL-CUBE-CORNER-HOVER (psui)**: the view cube at iso, pointer on the front-right-top corner (the vertex facing the
   viewer). Live draws a light-blue disc on the corner. Ours lights nothing there: a 5 × 5 grid of points (±8 px) round the corner
   lights only the neighbouring edges' bands (qa-scratch/tickets/cube-hover-w7.png).
+- [ ] P1 **FEEL-NAMED-VIEW-AFTER-SAVE (psui)**: Named views panel, type "w7" and Enter. Live's select then reads "w7" with the ⊗
+  delete button enabled (dark, bordered; live/qa/walk7-1121/7-saved.png). Ours reads "Select a view" with ⊗ greyed until a view is
+  picked (qa-scratch/tickets/named-view-saved-w7.png, top). (interaction-feel view-tools-1118 called "Select a view" + ⊗ after a save
+  "="; live's 11-22 take differs.) The panel, "No views created", the restore, and Shift+5 typing "%" into the focused name field all
+  match.
 - Matched live: a wheel notch is one jump anchored at the pointer (in and out); a middle drag follows the pointer and stops on
   release; a drag held still before release doesn't turn after it; cube hover on a face (fill), the top-front edge (band), the ▶ arrow
   and a rotate arrow (light blue). The heavy documents (scissor, infento, the 400-hole plate) are being measured on vibex8 (results to follow).
