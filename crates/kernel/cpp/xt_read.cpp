@@ -2607,6 +2607,81 @@ TopoDS_Shape place_ring_vertices(const TopoDS_Shape& shape)
 
 } // namespace
 
+// B-spline edges whose curves stray from their two faces by more than `over` (a writer's loose fit: live's
+// c2-extension-spring SAT has intcurves 0.033 mm off, which its own import puts back on the faces): each made
+// again through points refined onto both faces. An edge whose refined points don't make a curve on them stays.
+void refit_loose_edges(const TopoDS_Shape& shape, double over)
+{
+  ShapeAncMap edge_faces;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  BRep_Builder B;
+  for (int i = 1; i <= edge_faces.Extent(); ++i)
+  {
+    const TopoDS_Edge& E = TopoDS::Edge(edge_faces.FindKey(i));
+    std::vector<TopoDS_Face> fs;
+    for (NCollection_List<TopoDS_Shape>::Iterator it(edge_faces.FindFromIndex(i)); it.More(); it.Next())
+      if (std::none_of(fs.begin(), fs.end(), [&](const TopoDS_Face& f) { return f.IsSame(it.Value()); }))
+        fs.push_back(TopoDS::Face(it.Value()));
+    if (fs.size() != 2 || BRep_Tool::Degenerated(E) || TopExp::FirstVertex(E).IsSame(TopExp::LastVertex(E)))
+      continue;
+    TopLoc_Location               loc;
+    double                        f, l;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(E, loc, f, l);
+    if (c.IsNull() || !loc.IsIdentity() || occ::down_cast<Geom_BSplineCurve>(c).IsNull())
+      continue;
+    const occ::handle<Geom_Surface> s1 = BRep_Tool::Surface(fs[0]), s2 = BRep_Tool::Surface(fs[1]);
+    GeomAPI_ProjectPointOnSurf      pj1, pj2;
+    // How far off, on a few points first (most edges are on their faces).
+    double off = 0;
+    for (int k = 0; k <= 4; ++k)
+    {
+      const gp_Pnt x = c->Value(f + (l - f) * (k + 0.5) / 5);
+      pj1.Init(x, s1);
+      pj2.Init(x, s2);
+      off = pj1.NbPoints() && pj2.NbPoints() ? std::max({off, pj1.LowerDistance(), pj2.LowerDistance()}) : INFINITY;
+    }
+    if (!(off > over) || std::isinf(off))
+      continue;
+    GeomAdaptor_Surface a1(s1), a2(s2);
+    auto refined = [&](double t, gp_Pnt& q) {
+      gp_Pnt x;
+      gp_Vec d;
+      c->D1(t, x, d);
+      pj1.Init(x, s1);
+      pj2.Init(x, s2);
+      if (!pj1.NbPoints() || !pj2.NbPoints() || d.Magnitude() <= 0)
+        return false;
+      double u1, v1, u2, v2;
+      pj1.LowerDistanceParameters(u1, v1);
+      pj2.LowerDistanceParameters(u2, v2);
+      gp_Pnt2d p1(u1, v1), p2(u2, v2);
+      return on_both(a1, a2, p1, p2, x, d.Normalized(), q) && q.Distance(x) < 10 * off;
+    };
+    const int           n = std::max(32, 2 * occ::down_cast<Geom_BSplineCurve>(c)->NbPoles());
+    std::vector<gp_Pnt> pts(n + 1);
+    bool                ok = true;
+    for (int k = 0; k <= n && ok; ++k)
+      ok = refined(f + (l - f) * k / n, pts[k]);
+    if (!ok)
+      continue;
+    const occ::handle<Geom_BSplineCurve> fit = bspline_through(pts);
+    // The new curve between its points on both faces too.
+    for (int k = 0; k < n && ok; ++k)
+    {
+      const gp_Pnt x = fit->Value(fit->FirstParameter() + (fit->LastParameter() - fit->FirstParameter()) * (k + 0.5) / n);
+      pj1.Init(x, s1);
+      pj2.Init(x, s2);
+      ok = pj1.NbPoints() && pj2.NbPoints() && std::max(pj1.LowerDistance(), pj2.LowerDistance()) < std::min(over, off / 10);
+    }
+    if (!ok)
+      continue;
+    B.UpdateEdge(E, fit, BRep_Tool::Tolerance(E));
+    B.Range(E, fit->FirstParameter(), fit->LastParameter());
+    for (const auto& [v, p] : {std::make_pair(TopExp::FirstVertex(E), pts.front()), std::make_pair(TopExp::LastVertex(E), pts.back())})
+      B.UpdateVertex(v, std::max(BRep_Tool::Tolerance(v), BRep_Tool::Pnt(v).Distance(p)));
+  }
+}
+
 // Pcurves an imported body's file doesn't store, tolerances, cone apexes and
 // seams (shared by the Parasolid and ACIS readers). One edge or face the
 // healing chokes on must not leave the rest unhealed: on failure, edge by

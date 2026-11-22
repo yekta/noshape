@@ -13,24 +13,29 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 19:3x 11-22 (read first)
-- LANDED e52b091a as f09411c5 (agent API batch), fa3f2f31 as 52cfbc54 (drw-hover-1122 annotation cells), 002ec9fd as
-  88caeaa7 19:23 (kernel hlr.rs hide_outline_edges_behind_faces: extension-spring Right view fixed; hatch copies of one
-  part alternate (0, 1.0) / (90, 0.7), live hatch5-1122 B4; TICKETS P3 DRW-HATCH-CREATION-ORDER: no stored stamp, B6;
-  B3/B5 145/100/10 unexplained). asm re-measures the infento display key (waits).
+## STATE 22:4x 11-22 (read first)
+- QUEUED 4c8ee668 (22:3x): STL that closes = the model's solids (mesh_body.cpp mesh_pieces: 3+-triangle edges pair
+  each triangle with the one it meets turning into its solid, one-to-one, ties to the nearest file index; only what
+  can't close splits as live, DECISIONS 11-22 lead) + qa P1 DX-STEP-ASM-IMPORTS-AS-PART-STUDIO (one NAUO = Part
+  Studio only; live one-part-asm-1122; ticket ticked). Bottle 2 / duct 4 solids.
+- QUEUED (22:4x, after 4c8ee668): SAT refit_loose_edges (xt_read.cpp; sat_read.cpp before heal_import): B-spline
+  edges > 1 um off their two faces refitted onto both (on_both Newton + bspline_through). Spring SAT per face = its
+  x_t (600.7296 / 600.7285 mm2, was 600.7174). T1 export::a_sat_edge_off_its_faces_is_put_back_on_them. And parity.rs:
+  the import time counts document_create + import_files only (rings-loft x_t 8.8 s was 3.9 import + 4.9 query_parts).
+- NEXT: rings-loft STEP "revolved ring" +0.093 mm2: per face (probe /root/dx-scratch/step-probe.keep.rs, append to
+  kernel tests/export.rs, run like satp2.sh) the groove faces differ: Torus 0.767390 vs x_t 0.763936, Plane 1.815663 vs
+  1.810812 (each of 12 grooves). Try refit_loose_edges after STEP read (io.cpp fix_pole_pcurves at 881 / 1100), but
+  STEP edges have pcurves: rebuild them (ShapeFix_Edge FixRemovePCurve / FixAddPCurve, SameParameter). Then rerun the
+  exchange suite (vibe2: /root/dx-scratch/exa-run.sh style) and report the score.
+- Rows left after the a2 run: spring SAT area 600.7855 (live's own 600.7224, band to 600.7827); rings-loft STEP
+  "revolved ring" area 1450.036 (live's imports 1449.945, ours x_t matches) + Extruded ring 273/762/508 = model (live's
+  own STEP 767/513); hose x_t read-back 12/14/4: writer splits the inner-wall end rings (off their faces > 1e-8,
+  xt.cpp ~2563); live's x_t writes them as exact SP_CURVE rings (tolerance None). Idea: snap the B-surface's
+  boundary pole row onto the cap plane, write the iso as the ring.
 - !! /root/dx-scratch/env.sh does `cd /root/projects/noshape-wt/dx` : scripts must `. env.sh; cd
   /root/projects/noshape-wt/dx-open`. ssh remote ~ paths in quotes; rb.sh remote scripts as `bash -c 'bash $HOME/..'`.
-- Drawings DXF (vibex7 dx-keep/exd-h1.log; local /root/dx-scratch/exd-m1/): sm-louver MATCHES; rings-loft model
-  geometry (core/bool).
-- extension-spring Isometric (live's Visible LINE (8.4702, 5.9285)-(8.4943, 5.9145), 0.028 in): LIVE'S HLR ERROR, no
-  change. It is the lower bar's top-back edge (y 0.5, z 3, x 9.6-10.47 mm) next to the hook; rays toward the iso eye
-  (1,-1,1) from it pass through the hook's material (enter t 0.87-1.73, exit 1.732 mm) in ours.step AND in live.step
-  (probe 19:5x on vibe2, /root/dx-scratch/hlr-probe.rs + hlrt3.sh). Ours hides it (correct). Parity, not shortcomings.
-- housing-draft 1.2 in "on another kind": PARKED as TICKETS P3 DRW-DXF-DRAFT-EDGE-POLYLINE (live dxf-line-curves-1122
-  P1-P3: only those draft-corner edges are polylined in performance views, no rule found). Tool dxfsplsum.py.
-- NOW: full exchange suite on current main (vibex8 dx-keep/exa.sh a1 -> exa-a1.log, exs-a; runner
-  /root/dx-scratch/exa-run.sh, started 20:0x): the open list after it. The SAT read-back item below is DONE (59c0be35f).
-- Times: rings-loft Parasolid import/export over live's on loaded vibex7: host load.
+- extension-spring Isometric DXF line: LIVE'S HLR ERROR (b6338c85e). housing-draft: TICKETS P3
+  DRW-DXF-DRAFT-EDGE-POLYLINE.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.

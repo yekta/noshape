@@ -973,11 +973,15 @@ fn exchange_round_trip() {
         }
         v
     };
+    // The last import's own time (document_create and import_files, not the query of its parts after: live's times are
+    // its translations').
+    let import_secs = std::cell::Cell::new(0.0);
     // A file imported into a new mm document with live's import options (`unit`, `yAxisIsUp`, `flattenAssemblies`:
     // the dialog's Combine to a single Part Studio, `joinAdjacentSurfaces`): its first Part Studio's parts and its new
     // tabs (kind, name; not the file's).
     let import_with = |doc: &Path, file: &Path, o: &Value| -> Result<(Vec<PartState>, Tabs), String> {
         let _ = std::fs::remove_file(doc);
+        let started = std::time::Instant::now();
         let mut ctx = Ctx::new();
         let mut op = |tool: &str, args: Value| -> Result<Value, String> {
             let op = noshape_ops::registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
@@ -985,7 +989,9 @@ fn exchange_round_trip() {
         };
         let yes = |k: &str| o[k] == "true";
         let args = json!({ "files": [file], "mesh_unit": o["unit"].as_str().unwrap_or("Millimeter"), "y_up": yes("yAxisIsUp"), "combine": yes("flattenAssemblies"), "join": yes("joinAdjacentSurfaces"), "iges_postprocessing": yes("useIGESImportPostProcessing"), "density": yes("importMaterialDensity") });
-        let r = op("document_create", json!({ "path": doc, "length_unit": "mm" })).and_then(|_| op("import_files", args)).map_err(|e| format!("import failed: {e}"))?;
+        let r = op("document_create", json!({ "path": doc, "length_unit": "mm" })).and_then(|_| op("import_files", args));
+        import_secs.set(started.elapsed().as_secs_f64());
+        let r = r.map_err(|e| format!("import failed: {e}"))?;
         let tabs: Vec<&Value> = r["tabs"].as_array().into_iter().flatten().filter(|t| t["kind"] != "File").collect();
         let studio = tabs.iter().find(|t| t["kind"] == "Part Studio").map_or(r["first"].clone(), |t| t["id"].clone());
         let named = tabs.iter().map(|t| (t["kind"].as_str().unwrap_or_default().to_string(), t["name"].as_str().unwrap_or_default().to_string())).collect();
@@ -1154,9 +1160,8 @@ fn exchange_round_trip() {
             // (Live's OBJ is a zip of its .obj and .mtl.)
             let Some(file) = [format!("live.{ext}"), format!("live.{ext}.zip")].into_iter().map(|f| dir.join(f)).find(|f| f.is_file()) else { continue };
             imports += 1;
-            let started = std::time::Instant::now();
             let ours = import(&scratch(&format!("{name}-import-{ext}.noshape")), &file);
-            time(&name, &format!("import {format}"), started.elapsed().as_secs_f64(), &times[format!("import-{format}")]);
+            time(&name, &format!("import {format}"), import_secs.get(), &times[format!("import-{format}")]);
             let diff = match (ours, expected(format, false)) {
                 (Err(e), _) => vec![e],
                 (Ok(_), None) => vec!["live-self.json has no import of it".into()],

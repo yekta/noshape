@@ -2650,3 +2650,41 @@ fn step_all_surfaces_as_bsurfaces() {
     assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// An ACIS edge whose curve is off its faces (live's c2-extension-spring SAT: intcurves 0.033 mm off, its import's
+/// area as its Parasolid's) is put back on both: an extruded spline's edges moved 0.02 mm off the wall read back at the
+/// part's area (off 6e-4 before; the spring's side planes 150.381 mm² for 150.386).
+#[test]
+fn a_sat_edge_off_its_faces_is_put_back_on_them() {
+    let mm = 1e-3;
+    let plane = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let arch = Segment2d::Interpolated { points: vec![DVec2::new(20.0 * mm, 0.0), DVec2::new(14.0 * mm, 9.0 * mm), DVec2::new(6.0 * mm, 11.0 * mm), DVec2::ZERO], periodic: false };
+    let face = make_face_2d(&plane, &[Segment2d::Line { a: DVec2::ZERO, b: DVec2::new(20.0 * mm, 0.0) }, arch], &[]).unwrap();
+    let part = extrude(&face, DVec3::new(0.0, 0.0, 5.0 * mm)).unwrap().shape;
+    let want = surface_properties(&part).unwrap().mass;
+    let path = std::env::temp_dir().join(format!("noshape-sat-loose-{}.sat", std::process::id()));
+    write_acis(&path, std::slice::from_ref(&part), LengthUnit::Meter).unwrap();
+    // Each spline edge's poles 0.1 % farther out in x (up to 0.02 mm): still on its cap, off the wall.
+    let text = std::fs::read_to_string(&path).unwrap();
+    let (mut out, mut rest, mut moved) = (String::new(), text.as_str(), 0);
+    while let Some(i) = rest.find("{ exactcur full nubs ") {
+        let start = i + "{ exactcur full nubs ".len();
+        let end = start + rest[start..].find(" 0 null_surface").unwrap();
+        let mut t: Vec<String> = rest[start..end].split_whitespace().map(str::to_string).collect();
+        let first_pole = 3 + 2 * t[2].parse::<usize>().unwrap();
+        for k in (first_pole..t.len()).step_by(3) {
+            t[k] = format!("{:.17e}", t[k].parse::<f64>().unwrap() * 1.001);
+            moved += 1;
+        }
+        out += &rest[..start];
+        out += &t.join(" ");
+        rest = &rest[end..];
+    }
+    out += rest;
+    std::fs::write(&path, out).unwrap();
+    let back = read_acis_parts(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_file(&path);
+    assert!(moved > 0, "no spline edge written");
+    let a: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((a - want).abs() < 5e-6 * want, "{a} vs {want}");
+}
