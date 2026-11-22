@@ -432,6 +432,13 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   draws the Front plane orange (lit under the pointer where the menu was); live lights nothing there (tickets/wf29-paste.png row 7).
   Rest of 29 = live: 4 entities selected after the paste, an empty click clears them, Extrude (Solid) on the pasted face, Suppress /
   Unsuppress in both studios. Live's per-account remembered Surface tab is not a target.
+- [ ] P1 **EXTRA-UNFOLD-REFOLD-TOOLS (skasm)** (qa 06:0x, green b5b414278; live 11-22: Onshape has no Unfold or Rip feature, Rip is
+  a Make joint type): Search tools (alt+c) "unfold" offers **Unfold** ("Flatten bends of a sheet metal part in place") and "refold"
+  offers **Refold**, both with a warning icon (model-data features/sheetmetal.rs unfold() / refold() are in_toolbar; only Rip is
+  .hidden()). Live lists neither. Remove them from the tool search like Rip (keep the types for regenerating std / imported
+  documents), and refuse them in the agent API's generic feature_add the same way if it accepts them (tickets/extra-search-unfold.png,
+  extra-search-refold-rip.png). Checked and absent as live: feature copy / paste (feature rows offer Copy sketch / Paste sketch only;
+  Ctrl+C / Ctrl+V copy a part; no copy/paste-feature op), a drawing auto-dimension tool (no tool, menu or op), a Rip tool.
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
