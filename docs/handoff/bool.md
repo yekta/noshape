@@ -29,6 +29,15 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    BrepBody / the Boolean; then classification / merging by the pair's two), each stage through the full gate.
    Two-stage fuse tried 06:15 and FAILS (bool-stages worktree, uncommitted; repro PROBE_FAR=1 PROBE_SUBSET=6,17,23,45
    PROBE_RUST=1 on vibex8 BK/gm/rec/f68f43939fd850eb: a far 2.45 um pin still breaks the 0.2 um junctions).
+   PLAN (survey 06:3x): Body already has vertex_tol/edge_tol/face_tol (lib.rs:267) and GFace/GEdge.arg, Pool.pair is
+   per-entity. Global `tol` sites: get_sedge (boolean.rs ~6135 arcs GREY*tol, ~6158 others 100*tol; joins two edges
+   of ONE argument between the same vertices: suspected culprit, runs even with no contact), arc->line ~5101,
+   split_params regroup ~4376, own-edge split ~6348, seams ~5309/5329/5348/6642; cross-arg: plane_plane, cyl_cyl,
+   same_surface, lies_on, intervals_on ~1789, boxes_meet GREY*tol; C++ build() gives every out vertex max(tol, own).
+   Stage A: arg_tol Vec in Ctx + band(a,b); within-argument sites. Stage B: cross-argument sites. Worktree bool-ptol
+   (on bandbatch dfbc7eef1; rebase on main once the stack lands): PROBE_SAMEARG print in get_sedge, T1
+   bool_patterns::precise_parts_fused_with_a_far_tolerant_pin (case d596e8faa25b6a23, gamma clips + pin 1 m away,
+   OCCT 448 faces), run pt-probe.sh (vibex8) -> pt-probe.out.
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
