@@ -5,7 +5,7 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 10:41 UTC) — RESUME HERE
+## State (2026-11-22 11:56 UTC) — RESUME HERE
 - LANDING the whole stack in one land.sh (rebased on main 06:4x): f3a8ff93 welding (33829c47 failed only on dx's
   flaky prefs images_library test; dx fixes it order-free), the outline band / triad drag commits, 55f3ff11 followers +
   Replicate seed, e658bb03 assembly config row menu (config_edit_option for assemblies, AGENT_API regenerated, filter
@@ -43,14 +43,29 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   its first frame when its own row is missing; dx: WRITE a row only if built by the same mesher/tolerance as the PS's
   for that fine level, else read-only. Before timings: vibex8 ~/agents/asm-keep/asm-open-times.sh (green 604e9158 app
   at ~/tmp/asm/app/noshape, assembly tab seeded via last-viewed.json; out ot-before.out); isaac saved doc building (vibex8 ~/tmp/asm/isaac, /root/asm-scratch/isaac-save.sh); after run ot-after.out.
-- RUNNING at compaction: (a) probe on vibex7 (/root/asm-scratch/probe.log: KEY lines per Part Studio in two processes,
-  diffed; EVAL ms of each run with one DirStore at ~/tmp/asm/probe-store; out ~/tmp/asm/probe-{1,2}.txt there). Differing
-  keys -> find the session-dependent input of model-core regen result_key / per-feature keys (suspects: derived
-  version(), custom/files version set by the background script compile vs the evaluator's start); equal keys -> the
-  app's opts differ from ops'. Then fix, rebuild app-b, rerun asm-open-times.sh (slot, vibex8) for infento + isaac.
-  After that: revert the probe test from crates/ops/tests/assembly_perf.rs (git checkout that file).
-  (b) isaac saved doc on vibex8 (/root/asm-scratch/isaac-save.log -> ~/tmp/asm/isaac/asm-isaac-ball.noshape; tab id for
-  the timing script from the doc). Report to lead: scissor numbers below; dx: infento's 1.7-2 s display key hash.
+- STORE MISS FOUND + FIXED: COMMITTED 6c5d2de2c (local, land after c4395d69): persist::encode_result failed silently
+  ("key must be a string") for any Context with a BTreeMap<BodyId,_> (part_appearance, placements, sheet_metal(_flats),
+  frame_members); now `#[serde(with = "pairs")]` (context.rs) + test model regen::a_regeneration_with_part_keyed_maps_is_kept
+  (pairs.log green, 14 regen tests). Infento probe: 25 studios 57.7 s -> 3.2 s from the store; core told. Keys were equal
+  across processes. The rest of the assembly evaluate stays 19-21 s (EVAL2 = second evaluate in-process, in probe3).
+- UNCOMMITTED, DO NOT COMMIT: probe_store_keys in crates/ops/tests/assembly_perf.rs and probe_list_viewport_hover_cells
+  at the end of crates/assembly-ui/src/assembly_feel_tests.rs (`#[ignore = "probe"]`; remove that fn only, keep the
+  test above it). Revert assembly_perf.rs with git checkout once probe3 is read.
+- HOVER MATRIX (lead P0; live/asm/hover-list-1122/index.md, behaviours "psui / asm list × viewport hover matrix"):
+  ours (probe frames /root/asm-scratch/hl/*.png, vibex7 ~/tmp/asm/hl) = live on row hover silhouette #ffc685 (2 device
+  px), geometry hover #ffc20e silhouette, selected instance #f0b648 / #ffc04c, face select #e6a423 / #ffa90a, rows
+  #def1fb / #b2ddf6 / eye / name tip, Origin row lights nothing, graphics hover lights no row, Ctrl+click row = menu,
+  Area in status. ONE gap fixed UNCOMMITTED in assembly_view.rs: `manip_seen` (a triad that appears/moves under a still
+  pointer stays unlit until it moves; live a04) + test a_face_clicks_triad_stays_unlit_until_the_pointer_moves.
+  Checking: feel_tests:: run on vibex7 (/root/asm-scratch/hl2.log). Green -> commit (without the probe fn), TICKETS row +
+  interaction-feel "Hover × selection" assembly list cells; tell qa to score after the land. Not checked: suppressed-row
+  hover (ours draws nothing: no geometry) and Meta+click (ours: plain click adds already).
+- RUNNING at compaction: (a) probe3 perf on vibex7 (/root/asm-scratch/probe3.log; perf at ~/tmp/asm/probe.perf):
+  where the 19-21 s assembly evaluate goes with all studios stored. (b) ot2 on vibex8 (/root/asm-scratch/ot2.log,
+  ~/agents/asm-keep/ot2-{before,after}.out): app-b rebuilt 11:35 with 6c5d2de2c; isaac (tab 3a4877d94b7a7378, doc
+  ~/tmp/asm/isaac/asm-isaac-ball.noshape) on the old app ~/tmp/asm/app and on app-b, infento on app-b; via slot.
+  Then report the lead (<=3 lines): scissor below + infento + isaac cold/reopen first frame and interactive.
+  dx told 10:5x about infento's 1.7-2 s display key.
 - SPEED-ASM-OPEN timings (vibex8 loaded, ot-before.out / ot-after.out, ~/tmp/asm/ot-{before,after}/<doc>/*.log):
   scissor reopen to interactive (full model frame) 144 / 172 s -> 53 / 63 s (assembly eval 90-98 -> 28-30 s; features
   run 722 -> 219); cached first model frame 1.5-1.6 -> 1.0-1.1 s. infento NO gain (307 of 328 features rerun, 52-58 s):
