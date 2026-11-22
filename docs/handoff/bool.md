@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 17:48 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 20:26 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -20,17 +20,19 @@ all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/kn
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## NEXT (lead 11-22 16:4x; state 11-22 16:41 UTC)
-0. P0 (worktree bool-ptolc). Release v0.4.67 was cut without us (lead 16:5x: green 049f4e313 with ea0febb29 reverted).
-   - 7bfbf2b45 MAIN RED 85b2c04a2 (brep_results_are_the_same_on_any_thread: the replays' process env NOSHAPE_BOOL_SLAB
-     was one band for every Boolean since stage B; now thread-local set_boolean_slab / set_boolean_no_tree, env read
-     once). QUEUED ALONE 16:52 as 1de8fa6e from worktree bool-thr (g++-13 ok; no app change, so no corpus gate).
-   - 602310557 COMPAT-RINGS-LOFT-SLOWER: args_band(a, b) = max(sum of halves, min(arg_reach[a], arg_reach[b]))
-     (c2-rings-loft's 51 tools of 0.1 um on one plane cutting a ring of 6.1 um declined since stage A, OCCT 15 s ->
-     ours 0.8 s); test bool_patterns::patterned_tools_on_one_plane_cut_a_tolerant_ring (case 11cf6fc2ad8bd55b).
-     Knurls DONE 17:04 vibex8 kn-rl: 0 diff x5 (copies deleted). GATE RUNNING unit bool-rl-gate (rl-gate.sh, vibex8,
-     against main 6df3a218b) -> /root/bool-scratch/chain-bool-rl.out. When clean: land.sh from bool-ptolc (rebase drops
-     7bfbf2b45 once 1de8fa6e is on main), tell lead + qa. Then rm vibex8 ~/tmp/bool/kn-rl, thr, rl-case,
-     doc-prof-c2-rings-loft; worktree bool-thr after 1de8fa6e lands. Check cf-surface-pattern 384 -> 385 edges.
+0. P0s (state 11-22 20:26 UTC):
+   - IMPELLER-SHELL-INVALID (qa, TICKETS 838b08319): c2-impeller-loft Part 1 invalid f43-45, Part 3 f46-47 since
+     13d44f9db. A/B (imp-ab2.sh, NOSHAPE_PARITY_VALIDITY=1, vibex7 ~/tmp/bool/imp-ab): Newton-step normals undone ->
+     0 invalid; corner solve's 12-step give-up undone -> still invalid. FIX 9d9369a0f (worktree bool-imp): normal_at
+     back to the full projection. GATE RUNNING unit bool-imp-gate (imp-gate.sh, vibex7, vs main 838b08319, 20:10) ->
+     /root/bool-scratch/chain-bool-imp.out. Then knurls (kn-run.sh vibex7 kn-imp with the gate trees' kernel bins),
+     land.sh from bool-imp (this handoff with it), tell lead + qa. Gate's "took too long" on shell abf39e203b00b604
+     is load (main 24-27 s, budget ~30 s CPU): rerun it alone, both binaries, as 19:48.
+   - RINGS-LOFT 602310557 QUEUED 19:53 as f6618e4a (with the handoff; rebased on ac604174 = the any-thread fix, which
+     LANDED 17:56). Its gate FAILed only on the pre-fix crate test and abf39e203b00b604's time limit (lead told).
+     After it lands: tell qa (COMPAT-RINGS-LOFT-SLOWER), rm vibex8 ~/tmp/bool/kn-rl, thr, rl-case, shcase,
+     doc-prof-c2-rings-loft; vibex7 ~/tmp/bool/imp-ab after the impeller land. Check cf-surface-pattern 384 -> 385.
+   - Release v0.4.67 was cut without these (A reverted on the release branch).
 1. LANDED: usdvol c240175b, stage A ea0febb2 (13:03), B 02620804 (15:17), C + cd7ef8f0b 4511db62 (16:21).
 2. bool-uni 857221953 (worktree bool-uni): apply_band_merges computes the part's volume only when dv > 1e-12 diag^3
    (gamma B1 dv 1e-19: bands.bands 360 -> 180 ms, same 2652 faces / volume). Its gate was STOPPED 16:13 for the P0;
