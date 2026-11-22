@@ -364,7 +364,8 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [x] P1 **VS-NAME-FOCUS-BOX (studios)**: workflow 15 steps 2/4/8/10 (Variable Studio 1, click the empty Name row, type depth, Enter): live draws the Name input with a **blue focus box**, and after Enter puts the box on the next empty Name row; ours takes the typing but shows only a caret, no box (the Value cell's box matches) (tickets/wf15-vs-name-focus.png rows 2/4). Same look as psui's CONFIG-NAME-FOCUS-BOX in the configuration table.
   **Fixed (studios 11-22):** the focused empty Name cell outlined blue (test `the_focused_add_row_name_is_outlined`).
 - [ ] P0 **FEEL-HOVER-AFTER-MODAL (psui)**: workflow 16 steps 8 and 16 (doc-versions: Create in "Create workspace from Prototype", Merge in "Merging changes into Main from B1"; the pointer stays where the button was, over the Front plane): ours lights the **Front plane as hovered** the moment the modal closes; live lights nothing until the pointer moves (tickets/wf16-hover-after-modal.png, step 7 dialog / step 8 after Create). Also workflow 17 step 6: Export closes and ours lights the Top plane under the still pointer; live nothing. The version, branch, suppress, switch and merge results and the merge toast match live.
-- [ ] P2 **HISTORY-BRANCH-FILTER (studios)**: same workflow: once the document has a second workspace (B1), live's Versions and history panel adds a **filter ▾ button** right of the search box; ours has only the search box (tickets/wf16-history-filter.png).
+- [x] P2 **HISTORY-BRANCH-FILTER (studios)**: same workflow: once the document has a second workspace (B1), live's Versions and history panel adds a **filter ▾ button** right of the search box; ours has only the search box (tickets/wf16-history-filter.png).
+  **Fixed (studios 11-22 09:01):** the funnel ▾ (43 x 28, "Filter branches") once a second workspace exists, the box 276 px; the four items, the current one bold; Show current branch with "Branched from … on …" and its link; blue while filtered; gone with the second workspace.
 - [ ] P0 **SKETCH-USE-VERTEX-OTHER-SKETCH (skasm)**: workflow 12 steps 9–12 (curves, after Sweep 1: Sketch 4 on Right, click Sketch 2's line end vertex (-10, -20, 0), u; Sketch 3's end vertex (-10, 0, 20), u): live projects each selected vertex **at once** into a point on the line where it crosses the plane (hollow points at (0, -20) and (0, 20)); ours selects the vertex but u only switches the Use tool on/off and **no point is made** (sketch entities stay empty). The guide line drawn next (steps 13–15) is then not tied to the profiles (blue, one Horizontal) and the Loft with that guide (steps 18–24) **fails** (Loft 1 in error, the guide red); live's gives Surfaces (1) (tickets/wf12-use-vertex.png, wf12-loft-guide.png). u on a selected model edge works (verified e3368b77).
 - [x] P1 **IMPORT-TAB-TOAST (dx)** (fixed dx 11-22, queued: the green success bubble, gone by itself 5 s after the import lands, as live import-toast-1122) (workflow 17 steps 9–12, doc-tabs: Export… STEP to a new tab "Part Studio 1.step", that tab's
   Import… › Import to this document › Import; live answered REQUESTS qa 04:35, behaviours "qa workflow 17 import toast",
@@ -462,11 +463,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   the corner dot stays orange, the dimension click adds to it) and Delete removes the corner, the top and right lines and both
   dimensions (2 lines left); the ✓ then gives no Extrude. tickets/wf32-escape-delete.png (live left). Also 35-45: the Front plane's
   edge stays lit orange after the dimension edit box closes (re-check with psui's FEEL-HOVER-AFTER-MODAL, 454c71f2).
-- [ ] P1 **DRW-TITLEBLOCK-EDIT-BOX (studios)** (workflow 31 steps 38-42, holes-plate-drawing, green d15cec8db): dblclick the title
+- [x] P1 **DRW-TITLEBLOCK-EDIT-BOX (studios)** (workflow 31 steps 38-42, holes-plate-drawing, green d15cec8db): dblclick the title
   block's TITLE cell (sheet (230, 37) mm): live's edit box spans the whole cell (the ruler bar the cell's width, text centred,
   "PLATE 60X40" centred while typing); ours opens a narrow box at the cell's left end (a short ruler, text left-aligned).
   tickets/wf31-titleblock-edit-box.png (live left). Workflow 31 otherwise = live: Section A-A, Detail B (2:1), the 3 dimensions, the
   3X hole callout, the BREAK ALL SHARP EDGES note.
+  **Fixed (studios 11-22 09:01):** the field's editor spans its cell (1 mm in), the ruler as wide, a centred field's text centred while typed.
 - [ ] P0 **FEEL-PICK-SKETCH-LINE-THROUGH-FACE (psui)** (workflow 36 step 1, bracket, green 17157c2fa): with Measure, a click at
   (1104, 484) on the base's top face where Sketch 3's line is drawn faintly across it (seen through the face): live selects the face
   (Area 1000 mm²); ours selects the Sketch 3 line (Length 28.284 mm). Step 27, 7 px away, ours picks the face as live.
@@ -593,8 +595,9 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [x] P0 **FEEL-DRW-TITLEBLOCK-CLICK (studios)**: the Front view selected (edges orange), click in the title block (sheet (200, 30) mm):
   live keeps the view selected (e7); ours clears it (so v1–v5 then differ by one toggle). w9-drw-view-select.png.
   **Fixed (studios 11-22):** a click in the title block keeps the selection (test `a_title_block_click_keeps_a_selected_view...`).
-- [ ] P2 **FEEL-DRW-VIEW-FRAME-PAD (studios)**: the hovered / selected view's tan frame round the Front view (block-drawing): live
+- [x] P2 **FEEL-DRW-VIEW-FRAME-PAD (studios)**: the hovered / selected view's tan frame round the Front view (block-drawing): live
   17 px above and below the geometry, 9 px at the sides; ours 9 px all round.
+  **Fixed (studios 11-22 09:01):** frames 2 mm out from the geometry (sheet mm, not 8 px), at least 17.7 mm tall with the geometry centred (live drwm-7).
 - [x] P0 **FEEL-DRW-DIM-HOVER-ON-SELECTED (studios)**: the 1.575 dimension selected, pointer back on it: live returns to the light tan
   hover look (hover wins, d3); ours keeps the dark orange box. w9-drw-dimension.png.
   **Fixed (studios 11-22):** hover wins on a selected dimension (`hovered_dim`).
