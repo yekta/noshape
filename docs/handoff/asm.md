@@ -21,8 +21,12 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
 - Infento rerun with the welding fix timed out at 7200 s in the mate checks (121 checked, ~32 s each on a loaded
   vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
 - QUEUED a8722d2a (13 commits, 06:5x): don't land again till it lands; then tell qa the sha.
-- ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1): live REQUESTS "asm 07:08" asked what the checkbox does; then add
-  the row (app-core isolate_ui.rs is shared with the Part Studio: check its Isolate too).
+- ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1) NEXT: live answered (behaviours "asm isolate show internal geometry",
+  live/asm/isolate-1122/): ☐ Show internal geometry above Select transparent geometry, in the assembly AND Part Studio
+  Isolate (app-core isolate_ui.rs, shared); the slider "Adjust opacity" = the transparent parts' opacity (0 hidden,
+  100 opaque), one remembered value per checkbox state, shared by both studios; ticked: the isolated part drawn in
+  front of the transparent ones (they show only as a faint outline through it); unticked: normal depth. Tell psui
+  (Part Studio half) when it lands.
 - Scissor on main started 07:0x in the vibex8 slot (sc-main-1122.out).
 - SPEED-ASM-OPEN: scissor open 78.8 s under perf on vibex8 (beside the scissor run); perf.data in vibex8
   ~/tmp/asm/speed (perf report --no-children --sort dso,symbol takes minutes on the 700 MB binary).
