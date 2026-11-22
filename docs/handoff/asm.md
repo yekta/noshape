@@ -5,45 +5,30 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 02:35 UTC) — RESUME HERE
-- QUEUED 33829c47 (welding flexible subs: assembly_transform `also` + Translator::place_all; welding 41/81 -> 81/81 occ,
-  28/28, 29/29; e2e a_flexible_subassemblys_parts_move_together); main was red on dx's prefs flake until 281240db:
-  if 33829c47 fails on that, re-queue it. Stacked, NOT landed (land.sh after 33829c47 lands, never while it's
-  queued): 2d56de9dd (TICKETS batch 4), 2b3c38f3a (handoff), 017520625 (selected edge band + vertex disc over the
-  triad), f843236ed + e7d2a87ac (an entity-selected instance: a #ffa033 2 px band over its silhouette line, drawn
-  through the parts in front, via the hover_outline band pass with mask channels r coverage / g selected face seen /
-  b INSTANCE; a selected face's boundary #ffa90a, fs_body_face, live t1/t2), d931a59a0 (triad X arrow / Z ring drags
-  replayed from live triad-click-1120: 1.9 mm, 15 deg about world Y; manip_drag_text), this handoff.
-  All green on vibex8: clippy render/scene/assembly-ui, asm matrix 44/44, edge_looks, PS hover_matrix 71/71, render
-  68/68 (hm-1122f.log), the_triads_ 3/3 (triad-1122.log). After landing: tell qa the main sha (MANIPULATOR-RING).
+## State (2026-11-22 06:50 UTC) — RESUME HERE
+- LANDING the whole stack in one land.sh (rebased on main 06:4x): f3a8ff93 welding (33829c47 failed only on dx's
+  flaky prefs images_library test; dx fixes it order-free), the outline band / triad drag commits, 55f3ff11 followers +
+  Replicate seed, e658bb03 assembly config row menu (config_edit_option for assemblies, AGENT_API regenerated, filter
+  row 44/30 px), 806b1fcf qa workflow 24 / 25 / 40 / 08 feel (explode step dialog in ui_state + Distance mark + title,
+  instance pick in explode, triad on the exploded part, hollow hover, explode dash (LineSegment::EXPLODE_LINE 2048);
+  Limits Tab (DialogTab / FocusNavbar -> mate_tab: select all, commit the box left); coplanar pick tie (lead: free,
+  later inserted; `coplanar_tie`); graphics menu Open linked document + Where used for X…; world target), TICKETS.
+  Checks on vibex7 (r3..r7-1122.log in /root/asm-scratch): clippy 0, the new tests, ops e2e, coverage, PS
+  hover_matrix 71/71, render 16/16. After landing: tell qa the main sha (all the rows above + MANIPULATOR-RING).
+- Scissor on main (ops-main, vibex8 ~/agents/asm-keep/sc-main-1122.out, onerun-t.sh 5400 s) waits in the slot
+  queue: compare fed22d (main 10/24 mates vs 16/34 good) and the parked fillets 9cbb0e Fillet 23 / 665cf3 Fillet 4
+  for blend; bisect the window <14:10 .. 19:26 11-21 if Extrude 18 still fails (notes /root/asm-scratch/notes-1121.md).
+- Infento rerun with the welding fix timed out at 7200 s in the mate checks (121 checked, ~32 s each on a loaded
+  vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
+- Next: SPEED-ASM-OPEN profiling; then xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5,
+  tvc 41/43, keyboard BOM 15/16.
+- Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
+  weld/w0-p*.noshape and ~/tmp/asm/q copies; vibe2 ops-tc / ab1120e-*.out; local branch asm-rb-check.
 - Live triad (behaviours "assembly triad depth", live/asm/triad-depth-1122/): not depth-tested; selected band / vertex
-  dot over it; Escape keeps an assembly selection (ours too), an empty click clears it.
-- blend waits on the scissor bisect for 9cbb0e Fillet 23 / 665cf3 Fillet 4 (after b3345866 + 21754bd8 land; neither
-  on main at 02:11).
-- Infento rerun with the welding fix: vibex8 ~/agents/asm-keep/weld/inf-fix.out (slot, 7200 s, bin ops-weld; at
-  5218 s on mates at 02:11). Compare with 157/167 occ, 204/206 mates, 64/64 BOM; the 5 nested misses (b63c40 /
-  bdf7bf / dfc972) should close if they were the same one-at-a-time placing.
-- Scissor fed22d regression (main 10/24 mates vs 16/34): NOT skasm's two commits (their A/B). Top Openings is a red
-  herring (taken back in both runs). First new failure is Extrude 18 with identical translation (regions, frame, params):
-  the body before it differs. Good run vibe2 mc/asm-scissor-save.out (binary predates f5d9f0ea1 14:10), bad vibex7
-  mc/suite-main.out; window <14:10 .. 19:26. Single studio on ops-weld (vibex8 ~/tmp/asm/one-fed) builds every feature
-  but parity_models doesn't print states. Next: rerun the scissor assembly once skasm's b3345866 and bool's 21754bd8
-  (Spur Gear OK 2466.975 mm3) land; if Extrude 18 still fails, bisect the window in the assembly run stopped after
-  fed22d (bisect-scissor.sh pattern). Notes /root/asm-scratch/notes-1121.md.
 - transform-carry HELD (/root/asm-scratch/transform-carry.patch): its extra failures are the same Base mates.
 - Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
 - Infento main: 157/167 occ, 204/206 mates, 64/64 BOM; the 5 Wheel 7inch are deleted elements in live (not the gap).
-- isaac Sketch 8 reopen: closed by core (fixed by 89180ec5e; my repro was a pre-land branch binary).
-- Scissor fillets (blend 19:1x): 2d82a0 Fillet 13 blend's (fix building). 9cbb0e Fillet 23 (Upper Triangle after
-  Boolean 3: ours 160/352/186 92358 mm3, live 158/325/165 61977) and 665cf3 Fillet 4 (Top Cover after Boolean 1: ours
-  98/228/130 3515, live 42/87/42 7110) are wrong inputs: mine to bisect (665cf3 derives 0139f2: skasm's region bug;
-  9cbb0e after 2d82a0's Fillet 13). Core took the derived-import cost (DocStudios::context's own Regenerator cache).
 - Gear 184ad0: bool's fix queued 21754bd8 (helical sweep start cap right-handed; OK 2466.975 mm3, live 2466.978).
-- Landed 11-21: 89180ec5 (scissor P0: 38 -> 22 min), da49b2418, 1fc9fca74, 8eb92415 (P0 batch 4).
-- Then: xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5, tvc 41/43, keyboard BOM 15/16.
-- Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc /
-  cli-tc and ~/tmp/asm/q copies (it*, iy, iz, sc-tc, ia..ie); vibe2 ops-tc / ab1120e-*.out / old mc/*.out; local branch
-  asm-rb-check (trial rebase, delete); vibex8 weld/w0-p*.noshape probe copies after the welding land.
 
 ## State (2026-11-20 18:50 UTC)
 
