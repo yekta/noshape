@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 14:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 15:20 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -12,25 +12,29 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - ORDER: knifehandle Fillet 2 (the tip end, below) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end ->
   scissor 2d82a0 F13 (tool dumps vibex7 ~/tmp/blend/sc2/f13tool-*.brep; body dump: cli-cusp rebuilt with ZZ_BODYDUMP,
   committed WIP 429750f98 in blend-cusp).
-- FILLET 2 (11-22 14:40): main fails "could not orient a face at the edge" near the blade's tip. blend10 branch
-  blend-khtip, WIP b84251eb4 (never land as is; ZZ_* probes and kernel debug lines in it). Done there: a run-on over
-  free-form faces only (supports and end faces B-spline) skips closed_run_on's corner path, and where a face's own-part
-  wall (2094e64b7) doesn't cut it across, that face's whole surface does (extend_face_over, as 11-19); the direct build
-  by the run-on tools runs only when such a run-on exists -> Fillet 3's test passes again (6/12/8; it was the direct
-  build that took it). Fillet 2 now regenerates through the Boolean (valid, 30.60 mm3 off, band ok) but 13/41/30 vs
-  live 11/27/18: two 0.0013 mm2 caps at x -217.43 (the run-on's last section, a 7 um sliver near the top) and long
-  rounds 232.16 mm2 (live 236.45: the Boolean's contact on the top shifts at the tangent). The Boolean is also flaky:
-  ~1 in 6 runs 2 solids (fails). c87fec635 itself, rebuilt today on vibex7 (blend12), gives the same 13/41/30 trace:
-  its 11-19 pass doesn't reproduce. The direct build (the right path) fails two ways (bin/kh-stride.sh, logs/
-  kh-stride.out, ZZ_MINSTRIDE r/2..r/64): (a) with the r/16 floor, the cap is kept flipped (BadOrientationOfSubshape);
-  (b) otherwise "two blends' section": at the joint of a long round and its tip round the two end sections differ
-  (both from the top contact (-216.127,-0.162,41.843); side contacts (-216.400,-0.761,41.282) vs (-216.298,-0.743,
-  41.494), 0.24 mm apart): each section square to its own edge. NEXT: in ball_tools give both rounds one section plane at
-  a chain joint (the bisector of the two edges' tangents; check how junction() places it), so share_end_curve finds
-  the shared curve; then the cap. Tools: bin/kh-tip3.sh (F3 test + F2 debug), bin/kh-stride.sh, bin/kh-topo.sh.
-- SUSPENSION tip cap (ZZ_TIPCAP=1, blend-cusp 429750f98, logs/zzsusp25): a ruled loft from the last ball section to
-  the vanishing point is valid (8.6e-5 mm3) and fuses, but then the tools' union "lost one of its parts" -> 89/260/153.
-  Ruled out.
+- FILLET 2 (11-22 15:20): main fails "could not orient a face at the edge" near the blade's tip. blend10 branch
+  blend-khtip, WIP 4ae309ba3 (never land: ZZ_* probes, ZZJ debug, kernel debug lines). Done there: a run-on over
+  free-form faces only skips closed_run_on's corner path; where a face's own-part wall doesn't cut it across, the
+  whole surface does; the direct build by the run-on tools runs only then -> Fillet 3 passes (6/12/8). Fillet 2
+  regenerates through the Boolean (valid, 30.60-30.67 mm3 off, band ok) at 13/41/30 (8 sections) or 13/35/24
+  (ZZ_NMIN 24/48; long rounds 235.6/235.8 mm2, at 96 236.45 = live's 236.448) vs live 11/27/18; ~1 in 6 runs the
+  Boolean gives 2 solids. Chain: edges 0/2 long (+-y), 4/9 the tip's short edges, run on past the tip.
+  FOUND 15:00 (bin/kh-j.sh, logs/kh-j1.out): the joint sections ARE shared (junction -> tangency_ball, contacts
+  (-216.127,+-0.162,41.843) top, g (-216.400,+-0.761,41.282) on the crease between the blade side p and the tip
+  side qf). The earlier "end sections square to their own edges" was wrong. The direct build's "two blends' section"
+  is the tip round's blend face trimmed partway up that shared arc, at (-216.298,-0.743,41.494), on the crease p/qf.
+  The Boolean ends the long rounds there too (x -216.298..15.4). So below that point the joint arc lies against qf,
+  not p: the ball tangent to p at g is the wrong ball for that part of the arc. Section count doesn't move it
+  (ZZ_NMIN 8/32/96, logs/kh-n2.out).
+  The other mode, "an invalid solid", is the run-on's last section: a 7 um sliver cap 0.0013 mm2 at x -217.43
+  (the top contact stays on the top face's extension, so off() never holds), kept flipped. Carrying that section
+  straight on 9 um until off the part removes the cap, but then the direct build says "a tool's side off a face of its
+  edge" and the Boolean splits into 3-5 solids: dropped.
+  NEXT: the long/tip boundary must follow where the side contact meets the crease p/qf, not the plane at the chain
+  vertex: try the joint ball at the crease point where the long round's own ball (square to its edge) touches p
+  on the crease, and give the tip round its own ball there; or make share_end_curve accept the tip's arc as part of
+  the long one's, ending on the crease. Then the cap: end the run-on loft on a vertex where the ball vanishes.
+  Tools: bin/kh-j.sh (ZZJ joint balls), kh-n2.sh / kh-n3.sh (ZZ_NMIN, faces), kh-stride.sh, kh-topo.sh.
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
 - KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
@@ -50,7 +54,9 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   zz_khcut too): N 128 -> Fillet 1 OK 9.0 s, cut valid 5 faces (live 6/10/7); N 256 -> invalid again (4 solids). The
   0.087/0.132 mm 'stray' edges are the tool's air corners, not contacts. Not robust: wait for core's Loft 1 fix
   (station spacing + end tangents; core tells me when it lands), then redo; 9 s vs live 200 ms needs another build. Our Handle in: 206033.639
-  mm3 2/3/2 vs live 205332.687 2/1/1 (core 10:5x: Loft 1 runs 0.19 % wide at the sides; core 472eddd5 (+0.13 %) queued 11-22, rerun Fillet 1 once it lands; my 2/3/2 counted seam edges).
+  mm3 2/3/2 vs live 205332.687 2/1/1 (core 10:5x: Loft 1 runs 0.19 % wide at the sides; core's fix landed 11-22 14:40 as c08ef29e; my 2/3/2 counted seam edges). RERUN 15:10 on main 1cae525e9
+  (bin/kh-f1main.sh, vibex8 ~/tmp/blend/khf1main.log): still ERROR 3161 ms (live 200): "the rolling balls jump", then
+  the 64-section closed loft (valid) cuts to an invalid result. Next after Fillet 2.
   Count faces: bin/kh-topo.sh.
 - SCISSOR (asm 07:18 main 207/239). Doc vibex7 ~/agents/blend-keep/scissor.noshape. One feature: bin/sc-main2.sh <cli>
   <tab> "<F>" <out> "<env>" (prints only the last 50 lines of the block; grep ~/tmp/blend/sc2/prof-<tab>.txt for

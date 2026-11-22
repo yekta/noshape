@@ -1479,3 +1479,8 @@ Next: equal-radius rounds whose spines meet (cylinder axis through the torus' ce
 - isaac-ball a04711 Chamfer 1 / Fillet 1: wait on bool's Extrude 14. Halter faces: parked (61 vs 39; archive).
 - Agent ids: only from /root/lead-scratch/roster.md.
 
+## 11-22 15:20 (moved from the handoff)
+
+- SUSPENSION tip cap (ZZ_TIPCAP=1, blend-cusp 429750f98, logs/zzsusp25): a ruled loft from the last ball section to
+  the vanishing point is valid (8.6e-5 mm3) and fuses, but then the tools' union "lost one of its parts" -> 89/260/153.
+  Ruled out.
