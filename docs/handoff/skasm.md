@@ -1,32 +1,29 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 22:41 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 23:01 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (22:4x)
-- LANDED today: d2b509fc (ff4a8ed0), e0fc1afc (mc-reach R1-R5; asm + lead told).
-- QUEUED (both CHECKING at 22:3x): 4179663c (handoff) and 37df74ed (5 commits: query_entities `sketches` op + e2e,
-  Trim hover look S4, SM table row lights bend as HOVER, joint list open lights rip, SM cells outline/centre/Enter down).
-  Local unlanded on top: 5b91051d3 (handoff) + this handoff.
-- IN PROGRESS, UNCOMMITTED: SM-TAB-MERGE-PICK (P1). Diagnosis (GPU test, live's zoom 194 px / 60 mm, sm-box):
-  the click (30,35,2) sits ~1 px above Flange 1's inner top edge (live s04/our 04 pixel column 1240 identical: plate
-  475-484, inner top edge line 485-486, top side face 487-489, outer edge 490, outer face 491+). Live lit the OUTER face
-  (s05 column: olive from 491). Ours took (a) before: the plate top (another "Face of Sheet metal model 1"); (b) after
-  muting: the wall's INNER face New(6) (wall 2 ref side, y=0 box) via back-face slivers in the pick buffer.
-  Fix (3 files): behaviors.rs sync_pick_filter: sm dialog + face-only field mutes side faces (no wall, no bend);
-  while previewing, faces of a held wall (either side) the preview changed are muted (changed_picks). renderer.rs: new
-  mesh_pick_closed pipeline (cull Back), order_solid computes runs in pick too (no reorder when pick), pick pass draws
-  opaque_runs (Closed -> culled). Test sm_feel_tests.rs a_tabs_merge_click_on_the_walls_top_edge_takes_the_wall
-  (chips + the stored ref == the face hovered at the outer face's middle). Run b59ow2nx3 (vibex8 slot: clippy render
-  + psui, the test, render tests, full psui lib) was going at 22:35: script ~/tmp/skasm/tm.sh (local copy
-  /root/skasm-scratch/bin/tm.sh). If the full-lib output is lost, rerun it. Green -> commit "skasm: ..." (tab merge
-  pick + pick pass culls closed solids' back faces), TICKETS SM-TAB-MERGE-PICK fixed (to verify), land. The
-  renderer change touches every pick: tell psui in the report (render is psui's area).
-- c2-constrained-surface parity pair NOT run (vibex8 slot queue killed it at 30 min): rb.sh bash -c '~/bin/slot bash
-  ~/tmp/skasm/ut3t.sh c2-constrained-surface' with run_in_background timeout >= 60 min, quiet host.
-- PANE-SPLIT: lead 22:0x: REQUESTS row 22:07 (live: the fresh-document split, per doc/account memory). 50 % default
-  -> ours stays, replay seeded 0.405; else change SPLIT's default (sheet_metal_panel.rs SPLIT unwrap_or(0.5)).
-- JOINT-LIT: the list above the cell is the pane fit (lists stay in the tables pane) -> after the split answer.
+## NEXT (23:0x)
+- LANDED today: d2b509fc, e0fc1afc, 4179663c (651dc0fa), 37df74ed (42727e6e: SM cells, joint lights, Trim S4,
+  query_entities sketches). Rebased on origin/main 23:00; local unlanded: 35b3fe17a + da3069b02 (handoffs).
+- IN PROGRESS, UNCOMMITTED (5 files): SM-TAB-MERGE-PICK (P1) + SM-TABLE-SPLIT-KEPT (P2) + TICKETS (13 lines of
+  union-merge duplicate rows dropped: BEND-LIT-LOOK, JOINT-LIT, CELL-EDIT, LENGTH-LABEL, BEND-FACE-PICKED, HEM-NAME,
+  USE-VERTEX, FORM-REMEMBERED; each duplicated a fixed/verified row).
+  * TAB-MERGE: the click (30,35,2) sits ~1 px above Flange 1's inner top edge; live lit the OUTER face. Ours took the
+    plate top, then (muted) the wall's inner face via back-face slivers in the pick buffer. Fix: behaviors.rs
+    sync_pick_filter (sm dialog + face-only field mutes side faces; while previewing, faces of a held wall the preview
+    changed are muted); renderer.rs mesh_pick_closed (cull Back), pick pass draws opaque_runs (Closed -> culled), no
+    reorder in pick. Test sm_feel_tests a_tabs_merge_click_on_the_walls_top_edge_takes_the_wall.
+  * SPLIT-KEPT: sheet_metal_panel.rs stores the tables' height in px (sheet_metal_tables_px.txt, was a share in
+    sheet_metal_split.txt), default 50 %, flex_shrink so a short window keeps the flat's 210 px; dragged_split +
+    unit test a_dragged_split_is_kept_in_px (no GPUI test: the config dir is shared by the lib's tests).
+  * Run b7wgn2vlu (vibex8 slot, queued behind bool's release gates at 22:58): ~/tmp/skasm/tm.sh (clippy render+psui,
+    the tab test, render tests, full psui lib), log /root/skasm-scratch/tm-run.log (tail only). Green -> commit
+    "skasm: ...", TICKETS both fixed (to verify), land. The renderer change touches every pick: tell psui in the report.
+- c2-constrained-surface parity pair NOT run: rb.sh bash -c '~/bin/slot bash ~/tmp/skasm/ut3t.sh c2-constrained-surface'
+  run_in_background timeout >= 60 min.
+- JOINT-LIT list above the cell: live's capture had a 358 px pane (a kept drag). Wait for qa's replay at 50 %; if live
+  still opens above, the os dropdown needs the tables pane as its bounds (app-core, ask psui).
 - Trim: live's tinted core (curve ~1/3 over the band) not drawn (sketch mode has no curve states); minor.
 - Report to lead at queue empty (<=5 lines). Context: never cat task output files or logs whole; tail -40 / grep.
 

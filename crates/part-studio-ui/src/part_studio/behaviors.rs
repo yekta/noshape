@@ -1671,15 +1671,38 @@ impl PartStudioView {
         // Live 11-17 sm-feel-1117: Flange's (and Hem's) "Edges or side faces", Corner's and Bend relief's boxes light
         // rim and bend edges and a rip's thin side face (the last two a bend end's corner too), never a wall's broad
         // faces.
-        let muted: Vec<u32> = match (self.active_field_filter(cx), &self.context) {
-            (Some(f), Some(ctx)) if f == SM_EDGES_FILTER || f == SM_CORNER_FILTER => ctx
-                .bodies
+        let sm_faces = |keep: &dyn Fn(&noshape_model::sheetmetal::SheetMetalData, &noshape_model::reference::TopoName) -> bool| -> Vec<u32> {
+            let Some(ctx) = &self.context else { return Vec::new() };
+            ctx.bodies
                 .iter()
                 .filter_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)))
-                .flat_map(|(b, sm)| b.faces.iter().filter(|n| sm.wall_of_face(n).is_some()).flat_map(|n| built.picks.ids_for(&Reference::Face((**n).clone())).to_vec()).collect::<Vec<_>>())
-                .collect(),
+                .flat_map(|(b, sm)| b.faces.iter().filter(|n| keep(sm, n)).flat_map(|n| built.picks.ids_for(&Reference::Face((**n).clone())).to_vec()).collect::<Vec<_>>())
+                .collect()
+        };
+        let sm_dialog = self.picking_dialog().is_some_and(|d| d.read(cx).ty.category == noshape_model::features::Category::SheetMetal);
+        let mut muted: Vec<u32> = match self.active_field_filter(cx) {
+            Some(f) if f == SM_EDGES_FILTER || f == SM_CORNER_FILTER => sm_faces(&|sm, n| sm.wall_of_face(n).is_some()),
+            // A sheet metal feature's face field takes walls and bends, not a wall's thin side face (an edge of the model:
+            // live workflows-1123 02 s5, Tab's Flange to merge clicked on Flange 1's top edge takes its outer face).
+            Some(f) if sm_dialog && f.intersects(QueryFilter::ANY_FACE) && !f.intersects(QueryFilter::EDGE) => sm_faces(&|sm, n| sm.wall_of_face(n).is_none() && sm.bend_of_face(n).is_none()),
             _ => Vec::new(),
         };
+        // While the feature previews, a wall the dialog holds (either side) that the preview changed picks nothing (as a
+        // held face the preview changed lights nothing: Tab's merged plate, live wf02 s5 the click passes to the wall).
+        if sm_dialog && self.ui.preview_before.is_some() && let Some(d) = self.picking_dialog() {
+            let held: Vec<Reference> = d.read(cx).selected_refs().into_iter().filter(|r| matches!(r, Reference::Face(_))).collect();
+            let walls: Vec<(&noshape_model::sheetmetal::SheetMetalData, usize)> = self.context.iter().flat_map(|ctx| {
+                held.iter().filter_map(|r| {
+                    let Reference::Face(n) = r else { return None };
+                    let sm = ctx.bodies.iter().find(|b| b.faces.iter().any(|f| **f == *n)).and_then(|b| ctx.sheet_metal.get(&b.id))?;
+                    Some((&**sm, sm.wall_of_face(n)?.0))
+                })
+            }).collect();
+            let on_held: Vec<Reference> = self.context.iter().flat_map(|ctx| ctx.bodies.iter().filter_map(|b| Some((b, ctx.sheet_metal.get(&b.id)?)))).flat_map(|(b, sm)| {
+                b.faces.iter().filter(|n| sm.wall_of_face(n).is_some_and(|(w, _)| walls.iter().any(|(s, i)| std::ptr::eq(*s, &**sm) && *i == w))).map(|n| Reference::Face((**n).clone())).collect::<Vec<_>>()
+            }).collect();
+            muted.extend(self.changed_picks(&on_held).iter().flat_map(|r| built.picks.ids_for(r).to_vec()));
+        }
         if self.ui.pick_filter.as_ref() == Some(&key) && self.ui.pick_unhovered == own_plane && self.ui.pick_muted == muted {
             return;
         }

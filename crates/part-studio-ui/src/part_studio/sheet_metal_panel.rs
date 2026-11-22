@@ -23,13 +23,25 @@ const SPLIT_MIN_TOP: f32 = 140.0;
 const SPLIT_MIN_BOTTOM: f32 = 210.0;
 
 thread_local! {
-    /// The tables' share of the height the user dragged (live: kept across
-    /// a reload as a proportion, "ui (10-24 a)" (3)).
+    /// The tables' height in px the user dragged, the same in every document,
+    /// after a restart and at any window height (live keeps
+    /// `sheetmetaltablesPanelLength` per user, live sm-split-1122).
     static SPLIT: std::cell::Cell<Option<f32>> = std::cell::Cell::new(
-        std::fs::read_to_string(crate::paths::config_dir().join("sheet_metal_split.txt")).ok().and_then(|t| t.trim().parse().ok()),
+        std::fs::read_to_string(crate::paths::config_dir().join(SPLIT_FILE)).ok().and_then(|t| t.trim().parse().ok()),
     );
-    /// The tables' share when the splitter was pressed, and the pointer y.
-    static SPLIT_PRESS: std::cell::Cell<(f32, Pixels)> = const { std::cell::Cell::new((0.5, Pixels::ZERO)) };
+    /// The tables' height when the splitter was pressed (none: the default
+    /// half), and the pointer y.
+    static SPLIT_PRESS: std::cell::Cell<(Option<f32>, Pixels)> = const { std::cell::Cell::new((None, Pixels::ZERO)) };
+}
+
+const SPLIT_FILE: &str = "sheet_metal_tables_px.txt";
+
+/// The tables' height in px after a drag of `dy` from `h0` (none: the
+/// default half) in a panel `total` px tall, kept to the two minimums.
+fn dragged_split(h0: Option<f32>, dy: f32, total: f32) -> f32 {
+    let max = (total - SPLIT_MIN_BOTTOM).max(SPLIT_MIN_TOP);
+    let h0 = h0.unwrap_or(total * 0.5).clamp(SPLIT_MIN_TOP, max);
+    (h0 + dy).round().clamp(SPLIT_MIN_TOP, max)
 }
 
 /// The splitter being dragged.
@@ -1202,20 +1214,18 @@ impl PartStudioView {
             .id("sm-panel")
             .size_full()
             .on_drag_move(move |e: &DragMoveEvent<SmSplitDrag>, window, _| {
-                let (f0, y0) = SPLIT_PRESS.with(|p| p.get());
-                let total = f32::from(e.bounds.size.height).max(1.0);
-                let h = (f0 * total + f32::from(e.event.position.y - y0)).round().clamp(SPLIT_MIN_TOP, (total - SPLIT_MIN_BOTTOM).max(SPLIT_MIN_TOP));
-                let f = h / total;
-                if SPLIT.with(|s| s.get()) != Some(f) {
-                    SPLIT.with(|s| s.set(Some(f)));
-                    let _ = std::fs::write(crate::paths::config_dir().join("sheet_metal_split.txt"), f.to_string());
+                let (h0, y0) = SPLIT_PRESS.with(|p| p.get());
+                let h = dragged_split(h0, f32::from(e.event.position.y - y0), f32::from(e.bounds.size.height));
+                if SPLIT.with(|s| s.get()) != Some(h) {
+                    SPLIT.with(|s| s.set(Some(h)));
+                    let _ = std::fs::write(crate::paths::config_dir().join(SPLIT_FILE), h.to_string());
                     window.refresh();
                 }
             })
             .child(
                 v_flex()
-                    .h(relative(split.unwrap_or(0.5)))
-                    .flex_none()
+                    .h(split.map_or(relative(0.5), |h| px(h).into()))
+                    .flex_shrink(1.)
                     .min_h(px(SPLIT_MIN_TOP))
                     .overflow_hidden()
                     .child(context_row)
@@ -1235,7 +1245,7 @@ impl PartStudioView {
                     .cursor(CursorStyle::ResizeRow)
                     .child(div().w_full().h(px(1.)).bg(pal.border))
                     .on_mouse_down(MouseButton::Left, |e, _, _| {
-                        SPLIT_PRESS.with(|p| p.set((SPLIT.with(|s| s.get()).unwrap_or(0.5), e.position.y)));
+                        SPLIT_PRESS.with(|p| p.set((SPLIT.with(|s| s.get()), e.position.y)));
                     })
                     .on_drag(SmSplitDrag, |d, _, _, cx| cx.new(|_| d.clone())),
             )
@@ -1317,5 +1327,17 @@ mod tests {
         assert_eq!(plain(0.45), "0.45");
         assert_eq!(plain(180.0), "180");
         assert_eq!(plain(-0.0), "0");
+    }
+
+    /// Live sm-split-1122: the default half (485 of 971 px), a drag kept in
+    /// px whatever the panel's height, held to 140 px above and 210 below.
+    #[test]
+    fn a_dragged_split_is_kept_in_px() {
+        assert_eq!(dragged_split(None, 0.0, 971.0), 486.0);
+        assert_eq!(dragged_split(None, -127.0, 884.0), 315.0);
+        assert_eq!(dragged_split(Some(358.0), 20.0, 600.0), 378.0);
+        assert_eq!(dragged_split(Some(358.0), 0.0, 500.0), 290.0);
+        assert_eq!(dragged_split(Some(300.0), -400.0, 884.0), 140.0);
+        assert_eq!(dragged_split(Some(300.0), 900.0, 884.0), 674.0);
     }
 }
