@@ -11555,7 +11555,9 @@ bool split_by_edges_on_faces(const TopoDS_Shape& shape, const std::vector<TopoDS
     if (!(before > 0) || std::abs(after - before) > 1e-9 * before)
       return no(__LINE__);
   }
-  // The solid again, its shells' faces those made where they were made again.
+  // The solid again, its shells' faces those made where they were made again. (The iterators hand the faces out
+  // turned by their shell's and the solid's orientations: the new shells and solid stay forward. A revolve's shell
+  // is reversed in its solid: given its orientation again, the solid came out inside out.)
   TopoDS_Solid so;
   b.MakeSolid(so);
   for (TopoDS_Iterator s(shape); s.More(); s.Next())
@@ -11576,10 +11578,8 @@ bool split_by_edges_on_faces(const TopoDS_Shape& shape, const std::vector<TopoDS
         b.Add(sh, x.Value());
     }
     sh.Closed(BRep_Tool::IsClosed(sh));
-    sh.Orientation(s.Value().Orientation());
     b.Add(so, sh);
   }
-  so.Orientation(shape.Orientation());
   if (!BRepCheck_Analyzer(so).IsValid())
     return no(__LINE__);
   TopoDS_Compound c;

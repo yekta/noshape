@@ -1163,6 +1163,35 @@ fn an_external_thread_says_when_its_size_isnt_the_cylinders() {
     assert_eq!(status(0.008, "M6"), (FeatureStatus::Info, "Non-matching thread size selected.".to_string()));
 }
 
+/// Live workflow 21: a corner rectangle (0,0) -> (5,30) mm on Front, revolved in full about its left edge.
+fn revolved_pin(t: &mut T) -> RegenResult {
+    let mut sk = noshape_sketch::Sketch::new();
+    let left = sk.corner_rectangle(DVec2::ZERO, DVec2::new(0.005, 0.03)).curves[3];
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let r = t.regions(s)[0].clone();
+    t.add("revolve", &[("entities", q(vec![r])), ("axis", q(vec![Reference::SketchEntity { sketch: s, entity: left.0 }])), ("revolveType", en("FULL"))]);
+    t.ok()
+}
+
+/// qa THREAD-ON-REVOLVED-CYLINDER (live workflow 21): a Front rectangle 0,0-5,30 mm revolved about its left edge, an
+/// External thread with its defaults (ANSI 3/8, Blind 10 mm, Split face) on the top edge: live builds it, "Exact match
+/// for thread size not found.", the cylinder split 10 mm down.
+#[test]
+fn an_external_thread_on_a_revolved_cylinder() {
+    let mut t = T::new();
+    let res = revolved_pin(&mut t);
+    let faces0 = res.context.bodies[0].shape.faces().len();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.005, 0.0, 0.03));
+    t.add("externalThread", &[("entities", q(vec![edge])), ("branchOfStandard", ParamValue::Lookup(vec!["ANSI".into(), "3/8".into()]))]);
+    let res = t.ok();
+    let st = res.display.features.last().unwrap().clone();
+    assert_eq!((st.status, st.message.unwrap_or_default()), (FeatureStatus::Info, "Exact match for thread size not found.".to_string()));
+    let b = &res.context.bodies[0];
+    assert_eq!(b.shape.faces().len(), faces0 + 1);
+    let split = noshape_kernel::make_vertex(DVec3::new(0.005, 0.0, 0.02)).unwrap();
+    assert!(b.shape.edges().iter().any(|e| noshape_kernel::distance(&split, e).is_ok_and(|d| d.distance < 1e-9)), "no edge at z = 20 mm");
+}
+
 // ------------------------------------------------------------------ detail extras
 
 #[test]
