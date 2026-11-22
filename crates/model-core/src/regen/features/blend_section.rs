@@ -360,6 +360,8 @@ struct Frame {
     m: [DVec3; 2],
     /// How far each face reaches from the edge along `u` (infinite: unknown).
     extent: [f64; 2],
+    /// A convex round's corner out in the air: a face is free-form, and the tool's sides on it made OCCT's cut invalid.
+    air: bool,
 }
 
 fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f64) -> FResult<Frame> {
@@ -408,7 +410,7 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
             return Err(fail("could not orient a face at the edge"));
         }
     }
-    Ok(Frame { u, m, extent: [f64::INFINITY; 2] })
+    Ok(Frame { u, m, extent: [f64::INFINITY; 2], air: false })
 }
 
 /// Setbacks along the two faces of a frame (face 0, face 1); `first_is_side1`
@@ -532,7 +534,7 @@ fn section_wire(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> 
         let edges = [k::make_line(corner, a)?, k::make_line(a, b)?, k::make_line(b, corner)?];
         return Ok((k::make_wire(&edges)?, edges, convex));
     }
-    let p = if spec.reference.is_some() && convex { p - (f.m[0] + f.m[1]).normalize() * s1.max(s2) } else { p };
+    let p = if (spec.reference.is_some() || f.air) && convex { p - (f.m[0] + f.m[1]).normalize() * s1.max(s2) } else { p };
     let edges = [k::make_line(p, t1)?, curve, k::make_line(t2, p)?];
     Ok((k::make_wire(&edges)?, edges, convex))
 }
@@ -1204,7 +1206,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 let tangent = c.shape.tangent_at(t)?.normalize();
                 let oriented = match edge_frames.get(i).and_then(|f| f.as_ref()) {
                     Some(rf) => {
-                        let mut fr = Frame { u: rf.u, m: rf.m, extent: rf.extent };
+                        let mut fr = Frame { u: rf.u, m: rf.m, extent: rf.extent, air: false };
                         for (k, face) in ff.iter().enumerate() {
                             let n = if face.is_planar() { rf.m[k] } else { surface_normal(face, p)? };
                             let dir = n.cross(tangent).normalize();
@@ -1221,7 +1223,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     Err(_) => {
                         let fi = info.first_param + (info.last_param - info.first_param) * if c.forward { f.clamp(1e-3, 1.0 - 1e-3) } else { 1.0 - f.clamp(1e-3, 1.0 - 1e-3) };
                         let inner = frame_at(shape, ff, c.shape.point_at(fi)?, c.shape.tangent_at(fi)?.normalize(), scale)?;
-                        let mut fr = Frame { u: inner.u, m: inner.m, extent: inner.extent };
+                        let mut fr = Frame { u: inner.u, m: inner.m, extent: inner.extent, air: false };
                         for (i, face) in ff.iter().enumerate() {
                             let n = face.normal_at_point(p)?.normalize();
                             let dir = n.cross(tangent).normalize();
@@ -1234,6 +1236,8 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 // A chamfer as sections measures along the faces' sections, not their tangents (a hollow grind): each
                 // face's direction is the chord to its point at the first distance.
                 let mut fr = fr;
+                // (c2-surf-workshop-knifehandle's Fillet 1: a conic round on the lofted handle's rim.)
+                fr.air = spec.reference.is_none() && ff.iter().any(|f| matches!(f.face_surface(), Ok(k::Surface::BSpline { .. } | k::Surface::Bezier { .. })));
                 if spec.reference.is_some() {
                     for (i, face) in ff.iter().enumerate().filter(|(_, f)| !f.is_planar()) {
                         let mut a = p + fr.u[i] * spec.r1;
@@ -1611,7 +1615,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 // Frame at p0: rotate the mid frame back.
                 let back = (f0 - (f0 + f1) / 2.0) * span - g0;
                 let rot = |v: DVec3| glam::DQuat::from_axis_angle(ax, back) * v;
-                let fr0 = Frame { u: [rot(fr.u[0]), rot(fr.u[1])], m: [rot(fr.m[0]), rot(fr.m[1])], extent: fr.extent };
+                let fr0 = Frame { u: [rot(fr.u[0]), rot(fr.u[1])], m: [rot(fr.m[0]), rot(fr.m[1])], extent: fr.extent, air: fr.air };
                 let (face, edges3, convex) = section_face(p0, &fr0, spec, side1_first)?;
                 let mut angle = (f1 - f0) * span + g0 + g1;
                 // A closed circle (live K3: a conic on a Ø20 boss's top edge) is
@@ -2727,7 +2731,7 @@ fn sides_geometry(shape: &Shape, f1: usize, f2: usize, spec: &BlendSpec, flips: 
     let convex = u[0].dot(mat[1]) > 0.0;
     // A side is wrong when its blend side disagrees with the corner.
     let wrong: [bool; 2] = std::array::from_fn(|i| n[i].dot(if convex { mat[i] } else { -mat[i] }) < 0.0);
-    let fr = Frame { u, m: mat, extent: [f64::INFINITY; 2] };
+    let fr = Frame { u, m: mat, extent: [f64::INFINITY; 2], air: false };
     let (s1, s2) = setbacks(&fr, spec, true)?;
     // Each face's reach across and along the line, from points on its edges.
     let reach = |f: &Shape, w: DVec3| -> FResult<((f64, f64), (f64, f64))> {

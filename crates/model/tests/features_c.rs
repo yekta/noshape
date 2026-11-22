@@ -4273,6 +4273,41 @@ fn ring_rims_round_and_notch_arcs_chamfer_as_live() {
     assert!((703.105..708.601).contains(&v), "{v} (live 705.853)");
 }
 
+/// c2-surf-workshop-knifehandle's Fillet 1: a 4.5 mm conic (rho 0.5) round on the rim where the lofted handle meets its
+/// cap, both free-form: the round's tool with its sides on those faces made OCCT's cut invalid (live 6 faces).
+#[test]
+fn a_conic_round_on_a_lofted_handles_rim_cuts_valid() {
+    let brep = include_str!("data/knifehandle-handle.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let faces = b.shape.faces();
+    assert_eq!(faces.len(), 2);
+    let on_both = |e: &noshape_kernel::Shape| {
+        // (The loft's tip is a degenerated edge.)
+        let Ok(i) = e.edge_info() else { return false };
+        let Ok(q) = e.point_at(0.5 * (i.first_param + i.last_param)) else { return false };
+        faces.iter().all(|f| f.contains_point(q, mm(1e-3)).unwrap_or(false))
+    };
+    let rim: Vec<Reference> = b.shape.edges().iter().enumerate().filter(|(_, e)| on_both(e)).map(|(i, _)| Reference::Edge((*b.edges[i]).clone())).collect();
+    assert!(!rim.is_empty());
+    let before = volume(&r, 0);
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(rim));
+        p.set("crossSection", ParamValue::Enum("CONIC".into()));
+        p.set("nonCircularRadius", expr("4.5 mm"));
+        p.set("rho", expr("0.5"));
+    });
+    let r = s.ok();
+    let body = &r.context.bodies[0].shape;
+    assert!(body.is_valid());
+    assert_eq!(body.count(noshape_kernel::ShapeType::Solid), 1);
+    assert_eq!(body.faces().len(), 6);
+    let removed = (before - volume(&r, 0)) * 1e9;
+    assert!(removed > 100.0 && removed < 200.0, "removed {removed} mm³ (live 166.9 from its handle)");
+}
+
 /// c2-rings-loft's Fillet 1 and Chamfer 1 with Extrude 1 9.6 mm deep, its ring as built (live's numbers): R2 on the
 /// bore's two closed rims where the slanted sides cut it, the sides 1 mm apart at the bottom: one round per rim, the two
 /// meeting there, and the bore one face (OCCT made three pieces of each round and kept more of the bore).
