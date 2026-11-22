@@ -1349,8 +1349,12 @@ impl Ctx<'_> {
                     // knurl faces' 0.32 um curves into one vertex): straight between its ends there.)
                     return Ok(C2::Seg { a: g.to2(self.p(s.v[0])), b: g.to2(self.p(s.v[1])) });
                 } else {
-                    // (Two other faces' section lying on it: projected.)
-                    return self.projected_piece(f, s, su, sv).ok_or(Decline("a section on a third face"));
+                    // (Two other faces' section lying on it: projected, as far off it as its faces' band and the
+                    // nearer face's band with this one add up to (cf-surface-pattern's patterned cuts: a section of the
+                    // part (5 um) and one tool (0.1 um) 5.12 um off another tool's face, the band of 5.1 um declined).)
+                    let [a, b] = faces.map(|x| self.faces[x].arg);
+                    let band = (self.args_band(a, b) + self.args_band(a, g.arg).min(self.args_band(b, g.arg))).max(band);
+                    return self.projected_piece(f, s, su, sv, band).ok_or(Decline("a section on a third face"));
                 };
                 return Ok(C2::Nurbs { c: free::scaled(&on[k], su, sv), t0, t1 });
             }
@@ -1359,10 +1363,10 @@ impl Ctx<'_> {
             // (Else a piece lying on it with no curve there (a section of two other faces along it, a piece of
             // another argument's edge only partly on it): the piece projected.)
             let Some(e) = edge.or_else(|| self.projected_edge(f, s)) else {
-                return self.projected_piece(f, s, su, sv).ok_or(Decline("a curve on a free-form face not its own"));
+                return self.projected_piece(f, s, su, sv, band).ok_or(Decline("a curve on a free-form face not its own"));
             };
             let Some((pc, pt0, pt1)) = g.pcurves.get(&(e, copy == 1)) else {
-                return self.projected_piece(f, s, su, sv).ok_or(Decline("an edge without its curve on a free-form face"));
+                return self.projected_piece(f, s, su, sv, band).ok_or(Decline("an edge without its curve on a free-form face"));
             };
             let c = free::scaled(pc, su, sv);
             let (a, b) = match s.g {
@@ -1504,9 +1508,8 @@ impl Ctx<'_> {
     }
 
     /// Segment `s` on free-form face `f` projected onto it, its parameters scaled by `su`, `sv` (None where it leaves
-    /// the face's surface by more than the tolerance).
-    fn projected_piece(&self, f: usize, s: &Seg, su: f64, sv: f64) -> Option<C2> {
-        let band = self.face_band(f);
+    /// the face's surface by more than `band`).
+    fn projected_piece(&self, f: usize, s: &Seg, su: f64, sv: f64, band: f64) -> Option<C2> {
         if matches!(s.g, Geo::Apex { .. }) {
             return None;
         }

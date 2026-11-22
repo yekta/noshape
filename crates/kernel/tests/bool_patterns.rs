@@ -3560,3 +3560,21 @@ fn patterned_tools_on_one_plane_cut_a_tolerant_ring() {
     assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
     assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
 }
+
+/// cf-surface-pattern's Surface Pattern 3: a part of 5 um cut by 85 patterned tools of 0.1 um: a section of the part
+/// and one tool lies 5.12 um off another tool's free-form face, as far as the two bands add up to; projected onto it
+/// within that, not that face's own 5.1 um (declined, and OCCT took 14 s). Ours has 5 edges and vertices more than
+/// OCCT's.
+#[test]
+fn a_section_of_a_tolerant_part_lies_on_another_patterned_tools_face() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "be4f9303164aa29f").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+}
