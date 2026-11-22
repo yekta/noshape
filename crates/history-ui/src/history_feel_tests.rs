@@ -481,3 +481,58 @@ fn the_start_row_is_a_version_with_properties_and_publish(cx: &mut TestAppContex
     }));
     assert_eq!(cx.update(|cx| doc.read(cx).session.viewing_version()), Some("Start x".into()), "Versions are view only. Viewing Start x.");
 }
+
+/// Live hist-filter-1122: Filter branches shows only while the document has a second workspace (43 x 28, right of the
+/// magnifier); Show current branch lists the current branch's rows alone and "Branched from V1 on Main", whose link
+/// goes back to every branch; with parent branches Main's rows come back; deleting B1 takes the button away.
+#[gpui::test]
+fn the_branch_filter_shows_with_a_second_workspace_and_narrows_the_rows(cx: &mut TestAppContext) {
+    let (window, view, doc) = panel(cx, "branch-filter");
+    let drawn = |cx: &mut TestAppContext, selector: &'static str| VisualTestContext::from_window(window, cx).debug_bounds(selector).is_some();
+    assert!(!drawn(cx, "hist-branch-filter"), "no button with Main alone");
+    let v1 = cx.update(|cx| doc.read(cx).session.store.list_versions().expect("versions").into_iter().find(|v| v.name == "V1").expect("V1"));
+    let b1 = cx.update(|cx| doc.update(cx, |d, cx| {
+        let b = d.session.branch_from(v1.microversion, "B1").expect("B1");
+        d.edit_document("Rename tab", cx, |doc| doc.tabs[0].name = "Studio B1".into());
+        d.session.create_version("V3", "").expect("V3");
+        d.reloaded(cx);
+        b
+    }));
+    cx.run_until_parked();
+    draw(cx, window);
+    draw(cx, window);
+    let button = bounds(cx, window, "hist-branch-filter");
+    assert_eq!((f32::from(button.size.width), f32::from(button.size.height)), (43., 28.));
+    assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show all branches");
+    let pick = |cx: &mut TestAppContext, item: &'static str| {
+        let at = bounds(cx, window, "hist-branch-filter").center();
+        click(cx, window, at, 1);
+        let row = bounds(cx, window, item);
+        assert!(row.top() > button.bottom() && (f32::from(row.right()) - f32::from(button.right())).abs() <= 2., "the menu hangs right-aligned under the button (rows inside its border): {row:?} {button:?}");
+        click(cx, window, row.center(), 1);
+        draw(cx, window);
+        assert!(!drawn(cx, item), "one click picks and closes");
+    };
+    pick(cx, "hist-branch-item Show current branch");
+    assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show current branch");
+    for row in ["hist-row B1", "hist-row V3", "hist-branched-from Branched from V1 on Main"] {
+        assert!(drawn(cx, row), "{row} shown");
+    }
+    for row in ["hist-row Main", "hist-row V2", "hist-row V1", "hist-row Start"] {
+        assert!(!drawn(cx, row), "{row} hidden");
+    }
+    let link = bounds(cx, window, "hist-branch-history").center();
+    click(cx, window, link, 1);
+    assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show all branches");
+    assert!(drawn(cx, "hist-row Main") && drawn(cx, "hist-row V1") && !drawn(cx, "hist-branched-from Branched from V1 on Main"));
+    pick(cx, "hist-branch-item Show current branch with parent branches");
+    for row in ["hist-row B1", "hist-row V3", "hist-row Main", "hist-row V2", "hist-row V1", "hist-row Start"] {
+        assert!(drawn(cx, row), "{row} shown");
+    }
+    view.update(cx, |v, cx| v.delete_workspace(b1, "B1".into(), cx));
+    cx.run_until_parked();
+    draw(cx, window);
+    draw(cx, window);
+    assert!(!drawn(cx, "hist-branch-filter"), "deleting B1 takes the button away");
+    assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show all branches");
+}

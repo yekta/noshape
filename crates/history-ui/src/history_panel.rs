@@ -118,6 +118,29 @@ enum RowKind {
     Merged,
 }
 
+/// The Filter branches menu's items, in its order (live hist-filter-1122).
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+enum BranchFilter {
+    #[default]
+    All,
+    WithWorkspaces,
+    Current,
+    CurrentWithParents,
+}
+
+impl BranchFilter {
+    const ALL: [Self; 4] = [Self::All, Self::WithWorkspaces, Self::Current, Self::CurrentWithParents];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::All => "Show all branches",
+            Self::WithWorkspaces => "Show all branches with workspaces",
+            Self::Current => "Show current branch",
+            Self::CurrentWithParents => "Show current branch with parent branches",
+        }
+    }
+}
+
 /// A popup anchor: a field's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
@@ -212,6 +235,10 @@ pub struct HistoryPanel {
     filter_closed_at: Option<std::time::Instant>,
     filter_edit: HistoryFilter,
     filter: HistoryFilter,
+    /// The Filter branches button's choice (view state, not saved), its menu open, and when a press outside closed it.
+    branch_filter: BranchFilter,
+    branch_menu_open: bool,
+    branch_menu_closed_at: Option<std::time::Instant>,
     date_from: Entity<crate::date_time_field::DateTimeField>,
     date_to: Entity<crate::date_time_field::DateTimeField>,
     /// Tabs each microversion changed (store diffs, for the Tab filters).
@@ -232,6 +259,11 @@ impl HistoryPanel {
     /// "start" | "change", "selected"}`, top to bottom.
     pub fn ui_rows(&self, _cx: &App) -> Vec<serde_json::Value> {
         self.ui_drawn.borrow().clone()
+    }
+
+    /// The Filter branches menu's current item (the ui-parity state's filter).
+    pub fn ui_branch_filter(&self) -> &'static str {
+        self.branch_filter.label()
     }
 
     pub fn new(doc: Entity<DocModel>, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -281,6 +313,9 @@ impl HistoryPanel {
             filter_closed_at: None,
             filter_edit: HistoryFilter::default(),
             filter: HistoryFilter::default(),
+            branch_filter: BranchFilter::All,
+            branch_menu_open: false,
+            branch_menu_closed_at: None,
             date_from,
             date_to,
             changed_tabs: HashMap::new(),
@@ -499,6 +534,105 @@ impl HistoryPanel {
                         cx.notify();
                     }))),
             )
+            .into_any_element()
+    }
+
+    fn close_branch_menu(&mut self) {
+        self.branch_menu_open = false;
+        crate::ui_script::note_list(None);
+    }
+
+    /// The Filter branches button (live hist-filter-1122): 43 x 28, a funnel and a ▾, grey; filled blue while a filter
+    /// other than Show all branches is on; a blue outline while its menu is open, which hangs right-aligned under it.
+    fn render_branch_button(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let open = self.branch_menu_open;
+        let on = self.branch_filter != BranchFilter::All;
+        let ink = if on { pal.accent } else { pal.text_muted };
+        div()
+            .id("hist-branch-filter")
+            .map(|d| crate::ui_script::mark(d, || "button:Filter branches".into()))
+            .debug_selector(|| "hist-branch-filter".into())
+            .relative()
+            .ml(px(13.))
+            .w(px(43.))
+            .h(px(28.))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .gap(px(3.))
+            .rounded(px(3.))
+            .border_1()
+            .border_color(if open { pal.accent } else { rgba(0x00000000) })
+            .cursor_pointer()
+            .when(!open, |d| d.hover(|d| d.bg(rgb(0xeaeaea))))
+            .tooltip(crate::ui::tooltip("Filter branches"))
+            .child(crate::ui::glyph(if on { "filter-solid" } else { "filter" }, 20., ink))
+            .child(os::glyph(os::GLYPH_CARET, 8., ink))
+            .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                // The press that just closed it (outside the menu) doesn't reopen it.
+                if t.branch_menu_closed_at.take().is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(700)) {
+                    return;
+                }
+                if t.branch_menu_open {
+                    t.close_branch_menu();
+                } else {
+                    t.branch_menu_open = true;
+                }
+                cx.notify();
+            }))
+            .when(open, |d| d.child(deferred(div().absolute().top(px(30.)).right(px(0.)).child(self.render_branch_menu(cx))).with_priority(2)))
+            .into_any_element()
+    }
+
+    /// The Filter branches menu (live hist-filter-1122 hf-menu): 250 px, 22 px rows of 11 px text 17 px in; the current
+    /// item bold on `#b2ddf6`. One click picks and closes.
+    fn render_branch_menu(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        let current = self.branch_filter;
+        let rows: Vec<&str> = BranchFilter::ALL.iter().map(|f| f.label()).collect();
+        crate::ui_script::note_list(Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": BranchFilter::ALL.iter().position(|f| *f == current), "disabled": [] })));
+        v_flex()
+            .id("hist-branch-menu")
+            .occlude()
+            .w(px(250.))
+            .py(px(1.))
+            .bg(pal.panel)
+            .border_1()
+            .border_color(rgb(0xd7d7d7))
+            .rounded(px(4.))
+            .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
+            .on_mouse_down_out(cx.listener(|t, _: &MouseDownEvent, _, cx| {
+                t.close_branch_menu();
+                t.branch_menu_closed_at = Some(std::time::Instant::now());
+                cx.notify();
+            }))
+            .children(BranchFilter::ALL.into_iter().map(|f| {
+                let label = f.label();
+                div()
+                    .id(label)
+                    .map(|d| crate::ui_script::mark(d, || format!("menu:{label}")))
+                    .debug_selector(move || format!("hist-branch-item {label}"))
+                    .h(px(22.))
+                    .pl(px(17.))
+                    .pr(px(12.))
+                    .flex()
+                    .items_center()
+                    .whitespace_nowrap()
+                    .text_size(px(11.))
+                    .text_color(pal.text)
+                    .cursor_pointer()
+                    .when(f == current, |d| d.font_weight(FontWeight::BOLD).bg(crate::theme::themed(0xb2ddf6, 0x092046)))
+                    .when(f != current, |d| d.hover(|d| d.bg(crate::theme::themed(0xdef1fb, 0x666666))))
+                    .child(label)
+                    .on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
+                        cx.stop_propagation();
+                        t.branch_filter = f;
+                        t.close_branch_menu();
+                        cx.notify();
+                    }))
+            }))
             .into_any_element()
     }
 
@@ -1210,6 +1344,45 @@ impl Render for HistoryPanel {
         let rows = self.rows.get_or_insert_with(|| Rc::new(build_rows(&graph, &lanes, start).into_iter().map(Rc::new).collect())).clone();
         let info: HashMap<MicroversionId, &noshape_store::MicroversionInfo> = graph.microversions.iter().map(|m| (m.id, m)).collect();
         let q = self.applied_query.trim().to_lowercase();
+        let paged = self.page.is_some();
+        // Filter branches shows only while the document has a second workspace (live hist-filter-1122).
+        let branch_button = lanes.len() > 1 && !paged;
+        if !branch_button {
+            self.branch_filter = BranchFilter::All;
+            self.branch_menu_open = false;
+        }
+        let branch_filter = self.branch_filter;
+        let parent_of = |b: BranchId| graph.branches.iter().find(|x| x.id == b).and_then(|x| x.created_from).and_then(|f| info.get(&f)).map(|m| m.branch);
+        // The branches whose rows show (None: all of them, deleted workspaces' versions too).
+        let shown_branches: Option<HashSet<BranchId>> = match branch_filter {
+            BranchFilter::All => None,
+            BranchFilter::WithWorkspaces => Some(lanes.iter().copied().collect()),
+            BranchFilter::Current => Some(HashSet::from([current_branch])),
+            BranchFilter::CurrentWithParents => {
+                let mut set = HashSet::from([current_branch]);
+                let mut b = current_branch;
+                while let Some(parent) = parent_of(b).filter(|x| set.insert(*x)) {
+                    b = parent;
+                }
+                Some(set)
+            }
+        };
+        let row_shown = |r: &Row| {
+            let Some(set) = &shown_branches else { return true };
+            let branch = match r.kind {
+                RowKind::Workspace(b) => Some(b),
+                _ => info.get(&r.mv).map(|m| m.branch),
+            };
+            branch.is_some_and(|b| set.contains(&b))
+        };
+        // Show current branch ends with where it was branched from: "Branched from <version> on <parent>" (live hf-item2b).
+        let branched_from: Option<(String, String, usize)> = (branch_filter == BranchFilter::Current).then(|| {
+            let from = graph.branches.iter().find(|b| b.id == current_branch)?.created_from?;
+            let parent = info.get(&from)?.branch;
+            let parent_name = graph.branches.iter().find(|b| b.id == parent)?.name.clone();
+            let version = rows.iter().find(|r| r.mv == from && matches!(r.kind, RowKind::Version | RowKind::Start)).map(|r| r.name.clone()).unwrap_or_else(|| info.get(&from).map(|m| m.description.clone()).unwrap_or_default());
+            Some((version, parent_name, lanes.iter().position(|b| *b == parent).unwrap_or(0)))
+        }).flatten();
 
         // Lay out rows (with open "Show changes…" lists) to place the graph.
         let mut placed: Vec<Placed> = Vec::new();
@@ -1238,7 +1411,7 @@ impl Render for HistoryPanel {
             }
         }
         let mut more_at: HashMap<usize, String> = HashMap::new();
-        for r in rows.iter().filter(|_| !results) {
+        for r in rows.iter().filter(|r| !results && row_shown(r)) {
             placed.push(Placed { row: r.clone(), y, change: false });
             y += ROW_H;
             if !self.expanded.contains(&r.key) {
@@ -1261,9 +1434,16 @@ impl Render for HistoryPanel {
                 }
             }
         }
+        let branched = branched_from.as_ref().filter(|_| !results).map(|b| (b.clone(), y));
+        if branched.is_some() {
+            y += ROW_H;
+        }
         let total_h = y;
-        let nl = lanes.len().max(1) as f32;
-        let lane_x = move |l: usize| GRAPH_W / 2. - 7. * (nl - 1.) + 14. * l as f32;
+        // A filter's hidden branches give up their lanes' places (each keeps its colour).
+        let visible: Vec<usize> = (0..lanes.len()).filter(|l| shown_branches.as_ref().is_none_or(|s| s.contains(&lanes[*l]))).collect();
+        let nl = visible.len().max(1) as f32;
+        let lane_pos: Rc<Vec<f32>> = Rc::new((0..lanes.len()).map(|l| GRAPH_W / 2. - 7. * (nl - 1.) + 14. * visible.iter().position(|v| *v == l).unwrap_or(0) as f32).collect());
+        let lane_x = move |l: usize| lane_pos.get(l).copied().unwrap_or(GRAPH_W / 2.);
         let lane_names: Vec<SharedString> = lanes.iter().map(|b| graph.branches.iter().find(|x| x.id == *b).map(|x| SharedString::from(x.name.clone())).unwrap_or_default()).collect();
         let lane_name = |l: usize| lane_names.get(l).cloned().unwrap_or_default();
         let me = cx.entity().downgrade();
@@ -1298,6 +1478,16 @@ impl Render for HistoryPanel {
                 }
             }
         }
+        // The current branch's line runs down to the Branched from row's dot: (lane, parent's lane, y).
+        let stub = branched.as_ref().and_then(|((_, _, parent), y)| {
+            let l = lanes.iter().position(|b| *b == current_branch)?;
+            let at = y + 13.;
+            match segs.iter_mut().find(|s| s.0 == l) {
+                Some(s) => s.2 = at,
+                None => segs.push((l, at, at)),
+            }
+            Some((l, *parent, at))
+        });
         // Releases: versions with a release package get a triangle (solid;
         // with a dot when it contains an obsoletion; open for a Pending or
         // Rejected candidate).
@@ -1336,9 +1526,11 @@ impl Render for HistoryPanel {
             }
         };
         let nodes: Vec<(usize, f32, RowKind, u8)> = placed.iter().map(|p| (p.row.lane, p.y + 13., p.row.kind, if p.row.kind == RowKind::Version { mark(&p.row.mv) } else { 0 })).collect();
+        let paint_x = lane_x.clone();
         let graph_canvas = canvas(
             |_, _, _| {},
             move |bounds, _, window, _| {
+                let lane_x = &paint_x;
                 let o = bounds.origin;
                 let pt = |x: f32, y: f32| point(o.x + px(x), o.y + px(y));
                 let color = |l: usize| rgb(LANES[l % LANES.len()]);
@@ -1442,6 +1634,24 @@ impl Render for HistoryPanel {
                         }
                     }
                 }
+                // Branched from: a dot in the parent's colour and a dotted stub under it (live hf-item2b).
+                if let Some((l, parent, y)) = stub.filter(|s| shown(s.2, s.2 + 34.)) {
+                    let c = pt(lane_x(l), y);
+                    let mut f = PathBuilder::fill();
+                    f.add_polygon(&circle(c, 4.5), true);
+                    if let Ok(path) = f.build() {
+                        window.paint_path(path, color(parent));
+                    }
+                    let mut pb = PathBuilder::stroke(px(2.));
+                    for k in 0..6 {
+                        let top = 8. + 5. * k as f32;
+                        pb.move_to(point(c.x, c.y + px(top)));
+                        pb.line_to(point(c.x, c.y + px(top + 2.)));
+                    }
+                    if let Ok(path) = pb.build() {
+                        window.paint_path(path, color(parent));
+                    }
+                }
             },
         )
         .absolute()
@@ -1467,8 +1677,7 @@ impl Render for HistoryPanel {
         };
         let mut list: Vec<AnyElement> = Vec::new();
         let mut drawn: Vec<serde_json::Value> = Vec::new();
-        let paged = self.page.is_some();
-        let page_sel = self.page.as_ref().map(|p| p.selected.clone());
+        let page_sel =self.page.as_ref().map(|p| p.selected.clone());
         // A version made with no change since the row before it shares its
         // microversion (V1 right after Start): the version row is the one meant.
         let version_at = |mv: MicroversionId| placed.iter().any(|p| p.row.kind == RowKind::Version && p.row.mv == mv);
@@ -1862,6 +2071,49 @@ impl Render for HistoryPanel {
         if skipped > 0. {
             list.push(div().h(px(skipped)).flex_none().into_any_element());
         }
+        if let Some(((version, parent, _), _)) = &branched {
+            let text = format!("Branched from {version} on {parent}");
+            let link = format!("Show {parent} branch history");
+            if crate::ui_script::active() {
+                drawn.push(serde_json::json!({ "name": text, "kind": "version", "selected": false }));
+            }
+            let selector = format!("hist-branched-from {text}");
+            let mark_link = format!("button:{link}");
+            list.push(
+                h_flex()
+                    .debug_selector(move || selector)
+                    .h(px(ROW_H))
+                    .flex_none()
+                    .items_start()
+                    .pt(px(5.))
+                    .text_size(px(14.))
+                    .line_height(px(21.))
+                    .child(div().w(px(GRAPH_W + 5.)).flex_none())
+                    .child(
+                        v_flex()
+                            .w(px(115.))
+                            .flex_none()
+                            .child(div().truncate().font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(text)))
+                            // Its link goes back to every branch's history.
+                            .child(
+                                div()
+                                    .id("hist-branch-history")
+                                    .map(|d| crate::ui_script::mark(d, || mark_link))
+                                    .debug_selector(|| "hist-branch-history".into())
+                                    .truncate()
+                                    .underline()
+                                    .text_color(rgb(0x094174))
+                                    .cursor_pointer()
+                                    .child(crate::ui::user_text(link))
+                                    .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                        t.branch_filter = BranchFilter::All;
+                                        cx.notify();
+                                    })),
+                            ),
+                    )
+                    .into_any_element(),
+            );
+        }
         // The rows' place and the visible list around them, read as they're painted: a scroll or a resize that shows
         // rows not built draws again (within the margin, the rows built already show).
         let probe = {
@@ -2061,6 +2313,9 @@ impl Render for HistoryPanel {
                                                     .when(self.filter_open, |d| d.child(deferred(div().absolute().top(px(29.)).right(px(-1.)).child(self.render_filter_panel(cx))).with_priority(2))),
                                             )
                                             .child(div().size(px(30.)).flex().items_center().justify_center().border_1().border_l_0().border_color(rgb(0xaaaaaa)).rounded_r(px(4.)).child(crate::assets::icon("search", 20., cx)))
+                                            // Live hist-filter-1122: the box narrows from 330 to 276 px for the 43 x 28
+                                            // button, 13 px right of the magnifier.
+                                            .when(branch_button, |d| d.pr(px(8.)).child(self.render_branch_button(cx)))
                                             .debug_selector(|| "hist-search".into()),
                                     )
                                     .child(
