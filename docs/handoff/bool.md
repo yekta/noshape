@@ -19,29 +19,27 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (lead 11-22 06:2x; state 11-22 10:58 UTC)
-1. QUEUED: per-pair stage A 0b4f5ad47 as a13ddb27 (09:47; gate + knurls 0 diff x5 clean), usdvol f0929e9df as 6322eeca
-   (10:58; gate vibex7: replay +0 -0, suite 129 -> 129, shells 6 -> 6, crate tests pass, speed lines noise (main's
-   rounds 57-67% apart); knurls vibex7 0 diff x5, copies deleted). Check `land.sh --status`; then rm the worktrees'
+## NEXT (lead 11-22 06:2x; state 11-22 12:20 UTC)
+1. QUEUED: usdvol f0929e9df as 6322eeca (11:01; gate vibex7 clean, knurls 0 diff x5); per-pair stage A as 7d1f338c
+   (12:00, requeued: a13ddb27 FAILED in the queue on psui's sketch_hover pixel test a_closed_sketchs_lit_end_goes_with_it
+   under load, >60 s tests beside it; A touches only boolean.rs). Check `land.sh --status`; then rm the worktrees'
    targets (bool-ptol, bool-usdvol) on their hosts.
 2. P1 BOOL-PER-PAIR-TOL (DECISIONS 17157c2fa), STAGED. Ctx.arg_tol (each arg's half), Ctx.arg_reach (widest band with
    args whose boxes meet); helpers own_band / band(f,g) / edge_band / args_band / face_band / reach_band.
-   - STAGE B a23eae9b3 (worktree bool-ptolb, on A): classification, 6 sites. BROKEN: stage C's gate (vibe2, C on B on
-     A; run dir vibe2 ~/agents/bool-gate/runs/bool-ptolc-a75a7c9f9-1122-100805) FAIL: shells 26db61e922965935 (ours 44
-     faces vs OCCT 37) and a237eca5d7832a0e (shell failed), and shfall ce16a730f6abf890 newly taken but history
-     differs (main declined "two edges leave a vertex in one direction"). Same with C switched off (PROBE_NOCHORD) ->
-     B. Bisected (probe tree switch PROBE_B=<site>, sh-b.sh, cases vibex8 ~/tmp/bool/shc): ONLY site 5 = state_at's
-     coplanar check, `let tol = cx.args_band(arg, cx.solids[t].arg)` (bool-ptolb boolean.rs ~7111): with cx.tol
-     there both shells match OCCT. BUT gamma's Boolean 1 needs site 5 (PROBE_B=5: declines "a piece's point on
-     another solid's face" -> OCCT). NEXT: a band for site 5 that keeps both: try band(f, g) per coplanar face g
-     (the pair's band, as plane_plane paired them), or max of args_band and the piece's boundary edges' bands (a
-     piece's boundary can come from a third, looser argument's edges); check with sh-b.sh (2 shells) + gm-b5.sh
-     (gamma full, vibex8) + ce16a730f6abf890 (shfall corpus); amend B, rebase C, gate C only (it covers A+B+C).
-     B's own gate on vibex8 (unit bool-ptolb-gate, chain-bool-ptolb.out) still running: read it for anything else.
-   - STAGE C a75a7c9f9 (worktree bool-ptolc, on B): pcurves of chords / off-axis arcs on cylinders (off_edge +
-     chord_pcurve in build()); gamma FULL Boolean 1 ours 606 ms vs OCCT 6054 ms (vibex8), 2805/7332 as OCCT. T1
-     an_off_axis_arc_and_a_chord_on_a_cylinder_get_curves_on_it_that_follow_them (case 3c7300ba68882d9d, 2.7 MB).
-     Gate rerun after B's fix -> knurls -> land A, B, C in order.
+   - STAGE B ca0bb0156 (worktree bool-ptolb, on A 0b4f5ad47), FIXED: its first gate (a23eae9b3, vibex8) failed on
+     shells 26db61e922965935 / a237eca5d7832a0e and shfall ce16a730f6abf890, all from state_at (site 5: coplanar scan
+     AND ray_state's band). Cause: a Shell's slabs are each 0.1 um tolerant but a drafted wall's slab sits
+     tan(0.5 deg) x 1 mm = 8.7 um off its neighbour's plane: only the Boolean's one band (2e-5) holds them as one.
+     Gamma needs the narrow band (its clips are truly precise). Fix: the kernel's own Booleans (quick_boolean's,
+     t_slab; the replay's "direct" cases, NOSHAPE_BOOL_SLAB) pass flag bit 4 -> brep with_one_band -> arg_tols gives
+     every arg half the Boolean's. Tried and dropped: max with the piece's edge bands, max of reaches, scan-only
+     (probe tree switches PROBE_B=50/52/53/54, sh-b5*.sh).
+     Checked (vibex8, c-check.sh): both shells as OCCT (26db 37 faces), ce16a declines as main, gamma Boolean 1
+     equivalent, ours 423 ms vs OCCT 6422 ms.
+   - STAGE C ad5674aa8 (worktree bool-ptolc, on B ca0bb0156): pcurves of chords / off-axis arcs on cylinders.
+     GATE RUNNING: unit bool-ptolc-gate2 (local systemd, gate on vibex8, started 12:19, cold build ~2.5 h),
+     /root/bool-scratch/chain-bool-ptolc.out. Then knurls (kn-run.sh) -> land A (queued), B, C in order (B and C
+     rebased on A's landed commit first).
 3. SPEED-STANDOFFS. Live whole doc 176 ms. Main on vibe2 (loaded): Revolve 2 541 ms (brep 207, unify 260 of which
    usd.volume 172 = usdvol, queued), Boolean 1 339 (brep 198, unify 117), Boolean 2 238 (brep 137, unify 74).
    brep on vibex8 (cases BK/st/rec 330d / de7a / e714, st-brep*.sh, probe tree bool-stages, PROBE_BREP_TIMES):
