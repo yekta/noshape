@@ -19,7 +19,11 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 - **NEXT 3**: asm's SHIFT-NEAREST release fix (asm will say); rerun chain tmp/rr-3900.sh (fieldsel fs.sh, mcinfer mi.sh, asmfeel dr-BaseR).
   Rescore the matrix after psui/asm lands: tmp/hmr-26153.sh pattern (bin/hm-rescore.sh 'subj:<text>' 'b*' / '[ips]*' on vibe2).
 - Open: P1 PARITY-FAN-BLADE-SWEEP-TRANSLATOR (asm 4a22b2966 dedup); tyres ~1.6 m off; CROSSING-OUTLINE colour; wf25 s28 Gear look.
-- Waiting units: none else of mine on vibex8 (bool's gates there go first, lead 19:08). skasm BEND-FACE-RECLICK-EMPTIES reopened.
+- 22:4x (lead: replay workflows-1123 on newest green, rescore the matrix after psui b6812aae, re-verify skasm/asm/psui batch 2 rows):
+  unit qa-ver1 (tmp/ver1.sh, vibe2, green 02cea338f): mcinfer r6 all, fieldsel r4 sk/asm cells, workflows-1122 01/11/12/13/22/27 ->
+  hm2/out-wf-v, walk3 s5/s6/s3 cells -> hm2/out-wkv. Unit qa-ver2 (tmp/ver2.sh): waits b6812aae in green, then matrix hmr2-b/hmr2-ips
+  (vibe2), fieldsel r5 psui cells, manipnav r6; workflows-1123 -> hm2/out-wf23b on vibex8 after bool's gates (log tmp/ver2-wf.log).
+  MC matrix cells on e0fc1afc9 unchanged (8/8 same pixels). Feel runners take QA_HOST (default vibex8). skasm BEND-FACE-RECLICK reopened.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
