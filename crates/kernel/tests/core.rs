@@ -1576,3 +1576,18 @@ fn a_sheet_with_sharp_edges_thickens_with_its_offsets_meeting() {
     assert_eq!(r.shape.faces().len(), 1 + 4 + 1 + 4 + 4 + 1);
 }
 
+/// A cut's volume change from the faces it touched only: the hole's volume taken off (most faces shared), nothing
+/// for the part against itself, and the same as two whole volumes for a shape sharing no face.
+#[test]
+fn a_volume_change_counts_only_the_faces_not_shared() {
+    let mm = 1e-3;
+    let block = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 30.0, 10.0) * mm).unwrap();
+    let pin = make_cylinder(&Plane::new(DVec3::new(10.0, 10.0, -1.0) * mm, DVec3::Z, DVec3::X), 3.0 * mm, 12.0 * mm, 2.0 * PI).unwrap();
+    let cut = boolean(BooleanOp::Cut, std::slice::from_ref(&block), &[pin], &BooleanOptions::default()).unwrap().shape;
+    let hole = PI * 9.0 * 10.0;
+    assert!((volume_change(&block, &cut).unwrap() / (mm * mm * mm) + hole).abs() < 1e-6, "the hole taken off");
+    assert!((volume_change(&cut, &block).unwrap() / (mm * mm * mm) - hole).abs() < 1e-6, "and put back");
+    assert_eq!(volume_change(&cut, &cut).unwrap(), 0.0, "nothing against itself");
+    let other = make_box_corners(DVec3::ZERO, DVec3::new(20.0, 30.0, 10.0) * mm).unwrap();
+    assert!((volume_change(&block, &other).unwrap() / (mm * mm * mm) + 6000.0).abs() < 1e-6, "no shared face: the whole difference");
+}

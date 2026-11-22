@@ -2096,10 +2096,18 @@ pub fn unchanged(a: &Shape, b: &Shape) -> bool {
     if a.count(ShapeType::Edge) == b.count(ShapeType::Edge) && same_edges(a, b, 1e-3 * tol) {
         return true;
     }
-    match (a.volume(), b.volume()) {
-        (Ok(va), Ok(vb)) => (va - vb).abs() <= 1e-9 * va.abs().max(1e-12),
-        _ => false,
+    // The volume between them from the faces they don't share (two whole volumes: ~0.5 s on asm-isaac-ball's 180-face
+    // part); the part's own volume (at most its box's) only where that change is near the 1e-9 bound.
+    let Ok(d) = noshape_kernel::volume_change(a, b) else { return false };
+    let size = ba.max - ba.min;
+    let room = size.x * size.y * size.z;
+    if d.abs() > 1e-9 * room {
+        return false;
     }
+    if d.abs() <= 1e-12 * room {
+        return true;
+    }
+    a.volume().is_ok_and(|va| d.abs() <= 1e-9 * va.abs().max(1e-12))
 }
 
 /// Each edge of `b` one of `a`'s (its length and ends within `tol`): `a`'s sorted by length, searched within `tol`.

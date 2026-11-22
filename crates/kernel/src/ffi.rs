@@ -556,6 +556,7 @@ pub(crate) mod ffi {
         fn props_volume(s: &OcShape) -> Result<PropsF>;
         fn props_volume_precise(s: &OcShape) -> Result<PropsF>;
         fn props_volume_centre_estimate(s: &OcShape) -> Result<P3>;
+        fn volume_change(a: &OcShape, b: &OcShape) -> Result<f64>;
         fn max_edge_tolerance(s: &OcShape) -> Result<f64>;
         fn props_surface(s: &OcShape) -> Result<PropsF>;
         fn area_fast(s: &OcShape) -> Result<f64>;

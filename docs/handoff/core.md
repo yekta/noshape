@@ -1,56 +1,35 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-21 23:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 11:24 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-21 21:16 UTC)
-- **LANDED 11-21:** trunk-hanger 724b9cd2; fit spline ends 349ebdae9 + two-direction surface extrude ec2e52f99;
-  UIP-THREAD-MESSAGE-TWICE 02ccb4ef; EDGE-CENTRE-SEAM + surf-intro Fill 1 / Boundary surface 1 dc6e16ff.
-- **LANDED 45fb8d24 as 1ca9f153 (core-cache): chamfer edge-sense re-land** (projected line keeps its way; a body failing for no
-  named reason waits; a region key whose curves turned round still names its region). Full compat vs 0.4.64 = qa's
-  6be52caf run (user docs ALL-SAME; same 3 ticket + 4 corpus DIFFs; impeller Part 1 96100.36 -> 96068.64, accepted by
-  qa); infento 157/167. qa adds the TICKETS row after a green carries it. If it fails: fix forward.
-- **QUEUED ed773d89 (core-bis2, branch core-kh, 6 commits): knifehandle + direct thicken + test fix.** 8061866b failed
-  (batch red 21:16): a31ec6648's Mutual trim rule (std's qSplitBy back body) broke model
-  features_b::offset_curve_move_boundary_mutual_trim, whose expectation was our old larger-side guess; test now expects
-  std's sides (abc1e409a). Knifehandle: guided loft through >2 profiles, Mutual trim pieces, Union of surfaces to a solid,
-  Move boundary edge ends; Extend handle 1/2/3, 24144.7 mm2 (live 24143.0). Rest: sketch P4's ellipse (skasm).
-- **ISAAC-BALL REOPEN NAMING: closed 11-21 21:10.** asm's repro came from their pre-rebase branch (ops-mc2, before
-  89180ec5e); a main 626941712 session stores Extrude 6's split face as ordinal 0 (= scratch) and reopens Ok. asm agreed.
-- **THICKEN-DIRECT (in ed773d89):** crates/kernel/cpp/thicken_direct.cpp before OCCT's intersection join (OCCT fallback).
-  split Thicken 1: 11/24/16, 14590.40 mm3 (live 14589.80), 25-50 ms vs OCCT 12/26/16 in 230-440. A/B over the 18 thicken
-  docs: same or better everywhere. Kernel 566/0, GCC 13 clean.
-- **QUEUED f10fbdb6 (core-th, branch core-derived): scissor duplicate.** ops OpenDoc's tab Regenerators live in
-  studio_cache (shared with DocStudios); the app's Part Studio view starts from its snapshot. Serial open of every scissor
-  studio 292 -> 170 s (vibex7, same statuses). Test result_keys::a_derived_source_open_as_a_tab_is_regenerated_once.
-  The rest of scissor's cost is the Derived chains themselves (173-feature source 51 s, 78-feature 73 s, failing fillets).
-- **LANDED 04:08 2d321b28: Loft 3 + Loft 4** (05b06fe3, 4866d14d; core-th target removed on vibex7). TICKETS
-  LOFT3-EDGES / LOFT-PATHS-TOPOLOGY closed (core-cache).
-- **ORDERS (lead 11-22 02:1x), while lands queue:** 1) Mirror 1 DONE: live's two 0.069 / 0.072 mm
-  edges (x 0, y -254.03, z +-50.8, kept to Loft 5) are its A/mirror seam ending short of the cylinder end; ours is the
-  exact one. Row in parity.rs LIVE_SLIVER_EDGES (DECISIONS 11-15). With Loft 3/4 (core-th) on top: loft-paths-guides
-  29/29, matches to the end (vibex8 03:15). Speed left: Loft 3 376 ms (live 69), Mirror 1 720 (60), Loft 4/5 ~650-700.
-  2) isaac open PROFILED (vibex7 04:30, load 10-14, release, saved doc
-  vibex7 ~/agents/core-keep/isaac/save, logs prof.log / speed.log there, .is1.sh): real open's first evaluation
-  55.0 s (was 135-140 s in asm's 11-20 run); its 51 studios one after another 106 s. Prewarm already runs them side by
-  side, so the floor is the slowest studio: 00f1d4 18.9 s, de4eff 16.9, a04711 12.9, 7072ea 12.1, d78cbf 11.4 (five
-  near-copies, ~100 features each, 72 s of the 106), Gear Lab 8f5622 5.6 s (custom: not prewarmed), 850efe 4.2.
-  Slowest features: the same few in each copy: Extrude 43 1.2-1.7 s, Extrude 27 1.3-1.6 s, Fillet 6 1.1-1.3 s;
-  failing fillets 12.8 s (a04711 Fillet 1 4.2 s, Fillet 2 2.0; 00f1d4 Fillet 12 2.2; de4eff Fillet 10/11 1.3 each;
-  b29603 Fillet 9 0.9) + 850efe Extrude 8 0.85 s (Error). Next: why Extrude 43 / 27 and Fillet 6 take >1 s.
-  Lands 02:40:
-  ed773d89 FAILED 02:28 on a flaky part-studio-ui export-dialog test (shared export_solid.json; not ours), re-queued as
-  75dec34f; 4866d14d retest of 4; 07cad3ef batch of 4; f10fbdb6 (core-sj) queued.
-- **Hosts (lead 11-22 01:4x):** 02:00-04:00 UTC keep off vibex7 (qa's speed window): vibex8 or the Mac (NOSHAPE_RB_HOST=mac). vibex7 core-keep cleaned to 1.6 GB 01:41.
-- **Lands to watch (11-21 23:25):** 45fb8d24 LANDED 23:21 as 1ca9f153. ed773d89 + 05b06fe3e checking (batch of 4 at
-  23:21); f10fbdb6 FAILED 01:18 on main's red prefs test (dx images library, main RED d4a3bbfe4 01:05): re-queued 01:40 from core-sj (branch core-derived); 4866d14d (Loft 4) queued 23:43. Then land core-cache's handoff commits. Report at queue empty or a failed land.
-- **FACE BLEND 1 (core-cache):** QUEUED 1a5b61c3: sides on two solid parts are fused first (live joins Thicken 1's
-  slabs: 1 part, 14 faces; test a_face_blend_across_overlapping_parts_joins_them). On top: face blend's plain rolling
-  ball uses fillet_checked (unchecked k::fillet skipped finish_blend_faces, so its blend faces stayed B-splines; live
-  cylinders): surfaces-lofts-projected 3 -> 8/45 (next: Loft 1 = VALID-SURFLOFTS-LOFT1), other 3 blend docs same, face
-  blend tests pass (A/B vibex7 ~/agents/core-keep/fb/ab2-*.log). Test wanted: 3 tries (lens, valley, two slabs) didn't
-  reproduce a B-spline blend from OCCT.
+## Now (11-22 11:24 UTC)
+- **Queue:** 8e3ffc49 rectangle (core-rf, checking 11:08); 3779e4f1 knifehandle Blade scatter (core-dock, queued).
+  LANDED: dd3b72fa thread on revolved cylinder, 9a99b420 loft guide continuity None. Landing now from core-cache:
+  isaac speed (volume_change + merge_cylinder_patches copy only for merging pairs).
+- **knifehandle Sweep 2 DONE:** live's own area scatter (scatter entry 3779e4f1); first real difference Fillet 2 (blend).
+  Saved translated doc: vibex7 ~/agents/core-keep/kh/save/; probes ~/tmp/core/l5/pf.py, pm.py, ph.py (Handle per feature).
+- **asm FYI 11:1x:** our result store's encode_result silently returned None for BodyId-keyed maps; asm fixed it in
+  6c5d2de2c (pairs). TODO: log a line when an encode fails.
+- Probe kit for saved docs (vibex7 ~/tmp/core/l5): ts.py <cli> <doc> (feature statuses + Sketch 3), tn.py <cli> <doc>
+  <copy> (faces/vertices with decoded names after Tab 1); face names are urlsafe-b64 raw-deflate JSON.
+- **KNIFEHANDLE LOFT 1 (blend waits to rerun Fillet 1):** ours 21517.64 mm2 vs live 21477.23 (+0.19%). Live's surface
+  decoded (scripts ~/core-scratch/kh/: rep.py replica = live to 0.0017 mm from live's loops + tents):
+  (a) structure = ours: natural cubic columns through the stations (y exact), guides' corrections by periodic Hermite
+  tents (x exact); (b) each loop's u is its OWN curve parameter (P1 Bezier t, P2..P6 ellipse angle), not arc length;
+  (c) each guide's point at v = its own parameter by Hermite cubic through (v_i, t_i), ends' slopes = end-span secants,
+  interior close to our Pchip's weighted harmonic (replica +0.5 mm2); (d) station v: live 0 .240444 .390257 .575656
+  .719091 .896735 1, rule NOT found (middle spans = plane spacing x 1.0018 to 3e-4, P1-P2 and P5-P6 +0.55%, tip span
+  18.89 vs 12.16 dx); chord v costs +26 mm2 in the replica, live v +0.5. Fix (b)+(c) in core-rmx branch core-loft1
+  (loft_guided_multi: par/share by loop parameter, gmap on guide parameter); building + ph.py on vibex7 (.lf.sh new ->
+  ~/core-scratch/lf-new.out). Next: v rule (a live capture of a 3-profile guided loop with offset centres would settle
+  it), T1 test vs 21477.23 (Extend handle 24150.49).
+- **REGEN-SPEED isaac (landing 11:2x from core-cache):** kernel volume_change(a, b) (only unshared faces integrated) in
+  eval.rs `unchanged`; merge_cylinder_patches checks the original faces, copies only for a merging pair. A/B vibex7
+  ~/tmp/core/vc: parity 129/188, 2012/2680 = base; isaac open 77.8 -> 75.7 s (serial 51 uses); 00f1d4 19.9 -> 12.5 s.
+  Next: Extrude 27 unify.reordered/usd (4 USD passes, 600 ms); Fillet 6 = blend.fallback.by_groups 917 ms (blend's).
+- **Hosts:** vibex8 still under qa's ~/.slot-quiet (cargo rc 75 "held"); told lead 04:5x. vibex7 load 9-12.
 - **SURF-INTRO-OFFSET-END:** live (behaviours "core (11-21 20:33) surf-intro", dom/core-surfintro-loft1.txt): Loft 1 pairs
   its profiles BY PARAMETER (as ours), ruled 3x1, 120x2 CPs, knots doubled at 1/64. So our 1 mm2 gap is the profiles'
   own parametrisation (live's projected curves: 64 spans, doubled knots); compare ours with the dump next.

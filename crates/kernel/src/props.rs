@@ -40,6 +40,12 @@ pub fn volume_centre_estimate(shape: &Shape) -> Result<DVec3> {
     Ok(v3(ck(ffi::props_volume_centre_estimate(shape.raw()))?))
 }
 
+/// The volume `b` has more than `a`, from the faces they don't share only (exact where a Boolean left most faces as
+/// they were, and fast there).
+pub fn volume_change(a: &Shape, b: &Shape) -> Result<f64> {
+    ck(ffi::volume_change(a.raw(), b.raw()))
+}
+
 /// [`volume_properties`] with the centre of mass and inertia integrated
 /// tighter (the mass properties shown; slower, not cached).
 pub fn mass_properties(shape: &Shape) -> Result<MassProperties> {

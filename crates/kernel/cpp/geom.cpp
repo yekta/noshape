@@ -44,6 +44,7 @@
 #include <Geom_SurfaceOfLinearExtrusion.hxx>
 #include <Geom_SurfaceOfRevolution.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <Geom2d_Curve.hxx>
 #include <gp_Pnt2d.hxx>
 #include <gp_Circ.hxx>
@@ -1619,6 +1620,42 @@ P3 props_volume_centre_estimate(const OcShape& s)
   BRepGProp::VolumeProperties(s.shape, out);
   const gp_Pnt c = out.CentreOfMass();
   return P3{c.X(), c.Y(), c.Z()};
+}
+
+// The volume `b` has more than `a`: only the faces either has that the other doesn't (a Boolean's untouched faces are
+// the same faces) integrated, by one divergence field, so the shared faces' terms cancel exactly; milliseconds where
+// two whole volumes took ~0.5 s on a 180-face part (asm-isaac-ball's Extrude 41).
+double volume_change(const OcShape& a, const OcShape& b)
+{
+  require_non_null(a.shape, "a");
+  require_non_null(b.shape, "b");
+  TopTools_IndexedMapOfShape fa, fb;
+  for (TopExp_Explorer e(a.shape, TopAbs_FACE); e.More(); e.Next())
+    fa.Add(e.Current());
+  for (TopExp_Explorer e(b.shape, TopAbs_FACE); e.More(); e.Next())
+    fb.Add(e.Current());
+  // (The same face turned over is a different one: its term changes sign.)
+  auto only = [](const TopTools_IndexedMapOfShape& in, const TopTools_IndexedMapOfShape& other) {
+    std::vector<TopoDS_Shape> out;
+    for (int i = 1; i <= in.Extent(); ++i)
+    {
+      const int j = other.FindIndex(in(i));
+      if (j == 0 || other(j).Orientation() != in(i).Orientation())
+        out.push_back(in(i));
+    }
+    return out;
+  };
+  const std::vector<TopoDS_Shape> gone = only(fa, fb), added = only(fb, fa);
+  Bnd_Box box;
+  BRepBndLib::Add(b.shape, box);
+  gp_XYZ o;
+  if (!box.IsVoid())
+  {
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    o = gp_XYZ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  }
+  return faces_volume_precise(added, o) - faces_volume_precise(gone, o);
 }
 
 PropsF props_volume_precise(const OcShape& s)
