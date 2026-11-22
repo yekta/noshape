@@ -472,6 +472,22 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   Part Studio right after its source tab ("Part Studio 1 (1)" after .step, "(2)" after .x_t), the same "being prepared for export"
   message. Not tickets: live's Create task… (a cloud feature); live's STEP Preprocessing / derived tolerances / Store file in a new
   tab (account-remembered there). The import toast is IMPORT-TAB-TOAST (waiting on live).
+- [ ] P0 **FEEL-SKETCH-RCLICK-PLANE-LIT (psui)** (workflow 40 step 31, doc-linked, green 984adcc30): in Sketch 2 (on Right),
+  right-click empty sketch space: live lights the **Right plane orange** while its menu (Confirm Sketch 2 / Hide Right plane / …)
+  is open; ours shows the same menu with the plane unlit (tickets/wf40-sketch-rclick-plane.png).
+- [ ] P1 **CTX-MENU-FLIP-UP (psui)** (workflow 40 steps 8/50, 57): a context menu that doesn't fit below the click: live **opens it
+  above the click** (Part 1's row menu ends just over the row; the drawing view's menu ends above the pointer); ours slides it up
+  just enough to fit, so it covers the tab bar (Part 1 row) or lands **under the pointer** with the hovered row's submenu open
+  (drawing view: View orientation's Top/Left/…/Isometric list shown at once) (tickets/wf40-part-row-menu.png, wf40-drw-view-menu.png).
+- [ ] P1 **ASM-FACE-MENU-ROWS (asm)** (workflow 40 step 46): right-click a face of Part 1 <1> in Assembly 1: live's menu has
+  **Open linked document** (after Replace Part 1 <1>…) and **Where used for Part 1…**; ours lacks both, the rest in live's order
+  (tickets/wf40-asm-face-menu.png).
+- [ ] P1 **DRW-TAB-MENU-CHANGE-TO-VERSION (studios)** (workflow 40 step 59): the drawing tab's menu in a linked document: live has
+  **Change to version…** after Copy to clipboard; ours lacks it (tickets/wf40-drw-tab-menu.png).
+- Workflow 40 (21 right-clicks in one session) otherwise = live, rows in live's order: Extrude 1 row, Right plane in graphics, Part 1
+  row, face / edge / vertex, empty canvas, view cube, sketch line, Part Studio and Assembly tabs, the tab bar's empty end (no menu),
+  instance and root rows, the drawing view. Not tickets: live's Add comment / Create task… (cloud). Runner gaps: "Parts (1)" header
+  (step 10) not found by our runner; step 4's plane target hit the plane in graphics (variant 40v-plane-row for the row).
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
