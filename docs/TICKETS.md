@@ -287,6 +287,57 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
+
+- [ ] P1 **FEEL-DRW-TITLEBLOCK-CLICK (studios)**: the Front view selected (edges orange), click in the title block (sheet (200, 30) mm):
+  live keeps the view selected (e7); ours clears it (so v1–v5 then differ by one toggle). w9-drw-view-select.png.
+- [ ] P2 **FEEL-DRW-VIEW-FRAME-PAD (studios)**: the hovered / selected view's tan frame round the Front view (block-drawing): live
+  17 px above and below the geometry, 9 px at the sides; ours 9 px all round.
+- [ ] P1 **FEEL-DRW-DIM-HOVER-ON-SELECTED (studios)**: the 1.575 dimension selected, pointer back on it: live returns to the light tan
+  hover look (hover wins, d3); ours keeps the dark orange box. w9-drw-dimension.png.
+- [ ] P1 **FEEL-DRW-DIM-DRAG-EDITOR (studios)**: drag the dimension text 12 mm right / 10 up: on release live opens the inline text
+  editor under the text, the prefix field focused, the dimension tan (d5, behaviours); ours leaves it selected, no editor.
+- [ ] P1 **FEEL-DRW-DIM-PALETTE-LOOK (studios)**: with the dimension palette open (double-click), live draws the dimension in the tan
+  hover look with no end grips, diamonds or ±0.1 (p0, q1a, q2, q2b); ours draws the dark orange selected look with grips.
+  w9-drw-dim-palette.png (drwm-5b left pair, drwm-5 right pair).
+- [ ] P1 **FEEL-DRW-DIM-PALETTE-AUTOCLOSE (studios)**: pointer ~150 px off the palette (q1b) or to empty sheet (p1): live closes the
+  palette by itself and the dimension is black with the blue attachment dots; ours keeps the palette open. After Esc ours shows the
+  orange selected look with ±0.1 (live black), and only a second Esc gives live's look.
+- [ ] P1 **FEEL-DRW-NOTE-SELECTED-AFTER-PLACE (studios)**: Note at (60, 40), type TEMP, click (240, 190), Esc: ours keeps TEMP
+  selected (state selection count 1), so the next click on it DESELECTS it (n2 plain); live's click selects it (n2 dark orange
+  with handles). w9-drw-note.png.
+- [ ] P1 **FEEL-DRW-NOTE-HOVER-LOOK (studios)**: the hovered note: live keeps the text black on the tan box and draws the rotate handle
+  as a hollow circle with two tiny side arrows; ours tints the text tan-grey and draws an eye-shaped handle. w9-drw-note-hover.png
+  (live hover, ours hover, live selected).
+- [ ] P1 **FEEL-DRW-BOM-HOVER-ROW (studios)**: BOM table (pin-block asm drawing): the row under the pointer is #e2e2e2 in live
+  (header hovered: header #e2e2e2, rows #f1f1f1; a body row hovered: that row #e2e2e2, header #ebebeb, the other row #f1f1f1, b1/b2);
+  ours keeps header #ebebeb and both rows #f1f1f1. w9-drw-bom.png.
+- [ ] P1 **FEEL-DRW-BOM-CELL-SELECTED-LOOK (studios)**: one body cell clicked (b3, c4a, c4b): live shows only the cell's blue outline,
+  no table frame, grips or fills; ours also draws the tan frame, orange grips and the grey fills.
+- [ ] P1 **FEEL-DRW-BOM-SELECTED-FILLS (studios)**: the placed table selected, pointer on empty sheet (c1, c2): live's rows are white;
+  ours fills header #ebebeb and rows #f1f1f1. w9-drw-bom-frame.png.
+- [ ] P2 **FEEL-DRW-BOM-CELL-TOOLBAR (studios)**: the Cell toolbar on a cell click: live has a first row (column / row icons and the
+  cell's text "1") above Noto Sans · 0.1200 · B I U S…; ours lacks that row and truncates the size to "0.‹". Live anchors the
+  toolbar at the table's left edge for any cell; ours at the clicked cell's column (Description: it runs off to the right).
+- [ ] P2 **FEEL-VS-CHIP-ON-CLICK (studios)**: Variable Studio, click the width Value cell with the pointer kept there: live still shows
+  the "40 mm" chip over the Value header (v10); ours hides it on the click. w9-vs-rows.png.
+- [ ] P1 **FS-ERROR-WORDING (studios)**: a stray `opExtrude` line after the import: live's error tooltip reads "mismatched input
+  'opExtrude' expecting 'import'"; ours "extraneous input 'opExtrude' expecting {<EOF>, 'annotation', …". Box, icon and place match.
+- [ ] P2 **FS-DBLCLICK-BRACKETS (studios)**: double-click `import` on line 2: live outlines the `(` after it and its `)` (caret at the
+  word's end); ours draws no bracket boxes with the word selected.
+- [ ] P2 **FS-DRAG-SELECT-BAND (studios)**: drag from line 1's start to inside line 2: live paints line 1's selection the full width
+  (#9ec9ff) and drops the active-line band; ours stops line 1's selection at the text end and keeps the #ededed band on line 2.
+- [ ] P2 **UIS-EMPTY-NON-PS (psui)**: ui-script's `{"empty": true}` fails outside a Part Studio / Assembly ("not a drawing target",
+  "not in a Part Studio, an Assembly or a Drawing"), and `ace_word` (live's Feature Studio target) is unknown; walk 9 used px
+  stand-ins. Live's drwm / vsm / fsm scenarios should replay as recorded.
+- Matched live: a view's hover (tan frame, edges dark) and selected look (orange frame and edges), re-click deselects, shift-click
+  keeps; the dimension's hover / selected looks with grips, diamonds and the ±0.1 chip; the dimension and note double-click
+  editors; the note drag; the BOM table placed by its top-right corner, its right-click menu and the double-click text toolbar;
+  Variable Studio: no hover look, the value chip on hover, the 2 px #1651b0 cell border with the header #d7d7d7, shift / ctrl-click
+  moving the selection, Esc keeping it, double-click editing with the text selected; Feature Studio: no hover on keywords or
+  strings, the error tooltip box, double-click word selection, the active-line band and gutter #dcdcdc, the Copy / Paste / Cut menu.
+  Not compared: live b0/b5/c3b (unexplained in live itself), the std version line (3112 vs 3132).
+
 ## qa, 2026-11-22 01:4x (USER P0 walk 8, lead: feature list / tree, Measure + Mass properties, mate dialog flow; green 50772462b / 04389f02d, ui-script cells on vibe2, kit qa-scratch/hm2/walk8 gen9.py, shots out-w8*; live behaviours "qa walk 8" 01:17–01:35, live/qa/walk8-1122/ + featurelist-feel, measure-mass-1118, asm/feel-1117)
 
 - [ ] P1 **FEEL-DIALOG-FINAL-BUTTON (psui)**: double-click Extrude 2 with Extrude 3 after it. Live's footer has a small 49 × 22
