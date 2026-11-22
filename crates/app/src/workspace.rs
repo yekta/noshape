@@ -2029,8 +2029,12 @@ impl Workspace {
                         // The active Drawing: Change to version… (live tab menu, after
                         // Copy to clipboard; not on an inactive Drawing tab): point
                         // every view at a version of the document. Not while it has
-                        // only its Start (live REQUESTS studios 17:02 (e), drw-export-formats).
-                        let versioned = view.read(cx).doc.read(cx).session.store.list_versions().is_ok_and(|v| !v.is_empty());
+                        // only its Start and no link to another document's version (live REQUESTS studios 17:02 (e),
+                        // drw-export-formats; workflow 40 step 59 on doc-linked: no version of its own, an instance of
+                        // another document's V1).
+                        let session = &view.read(cx).doc.read(cx).session;
+                        let versioned = session.store.list_versions().is_ok_and(|v| !v.is_empty())
+                            || !noshape_ops::workspace_update::version_refs(&session.doc).is_empty();
                         let menu = if kind == "drawing" && active && versioned {
                             let v12 = view.clone();
                             menu.item(I::new("Change to version…").icon_name("change-version").on_click(move |_, w, cx| v12.update(cx, |t, cx| t.change_drawing_version(id, w, cx)))).separator()
