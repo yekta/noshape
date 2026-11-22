@@ -1,42 +1,27 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 10:00 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 10:22 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 10:10 UTC)
-- QUEUED acf660cb (10:03, on bb0d5959 in the check since 09:27): the batch below + TABLET-STAND-FACE-NAMES. Earlier 408ac79d: FEEL-BEND-FACE-PICKED-LOOK, SKETCH-USE-VERTEX-OTHER-SKETCH,
-  SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME, SKETCH-TRIM-SHORT-END, SKETCH-OFFSET-DEFAULT-SIDE,
-  SKETCH-MIRROR-LINE-LOOK, PASTE-SKETCH-CENTRED (first half), EXTRA-UNFOLD-REFOLD-TOOLS.
-- Also in bb0d5959 / acf660cb:
-  - 8b31621ae / 36d0ed547: ui.sketch_hover_held_at: a mirrored entity and a chain's end after Esc stay plain under the
-    still pointer until it moves (wf22 s11, s35; replayed on vibe2: match).
-  - b2d4f1303 P2 CORNER-RELIEF-TOO-SMALL-WARN: Square - Sized narrower than the bend allowance warns (T2 green).
-  - 33652bc4d: a line-line Distance's default label at the midpoint on its dimension line (wf22 s35's Offset "5").
-  - 7f474e30d SKETCH-SELECTED-GLYPH-OFFSET: Show constraints off, a point's glyph row centred 40 px above it (+4 px;
-    behaviours "skasm point glyph placement"); Show constraints on keeps up-left + leader. Not done: live moves the row
-    when its spot is taken by lingering glyphs (an inference, not measured).
-  - bf9db14a8 + next: SM-FLAT-VIEW-FIT fit half: Viewport::zoom_to_fill(0.953) for the flat's first fit; sm matrix
-    row "flat view / fitted". Orientation: live (behaviours "skasm flat orientation") = our flat_place formula (face_x
-    gives live's x); the gap is which piece keeps the fixed face (the plate's original bottom) after a Bend: live's
-    x 0-30 piece (origin corner + picked face), ours the base. ANSWERED 09:3x (behaviours "skasm flat fixed piece",
-    live/skasm/flat-orient-1122/ff-*): the piece carrying the Flange stays put, the other folds (5 cases: x10, x50,
-    line drawn -Y, flange on the x 0 edge); flat frame = the FOLDING piece's original bottom (wall outer) face,
-    (p·x, p·(x×n)). DONE 10:4x (landing): flat_place follows a Bend's folding piece (its "wallsplit" wall, across a
-    bend edge or the Bend's arc) from the fixed wall; the fold side was already std's onBendChange. T2 sheetmetal_std
-    a_bent_plates_flat_lies_by_its_folding_piece = live ff-a/b/d/e boxes.
-  - 679420eb2 PASTE-SKETCH-CENTRED: centred on the mean of line end points (live's L). The corner dots are psui's
-    (SKETCH-ON-FACE-EXITED-LOOK, builder.rs FreeEnds; psui confirmed 08:45).
-- Closed, no app change: FORM-REMEMBERED (runner seed, qa 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0 wf32:
-  live's take swallowed the press after a drag = lost input, DECISIONS 11-07; told qa to change the workflow).
-- Replay kit: vibe2 ~/tmp/skasm/wf (run.sh, starts.json, 05/11/12/22/29 json), binary ~/tmp/skasm/noshape (07:56),
-  shots ~/tmp/skasm/out-wf; compares in /root/skasm-scratch/wfcmp.
+## In flight (11-22 10:22 UTC)
+- LANDED 9164879d (10:02): FEEL-BEND-FACE-PICKED-LOOK, SKETCH-USE-VERTEX-OTHER-SKETCH, SKETCH-LENGTH-LABEL-IN-PLANE,
+  SM-TABLE-HEM-NAME, SKETCH-TRIM-SHORT-END, SKETCH-OFFSET-DEFAULT-SIDE, SKETCH-MIRROR-LINE-LOOK, PASTE-SKETCH-CENTRED,
+  EXTRA-UNFOLD-REFOLD-TOOLS, CORNER-RELIEF-TOO-SMALL-WARN, SKETCH-SELECTED-GLYPH-OFFSET (row 40 px above; not done:
+  moving off spots taken by lingering glyphs, an inference), SM-FLAT-VIEW-FIT's fit.
+- CHECKING acf660cb (TABLET-STAND-FACE-NAMES), QUEUED 47bfb052 (SM-FLAT-VIEW-FIT orientation: flat_place follows a
+  Bend's folding piece, live "skasm flat fixed piece"; T2 sheetmetal_std a_bent_plates_flat_lies_by_its_folding_piece).
+- Local, to land: SKETCH-ON-IN-FEATURE-MC: ui test a_sketch_on_its_own_in_feature_mate_connector (the Sketch plane field's
+  mate connector button makes the sketch's own connector, the sketch opens on it). The op (dx 00bc521ea) and the
+  translator (59d5c18ac, forms 21/21) were done; the 11-20 suite log predates them. TICKETS: every skasm ticket marked
+  fixed / to verify (the walk 3-4 P0s landed 05:29 in e8746d295 / bfce16794 but were never marked).
+- Replay kit: vibe2 ~/tmp/skasm/wf (run.sh, starts.json); its binary and shots deleted (copy a fresh green to run it).
 
-## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (landing)
+## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
   arcs' 68.066990), so their geometric `Role::New` key fell before the bend cylinder's (68.000000): New 11/12/13 swapped.
-- Fix: rolled_bend also thickens plain and keys each cap by its plain twin's box (NameKey); fresh_part_names uses it for
-  a part face untrimmed by the part. Saved tablet-stand copy: all Ok, face names identical to the plain build's (probe
-  /root/skasm-scratch/probes/zz_smnames.rs, bin/smn.sh). T2 sheetmetal_std a_rolled_walls_faces_keep_their_names_with_exact_arcs.
+- Fix: rolled_bend also thickens plain and keys each cap by its plain twin's box (NameKey); fresh_part_names uses it.
+  Saved tablet-stand copy: all Ok, names identical to the plain build's (probe /root/skasm-scratch/probes/zz_smnames.rs,
+  bin/smn.sh). T2 sheetmetal_std a_rolled_walls_faces_keep_their_names_with_exact_arcs.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
@@ -55,9 +40,8 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
 ## qa tickets waiting
-- NEXT: P2 SKETCH-ON-IN-FEATURE-MC (TICKETS ~212: a sketch on its own in-feature mate connector, c2-sheet-metal-forms).
-- qa to verify on green: FEEL-BEND-FACE-PICKED-LOOK, SM-FLAT-VIEW-FIT (fit 9164879d + orientation 47bfb052),
-  SKETCH-LENGTH-LABEL-IN-PLANE, SM-TABLE-HEM-NAME (all landed in 9164879d).
+- None open for me: all marked fixed / to verify in TICKETS (11-22 10:2x). Next: whatever qa / the lead files; else the
+  "Next, in order" list below (glyph row off taken spots, hem-jog counts are optional).
 
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
