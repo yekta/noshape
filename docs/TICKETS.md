@@ -564,8 +564,9 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [x] fixed (asm 11-22 06:4x: a linked document's part: Open linked document and Where used for Part 1… (where-used icon) after Replace Part 1 <1>…; test another_documents_part_pins_its_reference) P1 **ASM-FACE-MENU-ROWS (asm)** (workflow 40 step 46): right-click a face of Part 1 <1> in Assembly 1: live's menu has
   **Open linked document** (after Replace Part 1 <1>…) and **Where used for Part 1…**; ours lacks both, the rest in live's order
   (tickets/wf40-asm-face-menu.png).
-- [ ] P1 **DRW-TAB-MENU-CHANGE-TO-VERSION (studios)** (workflow 40 step 59): the drawing tab's menu in a linked document: live has
+- [x] P1 **DRW-TAB-MENU-CHANGE-TO-VERSION (studios)** (workflow 40 step 59): the drawing tab's menu in a linked document: live has
   **Change to version…** after Copy to clipboard; ours lacks it (tickets/wf40-drw-tab-menu.png).
+  **Fixed (studios 11-22 06:33):** the active drawing tab offers it when the document has a version or links another document's version (doc-linked has no version of its own).
 - Workflow 40 (21 right-clicks in one session) otherwise = live, rows in live's order: Extrude 1 row, Right plane in graphics, Part 1
   row, face / edge / vertex, empty canvas, view cube, sketch line, Part Studio and Assembly tabs, the tab bar's empty end (no menu),
   instance and root rows, the drawing view. Not tickets: live's Add comment / Create task… (cloud). Runner gaps: "Parts (1)" header
