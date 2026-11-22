@@ -5,21 +5,21 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 20:2x (after the compaction, first)
-- **DONE this session**: v0.4.67 FINAL GO 17:45. Impeller P0 -> bool 13d44f9db. live's manip follow-ups scored (d8000e10d).
-  Fan-blade-sweep bisect: asm 4a22b2966 (48/53 -> 5/53, likely the query dedup) = P1 PARITY-FAN-BLADE-SWEEP-TRANSLATOR, asm told; qa-t2 target removed.
-  asm 3900b9e1e on green 496a5d0b3: 5 of 6 =, PICKED-REHOVER reopened (markers on the re-hover), new P0s FEEL-MC-MARKER-LOOK-ASM,
-  FEEL-MC-EDGE-BEFORE-VERTEX-ASM, FEEL-ASM-FIXED-GLYPH-AA (asm told). skasm UIS-ASM-START-FIRST-INSTANCE verified (b37201ea6, skasm told).
-  19:08 lead: my vibex8 runs stopped for bool's rings gate; qa-requeue-gate restarted qa-suites + qa-uip-rerun at 19:47.
-- **NEXT 1, bool's impeller fix 9d9369a0f** (normal_at full projection; gate on vibex7 since 20:10, land ETA ~22:00): unit qa-wait-imp
-  (tmp/wait-imp.sh: subject match "bool:.*impeller" in green, then validity.py on vibex7) -> tmp/wait-imp.log (IMP-DONE). Expect no
-  invalid part (bool: Part 1 invalid at 43-45, Part 3 at 46-47 on main). Close IMPELLER-SHELL-INVALID, tell bool.
-- **NEXT 2, bool's rings fix 602310557**: unit qa-wait-rings (8 h, subject match) writes the line to qa-alerts; cut verdict for that green.
-- **NEXT 3, asm**: SHIFT-NEAREST release fix (asm writing a real-event repro); then the fan-blade P1 and the 20:2x P0s. Rerun chain:
-  tmp/rr-3900.sh (fieldsel fs.sh fu-asm-b6/b2/sc-asm, mcinfer mi.sh sub-asm sub-asmR asm-picked reach-asm-corner asm-shift, asmfeel dr-BaseR).
-- Open from asm: tyres ~1.6 m off live's poses, CROSSING-OUTLINE colour, wf25 s28 Gear look.
-- wf replays on hm2/out-wf: our shots are 2240x1440, the window at an offset other than (160,180); find it before cropping.
-- Waiting units: qa-rs-ec2f (psui batch). skasm BEND-FACE-RECLICK-EMPTIES reopened, no refix queued.
+## IN FLIGHT 22:1x (after the compaction, first)
+- **DONE since 20:2x**: asm 3900b9e1e scored (5 of 6 =, PICKED-REHOVER reopened, 3 P0s). Hover matrix 109/125 on a08754b16 (psui 613b06bb7:
+  7 fixed; 5 P0s: MC-AXIS-UNDER-DISC, FILLET-FACE-OVER-PICKED, SKETCH-INF-END-DOT (psui); ASM-RING-OVER-BAND, ASM-MC-LOOK (asm); rows in
+  interaction-feel.md). live's workflows-1123 (20) replayed (bin/wf23.sh, out-wf23; kit tools take WF_SET/WF_OUT; hm2/wf/files = repo
+  ui-parity files) and scored: TICKETS blocks "qa, 2026-11-22 21:4x" (01-10, 40 rows) and "22:0x" (11-20, 18 rows); owners told.
+  COMPAT-RINGS-LOFT-SLOWER verified (4.3 vs 4.7 s); P1 COMPAT-SURFACE-PATTERN-SLOWER filed; cut verdict a08754b16 GO (qa-alerts 21:50).
+- **Decisions asked of the lead** (open): Line tool end dot counts? (matrix 112 if not); ASM-MENU-WRAP-REVERSED (live now wraps).
+- **NEXT 1, bool's impeller fix 9d9369a0f**: unit qa-wait-imp (tmp/wait-imp.sh: subject "bool:.*impeller" in green -> validity.py on
+  vibex7) -> tmp/wait-imp.log (IMP-DONE). Expect no invalid part. Close IMPELLER-SHELL-INVALID, tell bool.
+- **NEXT 2, bool's surface pattern fix e7c98cc5a**: unit qa-wait-sp (wait-fix-compat.sh) -> tmp/wait-sp.log + qa-alerts. Expect
+  cf-surface-pattern ~13.6 s and Part 1 129/385/258. Close COMPAT-SURFACE-PATTERN-SLOWER, tell bool.
+- **NEXT 3**: asm's SHIFT-NEAREST release fix (asm will say); rerun chain tmp/rr-3900.sh (fieldsel fs.sh, mcinfer mi.sh, asmfeel dr-BaseR).
+  Rescore the matrix after psui/asm lands: tmp/hmr-26153.sh pattern (bin/hm-rescore.sh 'subj:<text>' 'b*' / '[ips]*' on vibe2).
+- Open: P1 PARITY-FAN-BLADE-SWEEP-TRANSLATOR (asm 4a22b2966 dedup); tyres ~1.6 m off; CROSSING-OUTLINE colour; wf25 s28 Gear look.
+- Waiting units: none else of mine on vibex8 (bool's gates there go first, lead 19:08). skasm BEND-FACE-RECLICK-EMPTIES reopened.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
