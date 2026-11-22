@@ -26,6 +26,17 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Replay kit: vibe2 ~/tmp/skasm/wf (run.sh, starts.json, 05/11/12/22/29 json), binary ~/tmp/skasm/noshape (07:56),
   shots ~/tmp/skasm/out-wf; compares in /root/skasm-scratch/wfcmp.
 
+## Next: P1 TABLET-STAND-FACE-NAMES (lead, from core's compat analysis, received 11-22 08:55)
+- 60c0a861f (rolled_bend: thicken_plain -> exact k::thicken on a tightened face, custom/host/sheetmetal.rs ~2400)
+  reorders Sheet metal model 1's new faces (New 11/12/13) through the part's fuse: saved c2-sm-tablet-stand's Sketch 3
+  references stop resolving (Ok -> "Some external references are missing.").
+- Wanted: keep the exact arcs (+5 features in start-extrude-bounds) AND name those faces from their source geometry
+  (as name_result / sweep_names do), independent of fuse order. Test with the saved tablet-stand copy (private-doc
+  rules: mode-700 copy in ~/tmp/skasm, deleted after).
+- Found so far: Role::New(i) = "ordered geometrically" (model-data reference.rs 75; bshared.rs new_face_names /
+  names_from_sources). Not yet found: where the sheet metal host's result faces get their New(i) (start with
+  rolled_bend's `from` mapping right after the thicken, and how the custom host names its bodies' faces).
+
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
