@@ -408,7 +408,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P1 **SURFACE-LOFT-GUIDE-FAILS (core)** (workflow 12 steps 18-25, curves, seeded Loft = Surface, green 17157c2fa): Surface Loft, New,
   profiles Edge of Sketch 2 + Edge of Sketch 3, Guides and continuity ticked, guide Edge of Sketch 4, ✓: live builds the surface
   ("Surfaces (1)", the preview shows it while the dialog is open); ours shows no preview and Loft 1 ends red. tickets/wf12-surface-loft-guide.png.
-- [ ] P0 **SKETCH-ESC-KEEPS-POINT-DELETE-LINES (skasm)** (workflow 32 steps 38-43, block, green a50f763e8): Sketch 1 fully defined
+- [ ] P0 **FEEL-DIM-SELECTED-REF-LINE-YELLOW (psui)** (workflow 32 step 42, block, green a50f763e8, variant 32v): in a sketch, click the
+  40 dimension (selected, mouse still on its label): live draws the dimension's line (the bottom line) light orange (255,198,133) and
+  the leader/arrows (131,111,53); ours draws that line yellow (240,252,147)/(234,237,107) and the leader (106,79,6). The label fill
+  matches ((208,158,97) vs ours (217,165,102)). tickets/wf32v-dim-selected.png row 1 (live left). Also steps 35-38: the Front plane's
+  edge stays lit orange after the dimension edit box closes until the next click (re-check with FEEL-HOVER-AFTER-MODAL, 454c71f2).
+- [x] not a bug (qa 11-22 07:5x: skasm: live swallowed step 39's click (press after a drag lost, behaviours 48288) and Escape keeps a sketch selection in live too (189, 32552); variant 32v with an empty-space click: Delete removes only the 40, the stretch, re-add 40 and ✓ = live) P0 **SKETCH-ESC-KEEPS-POINT-DELETE-LINES (skasm)** (workflow 32 steps 38-43, block, green a50f763e8): Sketch 1 fully defined
   (40 × 20), drag on the corner (40, 20) (doesn't move, as live), click the corner, Escape, hover away, click the 40 dimension, Delete:
   live deletes only the 40 (the right line turns blue); ours keeps the corner selected through Escape (selection count 1 at steps 39-42,
   the corner dot stays orange, the dimension click adds to it) and Delete removes the corner, the top and right lines and both
