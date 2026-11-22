@@ -8180,6 +8180,11 @@ fn default_label_pos(sk: &Sketch, k: &ConstraintKind, wpp: f64) -> Option<DVec2>
         }
         ConstraintKind::Distance { a, b, .. } => {
             let (p, q) = linear_pair(sk, *a, *b)?;
+            // Between two lines it sits on its dimension line at the first one's midpoint (live workflow 22 s35, an
+            // Offset's distance; behaviours "skasm (11-21 20:55) sketch Offset preview").
+            if line_of(sk, *a).is_some() && line_of(sk, *b).is_some() {
+                return Some((p + q) * 0.5);
+            }
             let n = (q - p).try_normalize().unwrap_or(DVec2::X).perp();
             return Some((p + q) * 0.5 + n * off);
         }
@@ -11925,6 +11930,10 @@ mod tests {
         assert!(matches!(d.sketch.constraint(cid).map(|c| &c.kind), Some(ConstraintKind::Distance { value, .. }) if (*value - 0.005).abs() < 1e-9));
         let below = d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).any(|c| c.start_point().y.abs() < 1e-9);
         assert!(below, "as previewed, 5 mm below");
+        // Its distance sits between the lines at their midpoint (live 22 s35), not pushed along them.
+        let kind = d.sketch.constraint(cid).unwrap().kind.clone();
+        let at = ed.label_pos(&d, cid, &kind).unwrap();
+        assert!(at.distance(v(0.01, 0.0025)) < 1e-9, "{at:?}");
         // The picked line clicked again: no offset, nothing previewed (live ui-parity sketch-offset).
         let (mut ed, mut d) = editor(Tool::Offset);
         d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
