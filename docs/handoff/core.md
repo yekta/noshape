@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-22 17:14 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 19:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -9,13 +9,18 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   model-edge drags (block_centre), snaps row (normalize_or_zero), glyph walk; lit-end was main's, psui f8b0a2d8);
   3779e4f1 knifehandle Blade scatter (core-dock). LANDED 472eddd5 Loft 1 as c08ef29e (14:40; blend told to rerun
   Fillet 1), f94fdf98 isaac speed (volume_change, merge_cylinder_patches copy only for merging pairs; 00f1d4 19.9 -> 12.5 s).
-- **NOW: SPEED gamma Move face 1** (bool 11-22): c2-gamma-imported's Move face 1 1609 ms ours (vibex7 profile), live's
-  whole doc 246 ms. Offset with reFillet: detail_a::reblend per body = delete_faces (defeature) + offset_faces + fillet,
-  3 small bodies, 8 faces removed each: op_defeature 1472 ms of it (3 calls, ~0.5 s each; OCCT "Trimming faces" 266 ms,
-  "Removing features one by one" x72). rounds::delete_planar_rounds (ops.rs delete_faces' fast path) declines them.
-  Dumps vibex7 ~/agents/core-keep/gamma-mf1 (defeature-0/3/6, offsetfaces-1/4/7, fillet-2/5/8 .brep+.txt, run.log).
-  Next: replay defeature-0 (NOSHAPE_REPLAY=<dir>/defeature-0 kernel crash_inputs::replay_one --ignored), find why
-  delete_planar_rounds declines (bends = inner+outer cylinders?), extend it; gate model suite none worse.
+- **NOW: SPEED gamma Move face 1** (bool/lead 11-22): c2-gamma-imported's Move face 1 1609 ms ours (vibex7), live's
+  whole doc 246 ms. Offset with reFillet: detail_a::reblend per body = delete_faces + offset_faces + fillet, 3 small
+  bodies; op_defeature 1472 ms of it (~0.45 s each, OCCT Defeaturing). Dumps vibex7 ~/agents/core-keep/gamma-mf1
+  (defeature-0/3/6, offsetfaces-1/4/7, fillet-2/5/8). Probe (core-rf, uncommitted, DON'T LAND: crash_inputs.rs
+  probe_defeature_faces + .pr.sh): defeature-0 = a sheet-metal hat profile extruded along y, 30 faces, caps 20/21, the 8
+  deleted = cylinders r 1.5/3 mm about parallel y axes, neighbours all planes; delete_faces 454 ms. So rounds.rs
+  delete_planar_rounds declines ON PURPOSE (all axes parallel -> "the prism case"), and C++ delete_prism_rounds
+  (features.cpp ~11955) must be declining. In flight: bbjux5w9n, features.cpp TEMPORARILY instrumented (every return false
+  in delete_prism_rounds -> prism_decline(__LINE__), prints with NOSHAPE_PRISM_DBG=1): read which line declines
+  (rerun: NOSHAPE_RB_HOST=vibex7 tools/tiers/rb.sh bash .pr.sh | grep PROBE), fix that case, then
+  `git checkout crates/kernel/cpp/features.cpp` the instrumentation before the real edit is kept (nothing else
+  uncommitted there), drop the probe test, T1 test from a hat profile, suite gate none worse.
 - **VALID-SURFLOFTS-LOFT1 LANDED e3e73b362 (18:27):** loft's own straight edges as lines (straight_edges_as_lines, op_loft;
   NOSHAPE_LOFT_SPLINE_EDGES=1 off). Suite 1984 -> 2015 features, none worse. Blend told: Face blend 2 next.
 - **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
