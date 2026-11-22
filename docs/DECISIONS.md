@@ -194,3 +194,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   6 MB/s. Opt in with NOSHAPE_RB_HOST=mac; default routing stays on the vibe hosts. Our app runs on the Mac (GPU timings)
   only while the user has been idle >= 10 min (`ioreg -c IOHIDSystem | awk '/HIDIdleTime/{print int($NF/1e9); exit}'`
   >= 600), one at a time, <= 3 min each. Older Mac rulings are void.
+- 11-22 (lead) Our Boolean moves to per-pair tolerances (bool, P1): one global tolerance band (2x the largest input's)
+  breaks junctions between precise tools when one input is imported loose (c2-gamma-imported Boolean 1, 87 tools, ~24 s
+  on OCCT vs live's ~0.25 s document). Staged, each stage through the full Boolean gate (+0 -0 on every corpus).
