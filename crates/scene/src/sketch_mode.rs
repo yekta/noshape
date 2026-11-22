@@ -7078,9 +7078,11 @@ impl SketchEditor {
         }
         // A hovered glyph (live sketch/27, 1956, 2203–2217): its constrained
         // entities turn pre-highlight orange; `constraint_masters` secondary yellow.
+        // A selected dimension with the pointer on it too (live workflow 32 step 42, qa
+        // FEEL-DIM-SELECTED-REF-LINE-YELLOW: its line (255,198,133), not the selection's yellow).
         let hover_roles: Vec<(EntityId, bool)> = self
             .hover_constraint
-            .filter(|c| !self.selected_constraints.contains(c) && use_glyph_entity(*c).is_none())
+            .filter(|c| (!self.selected_constraints.contains(c) || data.sketch.constraint(*c).is_some_and(|k| k.kind.is_dimension())) && use_glyph_entity(*c).is_none())
             .and_then(|c| data.sketch.constraint(c))
             .map(|c| {
                 let masters = constraint_masters(&c.kind, &data.sketch);
@@ -7095,7 +7097,7 @@ impl SketchEditor {
             })
             .unwrap_or_default();
         if !hover_roles.is_empty() {
-            let selected_entities: Vec<EntityId> = self.selected_constraints.iter().filter_map(|c| data.sketch.constraint(*c)).flat_map(|c| c.kind.entities()).collect();
+            let selected_entities: Vec<EntityId> = self.selected_constraints.iter().filter(|c| Some(**c) != self.hover_constraint).filter_map(|c| data.sketch.constraint(*c)).flat_map(|c| c.kind.entities()).collect();
             let picks = self.tool_picks();
             related.retain(|e| !hover_roles.iter().any(|(h, _)| h == e) || picks.contains(e) || selected_entities.contains(e) || self.mirror_axis == Some(*e));
             for (e, master) in &hover_roles {
@@ -11889,6 +11891,25 @@ mod tests {
         let (lines, _) = ed.overlay(&d, &noshape_units::UnitPrefs::default());
         let yellow_lines = lines.segments.iter().filter(|s| s.color == yellow).count();
         assert!(yellow_lines >= 2, "{l1:?} {l2:?} yellow");
+    }
+
+    /// Live workflow 32 step 42 (qa FEEL-DIM-SELECTED-REF-LINE-YELLOW): a selected dimension with the pointer still on
+    /// it lights its line pre-highlight orange, not the selection's translucent yellow; the pointer off, yellow.
+    #[test]
+    fn a_selected_dimension_hovered_lights_its_line_orange() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let line = d.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        let cid = d.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 0.04 }).unwrap();
+        ed.selected_constraints = vec![cid];
+        let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+        let halo = [0xf2, 0xff, 0x80, 150];
+        let looks = |ed: &SketchEditor| {
+            let (lines, _) = ed.overlay(&d, &noshape_units::UnitPrefs::default());
+            (lines.segments.iter().any(|s| s.color == orange && s.width >= 3.0), lines.segments.iter().any(|s| s.color == halo))
+        };
+        let off = looks(&ed);
+        ed.hover_constraint = Some(cid);
+        assert_eq!((off, looks(&ed)), ((false, true), (true, false)), "(orange, yellow) selected, then hovered too");
     }
 
     #[test]

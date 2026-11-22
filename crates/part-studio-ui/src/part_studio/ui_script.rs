@@ -720,7 +720,8 @@ impl PartStudioView {
             let ed = self.sketch.as_ref().ok_or("not in a sketch")?;
             let p = mm(p).ok_or("sketch_point: [x, y] mm")?;
             ed.frame.to_world(DVec2::new(p.x, p.y))
-        } else if let Some(p) = ["face", "edge", "vertex"].iter().find_map(|k| t.get(*k)) {
+        } else if let Some(p) = ["face", "edge", "vertex", "world"].iter().find_map(|k| t.get(*k)) {
+            // ("world": any model point, on empty space or a manipulator; live's workflow scenarios.)
             mm(p).ok_or("a model point: [x, y, z] mm")?
         } else if t.get("empty").is_some() {
             let size = vp.size();

@@ -2938,6 +2938,25 @@ fn the_appearance_editors_fields_tab_and_enter_as_live(cx: &mut TestAppContext) 
     assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Enter closed the editor");
 }
 
+/// Live workflow 28 (qa APPEARANCE-RGB-FIELD-SCROLL): R selected whole, 200 typed, Tab: the left field shows its
+/// start, "200", not the end it scrolled to while typing ("00").
+#[gpui::test]
+fn a_left_colour_field_shows_the_start_of_its_value(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "appearance-r-scroll");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Parts(vec![]), w, cx))).unwrap();
+    draw(cx, window);
+    let r_scroll = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.appearance_edit.as_ref().unwrap().channels[0].read(cx).scroll_offset().x);
+    keys(cx, window, &["tab", "secondary-a", "2", "0", "0"]);
+    draw(cx, window);
+    let typing = r_scroll(cx);
+    keys(cx, window, &["tab"]);
+    draw(cx, window);
+    let left = r_scroll(cx);
+    let r = cx.update(|cx| view.read(cx).ui.appearance_edit.as_ref().unwrap().rgb[0]);
+    assert_eq!((r, typing < gpui::px(0.), left), (200, true, gpui::px(0.)), "(R, scrolled while typing, offset when left)");
+}
+
 /// Live2 mass-appear-1118, the Mixer tab: a press alone in the saturation / value square changes nothing; a drag sets
 /// the colour (the hex follows); a click on the hue strip takes its hue and keeps saturation and value.
 #[gpui::test]
@@ -3454,6 +3473,37 @@ fn a_shown_sketchs_closed_loop_is_filled_at_rest(cx: &mut TestAppContext) {
         v.viewport.read(cx).scene().instances.iter().filter(|i| matches!(i.drawable, noshape_render::Drawable::Mesh(_)) && !i.pickable && (i.color[3] - 0.33).abs() < 1e-6).count()
     });
     assert_eq!(fills, 1, "the rectangle's fill at rest");
+}
+
+/// Live behaviours "psui exited sketch dots and fill" (c-1, qa SKETCH-ON-FACE-EXITED-LOOK): a rectangle sketched on a
+/// part's face is not filled at rest, its lines over the face's own colour (on a plane it is, above).
+#[gpui::test]
+fn a_shown_sketchs_closed_loop_on_a_face_is_not_filled_at_rest(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sk-face-rest-fill", Some(starts["block"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![v.display.bodies[0].face_refs[0].clone()];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    let (window, view) = sketch_in_tool(cx, window, view, Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    draw(cx, window);
+    let (on_face, fills) = cx.update(|cx| {
+        let v = view.read(cx);
+        let on_face = v.display.sketches.iter().filter(|s| !s.hidden).map(|s| s.on_face).collect::<Vec<_>>();
+        (on_face, v.viewport.read(cx).scene().instances.iter().filter(|i| matches!(i.drawable, noshape_render::Drawable::Mesh(_)) && !i.pickable && (i.color[3] - 0.33).abs() < 1e-6).count())
+    });
+    assert_eq!((on_face, fills), (vec![true], 0), "(the shown sketches on a face, rest fills)");
 }
 
 /// Live2 feature-dialogs-1119 (rcmp2.png): Extrude's picked top face under its preview takes a warm tint, filled at
@@ -4560,6 +4610,82 @@ fn a_part_in_a_dialog_field_is_outlined_not_tinted(cx: &mut TestAppContext) {
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
     assert_eq!((selected, look(cx)), ((true, true), (false, true)), "((tinted, outlined) selected, in Mirror's Entities)");
+}
+
+/// Live workflows 2, 11, 12 and 21 (qa FEEL-HELIX-FACE-PICKED-LOOK): a face in a dialog's field keeps its shading under
+/// a light tint (TINT), its boundary orange; selected outside a dialog it takes the amber (no TINT).
+#[gpui::test]
+fn a_face_in_a_dialog_field_is_lightly_tinted(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "face-pick-tint");
+    let look = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let id = v.built.as_ref().and_then(|b| b.picks.ids_for(&top).first().copied()).expect("the top face's pick");
+            let st = v.viewport.read(cx).scene().states.get(id as usize).copied().unwrap_or(0);
+            (st & noshape_render::state::SELECTED != 0, st & noshape_render::state::TINT != 0)
+        })
+    };
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection = vec![top.clone()];
+        v.refresh_scene(false, cx);
+    }));
+    draw(cx, window);
+    let selected = look(cx);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection.clear();
+        v.refresh_scene(false, cx);
+    }));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("cPlane", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![top.clone()]), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    assert_eq!((selected, look(cx)), ((true, false), (true, true)), "((selected, tinted) outside a dialog, in Plane's Entities)");
+}
+
+/// Live workflow 38 step 5 (qa FEEL-QUERY-PART-PICK-FILL): both overlapping parts in Boolean's Tools, the union
+/// previewed: no face takes the part amber, the parts outlined.
+#[gpui::test]
+fn parts_in_booleans_tools_stay_untinted_under_the_preview(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "bool-tools-untinted", Some(starts["overlap"].clone()));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 2);
+    let bodies: Vec<Reference> = cx.update(|cx| view.read(cx).display.bodies.iter().map(|b| Reference::Body(b.id.clone())).collect());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("booleanBodies", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("tools", noshape_model::ParamValue::Query(bodies), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let (amber, outlined) = cx.update(|cx| {
+        let v = view.read(cx);
+        let built = v.built.as_ref().expect("the scene");
+        let s = v.viewport.read(cx).scene();
+        let amber = v.display.bodies.iter().flat_map(|b| b.face_refs.iter()).flat_map(|f| built.picks.ids_for(f).iter().copied()).filter(|&id| s.states.get(id as usize).is_some_and(|st| st & noshape_render::state::BODY != 0)).count();
+        (amber, s.body_outline)
+    });
+    assert_eq!((amber, outlined), (0, true), "(faces in the part amber, outlined)");
+}
+
+/// Live workflow 38 (qa SPLIT-KEEP-TOOLS-AUTO): std's splitEditLogic: one face picked as Split's tool ticks Keep tools
+/// (else "Faces selected as split tools must be kept.").
+#[gpui::test]
+fn a_face_as_splits_tool_ticks_keep_tools(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "split-keep-tools");
+    let body = cx.update(|cx| Reference::Body(view.read(cx).display.bodies[0].id.clone()));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("splitPart", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("targets", noshape_model::ParamValue::Query(vec![body]), cx)));
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("tool", noshape_model::ParamValue::Query(vec![top]), cx)));
+    let keep = |cx: &mut TestAppContext| cx.update(|cx| d.read(cx).feature.params.bool("keepTools"));
+    for _ in 0..500 {
+        if keep(cx) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+    }
+    assert!(keep(cx), "Keep tools ticked by the face");
 }
 
 /// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click
@@ -8058,4 +8184,16 @@ fn u_on_another_sketchs_vertex_projects_it(cx: &mut TestAppContext) {
     keys(cx, window, &["u"]);
     let points = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).count());
     assert_eq!(points, 1, "the line end projected into a point");
+}
+
+/// Live's workflow scenarios (qa UIS-WORLD-TARGET): `{"world": [x, y, z]}` is a model point in mm, on empty space or a
+/// manipulator, placed as a vertex's.
+#[gpui::test]
+fn a_ui_script_world_target_is_a_model_point(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "uis-world");
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, t: serde_json::Value| cx.update(|cx| view.read(cx).ui_target_point(&t, cx));
+    let world = at(cx, serde_json::json!({ "world": [10, 0, 0] }));
+    let vertex = at(cx, serde_json::json!({ "vertex": [10, 0, 0] }));
+    assert!(world.is_ok() && world == vertex, "world {world:?}, vertex {vertex:?}");
 }

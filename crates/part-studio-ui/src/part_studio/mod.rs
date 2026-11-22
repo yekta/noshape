@@ -3010,10 +3010,22 @@ impl PartStudioView {
         let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
         // A reference whose creating feature is gone (deleted or suppressed) is missing: a red "Missing Edge" chip with
-        // Clear missing references (live 1993 (c); retaken fillet-chip-clear-missing e4ff71a8).
+        // Clear missing references (live 1993 (c); retaken fillet-chip-clear-missing e4ff71a8). So is one the last
+        // regeneration couldn't resolve, its edge consumed by a feature dragged above (live workflow 33, qa
+        // FEAT-MISSING-REF-CHIP: "Missing Edge of Extrude 1").
+        // (Only when the feature failed: a warning's lost selection keeps its plain label, greyed.)
+        let mut unresolved: Vec<Reference> = self.display.feature_state(feature_id).filter(|s| s.status == FeatureStatus::Error).map(|s| s.missing_refs.clone()).unwrap_or_default();
         let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
-            Some(s) => Arc::new(noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s)),
-            None => Arc::new(|_: &Reference| false),
+            Some(s) => {
+                let gone = noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s);
+                unresolved.retain(|r| !gone(r));
+                let unresolved = unresolved.clone();
+                Arc::new(move |r: &Reference| unresolved.contains(r) || gone(r))
+            }
+            None => {
+                let unresolved = unresolved.clone();
+                Arc::new(move |r: &Reference| unresolved.contains(r))
+            }
         };
         let later_refs: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx).filter(|_| !is_new) {
             Some(s) => {
@@ -3034,6 +3046,7 @@ impl PartStudioView {
                 d.extra = Some(Self::sketch_dialog_extra(studio_view));
             }
             d.missing = missing;
+            d.unresolved = unresolved;
             d.later = later_refs;
             d.configured = configured;
             d.configurable_inputs = configurable_inputs;
@@ -4770,10 +4783,32 @@ impl PartStudioView {
             Some(e) => e.dialog.read(cx).active_refs().contains(&r),
             None => self.selection.contains(&r),
         };
+        // In a dialog, the part a field's face or edge belongs to (live workflow 21, qa PARTS-ROW-OF-PICK: Helix's face).
         let related = !selected
-            && self.edit.is_none()
-            && (self.selection.iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of(s).as_ref() == Some(&b.id)) || self.selected_features.contains(&b.id.feature));
+            && match &self.edit {
+                Some(e) => e.dialog.read(cx).active_refs().iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of_input(s).as_ref() == Some(&b.id)),
+                None => self.selection.iter().any(|s| !matches!(s, Reference::Body(_)) && self.body_of(s).as_ref() == Some(&b.id)) || self.selected_features.contains(&b.id.feature),
+            };
         (selected, related)
+    }
+
+    /// The part a dialog field's face, edge or vertex is on, also when the preview consumed it (a filleted edge): then
+    /// the part holding a face next to it.
+    fn body_of_input(&self, r: &Reference) -> Option<BodyId> {
+        self.body_of(r).or_else(|| {
+            let faces: &[Arc<TopoName>] = match r {
+                Reference::Edge(TopoName::Edge { faces, .. }) => faces,
+                Reference::Vertex(TopoName::Vertex { faces, .. }) => faces,
+                _ => return None,
+            };
+            faces.iter().find_map(|f| self.body_of(&Reference::Face((**f).clone())))
+        })
+    }
+
+    /// A part the open dialog's feature makes (its preview's): its row's name bold (live workflow 21 step 14, the Revolve
+    /// preview's new Part 1).
+    fn part_row_new(&self, b: &noshape_model::display::BodyDisplay, cx: &App) -> bool {
+        self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.id == b.id.feature)
     }
 
     /// A part row as a cached view while its state stays (as [`Self::feature_row_cached`]).
@@ -4821,7 +4856,7 @@ impl PartStudioView {
         let mut h = std::hash::DefaultHasher::new();
         // What the row shows of its body (not the display itself: a dialog's preview regenerates without changing it).
         (&b.id, &b.name, b.hidden, format!("{:?}", b.kind), b.composite.is_some(), b.is_mesh, self.display.bodies.len() > 1).hash(&mut h);
-        (self.part_row_flags(b, cx), self.show_part_props(cx)).hash(&mut h);
+        (self.part_row_flags(b, cx), self.part_row_new(b, cx), self.show_part_props(cx)).hash(&mut h);
         let props = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).map(|p| format!("{p:?}"));
         props.hash(&mut h);
         if let Some(pn) = self.studio(cx).and_then(|s| s.part_properties.get(&b.id)).and_then(|p| p.part_number.clone()).filter(|p| !p.is_empty()) {
@@ -4835,6 +4870,7 @@ impl PartStudioView {
         let pal = p();
         let r = Reference::Body(b.id.clone());
         let (selected, related) = self.part_row_flags(b, cx);
+        let new = self.part_row_new(b, cx);
         let hidden = b.hidden;
         let (id1, id2, id3) = (b.id.clone(), b.id.clone(), b.id.clone());
         let r_hover = r.clone();
@@ -4878,7 +4914,8 @@ impl PartStudioView {
             .pl(px(23.))
             .mr(crate::ui::LIST_ROW_INSET)
             .group("part-row")
-            .when(related, |d| d.bg(pal.row_related))
+            // Live `related-highlight`: #ECF0F4 with a 1 px #90CEF1 line under it.
+            .when(related, |d| d.bg(pal.row_related).border_b_1().border_color(gpui_kit::rgb(0x90cef1)))
             .when(renaming, |d| d.bg(gpui_kit::rgb(0xffffff)))
             .when(hidden, |d| d.text_color(pal.text_faint))
             .child(crate::ui::tree_icon(part_icon, hidden, cx))
@@ -4918,6 +4955,7 @@ impl PartStudioView {
                     .when(!show_props, |d| d.flex_1())
                     .when(show_props, |d| d.min_w_0().flex_shrink(1.))
                     .truncate()
+                    .when(new, |d| d.font_weight(FontWeight::BOLD))
                     .child(crate::ui::user_text(b.name.clone()))
                     .into_any_element(),
             })

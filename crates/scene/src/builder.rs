@@ -987,12 +987,12 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     // ---------------------------------------------------------------- origin
     if opts.show_origin && display.show_origin {
         let id = picks.push(PickTarget { reference: Reference::Origin, kind: PickKind::Origin, anchor: Some(DVec3::ZERO) });
-        // Onshape draws the origin as an 11 px ring with a center dot (point style 4).
-        // While sketching it stays over the edge-on planes crossing it (live
-        // sketch/06 shows the whole ring and dot).
-        let style = 4 | if opts.editing_sketch.is_some() { LineSegment::ON_TOP } else { 0 };
-        let pts = PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id: id, size: 11.0, style, _pad: 0 }] };
-        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().ignore_clip().layer(6));
+        // Onshape draws the origin as an 11 px ring with a center dot (point style 4), over everything: the edge-on
+        // planes crossing it while sketching (live sketch/06), a part through it or in front (live workflows 21, 37).
+        // Only where it shows does it take the pointer: the on-top copy (lit with it) is out of the pick pass.
+        let glyph = |pick_id: u32, style: u32| PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id, size: 11.0, style, _pad: 0 }] };
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&glyph(id, 4)))).per_primitive_color().ignore_clip().layer(6));
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&glyph(id, 4 | LineSegment::ON_TOP)))).per_primitive_color().unpickable().ignore_clip().layer(6));
     }
 
     // ---------------------------------------------------------------- sketches
@@ -1028,11 +1028,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
-            // At rest a curve's free end (no other curve ends there) and a centre show as a ~4 px dot in the sketch's
-            // colour; shared corners and handles don't (live2 nav-feel-1119: a lone line's ends rgb 153; a rectangle's corners
-            // undrawn, live2 11-18).
-            let free_end = if editing || through { FreeEnds::default() } else { FreeEnds::of(&sk.curves) };
-            let free_end = |q: &[f32; 3]| free_end.contains(q);
+            // At rest a curve's end (a lone line's, a rectangle's corners) and a centre show as a ~4 px dot in the sketch's
+            // colour; handles and a closed curve's seam don't (live behaviours "psui exited sketch dots and fill" 11-22:
+            // every exited sketch keeps its corner dots, after a click elsewhere and a reload; live2 nav-feel-1119 rgb 153).
+            let curve_end = if editing || through { CurveEnds::default() } else { CurveEnds::of(&sk.curves) };
+            let curve_end = |q: &[f32; 3]| curve_end.contains(q);
             for p in &sk.points {
                 let id = picks.push(PickTarget {
                     reference: Reference::SketchEntity { sketch: sk.feature, entity: p.entity },
@@ -1052,7 +1052,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                     7.0
                 } else if !editing && !through {
                     // (And a circle's or an arc's centre: live hover-matrix-1121 ps/sketch-region-none, sketch-arc-none.)
-                    if p.center || (!p.handle && !p.tip && free_end(&p.position)) { 4.0 } else { 0.0 }
+                    if p.center || (!p.handle && !p.tip && curve_end(&p.position)) { 4.0 } else { 0.0 }
                 } else if p.tip {
                     9.0
                 } else if p.handle {
@@ -1157,8 +1157,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 };
                 scene.instances.push(fill.ignore_clip().layer(9));
                 // A shown sketch's own closed loops at rest: filled light grey too (live2 feature-dialogs-1119
-                // Lo-extrude-open.png: (227,230,233) over the white background, the editing fill at a third).
-                if !editing {
+                // Lo-extrude-open.png: (227,230,233) over the white background, the editing fill at a third). Not on a
+                // part's face (live behaviours "psui exited sketch dots and fill" c-1: its lines over the face's colour).
+                if !editing && !sk.on_face {
                     let own: Vec<_> = sk.regions.iter().filter(|r| !r.imprinted).collect();
                     if !own.is_empty() {
                         let mut m = MeshData::default();
@@ -1574,6 +1575,10 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             state::ERROR
         } else if matches!(r, Reference::Body(_)) {
             state::SELECTED | state::BODY
+        } else if dialog && matches!(r, Reference::Face(_)) {
+            // A face in a feature dialog's field: its shading under a light tint, its boundary orange (live workflows 2,
+            // 11, 12, 21: 20 % #FFA90A, where a face selected outside a dialog is amber).
+            state::SELECTED | state::TINT
         } else {
             state::SELECTED
         };
@@ -2055,27 +2060,30 @@ fn pick_disc(o: DVec3, x: DVec3, y: DVec3, z: DVec3, r: f64, pick: u32) -> MeshD
     d
 }
 
-/// The curve ends no other curve shares (a lone line's ends; not a rectangle's corners, nor a closed curve's seam).
+/// The curves' ends (a lone line's, a rectangle's corners; not a closed curve's seam).
 #[derive(Default)]
-struct FreeEnds(std::collections::HashMap<[i64; 3], u32>);
+struct CurveEnds(std::collections::HashSet<[i64; 3]>);
 
-impl FreeEnds {
+impl CurveEnds {
     fn key(q: &[f32; 3]) -> [i64; 3] {
         q.map(|c| (f64::from(c) * 1e7).round() as i64)
     }
 
     fn of(curves: &[noshape_model::display::SketchCurveDisplay]) -> Self {
-        let mut ends = std::collections::HashMap::new();
+        let mut ends = std::collections::HashSet::new();
         for c in curves.iter().filter(|c| !c.handle) {
-            for e in c.points.first().into_iter().chain(c.points.last()) {
-                *ends.entry(Self::key(e)).or_default() += 1;
+            let (Some(first), Some(last)) = (c.points.first(), c.points.last()) else { continue };
+            if Self::key(first) == Self::key(last) {
+                continue;
             }
+            ends.insert(Self::key(first));
+            ends.insert(Self::key(last));
         }
-        FreeEnds(ends)
+        CurveEnds(ends)
     }
 
     fn contains(&self, q: &[f32; 3]) -> bool {
-        self.0.get(&Self::key(q)) == Some(&1)
+        self.0.contains(&Self::key(q))
     }
 }
 
@@ -2458,23 +2466,24 @@ mod inference_mark_tests {
 }
 
 #[cfg(test)]
-mod free_end_tests {
-    use super::FreeEnds;
+mod curve_end_tests {
+    use super::CurveEnds;
     use noshape_model::display::{SketchCurveDisplay, SketchEntityState};
 
     fn curve(points: &[[f32; 3]]) -> SketchCurveDisplay {
         SketchCurveDisplay { entity: 0, points: points.to_vec(), construction: false, external: false, state: SketchEntityState::Under, handle: false }
     }
 
-    /// Live2 nav-feel-1119: a lone line's ends are drawn at rest; a rectangle's corners and a closed curve's seam aren't.
+    /// Live behaviours "psui exited sketch dots and fill" (11-22): a lone line's ends and a rectangle's corners are drawn
+    /// at rest; a closed curve's seam isn't.
     #[test]
-    fn only_unshared_curve_ends_are_free() {
+    fn curve_ends_and_shared_corners_are_dotted() {
         let (a, b, c) = ([0.0, 0.0, 0.0], [0.01, 0.0, 0.0], [0.01, 0.01, 0.0]);
-        let lone = FreeEnds::of(&[curve(&[a, c])]);
+        let lone = CurveEnds::of(&[curve(&[a, c])]);
         assert!(lone.contains(&a) && lone.contains(&c), "a lone line's ends");
-        let corner = FreeEnds::of(&[curve(&[a, b]), curve(&[b, c])]);
-        assert_eq!((corner.contains(&a), corner.contains(&b), corner.contains(&c)), (true, false, true), "two lines meeting at b");
-        let closed = FreeEnds::of(&[curve(&[a, b, c, a])]);
+        let corner = CurveEnds::of(&[curve(&[a, b]), curve(&[b, c])]);
+        assert_eq!((corner.contains(&a), corner.contains(&b), corner.contains(&c)), (true, true, true), "two lines meeting at b");
+        let closed = CurveEnds::of(&[curve(&[a, b, c, a])]);
         assert!(!closed.contains(&a), "a closed curve's seam");
     }
 }

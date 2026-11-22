@@ -535,7 +535,7 @@ impl Regenerator {
                 keys.push((f.id, key));
             }
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, missing_refs: Vec::new(), computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
@@ -606,7 +606,7 @@ impl Regenerator {
                 noshape_kernel::kernel_profile_mark("");
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, missing_refs: Vec::new(), computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -638,7 +638,8 @@ impl Regenerator {
                         let own = |id: FeatureId| studio.features.iter().any(|g| g.id == id);
                         let (pruned, missing) = eval::drop_missing_regions(params, &base, &own);
                         let params = pruned.as_ref().unwrap_or(params);
-                        state.missing = missing;
+                        state.missing = missing.len();
+                        state.missing_refs = missing;
                         // Geometry of Assembly contexts joins the feature's context only
                         // while it is evaluated (never merged, patterned or listed).
                         let uses_context = !studio.contexts.is_empty() && crate::in_context::params_use_context(params, None);
@@ -695,8 +696,8 @@ impl Regenerator {
                         }
                         match result {
                             Ok(Ok(())) => {
-                                if missing > 0 && ev.warnings.is_empty() {
-                                    ev.warnings.push(missing_text(missing));
+                                if state.missing > 0 && ev.warnings.is_empty() {
+                                    ev.warnings.push(missing_text(state.missing));
                                 }
                                 if !ev.warnings.is_empty() {
                                     // (Live 11-18 sm-rip-1118: a model that can't be unfolded is a WARNING on the

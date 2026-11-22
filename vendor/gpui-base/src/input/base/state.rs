@@ -3797,6 +3797,8 @@ impl<M: InputModeKind> InputBaseState<M> {
             if self.select_on_focus {
                 self.set_selection(0, 0);
                 self.scroll_to(0, None, cx);
+            } else {
+                self.reset_scroll_to_start();
             }
         }
         cx.emit(InputEvent::Blur);

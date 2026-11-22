@@ -423,6 +423,9 @@ pub struct SketchDisplay {
     pub hidden: bool,
     /// Its plane is a face of a sheet metal flat (live 2468): drawn in the flat view, not the main one.
     pub on_flat: bool,
+    /// Its plane is a part's face (live behaviours "psui exited sketch dots and fill": at rest its regions unfilled).
+    #[serde(default)]
+    pub on_face: bool,
     /// Remaining degrees of freedom (0 = fully defined).
     pub dof: usize,
     /// Custom sketch appearance (linear RGBA) when not being edited.
@@ -501,6 +504,9 @@ pub struct FeatureState {
     /// Selections that no longer resolve (live: the row's tooltip adds
     /// "1 missing selection").
     pub missing: usize,
+    /// Of them, the query fields' references (live: their chips read "Missing …", Clear missing references).
+    #[serde(default)]
+    pub missing_refs: Vec<Reference>,
     /// Values the feature computed for its read-only parameters (Onshape's
     /// `setFeatureComputedParameter`, e.g. a Hole's Up to next depth).
     pub computed: Vec<(String, ComputedValue)>,

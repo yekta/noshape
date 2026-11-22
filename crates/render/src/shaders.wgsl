@@ -388,7 +388,8 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     // the hovered face instead (Onshape).
     let unlit = (inst.params.y & 2u) != 0u;
     // A hovered selection row's entity: its yellow-green instead of the selection's orange (live2 recheck-1119 (3)).
-    let hs = select(st, st & ~SELECTED, (st & QUERY) != 0u);
+    // A dialog field's face (TINT with SELECTED): its shading, the light tint below.
+    let hs = select(st, st & ~SELECTED, (st & (QUERY | TINT)) != 0u);
     var c = highlight(own, select(hs & ~HOVER, hs, unlit));
     // A vertex color with alpha 128 (a curvature map's face of one value): its color as it is, unlit (live),
     // unless selected.
@@ -399,7 +400,7 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
         if ((st & SELECTED) != 0u) { c = mix(c, FACE_SELECTED, 0.5); }
     } else if (!unlit) {
         // (A hovered selection row's: its yellow-green over the selection, `highlight`.)
-        if ((st & SELECTED) != 0u && (st & (ERROR | QUERY)) == 0u) {
+        if ((st & SELECTED) != 0u && (st & (ERROR | QUERY | TINT)) == 0u) {
             let sel = select(select(FACE_SELECTED, FACE_PICKED, (st & PICKED) != 0u), BODY_SELECTED, (st & BODY) != 0u);
             // A whole part keeps more of its shading (live "psui (10-27, interaction 5.x)": top (243,183,72), front (192,144,57), right (224,169,66)).
             let body = (st & BODY) != 0u;

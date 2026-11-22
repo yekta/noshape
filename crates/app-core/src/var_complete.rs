@@ -350,18 +350,19 @@ impl VarCompletion {
                     let value = variables.get(name).map(|q| noshape_units::format_quantity(*q, units)).unwrap_or_default();
                     row(id, i, "variable").justify_between().child(div().flex_1().child(format!("#{name}"))).child(div().px(px(4.)).italic().text_color(faint).child(value))
                 }
+                // Live wf37: "(f) max(x,y)", the arguments close up to their commas.
                 Entry::Function(name, args) => {
-                    let mut r = row(id, i, "function").child(format!("{name}("));
+                    let mut call = h_flex().child(format!("{name}("));
                     for (k, a) in args.iter().enumerate() {
                         if k > 0 {
-                            r = r.child(",");
+                            call = call.child(",");
                         }
-                        r = r.child(div().text_color(faint).child(*a));
+                        call = call.child(div().text_color(faint).child(*a));
                     }
-                    r.child(")")
+                    row(id, i, "ac-function").child(call.child(")"))
                 }
-                Entry::Unit(name) => row(id, i, "dp-units").child(*name),
-                Entry::Constant(name) => row(id, i, "function").child(*name),
+                Entry::Unit(name) => row(id, i, "ac-unit").child(*name),
+                Entry::Constant(name) => row(id, i, "ac-function").child(*name),
             }
         });
         // Live 152: "(x) New variable…" (highlighted when selected).

@@ -280,7 +280,7 @@ pub fn touching(bodies: &[Arc<Body>], tools: &[Shape], exact: bool) -> Vec<usize
         .collect()
 }
 
-pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> (Option<ParamValues>, usize) {
+pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(FeatureId) -> bool) -> (Option<ParamValues>, Vec<Reference>) {
     /// Whether every face `n` is named after comes from this studio's features
     /// (sketch and wire-body curves are left alone).
     fn own_topo(n: &TopoName, own: &dyn Fn(FeatureId) -> bool) -> bool {
@@ -325,12 +325,12 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
             _ => true,
         }
     }
-    fn prune(v: &ParamValues, resolves: &dyn Fn(&Reference) -> bool, missing: &mut usize) -> Option<ParamValues> {
+    fn prune(v: &ParamValues, resolves: &dyn Fn(&Reference) -> bool, missing: &mut Vec<Reference>) -> Option<ParamValues> {
         let mut out: Option<ParamValues> = None;
         for (k, p) in v.0.iter() {
             let new = match p {
                 ParamValue::Query(q) if q.iter().any(|r| !resolves(r)) => {
-                    *missing += q.iter().filter(|r| !resolves(r)).count();
+                    missing.extend(q.iter().filter(|r| !resolves(r)).cloned());
                     Some(ParamValue::Query(q.iter().filter(|r| resolves(r)).cloned().collect()))
                 }
                 ParamValue::Array(items) => {
@@ -345,7 +345,7 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
         }
         out
     }
-    let mut missing = 0;
+    let mut missing = Vec::new();
     let out = prune(params, &resolves, &mut missing);
     (out, missing)
 }

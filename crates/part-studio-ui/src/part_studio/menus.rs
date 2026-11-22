@@ -1325,7 +1325,25 @@ impl PartStudioView {
                                 .id(SharedString::from(format!("readout-hover-{label}")))
                                 .on_hover(cx.listener(move |this, h: &bool, _, cx| this.set_measure_hover(hover.clone(), *h, cx)))
                                 .child(crate::ui_script::mark(v, move || format!("measure_value:{l2}")));
-                            item.child(v)
+                            // Its (x) after the unit, as the panel's (live workflow 36: distances, lengths, radii).
+                            let var: Option<MeasureVar> = match m {
+                                Measurement::Distance { .. } => Some(("DISTANCE", label.starts_with("Max"))),
+                                Measurement::Length(_) => Some(("LENGTH", false)),
+                                Measurement::Diameter(_) => Some(("DIAMETER", false)),
+                                Measurement::Radius(_) => Some(("RADIUS", false)),
+                                _ => None,
+                            };
+                            let l4 = label.clone();
+                            item.child(v).children(var.map(|var| {
+                                div()
+                                    .id(SharedString::from(format!("readout-var-{label}")))
+                                    .debug_selector(move || format!("readout-var:{l4}"))
+                                    .ml(px(4.))
+                                    .cursor_pointer()
+                                    .child(crate::assets::icon("variable", 14., cx))
+                                    .tooltip(crate::ui::tooltip("Add variable for this measurement"))
+                                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.create_variable_from_measure(var, None, window, cx)))
+                            }))
                         }
                         None => item.child(value(text)),
                     }
@@ -1763,11 +1781,20 @@ impl PartStudioView {
                     Measurement::Radius(_) => Some(("RADIUS", false)),
                     _ => None,
                 };
-                mrows.push((label, v, None, var));
+                // Clicked, a value shows 5 decimals (live workflow 36: Min dist 39.05125).
+                let five = |x: f64, d: Dim| Some(noshape_units::to_fixed(x / units.si_factor(d), 5));
+                let precise = match m {
+                    Measurement::Length(x) | Measurement::Radius(x) | Measurement::Diameter(x) | Measurement::Distance { distance: x, .. } => five(x, Dim::LENGTH),
+                    Measurement::Area(x) => five(x, Dim { length: 2, angle: 0 }),
+                    Measurement::Volume(x) => five(x, Dim { length: 3, angle: 0 }),
+                    Measurement::Angle(x) => five(x, Dim::ANGLE),
+                    Measurement::Percent(_) | Measurement::Point(_) => None,
+                };
+                mrows.push((label, v, None, var, precise));
                 // Live: signed X / Y / Z sub-rows under a distance.
                 if let Measurement::Distance { dx, dy, dz, .. } = m {
                     for (i, d) in [dx, dy, dz].into_iter().enumerate() {
-                        mrows.push((String::new(), l(d), Some(i), var));
+                        mrows.push((String::new(), l(d), Some(i), var, five(d, Dim::LENGTH)));
                     }
                 }
             }
@@ -2201,16 +2228,20 @@ impl PartStudioView {
         // measurements says so.
         let nothing = mrows.is_empty() && !self.selection.is_empty();
         let view_rows = cx.entity();
+        let precise_rows = if self.ui.measure_precise.0 == self.selection { self.ui.measure_precise.1.clone() } else { Default::default() };
         // The distance row an X/Y/Z row belongs to (picks its glyph).
         let mut parent = String::new();
-        vec![
+        // Moved by its title, it opens where it was left, after closing and in later sessions (live behaviours "psui
+        // Measure panel position": panelLayoutManager's measure-dialog rect).
+        vec![crate::ui::moved_panel(
             v_flex()
                 .id("measure-panel")
                 .debug_selector(|| "measure-panel".into())
                 .occlude()
-                // Live (part-studio/82, at 1×): 220 px, flush with the
-                // viewport's bottom-right corner, over the panel strip and
-                // the measure buttons.
+                .child(crate::ui::panel_probe("ps-measure"))
+                // Live (part-studio/82, at 1×; behaviours "psui Measure panel position"): 220 px, flush with the
+                // graphics area's bottom-right corner (2 px above its bottom) until moved, over the panel strip and the
+                // measure buttons.
                 .absolute()
                 .bottom(px(2.))
                 .right_0()
@@ -2218,7 +2249,7 @@ impl PartStudioView {
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
-                .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)).child(close("measure-close", true, cx)))
+                .child(h_flex().h(px(29.)).pl(px(6.)).border_b_1().border_color(pal.border).child(crate::ui::panel_title("ps-measure", div().flex_1().h_full().flex().items_center().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title))).child(close("measure-close", true, cx)))
                 // It takes no whole parts (live 2463).
                 .child(field("Select entities to measure", measured_names, true, false, true).mt(px(5.)).mb(px(5.)))
                 .child(select_row("Measure type:", type_menu))
@@ -2250,19 +2281,49 @@ impl PartStudioView {
                             .child("No measurements available for current selection."),
                     )
                 })
-                .children(mrows.into_iter().enumerate().map(|(n, (k, v, axis, var))| {
+                .children(mrows.into_iter().enumerate().map(|(n, (k, v, axis, var, five))| {
                     if axis.is_none() {
                         parent = k.to_string();
                     }
                     // "12.5 in" -> monospace number on an underline and the unit.
                     let (num, unit) = v.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((v, String::new()));
+                    // A value clicked (live workflow 36): its row light blue, its 5 decimals selected white on blue, for
+                    // Ctrl+C; another click goes back.
+                    let key = format!("panel:{n}");
+                    let picked = five.is_some() && precise_rows.contains(&key);
+                    let shown = if picked { five.clone().unwrap_or_default() } else { num.clone() };
+                    let number = crate::ui::measure_value(shown).when(picked, |d| d.bg(gpui_kit::rgb(0x3367d1)).text_color(gpui_kit::rgb(0xffffff)));
+                    let pick_view = view_rows.clone();
                     let value = h_flex()
                         .gap(px(2.))
-                        .child(crate::ui::measure_value(num))
+                        .child(match five {
+                            Some(five) => div()
+                                .id(SharedString::from(format!("measure-panel-value-{n}")))
+                                .debug_selector(move || format!("measure-panel-value-{n}"))
+                                .child(number)
+                                .tooltip(crate::ui::tooltip(five.clone()))
+                                .on_click(move |_, _, cx| {
+                                    let (key, five, num) = (key.clone(), five.clone(), num.clone());
+                                    pick_view.update(cx, |this, cx| {
+                                        if this.ui.measure_precise.0 != this.selection {
+                                            this.ui.measure_precise = (this.selection.clone(), Default::default());
+                                        }
+                                        let set = &mut this.ui.measure_precise.1;
+                                        let on = !set.remove(&key);
+                                        if on {
+                                            set.insert(key);
+                                        }
+                                        this.ui.measure_text = Some((this.selection.clone(), if on { five } else { num }));
+                                        cx.notify();
+                                    });
+                                })
+                                .into_any_element(),
+                            None => number.into_any_element(),
+                        })
                         .child(div().text_size(px(12.)).child(unit));
                     // Live (part-studio/82): labels, values and units all `#666`.
                     // The (x) 9 px from the panel's edge.
-                    let row = h_flex().min_h(px(26.)).pl(px(4.)).pr(px(9.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text_muted);
+                    let row = h_flex().min_h(px(26.)).pl(px(4.)).pr(px(9.)).gap(px(4.)).text_size(px(12.)).text_color(pal.text_muted).when(picked, |d| d.bg(gpui_kit::rgb(0xdef1fb)));
                     let row = match axis {
                         // Live (part-studio/495): the letter, then a glyph in the axis
                         // colour: arrows under a distance, converging arrows under
@@ -2300,9 +2361,9 @@ impl PartStudioView {
                 // Live (feel/measure/meas-panel.png): 4 px below the last row a 1 px `#d7d7d7` line over a 21 px
                 // `#eee` band with the ?; 220 × 345 with a distance and its X / Y / Z rows.
                 .child(div().h(px(4.)))
-                .child(h_flex().h(px(22.)).px(px(4.)).justify_end().border_t_1().border_color(pal.border).bg(gpui_kit::rgb(0xeeeeee)).child(help()))
-                .into_any_element(),
-        ]
+                .child(h_flex().h(px(22.)).px(px(4.)).justify_end().border_t_1().border_color(pal.border).bg(gpui_kit::rgb(0xeeeeee)).child(help())),
+            self.ui.panels.get("ps-measure"),
+        )]
     }
 }
 
@@ -2476,7 +2537,8 @@ fn face_mass_ui_state(f: &FaceMassView, ref_active: bool, reference: Option<Stri
 /// Kind of a measurement for the measure type selector.
 /// A Measure panel row: label, value, X/Y/Z sub-row axis, and the (x)
 /// variable it creates.
-type MeasureRow = (String, String, Option<usize>, Option<MeasureVar>);
+/// (label, value, X / Y / Z sub-row axis, its (x), the value's 5 decimals)
+type MeasureRow = (String, String, Option<usize>, Option<MeasureVar>, Option<String>);
 
 /// What a Measure row's (x) measures: `DISTANCE`, `LENGTH`, `DIAMETER` or
 /// `RADIUS`, and whether it is a maximum distance.

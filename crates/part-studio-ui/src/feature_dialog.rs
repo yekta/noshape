@@ -232,8 +232,11 @@ pub struct FeatureDialog {
     preview_track: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// Where the title was grabbed when dragging the dialog.
     drag_grab: Arc<parking_lot::Mutex<Point<Pixels>>>,
-    /// Whether a reference is missing (its feature was deleted/suppressed).
+    /// Whether a reference is missing (its feature was deleted/suppressed, or it didn't resolve: [`Self::unresolved`]).
     pub missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
+    /// Missing references whose feature is still there (the last regeneration couldn't resolve them): their chips read
+    /// "Missing " and their label (live workflow 33: "Missing Edge of Extrude 1").
+    pub unresolved: Vec<Reference>,
     /// References made by a feature after this one (it was moved above its input).
     pub later: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
     /// Number of regions of a sketch (a field holding all of them shows
@@ -484,6 +487,7 @@ impl FeatureDialog {
             preview_track: Default::default(),
             drag_grab: Default::default(),
             missing: Arc::new(|_| false),
+            unresolved: Vec::new(),
             later: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
             sketch_vertices: Arc::new(|_| Vec::new()),
@@ -1937,7 +1941,12 @@ impl FeatureDialog {
                 Reference::Vertex(_) if self.ref_missing(r) => Some("Missing Vertex"),
                 _ => None,
             };
-            rows.push((missing.map(String::from).unwrap_or_else(|| (self.labeler)(r)), vec![k], r.clone()));
+            let label = match missing {
+                Some(_) if self.unresolved.contains(r) => format!("Missing {}", (self.labeler)(r)),
+                Some(m) => m.to_string(),
+                None => (self.labeler)(r),
+            };
+            rows.push((label, vec![k], r.clone()));
         }
         rows
     }

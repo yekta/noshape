@@ -190,6 +190,35 @@ fn rows() -> Vec<Row> {
             // (Live's recorder reads the field itself "ok": fillet-too-big; the entry is what turns red.)
             expect((d["titleState"].as_str(), query["state"].as_str(), entry_red, tip.as_str()), (Some("error"), Some("ok"), true, "Fillet 1 did not regenerate properly: Failed to fillet selections."), "(title, field, its entry red, title's tooltip)")
         } },
+        Row { id: "error / an edge a chamfer dragged above consumed: its chip Missing", live: "workflow 33 steps 23-26 (qa FEAT-MISSING-REF-CHIP): Fillet 1's chip reads 'Missing Edge of Extrude 1' in red; its menu Clear all / Clear missing references / Edit healthy moment", gap: false, check: |cx| {
+            let json = serde_json::json!({ "units": "mm", "features": [
+                { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+                { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+                { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [40, 15, 10]"], "radius": "1 mm" } },
+                { "type": "chamfer", "name": "Chamfer 1", "params": { "entities": ["edge through [0, 15, 10]"], "width": "2 mm" } },
+                { "op": "reorder", "feature": "Chamfer 1", "before": "Fillet 1" }
+            ] });
+            let (window, view) = start(cx, "fb-missing-chip", json);
+            let id = feature_id(cx, &view, "Fillet 1");
+            // Chamfer 1, now above Fillet 1, edited to take Fillet 1's edge.
+            let chamfer = feature_id(cx, &view, "Chamfer 1");
+            let edge = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id)).map(|f| f.params.query("entities").to_vec())).ok_or("no Fillet 1")?;
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(chamfer, w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let chamfer_dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no Chamfer dialog")?;
+            cx.update(|cx| chamfer_dialog.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(edge), cx)));
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_open_dialog(w, cx))).unwrap();
+            wait_until(cx, window, |cx| { let v = view.read(cx); v.edit.is_none() && !v.ui_busy() });
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).ok_or("no dialog")?;
+            let (labels, missing) = cx.update(|cx| {
+                let d = dialog.read(cx);
+                (d.chip_labels("entities"), d.feature.params.query("entities").iter().map(|r| d.ref_missing(r)).collect::<Vec<_>>())
+            });
+            let regen = cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.message.clone(), s.missing_refs.len())));
+            expect((labels, missing), (vec!["Missing Edge of Extrude 1".to_string()], vec![true]), &format!("Fillet 1's chip, missing (red, Clear missing references); its regeneration {regen:?}"))
+        } },
         Row { id: "error / inputs refused", live: "Thicken on a block's top face with Thickness 1 and 2 both 0 (live part-studio 2059, L19): 'Invalid input selections.', the title red, the face's entry dark and the face orange (selected), no field marked (qa ERROR-CHIP-RED-NO-FIELD)", gap: false, check: |cx| {
             let json = serde_json::json!({ "units": "mm", "features": [
                 { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },

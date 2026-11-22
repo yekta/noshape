@@ -32,7 +32,6 @@ pub(super) fn matrix_studio(cx: &mut TestAppContext, name: &str) -> Matrix {
 
 /// [`matrix_studio`], with batch 3's Mate connector 1 on the block's top back right corner when `connector`.
 pub(super) fn matrix_studio_with(cx: &mut TestAppContext, name: &str, connector: bool) -> Matrix {
-    RENDERING.set(true);
     let start = serde_json::json!({ "units": "mm", "features": [
         { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
         { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
@@ -49,6 +48,12 @@ pub(super) fn matrix_studio_with(cx: &mut TestAppContext, name: &str, connector:
         let mc = serde_json::json!({ "type": "mateConnector", "name": "Mate connector 1", "params": { "originQuery": ["vertex through [40, 30, 20]"] } });
         start["features"].as_array_mut().expect("features").push(mc);
     }
+    matrix_studio_from(cx, name, start)
+}
+
+/// A rendering test window on `start` at a device pixel ratio of 1, with the matrix's live camera.
+pub(super) fn matrix_studio_from(cx: &mut TestAppContext, name: &str, start: serde_json::Value) -> Matrix {
+    RENDERING.set(true);
     let (window, view) = part_studio_from(cx, name, Some(start));
     cx.update_window(window, |_, w, _| w.set_scale_factor(1.0)).unwrap();
     draw(cx, window);
@@ -1053,8 +1058,24 @@ fn the_sketchs_own_plane_right_clicked_gives_its_menu(cx: &mut TestAppContext) {
         if lit != Some(Reference::Plane(DatumPlane::Top)) {
             wrong.push(format!("{tool:?}: {lit:?} lit under the menu"));
         }
+        // Drawn lit (live workflow 40, qa FEEL-SKETCH-RCLICK-PLANE-LIT: the plane's outline orange under the menu).
+        let edge = cx.update(|cx| {
+            let v = m.view.read(cx);
+            let vp = v.viewport.read(cx);
+            let pl = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top))?;
+            [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)].into_iter().filter_map(|(u, w)| vp.project(pl.corner(u, w))).find(|s| s.x > 60.0 && s.y > 60.0 && s.x < vp.size().x - 60.0 && s.y < vp.size().y - 60.0)
+        });
+        let Some(edge) = edge else {
+            wrong.push(format!("{tool:?}: no edge of the Top plane on screen"));
+            continue;
+        };
+        let lit_px = count(&m.crop(cx, edge), 0xffc685);
         m.view.update(cx, |v, cx| v.close_context_menu(cx));
         m.park(cx);
+        let rest_px = count(&m.crop(cx, edge), 0xffc685);
+        if lit_px < 40 || rest_px > 0 {
+            wrong.push(format!("{tool:?}: the plane's border not drawn lit under the menu ({lit_px} #ffc685 px open, {rest_px} closed)"));
+        }
     }
     assert!(wrong.is_empty(), "{wrong:#?}");
 }
@@ -1274,3 +1295,4 @@ fn a_failing_feature_patterns_direction_stays_orange_and_its_instance_shows_red(
         .count();
     assert!(off.is_empty() && red >= 5, "the Direction edge not orange at {off:?}; {red} of 9 samples red up the instance's axis; the pattern's state {state:?}");
 }
+

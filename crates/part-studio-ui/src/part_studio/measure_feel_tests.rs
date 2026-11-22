@@ -157,7 +157,11 @@ impl Bench {
     }
 
     fn click_value(&self, cx: &mut TestAppContext, name: &str) -> Result<(), String> {
-        let b = gpui_kit::VisualTestContext::from_window(self.window, cx).debug_bounds(Box::leak(format!("measure_value:{name}").into_boxed_str())).ok_or(format!("no value {name}"))?;
+        self.click_on(cx, &format!("measure_value:{name}"))
+    }
+
+    fn click_on(&self, cx: &mut TestAppContext, sel: &str) -> Result<(), String> {
+        let b = gpui_kit::VisualTestContext::from_window(self.window, cx).debug_bounds(Box::leak(sel.to_string().into_boxed_str())).ok_or(format!("no {sel}"))?;
         let mut v = gpui_kit::VisualTestContext::from_window(self.window, cx);
         let at = point(b.center().x, b.center().y);
         v.simulate_event(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
@@ -243,6 +247,23 @@ fn rows() -> Vec<Row> {
             let copied = cx.update(|cx| cx.read_from_clipboard().and_then(|c| c.text()));
             // Back to 3 decimals for the next rows.
             b.click_value(cx, "Min dist")?;
+            Ok(copied.into_iter().collect())
+        } },
+        Row { id: "the readout's (x) after a distance's unit (workflow 36)", live: &["(x)"], gap: false, check: |b, cx| {
+            b.readout(cx, &[V40, V60], &[])?;
+            let shown = gpui_kit::VisualTestContext::from_window(b.window, cx).debug_bounds("readout-var:Min dist").is_some();
+            Ok(shown.then(|| "(x)".to_string()).into_iter().collect())
+        } },
+        Row { id: "a panel value clicked: its 5 decimals selected, Ctrl+C copies it (workflow 36)", live: &["20.00000"], gap: false, check: |b, cx| {
+            b.readout(cx, &[V40, V60], &[])?;
+            b.panel(cx, true);
+            b.click_on(cx, "measure-panel-value-0")?;
+            let focus = cx.update(|cx| b.view.read(cx).focus.clone());
+            cx.update_window(b.window, |_, w, cx| w.focus(&focus, cx)).unwrap();
+            gpui_kit::VisualTestContext::from_window(b.window, cx).simulate_keystrokes("secondary-c");
+            let copied = cx.update(|cx| cx.read_from_clipboard().and_then(|c| c.text()));
+            b.click_on(cx, "measure-panel-value-0")?;
+            b.panel(cx, false);
             Ok(copied.into_iter().collect())
         } },
         Row { id: "a value hovered: its 5 decimals' tooltip and its dashed line", live: &["Min dist: 20.000 mm", "20.00000", "dashed black", "left: no line"], gap: false, check: |b, cx| {

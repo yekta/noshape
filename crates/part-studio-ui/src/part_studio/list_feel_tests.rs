@@ -806,6 +806,46 @@ fn rows() -> Vec<Row> {
             let want = (1, 0, names(&["Extrude 1"]), (false, true));
             expect(got, vec![want.clone(), want], "(selected in the graphics, rows selected, rows related, Part 1's row (selected, related)) after a face's click, an edge's")
         } },
+        Row { id: "Parts list / a dialog field's edge relates its part; a preview's new part bold", live: "workflow 21 (qa PARTS-ROW-OF-PICK, tickets/wf21-parts.png): the part of the face or edge in Helix's field related (#ECF0F4, a 1 px #90CEF1 line under it); the Revolve preview's new Part 1 bold", gap: false, check: |l, cx| {
+            cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| {
+                v.selection.clear();
+                v.start_feature("fillet", w, cx);
+                let edge = v.display.bodies.iter().find(|b| b.name == "Part 1").and_then(|b| b.edge_refs.first().cloned());
+                let d = v.edit.as_ref().expect("the Fillet dialog").dialog.clone();
+                d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(edge.into_iter().collect()), cx));
+            }))
+            .unwrap();
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            draw(cx, l.window);
+            let flags = |cx: &gpui_kit::App| {
+                let v = l.view.read(cx);
+                let mut rows: Vec<(String, (bool, bool), bool)> = v.display.bodies.iter().map(|b| (b.name.clone(), v.part_row_flags(b, cx), v.part_row_new(b, cx))).collect();
+                rows.sort();
+                rows
+            };
+            let fillet = cx.update(|cx| flags(cx).into_iter().filter(|r| r.1 != (false, false) || r.2).collect::<Vec<_>>());
+            l.keys(cx, "escape");
+            wait_until(cx, l.window, |cx| l.view.read(cx).edit.is_none() && !l.view.read(cx).ui_busy());
+            cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| {
+                let sk = v.display.sketches.iter().find(|s| v.studio(cx).and_then(|st| st.feature(s.feature)).is_some_and(|f| f.name == "Sketch 1")).expect("Sketch 1");
+                let region = Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() };
+                v.start_feature("extrude", w, cx);
+                let d = v.edit.as_ref().expect("the Extrude dialog").dialog.clone();
+                d.update(cx, |d, cx| {
+                    d.set_value("entities", noshape_model::ParamValue::Query(vec![region]), cx);
+                    d.set_value("operationType", noshape_model::ParamValue::Enum("NEW".into()), cx);
+                });
+            }))
+            .unwrap();
+            wait_until(cx, l.window, |cx| {
+                let v = l.view.read(cx);
+                !v.ui_busy() && v.edit.as_ref().is_some_and(|e| v.display.bodies.iter().any(|b| b.id.feature == e.dialog.read(cx).feature.id))
+            });
+            draw(cx, l.window);
+            let bold = cx.update(|cx| flags(cx).into_iter().filter(|r| r.2).count());
+            l.keys(cx, "escape");
+            expect((fillet, bold), (vec![("Part 1".to_string(), (false, true), false)], 1), "(the rows tinted with Fillet's edge picked: (name, (selected, related), bold), the Extrude preview's bold rows)")
+        } },
         Row { id: "click / a sketch region relates only its sketch", live: "Sketch 1's row related, not the Extrude that used it nor the part on it; no row selected (live2 11-17 sel-feel)", gap: false, check: |l, cx| {
             l.keys(cx, "space");
             cx.update(|cx| l.view.update(cx, |v, cx| {
