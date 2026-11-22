@@ -1012,13 +1012,13 @@ matrix"; ours: asm's frames of the same cells, one Part 1 instance after `f`, to
 | Cell | Live | Ours | Status |
 |---|---|---|---|
 | instance row hovered | the instance's 2 px #FFC685 silhouette; the row #DEF1FB, eye icon, name tooltip; the viewport lights ~880–1030 ms after the pointer stops | the silhouette, row, eye and tooltip the same; the delay not measured | = (delay ?) |
-| Origin row hovered | nothing lit | the same | = |
+| Origin row hovered | the origin glyph lit orange (live a03 picture; an earlier note said nothing lit) | stays black (qa 11-22 049f4e313, FEEL-ASM-ORIGIN-ROW-HOVER) | ≠ |
 | face / edge hovered in the viewport | the face's boundary / edge band, and the whole instance's silhouette #FFC20E; no row lit | the same | = |
 | face selected in the viewport | the row selected #B2DDF6; the face #E5A222 with a #FFA90A boundary; the move triad at the click, its ring white under the still pointer; "Area: …" in the status bar | the same (#E6A423); the ring unlit until the pointer moves (fixed asm, FEEL-ASM-TRIAD-STILL-POINTER) | = |
 | instance selected (its row clicked) | the instance filled #F2B648 | #F0B648, outline #FFC04C | = |
 | suppressed instance's row hovered | the row tints, nothing lit | the same (nothing drawn: no geometry) | = |
 | Ctrl+click on a row | the instance's context menu | the same | = |
-| Meta / Shift+click on rows | multi-select | not checked | ? |
+| Meta / Shift+click on rows | multi-select (adds) | Shift selects the range (ASM-ROW-SHIFT-CLICK, live to confirm) | ? |
 
 An assembly instance dragged (live asm/drag-feel-1122, behaviours "asm assembly drag feel"; a free part, one on a Revolute,
 one on a Slider and a fixed one):
@@ -1032,7 +1032,7 @@ one on a Slider and a fixed one):
 | free part | the grab point stays under the pointer | the same (`a_dragged_free_instance_takes_the_whole_move_from_the_press`) | = |
 | Slider | follows only the pointer's component along its axis on screen, all of it (-155 px for -152) | the same (`a_slider_drag_follows_the_pointer_on_screen_in_an_iso_view`) | = |
 | Revolute | turns about the pivot, the screen angle following the pointer's round it | the same (drawn to the pointer's ray: `a_ball_drag_turns_as_an_arcball`, `a_revolute_drag_stops_at_its_limits`) | = |
-| fixed part | never moves; a 36 × 16 px ground glyph (white box over hatching) lying on its face, where the drag started, till the release | the same (fixed asm: was a screen icon following the cursor; `a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started`); its offset from the pointer to be scored | = (offset ?) |
+| fixed part | never moves; a 36 × 16 px ground glyph (white box over hatching) lying on its face, where the drag started, till the release | never moves, glyph at the grab point till release, but drawn flat on the screen, not in the face's plane (qa 11-22 049f4e313, FEEL-ASM-FIXED-GLYPH) | ≠ |
 | drag start | ~1.8 s after the first move, then a jump to the pointer (software GL) | from the first move past 2 px / 50 ms | = (live's delay is not a target) |
 
 Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf4; block doc after `f`, the field active; live b5/ (lane 4,

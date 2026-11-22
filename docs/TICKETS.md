@@ -6,9 +6,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## asm, 2026-11-22 (live asm/drag-feel-1122, instance drag feel)
-- [x] P0 **FEEL-ASM-DRAG-UNDO (asm)**: (fixed asm) Undo stayed on while an instance was dragged; live greys it until the
+- [x] P0 **FEEL-ASM-DRAG-UNDO (asm)**: (verified qa 11-22 15:5x, green 049f4e313 (ec33215f), hm2/asmfeel cells vs live asm/{hover-list,drag-feel}-1122: greyed while a free part is held, back on release; not greyed for the fixed part, as live) (fixed asm) Undo stayed on while an instance was dragged; live greys it until the
   release. Test: feel_tests::a_dragged_part_shows_no_hover_until_released.
-- [x] P0 **FEEL-ASM-FIXED-GLYPH (asm)**: (fixed asm) a fixed part's drag drew a 20 px screen icon following the cursor; live
+- [ ] P0 REOPENED (qa 11-22 15:5x, green 049f4e313, cell dr-BaseR: the part stays put, the hover look goes and the glyph shows at the grab point till release, as live; but ours is a flat SCREEN-aligned icon (a bar with ticks under it, ~36 x 12 px), live's lies IN THE FACE'S PLANE, foreshortened with the face: a white box over a hatched band; tickets/asm-fixed-glyph-049f.png, live x3 left, ours right) **FEEL-ASM-FIXED-GLYPH (asm)**: (fixed asm) a fixed part's drag drew a 20 px screen icon following the cursor; live
   lays a 36 × 16 px ground glyph on the face where the drag started, still till the release. Test:
   feel_tests::a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started.
 - [ ] P1 **ASM-OPEN-TYRES-TURNED (asm)**: opening infento (saved doc vibex7 ~/tmp/asm/infento-saved.noshape) moves "Large
@@ -16,12 +16,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   connector frames vs live's). The same group spends 11-15 s in least_change. Probe: assembly_perf probe_store_keys.
 
 ## asm, 2026-11-22 (live asm/hover-list-1122, list × viewport hover)
-- [x] P0 **FEEL-ASM-TRIAD-STILL-POINTER (asm)**: (fixed asm: the triad a press shows or moves under the still pointer is
+- [x] P0 **FEEL-ASM-TRIAD-STILL-POINTER (asm)**: (verified qa 11-22 15:5x, green 049f4e313 (ec33215f), hm2/asmfeel cells vs live asm/{hover-list,drag-feel}-1122: a04 triad white/grey under the still pointer, as live) (fixed asm: the triad a press shows or moves under the still pointer is
   drawn unlit until the pointer moves; a drag clears it) a click on an instance's face shows the move triad at the click,
   its handle under the pointer; live leaves its ring white until the pointer moves (a04), ours lit it blue at once.
   Test: assembly_feel_tests::a_face_clicks_triad_stays_unlit_until_the_pointer_moves.
 
 ## bool, 2026-11-22 (c2-gamma-imported's Boolean 1; lead 06:2x: per-pair tolerances P1, staged, after the in-flight stack)
+- [ ] P0 **FEEL-ASM-ORIGIN-ROW-HOVER (asm)** (qa 11-22 15:5x, green 049f4e313, cell hl-a03): hovering the instance list's Origin row lights the origin glyph in live (an orange disc ~#F6C58A over the point, live hover-list-1122 a03_f-vp; a01 shows it black); ours keeps it black (our glyph also reads as a broken ring, live a ring with a centre dot). tickets/asm-origin-row-hover-049f.png (live a03, live a01, ours a03). The feel doc's "Origin row hovered: nothing lit" contradicts live's own picture.
+- [ ] P0 **FEEL-ASM-ROW-EYE-ICON (asm)** (qa 11-22 15:5x, green 049f4e313, cell hl-a01): a hovered instance row's eye icon is ~8 px wide in ours, live's a bold ~20 px eye (row #DEF1FB, tooltip match); tickets/asm-row-eye-049f.png (live top, x3).
+- [ ] P2 **ASM-ROW-SHIFT-CLICK (asm)** (qa 11-22 15:5x, cell hl-a13 first run): Shift+click Part 3 <1> with Part 1 <1> selected selects Part 1..3 (a range) in ours; live's note (hover-list-1122 "Multi-select") says Meta+click and Shift+click add; live's a13 picture was made with Meta. Confirm with live whether Shift ranges in the instance list before changing.
 - [ ] P1 **BOOL-PER-PAIR-TOL (bool)**: noshape's Boolean judges every pair of entities by twice the largest tolerance of
   ANY argument (rust_boolean.cpp `tol`); an imported pin of 1.5-2.45 um widens the band for precise tools far from it
   (c2-gamma-imported's Boolean 1, 87 tools: a non-manifold result at two 0.2 um tools' junctions). The two-stage stopgap
