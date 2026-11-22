@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 21:37 UTC.
+Updated 2026-11-22 22:21 UTC.
 
 ## In flight
 
@@ -27,36 +27,19 @@ crates/drawing land (drawing-ui alone: not needed).
 - LANDED cd7b7401 as 634aa1f1 (15:21): Select line reach 8 px (lit at 7, not 8), SELECT_FORMAT_REACH_PX 9 (sheet border
   lit at 8, not 9). vibex8 drw run on it (uip1122k): 371/374, same 3 diffs; hover matrices 3/3.
 - LANDED dd49dc0f as 1a9112ed (15:47): TICKETS stale rows.
-- COMMITTED, not queued: 3806ff953 (dx's 3 hover cells: text reach 8 px, no-tool centerline 7 px, Note leader on a
-  centerline; full ops e2e green x202), c1b5a6a07 (live's table re-record: Insert ▸ keeps the Cell panel; app CHECKED
-  insert-row 12/12, cell-menu 31/31), 991e634b3 (VS chip stays on a click: gpui-pre `tooltip_stays_on_click` +
-  app-core `with_tip_kept_on_click`; VS row drag 6 px threshold, named #1651b0 pill, Esc cancels; feel_tests 11/11,
-  clippy clean).
-- COMMITTED 18717c50d: FS squiggle tooltip under the line in live's look + completion kinds #666 (ui_tests 10/10);
-  Restore to Main… ignores Enter (gpui-component `Dialog::enter_confirms`; history feel_tests 14/14); TICKETS rows
-  P1 DRW-DIM-HIDDEN-VERTEX-SNAP, P2 UIP-ANNOTATION-STALE-POS. Clippy clean.
-- COMMITTED 6e764f4f6 (not queued): documents page (live docs-page-gaps-1122): app-core OsMenu `documents_list()` +
-  `arrows_leave(f)`, app-core `with_user_tip`; start page menus 12 px #666 / 167 wide / no shadow, ↓/↑ close the doc
-  menu and move the selection, "Click to open <name>." tips, folder tile hover (white, shadow, underline, Trash pill),
-  `ThumbPopover` 302x183. start-ui `start_` tests 32/32 + clippy clean (x222).
-- UNCOMMITTED, verified: title-block fix in crates/drawing build.rs `hit_reach` + 3 feel tests (sweep inside the cell
-  only); drawing-ui tests, clippy, FULL ops e2e green (x218), app scenarios title-block-dblclick 4/4, insert-row 12/12,
-  cell-menu 31/31 (x221, fresh app; x218's 2/4 was a stale binary).
-- UNCOMMITTED (21:37), x224 RUNNING (task bueyo0q1m: drawing lib, model-data drawing::, drawing-ui all, FULL ops e2e,
-  clippy model-data/drawing/drawing-ui/start-ui; read with grep):
-  - drag marks (live drw-drag-feel T): drawing_tools.rs `annotation_drag_overlay`, `dimension_marks(skip)`, `plus_marks`;
-    a dimension's inference now on its text middle (`dimension_grab`, editor field `drag_grab`, reset on release).
-  - Esc mid view drag (live V): root cause GPUI: after a key the pointer counts as not hovering until it moves, so the
-    release never reached `on_mouse_up`. drawing_view.rs adds `on_mouse_up_out` ending any non-Pending drag.
-  - V: a dragged view's dimensions/notes flagged SELECTED (orange) while dragged, not after Esc.
-  - R: model-data sheet.rs: a radius value dropped inside the circle is centred at its position (else r/2 right as
-    before); test extended in crates/drawing tests.rs `ansi_radial_values_dropped_inside_the_circle`.
-  - docs page (live docs-page-gaps-1122 list-row drop): folder list row drop look top/bottom 2 px lines only
-    (`folder_row_drop_style`); Esc ends a row drag and selects the grabbed row (root `capture_key_down`); test
-    `esc_ends_a_row_drag_and_leaves_the_row_selected` (start_ 33/33 x223).
-  - x226: feel:: 91/92 (only the dim text height test failed before `dimension_grab`).
-- Then: commit drawing + start, fetch, rebase, diff --stat, drop the "[ ]" VS-NAME-FOCUS-BOX duplicate in TICKETS,
-  land.sh (3806ff953, c1b5a6a07, 991e634b3, 18717c50d, 6e764f4f6, dc227091f, new). Logs only with grep / tail -40.
+- QUEUED 323f69d3 (11-22 22:20; 12 commits): VS chip / row drag, FS tooltip, Restore ignores Enter, documents page,
+  title-block fix, drag marks + dim text inference, Esc mid view drag (`on_mouse_up_out`), dragged view's dims orange,
+  radius value dropped inside, folder list-row drop look, Esc ends a row drag, table Insert ▸ fix, TICKETS dup row.
+  3806ff953 (dx's hover cells) DROPPED in the rebase: dx landed its own (52cfbc549). Not in dx's: the Note tool's leader
+  on a centerline (live drw-hover-1122): recheck on main.
+- UNCOMMITTED, x229 running (qa workflows-1123 08-10 P0s): FEEL-DRW-SELECTED-VIEW-LABEL (a selected view's label pick
+  not flagged), FEEL-DRW-PICK-EDGE-STAYS-LIT (pick.rs: Balloon{anchor:Some} / Detail{center:Some} hover None; Detail
+  snaps only before the centre), FEEL-DRW-BOM-HOVER-FILL (fills only with the cursor inside; `menu_table` keeps them
+  while its menu is open), FEEL-DRW-CALLOUT-SELECTED-LOOK (balloons in the dims look; leaders black when selected).
+  Tests in feel.rs. Then commit, land, mark the tickets.
+- qa queue left (TICKETS blocks "qa, 2026-11-22 21:4x" and "22:0x"): P0 FEEL-DRW-RELATED-MARKS-BLUE,
+  FEEL-DRW-SECTION-EDIT-MARKS, FEEL-DRW-CALLOUT-PLACED-HOVER, FEEL-FS-COMMIT-DISABLED-HOVER (live hovered disabled
+  Commit (85,127,194), ours (186,207,229); render_commit in feature_studio.rs ~1765 uses opacity 0.5); P1/P2 rows there.
 - drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box) not checked.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.
