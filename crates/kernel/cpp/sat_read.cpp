@@ -1353,7 +1353,8 @@ private:
     if (nshapes == 0)
       return TopoDS_Shape();
     TopoDS_Shape out = nshapes == 1 ? last : TopoDS_Shape(part);
-    out              = heal_import(out, tol);
+    refit_loose_edges(out, 1e-6);
+    out = heal_import(out, tol);
     if (tf >= 0)
     {
       Cursor t = cursor(tf);

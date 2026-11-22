@@ -453,6 +453,8 @@ XtTree read_xt_tree(const std::string& path);
 // Pcurves, tolerances, seams and apexes for an imported body (xt_read.cpp),
 // shared by the Parasolid and ACIS readers.
 TopoDS_Shape heal_import(TopoDS_Shape shape, double tol);
+// B-spline edges more than `over` off their two faces refitted onto both (xt_read.cpp).
+void refit_loose_edges(const TopoDS_Shape& shape, double over);
 // ACIS import (sat_read.cpp): every body of a .sat/.sab file (or a
 // ShapeManager stream), metres, with its name and colour.
 std::vector<XtPart> read_sat_parts(const std::string& path);
