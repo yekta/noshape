@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 10:51 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 10:59 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,35 +33,37 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## Now (09:53 UTC 11-22): batch landing (lead order: batch → land; corner dots; Recognize; wf tickets)
-454c71f2 LANDED 09:27 as c45df7d2 (qa re-scores wf29/19/38/02/05 now).
-BATCH QUEUED as 9ad9b5d6 (6d72a4e3 failed 10:01 on a rebase conflict at sketch_ui_tests.rs's end with skasm's
-u_on_another_sketchs_vertex_projects_it: both kept, rebased, requeued; t35 + t36 green: hover_matrix 85/85, list 112/112, feedback, fields, sketch_hover, measure, feel,
-scene lib, ops e2e::sketch; clippy clean). Ticked: FEEL-HELIX-FACE-PICKED-LOOK, FEEL-QUERY-PART-PICK-FILL,
-APPEARANCE-RGB-FIELD-SCROLL, SPLIT-KEEP-TOOLS-AUTO, FEEL-SKETCH-RCLICK-PLANE-LIT, MEASURE-VALUE-CLICK-PIN,
-MEASURE-READOUT-VARIABLE-ICON, FEAT-MISSING-REF-CHIP, PARTS-ROW-OF-PICK, SKETCH-ON-FACE-EXITED-LOOK. Not ticked:
-UIS-WORLD-TARGET (asm's half), EXPR-AUTOCOMPLETE-LOOK (the list's left edge in a sketch dimension box),
-MEASURE-PANEL-POSITION (no drag test: PanelOffsets writes the user's config; qa recheck). Model-core changes for core:
-FeatureState.missing_refs (eval::drop_missing_regions), SketchDisplay.on_face (serde default).
-- PARTS-ROW-OF-PICK: a dialog field's face/edge/vertex relates its part row (#ECF0F4 + 1 px #90CEF1 underline);
-  body_of_input falls back to a face next to an edge/vertex the preview consumed (a Fillet's edge).
-- SKETCH-ON-FACE-EXITED-LOOK: builder CurveEnds (every curve end dotted at rest, not a closed curve's seam); no rest
-  region fill on a part's face (SketchDisplay.on_face).
-- MEASURE-PANEL-POSITION: Measure a moved panel ("ps-measure"), remembered in panel_positions.json.
-- P0 FEEL-PICK-SKETCH-LINE-THROUGH-FACE taken OUT (patch /root/psui-scratch/pickclass-line.patch; test
-  line-8px-test.rs). A reach circle can't satisfy both live cases: inside a shown sketch's rectangle the region's
-  pick-only mesh (PICK_PRIORITY_DEPTH_BIAS +4, drawn before line_pick) hides the inner half of the line's 5 px band
-  (-7 px needs ~6.5 px reach; wf36 needs < 5.4). Fix the occlusion first (lines' pick depth beating the region), then
-  the circle (radius² + 4 at scale 1; pick radii device px, r = 5 × scale). NOTE (t37): a lit line's pick band is
-  11 px (vs_line `held`), so measure with the pointer parked between samples. DIAG (uncommitted, never land):
-  /root/psui-scratch/tmp-diag.patch (viewport psui_tmp_raw_id + test psui_tmp_line_band_ids; reverted).
-- FEEL-SECTION-PLANE-LABEL-LOOK labels half: the section's back-face tint (shaders mesh_shade, accent·0.5) hit unlit
-  meshes (plane names, fills) seen from behind; now shaded faces only. Test hover_matrix
-  plane_names_keep_their_blue_in_a_section_view. OPEN half: ours outlines the cut part in thick black ~3 px edges, live
-  1 px (qa-scratch/tickets/wf28-section-zoom.png).
+## Now (10:59 UTC 11-22): lead order: batch → land; corner dots; Recognize; wf tickets
+QUEUED 91ae59a8 (10:53; carries 9ad9b5d6, the batch: 6d72a4e3 failed 10:01 on a rebase conflict at
+sketch_ui_tests.rs's end with skasm's u_on_another_sketchs_vertex_projects_it, both kept). Batch: t35 + t36 green
+(hover_matrix 85/85, list 112/112, feedback, fields, sketch_hover, measure, feel, scene lib, ops e2e::sketch, clippy).
+91ae59a8: section labels (t39: 96/96 incl. hover_matrix 86/86, render lib 17/17). Reported to lead 09:58 (batch);
+the section-label land not yet reported. Core and qa told 09:58.
+Ticked: FEEL-HELIX-FACE-PICKED-LOOK, FEEL-QUERY-PART-PICK-FILL, APPEARANCE-RGB-FIELD-SCROLL, SPLIT-KEEP-TOOLS-AUTO,
+FEEL-SKETCH-RCLICK-PLANE-LIT, MEASURE-VALUE-CLICK-PIN, MEASURE-READOUT-VARIABLE-ICON, FEAT-MISSING-REF-CHIP,
+PARTS-ROW-OF-PICK, SKETCH-ON-FACE-EXITED-LOOK. Not ticked: UIS-WORLD-TARGET (asm's half), EXPR-AUTOCOMPLETE-LOOK (the
+list's left edge in a sketch dimension box), MEASURE-PANEL-POSITION (qa recheck; note rb.sh sets a temp
+NOSHAPE_CONFIG_DIR, so a drag test may be possible there, but not in CI). FEEL-SECTION-PLANE-LABEL-LOOK: labels half
+done (annotated, not ticked).
+- P0 FEEL-PICK-SKETCH-LINE-THROUGH-FACE: CAUSE CONFIRMED (t38b, offline pick buffer, diag test
+  /root/psui-scratch/line-band-diag.patch, rendered like Matrix::crop with pick: true). On the shown-sketch-reach
+  rectangle the two FAR lines (screen normal pointing up) lose their inner band pixels (-1, -2 px) to the region's
+  pick id; the near lines keep the full -2..+2 band. Tilt: across the band, the tilted plane's depth gains more than
+  the line's pick lift (vs_line: 1.5 * min(half, 1.5 * scale) = 2.25 px toward the eye; iso tan ~1.4 x 2 px = 2.8).
+  Plan: (a) sketch-line instances carry their plane normal (new Instance field, e.g. in a free params.z bit plus a
+  vec; params.z bits 1-7 are free; normal_m is used by silhouette lines, shaders 883) and in picking lift by
+  half * tan(tilt) + 1 px, clamped ~20 px; or (b) regions not overwriting a line's band (needs a stencil; the pick
+  depth is Depth32Float, no stencil). Prefer (a). Then reapply pickclass-line.patch (PickClass::Line, circle r² ~29 at
+  scale 1) and restore line-8px-test.rs. Check sketch_hover a_shown_sketchs_line_and_point_reach_outside_sketch_mode_as_live
+  (-7 px inside lit) + the 8 px test (wf36).
+- FEEL-SECTION-PLANE-LABEL-LOOK labels half (in 91ae59a8): the section's back-face tint (shaders mesh_shade,
+  accent*0.5) hit unlit meshes (plane names, fills) seen from behind; now shaded faces only. Test hover_matrix
+  plane_names_keep_their_blue_in_a_section_view. OPEN half: ours outlines the cut part in thick black ~3 px edges,
+  live 1 px (qa-scratch/tickets/wf28-section-zoom.png).
+- PARTS-ROW-OF-PICK: body_of_input falls back to a face next to an edge/vertex the preview consumed (a Fillet's edge).
+- Model-core changes (core told): FeatureState.missing_refs, SketchDisplay.on_face (serde default).
 RECOGNIZE: CLOSED 09:26 (live offers it nowhere; ours is .hidden(); existing features still evaluate and edit).
-NEXT: the P0 line pick (above; diag via pointer-parked samples gave None/stale hover: read the pick buffer
-directly from a Renderer like Matrix::crop instead), the section's thick edges, CTX-MENU-FLIP-UP (submenu-at-once: needs live
+NEXT: the P0 line pick (plan above), the section's thick edges, CTX-MENU-FLIP-UP (submenu-at-once: needs live
 evidence whether a row under the pointer at open lights), the autocomplete list position, tooltip-after-press opt-out.
 OPEN: tooltip after a press (gpui-pre div.rs TooltipPressGate needs a per-element opt-out). Helix arrow direction = the
 revolve axis (core/skasm). CTX-MENU-FLIP-UP: ours fits below as it lacks live's cloud rows.
