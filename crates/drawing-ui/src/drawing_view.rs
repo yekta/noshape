@@ -1854,7 +1854,7 @@ impl DrawingEditor {
         for (v, rgb) in frames {
             let Some(pl) = self.placement(v) else { continue };
             let color = [(rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8, 255];
-            let (a, c) = view_frame_box(pl.min, pl.max);
+            let (a, c) = noshape_scene::drawing_tools::view_frame_box(pl.min, pl.max);
             let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
             for w in q.windows(2) {
                 lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
@@ -2316,7 +2316,7 @@ impl DrawingEditor {
         }
         let b = self.built.as_ref()?;
         let area = |p: &&noshape_model::drawing::build::ViewPlacement| (p.max[0] - p.min[0]) * (p.max[1] - p.min[1]);
-        let v = b.placements.iter().filter(|p| p.contains(self.cursor, noshape_scene::drawing_tools::VIEW_REACH_MM) && self.drawing_sheet().view(p.id).is_some()).min_by(|a, c| area(a).total_cmp(&area(c)))?;
+        let v = b.placements.iter().filter(|p| noshape_scene::drawing_tools::in_view_reach(p, self.cursor) && self.drawing_sheet().view(p.id).is_some()).min_by(|a, c| area(a).total_cmp(&area(c)))?;
         b.picks.iter().position(|t| *t == PickTarget::View(v.id)).map(|i| i as u32)
     }
 
@@ -2737,32 +2737,22 @@ mod frame_cam_tests {
     }
 }
 
-/// How far a view's hover / selection frame stands out from its geometry (sheet mm), and the least height of that
-/// frame, the geometry centred in it (live drwm-7: 8-10 px at 4.3 px/mm on every side; Front and Right of a 10 mm
-/// block both 76 px tall, 17 px above and below).
-pub(crate) const VIEW_FRAME_PAD_MM: f64 = 2.0;
-pub(crate) const VIEW_FRAME_MIN_H_MM: f64 = 17.7;
-
-/// A view's frame (sheet mm, bottom-left and top-right) around its geometry's box.
-pub(crate) fn view_frame_box(min: [f64; 2], max: [f64; 2]) -> ([f64; 2], [f64; 2]) {
-    let (mut a, mut c) = ([min[0] - VIEW_FRAME_PAD_MM, min[1] - VIEW_FRAME_PAD_MM], [max[0] + VIEW_FRAME_PAD_MM, max[1] + VIEW_FRAME_PAD_MM]);
-    if c[1] - a[1] < VIEW_FRAME_MIN_H_MM {
-        let mid = (min[1] + max[1]) / 2.0;
-        (a[1], c[1]) = (mid - VIEW_FRAME_MIN_H_MM / 2.0, mid + VIEW_FRAME_MIN_H_MM / 2.0);
-    }
-    (a, c)
-}
-
 #[cfg(test)]
 mod view_frame_tests {
-    use super::view_frame_box;
+    use noshape_scene::drawing_tools::view_frame_box;
 
-    /// Live drwm-7 (block-drawing at 4.3 px/mm): Top 172 x 129 px framed 190 x 148; Front 172 x 42 framed 190 x 76.
+    /// Live drwm-7 (block-drawing at 4.3 px/mm): Top 172 x 129 px framed 190 x 148, Front 172 x 42 framed 190 x 76,
+    /// Isometric 212 x 158 framed 236 x 181; drw-hover-1122: Front at 2:1, 343 x 86 px framed 19-19.5 px out.
     #[test]
-    fn a_view_frame_stands_2_mm_out_and_a_thin_view_gets_the_least_height() {
+    fn a_view_frame_stands_out_by_its_size_and_a_thin_view_gets_the_least_height() {
         let px = |mm: f64| mm * 4.3;
+        let mm = |px: f64| px / 4.3;
         let (a, c) = view_frame_box([0.0, 0.0], [40.0, 30.0]);
         assert!((px(c[0] - a[0]) - 190.0).abs() < 2.0 && (px(c[1] - a[1]) - 148.0).abs() < 2.0, "Top: {a:?} {c:?}");
+        let (a, c) = view_frame_box([0.0, 0.0], [mm(212.0), mm(158.0)]);
+        assert!((px(c[0] - a[0]) - 236.0).abs() < 2.0 && (px(c[1] - a[1]) - 181.0).abs() < 2.0, "Isometric: {a:?} {c:?}");
+        let (a, _) = view_frame_box([0.0, 0.0], [mm(343.0), mm(86.0)]);
+        assert!((-px(a[0]) - 19.25).abs() < 1.0 && (-px(a[1]) - 19.25).abs() < 1.0, "Front at 2:1: {a:?}");
         let (a, c) = view_frame_box([0.0, 0.0], [40.0, 10.0]);
         assert!((px(c[1] - a[1]) - 76.0).abs() < 1.0, "Front: {} px tall", px(c[1] - a[1]));
         assert!(((a[1] + c[1]) / 2.0 - 5.0).abs() < 1e-9, "Front: its geometry centred");

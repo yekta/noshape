@@ -22,10 +22,35 @@ pub const CENTER_SNAP_REACH_PX: f64 = 10.0;
 /// The 2 point centerline's reach to a view's points (live2 ann-1118: lit 9 px from a vertex on the diagonal, not at 10).
 pub const CENTERLINE_SNAP_REACH_PX: f64 = 9.5;
 
-/// How far outside its geometry a view lights and takes a click in Select, in sheet mm (it scales with the zoom;
-/// live reach-px-1119 from full-page shots: lit and taken at 13 px, not 14, at the fit's ~3.93 px/mm (D1's 14–16 was
-/// read from clip shots that miss the hover)).
-pub const VIEW_REACH_MM: f64 = 3.45;
+/// How far a view's box stands out from its geometry, per length of the geometry's longer side (live drwm-7 at 4.3
+/// px/mm: Right 128 px wide framed 8 px out, Top 172 px 9, Isometric 212 px 12; drw-hover-1122: Front at 2:1, 343 px,
+/// 19 px).
+pub const VIEW_FRAME_PAD: f64 = 0.055;
+/// The least height of a view's box, its geometry centred (live drwm-7: Front and Right of a 10 mm block both 76 px
+/// tall at 4.3 px/mm, 17 px above and below).
+pub const VIEW_FRAME_MIN_H_MM: f64 = 17.7;
+/// How far past its box a view lights and takes a click in Select, in sheet mm (it scales with the zoom; live
+/// drw-hover-1122: lit to 22-24 px out from a box drawn 19-19.5 px out at 4.3 px/mm; reach-px-1119: 13 px at 3.93
+/// px/mm around a 1:1 view of the 40 mm block).
+pub const VIEW_REACH_MM: f64 = 1.0;
+
+/// A view's box (sheet mm, bottom-left and top-right) around its geometry's box `min`-`max`.
+pub fn view_frame_box(min: [f64; 2], max: [f64; 2]) -> ([f64; 2], [f64; 2]) {
+    let pad = VIEW_FRAME_PAD * (max[0] - min[0]).max(max[1] - min[1]);
+    let (mut a, mut c) = ([min[0] - pad, min[1] - pad], [max[0] + pad, max[1] + pad]);
+    if c[1] - a[1] < VIEW_FRAME_MIN_H_MM {
+        let mid = (min[1] + max[1]) / 2.0;
+        (a[1], c[1]) = (mid - VIEW_FRAME_MIN_H_MM / 2.0, mid + VIEW_FRAME_MIN_H_MM / 2.0);
+    }
+    (a, c)
+}
+
+/// Whether sheet point `s` is within a view's reach: its box and [`VIEW_REACH_MM`] past it.
+pub fn in_view_reach(p: &ViewPlacement, s: [f64; 2]) -> bool {
+    let (a, c) = view_frame_box(p.min, p.max);
+    let r = VIEW_REACH_MM;
+    s[0] >= a[0] - r && s[0] <= c[0] + r && s[1] >= a[1] - r && s[1] <= c[1] + r
+}
 
 /// The tools' pick reach (screen px): Graebert's PICKBOX, 7 at DPR 1 (live drawing-sysvars.json; getIntersected uses
 /// it for every tool).
@@ -333,7 +358,7 @@ impl<'a> SheetPick<'a> {
     /// behind it (live drw-aligned-section-edit), else the smallest view box holding it.
     fn view_under(&self, s: [f64; 2]) -> Option<&'a ViewPlacement> {
         let built = self.built?;
-        smallest(built.placements.iter().filter(|p| p.contains(s, 0.0) && self.geoms.get(&p.id).is_some_and(|g| g.in_cut_face(p.to_view(s))))).or_else(|| smallest_view(built, s, VIEW_REACH_MM))
+        smallest(built.placements.iter().filter(|p| p.contains(s, 0.0) && self.geoms.get(&p.id).is_some_and(|g| g.in_cut_face(p.to_view(s))))).or_else(|| smallest(built.placements.iter().filter(|p| in_view_reach(p, s))))
     }
 
     /// Snap point (vertex / circle center) of a view near a sheet point.

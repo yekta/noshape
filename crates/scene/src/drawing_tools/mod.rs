@@ -30,7 +30,7 @@ pub use measure::{MEASURE_UNITS, MeasurePick, Measured, measure_pick_names, meas
 pub use annotation_edit::LeaderHit;
 pub use opts::*;
 pub use pending::ToolValues;
-pub use pick::{GRIPSIZE_PX, PICKBOX_PX, SheetPick, VIEW_REACH_MM, closed_circle};
+pub use pick::{GRIPSIZE_PX, PICKBOX_PX, SheetPick, VIEW_REACH_MM, closed_circle, in_view_reach, view_frame_box};
 pub use smart::{Refs, same, view_of};
 pub use sketch::{SkCon, SkTool, constraint_ready, sketch_constraint};
 pub use types::*;

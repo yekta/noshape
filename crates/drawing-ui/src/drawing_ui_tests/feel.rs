@@ -44,9 +44,8 @@ fn view_of(s: &Option<Sel>) -> Option<noshape_model::drawing::ViewId> {
     }
 }
 
-/// Live reach-px-1119 (D1 re-read from full-page shots): in Select a view lights and takes a click out to 13 px outside
-/// its geometry, not at 14, at the fit (a reach in sheet mm, ours 3.45); beyond it nothing lights and a click takes
-/// nothing.
+/// Live drw-hover-1122 (reach-px-1119 alike): in Select a view lights and takes a click out to about 4 px past its box
+/// (a reach in sheet mm); beyond it nothing lights and a click takes nothing.
 #[gpui::test]
 fn a_view_lights_and_is_taken_within_its_reach_in_sheet_mm(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
@@ -56,16 +55,17 @@ fn a_view_lights_and_is_taken_within_its_reach_in_sheet_mm(cx: &mut TestAppConte
     // The topmost view, approached from the free sheet above it (the left panel covers the sheet's left margin).
     let pl = cx.update(|cx| editor.read(cx).built.as_ref().and_then(|b| b.placements.iter().max_by(|a, b| a.max[1].total_cmp(&b.max[1])).copied())).expect("a view");
     let x = (pl.min[0] + pl.max[0]) / 2.0;
+    let top = noshape_scene::drawing_tools::view_frame_box(pl.min, pl.max).1[1];
     for zoom_by in [1.0, 2.5] {
         // (Zoomed about the approach, which stays where it is on screen.)
         let zoom = cx.update(|cx| editor.update(cx, |e, cx| {
-            let l = e.sheet_to_local([x, pl.max[1] + reach]);
+            let l = e.sheet_to_local([x, top + reach]);
             e.zoom_by(zoom_by, [l[0], l[1]], cx);
             e.zoom
         }));
         draw(cx, window);
         for (px_off, lights) in [(-0.5, true), (0.5, false)] {
-            let s = [x, pl.max[1] + reach + px_off / zoom];
+            let s = [x, top + reach + px_off / zoom];
             let lit = lit_at(cx, window, &editor, s);
             assert_eq!(view_of(&lit) == Some(pl.id), lights, "zoom {zoom}: {px_off} px past the reach, lit {lit:?}");
             cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
@@ -638,6 +638,11 @@ fn a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange(cx: &mut T
     let on_edge = (0..400).map(|i| [inside[0] - i as f64 * 0.25, inside[1]]).find(|p| matches!(lit_at(cx, window, &editor, *p), Some(Sel::Edge(v, _)) if v == pl.id)).expect("an edge left of the centre");
     click_at(cx, window, &editor, on_edge, Modifiers::default());
     assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_HOVER)], "clicked on an edge: the hover frame");
+    // (Live drw-hover-1122 s-edge: the edge's click selects the whole view, framed in orange once the pointer leaves.)
+    let (selected, all) = flags(cx, state::SELECTED);
+    assert_eq!(selected, all, "an edge's click: every edge of the view selected");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_SELECTED)], "the pointer gone: framed in orange");
 }
 
 /// Live drw/dact-aa-d3, behaviours "drawing Dimension tool": with the Dimension tool a view's edge lights alone, in
