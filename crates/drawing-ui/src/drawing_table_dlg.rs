@@ -279,11 +279,13 @@ impl DrawingEditor {
     pub fn general_cell_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
         let id = t.id;
         let (r0, r1, c0, c1) = (*cs.rows().start(), *cs.rows().end(), *cs.cols().start(), *cs.cols().end());
+        // Insert ▸ and Duplicate ▸ leave nothing selected, the Cell panel closed (live drw-table-cells-insert-row s11).
         let edit = |label: &'static str, f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
             let f = std::rc::Rc::new(f);
             MenuEntry::item(label, move |ed, _, cx| {
                 let f = f.clone();
                 ed.cell_sel = None;
+                ed.selection.clear();
                 ed.edit_table(id, label, cx, move |t| f(t));
             })
         };

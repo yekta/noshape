@@ -413,6 +413,7 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-cell-panel")
+                .debug_selector(|| "dr-cell-panel".into())
                 .absolute()
                 .left(px(left))
                 .bottom(px(bottom))

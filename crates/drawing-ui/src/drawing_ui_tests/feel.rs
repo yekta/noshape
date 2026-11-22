@@ -3419,3 +3419,54 @@ fn a_hovered_balloon_keeps_its_leader_black(cx: &mut TestAppContext) {
     assert!(!hovered.contains(&leader[0]), "hovered: the leader as it is");
     assert!(selected.contains(&leader[0]), "selected: the leader orange as before");
 }
+
+/// Live drw-table-cells-insert-row s11: with a cell selected, the right-click menu's Insert ▸ Row Below adds the row
+/// and closes the Cell panel, nothing left selected.
+#[gpui::test]
+fn a_cells_insert_row_below_closes_the_cell_panel(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseDownEvent, MouseUpEvent};
+    let (window, editor) = drawing(cx, "feel-cell-insert-row");
+    real_sheet(cx, window, &editor);
+    let id = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let id = e.current_sheet().tables.iter().map(|t| t.id).max().unwrap_or(0) + 1;
+            e.edit_sheet("Table", cx, |s| {
+                s.tables.push(noshape_model::drawing::Table::new(id, noshape_model::drawing::TableKind::General { cells: vec![vec!["a".into(), "b".into()], vec!["c".into(), "d".into()]], title: None, header: false }, [60.0, 200.0]));
+            });
+            id
+        })
+    });
+    draw(cx, window);
+    let cell = cx.update(|cx| {
+        let l = editor.read(cx).built.as_ref().and_then(|b| b.table_layout(id).cloned()).expect("the table laid out");
+        [(l.xs[0] + l.xs[1]) / 2.0, (l.ys[0] + l.ys[1]) / 2.0]
+    });
+    click_at(cx, window, &editor, cell, Modifiers::default());
+    assert!(cx.update(|cx| editor.read(cx).cell_panel.is_some()), "a clicked cell opens the Cell panel");
+    let p = at_window(cx, &editor, cell);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_event(MouseDownEvent { button: MouseButton::Right, position: p, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    v.simulate_event(MouseUpEvent { button: MouseButton::Right, position: p, modifiers: Modifiers::default(), click_count: 1 });
+    draw(cx, window);
+    let mut v = VisualTestContext::from_window(window, cx);
+    let insert = v.debug_bounds("menu:Insert").expect("the cells' menu with Insert ▸").center();
+    v.simulate_mouse_move(insert, None, Modifiers::default());
+    cx.executor().advance_clock(std::time::Duration::from_millis(600));
+    draw(cx, window);
+    let mut v = VisualTestContext::from_window(window, cx);
+    let below = v.debug_bounds("menu:Row Below").expect("Insert ▸ Row Below").center();
+    v.simulate_mouse_move(below, None, Modifiers::default());
+    v.simulate_click(below, Modifiers::default());
+    draw(cx, window);
+    let rows = cx.update(|cx| match editor.read(cx).current_sheet().table(id).map(|t| &t.kind) {
+        Some(noshape_model::drawing::TableKind::General { cells, .. }) => cells.len(),
+        _ => 0,
+    });
+    assert_eq!(rows, 3, "a row added");
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.cell_panel.is_none() && e.cell_sel.is_none(), "the Cell panel closes");
+        assert!(e.selection.is_empty(), "nothing selected: {:?}", e.selection);
+    });
+    assert!(VisualTestContext::from_window(window, cx).debug_bounds("dr-cell-panel").is_none(), "the Cell panel isn't drawn");
+}
