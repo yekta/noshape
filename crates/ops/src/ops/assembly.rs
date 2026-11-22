@@ -1099,11 +1099,27 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         names.push(name);
         moves.push(m);
     }
+    // As the app's triad move: the moved instances held where asked and the rest solved round them, so mated
+    // followers come along (live's drag of asm-scissor-lift's Top moved 132 instances), committed as solved. A fixed
+    // one (the translator holds all while it places them) is set where asked.
+    let targets: Vec<(InstanceId, Placement)> = moves
+        .iter()
+        .filter_map(|m| match m {
+            Move::Top(inst, xyz, rotation) if asm.instance(*inst).is_some_and(|i| !i.fixed) => {
+                let now = result.solved.placements.iter().find(|(i, _)| i == inst).map(|(_, p)| *p).or_else(|| asm.instance(*inst).map(|i| i.placement))?;
+                Some((*inst, Placement { translation: *xyz, rotation: rotation.unwrap_or(now.rotation) }))
+            }
+            _ => None,
+        })
+        .collect();
+    let result = if targets.is_empty() { result } else { solve(od, tab, &SolveOptions { targets, ..Default::default() })? };
     // All in one edit: a flexible subassembly's instances placed together, its mates not pulling each back toward
     // the others' old places (as live's occurrence transforms of several at once).
     commit(od, tab, &format!("Move : {}", names.join(", ")), &result, |a| {
         for m in moves {
             match m {
+                // Placed by the solve.
+                Move::Top(inst, ..) if a.instance(inst).is_some_and(|i| !i.fixed) => {}
                 Move::Top(inst, xyz, rotation) => {
                     if let Some(i) = a.instance_mut(inst) {
                         i.placement.translation = xyz;

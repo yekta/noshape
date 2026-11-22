@@ -479,6 +479,13 @@ pub fn matched_targets(result: &AssemblyResult, asm: &Assembly, pattern: &Instan
     } else {
         return Err("The mate to be matched must mate the seed instance".into());
     };
+    // A mate connector on a part matches through the entity it stands on (live workflow 18: a Fastened to Mate
+    // connector 1 at Part 1's top face's centre replicates onto the identical bottom face).
+    let on_part = target.connector.and_then(|id| asm.connectors.iter().find(|c| c.id == id)).filter(|c| c.between.is_none() && c.on.connector.is_none()).map(|c| &c.on);
+    let target = match on_part {
+        Some(on) => on,
+        None => target,
+    };
     if target.connector.is_some() || target.instance == InstanceId::ORIGIN {
         return Err("The seed mate must reference geometry (not a mate connector) to be matched".into());
     }

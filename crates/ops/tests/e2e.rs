@@ -9617,6 +9617,63 @@ fn a_flexible_subassemblys_parts_move_together() {
     assert_eq!(e["param"], "also[0].instance", "{e}");
 }
 
+/// assembly_transform moves an instance as the app's triad does: held where asked, its mated followers solved round it
+/// (ASM-TRANSFORM-FOLLOWERS: only its own placement was stored and the assembly re-solved from there).
+#[test]
+fn a_moved_instance_brings_its_mated_followers() {
+    let mut ctx = Ctx::new();
+    let path = scratch("transform-followers.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+    let (top, bottom) = (face(&mut ctx, "Part 1 <1>", 1.0), face(&mut ctx, "Part 1 <2>", -1.0));
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 1 <2>", "entity": bottom }, "b": { "instance": "Part 1 <1>", "entity": top } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    let at = |ctx: &mut Ctx| -> Vec<[f64; 3]> {
+        let l = call(ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+        ["Part 1 <1>", "Part 1 <2>"].map(|n| { let i = l["instances"].as_array().unwrap().iter().find(|i| i["name"] == n).unwrap(); [0, 1, 2].map(|k| num(&i["translation"][k])) }).to_vec()
+    };
+    let before = at(&mut ctx);
+    let moved = [before[0][0] + 25.0, before[0][1], before[0][2]];
+    call(&mut ctx, "assembly_transform", json!({ "tab": "Assembly 1", "instance": "Part 1 <1>", "translation": moved.map(|x| format!("{x} mm")) }));
+    let after = at(&mut ctx);
+    for (k, (b, a)) in before.iter().zip(&after).enumerate() {
+        let d = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        assert!((d[0] - 25.0).abs() < 1e-6 && d[1].abs() < 1e-6 && d[2].abs() < 1e-6, "instance {k} moved {d:?}, want 25 mm along X (both: {before:?} -> {after:?})");
+    }
+}
+
+/// Replicate on a mate to a mate connector matches through the face the connector stands on (live workflow 18,
+/// REPLICATE-CONNECTOR-SEED: a Fastened to Mate connector 1 at Part 1's 40x40 top adds one copy, on the identical
+/// bottom; ours refused "The seed mate must reference geometry (not a mate connector) to be matched").
+#[test]
+fn a_replicate_seeded_on_a_mate_connector_matches_its_face() {
+    let mut ctx = Ctx::new();
+    let path = scratch("replicate-connector.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 40]] }, { "tool": "corner_rectangle", "points": [[60, 0], [80, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "20 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 2" }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+    let (top, bottom) = (face(&mut ctx, "Part 1 <1>", 1.0), face(&mut ctx, "Part 2 <1>", -1.0));
+    call(&mut ctx, "assembly_mate_connector", json!({ "tab": "Assembly 1", "on": { "instance": "Part 1 <1>", "entity": top } }));
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 2 <1>", "entity": bottom }, "b": { "connector": "Mate connector 1" } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    let r = call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "replicate", "seeds": ["Part 2 <1>"], "scope_refs": [{ "instance": "Part 1 <1>" }] }));
+    assert_eq!(r["created"].as_array().map(Vec::len), Some(1), "one copy, on the bottom: {r}");
+    let l = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let z = |n: &str| num(&l["instances"].as_array().unwrap().iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("no {n}: {l}"))["translation"][2]);
+    assert!(z("Part 2 <2>") < z("Part 2 <1>") - 1.0, "the copy under Part 1, the seed on its top: {l}");
+}
+
 /// Flexible subassemblies inside a flexible subassembly join the top solve (live: asm-bjr-config's Sub 8c440a in each
 /// Sub c1e15f): a mate in Assembly 1 to a part two levels down moves that part alone; its unmated neighbours, in its
 /// subassembly and one level up, stay where they are (a rigid middle level carried them along).

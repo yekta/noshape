@@ -9103,8 +9103,9 @@ fn row_major(m: glam::DMat4) -> Vec<f64> {
 
 /// A root mate whose status isn't live's: how far each of our two connectors lies from live's `mateConnectorCS` (its
 /// `matedCS` carries the mate's offset and flip, live 2423), in its part's own coordinates and live's order, and the
-/// two as ours solved them.
-fn mate_ends_off(ctx: &mut Ctx, live_root: &Value, name: &str) -> Option<String> {
+/// two as ours solved them. `solved`: the assembly's solve, made on the first call and kept for the next (each mate's
+/// own took 7-35 s on asm-infento-subs).
+fn mate_ends_off(ctx: &mut Ctx, solved: &mut Option<noshape_model::assembly::eval::AssemblyResult>, live_root: &Value, name: &str) -> Option<String> {
     use glam::DVec3;
     use noshape_model::assembly::MateConnectorRef;
     use noshape_model::assembly::eval::matrix_frame;
@@ -9119,7 +9120,7 @@ fn mate_ends_off(ctx: &mut Ctx, live_root: &Value, name: &str) -> Option<String>
     };
     let m = asm.mates.iter().find(|m| m.name == name)?.clone();
     let units = od.doc().settings.units;
-    let r = od.evaluate_assembly(&asm, &Default::default());
+    let r = &*solved.get_or_insert_with(|| od.evaluate_assembly(&asm, &Default::default()));
     let local = |c: &MateConnectorRef| -> Option<(DVec3, DVec3, DVec3)> {
         let path: Vec<_> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
         let o = r.occurrences.iter().find(|o| o.path == path)?;
@@ -10944,6 +10945,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         return res;
     };
     let states = &asm["features"]["featureStates"];
+    let mut solved = None;
     for (id, name) in &mate_names {
         res.mates += 1;
         // Live's status: its latest reading (mate-messages.json, live 11-15: infento's Fastened 8 is OK there, ERROR in
@@ -10973,7 +10975,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             // (Traced: each end's offset from live's frame, Z and X angles: a mate OK on both sides whose X turns its
             // part, asm-scissor-lift's Fastened 35.)
             if ok && tracing
-                && let Some(e) = mate_ends_off(&mut *placer.ctx, root, name)
+                && let Some(e) = mate_ends_off(&mut *placer.ctx, &mut solved, root, name)
             {
                 trace(&format!("{name}: {e}"));
             }
@@ -10981,7 +10983,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.mates_matching += 1;
             res.live_defects.push(format!("{name}: live ERROR ({why}), ours solves it"));
         } else {
-            let ends = mate_ends_off(&mut *placer.ctx, root, name).map(|e| format!("; {e}")).unwrap_or_default();
+            let ends = mate_ends_off(&mut *placer.ctx, &mut solved, root, name).map(|e| format!("; {e}")).unwrap_or_default();
             res.differences.push(format!("{name}: {}, live {}{ends}", if ok { "OK".to_string() } else { format!("error ({})", m["message"].as_str().unwrap_or("")) }, live_status));
         }
     }

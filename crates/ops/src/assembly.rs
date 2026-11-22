@@ -278,6 +278,8 @@ pub fn default_replicate_scope(a: &Assembly, seed: InstanceId, mate: MateId) -> 
     use noshape_model::reference::Reference;
     let Some(m) = a.mate(mate) else { return ReplicateScope::FacesInParts };
     let target = if m.a.instance == seed { &m.b } else { &m.a };
+    // (A mate connector's: the entity it stands on.)
+    let target = target.connector.and_then(|id| a.connectors.iter().find(|c| c.id == id)).map_or(target, |c| &c.on);
     let entity = match &target.reference {
         Reference::Implicit { on, .. } => &**on,
         r => r,

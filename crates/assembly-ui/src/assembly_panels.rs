@@ -2017,7 +2017,7 @@ impl AssemblyView {
                 // field's error (its label's tooltip).
                 let mate_tip = (kind == PatternDialogKind::Replicate && !s.scope_refs.is_empty() && s.mate.is_none()).then(|| SharedString::from("Missing mate to be matched."));
                 let mate_err = mate_tip.is_some();
-                body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows).when(mate_err, os::query_box_error)));
+                body = body.child(crate::ui_script::mark(div().px(px(3.)).pt(px(5.)), || "field:Mate to be matched".into()).child(os::query_box_tip("pat-mate", "Mate to be matched", mate_tip, false, mate_rows).when(mate_err, os::query_box_error)));
                 if kind == PatternDialogKind::Replicate {
                     // Live ("qa5 assembly" 5, help: Replicate 6–7): the match
                     // scope, then "Parts to find match in" (red while empty).
@@ -2048,7 +2048,8 @@ impl AssemblyView {
                     let active = s.active == Some(2);
                     // Live (qa5 A19): empty, the field is red (label and border).
                     let scope_tip = s.scope_refs.is_empty().then(|| SharedString::from("A target scope must be selected."));
-                    body = body.child(div().px(px(3.)).pt(px(5.)).child(os::query_box_tip("rep-parts", replicate_scope_field(scope), scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    let parts_field = replicate_scope_field(scope);
+                    body = body.child(crate::ui_script::mark(div().px(px(3.)).pt(px(5.)), move || format!("field:{parts_field}")).child(os::query_box_tip("rep-parts", parts_field, scope_tip, active, rows).when(s.scope_refs.is_empty(), os::query_box_error).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }

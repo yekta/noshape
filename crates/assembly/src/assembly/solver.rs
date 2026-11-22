@@ -1361,10 +1361,19 @@ fn solve_oriented(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
 pub fn solve_placed(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], placed: &[usize], dof: bool) -> SolveResult {
     let mut trial: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || !placed.contains(&i) }).collect();
     let r = solve_with(&mut trial, mates, relations, &[], false);
-    let held = if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| placed.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
-    if !held {
-        return solve_with(bodies, mates, relations, &[], dof);
-    }
+    let held = |r: &SolveResult| if relations.is_empty() { mates.iter().enumerate().filter(|(_, m)| mate_bodies(m).any(|b| placed.contains(&b))).all(|(i, _)| r.mate_ok[i]) } else { r.converged };
+    let (r, trial) = if held(&r) {
+        (r, trial)
+    } else {
+        // The placed bodies where asked and the others solved round them: mated followers come along (live's move of
+        // a part fastened to free ones takes them too: ASM-TRANSFORM-FOLLOWERS).
+        let mut follow: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: b.fixed || placed.contains(&i) }).collect();
+        let r = solve_with(&mut follow, mates, relations, &[], false);
+        if !(r.converged && r.mate_ok.iter().all(|ok| *ok)) {
+            return solve_with(bodies, mates, relations, &[], dof);
+        }
+        (r, follow)
+    };
     for (b, t) in bodies.iter_mut().zip(&trial) {
         if !b.fixed {
             b.pose = t.pose;
