@@ -36,7 +36,9 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - SUSPENSION Fillet 3: ZZ_CBALL + packed vanishing stations >= 0.05 r (was 1e-3 r: a near-point end crossed itself) ->
   ONE VALID SOLID 61/146/87, 393419.692 mm3 (live 53/98/46, 393486.602; -0.017 %). Live faces: 19 torus, 14 cylinder,
   8 plane, 4 sphere, 8 OTHER (4 x 25.287, 4 x 29.602 mm2). zz_susp now prints ZZF <type> <area> <centre> per face
-  (logs/zzsusp18.out) -> find the 8 extra faces. Then a clean land branch (ZZ_CBALL + 0.05 r without the probes).
+  (logs/zzsusp18.out) -> find the 8 extra faces. BUT zzsusp18 (same env, build with the frame fallback + ZZONE)
+  went back to "the union lost one of its parts" -> sections 89/260/153: find which change (try the build without the
+  frame fallback) or whether it is nondeterministic (run zzsusp17's setup twice). Then a clean land branch (ZZ_CBALL + 0.05 r without the probes).
 - blend-cusp env switches: ZZ_NOTIP, ZZ_CBALL, ZZ_FLIPMAP, ZZ_ORIENTDBG, ZZ_SOLIDS (+ZZONE), ZZ_BALLDUMP, ZZ_TOOLDUMP,
   ZZ_SECDIST, ZZ_RUNON.
 - RINGS Fillet 1 landed 18f929e78 (open: 10.4 mm leaves a 0.774 mm2 bore island).
