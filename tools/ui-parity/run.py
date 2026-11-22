@@ -1206,6 +1206,29 @@ def scenario_start(name):
         return None
 
 
+# Live's current std release, the header of a new Feature Studio (core 8631c5717). Recordings keep the version of their
+# day (3112 before 11-22), so the number is compared only in fs-open, against this (lead 11-22: a change is studios').
+LIVE_FS_VERSION = 3132
+FS_VERSION_CHECK = "fs-open"
+
+
+def fs_version_line(state, scenario, is_live):
+    """The "FeatureScript NNNN;" header's and std imports' version as `<v>`, except in FS_VERSION_CHECK, where live reads LIVE_FS_VERSION."""
+    def sub(x):
+        if isinstance(x, str):
+            if scenario == FS_VERSION_CHECK and not is_live:
+                return x
+            n = str(LIVE_FS_VERSION) if scenario == FS_VERSION_CHECK else "<v>"
+            x = re.sub(r"\bFeatureScript \d+;", f"FeatureScript {n};", x)
+            return re.sub(r'(path : \\?"onshape/std/[\w/.]+\\?", version : \\?")\d+\.0', rf"\g<1>{n}.0", x)
+        if isinstance(x, list):
+            return [sub(v) for v in x]
+        if isinstance(x, dict):
+            return {k: sub(v) for k, v in x.items()}
+        return x
+    return sub(state)
+
+
 def compare(live, ours, whole_document=True):
     """(matched steps, total steps, first difference or None). `whole_document`: the scenario starts on a whole
     document or a page (README "Documents, tabs and preferences"); otherwise live's runner works in a lane copy whose
@@ -1359,6 +1382,7 @@ def compare(live, ours, whole_document=True):
         a = unknown_picks(a, b)
         a, b = camera_compared(a), camera_compared(b)
         a, b = export_fields_by_label(a), export_fields_by_label(b)
+        a, b = fs_version_line(a, live.get("scenario"), True), fs_version_line(b, live.get("scenario"), False)
         bl = (b or {}).get("list")
         if isinstance(bl, dict) and isinstance(bl.get("rows"), list) and str(live.get("recorded", "")) < PRO_SINCE:
             # (The pointer's row keeps its place: the rows above it that go move it up.)

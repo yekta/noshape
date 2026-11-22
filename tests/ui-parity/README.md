@@ -679,6 +679,10 @@ clicked button holding the keyboard (Enter or Space re-activating it) is the exc
 The Feature Studio's code editor holding the keyboard is live's Ace textarea, whose text is a piece around the
 caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).
 
+The std version in a Feature Studio's text ("FeatureScript NNNN;", std imports' `version : "NNNN.0"`) is the
+recording day's: compared as `<v>`, except in `fs-open`, where live reads run.py's `LIVE_FS_VERSION` (live's current
+release, 3132 since 11-22) and ours' new Feature Studio must carry it (lead 11-22; a difference is studios').
+
 A native `<select>` of a page (Preferences' units) opens the OS's popup, which live's recorder can't read: while live's
 focus is such a select and its `list` null, ours' open dropdown isn't compared.
 
