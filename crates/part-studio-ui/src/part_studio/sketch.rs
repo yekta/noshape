@@ -433,6 +433,7 @@ impl PartStudioView {
             // remembered place, a region's outline after ✓); the viewport's next pick lights what is under the pointer.
             self.hover = None;
             (self.ui.hover_pick, self.ui.hover_raw, self.ui.sketch_gpu_hover) = (None, None, None);
+            self.ui.sketch_hover_held_at = None;
             self.sketch_fillet_radius = Some(ed.fillet_radius);
             self.dim_input = None;
             (self.opts.editing_sketch, self.opts.sketch_dragging) = (None, false);
@@ -1095,7 +1096,7 @@ impl PartStudioView {
         matches!(id.and_then(|i| self.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|s| s.feature == *sketch))
     }
 
-    /// Nothing under the pointer hovers until it moves (an entity just mirrored).
+    /// Nothing under the pointer hovers until it moves (an entity just mirrored, a chain ended by Esc).
     fn hold_sketch_hover(&mut self, at: DVec2) {
         self.ui.sketch_hover_held_at = Some(at);
         self.hover = None;
@@ -1904,7 +1905,12 @@ impl PartStudioView {
             self.close_dim_menu(cx);
             return;
         }
+        // Live (workflow 22 s11): Esc ending a chain leaves its end point plain under the still pointer.
+        let mid_shape = self.sketch.as_ref().is_some_and(|s| s.tool.draws() && !s.clicks_empty());
         let cancelled = self.sketch.as_mut().map(|s| s.cancel()).unwrap_or(false);
+        if cancelled && mid_shape {
+            self.hold_sketch_hover(self.viewport.read(cx).pointer_position());
+        }
         if self.sketch.as_ref().is_some_and(|s| s.offset_pending.is_none())
             && let Some(ui) = self.ui_mut()
         {

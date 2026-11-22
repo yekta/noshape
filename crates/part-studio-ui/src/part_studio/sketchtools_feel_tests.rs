@@ -466,3 +466,33 @@ fn a_mirrored_entity_is_plain_until_the_pointer_moves(cx: &mut TestAppContext) {
     send(cx, (502., 302.), false);
     assert!(hovered(cx).is_some(), "lit again once the pointer moves");
 }
+
+/// Live workflows-1122 22 s11: Esc after a line's second click ends the chain; the end point under the still pointer
+/// stays plain (ours lit it) until the pointer moves.
+#[gpui::test]
+fn esc_ending_a_chain_leaves_its_end_plain_until_the_pointer_moves(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "st-esc-hold", Tool::Line);
+    click(cx, window, &view, (400., 300.));
+    click(cx, window, &view, (550., 300.));
+    let hover_at = |cx: &mut TestAppContext, at: (f64, f64)| {
+        let at = DVec2::new(at.0, at.1);
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                vp.update(cx, |vp, _| vp.place_pointer(at));
+                for ev in [ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, ViewportEvent::Hover(None)] {
+                    v.on_viewport_event(&vp, &ev, w, cx);
+                }
+            })
+        })
+        .unwrap();
+        cx.run_until_parked();
+    };
+    let hovered = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|ed| ed.hover));
+    hover_at(cx, (550., 300.));
+    keys(cx, window, &["escape"]);
+    hover_at(cx, (550., 300.));
+    assert_eq!(hovered(cx), None, "plain under the still pointer");
+    hover_at(cx, (551., 300.));
+    assert!(hovered(cx).is_some(), "lit again once the pointer moves");
+}
