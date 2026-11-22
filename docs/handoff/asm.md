@@ -5,16 +5,28 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 00:25 UTC) — RESUME HERE
+## State (2026-11-22 01:22 UTC) — RESUME HERE
 - QUEUED 33829c47 (welding flexible subs: assembly_transform `also` + Translator::place_all; welding 41/81 -> 81/81 occ,
-  28/28, 29/29; e2e a_flexible_subassemblys_parts_move_together). Stacked, NOT landed: 2d56de9dd (TICKETS: batch 4
-  fixed) + this handoff: land.sh after 33829c47 lands (never while it's queued).
-- LANDED 8eb92415 (11-21 23:31): P0 batch 4 (PS-MC-MISSING, VERTEX-LOOK, MATE-VERTEX, DRAG-LIT; MANIPULATOR-RING's ring);
-  qa told. Open: MANIPULATOR-RING's X shaft along a selected edge (ours ON_TOP white shaft over the edge band; live hides
-  it, the band crosses the ring stroke, the triad whole over a selected face). Likely live draws the triad depth-tested
-  with a line bias (beats faces, loses to the lifted lit edge): style 0 instead of ON_TOP in asm_scene.rs manipulator
-  `stroke`. Waiting on live: REQUESTS.md "is the assembly move triad depth-tested?" (asked 00:0x, live messaged).
-  Crops: our dump NOSHAPE_HOVER_MATRIX_DUMP=<dir> on the hover matrix tests; /root/asm-scratch/{ours,live}-sel-crops.png.
+  28/28, 29/29; e2e a_flexible_subassemblys_parts_move_together). Stacked, NOT landed (land.sh after 33829c47 lands,
+  never while it's queued): 2d56de9dd (TICKETS batch 4), 2b3c38f3a (handoff), 017520625 (MANIPULATOR-RING: selected
+  edge band + vertex disc over the triad; render: a Lines instance `.on_top()` = nearest depth, selected lines only,
+  params.x bit 4), then the INSTANCE outline commit (state::INSTANCE 8192 with OUTLINE: an instance selected through an
+  entity gets the pushed-out back-face outline in #ffa033; lines draw over it, so the selected face's #ffa90a boundary
+  wins as live t1). Tests: hover_matrix_tests::edge_band_over_triad, ::entity_selected_instance_outlined; asm matrix +
+  feel 44/44, PS hover_matrix 71/71, render 68/68 (band version; INSTANCE version run hm-1122e.log).
+- Live answered the triad (behaviours "assembly triad depth", live/asm/triad-depth-1122/): NOT depth-tested; selected
+  band / vertex dot over it; selecting an entity selects the instance (outlined); Escape doesn't clear an assembly
+  selection, an empty click does (check ours: not yet).
+- qa 11-22: batch 4 12/20 (matrix 100/125); connector cells' navy rim / front square = shared ConnectorGlyphs (psui
+  FEEL-MC-LOOK), told qa. Tell qa the MANIPULATOR-RING commit when it lands.
+- blend waits on the scissor bisect for 9cbb0e Fillet 23 / 665cf3 Fillet 4 (told: after b3345866 + 21754bd8 land).
+- Next item after these: handoff "Next" 3 (triad value boxes: live 30 px X drag = 1.9 mm; ring 30 px right = 15 deg:
+  ours (assembly_view.rs ~3735): the ring angle is geometric, the pointer's ray on the plane ⟂ ring_axis(k) through
+  the triad centre, then ring_snap (Shift: free); the arrow uses arrow_snap_step_for. No test replays live's
+  triad-click-1120 drags (x.json / ring-z.json: pick (70,10,10), press px; no camera scale: measure mm/px from
+  x-0-after-click.png's block edges, then a feel test with live's camera: 30 px -> 1.9 mm, 30 px right -> 15.0 deg).
+- Runs: hm-1122e.log (clippy render/scene/assembly-ui + asm matrix/feel + PS hover_matrix + render on f843236ed) was
+  waiting for a vibex8 build slot at 01:32; infento inf-fix.out in its slot run (01:11 at studio 1dc32b feature 301).
 - Infento rerun with the welding fix: vibex8 ~/agents/asm-keep/weld/inf-fix.out (onerun-t.sh, 7200 s, bin ops-weld),
   started 00:0x. Compare with 157/167 occ, 204/206 mates, 64/64 BOM; the 5 nested misses (b63c40 / bdf7bf / dfc972)
   should close if they were the same one-at-a-time placing.
