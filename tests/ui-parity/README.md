@@ -160,7 +160,8 @@ take's placement) carries the same control by name for ours, which runs `ours_on
 - `{"menu": "Suppress"}`: an item of the open context menu.
 - `{"face": [x, y, z]}`, `{"edge": [x, y, z]}`, `{"vertex": [x, y, z]}`: the entity through that model point (mm),
   picked where it shows in the current view; `{"sketch_point": [x, y]}` on the active sketch plane (mm);
-  `{"plane": "Top"}`, `{"origin": true}`, `{"empty": true}` (empty graphics area).
+  `{"plane": "Top"}`, `{"origin": true}`, `{"empty": true}` (empty graphics area; in a drawing, a Variable or Feature
+  Studio window pixel (1560, 960), as live's recorder).
 - `{"view_cube": "Top"}` (a face: Top, Bottom, Front, Back, Right, Left; the view menu's Isometric is `{"button": "Camera and render options"}`, then `{"menu": "Isometric"}`).
 - `{"flat_bend": 0, "frac": 0.4}`: the Sheet metal panel's flat view, inside bend line n's zone, `frac` of the way
   from its centre line to its edge (ours only, for one-off scenarios: live's recorder has no flat view target yet).
@@ -436,7 +437,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   n, "committed": true, "notices": n}` (from 0; `committed`: the text is what was last committed; `notices`: the
   studio's notices after the last commit); the autocomplete is `list` (`"kind": "autocomplete"`, its rows' names).
 - Code targets (dx, 11-08): `{"code": "myFeature", "nth": 2}` the middle of that text's nth occurrence in the editor
-  (default 1st); `{"gutter": 3}` line 3's number cell (1-based; a text instead: the first line holding it);
+  (default 1st); `{"ace_word": "import", "nth": 1}` the same for a whole word (live's recorder); `{"gutter": 3}` line 3's number cell (1-based; a text instead: the first line holding it);
   `{"fold": 8}` line 8's fold arrow (Ace's ▾; only lines whose last open bracket closes on a later line have one);
   `{"heat": "println"}` while profiling, the heat bar beside that line; `{"profile_badge": "total"}` the profile's
   total-time badge. `{"list_row": "Define feature"}` an autocomplete row by its caption. Profile times (in `tooltip`

@@ -417,7 +417,8 @@ pub fn jog() -> FeatureType {
         let mut computed = angle.clone().hints(Hints::READ_ONLY).visible(move |v| by_angle(v) && set(v));
         computed.id = "bendAngleReadOnly";
         p[i] = angle.hints(Hints::UNCONFIGURABLE).visible(move |v| by_angle(v) && !set(v));
-        p.insert(i + 1, computed);
+        // Live's spec order: the flag, the read-only angle, the angle.
+        p.insert(i, computed);
         p.insert(i, hidden(ParamSpec::bool("bendAngleSetProgrammatically", "Bend angle set programmatically", false)));
     }
     p.extend(bend_radius_override(always, "bendRadius"));

@@ -693,6 +693,13 @@ impl FeatureStudioView {
             let at = text.match_indices(code).nth(nth - 1).map(|(i, _)| i);
             return Some(at.and_then(|i| ed.range_to_bounds(&(i..i + code.len()))).map(|b| b.center()).ok_or_else(|| format!("code:{code} is not shown")));
         }
+        // A word of the code (live's recorder: ace_word, the nth whole word so spelled, at its middle; qa UIS-EMPTY-NON-PS).
+        if let Some(word) = t.get("ace_word").and_then(|v| v.as_str()) {
+            let nth = t.get("nth").and_then(|v| v.as_u64()).unwrap_or(1).max(1) as usize;
+            let is_word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+            let at = text.match_indices(word).filter(|(i, _)| !is_word(text[..*i].chars().next_back()) && !is_word(text[i + word.len()..].chars().next())).nth(nth - 1).map(|(i, _)| i);
+            return Some(at.and_then(|i| ed.range_to_bounds(&(i..i + word.len()))).map(|b| b.center()).ok_or_else(|| format!("ace_word:{word} is not shown")));
+        }
         let (key, spec) = ["gutter", "fold", "heat"].into_iter().find_map(|k| t.get(k).map(|v| (k, v)))?;
         let lines: Vec<&str> = text.split('\n').collect();
         let line = match (spec.as_u64(), spec.as_str()) {

@@ -39,13 +39,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Now (02:54 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
 LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (qa re-score 4/15, matrix 94/125).
 QUEUED 0fc65a29 (03:0x, 3 commits: walk 6, batch 3/walk 7, walk 5 + 8 below); lead + qa + live told.
-IN TREE (03:12, next land; run-t13.sh): FEEL-PLANE-LIT-WHILE-DIMENSIONING per live dimplane-1122 (behaviours "psui plane
+QUEUED 30d77c0f (03:12, carries 0fc65a29; run-t13.sh green): FEEL-PLANE-LIT-WHILE-DIMENSIONING per live dimplane-1122 (behaviours "psui plane
 while dimensioning"): with Dimension picks a plane lights by its outline only (sketch.rs sketch_hover -> plane_by_outline,
 reach DIM_PLANE_OUTLINE_PX 2.5, 6 with an ellipse); test sketch_hover_feel a_line_picked_for_a_dimension_lights_a_plane_
 only_on_its_outline. KEYS-SHEET-DETAILS: "select rollback bar" a keycap (shortcuts.rs locked_row; SheetRow.prefix gone).
 Fillet arrow anchor pin test (hover_matrix the_fillet_arrow_stays_at_the_edges_midpoint…; lead re-raised it, told closed).
 SPEED-HEAVY-HOVER closed (Mac GPU: plate 22-86 ms, parts-1000 21-69 ms move-to-present vs live 42-53 / 265-270;
 kit ~/noshape-host/psui-keep run.sh / run2.sh ps1000, local psui-scratch/mac). TICKETS dup headers dropped.
+LANDING (03:36, after 30d77c0f): lead order 11-22 03:2x: (1) qa 1121-0935 full run's Part Studio failures: all 9 left match
+on green e97ac7f1c (uip-green.sh on vibe2, ~/agents/psui-keep/noshape = /root/green copy; the 15 Section view rows fixed
+earlier); (2) missing-commands-1119: no psui row open; (3) dialog specs vs std 3132: Jog, Tag reordered (82/86; specdiff
+e97a in psui-scratch/dlg); Hole = live's legacy/V2 fields (ours is V3), Import, Recognize (live asked), Frame/Tag errors
+explained in feature-dialogs.md. qa P2 UIS-EMPTY-NON-PS: empty outside PS/asm = (1560, 960); ace_word in FS.
 WALK 5 + 8 BATCH (part-studio-ui hover_matrix/menu/midpoint/snaps 116, list:: + dialogs + ui_script + assembly-ui
 green on vibe2, run-t9.sh / run-t10.sh):
 - live psui walk 5 (behaviours "psui walk 5", live/psui/walk5-1121/): in a sketch with no tool a part edge's midpoint

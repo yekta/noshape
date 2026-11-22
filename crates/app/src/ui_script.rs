@@ -351,6 +351,11 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
     if let Some(ps) = studio.as_ref() {
         return ps.read(cx).ui_target_point(t, cx).map(whole);
     }
+    // Elsewhere than a Part Studio's or an Assembly's graphics (a drawing, a Variable or Feature Studio), live's recorder
+    // takes "empty" as window pixel (1560, 960) (live-pw uip/run.mjs; qa UIS-EMPTY-NON-PS).
+    if empty && (drawing.is_some() || assembly.is_none()) {
+        return Ok(whole(point(px(1560.), px(960.))));
+    }
     if let Some(d) = drawing.as_ref() {
         return d.read(cx).ui_target_point(t, cx).map(whole);
     }

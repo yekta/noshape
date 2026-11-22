@@ -247,6 +247,12 @@ fn ace_line_keys_comment_move_duplicate_and_remove(cx: &mut TestAppContext) {
     assert!(lines(cx).ends_with(" 42"), "{}", lines(cx));
     type_key(cx, window, if cfg!(target_os = "macos") { "ctrl-t" } else { "alt-shift-x" });
     assert!(lines(cx).ends_with(" 24"), "{}", lines(cx));
+    // ui-script's ace_word (live's recorder, qa UIS-EMPTY-NON-PS): a whole word of the code, at its middle.
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, t: serde_json::Value| cx.update(|cx| view.read(cx).ui_target_point(&t, cx));
+    let import = at(cx, serde_json::json!({ "ace_word": "import" }));
+    assert!(matches!(import, Some(Ok(p)) if p.x > px(0.) && p.y > px(0.)), "{import:?}");
+    assert!(matches!(at(cx, serde_json::json!({ "ace_word": "mport" })), Some(Err(_))), "only whole words");
     let _ = std::fs::remove_dir_all(&dir);
 }
 

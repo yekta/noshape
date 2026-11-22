@@ -18,12 +18,13 @@ Method:
 Result on green 4553fc38a (11-21 10:4x), against live's fresh dump (live/psui/dlg-1121/featurespecs.json, std 3132)
 and live's empty errors by REST (dlg-1121/empty-errors.json): 88 feature types, 86 with a live spec. 81 equal in every
 field (ids, order, labels, defaults, toggles, options); 85 of 87 empty errors equal (Form tool: no live answer). Left:
-- Hole: field order from unitsSystem on (live's V2 diameter / tolerance fields): our std is 3112, live's 3132 (hole.fs
-  is one of the 14 files that differ; reported to lead 11-21).
-- Jog (bendAngleReadOnly / bendAngle) and Tag (pcbEntityType / standardContentPart): order of fields that are never
-  shown together; the dialogs look the same.
+- 11-22 (green e97ac7f1c, std 3132 embedded by core 8631c5717): Jog and Tag now in live's spec order (82 of 86).
+- Hole: ours is std 3132's V3 Hole (holeVersion V3, holeDiameterV3 …), as a new live Hole. Live's spec also lists the
+  116 legacy and V2 fields (holeDiameter, holeDiameterV2 and their tolerance fields) that only features made before
+  V3 show, and puts style (legacy) after styleV2: no difference in the dialog of a Hole made today.
 - Import: Import appearances on in ours and in live's dialog (live's spec default False is not what its UI shows).
-- Recognize (in neither toolbar): Thickness / Minimal gap 25 mm in live's spec, 1.6 / 0.02 mm in ours.
+- Recognize (in neither toolbar): Thickness / Minimal gap 25 mm in live's spec, 1.6 / 0.02 mm in ours (live's dialog
+  asked, REQUESTS psui 11-22).
 - Frame empty error: live's REST "Select profile." comes from the spec skipping the library profile default; live's
   dialog says ours, "Select sweep paths.".
 - Tag empty error: std (tag.fs) names the faulty field instanceFunction, which Tag doesn't have; live's dialog marks no
@@ -82,7 +83,7 @@ Status: = same, ≠ differs.
 | Intersection curve | intersectionCurve | 10 (2 sel, 4 val, 4 tog, 0 list) | = | = | = | Cannot resolve entities. | Cannot resolve entities. | = spec, = error |
 | Isocline | isocline | 5 (2 sel, 1 val, 2 tog, 0 list) | = | = | = | Select faces to create isoclines. | Select faces to create isoclines. | = spec, = error |
 | Isoparametric curve | isoparametricCurve | 5 (1 sel, 1 val, 1 tog, 1 list) | = | = | = | Select face to create isoparametric curve. | Select face to create isoparametric curve. | = spec, = error |
-| Jog | sheetMetalJog | 25 (5 sel, 8 val, 8 tog, 4 list) | ≠ first at bendAngleReadOnly / bendAngle | = | = | Select a line. | Select a line. | ≠ spec, = error |
+| Jog | sheetMetalJog | 25 (5 sel, 8 val, 8 tog, 4 list) | = | = | = | Select a line. | Select a line. | = spec, = error |
 | Linear pattern | linearPattern | 21 (5 sel, 4 val, 8 tog, 2 list) | = | = | = | Select parts to pattern. | Select parts to pattern. | = spec, = error |
 | Loft | loft | 34 (7 sel, 7 val, 11 tog, 5 list); ours only: asVersion | = | = | = | Select profiles in order from start to finish. | Select profiles in order from start to finish. | = spec, = error |
 | Make joint | sheetMetalMakeJoint | 5 (1 sel, 1 val, 1 tog, 2 list) | = | = | = | Selected edges should be from the same active sheet metal model. | Selected edges should be from the same active sheet metal model. | = spec, = error |
@@ -115,7 +116,7 @@ Status: = same, ≠ differs.
 | Split | splitPart | 13 (5 sel, 0 val, 6 tog, 2 list) | = | = | = | Select parts, surfaces, or curves to split. | Select parts, surfaces, or curves to split. | = spec, = error |
 | Sweep | sweep | 30 (8 sel, 7 val, 10 tog, 5 list) | = | = | = | Select entities for sweep path. | Select entities for sweep path. | = spec, = error |
 | Tab | sheetMetalTab | 4 (3 sel, 1 val, 0 tog, 0 list) | = | = | = | Select a face for the tab. | Select a face for the tab. | = spec, = error |
-| Tag | tag | 16 (6 sel, 0 val, 2 tog, 2 list) | ≠ first at pcbEntityType / standardContentPart | = | = | Select a single sketch feature. The selected feature must create sketch regions. ≠fields | Select a single sketch feature. The selected feature must create sketch regions. (fields instanceFunction; ours none) | ≠ spec, ≠ error |
+| Tag | tag | 16 (6 sel, 0 val, 2 tog, 2 list) | = | = | = | Select a single sketch feature. The selected feature must create sketch regions. ≠fields | Select a single sketch feature. The selected feature must create sketch regions. (fields instanceFunction; ours none) | = spec, ≠ error (explained) |
 | Thicken | thicken | 10 (2 sel, 3 val, 4 tog, 1 list) | = | = | = | Select surfaces or faces to thicken. | Select surfaces or faces to thicken. | = spec, = error |
 | Transform | transform | 23 (7 sel, 9 val, 5 tog, 2 list) | = | = | = | Cannot resolve entities. | Cannot resolve entities. | = spec, = error |
 | Trim curve | trimCurve | 9 (4 sel, 1 val, 1 tog, 3 list) | = | = | = | Select a curve to adjust. | Select a curve to adjust. | = spec, = error |

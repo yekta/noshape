@@ -424,7 +424,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   word's end); ours draws no bracket boxes with the word selected.
 - [ ] P2 **FS-DRAG-SELECT-BAND (studios)**: drag from line 1's start to inside line 2: live paints line 1's selection the full width
   (#9ec9ff) and drops the active-line band; ours stops line 1's selection at the text end and keeps the #ededed band on line 2.
-- [ ] P2 **UIS-EMPTY-NON-PS (psui)**: ui-script's `{"empty": true}` fails outside a Part Studio / Assembly ("not a drawing target",
+- [x] (fixed psui 11-22 03:36: "empty" in a drawing, a Variable or Feature Studio = live's window pixel (1560, 960); ace_word = the nth whole word of the code, at its middle (feature_studio ui_tests ace_line_keys…); README) P2 **UIS-EMPTY-NON-PS (psui)**: ui-script's `{"empty": true}` fails outside a Part Studio / Assembly ("not a drawing target",
   "not in a Part Studio, an Assembly or a Drawing"), and `ace_word` (live's Feature Studio target) is unknown; walk 9 used px
   stand-ins. Live's drwm / vsm / fsm scenarios should replay as recorded.
 - Matched live: a view's hover (tan frame, edges dark) and selected look (orange frame and edges), re-click deselects, shift-click

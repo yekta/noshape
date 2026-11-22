@@ -200,8 +200,6 @@ pub fn tag() -> FeatureType {
         ParamSpec::query1("negativePart", "Part to remove", QueryFilter::SOLID_BODY).visible(form),
         ParamSpec::query1("flatFormSketch", "Sketch for flat view", QueryFilter::FEATURE | QueryFilter::SKETCH).visible(form),
         ParamSpec::query1("cSysMateConnector", "Form origin mate connector", QueryFilter::MATE_CONNECTOR).describe("If none selected, this feature will create one at Origin").visible(form),
-        // Standard content (std 3112 defineStandardContentTagParams: a solid or composite part, one pick).
-        ParamSpec::query1("standardContentPart", "Standard content part", QueryFilter::SOLID_BODY).visible(standard_content),
         // PCB holes (std definePcbHolesTagParams; std runs Tag).
         ParamSpec::enum_("pcbEntityType", "PCB entity type", &[("HOLE", "Holes"), ("CUTOUT", "Cutouts")]).hints(Hints::SHOW_LABEL).visible(pcb),
         ParamSpec::bool("plated", "Plated", false).visible(pcb),
@@ -229,6 +227,9 @@ pub fn tag() -> FeatureType {
         .item_template("[#designator] #interiorFaces")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::INITIAL_FOCUS_ON_EDIT | Hints::DRIVEN_QUERY)
         .visible(pcb),
+        // Standard content (std defineStandardContentTagParams: a solid or composite part, one pick), after the PCB
+        // fields as live's spec (std 3132).
+        ParamSpec::query1("standardContentPart", "Standard content part", QueryFilter::SOLID_BODY).visible(standard_content),
     ]);
     FeatureType::new("tag", "Tag", Category::Frame, p).icon("tagProfile").describe("Tag a profile sketch for frames or a form tool for sheet metal")
 }
