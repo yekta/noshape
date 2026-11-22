@@ -294,6 +294,25 @@ cells! {
     }
 }
 
+/// Live triad-depth-1122 e1 (qa FEEL-ASM-MANIPULATOR-RING): a selected edge's #ffa90a band draws over the move
+/// manipulator, hiding the X shaft that lies along the edge (no shaft core on the edge's line past the centre ring:
+/// before, the shaft's white and grey strokes ran over the band).
+#[gpui::test]
+fn edge_band_over_triad(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix(cx, "edge_band_over_triad");
+    let p = m.screen(cx, EDGE);
+    m.click(cx, p);
+    m.park(cx);
+    let along = (m.screen(cx, [EDGE[0] + 5.0, EDGE[1], EDGE[2]]) - p).normalize();
+    let crop = m.crop(cx, p);
+    dump("edge_band_over_triad", &crop);
+    let at = |d: f64| crop[((40.0 + along.y * d).round() as usize) * 80 + (40.0 + along.x * d).round() as usize];
+    let line: Vec<[u8; 3]> = (11..36).flat_map(|d| [at(d as f64), at(-(d as f64))]).collect();
+    // The band's 78 % core lets the shaft's white tint it, as live's (246,179,54); the shaft's own white never shows.
+    assert!(line.iter().all(|c| c[0] >= 190 && c[2] <= 70 && !close(*c, 0xf7f7f8, 40)), "the band along the edge, over the shaft: {line:?}");
+}
+
 /// Live b5-fastened-vertex (qa FEEL-ASM-MATE-VERTEX): Fastened's first field active, the pointer on the corner
 /// (40, 0, 20): the vertex's ~11 px light orange disc (#f8c58a) with the white corner mark of the inferred connector
 /// over it, no connector glyph (no triad's blue Z, no ring).

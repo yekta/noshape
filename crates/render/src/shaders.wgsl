@@ -999,8 +999,10 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let half_vp = g.viewport.xy * 0.5;
     let pick = global_pick(l.pick);
     let st = (state_of(pick) | state_add) & state_mask;
-    // params.x bit 2 (Instance::selected_only): only its selected, query-lit or hovered lines.
-    if ((inst.params.x & 4u) != 0u && (st & (SELECTED | QUERY | HOVER)) == 0u) {
+    // params.x bit 2 (Instance::selected_only): only its selected, query-lit or hovered lines; bit 4 too (on top):
+    // only the selected.
+    let on_top = (inst.params.x & 16u) != 0u;
+    if ((inst.params.x & 4u) != 0u && (st & select(SELECTED | QUERY | HOVER, SELECTED, on_top)) == 0u) {
         var gone: LineOut;
         gone.pos = vec4(0.0, 0.0, -2.0, 1.0);
         return gone;
@@ -1074,7 +1076,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     }
     c = vec4(c.xy + off_px / half_vp * c.w, c.z, c.w);
 
-    if ((l.style & 2u) != 0u) {
+    if ((l.style & 2u) != 0u || on_top) {
         c.z = c.w; // on top: nearest depth
     } else {
         // At the edge's own depth, offset like Onshape's (27 - 15 units).

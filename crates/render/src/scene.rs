@@ -511,7 +511,8 @@ impl Instance {
         self.front_only = true;
         self
     }
-    /// Draw a translucent mesh through all other geometry ([`Instance::on_top`]).
+    /// Draw a translucent mesh through all other geometry ([`Instance::on_top`]); lines at the nearest depth, as
+    /// their ON_TOP style (with [`Instance::selected_only`]: only the selected ones).
     pub fn on_top(mut self) -> Self {
         self.on_top = true;
         self

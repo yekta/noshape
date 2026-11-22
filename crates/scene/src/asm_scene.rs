@@ -1070,9 +1070,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         }
     }
     let mut pts = PointData::default();
+    // A selected vertex's disc over the move manipulator, as its edge's band (live triad-depth-1122 t6).
+    let mut sel_pts = PointData::default();
     let sel = theme::lin(theme::viewport::SELECTION);
     let hov = theme::lin(theme::viewport::PREHIGHLIGHT);
-    let mut mark = |path: &InstancePath, r: &Reference, flag: u32, scene: &mut Scene| {
+    let mark = |path: &InstancePath, r: &Reference, flag: u32, scene: &mut Scene, pts: &mut PointData, sel_pts: &mut PointData| {
         for id in built.picks.ids_for(path, r) {
             scene.add_flag(id, flag);
             if let Some(t) = built.picks.get(id)
@@ -1084,15 +1086,16 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
                 let disc = crate::builder::vertex_disc(w.as_vec3().into(), lin_to_u8(if flag == state::HOVER { hov } else { sel }));
                 // Under a mate field's corner mark: depth-tested, so the mark (nearer) covers its middle.
                 let under = flag == state::HOVER && h.hover_vertex_open;
-                pts.points.extend(disc.map(|p| PointSprite { style: if under { p.style & !LineSegment::ON_TOP } else { p.style }, ..p }));
+                let out = if flag & state::SELECTED != 0 { &mut *sel_pts } else { &mut *pts };
+                out.points.extend(disc.map(|p| PointSprite { style: if under { p.style & !LineSegment::ON_TOP } else { p.style }, ..p }));
             }
         }
     };
     for (p, r) in &h.selected_entities {
-        mark(p, r, state::SELECTED, &mut scene);
+        mark(p, r, state::SELECTED, &mut scene, &mut pts, &mut sel_pts);
     }
     if let Some((p, r)) = &h.hover_entity {
-        mark(p, r, state::HOVER, &mut scene);
+        mark(p, r, state::HOVER, &mut scene, &mut pts, &mut sel_pts);
     }
     for (p, r) in &h.query_entities {
         for id in built.picks.ids_for(p, r) {
@@ -1100,7 +1103,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         }
     }
     for (p, r) in &h.picked_entities {
-        mark(p, r, state::SELECTED | state::PICKED, &mut scene);
+        mark(p, r, state::SELECTED | state::PICKED, &mut scene, &mut pts, &mut sel_pts);
         for id in built.picks.boundary_ids(p, r) {
             scene.add_flag(id, state::HOVER | state::OUTLINE | state::PICKED);
         }
@@ -1373,6 +1376,22 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     }
     if !pts.points.is_empty() {
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&pts))).per_primitive_color().unpickable().ignore_clip().layer(21));
+    }
+    // The selected edges' band over the move manipulator: it hides the shaft along the edge and crosses the centre
+    // ring and arrowhead (live triad-depth-1122 e1; the triad itself draws over the parts, t2).
+    if h.manipulator.is_some() {
+        let tops: Vec<_> = h.selected_entities.iter().map(|(p, _)| p[0]).collect();
+        for span in built.spans.iter().filter(|s| tops.contains(&s.top)) {
+            let edges = scene.instances[span.start..span.end.min(built.static_instances)]
+                .iter()
+                .filter(|i| i.pickable && !i.pick_only && !i.back_silhouette && matches!(i.drawable, Drawable::Lines(_)))
+                .map(|i| i.clone().unpickable().selected_only().on_top().over_lines())
+                .collect::<Vec<_>>();
+            scene.instances.extend(edges);
+        }
+    }
+    if !sel_pts.points.is_empty() {
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&sel_pts))).per_primitive_color().unpickable().ignore_clip().over_lines().layer(24));
     }
     scene
 }
