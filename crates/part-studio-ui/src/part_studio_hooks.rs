@@ -78,6 +78,8 @@ pub struct Hooks {
     pub compare_slider: fn(&Entity<DocModel>, &App) -> Option<AnyElement>,
     /// A part's entity clicked in Compare: its feature's row selected in the panel (None: deselected).
     pub compare_select: fn(&Entity<DocModel>, Option<FeatureId>, &mut App),
+    /// The feature whose row is selected in Compare's panel (its geometry lit in the graphics).
+    pub compare_selected: fn(&Entity<DocModel>, &App) -> Option<FeatureId>,
     /// Repair mode: open, close, its panel (over the graphics).
     pub repair_open: fn(&Entity<DocModel>, &App) -> bool,
     pub repair_close: fn(&Entity<DocModel>, &mut App),
@@ -185,6 +187,10 @@ pub fn compare_blend(doc: &Entity<DocModel>, cx: &App) -> Option<f32> {
     (hooks().compare_blend)(doc, cx)
 }
 
+pub fn compare_selected(doc: &Entity<DocModel>, cx: &App) -> Option<FeatureId> {
+    (hooks().compare_selected)(doc, cx)
+}
+
 pub fn compare_documents(doc: &Entity<DocModel>, cx: &App) -> Option<(Arc<Document>, ConfigValues, Arc<Document>, ConfigValues)> {
     (hooks().compare_documents)(doc, cx)
 }
@@ -258,6 +264,7 @@ pub fn register_for_tests() {
         compare_panel: |_, _, _| None,
         compare_slider: |_, _| None,
         compare_select: |_, f, _| TEST_COMPARE_SELECTED.with(|c| c.borrow_mut().push(f)),
+        compare_selected: |_, _| None,
         repair_open: |_, _| false,
         repair_close: |_, _| {},
         repair_panel: |_, _, _| None,

@@ -1900,10 +1900,52 @@ pub fn vertex_disc(position: [f32; 3], rgb: [u8; 4]) -> [PointSprite; 2] {
 /// what lies behind them shows (a hole's walls). Not pickable (the hidden
 /// faces' pick ids would hide it too): a click there reaches what is behind.
 pub fn query_faces(display: &StudioDisplay, faces: &[Reference], up: &Uploader) -> Option<Instance> {
+    let m = faces_mesh(display, |r| faces.contains(r))?;
+    let k = theme::lin(theme::viewport::QUERY_HOVER);
+    Some(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], QUERY_FACE_ALPHA]).unpickable())
+}
+
+/// Versions and history › Compare with a feature's row selected (live wf23-18 step 25): the faces that feature made on
+/// one side, see-through in the selection orange over everything, and its edges orange. Drawn for both sides, the
+/// geometry the two share reads stronger than one side's own.
+pub fn compare_feature(display: &StudioDisplay, feature: FeatureId, up: &Uploader) -> Vec<Instance> {
+    let (faces, lines) = compare_feature_geometry(display, feature);
+    let mut out = Vec::new();
+    if let Some(m) = faces {
+        let k = theme::lin(theme::viewport::SELECTION);
+        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], COMPARE_FEATURE_ALPHA]).unpickable().front_only().on_top());
+    }
+    if !lines.segments.is_empty() {
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(12));
+    }
+    out
+}
+
+/// [`compare_feature`]'s faces (one mesh) and orange edges, before the GPU.
+pub fn compare_feature_geometry(display: &StudioDisplay, feature: FeatureId) -> (Option<MeshData>, LineData) {
+    let mine = |r: &Reference| r.depends_on() == Some(feature);
+    let color = lin_to_u8(theme::lin(theme::viewport::SELECTION));
+    let mut lines = LineData::default();
+    for b in display.bodies.iter().filter(|b| !b.hidden && b.face_refs.iter().any(mine)) {
+        // The edges bounding the feature's faces (an edge's own name doesn't say which feature made it).
+        let table = face_edge_table(&b.mesh);
+        let edges: std::collections::BTreeSet<u32> = b.face_refs.iter().enumerate().filter(|(_, r)| mine(r)).filter_map(|(fi, _)| table.get(fi)).flatten().copied().collect();
+        for pl in edges.into_iter().filter_map(|e| b.mesh.edges.get(e as usize)) {
+            lines.push_polyline(pl, color, 0, 1.5, 0);
+        }
+    }
+    (faces_mesh(display, mine), lines)
+}
+
+/// How opaque one side's faces of a feature selected in Compare are.
+pub const COMPARE_FEATURE_ALPHA: f32 = 0.45;
+
+/// The shown faces passing `keep`, as one mesh (None: none).
+fn faces_mesh(display: &StudioDisplay, keep: impl Fn(&Reference) -> bool) -> Option<MeshData> {
     let mut m = MeshData { positions: Vec::new(), normals: Vec::new(), pick_ids: Vec::new(), indices: Vec::new() };
     for b in display.bodies.iter().filter(|b| !b.hidden) {
         for (fi, r) in b.face_refs.iter().enumerate() {
-            if !faces.contains(r) {
+            if !keep(r) {
                 continue;
             }
             let Some(&(first, count)) = b.mesh.face_ranges.get(fi) else { continue };
@@ -1917,11 +1959,7 @@ pub fn query_faces(display: &StudioDisplay, faces: &[Reference], up: &Uploader) 
             }
         }
     }
-    if m.indices.is_empty() {
-        return None;
-    }
-    let k = theme::lin(theme::viewport::QUERY_HOVER);
-    Some(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([k[0], k[1], k[2], QUERY_FACE_ALPHA]).unpickable())
+    (!m.indices.is_empty()).then_some(m)
 }
 
 /// How opaque Create selection's see-through result faces are.

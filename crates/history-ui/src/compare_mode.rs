@@ -240,6 +240,11 @@ pub fn select_feature(doc: &Entity<DocModel>, feature: Option<FeatureId>, cx: &m
     update(doc, cx, |s| s.selected = feature);
 }
 
+/// The feature whose row is selected (its geometry lit in the graphics, live wf23-18 step 25).
+pub fn selected_feature(doc: &Entity<DocModel>, cx: &App) -> Option<FeatureId> {
+    session(doc, cx).and_then(|s| s.selected)
+}
+
 fn session<'a>(doc: &Entity<DocModel>, cx: &'a App) -> Option<&'a CompareSession> {
     cx.try_global::<Sessions>().and_then(|g| g.0.get(&doc.entity_id()))
 }
@@ -668,9 +673,9 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
         Some(f) => h_flex()
             .items_start()
             .size_full()
-            .child(dialog_column(f, true))
+            .child(dialog_column(f, true, cx))
             .child(div().w(px(1.)).h_full().flex_none().bg(rgb(0xd7d7d7)))
-            .child(dialog_column(f, false))
+            .child(dialog_column(f, false, cx))
             .into_any_element(),
     };
     let d = doc.clone();
@@ -793,7 +798,7 @@ fn config_section(doc: &Entity<DocModel>, a: &noshape_model::partstudio::PartStu
 /// One side's read-only feature dialog in the compare panel (live cp-921):
 /// the feature name over a rule, then its controls; a value that differs
 /// from the other side has a `#fab601` outline.
-fn dialog_column(f: &FeatureCompare, base: bool) -> AnyElement {
+fn dialog_column(f: &FeatureCompare, base: bool, cx: &App) -> AnyElement {
     use noshape_model::compare::ParamShape;
     let pal = p();
     let side = |p: &noshape_model::compare::ParamCompare| if base { p.base.clone() } else { p.target.clone() };
@@ -828,12 +833,47 @@ fn dialog_column(f: &FeatureCompare, base: bool) -> AnyElement {
             None => d.w_full(),
         }
     };
-    let rows = f.params.iter().filter(|p| p.shape != ParamShape::Name).filter_map(|p| {
+    // Live wf23-18 step 25: the dialog's own controls; suppression is no dialog row (shown only when it differs), a
+    // flip arrow sits at the end of the row before it.
+    let params: Vec<&noshape_model::compare::ParamCompare> = f.params.iter().filter(|p| p.shape != ParamShape::Name && !(p.label == "Suppressed" && !p.differs())).collect();
+    let flip_of = |k: usize| {
+        let next = params.get(k + 1).copied().filter(|n| matches!(n.shape, ParamShape::Flip | ParamShape::FlipCircular))?;
+        let on = side(next).as_deref() == Some("true");
+        let icon = match (next.shape == ParamShape::FlipCircular, on) {
+            (true, false) => "flip-circular-opposite",
+            (true, true) => "flip-circular",
+            (false, false) => "flip-direction-opposite",
+            (false, true) => "flip-direction",
+        };
+        Some(div().flex_none().p(px(2.)).rounded(px(2.)).when(next.differs(), |d| d.border_1().border_color(rgb(CHANGED))).child(crate::assets::icon(icon, 20., cx)))
+    };
+    let rows = params.iter().copied().enumerate().filter_map(|(k, p)| {
         let v = side(p)?;
         let changed = p.differs();
         Some(match p.shape {
-            ParamShape::Query => div().px(px(3.)).child(boxed(v, None, changed)).into_any_element(),
-            ParamShape::Enum => div().px(px(3.)).child(boxed(v, Some(162.), changed).justify_between().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 7., rgb(0x999999)))).into_any_element(),
+            ParamShape::Flip | ParamShape::FlipCircular if k > 0 && side(params[k - 1]).is_some() => return None,
+            ParamShape::Query => h_flex().px(px(3.)).gap(px(4.)).child(boxed(v, None, changed)).children(flip_of(k)).into_any_element(),
+            ParamShape::Enum => h_flex().px(px(3.)).gap(px(4.)).child(boxed(v, Some(162.), changed).justify_between().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 7., rgb(0x999999)))).children(flip_of(k)).into_any_element(),
+            ParamShape::Tabs => h_flex()
+                .px(px(4.))
+                .children(p.options.iter().map(|o| {
+                    let on = *o == v;
+                    div()
+                        .flex_grow(1.)
+                        .flex_shrink_0()
+                        .px(px(2.))
+                        .h(px(26.))
+                        .relative()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .text_size(px(12.))
+                        .text_color(pal.text)
+                        .when(on, |d| d.font_weight(FontWeight::SEMIBOLD).child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(if changed { rgb(CHANGED) } else { rgb(0x999999) })))
+                        .when(!on, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(rgb(0xd7d7d7))))
+                        .child(o.clone())
+                }))
+                .into_any_element(),
             ParamShape::Bool => {
                 let on = v == "true";
                 h_flex()

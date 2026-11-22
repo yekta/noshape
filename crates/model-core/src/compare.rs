@@ -219,6 +219,8 @@ pub struct ParamCompare {
     /// How the feature dialog shows it (the compare panel draws read-only
     /// dialogs side by side, live cp-921).
     pub shape: ParamShape,
+    /// A [`ParamShape::Tabs`] row's labels, in order.
+    pub options: Vec<String>,
 }
 
 /// A parameter's control in a feature dialog.
@@ -230,6 +232,11 @@ pub enum ParamShape {
     Bool,
     Query,
     Enum,
+    /// An enum the dialog shows as a row of tabs (Solid · Surface · Thin).
+    Tabs,
+    /// An opposite direction arrow (circular: a rotation's) on the row before it.
+    Flip,
+    FlipCircular,
     Number,
     Text,
     Other,
@@ -302,6 +309,19 @@ fn shape_of(v: &ParamValue) -> ParamShape {
     }
 }
 
+/// How the feature dialog draws a parameter of `shape` (live wf23-18 step 25: Extrude's tab rows, Blind with its
+/// flip arrow), and a tab row's labels.
+fn dialog_shape(shape: ParamShape, spec: Option<&crate::params::ParamSpec>) -> (ParamShape, Vec<String>) {
+    use crate::params::{Hints, ParamKind};
+    let Some(spec) = spec else { return (shape, Vec::new()) };
+    match &spec.kind {
+        ParamKind::Bool { .. } if spec.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR) => (ParamShape::FlipCircular, Vec::new()),
+        ParamKind::Bool { .. } if spec.hints.has(Hints::OPPOSITE_DIRECTION) => (ParamShape::Flip, Vec::new()),
+        ParamKind::Enum { options, .. } if spec.hints.has(Hints::HORIZONTAL_ENUM) => (ParamShape::Tabs, options.iter().map(|o| o.1.to_string()).collect()),
+        _ => (shape, Vec::new()),
+    }
+}
+
 /// A parameter value as the compare panel shows it.
 fn param_text(v: &ParamValue, spec: Option<&crate::params::ParamSpec>, studio: &PartStudio) -> String {
     match v {
@@ -342,7 +362,7 @@ pub fn compare_features(base: &PartStudio, target: &PartStudio) -> Vec<FeatureCo
             ids.sort_by_key(|id| t.params.iter().position(|s| s.id == *id).unwrap_or(usize::MAX));
         }
         // The feature's own name and suppression first, then its parameters.
-        let own = |label: &str, shape: ParamShape, f: fn(&Feature) -> String| ParamCompare { label: label.to_string(), base: a.map(f), target: b.map(f), shape };
+        let own = |label: &str, shape: ParamShape, f: fn(&Feature) -> String| ParamCompare { label: label.to_string(), base: a.map(f), target: b.map(f), shape, options: Vec::new() };
         let head = [own("Name", ParamShape::Name, |x| x.name.clone()), own("Suppressed", ParamShape::Bool, |x| x.suppressed.to_string())];
         let params = head
             .into_iter()
@@ -351,7 +371,8 @@ pub fn compare_features(base: &PartStudio, target: &PartStudio) -> Vec<FeatureCo
                 let spec = ty.and_then(|t| t.params.iter().find(|s| s.id == id));
                 let text = |side: Option<&Feature>, studio: &PartStudio| side.and_then(|x| x.params.get(id)).map(|v| param_text(v, spec, studio));
                 let shape = [a, b].into_iter().flatten().find_map(|x| x.params.get(id)).map(shape_of).unwrap_or(ParamShape::Other);
-                ParamCompare { label: spec.map(|s| s.label.to_string()).unwrap_or_else(|| id.to_string()), base: text(a, base), target: text(b, target), shape }
+                let (shape, options) = dialog_shape(shape, spec);
+                ParamCompare { label: spec.map(|s| s.label.to_string()).unwrap_or_else(|| id.to_string()), base: text(a, base), target: text(b, target), shape, options }
             }))
             .collect();
         let status = match (a, b) {
@@ -584,6 +605,14 @@ mod tests {
         // Suppression shows as its own row.
         assert!(ex.params.iter().any(|p| p.label == "Suppressed" && !p.differs()));
         assert!(rows.iter().filter(|r| r.type_id != "extrude" && r.type_id != "chamfer").all(|r| r.status.is_none()));
+        // qa HIST-COMPARE-PARAMS-PANEL (live wf23-18 step 25): the dialog's own controls, Solid · Surface · Thin and
+        // New · Add · Remove · Intersect as tab rows, Opposite direction as Blind's flip arrow.
+        let shape = |label: &str| ex.params.iter().find(|p| p.label == label).map(|p| (p.shape, p.options.clone()));
+        assert_eq!(shape("Creation type"), Some((ParamShape::Tabs, vec!["Solid".to_string(), "Surface".into(), "Thin".into()])));
+        assert_eq!(shape("Result body operation type").map(|s| s.1), Some(vec!["New".to_string(), "Add".into(), "Remove".into(), "Intersect".into()]));
+        assert_eq!(shape("Opposite direction").map(|s| s.0), Some(ParamShape::Flip));
+        let at = |label: &str| ex.params.iter().position(|p| p.label == label).unwrap();
+        assert_eq!(at("Opposite direction"), at("End type") + 1, "the arrow follows Blind");
     }
 
     /// Live ver-flow-branch-version-merge: a feature renamed in the base reads by the base's name (Main's "B1 base"
