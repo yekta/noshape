@@ -2477,8 +2477,8 @@ impl PartStudioView {
                 }
                 // Near a hovered edge's midpoint the midpoint becomes (or
                 // stops being) the target without a new pick (not while
-                // Select other is open).
-                if self.sketch.is_none() && self.ui.select_other.is_none() && self.hover.is_some() && (self.ui.midpoint_armed.is_some() || self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve))) && self.update_hover(cx) {
+                // Select other is open; in a sketch only with no tool on).
+                if self.sketch.as_ref().is_none_or(|s| s.tool == crate::sketch_mode::Tool::Select) && self.ui.select_other.is_none() && self.hover.is_some() && (self.ui.midpoint_armed.is_some() || self.ui.hover_pick.as_ref().is_some_and(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve))) && self.update_hover(cx) {
                     self.refresh_scene(false, cx);
                 }
                 // Hovering a manipulator arrow outlines it (Onshape).
@@ -6220,8 +6220,23 @@ impl PartStudioView {
             .child(match self.renaming.as_ref().filter(|(rid, _, _)| *rid == f.id) {
                 // Live (qa4 r5 s8 (5)): Esc cancels; Enter or a click elsewhere
                 // commits (dropping the subscription keeps the blur from it).
+                // Live featurelist-feel D1 (qa FEEL-RENAME-INPUT-LOOK): a square 24 px box, a 1 px #1651B0 border, from 5 px
+                // before the name to the list's right edge (over the row's right padding).
                 Some((_, st, _)) => div()
                     .flex_1()
+                    .h(px(24.))
+                    .ml(px(-5.))
+                    .mr(px(-16.))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0x1651b0))
+                    .bg(gpui_kit::rgb(0xffffff))
+                    .flex()
+                    .items_center()
+                    .map(|d| {
+                        #[cfg(test)]
+                        let d = d.debug_selector(|| "rename-box".into());
+                        d
+                    })
                     // A press anywhere else (the graphics too, which keeps the keyboard where it was) blurs the input,
                     // which commits (live2 featurelist-feel 4: "Bar", then a click elsewhere).
                     .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, window, cx| {
@@ -6239,7 +6254,7 @@ impl PartStudioView {
                             cx.notify();
                         }
                     }))
-                    .child(gpui_kit::component::input::Input::new(st).xsmall().text_size(px(13.33)).pl(px(3.)))
+                    .child(gpui_kit::component::input::Input::new(st).appearance(false).xsmall().text_size(px(13.33)).pl(px(4.)))
                     .into_any_element(),
                 // Live (psb 10-21 p): a Hole's row shows its whole callout,
                 // both parts ("Ø 6.6 mm ↧ 10 mm | ⌴Ø 11 mm ↧ 6.5 mm"), cut by

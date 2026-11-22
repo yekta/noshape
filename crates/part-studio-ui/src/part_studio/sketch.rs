@@ -5334,11 +5334,19 @@ impl PartStudioView {
         // A constraint glyph's menu has no dimension items.
         let dim_is_dimension = dim.and_then(|cid| Some(self.sketch_data(cx)?.sketch.constraint(cid)?.is_dimension())).unwrap_or(true);
         let dim_items: Vec<(String, String)> = dim.filter(|_| dim_is_dimension).map(|cid| self.dimension_menu_items(cid, cx)).unwrap_or_default();
-        let model_edge = matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_)));
+        // A part edge's midpoint lit: the part's items only, no Use, Curve/surface analysis…, Zoom to selection or Align
+        // view (live psui walk 5 p1b-20_0_10-menu).
+        let midpoint_of = match &self.hover {
+            Some(Reference::Implicit { on, inference: noshape_model::reference::Inference::Midpoint }) if matches!(**on, Reference::Edge(_)) => Some((**on).clone()),
+            _ => None,
+        };
+        let model_edge = matches!(self.hover, Some(Reference::Edge(_) | Reference::Face(_))) || midpoint_of.is_some();
         // Model geometry under the cursor: its part (Hide / Isolate / Make
         // transparent) and, for a straight edge, Align view (live sketch/204).
         let model_ref = self.hover.clone().filter(|_| model_edge);
-        let model_body = model_ref.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
+        let owner = midpoint_of.clone().or_else(|| model_ref.clone());
+        let model_body = owner.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
+        let model_ref = model_ref.filter(|_| midpoint_of.is_none());
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
         // A model face: Section view… and, planar, View normal to; no Curve/surface analysis… (live ctx-menus-1117 sk-model-face).
         let model_face = model_ref.clone().filter(|r| matches!(r, Reference::Face(_)));
@@ -5448,7 +5456,7 @@ impl PartStudioView {
             m = m.separator();
             // Live Onshape order (sketch/31, 37, 204): Confirm | Use | copy &
             // transform | analysis | selection | zoom & view | delete.
-            if model_edge && tool != Tool::Use {
+            if model_ref.is_some() && tool != Tool::Use {
                 // The right-clicked geometry (the cursor is on the menu by the time its row is clicked).
                 let used = model_ref.clone();
                 m = m
@@ -5466,7 +5474,7 @@ impl PartStudioView {
                         this.set_part_hidden(&b1, true, cx);
                         this.hover = None;
                     })));
-                    if model_face.is_none() {
+                    if model_face.is_none() && model_ref.is_some() {
                         m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
                     }
                     m = m.item(item("Isolate…", Box::new(move |this, w, cx| {
@@ -5496,8 +5504,15 @@ impl PartStudioView {
                     this.refresh_scene(false, cx);
                     cx.notify();
                 })));
-                if let Some(r) = model_ref.clone() {
-                    let criteria: &[noshape_model::select::Criterion] = if matches!(r, Reference::Face(_)) { &noshape_model::select::Criterion::FACE } else { &noshape_model::select::Criterion::SKETCH_EDGE };
+                // (A midpoint's Select ▸ holds only Create selection….)
+                if let Some(r) = model_ref.clone().or_else(|| midpoint_of.clone()) {
+                    let criteria: &[noshape_model::select::Criterion] = if midpoint_of.is_some() {
+                        &[]
+                    } else if matches!(r, Reference::Face(_)) {
+                        &noshape_model::select::Criterion::FACE
+                    } else {
+                        &noshape_model::select::Criterion::SKETCH_EDGE
+                    };
                     let vs = v.clone();
                     m = m.submenu("Select", window, cx, move |mut sm, _, _| {
                         for c in criteria {

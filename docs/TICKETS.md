@@ -437,12 +437,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 
 ## qa, 2026-11-22 01:4x (USER P0 walk 8, lead: feature list / tree, Measure + Mass properties, mate dialog flow; green 50772462b / 04389f02d, ui-script cells on vibe2, kit qa-scratch/hm2/walk8 gen9.py, shots out-w8*; live behaviours "qa walk 8" 01:17–01:35, live/qa/walk8-1122/ + featurelist-feel, measure-mass-1118, asm/feel-1117)
 
-- [ ] P1 **FEEL-DIALOG-FINAL-BUTTON (psui)**: double-click Extrude 2 with Extrude 3 after it. Live's footer has a small 49 × 22
+- [x] (fixed psui 11-22 e41b4f43: a 49 x 22 Final button right of the slider, #EAEAEA + focus ring when on, the slider greyed; list matrix row; qa to verify) P1 **FEEL-DIALOG-FINAL-BUTTON (psui)**: double-click Extrude 2 with Extrude 3 after it. Live's footer has a small 49 × 22
   secondary button "Final" to the right of the history slider (before "?"), tooltip "Preview Part Studio up to the rollback bar";
   pressed it turns rgb(234,234,234) with a blue focus ring, the slider greys out and the later features + Part 3 show
   (live/qa/walk8-1122 9a/9b, part-studio/2381). Ours draws a "☐ Final" checkbox to the left of the slider with the tooltip "Preview
   the finished model instead of rolling back to this feature" (feature_dialog.rs `dlg-final`; out-w8/w8-a-dblclick-feature/02.png).
-- [ ] P1 **FEEL-RENAME-INPUT-LOOK (psui)**: Extrude 1 › right-click › Rename. Live's inline box is square, a 1 px #1651B0 border,
+- [x] (fixed psui 11-22 e41b4f43: square, 1 px #1651B0, 24 high, to the list's right edge; list matrix row; qa to verify) P1 **FEEL-RENAME-INPUT-LOOK (psui)**: Extrude 1 › right-click › Rename. Live's inline box is square, a 1 px #1651B0 border,
   178 × 24 from x 62 to the list's right edge, the name all selected (featurelist-feel/D1-rename-input.png). Ours is rounded with a
   2 px light-blue #9EC9FF focus ring and ends ~10 px short of the edge (out-w8/w8-a-rename/03.png). Enter, Tab, a canvas click
   (commit) and Escape (restores) all behave as live.
@@ -601,6 +601,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   end) lacks **Hide other sketches** and **Hide all sketches** (after Revolve…); live sk-line, sk-line-selected, sk-line-and-end,
   sk-line-end. Everything else matches.
 - [ ] (psui 11-21 22:3x: the face fixed (Section view…, View normal to, no Curve/surface analysis…); the edge waits on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
+- [x] (fixed psui 11-22 e41b4f43 per live psui walk 5: the edge's midpoint lights first and gets the short menu (no Use, analysis, Zoom to selection, Align view); off it the edge's keeps them as live; qa to verify) (psui 11-21 22:3x: the face fixed (Section view…, View normal to, no Curve/surface analysis…); the edge waits on live REQUESTS psui 21:58) P0 **MENU-SK-MODEL-ENTITY (psui)**: in a Top-plane sketch, right-click the block's top front edge (20,0,10): ours adds **Use**,
   **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
   face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
   (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
@@ -757,7 +758,6 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   (qa 20:23, batch 5: the same muted look in Extrude's "Faces and sketch regions" field (face, edge) and the Plane field
   (face, edge; the Plane edge's dark midpoint ring is right); live b5/b5-{extrude,plane}-{face,edge}_f, ours qa-scratch/hm2/cmp-b5.)
 - [x] P0 **FEEL-FIELD-VERTEX-EDGE (psui)** (fixed psui 11-21: edges meeting under the pointer, the one most across the screen; qa verified 23:3x, green 9f33d43, hm2/cmp-b3psui: the top front edge lights, as live): in the Fillet field, the pointer on the block's top front right corner lights the top
-- [ ] P0 **FEEL-FIELD-VERTEX-EDGE (psui)**: in the Fillet field, the pointer on the block's top front right corner lights the top
 - [x] P0 **FEEL-FIELD-VERTEX-EDGE (psui)** (fixed psui 11-21: edges meeting under the pointer, the one most across the screen; qa to verify): in the Fillet field, the pointer on the block's top front right corner lights the top
   front edge in live (the field takes edges and faces, the same id as hovering that edge); ours lights the vertical edge.
   Live b3/dlg-vertex-hover_f.

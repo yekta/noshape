@@ -616,6 +616,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // moves, as live's runner moves it (what it passes over can wake a
         // sketch inference).
         let mut pointer: Option<Point<Pixels>> = None;
+        // A button a "hold" drag left down, and where (the "release" step lets it go).
+        let mut held: Option<(MouseButton, Point<Pixels>)> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
             let step = ours_step(step);
             let what = step["do"].as_str().unwrap_or("");
@@ -791,7 +793,11 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                     sleep(cx, plan.interval_ms).await;
                                 }
                             }
-                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: plan.button, position: b, modifiers: mods, click_count: 1 }), cx));
+                            if plan.hold {
+                                held = Some((plan.button, b));
+                            } else {
+                                let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: plan.button, position: b, modifiers: mods, click_count: 1 }), cx));
+                            }
                             Ok(())
                         }
                         (Err(e), _) | (_, Err(e)) => Err(e),
@@ -818,6 +824,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 },
                 // The modifiers a held "key" step left down (Ctrl+Space's switcher) let go.
                 "release" => {
+                    if let Some((button, at)) = held.take() {
+                        let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button, position: at, modifiers: Modifiers::default(), click_count: 1 }), cx));
+                    }
                     let ev = PlatformInput::ModifiersChanged(ModifiersChangedEvent { modifiers: Modifiers::default(), capslock: Default::default() });
                     let _ = cx.update(|window, cx| window.dispatch_event(ev, cx));
                     Ok(())
@@ -1398,12 +1407,14 @@ impl CurrentWorkspace {
 
 /// How a document "drag" step moves: its button (`"button"`: "left", "right" or "middle"), `"moves"` (15) and
 /// `"interval_ms"` (30) between them. A left drag waits the interval after its last move too (live's runner); a right or
-/// middle one lets go at once, a flick (qa FEEL-NAV-INERTIA).
+/// middle one lets go at once, a flick (qa FEEL-NAV-INERTIA). `"hold": true` keeps the button down for the shot; a
+/// "release" step lets it go.
 struct DragPlan {
     button: MouseButton,
     moves: usize,
     interval_ms: u64,
     settle: bool,
+    hold: bool,
 }
 
 fn drag_plan(step: &Value) -> DragPlan {
@@ -1412,7 +1423,7 @@ fn drag_plan(step: &Value) -> DragPlan {
         Some("middle") => MouseButton::Middle,
         _ => MouseButton::Left,
     };
-    DragPlan { button, moves: step["moves"].as_u64().map_or(15, |n| n.clamp(1, 1000) as usize), interval_ms: step["interval_ms"].as_u64().unwrap_or(30), settle: button == MouseButton::Left }
+    DragPlan { button, moves: step["moves"].as_u64().map_or(15, |n| n.clamp(1, 1000) as usize), interval_ms: step["interval_ms"].as_u64().unwrap_or(30), settle: button == MouseButton::Left, hold: step["hold"].as_bool().unwrap_or(false) }
 }
 
 #[cfg(test)]
@@ -1429,6 +1440,7 @@ mod tests {
         assert_eq!((flick.button, flick.moves, flick.interval_ms, flick.settle), (MouseButton::Right, 6, 8, false));
         let pan = super::drag_plan(&json!({ "do": "drag", "button": "middle", "moves": 0 }));
         assert_eq!((pan.button, pan.moves), (MouseButton::Middle, 1));
+        assert!(!pan.hold && super::drag_plan(&json!({ "do": "drag", "hold": true })).hold, "held only when asked");
     }
 
     /// ver-compare-*: comparing, the compare panel's picked row is the selection (a row clicked in the panel); a face

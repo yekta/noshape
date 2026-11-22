@@ -135,7 +135,8 @@ take's placement) carries the same control by name for ours, which runs `ours_on
   `{"do": "release"}` lets them go (psui, 11-09).
 - `{"do": "drag", "from": TARGET, "to": TARGET}` Optional `"button"`: `"right"` or `"middle"` (left by default), `"moves"` (15) and
   `"interval_ms"` (30) between moves; a right or middle drag lets go right after its last move (a flick), a left one
-  waits the interval first, as live's runner.
+  waits the interval first, as live's runner. `"hold": true` leaves the button down (the step's shot is taken while
+  held); `{"do": "release"}` lets it go where the drag ended.
 - `{"do": "pick_files", "files": ["uip-asm.step"]}`: answers the file dialog the step before opened with files of
   `files/` (no dialog shows on either side: live's runner intercepts the browser's, ours the app's while a scenario
   runs); the step fails with "no file dialog is open" when none waits. Ours imports at once, live's upload takes seconds:

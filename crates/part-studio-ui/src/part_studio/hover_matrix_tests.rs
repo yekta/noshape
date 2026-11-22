@@ -929,11 +929,59 @@ fn a_model_face_right_clicked_in_a_sketch_has_lives_menu(cx: &mut TestAppContext
     m.edit_sketch(cx);
     let p = m.screen(cx, FACE);
     approach(cx, &m, p);
+    let lit = cx.update(|cx| m.view.read(cx).hover.clone());
+    assert!(matches!(lit, Some(Reference::Face(_))), "the face lit: {lit:?} at {p:?}, the midpoint at {:?}", m.screen(cx, MID));
     m.pointer.right_click(cx, &m.view, p);
     let rows: Vec<String> = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
     let rows: Vec<&str> = rows.iter().map(String::as_str).filter(|l| *l != "———").collect();
     let live = ["Confirm Sketch 2", "Use", "Hide Part 1", "Isolate…", "Make transparent…", "Section view…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to", "View normal to sketch plane"];
     assert_eq!(rows, live);
+}
+
+// Sketch 2 (on Top) edited, no tool: a part edge's midpoint lights as in the Part Studio, its menu the part's items
+// only; off it the edge's adds Use, Curve/surface analysis…, Zoom to selection and Align view (live psui walk 5 p1a / p1b,
+// Add comment left out).
+#[gpui::test]
+fn a_model_edges_midpoint_in_a_sketch_lights_and_has_lives_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "sk-model-mid-menu");
+    m.edit_sketch(cx);
+    let menu = |cx: &mut TestAppContext, at: [f64; 3]| -> (Option<Reference>, Vec<String>) {
+        let p = m.screen(cx, at);
+        approach(cx, &m, p);
+        let lit = cx.update(|cx| m.view.read(cx).hover.clone());
+        m.pointer.right_click(cx, &m.view, p);
+        let rows = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
+        m.view.update(cx, |v, cx| v.close_context_menu(cx));
+        (lit, rows.into_iter().filter(|l| l != "———").collect())
+    };
+    let (lit, rows) = menu(cx, MID);
+    assert!(matches!(lit, Some(Reference::Implicit { .. })), "the midpoint lit: {lit:?}");
+    assert_eq!(rows, ["Confirm Sketch 2", "Hide Part 1", "Isolate…", "Make transparent…", "Clear selection", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane"]);
+    let (lit, rows) = menu(cx, EDGE);
+    assert!(matches!(lit, Some(Reference::Edge(_))), "the edge lit: {lit:?}");
+    assert_eq!(rows, ["Confirm Sketch 2", "Use", "Hide Part 1", "Curve/surface analysis…", "Isolate…", "Make transparent…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis"]);
+}
+
+// The Part Studio, the top face selected: the hand path to an edge's midpoint lights it, the click adds it to the face,
+// and the right-click gives the part's menu ending in "Add appearance to face…" (live psui walk 5 p2a-p2d).
+#[gpui::test]
+fn a_midpoint_clicked_with_a_face_selected_joins_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "ps-mid-with-face");
+    let f = m.screen(cx, FACE);
+    approach(cx, &m, f);
+    m.pointer.click(cx, &m.view, f);
+    let p = m.screen(cx, MID);
+    approach(cx, &m, p);
+    m.pointer.click(cx, &m.view, p);
+    let sel = cx.update(|cx| m.view.read(cx).selection.clone());
+    assert!(sel.len() == 2 && matches!(sel[0], Reference::Face(_)) && matches!(sel[1], Reference::Implicit { .. }), "the face and the midpoint: {sel:?}");
+    m.pointer.right_click(cx, &m.view, p);
+    let rows: Vec<String> = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
+    let rows: Vec<&str> = rows.iter().map(String::as_str).filter(|l| *l != "———").collect();
+    assert_eq!(rows.first().copied(), Some("Edit Extrude 1…"), "{rows:?}");
+    assert_eq!(rows.last().copied(), Some("Add appearance to face…"), "{rows:?}");
 }
 
 // Sketch 2 (on Top) edited, a right-click on Top's square where nothing else is (live qa walk 5 b-rclick-75-40,

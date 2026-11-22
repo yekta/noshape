@@ -434,6 +434,21 @@ fn rows() -> Vec<Row> {
             let after = (cx.update(|cx| l.view.read(cx).renaming.is_some()), l.order(cx)[1].clone());
             expect((input, after), (Some(("Extrude 1".to_string(), 9)), (false, "Extrude 1".to_string())), "input (value, selected bytes), after typing and Escape")
         } },
+        Row { id: "rename / the input's box", live: "square, 1 px #1651B0, 24 px tall, to the list's right edge (featurelist-feel D1: x 62-239, 178 x 24)", gap: false, check: |l, cx| {
+            rename(l, cx, "Extrude 1");
+            let (b, row) = (l.bounds(cx, "rename-box").ok_or("no rename box")?, l.bounds(cx, "feature:Extrude 1").ok_or("no row")?);
+            l.keys(cx, "escape");
+            expect((f32::from(b.size.height), f32::from(b.right() - row.right())), (24., 0.), "(height, right edge - the list's)")
+        } },
+        Row { id: "dialog / Final", live: "a 49 x 22 button right of the slider; pressed, Final is on (walk8 9a-9c)", gap: false, check: |l, cx| {
+            l.double_click(cx, "feature:Extrude 1");
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            let (fin, slider) = (l.bounds(cx, "dlg-final").ok_or("no Final")?, l.bounds(cx, "dlg-preview").ok_or("no slider")?);
+            l.press(cx, fin.center(), MouseButton::Left, NONE, 1);
+            let on = cx.update(|cx| l.view.read(cx).edit.as_ref().map(|e| e.dialog.read(cx).show_final));
+            l.keys(cx, "escape");
+            expect((f32::from(fin.size.width), f32::from(fin.size.height), fin.left() > slider.right(), on), (49., 22., true, Some(true)), "(width, height, after the slider, on after a click)")
+        } },
         Row { id: "menu / one feature", live: "Rename | Edit… | Edit Sketch 1… | Show dimensions | Add selection to folder… | Suppress | Dynamic suppression | Zoom to selection | Show dependencies… | Roll to here | Add appearance to feature… | Delete (Add comment: cloud)", gap: false, check: |l, cx| {
             l.right_click(cx, "feature:Extrude 1");
             expect(l.menu(cx), names(&["Rename", "Edit…", "Edit Sketch 1…", "Show dimensions", "Add selection to folder…", "Suppress", "Dynamic suppression", "Zoom to selection", "Show dependencies…", "Roll to here", "Add appearance to feature…", "Delete"]), "rows")

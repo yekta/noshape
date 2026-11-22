@@ -689,7 +689,8 @@ impl PartStudioView {
                             })))
                             .item(item(&format!("Edit appearance for {body_name}…"), Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Parts(vec![b2.clone()]), w, cx))));
                     }
-                    if body.is_some() && !point && k == PickKind::Face {
+                    // A midpoint right-clicked with faces selected: their appearance too (live psui walk 5 p2d).
+                    if body.is_some() && (if point { !faces.is_empty() } else { k == PickKind::Face }) {
                         let fs = faces.clone();
                         let label = if fs.len() > 1 { format!("Add appearance to {} faces…", fs.len()) } else { "Add appearance to face…".to_string() };
                         m = m.item(icon_item(&label, "add-appearance", Box::new(move |this, w, cx| this.edit_appearance(super::appearance::EditTarget::Faces(fs.clone(), None), w, cx))));

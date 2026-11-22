@@ -384,7 +384,7 @@ device pixel ratio of 1 and 2: part-studio-ui `list::the_feature_list_matrix_mat
 canvas click is the viewport's empty pick). Like the snaps matrix it prints matched / total and fails when a row's
 status moves. `LIST_ROW=<part of an id>` runs some rows.
 
-**Matched: 78 / 78** (11-18 00:40 UTC, live2 featurelist-feel / doc-level-1117 rows added; 57 / 57 11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
+**Matched: 80 / 80** (11-22 02:29 UTC: qa walk 8 rename box and dialog Final rows, both fixed; 78 / 78 at 11-18 00:40 UTC, live2 featurelist-feel / doc-level-1117 rows added; 57 / 57 11-13 15:51 UTC; 20 / 42 at the first run; 3 folder rows added 15:51: 1 / 3 matched, 2 fixed). ui-parity: the 78 list and tooltip scenarios 75 / 78 before the last fixes, the 3 left on green too or fixed since (feature-row-drag-above).
 
 | Row | Live | Ours | Status |
 |---|---|---|---|
@@ -399,6 +399,8 @@ status moves. `LIST_ROW=<part of an id>` runs some rows.
 | Hover a hidden sketch's row / click a default plane | the sketch drawn in place, light orange, while hovered / the plane's row selected, the Default geometry folder related (live2 11-17 sel-feel 4, 2, 5) | the same (`sketches_shown_for_now`, `default_geometry_related`; were: nothing drawn / the folder unlit, qa 208ca8549) | = (fixed 11-17) |
 | Double-click a default plane / a part | the plane left selected (retaken 11-18, live/feel/list-1118) / two toggles, no rename | the same (a part's name renamed: removed; ui-parity parts-row-dblclick agrees) | = (live recheck 11-18 on green b5b664aaa: Top stays selected) |
 | Rename | only the menu's: inline, the whole name selected; Escape cancels | the same | = |
+| Rename's box (qa FEEL-RENAME-INPUT-LOOK, live featurelist-feel D1, walk8) | square, 1 px #1651B0, 178 x 24 from x 62 to the list's right edge | was rounded with a #9EC9FF ring, 17 px tall, ~10 px short; now as live (psui 11-22) | = (fixed) |
+| Dialog footer's Final (qa FEEL-DIALOG-FINAL-BUTTON, live walk8 9a-9d) | a 49 x 22 secondary button right of the slider, tooltip "Preview Part Studio up to the rollback bar", #EAEAEA on / hovered, a 2 px #3E94FF ring with the keyboard; the slider greys (#D7D7D7) | was a "☐ Final" checkbox left of the slider; now as live (psui 11-22) | = (fixed) |
 | Y over a part row, nothing selected (after its double-click) | hides that part | the same | = (new) |
 | Menus: one feature; two features; two selected and a third right-clicked (counts 3) | live's rows (Add comment left out: cloud) | the same | = |
 | Menu: two hidden sketches | … Show, Show all sketches … | the same (Show all sketches was missing) | = (fixed) |

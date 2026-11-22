@@ -1,6 +1,6 @@
 # psui (Part Studio UI): current state
 
-Updated 2026-11-21 23:58 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 02:54 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -36,17 +36,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
 - vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (01:09 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
-
+## Now (02:54 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
 LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (qa re-score 4/15, matrix 94/125).
-CHECKING 6e5e17c8 (walks 3-5 + menus); QUEUED 2bc17f3e (qa walk 6, 7 tickets; qa's re-score unit fires when green).
-Next after this land: sk-model-edge + ps-edge menus; live answered 11-22 01:1x (behaviours "psui walk 5",
-live/psui/walk5-1121/): at (20,0,10) the midpoint lights (tan disc, edge not) and gives the short menu (Confirm | Hide
-Part 1 | Isolate… | Make transparent… | Clear selection | Select | Select other… | Zoom to fit | View normal to sketch
-plane); off it (10,0,10) the edge lights, + Use, Curve/surface analysis…, Add comment, Zoom to selection, Align view
-with vertical axis. Part Studio, face selected: the midpoint joins it; right-click = Extrude 1 part menu + "Add
-appearance to face…".
-IN TREE (to land next; tests: render + part-studio-ui lib on vibe2, run-full4.sh):
+QUEUED 38229ff2 (01:26, carries walk 6 2bc17f3e); walk 5 + walk 8 batch landing after it (one land.sh, 02:54).
+WALK 5 + 8 BATCH (part-studio-ui hover_matrix/menu/midpoint/snaps 116, list:: + dialogs + ui_script + assembly-ui
+green on vibe2, run-t9.sh / run-t10.sh):
+- live psui walk 5 (behaviours "psui walk 5", live/psui/walk5-1121/): in a sketch with no tool a part edge's midpoint
+  lights first (behaviors.rs update_hover; mod.rs per-move recheck now also in a sketch with the Select tool, else a
+  face stayed the midpoint after the approach) and its menu is the short one (sketch.rs `midpoint_of`); off it the
+  edge's menu keeps Use, analysis, Zoom to selection, Align view. Part Studio, face selected: the midpoint click joins
+  it; the menu adds "Add appearance to face…" (menus.rs: a point with faces selected). Tests hover_matrix
+  a_model_edges_midpoint_in_a_sketch…, a_model_face_right_clicked_in_a_sketch… (asserts the face lit),
+  a_midpoint_clicked_with_a_face_selected_joins_it.
+- walk 8 P1s: FEEL-DIALOG-FINAL-BUTTON (feature_dialog.rs render_final_button, the slider greyed) and
+  FEEL-RENAME-INPUT-LOOK (mod.rs rename box); list matrix rows "dialog / Final", "rename / the input's box" (80 / 80).
+- qa ask 2: ui-script drag "hold": true + "release" lets go (ui_script.rs `held`, README): tell qa when it lands.
+- Ticked: FINAL-BUTTON, RENAME-INPUT-LOOK, MENU-SK-MODEL-ENTITY; dropped FIELD-VERTEX-EDGE's union duplicate row.
+FEEL-FILLET-ARROW-ANCHOR: CLOSED by qa as no gap (ours edge_mid; pixel-identical picks on green 04389f02d).
+IN 38229ff2 (render 17, scene 200, part-studio-ui 453 green on vibe2; run-full5.sh):
 - FEEL-ORIGIN-HOVER-EDGE: renderer.rs pick_reaching's corner rule reaches 3 px (d2 <= 10): the origin glyph (a 5x5
   pick id under the edges' priority) covers the corner, the edges' nearest pixels were 3 px off. b3_cell aims at
   `m.exact` (unrounded, as the ui-parity runner); the rounded point hid it.

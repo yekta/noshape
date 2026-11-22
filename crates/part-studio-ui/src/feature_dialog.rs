@@ -4499,6 +4499,7 @@ impl Render for FeatureDialog {
         }
         let pal = p();
         let help_focus = self.tab_stop("help", cx);
+        let final_focus = self.tab_stop("final", cx);
         let params: &'static [ParamSpec] = self.ty.params.as_slice();
         self.live_y.set(0.);
         let mut rows = self.render_params(params, None, window, cx);
@@ -4758,23 +4759,12 @@ impl Render for FeatureDialog {
                     .gap_2()
                     .text_size(px(13.33))
                     .text_color(pal.text_muted)
-                    // The nested mate connector editor previews in its feature: no Final, no slider.
-                    .when(self.final_available && !self.nested, |d| d.child(
-                        gpui_kit::component::checkbox::Checkbox::new("dlg-final")
-                            .checked(self.show_final)
-                            .label("Final")
-                            .small()
-                            .tooltip("Preview the finished model instead of rolling back to this feature")
-                            .on_click(cx.listener(|this, v: &bool, _, cx| {
-                                this.show_final = *v;
-                                this.changed(cx);
-                                cx.notify();
-                            })),
-                    ))
                     // Preview slider: before (left) to after (right) the feature.
                     // Features without a preview (Sketch; FeatureScript
                     // NO_PREVIEW_PROVIDED: Variable) have no slider (live).
                     .when(!sketch && self.feature.type_id != "assignVariable" && !self.nested, |d| d.child(self.render_preview_slider(cx)))
+                    // The nested mate connector editor previews in its feature: no Final, no slider.
+                    .when(self.final_available && !self.nested, |d| d.child(self.render_final_button(&final_focus, cx)))
                     .child(div().flex_1())
                     .children(footer_extra)
                     .child(
@@ -4857,11 +4847,52 @@ pub const PREVIEW_REST: f32 = 0.7;
 impl FeatureDialog {
     /// Onshape's preview slider (noUi, live): a 112 px, 2 px `#777` track
     /// and an 11 px white handle with a 1 px `#888` ring and a soft shadow.
-    /// Left = the model before the feature, right = after it.
+    /// Live walk8 9a-9d (qa FEEL-DIALOG-FINAL-BUTTON): "Final" is a 49 x 22 secondary button after the slider, a 1 px
+    /// #aaa border, #eaeaea while on or hovered, a 2 px #3e94ff ring while it has the keyboard.
+    fn render_final_button(&self, focus: &FocusHandle, cx: &mut Context<Self>) -> AnyElement {
+        let ring: Hsla = gpui_kit::rgb(0x3e94ff).into();
+        let grey = gpui_kit::rgb(0xeaeaea);
+        div()
+            .id("dlg-final")
+            .map(|d| {
+                #[cfg(test)]
+                let d = d.debug_selector(|| "dlg-final".into());
+                d
+            })
+            .track_focus(focus)
+            .focus(move |s| s.shadow(vec![BoxShadow { color: ring, offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(2.), inset: false }]))
+            .flex_none()
+            .w(px(49.))
+            .h(px(22.))
+            .rounded(px(3.))
+            .border_1()
+            .border_color(gpui_kit::rgb(0xaaaaaa))
+            .bg(if self.show_final { grey } else { gpui_kit::rgb(0xffffff) })
+            .hover(move |s| s.bg(grey))
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_size(px(12.))
+            .text_color(gpui_kit::rgb(0x333333))
+            .child("Final")
+            .cursor_pointer()
+            .tooltip(crate::ui::tooltip("Preview Part Studio up to the rollback bar"))
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.show_final = !this.show_final;
+                this.changed(cx);
+                cx.notify();
+            }))
+            .map(|d| crate::ui_script::mark(d, || "button:Final".into()))
+            .into_any_element()
+    }
+
+    /// Left = the model before the feature, right = after it; grey and still while Final is on (live walk8 9c: track
+    /// and knob rim #d7d7d7).
     fn render_preview_slider(&self, cx: &mut Context<Self>) -> AnyElement {
         const W: f32 = 112.;
         const HANDLE: f32 = 11.;
         let track = self.preview_track.clone();
+        let off = self.show_final;
         let set = move |this: &mut Self, x: Pixels, cx: &mut Context<Self>| {
             let b = this.preview_track.get();
             let v = (f32::from(x - b.left()) / f32::from(b.size.width).max(1.)).clamp(0., 1.);
@@ -4873,12 +4904,17 @@ impl FeatureDialog {
         };
         div()
             .id("dlg-preview")
+            .map(|d| {
+                #[cfg(test)]
+                let d = d.debug_selector(|| "dlg-preview".into());
+                d
+            })
             .relative()
             .w(px(W))
             .h(px(HANDLE + 2.))
             .flex_none()
             .cursor_pointer()
-            .child(div().absolute().left_0().right_0().top(px((HANDLE + 2.) * 0.5 - 1.)).h(px(2.)).bg(gpui_kit::rgb(0x777777)))
+            .child(div().absolute().left_0().right_0().top(px((HANDLE + 2.) * 0.5 - 1.)).h(px(2.)).bg(gpui_kit::rgb(if off { 0xd7d7d7 } else { 0x777777 })))
             .child(
                 div()
                     .absolute()
@@ -4888,16 +4924,18 @@ impl FeatureDialog {
                     .rounded_full()
                     .bg(gpui_kit::rgb(0xffffff))
                     .border_1()
-                    .border_color(gpui_kit::rgb(0x888888))
-                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.6), offset: point(px(0.), px(0.)), blur_radius: px(1.5), spread_radius: px(0.), inset: false }]),
+                    .border_color(gpui_kit::rgb(if off { 0xd7d7d7 } else { 0x888888 }))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., if off { 0.1 } else { 0.6 }), offset: point(px(0.), px(0.)), blur_radius: px(1.5), spread_radius: px(0.), inset: false }]),
             )
             .child(canvas(move |b, _, _| track.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
             .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| {
                 cx.stop_propagation();
-                set(this, e.position.x, cx);
+                if !this.show_final {
+                    set(this, e.position.x, cx);
+                }
             }))
             .on_mouse_move(cx.listener(move |this, e: &MouseMoveEvent, _, cx| {
-                if e.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() {
+                if e.pressed_button == Some(MouseButton::Left) && !cx.has_active_drag() && !this.show_final {
                     set(this, e.position.x, cx);
                 }
             }))

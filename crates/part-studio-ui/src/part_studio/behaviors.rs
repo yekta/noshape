@@ -4022,13 +4022,14 @@ impl PartStudioView {
     /// whether it changed. Live (behaviours "icons2 midpoint radius", hover-matrix-1121 mid-paths): with the pointer
     /// on an edge in the 9 px square round its midpoint, the midpoint is the target from the first frame, whatever the
     /// approach; it stays the target over the adjacent faces while the pointer stays in that square (the edge black).
-    /// Not in sketch mode, nor with a field that takes no points.
+    /// In sketch mode only a part edge's, with no tool on (live psui walk 5 p1b); never with a field that takes no points.
     pub(super) fn update_hover(&mut self, cx: &App) -> bool {
         let raw = self.ui.hover_pick.as_ref().map(|t| t.reference.clone());
         // A shown sketch's line or arc takes its midpoint as a part edge does (live hover-matrix-1121 ps/sketch-linemid-*,
         // sketch-arc-*: a click there selects the midpoint).
-        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge | PickKind::SketchCurve)).map(|t| t.reference.clone());
-        let points_ok = self.sketch.is_none() && self.active_field_filter(cx).is_none_or(field_takes_points) && !self.inference_applies(cx);
+        let sketch_tool = self.sketch.as_ref().map(|s| s.tool);
+        let raw_edge = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Edge) || (t.kind == PickKind::SketchCurve && sketch_tool.is_none())).map(|t| t.reference.clone());
+        let points_ok = sketch_tool.is_none_or(|t| t == crate::sketch_mode::Tool::Select) && self.active_field_filter(cx).is_none_or(field_takes_points) && !self.inference_applies(cx);
         // Out of the graphics nothing snaps (HOVER-VERTEX-STAYS: the pointer's last place inside kept an armed edge's
         // midpoint lit after it left).
         let edge = raw_edge.clone().filter(|_| points_ok).or_else(|| self.ui.midpoint_armed.clone());
