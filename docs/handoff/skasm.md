@@ -53,9 +53,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   (1.51, 78.4759) and the R0.01 bend's 0.011 / 0.0276 edges apart; ours merges all in one ~0.02 mm vertex.
   Tried: exact non-uniform transform (kernel AffineAxial for std closed hem's scaleNonuniformly; patch
   /root/skasm-scratch/affine-axial.patch, test passed): counts unchanged, volume worse (18842.655), and live's corner
-  has SPLINE faces (Parasolid approximates too): DROPPED. Next: debug-print tolerances (patch
-  /root/skasm-scratch/hj-dbg-only.patch on top of the commit: definition, rolled bend, fuse inputs; the earlier dbg
-  build "failed" only because vibex8 was held for qa's 02:00-04:00 speed window). Then the flat "Collision".
+  has SPLINE faces (Parasolid approximates too): DROPPED. Tolerances (SKDBG=1 with
+  /root/skasm-scratch/hj-dbg-only.patch, vibex7 ~/tmp/skasm/hj-dbg.out): std closed hem's scaleNonuniformly
+  (k::transform -> GTransform) turns the cylinder into a B-spline Extrusion at tol 5.2e-5 m; the definition carries
+  5.2e-5, two rolled bend faces 1.5e-5 (tightened(1e-7) can't lower them), the fuse 3.3e-5 > live's 0.014 mm gaps.
+  AffineAxial (exact) didn't change the counts, so a 2nd source: next = AffineAxial + the prints together. Then "Collision".
 - Core's scissor region mappings (b58244 KICB, 0139f2 Extrude 8; 665cf3 derives) and qa's walk 3-5 skasm P0s are all in
   the 3 commits to re-queue; walks 6-9 have no skasm rows.
 - Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
