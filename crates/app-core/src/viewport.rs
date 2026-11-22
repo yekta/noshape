@@ -998,6 +998,12 @@ impl Viewport {
         self.avg_pick_ms
     }
 
+    /// The next hover pick is said even when its id stands: the studio held its hover back meanwhile (a sketch chain
+    /// ended by Esc) and lights it again from that pick.
+    pub fn say_hover_again(&mut self) {
+        self.hover_id_stale = true;
+    }
+
     /// What is lit is the pick under the pointer: no hover pick in flight, none waiting for a fast move to pause.
     pub fn hover_settled(&self) -> bool {
         !self.hover_query && self.paused_hover.is_none()
