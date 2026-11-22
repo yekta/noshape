@@ -399,10 +399,20 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   only Large's cell) can't be done (tickets/wf24-config-row-menu.png). P2: the assembly's configuration table sits 11 px higher than
   live's (rows at y 259 / 293 vs 270 / 305; tickets/wf24-config-table.png). Steps 12-19 = live (BOM, the "No assembly features are
   configured…" message, Configure suppression toast).
-- [ ] P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10, sm-box): live's Form opens on the account's last form (Circle
-  emboss) and builds at the picked point; ours opens with "Select Part Studio…" empty, so Form 1 errors (and the flat view has no
-  emboss). Corner relief width likewise: live remembered 3 mm (warns "A corner relief is too small…"), ours 5 mm. Rest of 27 matches
-  (Corner 8 mm, Make joint refused, relief notch in the flat view; flat view fit is SM-FLAT-VIEW-FIT).
+- [x] closed (qa 11-22 07:1x, green 17157c2fa; skasm: a runner gap, not the app) P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10):
+  qa's workflow runner now seeds live's account memory (hm2/wf/<name>.remembered -> feature_settings.json + NOSHAPE_UI_REMEMBERED=1, as
+  run.py remembered_settings): Form opens on Circle emboss and builds, Corner opens on 3 mm. What still differs is the next two tickets.
+- [ ] P2 **CORNER-RELIEF-TOO-SMALL-WARN (skasm)** (workflow 27 step 19, sm-box, seeded, green 17157c2fa): Corner 1 on Flange 1's vertex
+  with Square - Sized 3 mm: live warns "A corner relief is too small to be successfully applied." (yellow bar, Corner 1 row red); ours
+  accepts 3 mm silently. 8 mm then = live. tickets/wf27-corner-relief-3mm.png.
+- [ ] P1 **SURFACE-LOFT-GUIDE-FAILS (core)** (workflow 12 steps 18-25, curves, seeded Loft = Surface, green 17157c2fa): Surface Loft, New,
+  profiles Edge of Sketch 2 + Edge of Sketch 3, Guides and continuity ticked, guide Edge of Sketch 4, ✓: live builds the surface
+  ("Surfaces (1)", the preview shows it while the dialog is open); ours shows no preview and Loft 1 ends red. tickets/wf12-surface-loft-guide.png.
+- [ ] P1 **ISOLATE-SHOW-INTERNAL-GEOMETRY (asm)** (workflow 35 step 47, two-blocks asm, green 17157c2fa): the Isolate panel (instance menu >
+  Isolate…): live lists Transparency controls, **Show internal geometry**, Select transparent geometry, slider, Component controls,
+  Expand: connectivity, slider; ours has no Show internal geometry row. tickets/wf35-isolate-panel.png. Workflow 35 otherwise = live
+  (Revolute offset 10, Fastened places Part 2 <2> as live, Hide/Show, Exit isolate, Section view, Turn off section view); runner gap: the
+  second direction's fields (field index 1) are not found, px variant 35v-px.
 - [ ] P0 **FEEL-SECTION-PLANE-LABEL-LOOK (psui)** (workflow 28 steps 24-25, bracket, green b5b414278): Section view, Right picked
   and after Enter: live keeps the plane labels solid blue (39,94,181) and the part's edges 1 px; ours draws "Right" / "Top" thin
   and pale mauve (138,117,129; blue 23,82,176 up to step 23) and outlines the wall face and part in thick dark ~3 px edges
