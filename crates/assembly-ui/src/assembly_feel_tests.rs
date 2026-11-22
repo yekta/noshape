@@ -390,7 +390,7 @@ fn a_dragged_part_shows_no_hover_until_released(cx: &mut TestAppContext) {
 }
 
 /// Live asm/drag-feel-1122 (BaseR): a fixed part dragged never moves; a ground glyph lies on its face where the drag
-/// started, facing the viewer, and stays there while the pointer goes on; it goes with the release.
+/// started, facing the viewer, along the face's x, and stays there while the pointer goes on; it goes with the release.
 #[gpui::test]
 fn a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -399,8 +399,22 @@ fn a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started(cx: &mut T
         call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
     });
     let (window, view) = open_from_top(cx, &path, 1);
+    // Isometric, where the face's x and the screen's differ: the glyph follows the face.
+    let from = cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+                vp.project(glam::DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z)).unwrap()
+            })
+        })
+    })
+    .unwrap();
+    frames(cx, window, &view);
     let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
-    let from = (lo + hi) * 0.5;
     move_to(cx, window, &view, from);
     let w = at_window(cx, &view, from);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
@@ -418,6 +432,7 @@ fn a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started(cx: &mut T
         let v = view.read(cx);
         assert_eq!(v.ui.ground, Some(first), "it stays where the drag started");
         assert!(first.z().dot(glam::DVec3::Z) > 0.999, "lying on the top face, facing the viewer: {:?}", first.z());
+        assert!(first.x().dot(glam::DVec3::X) > 0.999, "its long side along the face's own x, not the screen's: {:?}", first.x());
         let at = v.viewport.read(cx).project(first.origin).unwrap();
         assert!((at.y - from.y).abs() <= 1.0 && at.x > from.x && at.x <= from.x + 60.0, "on the face under the pointer: {at:?} for {from:?}");
     });
@@ -427,7 +442,7 @@ fn a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started(cx: &mut T
     wait_until(cx, window, &view, |v, _| v.drag.is_none());
     assert_eq!(cx.update(|cx| view.read(cx).ui.ground), None, "gone with the release");
     let (lo2, hi2) = screen_box(cx, &view, "Part 1 <1>");
-    assert!(((lo2 + hi2) * 0.5 - from).length() < 0.5, "the fixed part never moves");
+    assert!(((lo2 + hi2) * 0.5 - (lo + hi) * 0.5).length() < 0.5, "the fixed part never moves");
 }
 
 /// live2 asm-feel (3b): in a subassembly, hovering one part outlines only that part (the pre-selection is its face with
@@ -759,6 +774,55 @@ fn select_other_reaches_an_edge_to_8_px_and_its_face_to_11(cx: &mut TestAppConte
     }
 }
 
+/// Live sel-gestures-1122 asm-16 (qa FEEL-ASM-SELECT-OTHER-FACE): Select other on a selected face, its triad up, lists
+/// "Face of Part 1 <1>" then the part.
+#[gpui::test]
+fn select_other_on_a_selected_face_lists_the_face(cx: &mut TestAppContext) {
+    use crate::scene_builder::PickKind;
+    use super::behaviors::SelectOtherRow;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "selother-selected-face");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let at = (lo + hi) * 0.5 + DVec2::new((hi.x - lo.x) * 0.25, (hi.y - lo.y) * 0.25);
+    move_to(cx, window, &view, at);
+    settle(cx, window, &view);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, at), Modifiers::default());
+    settle(cx, window, &view);
+    assert!(cx.update(|cx| !view.read(cx).ui.entity_sel.is_empty()), "the face selected");
+    wait_until(cx, window, &view, |v, cx| v.viewport.read(cx).pick_at_pointer_within(1.0, &|_| false).is_some());
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.select_other = None;
+        v.select_other(false, cx);
+    }));
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let rows = &v.ui.select_other.as_ref().unwrap().0;
+        let labels: Vec<String> = rows.iter().map(|r| v.select_other_label(r, cx)).collect();
+        assert!(matches!(rows.first(), Some(SelectOtherRow::Entity(t)) if t.kind == PickKind::Face), "the face first: {labels:?}");
+        assert!(labels.iter().any(|l| l == "Part 1 <1>"), "then its part: {labels:?}");
+    });
+}
+
+/// Live sel-gestures-1122 asm-06 (qa FEEL-ASM-CTRL): Ctrl+click on an instance opens its context menu, selection kept.
+#[gpui::test]
+fn a_ctrl_click_on_a_part_opens_its_context_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "ctrl-click-menu");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let at = (lo + hi) * 0.5 + DVec2::new((hi.x - lo.x) * 0.25, (hi.y - lo.y) * 0.25);
+    move_to(cx, window, &view, at);
+    settle(cx, window, &view);
+    let ctrl = Modifiers { control: true, ..Default::default() };
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, at), ctrl);
+    settle(cx, window, &view);
+    assert!(cx.update(|cx| crate::os_menu::is_open(cx)), "the context menu open");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.selected.is_empty() && v.ui.entity_sel.is_empty(), "nothing selected");
+        assert!(v.drag.is_none(), "no part drag");
+    });
+}
+
 /// The presented frame's pixels (BGRA, device px), its width and the window's scale.
 fn frame_pixels(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) -> (Vec<u8>, usize) {
     let vp = cx.update(|cx| view.read(cx).viewport.clone());
@@ -846,6 +910,62 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
         let selected = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & picked == picked && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face)).count();
         assert_eq!(selected, 1, "the picked face filled the picks' yellow (live feel cov-1120 A2), not a selection's amber");
     });
+    // Live mc-infer-1122 picked-asm (qa FEEL-MC-ASM-PICKED-REHOVER): hovered again, it keeps its yellow under the glyph.
+    move_to(cx, window, &view, on_top + DVec2::new(6.0, 3.0));
+    wait_until(cx, window, &view, |v, _| v.infer.is_some());
+    settle(cx, window, &view);
+    assert_eq!(picked_faces(cx, &view), 1, "the re-hovered pick still filled yellow");
+}
+
+/// Live mc-infer-1122 reach-asm-corner (qa FEEL-MC-VERTEX-FROM-FACE-ASM): brought onto a corner across its face, the
+/// pointer keeps the corner's connector glyph; straight from empty space the vertex shows no glyph.
+#[gpui::test]
+fn a_vertex_reached_from_its_face_keeps_the_connector_glyph(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mc-vertex-from-face", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on_top = (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2);
+    // The top face's corner nearest the top of the screen.
+    let corner = cx.update(|cx| {
+        let v = view.read(cx);
+        let o = &v.result.occurrences[0];
+        let vp = v.viewport.read(cx);
+        o.mesh.positions.iter().map(|p| o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64))).filter_map(|p| vp.project(p)).min_by(|a, b| a.y.total_cmp(&b.y)).unwrap()
+    });
+    let vertex_glyph = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let on_vertex = v.infer.as_ref().is_some_and(|((_, r), _, _)| matches!(r, noshape_model::reference::Reference::Vertex(_)));
+            (on_vertex, on_vertex && v.infer_vertex_glyph && v.infer_choice.is_some())
+        })
+    };
+    for k in 0..=10 {
+        move_to(cx, window, &view, on_top + (corner - on_top) * (f64::from(k) / 10.0));
+    }
+    settle(cx, window, &view);
+    assert_eq!(vertex_glyph(cx), (true, true), "across the face: the corner's glyph kept on its vertex");
+    move_to(cx, window, &view, corner + DVec2::new(0.0, -200.0));
+    settle(cx, window, &view);
+    move_to(cx, window, &view, corner);
+    settle(cx, window, &view);
+    assert_eq!(vertex_glyph(cx), (true, false), "straight from empty space: no glyph");
 }
 
 /// The faces a mate dialog's picks fill yellow.

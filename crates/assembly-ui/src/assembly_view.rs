@@ -548,6 +548,9 @@ pub struct AssemblyView {
     /// Inference candidates (body coordinates) for the hovered entity, and the chosen index.
     infer: Option<InferCache>,
     infer_choice: Option<usize>,
+    /// The hovered vertex was reached from a face or edge: its connector glyph shows (live mc-infer-1122 reach-corner
+    /// d=6..0); straight from empty space it doesn't.
+    infer_vertex_glyph: bool,
     mate: Option<MateSession>,
     relation: Option<RelationSession>,
     /// The relation dialog's type select (live dom/dialog-relation-*:
@@ -793,6 +796,7 @@ impl AssemblyView {
             pointer: DVec2::ZERO,
             infer: None,
             infer_choice: None,
+            infer_vertex_glyph: false,
             mate: None,
             relation: None,
             relation_select,
@@ -1711,18 +1715,19 @@ impl AssemblyView {
                 })
                 .collect();
             // A vertex's own point: its white corner mark over the vertex's hover disc, no connector glyph (live
-            // hover-matrix-1121 b5-fastened-vertex, qa FEEL-ASM-MATE-VERTEX).
-            chosen = self.infer_choice.filter(|_| !matches!(entity, Reference::Vertex(_)));
-            h.hover_vertex_open = matches!(entity, Reference::Vertex(_));
+            // hover-matrix-1121 b5-fastened-vertex, qa FEEL-ASM-MATE-VERTEX); reached from its face or edge, the
+            // glyph stays (mc-infer-1122 reach-asm-corner, qa FEEL-MC-VERTEX-FROM-FACE-ASM).
+            chosen = self.infer_choice.filter(|_| !matches!(entity, Reference::Vertex(_)) || self.infer_vertex_glyph);
+            h.hover_vertex_open = matches!(entity, Reference::Vertex(_)) && chosen.is_none();
         }
         // A mate dialog's picked face under the pointer keeps the hover look after its click, and once both picks are in
         // (live workflows-1122 08 s06 / s07: plain, not filled, its boundary and its part's outline lit; yellow once the
-        // pointer leaves).
+        // pointer leaves, and yellow under a re-hover: mc-infer-1122 picked-asm, qa FEEL-MC-ASM-PICKED-REHOVER).
         // The pointer still where the second pick's click was, with the moved part now under it (wf08 s07: Part 2 brought onto
         // Part 1's top): Part 1's top as hovered all the same, the moved part's face under the pointer lit as hovered.
         let still = self.mate.as_ref().is_some_and(|s| s.hud.is_some() && self.manip_click.is_some_and(|(at, _)| s.hud == Some(at)));
         let hovered = self.hover.as_ref().filter(|t| matches!(t.reference, Reference::Face(_))).map(|t| (t.path.clone(), t.reference.clone()));
-        let under = hovered.filter(|k| h.hover_outline.is_none() && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
+        let under = hovered.filter(|k| self.manip_click.is_some() && h.hover_outline.is_none() && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
         if self.mate.is_some()
             && let Some((path, face)) = under
         {
@@ -2648,22 +2653,16 @@ impl AssemblyView {
     }
 
     /// The ground glyph's frame for a fixed instance's drag at `position` (live asm/drag-feel-1122): on the face under
-    /// the pointer, lying in its plane facing the viewer, its long side along the screen's.
+    /// the pointer, lying in its plane facing the viewer, its long side along the face's own x (BaseR_hold: the top
+    /// face's edges).
     fn ground_glyph_at(&self, position: DVec2, cx: &App) -> Option<Frame> {
         let (t, p) = self.raycast_hit(position, &[], cx)?;
         let o = self.result.occurrences.get(t.occ)?;
         let at = Reference::Implicit { on: Box::new(t.reference.clone()), inference: Inference::Centroid };
         let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &at, &self.units(cx))?;
-        let vp = self.viewport.read(cx);
-        let n = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f).z();
-        let n = if n.dot(vp.ray(position).1) > 0.0 { -n } else { n };
-        let (o1, d1) = vp.ray(position + DVec2::X);
-        let along = d1.dot(n);
-        if along.abs() < 1e-9 {
-            return None;
-        }
-        let u = (o1 + d1 * ((p - o1).dot(n) / along) - p).reject_from(n).try_normalize()?;
-        Some(Frame::from_axes(p, n, u))
+        let f = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f);
+        let n = if f.z().dot(self.viewport.read(cx).ray(position).1) > 0.0 { -f.z() } else { f.z() };
+        Some(Frame::from_axes(p, n, f.x()))
     }
 
     /// The toolbar's Undo / Redo (they dispatch the actions, so an open mate dialog takes them).
@@ -3158,6 +3157,8 @@ impl AssemblyView {
             };
             let key = (h.path.clone(), h.reference.clone());
             if self.infer.as_ref().is_none_or(|(k, occ, _)| *k != key || *occ != h.occ) {
+                let from_entity = self.infer.as_ref().is_some_and(|((_, r), _, _)| !matches!(r, Reference::Vertex(_)) || self.infer_vertex_glyph);
+                self.infer_vertex_glyph = matches!(h.reference, Reference::Vertex(_)) && from_entity;
                 let units = self.units(cx);
                 let cands = self.result.occurrences.get(h.occ).map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
                 self.infer = Some((key, h.occ, cands));
@@ -3228,7 +3229,8 @@ impl AssemblyView {
         let boxes_select = self.pick_mode(cx).is_none() && self.placing.is_none();
         self.viewport.update(cx, |vp, _| {
             vp.tool_captures_left = capture;
-            vp.ctrl_boxes = selection_drag;
+            // (Ctrl over a part: its context menu on the click, not a part drag: live sel-gestures-1122 asm-06.)
+            vp.ctrl_boxes = selection_drag || (free && !self.explode_edit && self.hover.is_some() && self.manip_hover.is_none());
             vp.box_preview = boxes_select;
             vp.capture_picks_below = below;
             vp.capture_probe = probe;

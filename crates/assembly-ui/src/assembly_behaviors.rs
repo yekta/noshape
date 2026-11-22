@@ -4643,7 +4643,10 @@ impl AssemblyView {
                 let kind_of = |id: u32| self.pick(Some(id)).map(|t| t.kind);
                 let edge_within = |px: f64| self.pick(vp.pick_at_pointer_within(px, &|id| !matches!(kind_of(id), Some(PickKind::Edge | PickKind::Vertex))).flatten());
                 let face_behind = || self.pick(vp.pick_at_pointer_within(SELECT_OTHER_FACE_PX + 3.0, &|id| kind_of(id) != Some(PickKind::Face)).flatten());
-                let entity = self.hover.clone().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)).or_else(|| edge_within(SELECT_OTHER_EDGE_PX)).or_else(|| edge_within(SELECT_OTHER_FACE_PX).and_then(|_| face_behind()));
+                // (A face just selected has its triad under the pointer, no hover: the face there all the same, live
+                // sel-gestures-1122 asm-16 "Face of Part 1 <1>", qa FEEL-ASM-SELECT-OTHER-FACE.)
+                let face_under = || self.raycast_hit(self.pointer, &[], cx).map(|(t, _)| t).filter(|t| t.kind == PickKind::Face);
+                let entity = self.hover.clone().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)).or_else(|| edge_within(SELECT_OTHER_EDGE_PX)).or_else(face_under).or_else(|| edge_within(SELECT_OTHER_FACE_PX).and_then(|_| face_behind()));
                 let mut under = self.instances_under(self.pointer, cx);
                 if let Some(top) = entity.as_ref().and_then(|t| t.path.first().copied()).filter(|top| !under.contains(top)) {
                     under.push(top);

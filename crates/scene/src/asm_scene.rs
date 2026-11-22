@@ -1049,9 +1049,10 @@ impl noshape_render::camera_geometry::CameraGeometry for MateGlyphs {
     }
 }
 
-/// The ground glyph on a fixed instance's face while it is dragged (live asm/drag-feel-1122 fixed-glyph-x3.png): a white
-/// box outlined dark on a ground line with four hatch strokes under it, haloed white, ~36 px across, lying in the face's
-/// plane at `frame` (z the face's normal toward the viewer, x its long side).
+/// The ground glyph on a fixed instance's face while it is dragged (live asm/drag-feel-1122 fixed-glyph-x3.png, BaseR_hold
+/// unprojected onto the face): lying in the face's plane at `frame` (z the face's normal toward the viewer, x the face's
+/// own x), from 8 px past the pointer along x: a white box outlined dark (26 x 12 px in the plane) over a band of
+/// diagonal ground strokes, haloed white.
 pub struct GroundGlyph {
     pub frame: Frame,
 }
@@ -1061,18 +1062,20 @@ impl GroundGlyph {
         let (mut lines, mut points) = (LineData::default(), PointData::default());
         let f = &self.frame;
         let Some(px) = view.world_per_px(f.origin) else { return (lines, points) };
-        let half = 18.0 * px;
         let (u, v, n) = (f.x(), f.y(), f.z());
-        let lift = n * (half * 0.02);
-        let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * half) + v * (b * half)).as_vec3().into() };
+        let lift = n * (0.3 * px);
+        let at = |a: f64, b: f64| -> [f32; 3] { (f.origin + lift + u * (a * px) + v * (b * px)).as_vec3().into() };
         const WHITE: [u8; 4] = [255, 255, 255, 255];
         let mut pen = GlyphPen { lines: &mut lines, points: &mut points, at: &at, blue: WHITE, ink: DARK };
-        pen.fill([(-0.98, -0.42), (0.98, -0.42), (0.98, 0.5), (-0.98, 0.5)], WHITE);
-        pen.outline([(-0.8, 0.0), (0.8, 0.0), (0.8, 0.38), (-0.8, 0.38)]);
-        pen.poly(&[(-0.8, 0.0), (0.8, 0.0)], DARK, 2.0);
-        for x in [-0.55, -0.15, 0.25, 0.65] {
-            pen.poly(&[(x, 0.0), (x - 0.22, -0.3)], DARK, 1.6);
+        pen.fill([(8.5, -1.5), (37.5, -1.5), (37.5, 13.5), (8.5, 13.5)], WHITE);
+        let strokes: Vec<[(f64, f64); 2]> = [14.0, 19.0, 24.0, 29.0, 34.0].iter().map(|&x| [(x, 0.0), (x - 4.0, -10.0)]).collect();
+        for s in &strokes {
+            pen.poly(s, WHITE, 3.5);
         }
+        for s in &strokes {
+            pen.poly(s, DARK, 1.4);
+        }
+        pen.outline([(10.0, 0.0), (36.0, 0.0), (36.0, 12.0), (10.0, 12.0)]);
         (lines, points)
     }
 }
@@ -1194,10 +1197,9 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             scene.body_outline = true;
         }
     }
-    // A pick under the pointer shows the hover look alone: no fill, its boundary #ffc685 (live workflows-1122 08 s06 /
-    // s07: the picked face plain while the pointer stays on it, yellow once it leaves).
-    let hovered = |e: &(InstancePath, Reference)| h.hover_outline.as_ref() == Some(e) || h.hover_entity.as_ref() == Some(e);
-    for e @ (p, r) in h.picked_entities.iter().filter(|e| !hovered(e)) {
+    // (A pick under the still pointer, plain with the hover look, is left out of these by the view: live workflows-1122
+    // 08 s06 / s07; re-hovered later it stays yellow, mc-infer-1122 picked-asm.)
+    for e @ (p, r) in &h.picked_entities {
         mark(p, r, state::SELECTED | state::PICKED, &mut scene, &mut pts, &mut sel_pts);
         for id in built.picks.boundary_ids(p, r) {
             scene.add_flag(id, state::HOVER | state::OUTLINE | state::PICKED);

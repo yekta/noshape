@@ -2177,8 +2177,14 @@ impl noshape_render::camera_geometry::CameraGeometry for InferenceMarks {
         m.normals = vec![[0.0, 0.0, 1.0]; n];
         m.pick_ids = vec![0; n];
         let white = theme::lin(0xfdfdfd);
-        out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color([white[0], white[1], white[2], 1.0]).unlit().unpickable().pick_through().ignore_clip().layer(22));
-        out.push(Instance::new(Drawable::Lines(up.upload_lines(&rim))).per_primitive_color().unpickable().ignore_clip().layer(22));
+        let (mesh, rim) = (up.upload_mesh(&m), up.upload_lines(&rim));
+        // Also on top, under the lines: a cylinder's far cap centre shows through its side (live mc-infer-1122 cyl10/14,
+        // qa FEEL-MC-CAP-MARKER-HIDDEN); a visible one over its face's boundary line as before.
+        for top in [true, false] {
+            let disc = Instance::new(Drawable::Mesh(mesh.clone())).with_color([white[0], white[1], white[2], 1.0]).unlit().unpickable().pick_through().ignore_clip().layer(22);
+            let ring = Instance::new(Drawable::Lines(rim.clone())).per_primitive_color().unpickable().ignore_clip().layer(22);
+            out.extend(if top { [disc.on_top(), ring.on_top()] } else { [disc, ring] });
+        }
         out
     }
 }

@@ -446,8 +446,8 @@ pub struct Viewport {
     hover: Option<u32>,
     /// When true, left-drag goes to the active tool instead of box select.
     pub tool_captures_left: bool,
-    /// With Ctrl (Cmd) held a left drag boxes even so: an assembly's drag of its selection from empty space (live
-    /// sel-gestures-1122: Ctrl + window over the selection removes it).
+    /// With Ctrl (Cmd) held a left press isn't the tool's even so: a box from an assembly's empty space, not its selection's
+    /// drag (live sel-gestures-1122: Ctrl + window over the selection removes it); a click on a part, its menu.
     pub ctrl_boxes: bool,
     /// Every move picks at once, no pause (live's `alwaysPreHighlightOnMouseMove`): only while a sketch creation tool
     /// is active (live2 hover-time-1118); everywhere else a fast move's pick waits for the pause.
@@ -2643,7 +2643,8 @@ impl Viewport {
             }
         }
         match e.button {
-            MouseButton::Left if (self.tool_captures_left && !(self.ctrl_boxes && (e.modifiers.control || e.modifiers.platform))) || self.manipulator_at(p) || self.press_on_capture_pick(p) => {
+            // (Ctrl on a part: its context menu on release, not a part drag: live sel-gestures-1122 asm-06.)
+            MouseButton::Left if (self.tool_captures_left && !(self.ctrl_boxes && (e.modifiers.control || e.modifiers.platform))) || self.manipulator_at(p) || (!e.modifiers.control && self.press_on_capture_pick(p)) => {
                 self.drag = Drag::Tool;
                 cx.emit(ViewportEvent::ToolDown { position: p, modifiers: e.modifiers, click_count: e.click_count });
             }
