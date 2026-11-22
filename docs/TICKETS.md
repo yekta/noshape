@@ -296,7 +296,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [x] verified (qa 11-21 05:4x, green 3bbeb6096 release parity_models with NOSHAPE_PARITY_VALIDITY=1 on vibex8, qa-scratch/valid/core1121/pm.log): 0 invalid bodies over all 46 features. P1 **VALID-LORA-BATTERY-REMOVE (core)**: fixed 11-21 (core, "no invalid bodies from Battery Remove's unify..."): op_unify keeps the cut as it came when a face it merged is invalid; doc 0 invalid bodies (feature 16 region mapping still differs). Was: c2-lora-enclosure-ribs, first invalid at feature 41 "Battery Remove" (extrude remove):
   "Base" not a valid solid (raw 170/451/278; named 170/436/257 vs live 185/468/281, 13559.99 vs 13690.61 mm³), still invalid at 42.
   Also 6 parts vs live 2 there (Parts 3-6, 5/9/6, 7.6 mm³ each, not in live).
-- [ ] P1 **VALID-SURFLOFTS-LOFT1 (core)**: c2-surfaces-lofts-projected's Loft 1 (feature 8) makes Surface 1 an invalid body
+- [x] fixed 11-22 (core, e3e73b362): Loft 1 = 1/4/4 with 2 lines as live, doc 0 invalid (NOSHAPE_PARITY_VALIDITY=1, vibex7); doc 8 -> 9/45, next Face blend 2 (blend). P1 **VALID-SURFLOFTS-LOFT1 (core)**: c2-surfaces-lofts-projected's Loft 1 (feature 8) makes Surface 1 an invalid body
   (OCCT's shape check), and it stays invalid through the last feature (37 of 45 features hold it). Ours is 1 face / 3 edges /
   2 vertices, live's 1 / 4 / 4. Found while verifying VALID-SURFLOFTS-BOUNDARY-SURFACE, (qa 11-21 05:4x, green 3bbeb6096 release parity_models with NOSHAPE_PARITY_VALIDITY=1 on vibex8, qa-scratch/valid/core1121/pm.log). Wanted: Loft 1 as live's
   4-edge sheet, valid.

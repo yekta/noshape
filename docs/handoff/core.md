@@ -16,15 +16,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Dumps vibex7 ~/agents/core-keep/gamma-mf1 (defeature-0/3/6, offsetfaces-1/4/7, fillet-2/5/8 .brep+.txt, run.log).
   Next: replay defeature-0 (NOSHAPE_REPLAY=<dir>/defeature-0 kernel crash_inputs::replay_one --ignored), find why
   delete_planar_rounds declines (bends = inner+outer cylinders?), extend it; gate model suite none worse.
-- **VALID-SURFLOFTS-LOFT1 QUEUED b646175e (core-rf branch core-sfl):** op_loft's straight_edges_as_lines: a loft's
-  own B-spline edges with collinear poles become Geom_Line in place (history kept), faces' p-curves re-projected
-  (GeomProjLib::Curve2d), p-curves on surfaces no longer the edge's faces dropped first (natural lofts' planes replaced
-  their B-splines: re-ranged, the stale ones grew tolerances to 32 mm, every point OnBoundary, Cuts did nothing), vertex
-  params set. NOSHAPE_LOFT_SPLINE_EDGES=1 keeps the B-splines. Suite same binary: 1984 -> 2015 features, 127 -> 128 docs
-  (impeller 10 -> 27, loft-paths-guides 16 -> 29 = to the end, surfaces-lofts-projected 8 -> 9), none worse; speed
-  interleaved: lines same or faster. Validity: surfaces-lofts-projected 0 invalid, Loft 1 1/4/4 as live. On land: TICKETS
-  [x], tell blend the doc's next first difference is Face blend 2 ERROR "Failed to blend faces" (live OK).
-  Tests core::a_loft_between_two_open_curves..., core::a_solid_loft_between_two_hexagons_is_a_frustum_with_line_sides.
+- **VALID-SURFLOFTS-LOFT1 LANDED e3e73b362 (18:27):** loft's own straight edges as lines (straight_edges_as_lines, op_loft;
+  NOSHAPE_LOFT_SPLINE_EDGES=1 off). Suite 1984 -> 2015 features, none worse. Blend told: Face blend 2 next.
 - **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
   parameter from guide 0, each guide by its own parameter (Pchip through (v_i, t_i)): 21504.09 mm2 vs live 21477.23
   (was 21517.64), P1-P4 width within 0.02 mm, P5-tip +0.38 mm. T1 kernel the_knifehandle_loft_through_six_profiles_has_lives_area.
