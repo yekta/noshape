@@ -618,6 +618,24 @@ fn an_ellipse_round_the_other_way() {
     assert_eq!(counts(&r.shape), [c.summary.faces, c.summary.edges, c.summary.vertices]);
 }
 
+/// An imported pin whose cylinder's seam is a straight B-spline (c2-wire-clip-imported's Boolean 2: the pin fused
+/// with the clip it sits in, recorded): the seam's points map to either side of the cylinder's angle range, one
+/// curve each side, as OCCT's. noshape's Boolean takes it, valid, OCCT's faces and volume (to 1e-6: the two
+/// results' differences are empty both ways, their volume integrals 1.5e-7 apart).
+#[test]
+fn a_cylinder_seamed_by_a_b_spline() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "8a96c79ddef0cbf5").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+}
+
 /// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
 /// other's: a piece on the object and a tool, or on two tools, taken), as OCCT's: faces, edges, vertices, validity,
 /// every history record (each output where OCCT's is, within 2 µm; an edge's ends within 20 µm, below), the volume

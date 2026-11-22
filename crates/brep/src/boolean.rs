@@ -1417,12 +1417,18 @@ impl Ctx<'_> {
             // (And its other end at that angle too, unless at a cone's apex: a piece shorter than a few tolerances
             // is straight, and its middle within the tolerance of either end's angle (two knurl sections' 0.32 um
             // pieces from one vertex, 0.64 um apart round the cylinder, both mapped as rulings to one point).)
+            // (Angles a turn apart are one: a seam's points map to either side of it (an imported 1 mm pin's B-spline
+            // seam at -90°, c2-wire-clip-imported's Boolean 2: not a ruling, its two sides one curve).)
             let ruling = || {
-                let Surf::Cyl { o, a: ax, .. } = g.s else { return false };
+                let Surf::Cyl { o, a: ax, r, .. } = g.s else { return false };
                 let off = |p: DVec3| (p - o).cross(ax).length();
                 let (far, other) = if off(a) > off(b) { (a, b) } else { (b, a) };
                 let x = g.to2(far).x;
-                (g.to2(self.seg_at(s, 0.5)).x - x).abs() <= self.tol && (off(other) <= self.tol || (g.to2(other).x - x).abs() <= self.tol)
+                let apart = |p: DVec3| {
+                    let d = g.to2(p).x - x;
+                    (d - TAU * r * (d / (TAU * r)).round()).abs()
+                };
+                apart(self.seg_at(s, 0.5)) <= self.tol && (off(other) <= self.tol || apart(other) <= self.tol)
             };
             if matches!(g.s, Surf::Cyl { .. }) && ((straight && ruling()) || edge.is_some_and(|e| self.edges[e].g == Geo::Line)) {
                 return g.curve2(a, b, &Geo::Line, copy);
