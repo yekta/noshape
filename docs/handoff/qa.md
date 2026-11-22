@@ -24,6 +24,7 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Restarted 11-17 07:31: the lead's $HOME fix of the CLI pair (11-17's row INVALID: `~` after a comma isn't expanded, 1 of
   84 timed) and a guard: < 90 % of the docs timed or < 6 opens -> alert, no SCORE row. Earlier, 03:33: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
   `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
+- 11-22 05:38 (lead): fresh full suites on green b5b41427 = suites/1122-0538-b5b41427, ALL stages on vibex8 (unit qa-suites restarted with QA_UI_HOST/QA_SUITES_HOST/QA_SPEED_HOST=vibex8; the stale 11-21 run on 92d02c14 stopped, INVALID). When status lands: worse.txt (vs 1120-2308-8feaade1, 11-21) -> regressed scenarios / documents P0 to owners; qa-index-daily adds the 11-22 Parity index row (speed column: vibex8, not vibex7).
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
   suites of the newest green, each through `~/bin/slot`: ui + models on **vibex7**, assemblies / exchange (suites-rest) on
   **vibex6** beside them since 11-17 04:51 (vibex7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
