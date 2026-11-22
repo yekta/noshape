@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 16:53 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 17:56 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -12,29 +12,22 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
 - ORDER: knifehandle Fillet 2 (the tip end, below) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end ->
   scissor 2d82a0 F13 (tool dumps vibex7 ~/tmp/blend/sc2/f13tool-*.brep; body dump: cli-cusp rebuilt with ZZ_BODYDUMP,
   committed WIP 429750f98 in blend-cusp).
-- FILLET 2 (11-22 16:50): main fails "could not orient a face at the edge" near the blade's tip. blend10 branch
-  blend-khtip, WIP fe15f494e (never land: ZZ_* probes, ZZJ/ZZC/ZZT/ZZB debug, kernel ZZ prints, ZZ face print in
-  features_c.rs). Live (vibex8 live.jsonl line 11): tip rounds JSK/JSO 0.595 mm2 x -217.435..-216.127; the joint edge
-  JSF/JSZ is the PARTIAL arc (0.75 mm) from the top contact to the crease p/qf at x -216.29, where the long rounds
-  (JSC/JSG, x -216.291..15.4) end too; each tip round ends on a 0.214 mm edge (KSVB/KSdB, z 42.30, x ~-217.36) where
-  it meets the top face JSi: no cap. Done in fe15f494e:
-  (1) blend_direct share_end_curve also accepts one face's end arc lying along part of the other's from a shared end
-  (the tip run-on piece is pre-trimmed at the crease, the long tool face whole): "two blends' section" is gone.
-  (2) The cap: no ball fits past x -217.43 (ZZB: the fit flips ~1.4 r between two places, ZZ_BALLTOL doesn't help).
-  ZZ_CARRY=m0.04 (the last run-on section moved 40 um) removed the cap only when moved along the noisy last step,
-  which lifts it (z 0.095); along the section's plane normal (fe15f494e) the cap stays (0.0009 mm2, flipped). Adding a
-  section instead (a0.0x), or 80 um -> "a tool's side off a face of its edge". ZZ_TIPV (end on a vertex): wrong.
-  (3) Left after the cap: the -y crease edge p/qf, kept below (-216.095,-0.763,41.135) (piece of an input edge,
-  EmptyCopied + Range in split_face ~line 681), fails BRepCheck InvalidCurveOnSurface + SameParameter flag; the +y one
-  is fine; the input is valid. FixSameParameter and ShapeFix_Shape don't fix it. My own pcurve sampling (zz_dev)
-  reads 0.1-0.2 mm off on the INPUT's crease edges too while BRepCheck passes them: probably p and qf share one
-  surface after Split 1 (pick of the wrong pcurve); don't trust zz_dev there.
-  NEXT: (a) which face context fails for that edge (print_check: add the context face's area), compare its pcurves
-  with the input edge's; (b) the cap: end the run-on tool past where its round crosses the top face JSi (lift / carry
-  the last section until its arc is above JSi, or cut the tool by JSi's surface), as live's 0.214 mm end edge. The
-  Boolean fallback stays 13/35/24 at ZZ_NMIN 24 (13/41/30 at 8), the extra 2 faces / 8 edges / 6 vertices exactly
-  the two caps; ~1 in 6 runs 2 solids (OCCT Boolean run in parallel, boolean.cpp bop_parallel).
-  Tools: bin/kh-carry.sh (variants line at its end; logs kh-carry..6), kh-part.sh, kh-tipv.sh, kh-j.sh, kh-topo.sh.
+- FILLET 2 (11-22 17:56): PASSES 11/27/18 (live 11/27/18, removed volume in band, long rounds 236.452 mm2) via the
+  direct build in 3/3 variants. blend10 branch blend-khtip, WIP 06adcaa9d (never land as is). Real changes there:
+  (1) share_end_curve accepts a partial shared arc (joint); (2) split_face: each part-edge piece gets
+  ShapeFix_Edge().FixSameParameter(piece) (input crease's pcurve strays 38 um near the tip, BRepCheck missed it);
+  (3) ZZ_DROPSHORT probe -> make real: in split_face's drop loop, a cut whose two ends merged into one vertex
+  (shorter than snap, the end section 13 um over the tip edge) is left out; (4) ZZ_THINCAP probe -> make real: in the
+  blend pieces loop, a planar blend piece with 2A/P below the sewing tolerance (cap 6 um vs 52 um) is not sewn (the
+  sewing closes it): use the sew tolerance (approx.empty() ? 10*tol : 1e-4*size), maybe 4*2A/P < it; restrict to
+  tools' end caps. Probes already stripped from blend_section.rs (rolling_ball back to base, stride floor r/16 fixed)
+  and most of blend_direct.cpp; LEFT to strip: the ZZ prints in the two-blends'-section failure branch (~line 1833,
+  restore base), ZZ_DROPSHORT/ZZ_THINCAP env gates (make real), the ZZ face print in features_c.rs (~line 5008), and
+  check includes (ShapeAnalysis_Curve used by share_end_curve, ShapeFix_Edge used). Decide: the k::fuse_all Boolean
+  fallback in blend_section.rs (flaky, ~1 in 6 two solids) - drop it unless Fillet 3 / features tests need it.
+  Open: largest tolerance 0.106 mm in the result (run bin/kh-thin2.sh, logs/kh-thin2.out: baseline without THINCAP
+  vs with, and 5 repeats for flakiness). Then gate (features tests, knifehandle, scissor, parity via slot), git diff
+  --stat origin/main...HEAD, land. Tools: bin/kh-thin.sh, kh-thin2.sh, kh-faces.sh, kh-stride2..6.sh, kh-rep.sh.
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
 - KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
