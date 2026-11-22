@@ -3745,6 +3745,21 @@ bool valid_whole(const TopoDS_Shape& s)
   return BRepCheck_Analyzer(s, true, tight).IsValid();
 }
 
+// Whether `s`, `s0` with faces replaced, is valid: its faces not in `s0` (valid_whole's check of them), then its shells
+// (the whole part's check was 100 ms of c2-wire-clip-imported's unify, twice).
+bool valid_changed(const TopoDS_Shape& s0, const TopoDS_Shape& s)
+{
+  ShapeIMap before;
+  TopExp::MapShapes(s0, TopAbs_FACE, before);
+  TopoDS_Compound made;
+  BRep_Builder    B;
+  B.MakeCompound(made);
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    if (!before.Contains(x.Current()))
+      B.Add(made, x.Current());
+  return valid_whole(made) && shells_valid(s);
+}
+
 // Whether this thread's unify is op_unify_precise's (merge_cylinder_groups' volume check by the segmented integrals).
 thread_local bool t_precise_cylinder_merge = false;
 
@@ -3756,7 +3771,7 @@ thread_local bool t_precise_cylinder_merge = false;
 // boundary's (projected, a turn from the seam), round it one new seam where both chains have a vertex at one angle.
 // The shape unchanged where there's no such group or the merge doesn't come out valid with the same volume.
 // merge_cylinder_groups' merges, each checked valid as a whole part with `each_valid`.
-static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hist, bool any_frame, bool each_valid)
+static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hist, bool any_frame, bool each_valid, TopoDS_Shape* copied = nullptr)
 {
   auto cyl_of = [](const TopoDS_Face& f, gp_Cylinder& c) {
     TopLoc_Location           l;
@@ -3860,6 +3875,8 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
   carry_kept_marks(s0, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
   TopoDS_Shape        s     = cp.Shape();
   HHist               local = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s0}), cp);
+  if (copied != nullptr)
+    *copied = s;
   bool                any   = false;
   // Groups whose merge failed, by their faces (held, so their addresses stay theirs): not tried again in later rounds
   // while their faces are the same (isaac's Mirror 1: 470 retries of 43 groups), unless the whole part was what failed.
@@ -4626,13 +4643,14 @@ static TopoDS_Shape merge_cylinder_groups_with(const TopoDS_Shape& s0, HHist& hi
 
 TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any_frame)
 {
-  // (The whole part checked once, at the end, not after each group's merge: c2-hunting-knife's Mirror 1, its 15 hole
-  // and wall halves, 15 checks of the whole knife. Where the end isn't valid, again with each merge checked.)
+  // (The part checked once, at the end, not after each group's merge: c2-hunting-knife's Mirror 1, its 15 hole and wall
+  // halves, 15 checks of the whole knife. Where the end isn't valid, again with each merge checked.)
   HHist              h;
-  const TopoDS_Shape fast = merge_cylinder_groups_with(s0, h, any_frame, false);
+  TopoDS_Shape       copied;
+  const TopoDS_Shape fast = merge_cylinder_groups_with(s0, h, any_frame, false, &copied);
   if (fast.IsSame(s0))
     return s0;
-  if (valid_whole(fast))
+  if (valid_changed(copied, fast))
   {
     if (hist.IsNull())
       hist = h;
