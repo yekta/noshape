@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 20:26 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 22:15 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -20,31 +20,41 @@ all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/kn
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## NEXT (lead 11-22 16:4x; state 11-22 16:41 UTC)
-0. P0s (state 11-22 20:26 UTC):
+0. P0s / P1 (state 11-22 22:15 UTC):
    - IMPELLER-SHELL-INVALID (qa, TICKETS 838b08319): c2-impeller-loft Part 1 invalid f43-45, Part 3 f46-47 since
-     13d44f9db. A/B (imp-ab2.sh, NOSHAPE_PARITY_VALIDITY=1, vibex7 ~/tmp/bool/imp-ab): Newton-step normals undone ->
-     0 invalid; corner solve's 12-step give-up undone -> still invalid. FIX 9d9369a0f (worktree bool-imp): normal_at
-     back to the full projection. GATE RUNNING unit bool-imp-gate (imp-gate.sh, vibex7, vs main 838b08319, 20:10) ->
-     /root/bool-scratch/chain-bool-imp.out. Then knurls (kn-run.sh vibex7 kn-imp with the gate trees' kernel bins),
-     land.sh from bool-imp (this handoff with it), tell lead + qa. Gate's "took too long" on shell abf39e203b00b604
-     is load (main 24-27 s, budget ~30 s CPU): rerun it alone, both binaries, as 19:48.
-   - RINGS-LOFT 602310557 QUEUED 19:53 as f6618e4a (with the handoff; rebased on ac604174 = the any-thread fix, which
-     LANDED 17:56). Its gate FAILed only on the pre-fix crate test and abf39e203b00b604's time limit (lead told).
-     After it lands: tell qa (COMPAT-RINGS-LOFT-SLOWER), rm vibex8 ~/tmp/bool/kn-rl, thr, rl-case, shcase,
-     doc-prof-c2-rings-loft; vibex7 ~/tmp/bool/imp-ab after the impeller land. Check cf-surface-pattern 384 -> 385.
-   - Release v0.4.67 was cut without these (A reverted on the release branch).
+     13d44f9db. A/B (imp-ab2.sh, NOSHAPE_PARITY_VALIDITY=1): Newton-step normals undone -> 0 invalid. FIX 9d9369a0f
+     (worktree bool-imp, + this handoff): normal_at back to the full projection. GATE RUNNING unit bool-imp-gate
+     (imp-gate.sh, vibex7, vs main 838b08319; built 21:24, shards in slot) -> /root/bool-scratch/chain-bool-imp.out.
+     Then knurls (kn-run.sh vibex7 kn-imp, k-main/k-br = bool-gate-base / bool-imp-gate all-96c035059fc28abb), land.sh
+     from bool-imp, tell lead + qa (qa runs the validity check on green). Shell abf39e203b00b604 "took too long" =
+     load: rerun alone with both binaries. Then rm vibex7 ~/tmp/bool/imp-ab, kn-imp.
+   - RINGS-LOFT LANDED a092a991d (+ handoff 9a482099); qa verified 21:48 (4.3 vs 0.4.66 4.7 s), closed.
+   - P1 COMPAT-SURFACE-PATTERN-SLOWER (qa 21:48): Surface Pattern 3's cut (85 tools, part 5 um, tools 0.1 um) declined
+     since stage A "a section on a third face" (5.117 um off a tool's face, band 5.1) -> OCCT 14 s. FIX e7c98cc5a
+     (worktree bool-spat, test a_section_of_a_tolerant_part_lies_on_another_patterned_tools_face, case be4f9303164aa29f):
+     project within args_band(a,b) + min(args_band(a,f), args_band(b,f)). Ours takes it (+5 edges/vertices vs OCCT,
+     as 0.4.66; qa: 0.4.66 Part 1 129/385/258, OCCT path 384/257, live 131/387/258). GATE QUEUED unit bool-spat-gate
+     (spat-gate.sh: starts on vibex7 when bool-imp's is done) -> chain-bool-spat.out; check the suite shows
+     cf-surface-pattern 385 edges and its time; then knurls, land, tell qa + lead. Scratch: vibex7 ~/tmp/bool/sp-case,
+     doc-prof-cf-surface-pattern (rm after).
 1. LANDED: usdvol c240175b, stage A ea0febb2 (13:03), B 02620804 (15:17), C + cd7ef8f0b 4511db62 (16:21).
-2. bool-uni 857221953 (worktree bool-uni): apply_band_merges computes the part's volume only when dv > 1e-12 diag^3
-   (gamma B1 dv 1e-19: bands.bands 360 -> 180 ms, same 2652 faces / volume). Its gate was STOPPED 16:13 for the P0;
-   re-run it (/root/bool-scratch/uni-gate.sh as unit bool-uni-gate) after the P0 lands, rebased on main; then
-   knurls (kn-run.sh vibex8 kn-uni), land.sh, report.
+2. bool-uni (worktree bool-uni, rebased 20:41 as c4737a791): apply_band_merges computes the part's volume only when
+   dv > 1e-12 diag^3 (gamma B1 bands 360 -> 180 ms). GATE RUNNING unit bool-uni-gate (uni-gate.sh, vibex8, 20:41) ->
+   /root/bool-scratch/chain-bool-uni.out; then knurls (kn-run.sh vibex8 kn-uni), land.sh, report.
 3. OWN UNIFY (lead 11-22 17:4x, decision (a)): gamma B1's unify (1.5-2.3 s vibex8, live 246 ms) is spread over OCCT:
    USD build 340 ms, copies 220-340, checks 230-350, 4 whole-part ReShapes 210-300, ShapeFix of ~170 rebuilt arcs; no
    step > 100 ms, cheap cuts tried and dropped (usdlocal.diff; PROBE_JOIN_FIRST). START AFTER the P0 (item 0) and
    bool-uni (item 2) land. Plan (each stage its own land behind the brep gate + knurls; OCCT's unify the fallback until
    ours covers the corpus):
-   U0 oracle: a brep_replay mode (NOSHAPE_BREP_UNIFY=1) that unifies each case's result both ways and diffs faces /
-      edges / vertices, volume, area, surface kinds per face and the history images (merged-from); T1 tests per kind.
+   U0 oracle: COMMITTED locally aba0938cf (worktree bool-u0, not landed): crates/brep/src/unify.rs unify_planes (faces
+      on one plane merged, lines joined at 2-edge vertices, OCCT's 1e-7 / 1e-12; origins + history: Modified / Deleted;
+      `rest` = something left for OCCT), 4 T1 tests (tests.rs the_unify_*) pass, clippy clean; brep_bridge runs it
+      under NOSHAPE_BREP_UNIFY=1 (take_own_unified tally); brep_replay's oracle mode compares results after the
+      model's unify and reports "own unify: N cases, merged in, OCCT's unify then a no-op in, nothing left in".
+      ORACLE RUN queued on vibex7 slot (u0-oracle.sh via rb.sh -> /root/bool-scratch/u0-oracle.out, per corpus
+      vibex7 ~/tmp/bool/u0/<c>.out). Next: read its mismatches, fix, compare composed history too; then U1 wiring
+      (C++ flag: no own unify where an argument has kept-edge marks, keep_marked_edges), gate, land.
+      vibex7 ~/agents/bool-u0/target is this tree's (rm when done).
    U1 planes: on the Rust Boolean's own result (crates/brep, before the conversion in rust_boolean.cpp), adjacent
       faces on one plane (within the pair's band) merged, their shared edges dropped, loops rebuilt; lines meeting
       at a vertex of only those two edges joined. History: each new face/edge from its pieces. A result with any
