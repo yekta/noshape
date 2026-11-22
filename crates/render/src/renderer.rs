@@ -1039,7 +1039,7 @@ impl DrawLists {
     fn order_solid(&mut self, scene: &Scene, pick: bool) {
         self.opaque_runs.clear();
         self.masked_prefix.clear();
-        if pick || perf_overrides().no_solid {
+        if perf_overrides().no_solid {
             self.opaque_runs.push((self.opaque.len(), FaceKind::Discard));
             return;
         }
@@ -1064,8 +1064,11 @@ impl DrawLists {
             };
             (inst.layer, kind, i)
         }));
-        // The order within each layer's discard-free faces stays the instances' (which wins a depth tie).
-        keyed.sort_by_key(|&(layer, kind, _)| (layer, kind == FaceKind::Discard));
+        // The order within each layer's discard-free faces stays the instances' (which wins a depth tie); the pick keeps
+        // the instances' order whole, only its closed runs culled.
+        if !pick {
+            keyed.sort_by_key(|&(layer, kind, _)| (layer, kind == FaceKind::Discard));
+        }
         self.opaque.clear();
         for &(_, kind, i) in &keyed {
             match self.opaque_runs.last_mut() {
@@ -1499,7 +1502,11 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &flat, &pipelines.mesh_pick_plane);
         draw(pass, &behind, &pipelines.line_pick_behind);
         draw(pass, &lit, &pipelines.mesh_pick_transparent);
-        draw(pass, &lists.opaque, &pipelines.mesh_pick);
+        let mut start = 0;
+        for &(end, kind) in &lists.opaque_runs {
+            draw(pass, &lists.opaque[start..end], if kind == FaceKind::Closed { &pipelines.mesh_pick_closed } else { &pipelines.mesh_pick });
+            start = end;
+        }
         if let Some((group, planes)) = caps {
             pass.set_pipeline(&pipelines.section_cap_pick);
             for &k in planes {
@@ -2322,6 +2329,9 @@ struct Pipelines {
     mesh_xray_mark: Lazy,
     mesh_outline_xray: Lazy,
     mesh_pick: Lazy,
+    /// Closed solids' faces in the pick, back faces culled as in the color pass (a hidden back face's sliver along an edge
+    /// it shares with a front face won its depth tie: live workflows-1123 02 s5, a wall's inner face taken over its top edge).
+    mesh_pick_closed: Lazy,
     mesh_pick_transparent: Lazy,
     mesh_pick_plane: Lazy,
     /// Visible-depth samples: pick ids with true depth (no bias).
@@ -2374,6 +2384,7 @@ impl Pipelines {
             &self.mesh_xray_mark,
             &self.mesh_outline_xray,
             &self.mesh_pick,
+            &self.mesh_pick_closed,
             &self.mesh_pick_transparent,
             &self.mesh_pick_plane,
             &self.mesh_sample,
@@ -3056,6 +3067,7 @@ impl Renderer {
         let mesh_outline_xray = lazy(LayoutKind::Main, P { label: "mesh-outline-xray", vs: "vs_outline", fs: "fs_outline", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: None, depth: Some((false, always)), bias: none, samples: msaa }, Extra { stencil: Stencil::OutsideXray, ..PLAIN });
         let point_hidden = lazy(LayoutKind::Main, P { label: "point-hidden", vs: "vs_point", fs: "fs_point", buffers: POINT_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Less)), bias: POINT_DEPTH_BIAS, samples: msaa }, PLAIN);
         let mesh_pick = lazy(LayoutKind::Main, P { label: "mesh-pick", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, PLAIN);
+        let mesh_pick_closed = lazy(LayoutKind::Main, P { label: "mesh-pick-closed", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: face, samples: 1 }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back), stencil: Stencil::Off });
         let mesh_pick_transparent = lazy(LayoutKind::Main, P { label: "mesh-pick-t", vs: "vs_mesh", fs: "fs_mesh_pick", buffers: MESH_BUFFERS, format: PICK_FORMAT, blend: None, depth: Some((false, ge)), bias: none, samples: 1 }, PLAIN);
         // Datum planes: depth written scaled far back (fs_mesh_pick_plane), so the nearest plane wins among
         // planes and any part still wins over them.
@@ -3107,6 +3119,7 @@ impl Renderer {
             mesh_xray_mark,
             mesh_outline_xray,
             mesh_pick,
+            mesh_pick_closed,
             mesh_pick_transparent,
             mesh_pick_plane,
             mesh_sample,

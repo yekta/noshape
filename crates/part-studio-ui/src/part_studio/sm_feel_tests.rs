@@ -765,3 +765,51 @@ fn a_sheet_metal_pick_leaves_its_part_row_plain(cx: &mut TestAppContext) {
     });
     assert!(rows.is_empty(), "part rows marked (selected, related) with a sheet metal edge in Flange's field: {rows:?}");
 }
+
+// Tab with its profile picked (Flange to merge filled with the plate), the merge field clicked and Flange 1's wall clicked
+// where live's ray through (30, 35, 2) passes just above its top (live workflows-1123 02 step 5, zoomed as live: the plate's
+// 60 mm along x 194 px): live takes the wall's outer face, "Face of Flange 1", not the plate the dialog holds and the
+// preview changes, nor the wall's thin top face nor its inner face behind (qa SM-TAB-MERGE-PICK).
+#[gpui::test]
+fn a_tabs_merge_click_on_the_walls_top_edge_takes_the_wall(cx: &mut TestAppContext) {
+    let Some(_gpu) = super::feel::gpu_pointer() else { return };
+    RENDERING.set(true);
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sm-tab-merge-pick", Some(starts["sm-box"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let pointer = super::feel::Pointer::new(cx, window, &view);
+    let mm = |x: f64, y: f64, z: f64| glam::DVec3::new(x, y, z) * 1e-3;
+    let at = |cx: &mut TestAppContext, p: glam::DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(p)).expect("on screen");
+    let k = (at(cx, mm(60.0, 0.0, 0.0)) - at(cx, mm(0.0, 0.0, 0.0))).length() / 194.5;
+    let (c, size) = (at(cx, mm(30.0, 20.0, 10.0)), cx.update(|cx| view.read(cx).viewport.read(cx).size()));
+    cx.update(|cx| view.update(cx, |v, cx| v.viewport.update(cx, |vp, cx| vp.zoom_to_box(c - size * 0.5 * k, c + size * 0.5 * k, cx))));
+    let t = std::time::Instant::now();
+    while cx.update(|cx| view.read(cx).viewport.read(cx).camera_moving()) && t.elapsed() < std::time::Duration::from_secs(10) {
+        pointer.frames(cx, &view);
+    }
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sheetMetalTab", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Tab dialog").dialog.clone());
+    pointer.frames(cx, &view);
+    let p = at(cx, mm(15.0, 45.0, 0.0)).floor();
+    pointer.move_to(cx, &view, p);
+    pointer.click(cx, &view, p);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).feature.params.query("booleanUnionScope").len() == 1);
+    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("booleanUnionScope")));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).ui.preview_before.is_some());
+    pointer.frames(cx, &view);
+    let hovered = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        v.viewport.read(cx).pick_under_pointer().flatten().and_then(|id| v.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()))
+    });
+    let outer = at(cx, mm(30.0, -2.0, 14.5)).floor();
+    pointer.move_to(cx, &view, outer);
+    let outer = hovered(cx).expect("Flange 1's outer face");
+    let p = at(cx, mm(30.0, 35.0, 2.0)).floor();
+    pointer.move_to(cx, &view, p);
+    pointer.click(cx, &view, p);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let chips = cx.update(|cx| dialog.read(cx).chip_labels("booleanUnionScope"));
+    assert_eq!(chips, ["Face of Sheet metal model 1", "Face of Flange 1"], "Flange to merge after the click");
+    assert_eq!(cx.update(|cx| dialog.read(cx).feature.params.query("booleanUnionScope").get(1).cloned()), Some(outer), "the wall's outer face");
+}
