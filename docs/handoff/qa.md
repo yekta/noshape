@@ -5,27 +5,21 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 19:0x (after the compaction, first)
-- **DONE this session**: v0.4.67 (fca75a151) FINAL GO 17:45 (compat/rc-v0467.txt ALL-SAME + 4 known improvements; qa-t2 target removed).
-  Impeller bisect -> bool 13d44f9db (shell.cpp Newton normals / 12-step corner give-up; parent ec2e52f99 valid): P0 IMPELLER-SHELL-INVALID
-  (TICKETS 838b08319), bool took it 18:5x, fix ETA ~20:00. live's manip follow-ups (F1-F3) scored: P0 FEEL-FILLET-DRAG-FOCUS,
-  FEEL-TRANSFORM-PLANE-HANDLE, ROTATE-EDGE-SENSE amended (sense = live) (d8000e10d; cells feel1122/manipnav/cells/m15*, m16*, out5).
-  asm 440a5c94e (queue sha db8b1ef09 NEVER enters green: wait on the landed sha) checked on green 9ae39c2f4 (TICKETS 1bd14c376, asm told).
-- **NEXT 1, bool's impeller fix**: when bool names the commit, wait for it in green, then on vibex7:
-  `python3 ~/tmp/qa/validity.py ~/tmp/qa/imp-17157.noshape ~/qa-speed/bin/noshape` (expect invalid []), close the ticket, tell bool.
-- **NEXT 2, fan-blade-sweep 48->5/53 (suite 17157c2f)**: unit qa-bisect-fan (bin/bisect-parity.sh 8feaade18 17157c2fa c2-fan-blade-sweep 40:
-  git bisect over crates/ops/src/parity.rs commits in worktree qa-t2, parity_models release build on vibex7) -> tmp/bisect-parity.log
-  ("first bad commit" + BP-DONE). 4a22b2966 (asm) is already bad, so it is 4a22b2966 or earlier (0f86a0f84 skasm, ed0fcbec0 / 7aa7394a0 asm,
-  8551de756 / b4f526492 dx, 59d5c18ac skasm). First diff: feature 5 "Extrude 1" klammer 10/24/16 faces, live 6/12/8, volume 2469 vs 11170.
-  File P1 to the commit's owner; then `ssh vibex7 rm -rf ~/agents/qa-t2/target`.
-- **NEXT 3, bool's rings fix 602310557**: unit qa-wait-rings (bin/wait-fix-compat.sh) writes the rings line to qa-alerts when green has it
-  (not in 9ae39c2f4); check it is the landed sha, not the queue sha (as asm's was); give the cut verdict for that green.
-- Open from the asm check: tyres reopened (infento-saved tyres still ~1.6 m off live's assembly.json poses), CROSSING-OUTLINE colour,
-  MC-CYL-SIDE-AXIS-MID-ASM, SHIFT release on the cylinder, wf25 s28 Gear look. asm's next land: FIXED-GLYPH, CAP-MARKER-HIDDEN,
-  VERTEX-FROM-FACE, PICKED-REHOVER, SELECT-OTHER-FACE, Ctrl+click menu (re-run fieldsel fu cells asm-06 / asm-16, mcinfer sub-asm, mi.sh).
+## IN FLIGHT 20:2x (after the compaction, first)
+- **DONE this session**: v0.4.67 FINAL GO 17:45. Impeller P0 -> bool 13d44f9db. live's manip follow-ups scored (d8000e10d).
+  Fan-blade-sweep bisect: asm 4a22b2966 (48/53 -> 5/53, likely the query dedup) = P1 PARITY-FAN-BLADE-SWEEP-TRANSLATOR, asm told; qa-t2 target removed.
+  asm 3900b9e1e on green 496a5d0b3: 5 of 6 =, PICKED-REHOVER reopened (markers on the re-hover), new P0s FEEL-MC-MARKER-LOOK-ASM,
+  FEEL-MC-EDGE-BEFORE-VERTEX-ASM, FEEL-ASM-FIXED-GLYPH-AA (asm told). skasm UIS-ASM-START-FIRST-INSTANCE verified (b37201ea6, skasm told).
+  19:08 lead: my vibex8 runs stopped for bool's rings gate; qa-requeue-gate restarted qa-suites + qa-uip-rerun at 19:47.
+- **NEXT 1, bool's impeller fix 9d9369a0f** (normal_at full projection; gate on vibex7 since 20:10, land ETA ~22:00): unit qa-wait-imp
+  (tmp/wait-imp.sh: subject match "bool:.*impeller" in green, then validity.py on vibex7) -> tmp/wait-imp.log (IMP-DONE). Expect no
+  invalid part (bool: Part 1 invalid at 43-45, Part 3 at 46-47 on main). Close IMPELLER-SHELL-INVALID, tell bool.
+- **NEXT 2, bool's rings fix 602310557**: unit qa-wait-rings (8 h, subject match) writes the line to qa-alerts; cut verdict for that green.
+- **NEXT 3, asm**: SHIFT-NEAREST release fix (asm writing a real-event repro); then the fan-blade P1 and the 20:2x P0s. Rerun chain:
+  tmp/rr-3900.sh (fieldsel fs.sh fu-asm-b6/b2/sc-asm, mcinfer mi.sh sub-asm sub-asmR asm-picked reach-asm-corner asm-shift, asmfeel dr-BaseR).
+- Open from asm: tyres ~1.6 m off live's poses, CROSSING-OUTLINE colour, wf25 s28 Gear look.
 - wf replays on hm2/out-wf: our shots are 2240x1440, the window at an offset other than (160,180); find it before cropping.
-- Waiting units: qa-af-sf (skasm a183ba50a sf-Slider -> hm2/out-af-sf), qa-rs-ec2f (psui batch), qa-uip-rerun (suite 1122-1623).
-  skasm BEND-FACE-RECLICK-EMPTIES reopened, no refix queued. main was RED 17:51 (kernel brep_replay) then green moved to 9ae39c2f4.
+- Waiting units: qa-rs-ec2f (psui batch). skasm BEND-FACE-RECLICK-EMPTIES reopened, no refix queued.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
