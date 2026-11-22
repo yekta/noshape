@@ -466,7 +466,7 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - [ ] P2 **CUSTOM-TABLE-INFO-CELL (studios)**: workflow 14 step 2: live's tableCellWithInfo ⓘ small and grey at the cell's right edge; ours right after "0" and larger; the section "…" blue in ours, dark grey in live. tickets/wf23-14-table-info.png. (qa 2026-11-22 21:4x)
 - [ ] P2 **ASM-INSERT-FILTER-BUTTONS (asm)**: workflow 16 step 2: the Insert dialog's Part Studios filter row has 2 buttons in live, 3 in ours. tickets/wf23-16-insert-filters.png. (qa 2026-11-22 21:4x)
 - [ ] P2 **UIS-FEATURE-INITIALS (psui)**: workflow 12 steps 13/14/16/21, 13 steps 18/20/24: runner gap: live targets the row as "uF uip Feature 1"; our state export names it so (part_studio/ui_script.rs:189) but the row is test-named only "feature:uip Feature 1" (part_studio/mod.rs:4770-4776), so the resolver fails and later steps fail after it. (qa 2026-11-22 21:4x)
-- [ ] P3 **PS-RAIL-STOPWATCH-WARNING (psui)**: every Part Studio replay: our left rail shows a stopwatch icon with a red "!" live lacks (maybe a software-GL performance warning; owner?). (qa 2026-11-22 21:4x)
+- [x] (closed qa 23:3x, psui/lead: the software renderer's own performance badge, shown only under llvmpipe; the environment, not a bug) P3 **PS-RAIL-STOPWATCH-WARNING (psui)**: every Part Studio replay: our left rail shows a stopwatch icon with a red "!" live lacks (maybe a software-GL performance warning; owner?). (qa 2026-11-22 21:4x)
 
 ## qa, 2026-11-22 21:4x (lead: live's workflows-1123 01-10 replayed step by step; green a08754b16, vibex8, kit qa-scratch/hm2/wf (bin/wf.sh + WF_SET=workflows-1123 WF_OUT=out-wf23), shots hm2/out-wf23/<nn>; evidence qa-scratch/tickets/wf23-*.png, live left; notes hm2/score-wf23/01-10/*.md)
 
