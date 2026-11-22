@@ -460,6 +460,9 @@ impl GFace {
             (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. }) => Err(Decline("a curve on a free-form face")),
             (Surf::Plane { .. }, Geo::Line) => Ok(C2::Seg { a: self.to2(p0), b: self.to2(p1) }),
             (Surf::Plane { .. }, Geo::Apex { .. }) => Err(Decline("an apex on a plane")),
+            // (An arc across the plane: only a stretch of it within the tolerances (`arc_end_on_plane`), its chord, where that
+            // stays within the face's tolerance of it.)
+            (Surf::Plane { n, .. }, Geo::Arc { k, .. }) if k.n.cross(*n).length() > 1e-9 && (p1 - p0).length_squared() <= 8.0 * k.r * self.t.max(reach) => Ok(C2::Seg { a: self.to2(p0), b: self.to2(p1) }),
             (Surf::Plane { n, .. }, Geo::Arc { k, sweep, .. }) => {
                 let c = self.to2(k.c);
                 let d = self.to2(p0) - c;
@@ -2845,6 +2848,72 @@ impl Ctx<'_> {
         }
     }
 
+    /// An arc of a circle across plane face `f`'s plane, leaving it from one of its ends along it: its end there and
+    /// the angle where it leaves the edge's and the face's tolerances, if that's past the tolerance along it (a round's
+    /// edge running from a flat into another part's flush flat: c2-wire-clip-imported's clips, 2.5 um apart).
+    fn arc_end_on_plane(&self, e: usize, f: usize) -> Option<(usize, f64)> {
+        let (Surf::Plane { n, d, .. }, Geo::Arc { k, a0, sweep }) = (&self.faces[f].s, self.edges[e].g) else { return None };
+        if k.n.cross(*n).length() <= 1e-9 {
+            return None;
+        }
+        let on = self.pool.pair(self.edges[e].t, self.faces[f].t);
+        let off = |t: f64| (n.dot(k.at(t)) - d).abs();
+        (0..2).find_map(|end| {
+            let (from, dir) = if end == 0 { (a0, 1.0) } else { (a0 + sweep, -1.0) };
+            if off(from) > on {
+                return None;
+            }
+            let steps = 64;
+            let out = (1..=steps).map(|i| from + dir * sweep * i as f64 / steps as f64).position(|t| off(t) > on)?;
+            let (mut a, mut b) = (from + dir * sweep * out as f64 / steps as f64, from + dir * sweep * (out + 1) as f64 / steps as f64);
+            for _ in 0..60 {
+                let m = 0.5 * (a + b);
+                if off(m) > on {
+                    b = m;
+                } else {
+                    a = m;
+                }
+            }
+            ((a - from).abs() * k.r > self.tol).then_some((end, a))
+        })
+    }
+
+    /// [`Self::arc_end_on_plane`]'s part of arc `e` on face `f`, from its end there to where it crosses the face's
+    /// boundary, a vertex there (OCCT's common block of the edge's part and the face, its pave on the face's edge).
+    /// (Only a part ending on the boundary: one leaving the plane inside the face runs along the section of its own
+    /// flat there.)
+    fn arc_part_in_face(&mut self, e: usize, f: usize, (end, t): (usize, f64)) -> R<()> {
+        if !self.in_face_done.insert((e, f)) {
+            return Ok(());
+        }
+        let Geo::Arc { k, a0, sweep } = self.edges[e].g else { return Ok(()) };
+        let v = self.edges[e].v[end];
+        let from = if end == 0 { a0 } else { a0 + sweep };
+        let bound = self.bound(f)?.to_vec();
+        let q = self.faces[f].to2(k.at(t));
+        if inside2(q, &bound) || distance2(q, &bound) <= self.tol {
+            return Ok(());
+        }
+        let (mut a, mut b) = (from, t);
+        for _ in 0..60 {
+            let m = 0.5 * (a + b);
+            if inside2(self.faces[f].to2(k.at(m)), &bound) {
+                a = m;
+            } else {
+                b = m;
+            }
+        }
+        let p = k.at(a);
+        let (x, (d, q)) = self.faces[f].edges.iter().map(|&(x, _)| (x, self.edge_point_near(x, p))).fold((usize::MAX, (f64::INFINITY, p)), |m, x| if x.1.0 < m.1.0 { x } else { m });
+        if x == usize::MAX || d > self.pool.pair(self.edges[e].t, self.edges[x].t) || (a - from).abs() * k.r <= self.tol {
+            return Ok(());
+        }
+        let w = End::Vertex(self.pool.add_tol(q, (1.5 * d).max(self.tol))?);
+        let part = if end == 0 { (a0, End::Vertex(v), a, w) } else { (a, w, a0 + sweep, End::Vertex(v)) };
+        self.pending.push(Pending::InFace(f, Path::Circle(k), vec![part], vec![None], e));
+        Ok(())
+    }
+
     /// Whether edge `e` takes points along it to tell whether it lies on face `f`'s surface.
     fn by_points(&self, e: usize, f: usize) -> bool {
         !matches!(self.edges[e].g, Geo::Apex { .. }) && (matches!(self.faces[f].s, Surf::Nurbs { .. }) || matches!(self.edges[e].g, Geo::Nurbs { .. } | Geo::Ell { .. }))
@@ -3667,6 +3736,8 @@ impl Ctx<'_> {
                 }
                 if self.edge_on_surface(e, g)? {
                     self.edge_in_face(e, g)?;
+                } else if let Some(part) = self.arc_end_on_plane(e, g) {
+                    self.arc_part_in_face(e, g, part)?;
                 }
             }
         }
@@ -6855,8 +6926,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // signed distances agree (and some of them are past noise); else None (coincident: the signs mixed).)
     let tangent_side = |pi: usize, t: usize| -> Option<State> {
         let f = pieces[pi].face;
-        // (A plane's piece only: a round's torus along a boss's wall it touches splits as OCCT's at its seam.)
-        if !matches!(cx.faces[f].s, Surf::Plane { .. }) {
+        // (A plane's or a cylinder's piece only (a pin's 10 um strip on a floor it dips 9 nm into, c2-wire-clip-imported):
+        // a round's torus along a boss's wall it touches splits as OCCT's at its seam. A cylinder's strip standing off
+        // the faces within the band OCCT takes as on them (shfall 5e2cededd0026ac2's, 40 nm off a slab's side): None.)
+        if !matches!(cx.faces[f].s, Surf::Plane { .. } | Surf::Cyl { .. }) {
             return None;
         }
         let mut pts = vec![pieces[pi].inside];
@@ -6866,6 +6939,13 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             for &g in &cx.solids[t].faces {
                 let gf = &cx.faces[g];
                 if !boxes_meet(q, q, gf.lo, gf.hi, GREY * tol) || free::surface_distance(gf, q) > GREY * tol {
+                    continue;
+                }
+                // (Only a face that holds it: past its bound a face's surface goes on where the solid's boundary doesn't
+                // (the strip's round, its signs mixed there).)
+                let gb = cx.bound(g).ok()?;
+                let q2 = gf.to2(q);
+                if !inside2(q2, gb) && distance2(q2, gb) > tol {
                     continue;
                 }
                 let (ng, nf) = (cx.normal_at(g, q), cx.normal_at(f, q));
@@ -6882,7 +6962,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
         }
         match (tangent, pos, neg) {
-            (true, p, 0) if p >= 2 => Some(State::Out),
+            (true, p, 0) if p >= 2 && !matches!(cx.faces[f].s, Surf::Cyl { .. }) => Some(State::Out),
             (true, 0, n) if n >= 2 => Some(State::In),
             _ => None,
         }
