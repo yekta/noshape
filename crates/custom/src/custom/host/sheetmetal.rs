@@ -1594,7 +1594,10 @@ fn rolled_strip(topo: &Topo, fi: usize, radius: f64) -> Option<Strip> {
     for e in 0..topo.edges.len() {
         let fs = &topo.edge_faces[e];
         let (s, t) = topo.edge_ends[e];
-        if !fs.contains(&(fi as u32)) || s.distance(t) < TOL || (t - s).normalize().cross(axis).length() > 1e-7 {
+        // Along the axis by its curve: a closed corner's shared vertex lies off a closed hem's side line (by its radius,
+        // cov2-sm-hem-jog's 0.01 mm hems).
+        let (cs, ct) = topo.curve_ends[e];
+        if !fs.contains(&(fi as u32)) || s.distance(t) < TOL || (ct - cs).normalize().cross(axis).length() > 1e-7 {
             continue;
         }
         let w = fs.iter().map(|f| *f as usize).find(|f| *f != fi).unwrap_or(usize::MAX);

@@ -542,6 +542,39 @@ fn closed_corner_matches_live() {
     assert!((volume_mm3(&r) - 8535.1655548).abs() < 0.01 && (count("PLANE"), count("CYLINDER"), count("OTHER")) == (17, 4, 2), "{} mm³: {report:#?}", volume_mm3(&r));
 }
 
+/// Two straight hems closed at their corner (live c2-cov2-sm-hem-jog's "Hem straight opposite closed": OK, its flat with
+/// both hems unfolded off their own edges, 45° cuts at the corner, live/skasm/hem-jog-1121 flat.png): each 0.01 mm hem
+/// bend joins its wall in the flat; ours laid both hems flipped under the plate, "Collision in sheet metal flat pattern."
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn closed_straight_hems_unfold_off_their_edges() {
+    let mut s = Studio::new();
+    let region = s.rectangle(120.0, 80.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("1.5 mm"));
+        p.set("radius", expr("1.5 mm"));
+    });
+    let r = s.ok();
+    let edges = vec![edge_at(&r, DVec3::new(60.0, 80.0, 1.5)), edge_at(&r, DVec3::new(0.0, 40.0, 1.5))];
+    s.add("sheetMetalHem", |p| {
+        p.set("edges", ParamValue::Query(edges));
+        p.set("hemType", en("STRAIGHT"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+        p.set("length", expr("8 mm"));
+        p.set("hemAlignment", en("OUTER"));
+        p.set("hemCornerType", en("CLOSED"));
+    });
+    let r = s.ok();
+    let last = r.display.features.last().unwrap();
+    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Ok, None));
+    let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
+    let (lo, hi) = flat.bounds();
+    // The plate at y 0.., the hems out past its top (y 80) and left (x 0) edges.
+    assert!(!flat.collides && flat.bend_lines.len() == 2 && lo.y * 1e3 > -1e-6 && hi.y * 1e3 > 85.0 && lo.x * 1e3 < -5.0, "{lo:?} {hi:?}, {} bend lines", flat.bend_lines.len());
+}
+
 /// A sized round corner relief smaller than its corner's bend-allowance square isn't cut, and the corner warns (live
 /// c2-cov2-sm-corner-break-relief-joint's Corner 2, 5 mm round at a 1.6 mm sheet's 2.3 mm bends: WARNING
 /// SHEET_METAL_CORNER_UNDER_SIZED); one large enough is cut without a warning. A sized square one alike (live workflow 27:
