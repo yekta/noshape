@@ -584,15 +584,18 @@ fn a_bends_filled_face_is_outlined_whole(cx: &mut TestAppContext) {
     assert!(off.is_empty(), "the face to bend's outline not orange at:\n{}", off.join("\n"));
 }
 
-// Bend with its face filled from the line, that face clicked again where the preview still has it (qa workflow 11 step 14,
-// (20, 20, 2) on plate-bend): live keeps "Face of Sheet metal model 1" in the field and Bend 1 builds (qa
+// Bend with its face filled from the line, its field clicked and that face clicked again where the preview still has it (qa
+// workflow 11 steps 13-14, (20, 20, 2) on plate-bend with a Flange): live keeps "Face of Sheet metal model 1" in the field and Bend 1 builds (qa
 // BEND-FACE-RECLICK-EMPTIES).
 #[gpui::test]
 fn a_bends_face_clicked_again_stays_in_its_field(cx: &mut TestAppContext) {
     let Some(_gpu) = super::feel::gpu_pointer() else { return };
     RENDERING.set(true);
     let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
-    let (window, view) = part_studio_from(cx, "sm-bend-face-reclick", Some(starts["plate-bend"].clone()));
+    // With wf11's Flange 1 (15 mm on the x 60 edge) before it, the preview names the plate's face anew.
+    let mut start = starts["plate-bend"].clone();
+    start["features"].as_array_mut().unwrap().push(serde_json::json!({ "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [60, 20, 2]"], "distance": "15 mm" } }));
+    let (window, view) = part_studio_from(cx, "sm-bend-face-reclick", Some(start));
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
     let line = cx.update(|cx| {
@@ -607,6 +610,7 @@ fn a_bends_face_clicked_again_stays_in_its_field(cx: &mut TestAppContext) {
     let faces = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).feature.params.query("face").len());
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).ui.preview_before.is_some());
     assert_eq!(faces(cx), 1, "the face filled from the line");
+    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("face")));
     let pointer = super::feel::Pointer::new(cx, window, &view);
     let p = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.020, 0.020, 0.002))).expect("on screen").round();
     pointer.move_to(cx, &view, p);

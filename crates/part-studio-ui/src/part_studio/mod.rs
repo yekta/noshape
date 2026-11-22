@@ -2056,15 +2056,17 @@ impl PartStudioView {
         let held: Vec<Reference> = e.dialog.read(cx).selected_refs().into_iter().filter(|r| matches!(r, Reference::Face(_))).collect();
         let changed = self.changed_picks(&held);
         let (o, d) = self.viewport.read(cx).ray(position);
-        // (Not where the preview still has it: a Bend's face re-clicked stays in its field, live wf11 step 14, qa
-        // BEND-FACE-RECLICK-EMPTIES.)
-        let r = changed.into_iter().find(|r| self.before_face_hit(r, o, d) && !face_hit(&self.display, r, o, d))?;
+        // (Not where the preview still has a face, under whatever name: a Bend's face re-clicked stays in its field, live
+        // wf11 step 14 with a Flange before it, qa BEND-FACE-RECLICK-EMPTIES.)
+        let before = self.ui.preview_before.as_ref()?;
+        let now = face_depths(&self.display, None, o, d);
+        let r = changed.into_iter().find(|r| face_depths(before, Some(r), o, d).iter().any(|t| !now.iter().any(|n| (n - t).abs() < 5e-5)))?;
         Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
     }
 
     /// Whether the ray from `o` along `d` meets face `r` as the model before the previewed feature has it.
     fn before_face_hit(&self, r: &Reference, o: glam::DVec3, d: glam::DVec3) -> bool {
-        self.ui.preview_before.as_ref().is_some_and(|before| face_hit(before, r, o, d))
+        self.ui.preview_before.as_ref().is_some_and(|before| !face_depths(before, Some(r), o, d).is_empty())
     }
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -8610,25 +8612,35 @@ const ROLLBACK_DRAG_PX: f32 = 7.5;
 /// straight, not 5; from 7.1 diagonally, not 5.7; GPUI's default started past 2).
 const ROW_DRAG_PX: f32 = 5.8;
 
-/// Whether the ray from `o` along `d` meets face `r` as `display` draws it.
-fn face_hit(display: &noshape_model::display::StudioDisplay, r: &Reference, o: glam::DVec3, d: glam::DVec3) -> bool {
+/// Where along the ray from `o` along `d` it meets face `r` (any face with `None`) as `display` draws it.
+fn face_depths(display: &noshape_model::display::StudioDisplay, r: Option<&Reference>, o: glam::DVec3, d: glam::DVec3) -> Vec<f64> {
     let hit = |a: glam::DVec3, b: glam::DVec3, c: glam::DVec3| {
         let (e1, e2) = (b - a, c - a);
         let p = d.cross(e2);
         let det = e1.dot(p);
         if det.abs() < 1e-18 {
-            return false;
+            return None;
         }
         let t = o - a;
         let u = t.dot(p) / det;
         let q = t.cross(e1);
         let w = d.dot(q) / det;
-        u >= 0.0 && w >= 0.0 && u + w <= 1.0 && e2.dot(q) / det > 0.0
+        let depth = e2.dot(q) / det;
+        (u >= 0.0 && w >= 0.0 && u + w <= 1.0 && depth > 0.0).then_some(depth)
     };
-    display.bodies.iter().filter(|b| !b.hidden).any(|b| {
-        let Some(fi) = b.face_refs.iter().position(|f| f == r) else { return false };
-        let Some(idx) = b.mesh.face_ranges.get(fi).and_then(|&(first, n)| b.mesh.indices.get(first as usize..(first + n) as usize)) else { return false };
+    let mut depths = Vec::new();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
         let p = |i: u32| b.mesh.positions.get(i as usize).map(|p| glam::Vec3::from(*p).as_dvec3());
-        idx.as_chunks::<3>().0.iter().any(|t| matches!((p(t[0]), p(t[1]), p(t[2])), (Some(a), Some(b), Some(c)) if hit(a, b, c)))
-    })
+        for (fi, f) in b.face_refs.iter().enumerate() {
+            if r.is_some_and(|r| r != f) {
+                continue;
+            }
+            let Some(idx) = b.mesh.face_ranges.get(fi).and_then(|&(first, n)| b.mesh.indices.get(first as usize..(first + n) as usize)) else { continue };
+            depths.extend(idx.as_chunks::<3>().0.iter().filter_map(|t| match (p(t[0]), p(t[1]), p(t[2])) {
+                (Some(a), Some(b), Some(c)) => hit(a, b, c),
+                _ => None,
+            }));
+        }
+    }
+    depths
 }
