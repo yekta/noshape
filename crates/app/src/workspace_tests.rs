@@ -473,3 +473,28 @@ fn ctrl_or_shift_click_on_a_tab_opens_it_in_a_new_window(cx: &mut TestAppContext
         assert_eq!(ws.read_with(cx, |ws, _| ws.active), Some(c), "{m:?}: this window stays on C");
     }
 }
+
+/// Live workflow 26: a Feature Studio's tab reads "*Feature Studio 1" from its first uncommitted key (before the text is
+/// saved) until Commit.
+#[gpui::test]
+fn a_feature_studio_tab_is_starred_until_commit(cx: &mut TestAppContext) {
+    let (w, ws, _) = workspace(cx, "fs-star");
+    cx.update_window(w, |_, window, cx| ws.update(cx, |ws, cx| ws.add_tab("featurestudio", window, cx))).unwrap();
+    draw(cx, w);
+    let tab = ws.read_with(cx, |ws, _| ws.active.unwrap());
+    let label = |cx: &mut TestAppContext| {
+        ws.read_with(cx, |ws, cx| {
+            let name = ws.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+            ws.tab_label(tab, name, cx)
+        })
+    };
+    assert_eq!(label(cx), "Feature Studio 1", "new");
+    VisualTestContext::from_window(w, cx).simulate_input("x");
+    assert_eq!(label(cx), "*Feature Studio 1", "a key typed, not yet saved");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    draw(cx, w);
+    assert_eq!(label(cx), "*Feature Studio 1", "saved, not committed");
+    cx.update_window(w, |_, _, cx| ws.update(cx, |ws, cx| ws.active_feature_studio().map(|v| v.update(cx, |v, cx| v.commit(cx))))).unwrap();
+    draw(cx, w);
+    assert_eq!(label(cx), "Feature Studio 1", "committed");
+}

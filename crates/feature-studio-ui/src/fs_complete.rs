@@ -585,12 +585,7 @@ fn top_level() -> &'static [TopSnippet] {
         };
         let snippet = |triggers: &'static [&'static str], caption: &str, template: String| TopSnippet { triggers, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: plain(&template), template, doc: String::new(), rank: 0, order: usize::MAX } };
         // Live studios 2334 / 2337: each text, what Enter selects and where each Tab goes.
-        let feature = crate::feature_studio::NEW_FEATURE
-            .replacen("\"My Feature\"", "\"${1:My Feature}\"", 1)
-            .replacen("myFeature", "${2:myFeature}", 1)
-            .replacen("// Define the parameters of the feature type", "${3:// Define the parameters of the feature type}", 1)
-            .replacen("// Define the function's action", "${4:// Define the function's action}", 1)
-            + "$0";
+        let feature = crate::feature_studio::new_feature_snippet();
         let mut out = vec![
             snippet(&["defineFeature"], "Define feature", feature.clone()),
             snippet(&["defineTable"], "Define table", DEFINE_TABLE.into()),

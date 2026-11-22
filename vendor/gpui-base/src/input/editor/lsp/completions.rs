@@ -221,6 +221,51 @@ impl InputBaseState<EditorMode> {
         true
     }
 
+    /// Insert a snippet (`${1:default}`, `$0`) at the caret as one undo step:
+    /// its first placeholder selected and Tab walking the rest, as a
+    /// completion's snippet.
+    pub fn insert_snippet(&mut self, snippet: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let (text, stops, end) = parse_snippet(snippet);
+        let start = self.cursor();
+        self.insert(text, window, cx);
+        self.extras.snippet = None;
+        let stops: Vec<_> = stops.iter().map(|r| start + r.start..start + r.end).collect();
+        match stops.first() {
+            Some(first) => {
+                self.set_selected_range(first.clone(), cx);
+                self.extras.snippet = Some(SnippetSession { stops, end: start + end, current: 0, len: self.text.len() });
+            }
+            None => self.set_selected_range(start + end..start + end, cx),
+        }
+        cx.notify();
+    }
+
+    /// The open snippet's placeholders as they stand now (what was typed into
+    /// the current one widens it and moves the later ones); empty without one.
+    pub fn snippet_stops(&self) -> Vec<Range<usize>> {
+        let Some(s) = self.extras.snippet.as_ref() else {
+            return Vec::new();
+        };
+        let delta = self.text.len() as isize - s.len as isize;
+        let shift = |x: usize| (x as isize + delta).max(0) as usize;
+        s.stops
+            .iter()
+            .enumerate()
+            .map(|(i, r)| match i.cmp(&s.current) {
+                std::cmp::Ordering::Less => r.clone(),
+                std::cmp::Ordering::Equal => r.start..shift(r.end).max(r.start),
+                std::cmp::Ordering::Greater => shift(r.start)..shift(r.end),
+            })
+            .collect()
+    }
+
+    /// Finish the open snippet (Ace: Esc, or the caret leaving its placeholders).
+    pub fn end_snippet(&mut self, cx: &mut Context<Self>) {
+        if self.extras.snippet.take().is_some() {
+            cx.notify();
+        }
+    }
+
     pub(crate) fn handle_completion_trigger(
         &mut self,
         _range: &Range<usize>,

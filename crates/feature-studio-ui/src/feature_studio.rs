@@ -124,6 +124,8 @@ pub enum FeatureStudioEvent {
     /// Ctrl+click on a standard library symbol: open std's source there
     /// (module, 1-based line and column).
     OpenStd { module: String, line: usize, column: usize },
+    /// A key made the saved text uncommitted before it was saved (the tab's "*" follows at once).
+    Edited,
 }
 
 /// Search matches to highlight in each Feature Studio (set by the search
@@ -166,6 +168,9 @@ struct Symbol {
     line: usize,
     /// 0-based column of the name.
     column: usize,
+    /// 1-based line its annotation starts on (`line` without one): the toolbar names the symbol there too (live
+    /// workflow 26).
+    from: usize,
 }
 
 /// [`outline`] of an editor's text, parsed again only when the text changes:
@@ -205,7 +210,10 @@ fn outline(src: &str) -> Vec<Symbol> {
         let close = rest[open..].find(')').map(|c| open + c).unwrap_or(rest.len());
         rest[open + 1..close].split(',').map(|p| p.split(" is ").next().unwrap_or("").trim().to_string()).collect::<Vec<_>>().join(", ")
     };
-    src.lines()
+    let lines: Vec<&str> = src.lines().collect();
+    let from = |i: usize| (0..i).rev().take_while(|&j| lines[j].trim_start().starts_with("annotation")).last().unwrap_or(i) + 1;
+    lines
+        .iter()
         .enumerate()
         .filter_map(|(i, l)| {
             let t = l.trim_start();
@@ -215,13 +223,13 @@ fn outline(src: &str) -> Vec<Symbol> {
                 let inner = value.split_once("function").map(|(_, r)| r).unwrap_or("");
                 let name = name.trim().to_string();
                 let column = column_of(l, &name);
-                return Some(Symbol { name, params: params_of(inner), line: i + 1, column });
+                return Some(Symbol { name, params: params_of(inner), line: i + 1, column, from: from(i) });
             }
             let rest = t.strip_prefix("function ").or_else(|| t.strip_prefix("predicate "))?;
             let open = rest.find('(')?;
             let name = rest[..open].trim().to_string();
             let column = column_of(l, &name);
-            Some(Symbol { name, params: params_of(rest), line: i + 1, column })
+            Some(Symbol { name, params: params_of(rest), line: i + 1, column, from: from(i) })
         })
         .collect()
 }
@@ -356,6 +364,16 @@ fn changed_end(old: &str, new: &str) -> usize {
 pub const FS_TEMPLATE: &str = noshape_ops::docedit::FS_TEMPLATE;
 
 /// "New feature" (live document/72, dom/feature-studio-template-and-error.txt).
+/// New feature's template as Ace's snippet: the name, the constant, then each comment (live studios 2334 / 2337).
+pub(crate) fn new_feature_snippet() -> String {
+    NEW_FEATURE
+        .replacen("\"My Feature\"", "\"${1:My Feature}\"", 1)
+        .replacen("myFeature", "${2:myFeature}", 1)
+        .replacen("// Define the parameters of the feature type", "${3:// Define the parameters of the feature type}", 1)
+        .replacen("// Define the function's action", "${4:// Define the function's action}", 1)
+        + "$0"
+}
+
 pub(crate) const NEW_FEATURE: &str = "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }\nexport const myFeature = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {\n        // Define the parameters of the feature type\n    }\n    {\n        // Define the function's action\n    });\n";
 
 /// A notice of a Feature Studio (FeatureScript notices panel, editor squiggles).
@@ -635,6 +653,8 @@ pub struct FeatureStudioView {
     badge_hover: bool,
     /// Ace's bracket boxes (live FEEL-FS-BRACKET-MATCH): the collection and the caret / text length it was made for.
     bracket_box: Option<(gpui_kit::component::input::RangeDecorationCollection, (usize, usize))>,
+    /// Ace's snippet markers on the open snippet's placeholders, and the ranges they were drawn for.
+    snippet_boxes: Option<(gpui_kit::component::input::RangeDecorationCollection, Vec<std::ops::Range<usize>>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -760,17 +780,23 @@ impl FeatureStudioView {
         subs.push(cx.subscribe_in(&editor, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::Change) {
                 this.schedule_save(window, cx);
+                if this.uncommitted(cx) && !this.saved_uncommitted(cx) {
+                    cx.emit(FeatureStudioEvent::Edited);
+                }
             } else if matches!(ev, InputEvent::Blur) {
                 this.save(cx);
             }
         }));
-        subs.push(cx.observe(&editor, |this: &mut Self, _, cx| this.update_bracket_box(cx)));
+        subs.push(cx.observe(&editor, |this: &mut Self, _, cx| {
+            this.update_bracket_box(cx);
+            this.update_snippet_boxes(cx);
+        }));
         subs.push(cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabChanged(t) if *t == this.tab => this.sync_from_doc(window, cx),
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, checked: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, bracket_box: None, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), shown: Vec::new(), save_task: None, check_task: None, quiet: false, error_task: None, compile_task: None, checked: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, pointer: None, ctrl_link: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, bracket_box: None, snippet_boxes: None, _subs: subs };
         this.recompile(source, cx);
         // std's names, read for the completion list off the UI thread before the first key needs them.
         cx.background_spawn(async {
@@ -879,6 +905,42 @@ impl FeatureStudioView {
             None => {
                 let c = self.editor.update(cx, |e, cx| e.create_range_decorations_collection(boxes, cx));
                 self.bracket_box = Some((c, stamp));
+            }
+        }
+    }
+
+    /// Ace's snippet markers (live workflow 26 New feature): each placeholder of the open snippet boxed, fill
+    /// rgb(246, 242, 248) and a 1 px rgb(209, 192, 221) outline; the caret leaving them all ends the snippet.
+    fn update_snippet_boxes(&mut self, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{RangeDecoration, RangeDecorationStyle};
+        let (stops, caret) = {
+            let e = self.editor.read(cx);
+            (e.snippet_stops(), e.cursor())
+        };
+        if !stops.is_empty() && !stops.iter().any(|r| r.start <= caret && caret <= r.end) {
+            self.editor.update(cx, |e, cx| e.end_snippet(cx));
+            return;
+        }
+        if self.snippet_boxes.as_ref().is_some_and(|(_, s)| *s == stops) || (self.snippet_boxes.is_none() && stops.is_empty()) {
+            return;
+        }
+        let boxes: Vec<RangeDecoration> = stops
+            .iter()
+            .flat_map(|r| {
+                [
+                    RangeDecoration::new(r.clone()).with_style(RangeDecorationStyle::Fill).with_color(gpui_kit::rgb(0xf6f2f8).into()),
+                    RangeDecoration::new(r.clone()).with_style(RangeDecorationStyle::Frame).with_color(gpui_kit::rgb(0xd1c0dd).into()),
+                ]
+            })
+            .collect();
+        match &mut self.snippet_boxes {
+            Some((c, s)) => {
+                *s = stops;
+                c.clone().set(boxes, cx);
+            }
+            None => {
+                let c = self.editor.update(cx, |e, cx| e.create_range_decorations_collection(boxes, cx));
+                self.snippet_boxes = Some((c, stops));
             }
         }
     }
@@ -1105,7 +1167,7 @@ impl FeatureStudioView {
         let cell = |id: SharedString| h_flex().id(id).relative().flex_none().h(px(32.)).px(px(6.)).gap(px(2.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border));
         let pos = self.editor.read(cx).cursor_position();
         let symbols = outline_of(self.editor.read(cx));
-        let current = symbols.iter().rev().find(|s| s.line <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
+        let current = symbols.iter().rev().find(|s| s.from <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
         let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
         // Kept across renders: the outline popover is placed before this
         // frame paints the button (opened by ctrl+shift+O as well).
@@ -1113,12 +1175,14 @@ impl FeatureStudioView {
         h_flex()
             .flex_none()
             .child(
+                // Live workflow 26: 149 px for "Module outline", growing with a symbol's name to ~204 px, then truncated.
                 cell("fs-outline-btn".into())
-                    .w(px(149.))
+                    .min_w(px(149.))
+                    .max_w(px(204.))
                     .when(self.outline.is_some(), |d| d.bg(pal.border))
                     .tooltip(crate::ui::tooltip("Module outline (cmd+shift+O / ctrl+shift+O)")).map(|d| crate::ui_script::mark(d, || "button:Module outline".into()))
                     .child(os::glyph(os::GLYPH_OUTLINE, 20., pal.text))
-                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
+                    .child(div().flex_grow().flex_shrink().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., pal.text))
                     .child(probe(&out_anchor))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_outline(window, cx))),
@@ -1310,7 +1374,12 @@ impl FeatureStudioView {
         cx.notify();
     }
 
-    fn uncommitted(&self, cx: &App) -> bool {
+    fn saved_uncommitted(&self, cx: &App) -> bool {
+        matches!(self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content), Some(TabContent::FeatureStudio(f)) if f.has_uncommitted())
+    }
+
+    /// The text differs from the committed one, saved or still being typed (the tab reads "*Feature Studio 1").
+    pub fn uncommitted(&self, cx: &App) -> bool {
         match self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
             Some(TabContent::FeatureStudio(f)) => f.has_uncommitted() || self.editor.read(cx).value().as_ref() != f.source,
             _ => false,
@@ -1580,18 +1649,16 @@ impl FeatureStudioView {
         });
     }
 
-    /// New feature: the template, its name "My Feature" selected (live fs-new-feature, Ace's first tab stop).
+    /// New feature: the template as a snippet, its name "My Feature" selected and `myFeature` and both comments boxed
+    /// as the next tab stops (live fs-new-feature, workflow 26).
     fn insert_new_feature(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.read_only(cx) {
             return;
         }
-        let name = "My Feature";
-        let Some(offset) = NEW_FEATURE.find(name) else { return };
+        let snippet = new_feature_snippet();
         self.editor.update(cx, |e, cx| {
             e.focus(window, cx);
-            let at = e.selected_range().start;
-            e.insert(NEW_FEATURE, window, cx);
-            e.set_selected_range(at + offset..at + offset + name.len(), cx);
+            e.insert_snippet(&snippet, window, cx);
         });
     }
 
@@ -2388,6 +2455,8 @@ enum Tok {
     Keyword,
     /// Ace's `variable.language`: the `path` / `version` of `import(…)`.
     Variable,
+    /// Ace's `keyword.operator`: the arithmetic operators (`=` stays plain, live workflow 26).
+    Operator,
     Plain,
 }
 
@@ -2539,6 +2608,9 @@ fn lex(src: &str) -> Vec<(Range<usize>, Tok)> {
             if tok != Tok::Plain {
                 out.push((start..i, tok));
             }
+        } else if b"+-*/%^".contains(&c) {
+            i += 1;
+            out.push((start..i, Tok::Operator));
         } else {
             // Advance by one UTF-8 character.
             i += src[i..].chars().next().map(|ch| ch.len_utf8()).unwrap_or(1);
@@ -2572,8 +2644,9 @@ pub fn line_styles(src: &str) -> Vec<Vec<(Range<usize>, HighlightStyle)>> {
 
 fn tok_style(t: Tok) -> HighlightStyle {
     let color = |hex: u32| -> Hsla { gpui_kit::rgb_static(hex).into() };
-    // Light: Onshape's FeatureScript editor (Ace's default comment green,
-    // keywords and numbers in plain blue). Dark: Ace twilight as Onshape
+    // Light: Onshape's FeatureScript editor, Ace's textmate theme (upright
+    // comment green, keywords and numbers in plain blue, operators slate:
+    // live workflow 26). Dark: Ace twilight as Onshape
     // computes it (live dom/dark-drawing-fs-vs.json): comments #ccc,
     // keywords #cda869, strings #8f9d6a, numbers #cf6a4c, variables #7587a6.
     let dark = gpui_kit::hex_theme_active();
@@ -2582,8 +2655,9 @@ fn tok_style(t: Tok) -> HighlightStyle {
     match t {
         Tok::Comment => {
             s.color = Some(pick(0x4c886b, 0xcccccc));
-            s.font_style = Some(FontStyle::Italic);
+            s.font_style = dark.then_some(FontStyle::Italic);
         }
+        Tok::Operator => s.color = Some(pick(0x687687, 0xcda869)),
         Tok::String => s.color = Some(pick(0x036a07, 0x8f9d6a)),
         Tok::Number => s.color = Some(pick(0x0000cd, 0xcf6a4c)),
         Tok::Keyword => s.color = Some(pick(0x0000ff, 0xcda869)),
@@ -2694,6 +2768,7 @@ mod tests {
         assert_eq!(kinds.iter().filter(|k| **k == Tok::Variable).count(), 2);
         let outline = super::outline(super::NEW_FEATURE);
         assert_eq!((outline[0].name.as_str(), outline[0].params.as_str()), ("myFeature", "context, id, definition"));
+        assert_eq!((outline[0].from, outline[0].line), (1, 2), "the toolbar names it on its annotation line too (live workflow 26)");
     }
 
     #[::core::prelude::v1::test]

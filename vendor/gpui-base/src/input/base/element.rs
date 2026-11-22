@@ -450,8 +450,6 @@ fn empty_bottom_height(
 
 /// Layout information for fold icons.
 struct FoldIconLayout {
-    /// Hitbox for the line number area (used for hover detection)
-    line_number_hitbox: Hitbox,
     /// List of (display_row, is_folded, icon_element) pairs for each fold candidate
     icons: Vec<(usize, bool, gpui::AnyElement)>,
     /// NOSHAPE PATCH: the diagnostic markers (`GutterMarkerRenderer`), always shown.
@@ -1319,16 +1317,7 @@ impl<M: InputModeKind> TextElement<M> {
             offset_y: Pixels,
         }
 
-        let line_number_hitbox = window.insert_hitbox(
-            Bounds::new(
-                point(origin_x, bounds.origin.y + last_layout.visible_top),
-                size(last_layout.line_number_width, bounds.size.height),
-            ),
-            HitboxBehavior::Normal,
-        );
-
         let mut icon_layout = FoldIconLayout {
-            line_number_hitbox,
             icons: vec![],
             markers: self.layout_gutter_markers(origin_x, bounds, last_layout, window, cx),
         };
@@ -1524,33 +1513,15 @@ impl<M: InputModeKind> TextElement<M> {
     fn paint_fold_icons(
         &mut self,
         fold_icon_layout: &mut FoldIconLayout,
-        current_row: Option<usize>,
         window: &mut Window,
         cx: &mut App,
     ) {
-        let is_hovered = fold_icon_layout.line_number_hitbox.is_hovered(window);
-        if !fold_icon_layout.icons.is_empty() {
-            // Mouse moves do not repaint the editor, so repaint when the pointer
-            // enters or leaves the gutter to show or hide the hover chevrons.
-            let hitbox = fold_icon_layout.line_number_hitbox.clone();
-            let entity_id = self.state.entity_id();
-            window.on_mouse_event(move |_: &MouseMoveEvent, phase, window, cx| {
-                if phase.bubble() && hitbox.is_hovered(window) != is_hovered {
-                    cx.notify(entity_id);
-                }
-            });
-        }
         // NOSHAPE PATCH: diagnostic markers first, always visible.
         for marker in fold_icon_layout.markers.iter_mut() {
             marker.paint(window, cx);
         }
-        for (display_row, is_folded, icon) in fold_icon_layout.icons.iter_mut() {
-            let is_current_line = current_row == Some(*display_row);
-
-            if !is_hovered && !is_current_line && !*is_folded {
-                continue;
-            }
-
+        // NOSHAPE PATCH: Ace's fold arrows show on every foldable line, not only under the pointer (live workflow 26).
+        for (_, _, icon) in fold_icon_layout.icons.iter_mut() {
             icon.paint(window, cx);
         }
     }
@@ -3426,10 +3397,9 @@ impl<M: InputModeKind> Element for TextElement<M> {
             }
         }
 
-        // Paint fold icons (only visible on hover or for current line)
+        // Paint fold icons
         self.paint_fold_icons(
             &mut prepaint.fold_icon_layout,
-            prepaint.current_row,
             window,
             cx,
         );

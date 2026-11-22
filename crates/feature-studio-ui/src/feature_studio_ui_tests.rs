@@ -592,3 +592,65 @@ fn a_double_click_takes_the_word_and_a_triple_click_the_line(cx: &mut TestAppCon
     assert_eq!(click(cx, 3), line..line + 10, "a triple-click: \"x = true;\\n\"");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live workflow 26: New feature inserts its template as Ace's snippet: "My Feature" selected, it, `myFeature` and both
+/// comments boxed; typed text stays in its box, Tab takes the next, the caret leaving them all ends the boxes.
+#[gpui::test]
+fn new_feature_boxes_its_tab_stops(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-new-stops-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.insert_new_feature(w, cx))).unwrap();
+    draw(cx, window);
+    let boxed = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let text = v.editor.read(cx).value().to_string();
+            v.snippet_boxes.as_ref().map(|(_, r)| r.iter().map(|r| text[r.clone()].to_string()).collect::<Vec<_>>()).unwrap_or_default()
+        })
+    };
+    let selected = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = view.read(cx).editor.read(cx);
+            e.value()[e.selected_range()].to_string()
+        })
+    };
+    let comments = ["// Define the parameters of the feature type", "// Define the function's action"];
+    assert_eq!(selected(cx), "My Feature");
+    assert_eq!(boxed(cx), ["My Feature", "myFeature", comments[0], comments[1]]);
+    for k in ["B", "o", "x"] {
+        type_key(cx, window, k);
+    }
+    assert_eq!(boxed(cx), ["Box", "myFeature", comments[0], comments[1]], "typed into the first");
+    type_key(cx, window, "tab");
+    assert_eq!(selected(cx), "myFeature", "Tab takes the next");
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| v.editor.update(cx, |e, cx| e.set_selected_range(0..0, cx)))).unwrap();
+    draw(cx, window);
+    assert!(boxed(cx).is_empty(), "the caret left them: no boxes");
+    let _ = std::fs::remove_dir_all(&dir);
+}

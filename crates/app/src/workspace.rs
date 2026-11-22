@@ -402,6 +402,7 @@ impl Workspace {
                 let v = cx.new(|cx| crate::feature_studio::FeatureStudioView::new(doc, tab, window, cx));
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::feature_studio::FeatureStudioEvent, window, cx| match ev {
                     crate::feature_studio::FeatureStudioEvent::OpenSearch => this.open_fs_search(window, cx),
+                    crate::feature_studio::FeatureStudioEvent::Edited => cx.notify(),
                     crate::feature_studio::FeatureStudioEvent::NoticesChanged => {
                         if let Some((p, _)) = &this.fs_notices {
                             p.update(cx, |p, cx| p.refresh(cx));
@@ -1611,6 +1612,17 @@ impl Workspace {
     /// The tab bar: the Tab manager cell (it ends the left rail) and the
     /// row with "+" and the tabs (under the content, right of any open left
     /// panel).
+    /// A tab's name as its tab shows it: a Feature Studio with uncommitted text reads "*Feature Studio 1" until Commit
+    /// (live workflow 26).
+    pub(crate) fn tab_label(&self, id: TabId, name: String, cx: &App) -> String {
+        let uncommitted = match (self.views.get(&id), self.doc.read(cx).session.doc.tab(id).map(|t| &t.content)) {
+            (Some(TabView::FeatureStudio(v)), _) => v.read(cx).uncommitted(cx),
+            (_, Some(TabContent::FeatureStudio(f))) => f.has_uncommitted(),
+            _ => false,
+        };
+        if uncommitted { format!("*{name}") } else { name }
+    }
+
     fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> (AnyElement, AnyElement) {
         let pal = p();
         let d = &self.doc.read(cx).session.doc;
@@ -1894,7 +1906,7 @@ impl Workspace {
                         // A 1 px rgb(22,81,176) square border, no focus ring, 4 px nearer the icon than the name (live2
                         // doc-feel-1119 L11, recheck-1119).
                         Some((_, st, _)) => div().ml(px(-4.)).w(px(157.)).h(px(21.)).border_1().border_color(gpui_kit::rgb(0x1651b0)).bg(gpui_kit::rgb(0xffffff)).on_key_down(cx.listener(Self::tab_rename_escape)).child(gpui_kit::component::input::Input::new(st).appearance(false).h(px(19.)).text_size(px(14.)).px(px(2.)).text_color(pal.text)).into_any_element(),
-                        None => div().min_w_0().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(name)).into_any_element(),
+                        None => div().min_w_0().truncate().when(compare_off, |d| d.opacity(0.5)).child(crate::ui::user_text(self.tab_label(id, name, cx))).into_any_element(),
                     })
                     .children(compare_dot.map(|dot| div().flex_none().ml(px(3.)).when(compare_off, |d| d.opacity(0.55)).child(dot)))
                     .when(active, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(2.)).bg(pal.accent)))
