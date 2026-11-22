@@ -3091,6 +3091,52 @@ fn a_thickened_plates_flat_lies_by_its_up_side() {
     }
 }
 
+/// After a Bend the flat's frame is the folding piece's own bottom face (live behaviours "skasm flat fixed piece"): a
+/// 60 x 40 x 2 plate with a 15 mm Flange, bent 90 degrees on a line x = c; the piece with the Flange stays put (the
+/// dialog's holdOtherSide, std applyEditLogicForHoldOther), the flat (x, y) boxes as live's ff-a, ff-b, ff-d, ff-e.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_bent_plates_flat_lies_by_its_folding_piece() {
+    for (c, flange_x, hold, want) in [(30.0, 60.0, true, [-40.0, -31.72, 0.0, 41.83]), (10.0, 60.0, true, [-40.0, -11.72, 0.0, 61.83]), (50.0, 60.0, true, [-40.0, -51.72, 0.0, 21.83]), (10.0, 0.0, false, [0.0, -51.72, 40.0, 21.83])] {
+        let mut s = Studio::new();
+        let region = s.rectangle(60.0, 40.0);
+        s.add("sheetMetalStart", |p| {
+            p.set("process", en("THICKEN"));
+            p.set("regions", ParamValue::Query(vec![region]));
+            p.set("thickness", expr("2 mm"));
+            p.set("radius", expr("2 mm"));
+        });
+        let r = s.ok();
+        let edge = edge_at(&r, DVec3::new(flange_x, 20.0, 2.0));
+        s.add("sheetMetalFlange", |p| {
+            p.set("edges", ParamValue::Query(vec![edge]));
+            p.set("distance", expr("15 mm"));
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        let (a, b) = (sk.add_point(glam::DVec2::new(mm(c), 0.0)), sk.add_point(glam::DVec2::new(mm(c), mm(40.0))));
+        let line = sk.add_line_between(a, b).unwrap().0;
+        let sketch = s.add("sketch", |pv| {
+            pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+            pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+        });
+        let r = s.ok();
+        let top = face_at(&r, DVec3::new(45.0, 20.0, 2.0));
+        s.add("sheetMetalBend", move |p| {
+            p.set("bendReference", ParamValue::Query(vec![Reference::SketchEntity { sketch, entity: line }]));
+            p.set("face", ParamValue::Query(vec![top]));
+            p.set("bendAngle", expr("90 deg"));
+            p.set("holdOtherSide", ParamValue::Bool(hold));
+        });
+        let r = s.ok();
+        let part = &r.context.bodies[part(&r)];
+        let flat = noshape_model::sheetmetal::flat_body(&r.context, &noshape_model::sheetmetal::flat_body_id(&part.id), &part.name).expect("the flat body");
+        let b = flat.shape.bounding_box(false).expect("its box");
+        let (lo, hi) = (b.min * 1e3, b.max * 1e3);
+        let got = [lo.x, lo.y, hi.x, hi.y];
+        assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() < 0.01) && (lo.z + 2.0).abs() < 1e-3 && hi.z.abs() < 1e-3, "bend x {c}, flange x {flange_x}: {lo} {hi}, live {want:?}");
+    }
+}
+
 /// The lowest vertex of the part's bend faces at x (mm): a bend's end.
 fn bend_end_at(r: &RegenResult, x: f64) -> Reference {
     let b = &r.context.bodies[part(r)];

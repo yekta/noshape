@@ -21,11 +21,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
     x 0-30 piece (origin corner + picked face), ours the base. ANSWERED 09:3x (behaviours "skasm flat fixed piece",
     live/skasm/flat-orient-1122/ff-*): the piece carrying the Flange stays put, the other folds (5 cases: x10, x50,
     line drawn -Y, flange on the x 0 edge); flat frame = the FOLDING piece's original bottom (wall outer) face,
-    (p·x, p·(x×n)). NEXT (in progress 10:10): the fold side already matches (Bend runs std's onBendChange /
-    applyEditLogicForHoldOther: more faces, then edges, then bigger box stays); only flat_place's fixed wall differs
-    (custom/host/sheetmetal.rs flat_place: "first made" by def.wall_ids WALL attributeId). Check in a model test
-    (plate 60x40 + Flange on (60,20,2) + Bend at x 30) which pieces carry which wall id after the Bend (tie -> lowest
-    face index?); make the fixed wall the piece that folded (live, all 5 cases), keeping 2468's rules otherwise.
+    (p·x, p·(x×n)). DONE 10:4x (landing): flat_place follows a Bend's folding piece (its "wallsplit" wall, across a
+    bend edge or the Bend's arc) from the fixed wall; the fold side was already std's onBendChange. T2 sheetmetal_std
+    a_bent_plates_flat_lies_by_its_folding_piece = live ff-a/b/d/e boxes.
   - 679420eb2 PASTE-SKETCH-CENTRED: centred on the mean of line end points (live's L). The corner dots are psui's
     (SKETCH-ON-FACE-EXITED-LOOK, builder.rs FreeEnds; psui confirmed 08:45).
 - Closed, no app change: FORM-REMEMBERED (runner seed, qa 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0 wf32:

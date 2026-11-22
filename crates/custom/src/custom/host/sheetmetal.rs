@@ -3610,7 +3610,21 @@ fn flat_place(def: &Definition, topo: &Topo, unfolded: &Unfolded) -> Option<crat
     let own = |w: &&usize| made(w).is_some_and(|m| !m.0);
     let area = |w: usize| (topo.faces[w].area().unwrap_or(0.0) * 1e12).round() as i64;
     let largest = def.extracted.then(|| unfolded.walls.keys().filter(own).max_by_key(|w| (area(**w), std::cmp::Reverse(made(w))))).flatten();
-    let fixed = *largest.or_else(|| unfolded.walls.keys().filter(|w| made(w).is_some()).min_by_key(|w| made(w)))?;
+    let first = *largest.or_else(|| unfolded.walls.keys().filter(|w| made(w).is_some()).min_by_key(|w| made(w)))?;
+    // A Bend's folding piece (its split's new wall, bent off the fixed one across a bend or a Bend's arc) carries the
+    // frame on (live behaviours "skasm flat fixed piece": that piece's own bottom face, whichever side the Bend holds).
+    let split = |w: &usize| def.wall_ids.get(w).and_then(|id| id.rsplit_once('.')).is_some_and(|(_, n)| n.starts_with("wallsplit"));
+    let beside = |f: usize, bends_only: bool| -> Vec<usize> {
+        topo.edge_faces.iter().enumerate().filter(|(e, fs)| fs.len() == 2 && fs.contains(&(f as u32)) && (!bends_only || def.bends.contains_key(e))).filter_map(|(_, fs)| fs.iter().map(|x| *x as usize).find(|x| *x != f)).collect()
+    };
+    let mut fixed = first;
+    let mut seen = vec![fixed];
+    loop {
+        let arcs = beside(fixed, false).into_iter().filter(|f| def.rolled.contains_key(f)).flat_map(|a| beside(a, false));
+        let Some(next) = beside(fixed, true).into_iter().chain(arcs).find(|w| split(w) && !seen.contains(w) && unfolded.walls.contains_key(w)) else { break };
+        seen.push(next);
+        fixed = next;
+    }
     let w = unfolded.walls.get(&fixed)?;
     let (p0, n) = face_normal(&topo.faces[fixed]).ok()?;
     let x = crate::display::PlaneFrame::face_x(n);
