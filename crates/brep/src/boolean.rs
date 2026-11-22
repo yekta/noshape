@@ -1214,7 +1214,7 @@ impl Ctx<'_> {
         self.arg_reach[self.faces[f].arg as usize]
     }
 
-    /// How far apart edge `e` and face `f` may be and be one: the sum of their arguments' halves.
+    /// How far apart edge `e` and face `f` may be and be one: their arguments' band ([`Ctx::args_band`]).
     fn edge_band(&self, e: usize, f: usize) -> f64 {
         self.args_band(self.edges[e].arg, self.faces[f].arg)
     }
@@ -1224,15 +1224,17 @@ impl Ctx<'_> {
         self.arg_reach[a as usize]
     }
 
-    /// The sum of arguments `a`'s and `b`'s halves.
+    /// The sum of arguments `a`'s and `b`'s halves, or the lesser of their widest bands where that's more: two that
+    /// both meet a more tolerant one are held to its band (c2-rings-loft's 51 patterned tools of 0.1 um, their ends
+    /// on one plane, cutting a ring of 6.1 um: two tools' sections overlapped there, one cut 0.21 um off the other's
+    /// line, and ours declined).
     fn args_band(&self, a: u32, b: u32) -> f64 {
-        self.arg_tol[a as usize] + self.arg_tol[b as usize]
+        (self.arg_tol[a as usize] + self.arg_tol[b as usize]).max(self.arg_reach[a as usize].min(self.arg_reach[b as usize]))
     }
 
-    /// How far apart the entities of faces `f` and `g` may be and be one: the sum of their arguments' halves (the
-    /// Boolean's tolerance where both are of the most tolerant argument).
+    /// How far apart the entities of faces `f` and `g` may be and be one: their arguments' band ([`Ctx::args_band`]).
     fn band(&self, f: usize, g: usize) -> f64 {
-        self.arg_tol[self.faces[f].arg as usize] + self.arg_tol[self.faces[g].arg as usize]
+        self.args_band(self.faces[f].arg, self.faces[g].arg)
     }
 
     fn p(&self, v: u32) -> DVec3 {
