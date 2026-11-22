@@ -1510,6 +1510,41 @@ struct Built {
     strips: Vec<Strip>,
     /// A sized round corner relief too small for its corner.
     under_sized: bool,
+    name_keys: Vec<NameKey>,
+}
+
+/// A rolled bend's face whose new-face name ([`fresh_part_names`]) is ordered by its plain thicken's box: exact arcs box
+/// its end caps tighter, which reordered the part's `Role::New` faces against saved references (c2-sm-tablet-stand's
+/// Sketch 3).
+struct NameKey {
+    face: Shape,
+    exact: crate::naming::GeoKey,
+    plain: crate::naming::GeoKey,
+}
+
+/// A face's naming key (`face_key`'s: its box's centre and diagonal).
+fn box_key(f: &Shape) -> Option<crate::naming::GeoKey> {
+    f.bounding_box(false).ok().map(|b| {
+        let c = b.center();
+        [c.x, c.y, c.z, b.diagonal()]
+    })
+}
+
+/// New names for a part's faces (`Role::New` by geometric key), a rolled bend's face untrimmed by the part keyed by its
+/// [`NameKey`].
+fn fresh_part_names(ev: &crate::regen::eval::EvalCtx, part: &Shape, probes: &[Option<(DVec3, DVec3)>], keys: &[NameKey]) -> Vec<crate::naming::Name> {
+    if keys.is_empty() {
+        return super::ops::fresh_names(ev, part);
+    }
+    let near = |a: &crate::naming::GeoKey, b: &crate::naming::GeoKey| a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-7);
+    let key = |i: usize| {
+        let own = crate::regen::context::face_key(part, i);
+        let Some(Some((p, n))) = probes.get(i) else { return own };
+        let on = |nk: &&NameKey| near(&nk.exact, &own) && nk.face.contains_point(*p, 1e-7).unwrap_or(false) && nk.face.normal_at_point(*p).is_ok_and(|m| m.cross(*n).length() < 1e-6);
+        keys.iter().find(on).map_or(own, |nk| nk.plain)
+    };
+    let names = crate::naming::ShapeNames::default();
+    crate::naming::name_faces(&crate::naming::FaceNamingInput { feature: ev.feature, args: &[&names], records: &[], out_count: part.count(ShapeType::Face), out_face_key: &key, roles: &BTreeMap::new(), generated_role: None, parent_rank: None, aliases: None })
 }
 
 /// A bend's developed strip: the tangent lines on its two walls (from the
@@ -1635,6 +1670,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     let mut pieces = Vec::new();
     let mut wall_flats = Vec::new();
     let mut strips = Vec::new();
+    let mut name_keys = Vec::new();
     // Bend pull-backs first (they trim the walls).
     let mut setbacks: BTreeMap<usize, f64> = BTreeMap::new();
     let mut bends = Vec::new();
@@ -2058,7 +2094,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                 continue;
             }
             let face = trimmed_walls.get(&fi).unwrap_or(&topo.faces[fi]);
-            rolled_bend(&topo, fi, face, front, back, &mut solids, &mut pieces)?;
+            name_keys.extend(rolled_bend(&topo, fi, face, front, back, &mut solids, &mut pieces)?);
             if let Some(st) = def.rolled.get(&fi).and_then(|r| rolled_strip(&topo, fi, *r)) {
                 strips.push(st);
             }
@@ -2241,7 +2277,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         });
     }
     let fused = exact_bend_edges(fuse(&parts)?, &strips, front + back);
-    Ok(Built { part: fused, pieces, topo, wall_flats, strips, under_sized })
+    Ok(Built { part: fused, pieces, topo, wall_flats, strips, under_sized, name_keys })
 }
 
 /// The part's B-spline edges that are a bend's arcs rebuilt as circles, and straight ones as lines: two bends meeting
@@ -2440,18 +2476,28 @@ fn exact_bend_face(f: &Shape, dir: DVec3, radius: f64) -> Option<Shape> {
 
 /// A rolled bend: definition face `fi` thickened (`front` along its normal).
 /// Its offsets come from the face; its end caps from the face's edges there,
-/// their arcs exact circles (live's "Sheet metal arcs as bends": 4 circles).
-fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<()> {
+/// their arcs exact circles (live's "Sheet metal arcs as bends": 4 circles), named by the plain thicken's boxes.
+fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, solids: &mut Vec<Shape>, pieces: &mut Vec<Piece>) -> FResult<Vec<NameKey>> {
     // (A hem's corner trim leaves its face's edges 0.06 mm loose: the part's fuse then closes a 0.02 mm hem slot,
     // c2-cov2-sm-hem-jog's R0.01 bends.)
     let tight = face.tightened(1e-7).ok();
+    let plain = k::thicken_plain(face, front, back).map(|r| r.shape.faces()).unwrap_or_default();
+    let plain_planes = face_planes(&plain);
+    let mut keys = Vec::new();
     let face = tight.as_ref().unwrap_or(face);
     let res = k::thicken(face, front, back).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
     let own: Vec<usize> = (0..topo.edges.len()).filter(|e| topo.edge_faces[*e].contains(&(fi as u32))).collect();
     for f in res.faces() {
         let from = match f.face_surface() {
-            Ok(k::Surface::Plane(_)) => {
+            Ok(k::Surface::Plane(pl)) => {
                 let c = inner_point(&f).unwrap_or_default();
+                let n = pl.normal.normalize();
+                let twin = plain.iter().zip(&plain_planes).find(|(g, q)| q.is_some_and(|(o, m)| (c - o).dot(m).abs() < 1e-6 && m.cross(n).length() < 1e-6) && g.contains_point(c, 1e-7).unwrap_or(false));
+                if let (Some(exact), Some(old)) = (box_key(&f), twin.and_then(|(g, _)| box_key(g)))
+                    && exact != old
+                {
+                    keys.push(NameKey { face: f.clone(), exact, plain: old });
+                }
                 let near = |e: &usize| k::make_vertex(c).ok().and_then(|v| k::distance(&v, &topo.edges[*e]).ok()).map_or(f64::INFINITY, |d| d.distance);
                 own.iter().copied().min_by(|a, b| near(a).total_cmp(&near(b))).map_or(Def::Face(fi), Def::Edge)
             }
@@ -2460,7 +2506,7 @@ fn rolled_bend(topo: &Topo, fi: usize, face: &Shape, front: f64, back: f64, soli
         pieces.push(Piece { face: f, from, relief: false });
     }
     solids.push(res);
-    Ok(())
+    Ok(keys)
 }
 
 /// A point inside a face.
@@ -2703,7 +2749,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for (n, def) in defs.iter().enumerate() {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| b.id == def.body) else { continue };
             let shape = ev.ctx.bodies[bi].shape.clone();
-            let Built { mut part, mut pieces, topo, wall_flats, strips, under_sized: small } = build_part(def, &shape)?;
+            let Built { mut part, mut pieces, topo, wall_flats, strips, under_sized: small, name_keys } = build_part(def, &shape)?;
             under_sized |= small;
             stop_if_cancelled()?;
             let births = births(&mut ev.ctx.sm_births, def, &topo);
@@ -2779,7 +2825,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             // the names they get now.
             let mut relief_aliases = Vec::new();
             for (k, p) in parts.iter_mut().enumerate() {
-                p.names = super::ops::fresh_names(ev, &p.solid);
+                p.names = fresh_part_names(ev, &p.solid, &p.probes, &name_keys);
                 // Fresh faces are named by their order in the solid, so the
                 // part of another model (or a second part of this one) built
                 // in the same feature named its faces as the first did: their

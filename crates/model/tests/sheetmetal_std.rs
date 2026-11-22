@@ -1295,6 +1295,54 @@ fn an_extruded_arc_is_a_rolled_wall_in_the_flat() {
     assert!((size.x.max(size.y) - want).abs() < 1e-3 && (size.x.min(size.y) - 18.0).abs() < 1e-3, "flat {size:?}, want {want} × 18");
 }
 
+/// A rolled wall's faces keep the new-face names documents saved before its exact arcs hold: a curl's end caps are
+/// ordered by the boxes their B-spline arcs gave, after its outer cylinder (c2-sm-tablet-stand's Sketch 3 lost its
+/// references when the exact arcs' tighter boxes put a cap first).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_rolled_walls_faces_keep_their_names_with_exact_arcs() {
+    use noshape_model::reference::{Role, TopoName};
+    fn ordinal(n: &TopoName) -> Option<u32> {
+        match n {
+            TopoName::Face { role: Role::New(i), .. } => Some(*i),
+            TopoName::Face { role: Role::Generated(g) | Role::Copy { of: g, .. }, .. } => ordinal(g),
+            _ => None,
+        }
+    }
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (40.0, 0.0), (40.0, 12.0), (0.0, 12.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let c = sk.add_point(glam::DVec2::new(mm(40.0), mm(6.0)));
+    let curves = [sk.add_line_between(p[0], p[1]).unwrap(), sk.add_arc_between(c, p[1], p[2]).unwrap(), sk.add_line_between(p[2], p[3]).unwrap()];
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(curves.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("18 mm"));
+        pv.set("thickness", expr("3 mm"));
+        pv.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let body = &r.context.bodies[part(&r)];
+    // The curl's outer cylinder and end caps (beyond the walls' ends at x 40 mm): their boxes' centres tie in x and y.
+    let mut outer = (0.0, None);
+    let mut caps = Vec::new();
+    for (i, f) in body.shape.faces().iter().enumerate() {
+        match f.face_surface() {
+            Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if radius > outer.0 => outer = (radius, ordinal(&body.faces[i])),
+            Ok(noshape_kernel::Surface::Plane(_)) if f.bounding_box(false).unwrap().center().x > mm(40.0) => caps.push(ordinal(&body.faces[i])),
+            _ => {}
+        }
+    }
+    let outer = outer.1.expect("the curl's outer cylinder is a new face");
+    assert_eq!(caps.len(), 2);
+    assert!(caps.iter().all(|c| c.is_some_and(|c| c > outer)), "outer cylinder New({outer}), caps {caps:?}: the caps come after it");
+}
+
 /// Move face on an active sheet metal part runs std's sheet metal aware Move face: the model's end edge moves and
 /// the part is rebuilt from it, its walls' and bend's side faces kept apart (the native offset merged the coplanar
 /// ones: c2-sm-tablet-stand's Move face 1, 17 faces vs live 20).

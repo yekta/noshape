@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 08:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 10:00 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-22 08:45 UTC)
@@ -18,7 +18,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   - bf9db14a8 + next: SM-FLAT-VIEW-FIT fit half: Viewport::zoom_to_fill(0.953) for the flat's first fit; sm matrix
     row "flat view / fitted". Orientation: live (behaviours "skasm flat orientation") = our flat_place formula (face_x
     gives live's x); the gap is which piece keeps the fixed face (the plate's original bottom) after a Bend: live's
-    x 0-30 piece (origin corner + picked face), ours the base. REQUESTS skasm 08:49 asks live to tell which decides.
+    x 0-30 piece (origin corner + picked face), ours the base. ANSWERED 09:3x (behaviours "skasm flat fixed piece",
+    live/skasm/flat-orient-1122/ff-*): the piece carrying the Flange stays put, the other folds (5 cases: x10, x50,
+    line drawn -Y, flange on the x 0 edge); flat frame = the FOLDING piece's original bottom (wall outer) face,
+    (p·x, p·(x×n)). To do after the P1.
   - 679420eb2 PASTE-SKETCH-CENTRED: centred on the mean of line end points (live's L). The corner dots are psui's
     (SKETCH-ON-FACE-EXITED-LOOK, builder.rs FreeEnds; psui confirmed 08:45).
 - Closed, no app change: FORM-REMEMBERED (runner seed, qa 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0 wf32:
@@ -26,16 +29,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Replay kit: vibe2 ~/tmp/skasm/wf (run.sh, starts.json, 05/11/12/22/29 json), binary ~/tmp/skasm/noshape (07:56),
   shots ~/tmp/skasm/out-wf; compares in /root/skasm-scratch/wfcmp.
 
-## Next: P1 TABLET-STAND-FACE-NAMES (lead, from core's compat analysis, received 11-22 08:55)
-- 60c0a861f (rolled_bend: thicken_plain -> exact k::thicken on a tightened face, custom/host/sheetmetal.rs ~2400)
-  reorders Sheet metal model 1's new faces (New 11/12/13) through the part's fuse: saved c2-sm-tablet-stand's Sketch 3
-  references stop resolving (Ok -> "Some external references are missing.").
-- Wanted: keep the exact arcs (+5 features in start-extrude-bounds) AND name those faces from their source geometry
-  (as name_result / sweep_names do), independent of fuse order. Test with the saved tablet-stand copy (private-doc
-  rules: mode-700 copy in ~/tmp/skasm, deleted after).
-- Found so far: Role::New(i) = "ordered geometrically" (model-data reference.rs 75; bshared.rs new_face_names /
-  names_from_sources). Not yet found: where the sheet metal host's result faces get their New(i) (start with
-  rolled_bend's `from` mapping right after the thicken, and how the custom host names its bodies' faces).
+## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (landing)
+- Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
+  arcs' 68.066990), so their geometric `Role::New` key fell before the bend cylinder's (68.000000): New 11/12/13 swapped.
+- Fix: rolled_bend also thickens plain and keys each cap by its plain twin's box (NameKey); fresh_part_names uses it for
+  a part face untrimmed by the part. Saved tablet-stand copy: all Ok, face names identical to the plain build's (probe
+  /root/skasm-scratch/probes/zz_smnames.rs, bin/smn.sh). T2 sheetmetal_std a_rolled_walls_faces_keep_their_names_with_exact_arcs.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
