@@ -3561,12 +3561,10 @@ fn a_hovered_balloon_keeps_its_leader_black(cx: &mut TestAppContext) {
     assert!(selected.contains(&leader[0]), "selected: the leader orange as before");
 }
 
-/// Live drw-table-cells-insert-row s11: with a cell selected, the right-click menu's Insert ▸ Row Below adds the row
-/// and closes the Cell panel, nothing left selected.
-#[gpui::test]
-fn a_cells_insert_row_below_closes_the_cell_panel(cx: &mut TestAppContext) {
+/// A 2 × 2 general table with its top-left cell clicked (the Cell panel open) and right-clicked (the cells' menu open).
+fn cell_menu_open(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<DrawingEditor>, u64) {
     use gpui_kit::{MouseDownEvent, MouseUpEvent};
-    let (window, editor) = drawing(cx, "feel-cell-insert-row");
+    let (window, editor) = drawing(cx, name);
     real_sheet(cx, window, &editor);
     let id = cx.update(|cx| {
         editor.update(cx, |e, cx| {
@@ -3589,8 +3587,24 @@ fn a_cells_insert_row_below_closes_the_cell_panel(cx: &mut TestAppContext) {
     v.simulate_event(MouseDownEvent { button: MouseButton::Right, position: p, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
     v.simulate_event(MouseUpEvent { button: MouseButton::Right, position: p, modifiers: Modifiers::default(), click_count: 1 });
     draw(cx, window);
+    assert!(VisualTestContext::from_window(window, cx).debug_bounds("menu:Insert").is_some(), "the cells' menu with Insert ▸");
+    (window, editor, id)
+}
+
+fn table_rows(cx: &mut TestAppContext, editor: &Entity<DrawingEditor>, id: u64) -> usize {
+    cx.update(|cx| match editor.read(cx).current_sheet().table(id).map(|t| &t.kind) {
+        Some(noshape_model::drawing::TableKind::General { cells, .. }) => cells.len(),
+        _ => 0,
+    })
+}
+
+/// Live drw-table-insert-row-1122 (entered sideways): the cells' menu's Insert ▸ Row Below adds the row, the Cell
+/// panel stays open on the same cell.
+#[gpui::test]
+fn a_cells_insert_row_below_keeps_the_cell_panel(cx: &mut TestAppContext) {
+    let (window, editor, id) = cell_menu_open(cx, "feel-cell-insert-row");
     let mut v = VisualTestContext::from_window(window, cx);
-    let insert = v.debug_bounds("menu:Insert").expect("the cells' menu with Insert ▸").center();
+    let insert = v.debug_bounds("menu:Insert").expect("Insert ▸").center();
     v.simulate_mouse_move(insert, None, Modifiers::default());
     cx.executor().advance_clock(std::time::Duration::from_millis(600));
     draw(cx, window);
@@ -3599,15 +3613,46 @@ fn a_cells_insert_row_below_closes_the_cell_panel(cx: &mut TestAppContext) {
     v.simulate_mouse_move(below, None, Modifiers::default());
     v.simulate_click(below, Modifiers::default());
     draw(cx, window);
-    let rows = cx.update(|cx| match editor.read(cx).current_sheet().table(id).map(|t| &t.kind) {
-        Some(noshape_model::drawing::TableKind::General { cells, .. }) => cells.len(),
-        _ => 0,
+    assert_eq!(table_rows(cx, &editor, id), 3, "a row added");
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(e.cell_panel.is_some(), "the Cell panel stays");
+        assert_eq!(e.cell_sel.map(|c| (c.a, c.b)), Some(((0, 0), (0, 0))), "the same cell selected");
     });
-    assert_eq!(rows, 3, "a row added");
+    assert!(VisualTestContext::from_window(window, cx).debug_bounds("dr-cell-panel").is_some(), "the Cell panel drawn");
+}
+
+/// Live drw-table-insert-row-1122 (the straight move): a click on the sheet beside the cells' open menu closes it
+/// and ends the cell's edit: the Cell panel closes, nothing selected, the table as it was.
+#[gpui::test]
+fn a_click_beside_a_cells_menu_ends_the_cell_edit(cx: &mut TestAppContext) {
+    let (window, editor, id) = cell_menu_open(cx, "feel-cell-menu-click-away");
+    let p = at_window(cx, &editor, [8.0, 8.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_click(p, Modifiers::default());
+    draw(cx, window);
+    assert!(VisualTestContext::from_window(window, cx).debug_bounds("menu:Insert").is_none(), "the menu closed");
+    assert_eq!(table_rows(cx, &editor, id), 2, "nothing inserted");
     cx.update(|cx| {
         let e = editor.read(cx);
         assert!(e.cell_panel.is_none() && e.cell_sel.is_none(), "the Cell panel closes");
         assert!(e.selection.is_empty(), "nothing selected: {:?}", e.selection);
     });
-    assert!(VisualTestContext::from_window(window, cx).debug_bounds("dr-cell-panel").is_none(), "the Cell panel isn't drawn");
+}
+
+/// Live drw-table-cell-menu s27: a right-click beside the cells' open menu only closes it (no menu opens, the Cell
+/// panel stays).
+#[gpui::test]
+fn a_right_click_beside_a_cells_menu_only_closes_it(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseDownEvent, MouseUpEvent};
+    let (window, editor, _) = cell_menu_open(cx, "feel-cell-menu-rclick-away");
+    let p = at_window(cx, &editor, [8.0, 8.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_event(MouseDownEvent { button: MouseButton::Right, position: p, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    v.simulate_event(MouseUpEvent { button: MouseButton::Right, position: p, modifiers: Modifiers::default(), click_count: 1 });
+    draw(cx, window);
+    assert!(cx.update(|cx| crate::os_menu::open_menu(cx).is_none()), "no menu open");
+    assert!(cx.update(|cx| editor.read(cx).cell_panel.is_some()), "the Cell panel stays");
 }

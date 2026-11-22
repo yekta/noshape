@@ -1433,6 +1433,20 @@ impl DrawingEditor {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         window.focus(&self.focus, cx);
+        // A press beside a table cell's open menu: a left one ends the cell's edit (the Cell panel closes, nothing
+        // selected; live drw-table-insert-row-1122), a right one only closes the menu (live drw-table-cell-menu s27).
+        // (The menu's own press handler closes it first; its host lets go only once the press is handled.)
+        let menu_open = self.frame_menu.as_ref().is_some_and(|m| crate::os_menu::is_open_menu(m, cx));
+        if self.cell_sel.is_some() && menu_open && matches!(e.button, MouseButton::Left | MouseButton::Right) {
+            if e.button == MouseButton::Left {
+                self.cell_sel = None;
+                self.selection.clear();
+                self.redraw(cx);
+            }
+            self.drag = Drag::None;
+            cx.stop_propagation();
+            return;
+        }
         // A note edited in place: a click away commits it (live).
         if e.button == MouseButton::Left && (matches!(self.panel, Some(Panel::Note { .. })) || self.cell_inplace_box().is_some()) {
             self.apply_panel(cx);

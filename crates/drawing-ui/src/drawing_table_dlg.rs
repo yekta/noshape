@@ -279,7 +279,7 @@ impl DrawingEditor {
     pub fn general_cell_entries(&self, t: &noshape_model::drawing::Table, cs: crate::drawing_cells::CellSel) -> Vec<MenuEntry> {
         let id = t.id;
         let (r0, r1, c0, c1) = (*cs.rows().start(), *cs.rows().end(), *cs.cols().start(), *cs.cols().end());
-        // Insert ▸ and Duplicate ▸ leave nothing selected, the Cell panel closed (live drw-table-cells-insert-row s11).
+        // Duplicate ▸ leaves nothing selected, the Cell panel closed.
         let edit = |label: &'static str, f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
             let f = std::rc::Rc::new(f);
             MenuEntry::item(label, move |ed, _, cx| {
@@ -287,6 +287,20 @@ impl DrawingEditor {
                 ed.cell_sel = None;
                 ed.selection.clear();
                 ed.edit_table(id, label, cx, move |t| f(t));
+            })
+        };
+        // Insert ▸ keeps the Cell panel and its cell, moved along by a row above or a column left (live
+        // drw-table-insert-row-1122: Row Below, the top-right cell stays selected).
+        let insert = |label: &'static str, shift: (usize, usize), f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
+            let f = std::rc::Rc::new(f);
+            MenuEntry::item(label, move |ed, _, cx| {
+                let f = f.clone();
+                ed.edit_table(id, label, cx, move |t| f(t));
+                if let Some(c) = ed.cell_sel.as_mut().filter(|c| c.table == id) {
+                    c.a = (c.a.0 + shift.0, c.a.1 + shift.1);
+                    c.b = (c.b.0 + shift.0, c.b.1 + shift.1);
+                    cx.notify();
+                }
             })
         };
         // Merge ▸ and Unmerge keep the cells selected (live2 drw-table-cells-merge s12, -unmerge s15: the Cell panel
@@ -321,10 +335,10 @@ impl DrawingEditor {
             MenuEntry::Submenu(
                 "Insert".into(),
                 vec![
-                    edit("Column Left", Box::new(move |t| t.insert_col(c0))),
-                    edit("Column Right", Box::new(move |t| t.insert_col(c1 + 1))),
-                    edit("Row Above", Box::new(move |t| t.insert_row(r0))),
-                    edit("Row Below", Box::new(move |t| t.insert_row(r1 + 1))),
+                    insert("Column Left", (0, 1), Box::new(move |t| t.insert_col(c0))),
+                    insert("Column Right", (0, 0), Box::new(move |t| t.insert_col(c1 + 1))),
+                    insert("Row Above", (1, 0), Box::new(move |t| t.insert_row(r0))),
+                    insert("Row Below", (0, 0), Box::new(move |t| t.insert_row(r1 + 1))),
                 ],
             ),
             MenuEntry::Submenu(
