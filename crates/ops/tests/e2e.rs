@@ -4442,6 +4442,17 @@ fn drawing_title_block_fields() {
     assert_eq!((edits[0]["deleted"].clone(), edits[0]["layer"].clone()), (json!(true), json!("Border zones")));
     let e = try_call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": [140, 108], "delete": true })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("point"), "no format line mid-sheet {e:?}");
+    // Live walk6 22:54: the frame's left line drags 50 mm right; the dragged line is picked where it now is.
+    let left = json!([9.652, 100.0]);
+    let moved = call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": left, "move": [30, 0] }));
+    assert!(moved.get("error").is_none(), "{moved}");
+    assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Move"));
+    call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": [40.0, 100.0], "move": [20, 0] }));
+    let edits = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["format_edits"].clone();
+    let off = edits.as_array().unwrap().iter().find(|e| !e["offset"].is_null()).map(|e| e["offset"].clone()).expect("a dragged line");
+    assert_eq!(off, json!([50.0, 0.0]), "{edits}");
+    let e = try_call(&mut ctx, "drawing_format_line", json!({ "drawing": tab, "point": left, "move": [1, 0] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("point"), "the line left its old place {e:?}");
     // TITLE is three fields, a line each (live2 title-line-edit): typing into the second keeps the other two.
     let field = |ctx: &mut Ctx, key: &str| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["title_fields"].as_array().unwrap().iter().find(|f| f["field"] == key).cloned();
     let (one, three) = (field(&mut ctx, "Title").expect("Title")["value"].clone(), field(&mut ctx, "Title 3").expect("Title 3")["value"].clone());

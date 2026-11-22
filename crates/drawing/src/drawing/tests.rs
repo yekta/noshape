@@ -1879,6 +1879,13 @@ fn format_lines_are_picked_deleted_and_moved_alone() {
     drawing.sheets[0].edit_format_line(left, |e| e.layer = Some(SheetLayer::TitleBlock));
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert_eq!(layer_of(&built, side(&built).unwrap()), Some(SheetLayer::TitleBlock));
+    // Dragged (live walk6 22:54): drawn and picked where it moved to, under its own key.
+    drawing.sheets[0].edit_format_line(left, |e| e.offset = Some([5.0, 0.0]));
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    let l = &built.geometry.lines[side(&built).expect("still drawn")];
+    assert!(l.points.iter().all(|p| (p[0] - fx0 - 5.0).abs() < 1e-9), "{:?}", l.points);
+    let hit = built.hit([fx0 + 5.0, (fy0 + fy1) / 2.0], 1.0).and_then(|h| built.picks.get(h as usize).cloned());
+    assert_eq!(hit, Some(PickTarget::FormatLine(left)));
     drawing.sheets[0].edit_format_line(left, |e| e.deleted = true);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(side(&built).is_none(), "deleted");

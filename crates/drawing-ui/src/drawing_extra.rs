@@ -1358,7 +1358,10 @@ impl DrawingEditor {
     /// behaviours "title block clicks" (2): "orange, with end/mid grips").
     pub fn format_line_grip_overlay(&self, o: &mut crate::drawing_scene::Overlay) {
         let [Sel::FormatLine(k)] = self.selection.as_slice() else { return };
-        let (a, b) = ([k[0] as f64 / 100.0, k[1] as f64 / 100.0], [k[2] as f64 / 100.0, k[3] as f64 / 100.0]);
+        // (Where it was dragged to: its offset, or the drag's preview.)
+        let sheet = self.display().sheets.get(self.sheet);
+        let d = sheet.and_then(|s| s.format_edit(*k)).and_then(|e| e.offset).unwrap_or([0.0, 0.0]);
+        let (a, b) = ([k[0] as f64 / 100.0 + d[0], k[1] as f64 / 100.0 + d[1]], [k[2] as f64 / 100.0 + d[0], k[3] as f64 / 100.0 + d[1]]);
         let h = 4.0 / self.zoom.max(1e-6);
         const TAN: [u8; 4] = [0xcc, 0x92, 0x5c, 255];
         for p in [a, b, [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]] {
@@ -1497,6 +1500,13 @@ impl DrawingEditor {
                     Some(Drag::MoveTable { id, start, orig: t.position })
                 }
             }
+            // A format line moves on its own, selected (live qa walk 6 (5): the frame's left side dragged across the views,
+            // orange with its grips after).
+            PickTarget::FormatLine(key) => {
+                self.selection = vec![Sel::FormatLine(key)];
+                let orig = sheet.format_edit(key).and_then(|e| e.offset).unwrap_or([0.0, 0.0]);
+                Some(Drag::MoveFormatLine { key, start, orig })
+            }
             // A break line: dragging moves the break (help V35).
             PickTarget::BreakLine { view, index } => {
                 let orig = sheet.view(view)?.breaks.get(index)?.clone();
@@ -1632,6 +1642,10 @@ impl DrawingEditor {
         let si = self.sheet;
         let Some(sheet) = dr.sheets.get_mut(si) else { return };
         match drag {
+            Drag::MoveFormatLine { key, start, orig } => {
+                let off = add(*orig, sub(c, *start));
+                sheet.edit_format_line(*key, |e| e.offset = Some(off));
+            }
             Drag::NoteGrip { id, grip, start, orig } => {
                 let Some(a) = sheet.annotations.iter_mut().find(|a| a.id == *id) else { return };
                 *a = orig.clone();

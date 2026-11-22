@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-21 22:37 UTC.
+Updated 2026-11-21 22:56 UTC.
 
 ## In flight
 
@@ -78,29 +78,34 @@ or save a patch first (land.sh needs a clean tree: `git diff > patch`, land, `gi
     max/min to an edge: `MaxMinDimension.b_edge` (resolved, not saved) + sheet.rs `ext_from_edge` start that extension
     line at the edge's end (drw-max-min-fillet-arc s6); Note colour panel opens with its hex focused + selected
     (`note_color_focus`, note-format-lists s14); run.py drops Change to version… in pre-Pro takes.
-  - r49 (vibe2, uip1121g): 5 dimension scenarios regressed (a hovered annotation read as selected). COMMITTED fix on
-    top: a hovered annotation reads lit only if Esc left it (`esc_kept`: a tool made it, or Esc in Select deselected
-    it: styles-radial s16); Esc after a 2 point centerline keeps it, read EDGE^ (cylinder-axis s5); Esc with a custom
-    table's cells picked keeps the table; the Note color panel sits over the swatch (top 46, live s14), a press in it
-    off its fields keeps the keyboard there (field, no text), a press elsewhere in the Note panel hands it back, the
-    swatch clicked again keeps it open, Esc closes it alone (live (j): note-format-lists s16-s22 all match).
-    x160/x161 (vibex7): 23/26 + 19/20; left: custom-table-cell s15 (live keeps the table lit after Esc closes the
-    cell menu + Cell dialog; ours reads nothing: not from this batch, next), table-cell-menu s3 (live reads the
-    Insert click's focus as a field in one 11-21 take and "other" in two others: live timing, left). x162 (vibex7):
-    151 drw-* scenarios into uip1121l before landing both commits.
-  - Waiting on live: (k) 3 point circle centerline at hole centres listed [] by the 11-18.1 reader
-    (drw-centerline-circle-3-point-hole-centres s4, ours 1); qa's (5) for P0 DRW-BORDER-LIT (frame lines are
-    selectable alone when formats are unlocked, behaviours "(2)": the lit look is live's, ours lacks the mid grip;
-    open: hover look, press-drag); (i) drw-export-formats on PDF (df57f52f) and (g) 648646fa queued: re-run on main.
+  - COMMITTED 8b1d10552 on top of 7038164b0 (both unlanded): a hovered annotation reads lit after Esc only if Esc left
+    it (`esc_kept`); Esc after a 2 point centerline keeps it (EDGE^); the Note color panel over its swatch (top 46),
+    focus/Esc per live (j). x160/x161/x162 (vibex7): 23/26, 19/20, 147-scenario run 139/147.
+  - UNCOMMITTED (x164 on vibex7 running: tests, clippy on 5 crates, app, x162's 147 drw-* into uip1121n; x165 then
+    the other 224 drw-* into uip1121o, same binary; logs ~/agents/studios-keep/x164.log / x165.log):
+    (a) Esc on a table cell's menu and Esc with cells picked keep a custom table selected (`keep_custom_tables_selected`,
+        custom-table-cell s15, x163 green); hole/revision tables still cleared.
+    (b) Esc in Select keeps in `esc_kept` only the deselected annotation under the pointer (styles-radial s16 yes;
+        hcallout-palette-dual s24 / -tips s40 no). Test `esc_deselecting_a_dimension_keeps_it_lit_only_under_the_pointer`.
+    (c) P0 DRW-BORDER-DRAG (qa walk 6, live 22:54 live/qa/walk6-1121/walk6-5-border*: only the dragged line moves;
+        frame's top/bottom and zone ticks stay; recorder reads no selection): `FormatLineEdit.offset` (model-data,
+        saved; Eq dropped), build.rs adds it, `format_line_grip_overlay` follows, `Drag::MoveFormatLine`,
+        `extra_start_drag` selects + starts, `extra_drag_move`, commit "Move". Ops `drawing_format_line` `move` [dx, dy]
+        (adds to the offset), drawing_get format_edits `offset`; tests: e2e drawing_title_block_fields, drawing
+        format_lines_are_picked_deleted_and_moved_alone, UI the_sheet_border_line_drags.
+    Then: ops e2e full (drawing changed), commit, fetch, rebase, diff --stat, land
+    (NOSHAPE_RB_HOST=vibe2 NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh); TICKETS DRW-BORDER-DRAG note after the rebase.
+  - Expected after landing: drw-custom-table-insert/-delete/-properties s8 fail until live's re-takes (df57f52f, with
+    1336af80) land; table-cell-menu s3 is live's own timing (field vs other at the Insert click across 3 takes).
+  - Waiting on live: (k) 3 point circle centerline at hole centres read [] (drw-centerline-circle-3-point-hole-centres
+    s4); (i) drw-export-formats on PDF (df57f52f) and (g) 648646fa queued: re-run once on main.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
    was shot in pd/b1-b35 (tables, inspection / revision, section / detail included). The 456 shown are mostly
    dropdown options our takes don't list in order (fonts, balloon shapes, standards: Drawing properties 101, Create Drawing 57, Title block 54,
    Hole/thread callout 53, Note 52, Hole table 45, Styles 43): only a take opening each list would make them =.
-   Regenerate: `drawing_matrix.py --run /root/studios-scratch/uip-merged --ours-menus /root/studios-scratch/menudump.json`
-   (copy new take outputs into uip-merged first).
-2. Speed pass 11-19 done (no gap >=100 ms and >=2x); P1 parity rows for drawings / Feature Studio: none open.
+   Regenerate (copy new take outputs into uip-merged first): `drawing_matrix.py --run /root/studios-scratch/uip-merged --ours-menus /root/studios-scratch/menudump.json`
 
 ## Feel rows to take (gaps only; check ours against each, fix with a feel test)
 - live2 drawing tables (behaviours "studios (lead 11-18 ~03:36, feel): drawing tables", live/studios/tables-1118/):

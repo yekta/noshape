@@ -2333,6 +2333,58 @@ fn esc_after_a_2_point_centerline_reads_it_lit_but_not_a_line_to_line_dimension(
     assert_eq!(sel[0]["since"], "2026-11-14.1");
 }
 
+/// Live drw-styles-radial s16: Esc deselecting a clicked dimension under the pointer leaves it lit for live's reader;
+/// drw-hcallout-palette-dual s24: with the pointer off it, nothing is left.
+#[gpui::test]
+fn esc_deselecting_a_dimension_keeps_it_lit_only_under_the_pointer(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "dim-esc-deselect");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let (id, on) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        e.current_sheet().annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|a| {
+            let l = b.geometry.lines.iter().find(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::Annotation(a.id)) && l.points.len() >= 2)?;
+            Some((a.id, [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0]))
+        }).expect("a dimension with a line")
+    });
+    for (at, kept) in [([-1.0e4, -1.0e4], false), (on, true)] {
+        let got = cx.update(|cx| {
+            editor.update(cx, |e, cx| {
+                e.esc_kept.clear();
+                e.selection = vec![Sel::Annotation(id)];
+                e.cursor = at;
+                e.update_hover(cx);
+                e.cancel(cx);
+                (e.selection.is_empty(), e.esc_kept.contains(&Sel::Annotation(id)))
+            })
+        });
+        assert_eq!(got, (true, kept), "pointer at {at:?}");
+    }
+    // Right-click it, Edit… opens the palette, a palette change rebuilds the sheet with the pointer on the palette: the
+    // dimension under the last sheet position isn't hovered, and Esc then leaves nothing lit (drw-hcallout-palette-dual
+    // s24).
+    let got = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            e.esc_kept.clear();
+            e.selection = vec![Sel::Annotation(id)];
+            e.cursor = on;
+            e.update_hover(cx);
+            e.pointer_off = true;
+            e.hover = None;
+            e.update_hover(cx);
+            let hovered = e.hover.is_some();
+            e.cancel(cx);
+            (hovered, e.selection.is_empty(), e.esc_kept.contains(&Sel::Annotation(id)))
+        })
+    });
+    assert_eq!(got, (false, true, false));
+}
+
 /// Live drw-custom-table-cell s15: Esc with a custom table's cell picked drops the cell and keeps the table selected.
 #[gpui::test]
 fn esc_with_a_custom_tables_cell_picked_keeps_the_table(cx: &mut TestAppContext) {
@@ -2491,4 +2543,39 @@ fn an_empty_target_distances_precision_opens_no_list(cx: &mut TestAppContext) {
     click(cx, b);
     press(cx, window, "dt-prec-0-0");
     assert!(cx.update(|cx| crate::os_menu::is_open(cx)), "a filled one lists the precisions");
+}
+
+/// Live walk6 22:54 (P0 DRW-BORDER-DRAG): the frame's left line drags 50 mm and stays selected.
+#[gpui::test]
+fn the_sheet_border_line_drags(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    use noshape_scene::drawing_tools::Sel;
+    let (window, editor) = drawing(cx, "border-drag");
+    cx.update_window(window, |_, _, cx| editor.update(cx, |e, cx| e.edit("Formats", cx, |d| d.props.formats_locked = false))).unwrap();
+    real_sheet(cx, window, &editor);
+    let [fx0, fy0, _, fy1] = cx.update(|cx| editor.read(cx).current_sheet().size.frame_rect());
+    let key = noshape_model::drawing::format_line_key([fx0, fy0], [fx0, fy1]);
+    let screen = |cx: &mut TestAppContext, p: [f64; 2]| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let l = e.sheet_to_local(p);
+            e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+        })
+    };
+    // Off the zone ticks (one sits at the middle).
+    let y = (fy0 + fy1) / 2.0 + 10.0;
+    let (from, to) = (screen(cx, [fx0, y]), screen(cx, [fx0 + 50.0, y]));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_move(&MouseMoveEvent { position: from, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: from, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+        for k in 1..=5 {
+            let position = from + (to - from) * (k as f32 / 5.0);
+            e.on_mouse_move(&MouseMoveEvent { position, pressed_button: Some(MouseButton::Left), modifiers: Modifiers::default() }, w, cx);
+        }
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: to, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+        assert_eq!(e.selection, vec![Sel::FormatLine(key)]);
+        let off = e.current_sheet().format_edit(key).and_then(|f| f.offset).expect("moved");
+        assert!((off[0] - 50.0).abs() < 0.5 && off[1].abs() < 0.5, "{off:?}");
+    }))
+    .unwrap();
 }

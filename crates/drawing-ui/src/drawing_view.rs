@@ -417,6 +417,8 @@ pub struct DrawingEditor {
     pub esc_kept: Vec<Sel>,
     pub drag: Drag,
     pub cursor: [f64; 2],
+    /// The pointer is on a panel, palette or menu over the sheet: a rebuild hovers nothing at the last `cursor`.
+    pub pointer_off: bool,
     pub overlay: Overlay,
     pub panel: Option<Panel>,
     /// View properties dialog (double-click a view; see `drawing_props`).
@@ -811,6 +813,7 @@ impl DrawingEditor {
             esc_kept: Vec::new(),
             drag: Drag::None,
             cursor: [0.0, 0.0],
+            pointer_off: false,
             overlay: Overlay::default(),
             panel: None,
             view_props: None,
@@ -2233,7 +2236,7 @@ impl DrawingEditor {
     pub fn update_hover(&mut self, cx: &mut Context<Self>) {
         // The table being placed is not lit: it follows the pointer in black lines (live2 place-1118).
         let placing = |t: &PickTarget| matches!(t, PickTarget::Table(id) if self.drawing_sheet().table(*id).is_none());
-        let hover = self.pk().hover_at().filter(|h| !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
+        let hover = self.pk().hover_at().filter(|h| !self.pointer_off && !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
         if hover != self.hover {
             if hover.and_then(|h| self.sel_of_pick(h)).is_some_and(|s| !self.esc_kept.contains(&s)) {
                 self.esc_kept.clear();
@@ -2253,6 +2256,7 @@ impl DrawingEditor {
             return;
         }
         cx.stop_propagation();
+        self.pointer_off = true;
         if self.hover.take().is_some() {
             self.redraw(cx);
         }

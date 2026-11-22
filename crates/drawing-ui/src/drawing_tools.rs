@@ -167,10 +167,7 @@ impl DrawingEditor {
         // (Resize…) goes first (drw-revision-cell-resize).
         // (A custom table stays selected: live drw-custom-table-cell s15, its frame still read lit.)
         if self.panel.is_none() && self.cell_sel.take().is_some() {
-            let sheet = self.current_sheet();
-            let custom = |s: &Sel| matches!(s, Sel::Table(id) if sheet.table(*id).is_some_and(|t| matches!(t.kind, TableKind::Custom { .. })));
-            let kept: Vec<Sel> = self.selection.iter().filter(|s| custom(s)).cloned().collect();
-            self.selection = kept;
+            self.keep_custom_tables_selected();
             cx.notify();
             return;
         }
@@ -376,11 +373,20 @@ impl DrawingEditor {
         if !self.selection.is_empty() && self.selection.iter().all(hole) {
             return;
         }
-        // A clicked annotation Esc deselects stays drawn lit under the pointer, as one a tool made (live drw-styles-radial
-        // s16: 0.394 clicked, Esc, still read).
-        let deselected = self.selection.drain(..).filter(|s| matches!(s, Sel::Annotation(_)));
+        // A clicked annotation Esc deselects under the pointer stays drawn lit, as one a tool made (live drw-styles-radial
+        // s16: 0.394 clicked, Esc, still read; with the pointer off it nothing is: drw-hcallout-palette-dual s24).
+        let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| matches!(s, Sel::Annotation(_)));
+        let deselected = self.selection.drain(..).filter(|s| Some(s) == hovered.as_ref());
         self.esc_kept.extend(deselected);
         self.redraw(cx);
+    }
+
+    /// The selection down to its custom tables: what Esc leaves of picked cells (live drw-custom-table-cell s15).
+    fn keep_custom_tables_selected(&mut self) {
+        let sheet = self.current_sheet();
+        let custom = |s: &Sel| matches!(s, Sel::Table(id) if sheet.table(*id).is_some_and(|t| matches!(t.kind, TableKind::Custom { .. })));
+        let kept: Vec<Sel> = self.selection.iter().filter(|s| custom(s)).cloned().collect();
+        self.selection = kept;
     }
 
     /// The drawing's tab left: the grips Esc left drawn go, and nothing stays hovered.
@@ -1401,6 +1407,7 @@ impl DrawingEditor {
     pub fn on_mouse_down(&mut self, e: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.glyph_selected = None;
         self.esc_kept.clear();
+        self.pointer_off = false;
         if self.placed_table.take().is_some() {
             cx.notify();
         }
@@ -1519,6 +1526,7 @@ impl DrawingEditor {
     pub fn on_mouse_move(&mut self, e: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
+        self.pointer_off = false;
         if self.zoom_window_move(lp, cx) {
             return;
         }
@@ -1603,7 +1611,7 @@ impl DrawingEditor {
                     cx.notify();
                 }
             }
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
+            Drag::MoveTable { .. } | Drag::MoveFormatLine { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } => {
                 let drag = self.drag.clone();
                 self.extra_drag_move(&drag, cx);
             }
@@ -2013,8 +2021,9 @@ impl DrawingEditor {
             // A box adds to the selection; Shift+drag makes none (live2 feel/drawing.json F3).
             Drag::SelectBox { start } if !e.modifiers.shift => self.select_in_box(start, self.cursor, true, cx),
             Drag::SelectBox { .. } => self.box_preview.clear(),
-            Drag::MoveTable { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => {
+            Drag::MoveTable { .. } | Drag::MoveFormatLine { .. } | Drag::ResizeTable { .. } | Drag::TableDivider { .. } | Drag::MoveBreak { .. } | Drag::MoveSectionLine { .. } | Drag::MoveDetailCircle { .. } | Drag::ResizeDetailCircle { .. } | Drag::MoveDetailLabel { .. } | Drag::MoveSectionPoint { .. } | Drag::AuxIndicator { .. } | Drag::NoteGrip { .. } | Drag::MoveViewLabel { .. } | Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => {
                 let name = match drag {
+                    Drag::MoveFormatLine { .. } => "Move",
                     Drag::LeaderBend { .. } | Drag::LeaderEnd { .. } | Drag::LeaderNode { .. } => "Move by grip",
                     Drag::MoveTable { .. } => "Move table",
                     Drag::TableDivider { .. } => "Resize cells",
@@ -2427,21 +2436,23 @@ impl DrawingEditor {
         self.menu_at = self.local(position);
         let entries = self.context_menu_entries(pick, cx);
         // The pointer is on the menu now: the canvas hover drops, so a selected leader shows orange, not tan (live2
-        // drw-leader-add-node s10).
+        // drw-leader-add-node s10); a rebuild under the menu or the palette it opens hovers nothing there
+        // (drw-hcallout-palette-dual s24).
+        self.pointer_off = true;
         if self.hover.take().is_some() {
             self.redraw(cx);
         }
         let ed = cx.entity();
         // Onshape's right-click menu (os_menu: 12 px text, a drawing's 23.5 px rows).
         // Esc on a table cell's menu closes the Cell panel too and clears the selection (live2 drw-hole-table-cell-rmb
-        // s20: nothing read lit after it).
+        // s20: nothing read lit after it); a custom table stays selected (live drw-custom-table-cell s15).
         let cell = self.cell_sel.is_some().then(|| ed.downgrade());
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
             let m = match cell {
                 Some(ed) => m.after_escape(move |_, cx| {
                     ed.update(cx, |t, cx| {
                         t.cell_sel = None;
-                        t.selection.clear();
+                        t.keep_custom_tables_selected();
                         t.redraw(cx);
                     })
                     .ok();

@@ -1854,9 +1854,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             for i in 0..segs {
                 let (a, b) = (l.points[i], l.points[(i + 1) % n]);
                 let key = super::format_line_key(a, b);
-                if sheet.format_edit(key).is_some_and(|e| e.deleted) {
+                let edit = sheet.format_edit(key);
+                if edit.is_some_and(|e| e.deleted) {
                     continue;
                 }
+                let d = edit.and_then(|e| e.offset).unwrap_or([0.0, 0.0]);
+                let (a, b) = ([a[0] + d[0], a[1] + d[1]], [b[0] + d[0], b[1] + d[1]]);
                 g.lines.push(Polyline2 { points: vec![a, b], style: l.style, closed: false, pick: 0 });
                 keys.push(Some(key));
                 own_pens.push(pen);

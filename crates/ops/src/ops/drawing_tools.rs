@@ -300,14 +300,15 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "drawing",
             verb: "format_line",
-            summary: "Delete a format line or move it to another format layer",
-            description: "Right-click a line of the sheet's format (frame, zone divider, title block line; live: each is selected alone) at `point` (sheet mm, within 2 mm): `delete` (Delete: the template no longer draws it on this sheet) or `layer` (Move to ▸ \"Border frame\", \"Border zones\" or \"Title block\": its color and thickness follow that layer's). Not with Formats locked. drawing_get's `format_edits` lists the edited lines. One edit (\"Delete\" / \"Move to\").",
+            summary: "Delete, drag or re-layer a format line",
+            description: "Right-click a line of the sheet's format (frame, zone divider, title block line; live: each is selected alone) at `point` (sheet mm, within 2 mm): `delete` (Delete: the template no longer draws it on this sheet) `layer` (Move to ▸ \"Border frame\", \"Border zones\" or \"Title block\": its color and thickness follow that layer's) or `move` (drag it by [dx, dy] sheet mm; the zone letters and ticks stay). Not with Formats locked. drawing_get's `format_edits` lists the edited lines (`offset`: how far it was dragged). One edit (\"Delete\" / \"Move to\" / \"Move\").",
             fields: with(
                 common(),
                 vec![
                     req("point", point(), "On the format line (sheet mm)."),
                     opt("delete", json!({ "type": "boolean" }), "Delete it."),
                     opt("layer", json!({ "type": "string", "enum": ["Border frame", "Border zones", "Title block"] }), "Move it to this format layer."),
+                    opt("move", point(), "Drag it by [dx, dy] (sheet mm)."),
                 ],
             ),
             mutates: true,
@@ -1989,8 +1990,9 @@ fn format_line(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(n) => Some(SheetLayer::FORMAT.into_iter().find(|l| l.name() == n).ok_or_else(|| OpError::param("layer", "Border frame, Border zones or Title block"))?),
         None => None,
     };
-    if !delete && layer.is_none() {
-        return Err(OpError::param("delete", "give delete or layer"));
+    let shift = if a.get("move").is_some() { Some(pt_arg(a, "move")?) } else { None };
+    if !delete && layer.is_none() && shift.is_none() {
+        return Err(OpError::param("delete", "give delete, layer or move"));
     }
     let b = t.m.built.as_ref().ok_or_else(|| OpError::param("point", "the sheet isn't drawn"))?;
     let key = b.geometry.lines.iter().filter(|l| l.pick != 0).filter_map(|l| match b.picks.get(l.pick as usize) {
@@ -2005,8 +2007,13 @@ fn format_line(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if let Some(l) = layer {
             e.layer = Some(l);
         }
+        if let Some([dx, dy]) = shift {
+            let [x, y] = e.offset.unwrap_or([0.0, 0.0]);
+            e.offset = Some([x + dx, y + dy]);
+        }
     });
-    commit(od, t.tab, si, t.d, if delete { "Delete" } else { "Move to" })?;
+    let name = if delete { "Delete" } else if layer.is_some() { "Move to" } else { "Move" };
+    commit(od, t.tab, si, t.d, name)?;
     Ok(reply(od, t.tab, si, false)?.into())
 }
 

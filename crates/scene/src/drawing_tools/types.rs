@@ -279,6 +279,8 @@ pub enum Drag {
     /// An end grip of a centerline (along its line).
     CenterlineEnd { orig: Annotation, k: usize },
     MoveTable { id: u64, start: [f64; 2], orig: [f64; 2] },
+    /// A format line dragged by its body (live qa walk 6 (5)): `orig` its offset at the press.
+    MoveFormatLine { key: [i64; 4], start: [f64; 2], orig: [f64; 2] },
     /// Drag-select table cells: a rubber band from `start` (help H:table:
     /// the cells it touches are selected on release).
     SelectCells { id: u64, start: [f64; 2] },

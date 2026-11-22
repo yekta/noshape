@@ -2973,14 +2973,18 @@ pub struct Sheet {
     pub format_edits: Vec<FormatLineEdit>,
 }
 
-/// An edit of one format line: deleted, or moved to another format layer.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// An edit of one format line: deleted, moved to another format layer, or dragged.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct FormatLineEdit {
     pub key: [i64; 4],
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub deleted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layer: Option<SheetLayer>,
+    /// Dragged by this much (sheet mm; live qa walk 6 (5): the frame's left side dragged 50 mm right, the zone
+    /// ticks staying).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<[f64; 2]>,
 }
 
 /// A format line's key: its ends (sheet mm, to 0.01 mm), the lower one first.
@@ -3058,7 +3062,7 @@ impl Sheet {
         let i = match self.format_edits.iter().position(|e| e.key == key) {
             Some(i) => i,
             None => {
-                self.format_edits.push(FormatLineEdit { key, deleted: false, layer: None });
+                self.format_edits.push(FormatLineEdit { key, deleted: false, layer: None, offset: None });
                 self.format_edits.len() - 1
             }
         };
