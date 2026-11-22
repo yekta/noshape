@@ -160,6 +160,19 @@ fn corner_rectangle_constraints_follow_the_click_order() {
     assert_eq!(sk.solve().dof, Some(4));
 }
 
+/// Live (behaviours "spec: skasm sketch tools", clicks upper left then lower right): every edge runs from the first
+/// click's side to the second's, bottom and top (+1, 0), left and right (0, -1).
+#[test]
+fn corner_rectangle_edges_run_from_the_first_click() {
+    let mut sk = Sketch::new();
+    let r = sk.corner_rectangle(v(0.0, 1.0), v(2.0, 0.0));
+    for c in r.curves {
+        let Some(Curve2::Line { a, b }) = sk.curve(c) else { panic!("not a line") };
+        let d = (b - a).normalize();
+        assert!(d == v(1.0, 0.0) || d == v(0.0, -1.0), "edge {a} -> {b}");
+    }
+}
+
 /// A center point rectangle's point-to-point midpoints survive a save and
 /// load (the document stores the sketch as JSON).
 #[test]

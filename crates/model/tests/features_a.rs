@@ -1173,6 +1173,20 @@ fn revolved_pin(t: &mut T) -> RegenResult {
     t.ok()
 }
 
+/// Live workflow 21 (psui): the rectangle's left edge runs up from its first corner, so the revolved cylinder's z runs
+/// down (z against the axis as drawn): live's Helix on it starts at the bottom.
+#[test]
+fn a_revolve_about_a_rectangles_left_edge_turns_its_cylinder_down() {
+    let mut t = T::new();
+    let res = revolved_pin(&mut t);
+    let axes: Vec<DVec3> = res.context.bodies[0].shape.faces().iter().filter_map(|f| match f.face_surface() {
+        Ok(noshape_kernel::Surface::Cylinder { axis, .. }) => Some(axis),
+        _ => None,
+    }).collect();
+    assert_eq!(axes.len(), 1);
+    assert!((axes[0] - DVec3::NEG_Z).length() < 1e-9, "cylinder z {:?}", axes[0]);
+}
+
 /// qa THREAD-ON-REVOLVED-CYLINDER (live workflow 21): a Front rectangle 0,0-5,30 mm revolved about its left edge, an
 /// External thread with its defaults (ANSI 3/8, Blind 10 mm, Split face) on the top edge: live builds it, "Exact match
 /// for thread size not found.", the cylinder split 10 mm down.

@@ -48,15 +48,14 @@ impl Sketch {
     /// Axis-aligned rectangle from two opposite corners. Live Onshape (REST,
     /// qa5 sketch tools; behaviours "spec: skasm sketch tools"): Perpendicular
     /// top / left, Parallel bottom / top and left / right, Horizontal top,
-    /// where "top" is the edge at `p1`'s y and "left" the one at `p0`'s x.
+    /// where "top" is the edge at `p1`'s y and "left" the one at `p0`'s x. Each edge runs from `p0`'s side to `p1`'s
+    /// (live: a revolve about the left edge of a rectangle drawn up from the origin has its cylinder's z down).
     pub fn corner_rectangle(&mut self, p0: DVec2, p1: DVec2) -> ShapeIds {
-        let (lo, hi) = (p0.min(p1), p0.max(p1));
-        let pts: Vec<EntityId> = [lo, DVec2::new(hi.x, lo.y), hi, DVec2::new(lo.x, hi.y)].iter().map(|p| self.add_point(*p)).collect();
-        let lines = self.closed_polyline(&pts);
+        let pts: Vec<EntityId> = [p0, DVec2::new(p1.x, p0.y), p1, DVec2::new(p0.x, p1.y)].iter().map(|p| self.add_point(*p)).collect();
+        // The edges at p0's y, p1's x, p1's y and p0's x.
+        let lines: Vec<EntityId> = [(0, 1), (1, 2), (3, 2), (0, 3)].iter().map(|&(a, b)| self.add_line_between(pts[a], pts[b]).unwrap()).collect();
         let mut out = ShapeIds { points: pts, curves: lines.clone(), ..Default::default() };
-        // The edges run counter-clockwise: low y, high x, high y, low x.
-        let (bottom, top) = if p1.y >= p0.y { (lines[0], lines[2]) } else { (lines[2], lines[0]) };
-        let (left, right) = if p0.x <= p1.x { (lines[3], lines[1]) } else { (lines[1], lines[3]) };
+        let (bottom, right, top, left) = (lines[0], lines[1], lines[2], lines[3]);
         self.c(&mut out, ConstraintKind::Perpendicular { a: top, b: left });
         self.c(&mut out, ConstraintKind::Parallel { a: bottom, b: top });
         self.c(&mut out, ConstraintKind::Parallel { a: left, b: right });

@@ -3732,17 +3732,14 @@ impl SketchEditor {
                 self.finish_create(data, &ids.curves);
                 let w = self.world_per_px;
                 // Live (sketch/05-06): the width and height boxes sit on the
-                // two edges through the first corner (edges run bottom,
-                // right, top, left).
+                // two edges through the first corner (the edges at the first
+                // corner's y, the second's x, the second's y, the first's x).
                 let mid = |id: EntityId| match data.sketch.curve(id) {
                     Some(Curve2::Line { a, b }) => (a + b) * 0.5,
                     _ => DVec2::ZERO,
                 };
                 let (horizontal, vertical) = if self.tool == Tool::CornerRect {
-                    let (lo, hi) = (first.pos.min(click.pos), first.pos.max(click.pos));
-                    let top = (first.pos.y - hi.y).abs() < (first.pos.y - lo.y).abs();
-                    let left = (first.pos.x - lo.x).abs() < (first.pos.x - hi.x).abs();
-                    (ids.curves[if top { 2 } else { 0 }], ids.curves[if left { 3 } else { 1 }])
+                    (ids.curves[0], ids.curves[3])
                 } else {
                     // Live (behaviours "… center point rectangle and tangent
                     // arc", request 1503): the width on the bottom edge, the
