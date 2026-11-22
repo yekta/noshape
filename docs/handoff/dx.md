@@ -13,51 +13,35 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 23:28 11-21 (read first)
-TASK (user 21:5x, two speed items, both user-facing): (1) fast open honestly measured: open -> first frame WITH the model
-on infento, scissor, isaac, rings, 400-hole plate, vs live; target <= 0.5 s; close gaps >= 2x and >= 100 ms. (2) hover
-latency on heavy docs (qa: plate 353-487 ms, 1000-inst asm 560-750, 30-feature 150-245): profile, cut what's > ~100 ms.
-Builds on the Mac or vibex8 (vibe2 = land queue; my vibe2 dx-open target deleted 23:00, lead asked).
-- QUEUED 21f0ca98 (23:2x, 9 commits): 76d128b9c (display row of another build stands in if same_layout), 860c7fb02
-  (software prewarms 1x), e16205d6e (STL open pieces = surfaces), handoffs; carries e418ada0 (DRW-VIEW-CENTRE, checking).
-- VERIFY 76d128b9c (after landing is fine, it is safe either way): build I = vibex8 ~/agents/dx-keep/bin/noshape-I;
-  script vibex8 ~/agents/dx-keep/bin/xbuild.sh <bin> <tag> doc:tab.. (run 1 writes rows, rows' build suffix rewritten to
-  fff.., run 2 fresh cache must show "cached display in"). Rows written by H (old key format) never match: expected.
-- UNCOMMITTED: crates/render/tests/instancing_bench.rs software_pick_cost (T2 bench: pick pass + frame time vs
-  triangles on a software adapter); running on vibex8 -> /root/dx-scratch/fo/pickbench.out. If the pick pass grows
-  with triangles (llvmpipe's vertex stage is one thread), cut it: pick-only index buffer in spatial chunks with boxes,
-  draw only chunks in the pick area (software only; no look change). Then the 5x-avg wait shrinks with it.
-- OPEN numbers (vibex8 llvmpipe, load 11-20, ms from launch; /root/dx-scratch/fo/openH.out, script fo/open3.sh,
-  logs vibex8 ~/tmp/dx/fo-H-<doc>/run{1,2,3}.log; run1 = no rows, run2 = rows + fresh cache, run3 = rows + same cache):
-  l30 3050 / 1606 / 1170; big-plate 2189 / 1800 / 1375; pins-1000 1737 / 1660 / 1509; rings 17153 / 1815 / 1337;
-  isaac full 135 s / cached 1118 / 2628 (full regen 164-191 s); scissor full 452 s / cached 1835 / 1771 (regen 312-402 s);
-  infento 34.7 s / 797 / 1023. Live (behaviours "Assemblies 1-5", 11-20): shaded 15-32 s (scissor 17-19, isaac 16-32,
-  infento 26). With rows we beat live 10-30x; over 0.5 s mostly from software GPU. Regen-to-editable is the real gap:
-  scissor 5-7 min vs live ~18 s, isaac 2.5-3 min (one scissor studio of 20 features 155 s: core's regen speed ->
-  report to lead; persisting B-reps = "step 4 B-reps" needs the lead's go).
-  Real GPU: perf.yml macOS jobs FAIL since 11-18 ("runner lost communication" in Benchmarks) -> tell lead. Last mac15
-  artifact (11-19, no rows): l30 379-1005, big-plate 816-1086, parts-1000 1133, NIST 1650-1789 (dx-scratch/perfrun/m15).
-  Breakdown l30 run3: GPU device+4x pipelines 372 ms, window after, session 408, cached display 420, frame 1 on llvmpipe
-  508 ms (incl. 1x pipelines 105). UI "ui stall ~150-300 ms (ui cpu ~30)" during first frames on Linux AND the mac
-  runner (Metal compile service / render-thread lock?): next lead to chase. decision needed (lead): run the app on the
-  Mac mini for real-GPU open/hover numbers (opens windows on the user's Mac)?
-- HOVER numbers (vibex8, frame log; /root/dx-scratch/fo/hovH.out, script fo/hov.sh <bin> <tag> <doc> <tab> x,y..):
-  plate 235-498 ms = move->pick asked 61-215 (Onshape's rule: fast move waits min(5 x avg pick, 250): our software pick
-  ~65-90 ms inflates it) + pick 65-90 + answer->present 152-277 (full re-render on llvmpipe + GPUI present ~60 ms each).
-  pins-1000 277-532 (2 x 2 s: two frames). l30 69-125 ms. Its 1.5 s "outliers" are a probe parse artifact (matched the
-  next round's move): lit at ~108 ms. Fix hov.sh: run dirs all named hov-H-a (basename a.noshape) -> use the tag.
-  Live (live 22:52, behaviours "qa 20:18 (1)", live/qa/walk2-1121/heavy-*.json; software GL Chrome): plate top face
-  42-53 ms, side 299-361; 1000-part PS face ~266, edge 0.74-2.0 s; 2000-inst asm 1.3-2.5 s (render-bound, no target).
-  Gap: plate top face ours ~350 vs 45 (both software). Real-GPU hover (perf.yml 11-04 pins-1000): p50 23-32 ms.
-  Levers: software pick cheaper (cull instances / per-face ranges outside the pick rect frustum; or pick ids in the
-  colour pass so picks are always "covered") -> also shrinks the 5x-avg wait; highlight without a full re-render.
-- HOVER breakdown 23:0x (vibex8 under load 11-14, plate, frame log + NOSHAPE_PERF_PERIOD=4): move->ask ~200 (5x avg
-  pick, cap 250), pick ~70-100 (alone), hover frame r.gpu_ms 150-220, gpui.present 55-75. NOSHAPE_PERF_SKIP A/B
-  (lines / silhouettes / backsil / ao / meshes): each cuts the frame only ~10-30%: no single pass dominates.
-  Plate 116,812 triangles fine (20,812 preview). Overlay highlight (no full re-render) = big renderer change ->
-  decision for the lead. perf record impossible on vibex8 (paranoid 4).
-- NEXT: xbuild verify; pick bench -> chunked pick cut; report to lead (<= 5 lines): open table, isaac / scissor regen
-  gap (core), macOS perf.yml broken since 11-18, Mac GUI decision, overlay-highlight decision.
+## STATE 00:55 11-22 (read first)
+TASK (user 21:5x): (1) fast open honestly measured vs live, target <= 0.5 s; (2) hover latency on heavy docs.
+RULING (lead 00:2x 11-22): software GL (llvmpipe, our Xvfb hosts, live's lane 4) is NOT a target: measure hover and
+open on the Mac's GPU (NOSHAPE_RB_HOST=mac, its slots). live's software orbit times (behaviours "qa walk 7
+navigation" (8)) are not targets either.
+- MAIN RED (prefs.rs:320, mine): the images library read a version's tabs in stored order (by tab id), not tab order:
+  random per run. Fix = ordered_tabs (images + forms libraries); 24/24 stress runs ok. QUEUED with 319feba2 (00:4x;
+  carries 425d28c1 display row of another build, f82cc940 software prewarm 1x, b42846179 STL surfaces, handoffs,
+  latency test). Lead told. CHECK land.sh --status; a failed land = next task.
+- HOVER on the Mac GPU (T2 part_studio latency::a_face_lights_on_heavy_part_studios): plate face lit 17.1 ms median
+  (live 53), parts-1000 18.6 ms (live 266); average pick 1.6-2.3 ms. Done (no gap). Assembly (pins-1000) not timed
+  on the Mac yet (assembly-ui has no latency harness; live 2000-inst asm 1.3-2.5 s render-bound).
+- OPEN on the Mac GPU: STOPPED 00:55 (user couldn't reach the Mac: the Mac is CLOSED to builds, tests and app runs
+  until reopened; my Mac target, docs and binaries deleted). No GPU open numbers yet: decision for the lead (GPU host).
+  Live's open (behaviours "heavy-doc open times", lane 4 software, s, warm shaded / cold): infento 23.5-62.7 / 38.2,
+  scissor 18.3-20.1 / 36.8, isaac 17.6-21.7 / 26.9, rings-loft 25.9-26.6 / 26.2, dx-big-asm 17.0-58.9 / 22.7,
+  400-hole plate 60.6-70.8 / 71.0 (list at 85-104 s).
+- 76d128b9c verified (vibex8 xbuild.sh): rows rewritten to another build's suffix are used: cached display 123-814 ms
+  on l30, big-plate, pins-1000, rings, infento, isaac (regen then replaces it).
+- OPEN numbers vibex8 llvmpipe (not a target now; ms from launch; run1 no rows / run2 rows + fresh cache / run3 same
+  cache): l30 3050/1606/1170; big-plate 2189/1800/1375; pins-1000 1737/1660/1509; rings 17153/1815/1337; isaac full
+  135 s / 1118 / 2628 (regen 164-191 s); scissor 452 s / 1835 / 1771 (regen 312-402 s); infento 34.7 s / 797 / 1023.
+  Live shaded 15-32 s. Regen-to-editable is the real gap (scissor 5-7 min vs live ~18 s): core's regen speed.
+- Software hover breakdown (vibex8, for the record): wait 5 x avg pick ~200, pick round trip 38-100, frame 60-220,
+  GPUI present 15-75 ms; a 120k-triangle pick pass alone 8 ms (bench). Not pursued (ruling).
+- Cleaned: local dx-scratch 23 -> 2.9 GB (user 00:3x); vibe2 dx-open target; vibex8 A/B bins; Mac dx, dx-land,
+  dx-main, dx-nightly worktrees.
+- NEXT: report to lead (<= 5 lines): open (Mac GPU) vs live, isaac / scissor regen gap
+  (core), perf.yml macOS broken since 11-18, main red fixed; then the queue below (bottle DXF 0.015 in).
 ## Exchange leftovers (11-21)
 - Drawing rows (2/10): bottle Front's lip arc 41.8..180 deg (live 90..180): Part 1 is one revolved solid (14 closed
   edges), the arc is the lip torus's outline; its inner 41.8..90 part should be hidden by the torus's near side, ours
