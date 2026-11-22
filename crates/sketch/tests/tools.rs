@@ -79,6 +79,31 @@ fn trim_circle_to_arc_and_delete_isolated() {
     assert!(sk.entity(lone).is_none());
 }
 
+/// Live sketch-edit-feel-1122 sk3: a circle at (14, 3) R 6 on the line (0, 0) → (40, 0) crossing it at 8.8 and 19.2;
+/// Trim's hover lights the piece under the pointer between those crossings (the line's ends past them).
+#[test]
+fn trim_hover_pieces_of_a_circle_on_a_line_end_at_the_crossings() {
+    let mut sk = Sketch::new();
+    let l = sk.add_line(v(0.0, 0.0), v(40.0, 0.0));
+    let c = sk.add_circle(v(14.0, 3.0), 6.0);
+    let x = 27.0_f64.sqrt();
+    let ends = |id, at| {
+        let (t0, t1) = sk.trim_span(id, at).unwrap();
+        let curve = sk.curve(id).unwrap();
+        let (a, b) = curve.domain();
+        let p = |t: f64| curve.point(if curve.is_periodic() && t > b { t - (b - a) } else { t });
+        let (p0, p1) = (p(t0), p(t1));
+        if p0.x <= p1.x { (p0, p1) } else { (p1, p0) }
+    };
+    let near = |(p, q): (DVec2, DVec2), (a, b): (DVec2, DVec2)| (p - a).length() < 1e-6 && (q - b).length() < 1e-6;
+    let (left, right) = (v(14.0 - x, 0.0), v(14.0 + x, 0.0));
+    assert!(near(ends(c, v(14.0, -2.9)), (left, right)), "the lower arc");
+    assert!(near(ends(c, v(14.0, 9.0)), (left, right)), "the upper arc");
+    assert!(near(ends(l, v(14.0, 0.0)), (left, right)), "the chord");
+    assert!(near(ends(l, v(4.0, 0.0)), (v(0.0, 0.0), left)), "left of the circle");
+    assert!(near(ends(l, v(30.0, 0.0)), (right, v(40.0, 0.0))), "right of it");
+}
+
 #[test]
 fn split_and_extend() {
     let mut sk = Sketch::new();
