@@ -1318,3 +1318,87 @@ Next: equal-radius rounds whose spines meet (cylinder axis through the torus' ce
    "Failed to chamfer selections." (live OK; before 46/116/68, live after 47/119/70, ~138 mm3 off): likely the same
    TWO_OFFSETS cause as a2e4a2; costs Ball 13/14, Revolute 17; repro vibex8 ~/agents/asm-keep/me5 (bin/ops-c21,
    trace me5/tr.log).
+
+## From the handoff, 11-22 03:35 (Now 11-21 20:11 and Earlier 11-21 15:59 blocks)
+## Now (11-21 20:11)
+
+- Hosts (user 11-21, DECISIONS a16b39297): builds/tests on rb-hosts (vibex7); the Mac only via its one 4-job nice-19
+  slot. My Mac target was deleted. Never `| head` a cargo pipe: it kills the build (filter the kernel warnings, then tail).
+- RINGS Fillet 1 (9.6 mm): LANDED 18f929e78 (11-21 23:31; bool told). Open: at 10.4 mm a 0.774 mm² bore island
+  stays at the bottom.
+- SCISSOR (asm P0, asm-scissor-lift; copy vibex7 ~/tmp/blend/scissor.noshape; bin/scissor-x.sh <cli> [tabs],
+  scissor-f.sh <cli> <tab> <feature> (profile + records), scissor-e.sh (edit entities), scissor-p.sh (part + def)):
+  - 2d82a0 Fillet 13 (R1 on two whole end walls of the Middle Cover slab, tangent propagation: 16 edges; live 24/61/40
+    -> 48/107/62, -11.505 mm³; our input 25/63/41, 22549.240 vs 22549.298): see the SCISSOR item below.
+  - 9cbb0e Fillet 23, 665cf3 Fillet 4: inputs differ upstream (asm bisecting; 9cbb0e derives from 2d82a0, so Fillet
+    13 is upstream of it).
+- KNIFEHANDLE Fillet 1: core (11-21 ~20:50) queued 8061866b (branch core-kh): Extend handle 1/2/3 as live, Handle
+    204640 mm³ (live 205332.7; rest is P4's ellipse radius, with skasm). Fillet 1 is mine once it lands.
+- isaac-ball a04711 Chamfer 1 / Fillet 1: wait on bool's Extrude 14 (+776.4 mm³), then re-check.
+- Halter faces (parked): ZZ_NOKEPT + ZZ_INTO=0.05 builds VALID +2.333 mm3 (live 2.4694), 61/162/104 vs 39/111/73,
+  108 s. Extra faces: fill lofts' planar sides not merged into body faces, 0.004 mm2 tip slivers, extra B-spline pieces.
+  logs/zzh10.out (bin/zzh10.sh -> vibex7 ~/tmp/blend/halter-out.brep; bin/faces2.sh lists faces). ZZ_INTO 0.01 invalid.
+- SUSPENSION 23:10: Common-ring refill (once per cylinder) + vanishing chain ends in sections() (blend-cusp, ZZV debug +
+  ZZ_NOTIP switch, never land): root chain [9,10,11,14,15,16] now runs; loft to the tip vertex failed with the end
+  section 3 um in (logs/zzsusp6); without the tip the loft is valid but the union lost it (zzsusp7); zzsusp8 tries the
+  end section half a station in.
+- SUSPENSION cusp_staged (blend-cusp, uncommitted): refill + root chain VALID 63/146/85, 393418.75 (live 53/98/46,
+  393486.60): the root chain stays [12,21]. Why (11-21 22:40, susp-b2 = body before the root chain, kept in vibex7
+  ~/agents/blend-keep/susp/susp-b2.brep; faces in blend-scratch/susp/b2-faces.txt): the boss cylinder F2's concave edges
+  from root to cusp C (17.5, 39.681, 38.084) are 66.76 (face 27, x=20 plane) + 0.9952 (face 32: a 0.346 mm2 x=20 sliver
+  not merged into 27) + 0.0359 (face 33: a 0.010 mm2 slanted plane from the refill) + 10.2768 (face 49, the R40 torus:
+  live's patch edge, live 15.877 from x 22.5). 23:00: slivers were the refill box's faces (y = cusp - 7.5): refill now
+  = Common(body, the cylinder's whole ring +-3r along its axis), once per cylinder (blend-cusp detail.rs) -> body valid
+  45 faces, root chain runs on: [9,10,11,14,15,16]; sections then fail 'the faces at the edge are tangent' at the cusp
+  end (torus meets cylinder tangent at C: live's ball vanishes there). Concave chains go through sections() (ball_tools
+  is convex only; its vanish try saved as blend-scratch/susp/balltools-vanish.patch, reverted). 23:00: sections() station
+  loop got a vanishing end (chain free end with |m0.m1| > 1-1e-6: last section backed off 1e-3..0.5 station, loft ends
+  on a vertex at the end point; rounds only, not held). Run in flight: bin/zzsusp2.sh -> logs/zzsusp5.out.
+- SCISSOR 2d82a0 Fillet 13 = the same cusp problem: each wall's outline turns convex -> concave at tangent joins (top
+  line 0 -> arc 5; x=103.736 edges concave). blend-sc commit 3453a0d8f (runs joined + per-run lofts + refuse a run
+  turning convex -> concave: error in 16 ms, was 18.9 s; unit test) in gate (bin/gate2.sh d5c8c1e79 3453a0d8f sc ->
+  suite-sc.cmp, ud-sc.log), then land, tell asm. Orientation fallback + debug kept in blend-scratch/sc-wip-full.patch.
+- Next after these: Suspension root chain (item 2 below), Halter faces (parked: 61 vs 39, needs the rounds' true
+  intersection at the corner), P1b/P1c.
+
+## Earlier (11-21 15:59, thread on the Hello account)
+
+- Landed a9c26c41c isaac Fillet 4 (bool told).
+- 1. Impeller P0 (lead: Halter, then Fillet 3's speed, then SUSPENSION-CIRCPAT1).
+  - Landed d2efb9fd (11-21 15:15): run-on end face first among exact ties, deferred overflow check (no-op on main; keeps
+    Fillet 3 at 34/93/60 once bool's mend db41b6bec lands; bool told).
+  - Halter (f29): worktree blend-halter3 = f3end + ce09aaef1 (switch to db41b6bec once landed) + corner_run WIP (7248eb349)
+    + tighten_new_vertices (Fillet 3's tip vertices 2.6e-3 -> 6e-6) + corner trim (a fill's run past a corner kept only
+    inside the neighbouring round, live's convex ridges): fills 1.29 / 1.29 (x 5) + 1.16 / 1.16 (tip) vs live +2.4694 total.
+    Probe bin/zzh3.sh -> logs/zzh5/6.out. The x 5 fills fuse valid when cut by the body first (dv 1.2896 each); both tip
+    fills fail every Boolean (Fuse, Cut, glue, fuzzy: BOPAlgo_AlertBuilderFailed); zzh6 = their tolerances + tightened
+    retries. 79 s per run (live: fast).
+  - 11-21 15:59: without the kept pieces (ZZ_NOKEPT) fills 0.3464 x2 + 0.8313 x2 = 2.355 (live 2.4694) but tip cells
+    lose the body in the Fuse; neighbour-cut first (ZZ_KEPTCUT) 1.047 x2 + 1.05 + 1.09 (too much), tip cells again
+    break the body (add 2 alone: dv -71062). Next: zzh9 (NOKEPT + corner pushed in by ZZ_INTO 0.05 / 0.01 R).
+    Input brep kept: vibex7 ~/agents/blend-keep/halter/in29.brep.
+  - Halter input differs upstream: our tip x 0.957, live 0.097 (live's chamfer extension after Fillet 3 12.67 mm2, ours
+    12.49); the bevel (192x2, v linear across x 5.175..1.325) holds the tip line at x 1.5025 (probe zz_bevel_ext, blend-speed).
+  - Fillet 3 speed (Mac 3.1 s, live 107): op_boolean 640, min_distance 389 (touches), bounding_box 298, split 226 ms.
+  - asm isaac-ball Studio a04711 Chamfer 1 / Fillet 1: upstream first (Extrude 14 Info, Sketch 10 untranslated); asm told.
+- 2. SUSPENSION-CIRCPAT1 (P1): asm-suspension 805e29 Fillet 3 (R2.5, 17 edges) fails. Live
+  live/blend/q-susp-knuckle-f3/: 53/98/46, 393486.60 mm3. Front chain lobe-R40-root(boss R55, concave)-R40 flips
+  convexity at 4 tangent cusps. Live's cusp patch (29.602 mm2) = an R2.5 air ball rolling between the R55 cylinder
+  (extended down to x 17.5) and the R40 round's torus (42.5/2.5), from the crossing A (20, r57.5 @59.4 deg: the root
+  round's end section) to the cusp C (17.5, r55 @43.8), where it vanishes: computed contact lengths 15.869 / 15.649 vs live
+  15.877 / 15.651. So: convex rounds first (cusps as ends), the R40 round cut back by the R55 cylinder (notch under the
+  boss refilled), then the concave root chain on that body (ball rolls plane -> torus, tangent across A). Probe
+  crash_inputs::zz_susp stages (blend-speed, bin/zzsusp.sh -> logs/zzsusp1.out; breps vibex7 ~/tmp/blend/susp-b*.brep).
+  Back patches (4 x 25.287 mm2) from OCCT. Notes blend-scratch/susp/notes.md.
+- 2b. KNIFEHANDLE Fillet 1 (lead, after the current step; unblocks core's land): c2-surf-workshop-knifehandle on
+  origin/core-knifehandle: 1 mm conic (rho 0.5) on the cap face's closed edge; our 64-section closed loft valid, the
+  Boolean invalid, 2.3 s (live 6/10/7, 204 ms). Worktree blend-kh; bin/khf1.sh [host] -> logs/khf1.out (dumps vibex7
+  ~/tmp/blend/khdump).
+- 3. P1b/P1c time limits -> work counts (worktree blend-p1c + p1b/p1c-wip.patch; notes-p1b.md).
+- 4. SPEED-MUTUALTRIM-FILLET1 (low). 5. c2-opt-fillet-partial-asym-smooth Fillet 2. 6. P2
+  c2-curve-pattern-composite Fillet 2. P2 FILLET-FAIL-SLOW.
+- Probe/trace worktrees (never land): blend-speed (c44c0240d + f3time2.patch + zz_susp/zz_faces + BODYDUMP),
+  blend-f3time. Cleanup: those, blend-p1c, blend-f850 (uncommitted features.cpp; f850/f3geo/f3end targets removed); vibex7 ~/tmp/blend/{impdump,imd,bd}, ~/agents/blend-speed target; Mac
+  blend-models, blend-mtdump; Mac blend10 back to branch blend-p1c-wip.
+- Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
+
