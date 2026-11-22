@@ -5843,7 +5843,7 @@ fn paste_sketch_centres_the_copy_on_the_origin() {
     assert!((x0 + 20.0).abs() < 1e-6 && (x1 - 20.0).abs() < 1e-6 && (y0 + 15.0).abs() < 1e-6 && (y1 - 15.0).abs() < 1e-6, "{x0} {x1} {y0} {y1}: {p}");
     // Live's L (behaviours "skasm paste sketch corners"): its corner mean lands on the origin, its box centre at
     // (3.28, 1.62).
-    let sk = new_sketch(&mut ctx, "paste_centred.noshape", "plane:front");
+    let sk = new_sketch(&mut ctx, "paste_centred_l.noshape", "plane:front");
     let corners = [[-16.70, -13.60], [23.26, -13.60], [23.26, -3.23], [-6.56, -3.23], [-6.56, 16.83], [-16.70, 16.83]].map(|[x, y]| [x + 10.0, y + 5.0]);
     for i in 0..6 {
         call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [corners[i], corners[(i + 1) % 6]] }));
