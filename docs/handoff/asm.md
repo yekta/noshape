@@ -5,86 +5,44 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 11:56 UTC) — RESUME HERE
-- LANDING the whole stack in one land.sh (rebased on main 06:4x): f3a8ff93 welding (33829c47 failed only on dx's
-  flaky prefs images_library test; dx fixes it order-free), the outline band / triad drag commits, 55f3ff11 followers +
-  Replicate seed, e658bb03 assembly config row menu (config_edit_option for assemblies, AGENT_API regenerated, filter
-  row 44/30 px), 806b1fcf qa workflow 24 / 25 / 40 / 08 feel (explode step dialog in ui_state + Distance mark + title,
-  instance pick in explode, triad on the exploded part, hollow hover, explode dash (LineSegment::EXPLODE_LINE 2048);
-  Limits Tab (DialogTab / FocusNavbar -> mate_tab: select all, commit the box left); coplanar pick tie (lead: free,
-  later inserted; `coplanar_tie`); graphics menu Open linked document + Where used for X…; world target), TICKETS.
-  Checks on vibex7 (r3..r7-1122.log in /root/asm-scratch): clippy 0, the new tests, ops e2e, coverage, PS
-  hover_matrix 71/71, render 16/16. After landing: tell qa the main sha (all the rows above + MANIPULATOR-RING).
-- Scissor on main DONE 07:18 (vibex8 ~/agents/asm-keep/sc-main-1122.out): 207/239 occ, 16/34 mates, BOM 62/87; the
-  fed22d regression is gone (Extrude 18 OK, no bisect). blend told: 9cbb0e Fillet 23 (+2/6/18/19), 665cf3 Fillet 4
-  (+1/2/5), fed22d Fillet 4/5/24/25 still fail.
-- Infento rerun with the welding fix timed out at 7200 s in the mate checks (121 checked, ~32 s each on a loaded
-  vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
-- a8722d2a FAILED 09:27 (e2e a_moved_instance_brings_its_mated_followers: solve_placed's moved-part-alone trial snapped a
-  Fastened part back). Fixed: followers solved first (fol2.log: e2e 281, assembly 168, assembly-ui 172, clippy 0).
-  QUEUED c4395d69 (22 commits, 10:0x: the a8722d2a stack + fix + Isolate + result store + TICKETS dedupe): don't land
-  again till it lands; then tell qa the sha (all workflow rows + MANIPULATOR-RING + ISOLATE) and psui (Isolate's PS half).
-- ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1) COMMITTED 2b04436c8 (r9-1122.log green; land after a8722d2a):
-  app-core isolate_ui: ☐ Show internal geometry above Select transparent geometry (28 px rows, 220 × 231 as live
-  ps-panel), Isolate's slider a plain line "Adjust opacity"; `isolate_alpha` (0 = not drawn .. 0.9, ticked x0.55);
-  `remembered_knob` / `remember_knob`: one knob per box state, an App global shared by both studios, saved in
-  feature_settings view:isolateOpacity(Internal), start 30 %. Assembly: ui.iso_internal, AsmSceneOptions.front_internal
-  (isolated meshes drawn again over_transparent; dimmed edges hidden_only at 8 %; knob 0 = dimmed not drawn). Part
-  Studio: Isolation.show_internal, the same knob, SceneOptions front_bodies / faint_through_bodies; Isolate's look is
-  now live's (old iso_look Ghost..Hidden kept for Make transparent only). Test isolate_shows_internal_geometry; PS
-  tests 231 px / 30 %. Make transparent unchanged (legend track). Tell psui + qa when it lands (TICKETS row on main
-  line ~432: mark after the land rebase).
-- SPEED-ASM-OPEN IN PROGRESS (lead 07:5x ruling: the assembly open uses stored studio results and regenerates behind,
-  never a stale cache; reuse dx's code, one cache; measure scissor / infento / isaac to first frame and interactive
-  before / after). (1) COMMITTED b61bfc67b (r9 green): AssemblyEvaluator::set_result_store (core's result_store, RegenOptions.store for every
-  studio regen + persist::keep), app-core DocModel uses ops derived::assembly_evaluator_with_store; test
-  part_studio_regenerations_are_kept_across_sessions. (2) display_cache::studio_key in b61bfc67b (PS uses it). Next, after the
-  timings: an after app is building on vibex8 (~/tmp/asm/app-b/noshape, log /root/asm-scratch/build-app-b.log); the assembly reads studio StudioDisplay rows for
-  its first frame when its own row is missing; dx: WRITE a row only if built by the same mesher/tolerance as the PS's
-  for that fine level, else read-only. Before timings: vibex8 ~/agents/asm-keep/asm-open-times.sh (green 604e9158 app
-  at ~/tmp/asm/app/noshape, assembly tab seeded via last-viewed.json; out ot-before.out); isaac saved doc building (vibex8 ~/tmp/asm/isaac, /root/asm-scratch/isaac-save.sh); after run ot-after.out.
-- STORE MISS FOUND + FIXED: COMMITTED 6c5d2de2c (local, land after c4395d69): persist::encode_result failed silently
-  ("key must be a string") for any Context with a BTreeMap<BodyId,_> (part_appearance, placements, sheet_metal(_flats),
-  frame_members); now `#[serde(with = "pairs")]` (context.rs) + test model regen::a_regeneration_with_part_keyed_maps_is_kept
-  (pairs.log green, 14 regen tests). Infento probe: 25 studios 57.7 s -> 3.2 s from the store; core told. Keys were equal
-  across processes. The rest of the assembly evaluate stays 19-21 s (EVAL2 = second evaluate in-process, in probe3).
-- UNCOMMITTED, DO NOT COMMIT: probe_store_keys in crates/ops/tests/assembly_perf.rs and probe_list_viewport_hover_cells
-  at the end of crates/assembly-ui/src/assembly_feel_tests.rs (`#[ignore = "probe"]`; remove that fn only, keep the
-  test above it). Revert assembly_perf.rs with git checkout once probe3 is read.
-- HOVER MATRIX (lead P0; live/asm/hover-list-1122/index.md, behaviours "psui / asm list × viewport hover matrix"):
-  ours (probe frames /root/asm-scratch/hl/*.png, vibex7 ~/tmp/asm/hl) = live on row hover silhouette #ffc685 (2 device
-  px), geometry hover #ffc20e silhouette, selected instance #f0b648 / #ffc04c, face select #e6a423 / #ffa90a, rows
-  #def1fb / #b2ddf6 / eye / name tip, Origin row lights nothing, graphics hover lights no row, Ctrl+click row = menu,
-  Area in status. ONE gap fixed UNCOMMITTED in assembly_view.rs: `manip_seen` (a triad that appears/moves under a still
-  pointer stays unlit until it moves; live a04) + test a_face_clicks_triad_stays_unlit_until_the_pointer_moves.
-  Checking: feel_tests:: run on vibex7 (/root/asm-scratch/hl2.log). Green -> commit (without the probe fn), TICKETS row +
-  interaction-feel "Hover × selection" assembly list cells; tell qa to score after the land. Not checked: suppressed-row
-  hover (ours draws nothing: no geometry) and Meta+click (ours: plain click adds already).
-- RUNNING at compaction: (a) probe3 perf on vibex7 (/root/asm-scratch/probe3.log; perf at ~/tmp/asm/probe.perf):
-  where the 19-21 s assembly evaluate goes with all studios stored. (b) ot2 on vibex8 (/root/asm-scratch/ot2.log,
-  ~/agents/asm-keep/ot2-{before,after}.out): app-b rebuilt 11:35 with 6c5d2de2c; isaac (tab 3a4877d94b7a7378, doc
-  ~/tmp/asm/isaac/asm-isaac-ball.noshape) on the old app ~/tmp/asm/app and on app-b, infento on app-b; via slot.
-  Then report the lead (<=3 lines): scissor below + infento + isaac cold/reopen first frame and interactive.
-  dx told 10:5x about infento's 1.7-2 s display key.
-- SPEED-ASM-OPEN timings (vibex8 loaded, ot-before.out / ot-after.out, ~/tmp/asm/ot-{before,after}/<doc>/*.log):
-  scissor reopen to interactive (full model frame) 144 / 172 s -> 53 / 63 s (assembly eval 90-98 -> 28-30 s; features
-  run 722 -> 219); cached first model frame 1.5-1.6 -> 1.0-1.1 s. infento NO gain (307 of 328 features rerun, 52-58 s):
-  store keys miss across sessions; probe on vibex7 (uncommitted probe_store_keys in ops tests/assembly_perf.rs, DO
-  NOT COMMIT; /root/asm-scratch/probe.sh, probe.log). infento's cached frame waits 1.7-2.0 s on "display key"
-  (dx's key hashes the whole 400 MB document's JSON).
-- SPEED-ASM-OPEN profile (perf, vibex8 ~/tmp/asm/speed): the scissor open is the Part Studio regenerations, OCCT
-  geometry (BSplCLib::Bohm 6.8 %, BSplSLib::RationalDerivative 3.7, Extrema_GenExtPS / math_FunctionSetRoot,
-  IntPatch walking, BRepGProp); no mate-solver frames. 2x of live needs the open to show stored studio results
-  (DECISIONS 11-21 display cache, dx) and regenerate behind: decision for the lead.
-- Next: then xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5,
-  tvc 41/43, keyboard BOM 15/16.
+## State (2026-11-22 13:15 UTC) — RESUME HERE
+- QUEUED 22f626c1 at 13:1x (8 commits; check `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
+  --status`, never land again while it is queued): rebased on main after c4395d69 LANDED as 1420a57e (12:28; qa + psui
+  told). The stack: 3fd2746a0 store pairs (was 6c5d2de2c), 18f6bc731 triad unlit under a still pointer (hover-list-1122),
+  4b36e7406 drag feel (ground glyph + Undo greyed), 22f626c18 TICKETS (two closed FEEL-DRW rows a stale commit re-added,
+  dropped), handoffs. 66b410ee skipped in the rebase (on main as 692c39370). When it lands: tell qa the sha (hover-list
+  and drag-feel cells in interaction-feel.md, FEEL-ASM-TRIAD-STILL-POINTER, FEEL-ASM-DRAG-UNDO, FEEL-ASM-FIXED-GLYPH).
+- DRAG FEEL (lead P0, live/asm/drag-feel-1122/index.md): DONE in 4b36e7406, feel_tests 29/29 + assembly drag tests green
+  on vibex7. Ground glyph `asm_scene::GroundGlyph` (in the face's plane, static where the drag started,
+  `ground_glyph_at`, `ui.ground`); the old screen icon at the cursor removed (no-drop cursor kept). Undo greyed while a
+  non-fixed instance drag runs (`history_state`). New tests: a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started,
+  Undo asserts in a_dragged_part_shows_no_hover_until_released, assembly a_slider_drag_follows_the_pointer_on_screen_in_an_iso_view.
+  Open: the glyph's offset from the pointer (live's box 522..558 x 430..446 with the pointer ~(500,446) at its
+  appearance; ours centred on the point under the pointer) -> qa scores, or ask live.
+- HOVER MATRIX (live/asm/hover-list-1122): DONE in 18f6bc731 (`manip_click`: set at ToolDown/Click with the triad before,
+  cleared by a pointer move or ToolDrag; draw-only). Open cells: list-hover delay (live 880-1030 ms; ours not
+  measured), Meta / Shift+click rows.
+- SPEED-ASM-OPEN timings REPORTED to the lead 12:5x (vibex8 ~/agents/asm-keep/ot2-{before,after}.out): reopen full
+  model Isaac 36.1-36.7 s -> 6.7-7.7 s, infento 12.9-13.3 s (studios 57.7 -> 3.2 s), scissor 144/172 -> 53/63 s; cached
+  first frame 0.7-1.8 s; cold unchanged (noise).
+- INFENTO REST (next after the land): the evaluate is 13-20 s, all in ONE solver group (114 free bodies, 161 terms: 74
+  Fastened, 61 Planar, 14 Revolute, 5 Cylindrical, 4 Parallel, 1 Slider, 2 relations -> tree_order/place_blocks refuse
+  it, relations). LM 24-29 ms; least_change 11-15 s (12 rounds of a 684x684 symmetric_eigen). AND a parity bug
+  (TICKETS ASM-OPEN-TYRES-TURNED P1): the open moves "Large wheel tyre <1>/<2>" 1.6 m and turns them pi: Fastened mates
+  MateId(197) (instances 38/37) and MateId(216) (51/52) read pi off the saved poses. Fix that first (our connector
+  frames vs live's: flip / reorient / which face), then least_change speed (e.g. skip when start residual within the
+  bound, or reuse the eigendecomposition). Probe instrumentation saved as /root/asm-scratch/probe-instrumentation.patch
+  (git apply; DO NOT COMMIT: eprintln PHASE/GROUP/LM/START/BIGMATE in eval.rs + solver.rs, MOVED in ops
+  tests/assembly_perf.rs probe_store_keys); run /root/asm-scratch/probe4.sh via rb.sh vibex7 (doc vibex7
+  ~/tmp/asm/infento-saved.noshape, store ~/tmp/asm/probe-store, tab 6243c2e4dc39b669). perf is blocked on vibex7
+  (perf_event_paranoid 4); gdb sampling didn't work.
+- Next after that: the first frame from studio StudioDisplay rows (dx: write only if same mesher/tolerance); infento
+  parity rerun on main (10800 s); xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5, tvc
+  41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
-  weld/w0-p*.noshape and ~/tmp/asm/q copies; vibe2 ops-tc / ab1120e-*.out; local branch asm-rb-check.
-- Live triad (behaviours "assembly triad depth", live/asm/triad-depth-1122/): not depth-tested; selected band / vertex
-- transform-carry HELD (/root/asm-scratch/transform-carry.patch): its extra failures are the same Base mates.
-- Suspension d986b3 Ball 1/2: both ends one face in 805e29; likely 805e29 Fillet 3/4 (blend SUSPENSION-CIRCPAT1).
-- Infento main: 157/167 occ, 204/206 mates, 64/64 BOM; the 5 Wheel 7inch are deleted elements in live (not the gap).
-- Gear 184ad0: bool's fix queued 21754bd8 (helical sweep start cap right-handed; OK 2466.975 mm3, live 2466.978).
+  weld/w0-p*.noshape, ~/tmp/asm/q, ~/tmp/asm/app-b + app; vibe2 ops-tc / ab1120e-*.out; local branch asm-rb-check;
+  /root/asm-scratch/feel_tests_with_probe.rs.
+- Infento main: 157/167 occ, 204/206 mates, 64/64 BOM. Scissor main 07:18: 207/239 occ, 16/34 mates, BOM 62/87.
 
 ## State (2026-11-20 18:50 UTC)
 
