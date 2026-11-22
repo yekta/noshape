@@ -1107,6 +1107,8 @@ impl PartStudioView {
 
     fn sketch_hover(&mut self, gpu_id: Option<u32>, vp: &Entity<Viewport>, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if let Some(at) = self.ui.sketch_hover_held_at {
+            // Kept for the move that ends the hold: the pick may stay the same id, which the viewport says only once.
+            self.ui.sketch_gpu_hover = Some((gpu_id, None));
             self.hold_sketch_hover(at);
             self.refresh_scene(false, cx);
             return true;
@@ -1297,7 +1299,8 @@ impl PartStudioView {
             }
             ViewportEvent::Hover(gpu_id) => self.sketch_hover(*gpu_id, vp, window, cx),
             ViewportEvent::PointerMove { position, modifiers } => {
-                if self.ui.sketch_hover_held_at.is_some_and(|h| h.distance(*position) > 0.5) {
+                let released = self.ui.sketch_hover_held_at.is_some_and(|h| h.distance(*position) > 0.5);
+                if released {
                     self.ui.sketch_hover_held_at = None;
                 }
                 let Some(p) = to_plane(self, *position, cx) else { return false };
@@ -1378,7 +1381,7 @@ impl PartStudioView {
                         && this.sketch_data(cx).is_some_and(|d| this.sketch.as_ref().is_some_and(|ed| !ed.takes_plane_faces(&d)))
                 };
                 if let Some((gpu, resolved)) = self.ui.sketch_gpu_hover
-                    && (self.sketch_hover_id(gpu, cx) != resolved || by_outline(self, resolved))
+                    && (released || self.sketch_hover_id(gpu, cx) != resolved || by_outline(self, resolved))
                 {
                     self.sketch_hover(gpu, vp, window, cx);
                 }
