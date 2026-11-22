@@ -2455,15 +2455,23 @@ static TopoDS_Shape apply_band_merges(const TopoDS_Shape& s, const std::vector<B
   for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
     if (!after.Contains(x.Current()))
       changed.push_back(x.Current().Reversed());
+  const double dv = faces_volume(changed);
+  // The solid's volume only where the box doesn't settle it: a change under 1e-12 of the box's diagonal cubed is the
+  // integrals' noise, as usd_kept_volume's (c2-gamma-imported's Boolean 1, 2805 faces: 180 ms, its merges 1e-19).
   if (vol < 0)
   {
-    GProp_GProps g0;
-    BRepGProp::VolumeProperties(s, g0);
-    vol = g0.Mass();
+    Bnd_Box box;
+    BRepBndLib::Add(s, box, false);
+    const double diag = box.IsVoid() ? 0 : std::sqrt(box.SquareExtent());
+    if (std::abs(dv) > 1e-12 * diag * diag * diag)
+    {
+      GProp_GProps g0;
+      BRepGProp::VolumeProperties(s, g0);
+      vol = g0.Mass();
+    }
   }
-  const double dv = faces_volume(changed);
   // (Within the integration's noise: a seam moved round a torus cap reads 2e-7 apart, the PEM FH4 stud's.)
-  if (std::abs(dv) > 1e-6 * std::abs(vol))
+  if (vol >= 0 && std::abs(dv) > 1e-6 * std::abs(vol))
     return {};
   if (hist.IsNull())
     hist = new BRepTools_History();
@@ -2482,7 +2490,8 @@ static TopoDS_Shape apply_band_merges(const TopoDS_Shape& s, const std::vector<B
       h->Remove(e);
   }
   hist->Merge(h);
-  vol += dv;
+  if (vol >= 0)
+    vol += dv;
   return out;
 }
 
