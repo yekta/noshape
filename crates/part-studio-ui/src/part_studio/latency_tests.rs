@@ -44,8 +44,13 @@ const TARGETS: [Target; 9] = [
 
 /// The 30-feature part in a test window drawing real frames, regenerated and shown.
 fn thirty_features(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    perf_document(cx, "live-30-features")
+}
+
+/// tests/perf/<name>.noshape in a test window drawing real frames, regenerated and shown.
+fn perf_document(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
     RENDERING.set(true);
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/live-30-features.noshape");
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../tests/perf/{name}.noshape"));
     let (window, view) = part_studio_with(cx, "latency", |path| {
         std::fs::copy(&src, path).unwrap();
         crate::session::Session::open(path).unwrap()
@@ -243,5 +248,63 @@ fn everyday_interactions_beat_live_on_the_30_feature_part(cx: &mut TestAppContex
     }
     report.push(format!("average pick: {:.1} ms", cx.update(|cx| pointer.vp.read(cx).average_pick_ms())));
     eprintln!("{}", report.join("\n"));
+    assert!(slower.is_empty(), "slower than half of live's time: {slower:?}");
+}
+
+/// Two points of the view lighting different things: tried on a grid round the view's centre, each after a rest.
+fn two_lit_points(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, pointer: &Pointer) -> (DVec2, DVec2) {
+    let size = cx.update(|cx| pointer.vp.read(cx).size());
+    let mut first: Option<(DVec2, _)> = None;
+    for (i, j) in [(0, 0), (1, 0), (0, 1), (-1, 0), (0, -1), (2, 1), (-2, -1), (1, 2), (-1, -2), (3, 0), (0, 3)] {
+        let at = size / 2.0 + DVec2::new(i as f64, j as f64) * (size.min_element() / 10.0);
+        move_to(cx, window, pointer, at);
+        pump(cx, window, view, Duration::from_millis(400));
+        let Some(lit) = cx.update(|cx| view.read(cx).hover.clone()) else { continue };
+        match &first {
+            None => first = Some((at, lit)),
+            Some((a, h)) if *h != lit => return (*a, at),
+            Some(_) => {}
+        }
+    }
+    panic!("no two points lighting different things");
+}
+
+/// Live's pre-highlight on heavy Part Studios (live 11-21 "qa 20:18 (1)", software GL Chrome): the 806-face plate's top
+/// face 42-53 ms, a side face 299-361 ms; the 1000-part Part Studio's face ~266 ms. Ours: a face lit after live's
+/// approach (8 moves 16 ms apart), the same as on the 30-feature part, at points across the part.
+#[gpui::test]
+#[ignore = "T2: wall-clock timing; a release build on a quiet machine (the Mac)"]
+fn a_face_lights_on_heavy_part_studios(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let mut report = Vec::new();
+    for (name, live_ms) in [("big-plate", 53.0), ("parts-1000", 266.0)] {
+        let (window, view) = perf_document(cx, name);
+        let pointer = Pointer::new(cx, window, &view);
+        let (a, b) = two_lit_points(cx, window, &view, &pointer);
+        for k in 0..40 {
+            move_to(cx, window, &pointer, a + DVec2::new(k as f64 * 1.5, 0.0));
+            pump(cx, window, &view, Duration::from_millis(16));
+        }
+        let mut ms = Vec::new();
+        for i in 0..RUNS * 2 {
+            let (from, at) = if i % 2 == 0 { (b, a) } else { (a, b) };
+            pump(cx, window, &view, Duration::from_millis(200));
+            let before = cx.update(|cx| view.read(cx).hover.clone());
+            for k in 1..8 {
+                move_to(cx, window, &pointer, from + (at - from) * (k as f64 / 8.0));
+                pump(cx, window, &view, Duration::from_millis(16));
+            }
+            let win = pointer.window_point(cx, at);
+            ms.push(timed(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default()), |cx| {
+                let v = view.read(cx);
+                v.hover.is_some() && v.hover != before && v.ui.scene_task.is_none() && pointer.vp.read(cx).hover_settled()
+            }));
+        }
+        let m = median(ms.clone());
+        report.push((name, m, live_ms, format!("{name}: a face lit {m:.1} ms median (live {live_ms} ms), average pick {:.1} ms (runs: {})", cx.update(|cx| pointer.vp.read(cx).average_pick_ms()), ms.iter().map(|x| format!("{x:.1}")).collect::<Vec<_>>().join(" "))));
+        cx.update_window(window, |_, w, _| w.remove_window()).unwrap();
+    }
+    eprintln!("{}", report.iter().map(|r| r.3.as_str()).collect::<Vec<_>>().join("\n"));
+    let slower: Vec<_> = report.iter().filter(|r| r.1 > r.2 / 2.0).map(|r| r.0).collect();
     assert!(slower.is_empty(), "slower than half of live's time: {slower:?}");
 }

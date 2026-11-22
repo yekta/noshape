@@ -288,6 +288,7 @@ fn route_frames(r2: Arc<Mutex<Routes>>) -> impl Fn(Completed) + Send + 'static {
         let (target, seq, result) = match done {
             Completed::Frame { target, seq, result } => (target, seq, result),
             Completed::Pick { target, token, result } => {
+                frame_log("pick_read");
                 let sender = r2.lock().pick_senders.get(&target).cloned();
                 if let Some(tx) = sender {
                     let _ = tx.try_send((token, result.map(Arc::new).map_err(|e| e.to_string())));
