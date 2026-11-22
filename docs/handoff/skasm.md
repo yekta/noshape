@@ -1,28 +1,37 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 15:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 15:41 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 15:05 UTC): P0 sketch column of live psui/sel-gestures-1122 (lead)
-- Split with psui: psui has the Part Studio + assembly columns, the box's look and the sketch rows in
-  sketch_box_feel_tests.rs (Esc over the menu / with two keeps, Space clears, same window = no change, Shift window adds;
-  they dropped "Ctrl window removes" for me). Long press: live longpress-1122 = a release selects only if held < ~0.5 s
-  (<= 504 ms selects, >= 533 nothing), same on a sketch line. psui adds app-core Viewport `long_press_cancels:
-  Option<Duration>` (Part Studio 520 ms) for Drag::Pending(Left) clicks only; sketch picks via ToolDown/ToolUp
-  (press_on_capture_pick / tool_captures_left) are mine once psui's change is on main.
-- Done in my tree (landing): sketch_gesture_feel_tests.rs (mod sketch_gesture in sketch_ui_tests.rs; ~/tmp/skasm/sg.sh on
-  vibex6): boxes as live (window right part -> 1 line; window round it + circle; Ctrl window removes; crossing + circle ->
-  circle + 3) and ` over a sketch line -> "Edge of Sketch 1" first, "Face of Sketch 1" behind. Fixes: sketch-mode ` and the
-  sketch menu's Select other… open the shared panel (sketch.rs sketch_select_other: the open sketch's curves/points first,
-  its regions at the plane's depth, its own plane skipped; choosing one toggles ed.selection / selected_regions); the
-  labeler names a feature being created; a sketch box's Ctrl comes from ToolUp's modifiers (control || platform), and
-  Ctrl+press on nothing lit starts the box (ui.sketch_ctrl_press: unmoved release opens the menu, as before on a lit
-  entity at press). part-studio-ui 478/478, then all sketch tests 426/426 with the Ctrl change. Live lists "Face of Sketch 3" twice (unknown why; we list it once).
-  A circle centred level with the Origin adds a construction Origin point a window takes: not asked of live yet.
-- CI 45022206585 (Windows): e2e paste_sketch_centres_the_copy_on_the_origin reused paste_centred.noshape for its second
-  sketch: now paste_centred_l.noshape (same batch).
-- QUEUED 13f38500 (carries cad1ad91: saved Rip/Unfold/Refold via Ctx::saved_features, qClosestTo vertices); 94a986b1
-  LANDED 14:40 as 32578a95. Watcher polls land.sh --status for 13f38500.
+## In flight (11-22 15:41 UTC), UNCOMMITTED in agent/skasm
+- cov2-frame-corners (my SM firsts, item 1), crates/model-core/src/regen/features/frames.rs; trace with
+  ~/tmp/skasm/ut3x.sh <doc> on vibex6 (/root/skasm-scratch/bin/ut3x.sh, release ops --test all, log
+  /root/skasm-scratch/fc-run.log). c2-cov2-frame-corners-trim-endcap-gusset 17/23 -> 22/23 so far:
+  - Trim group: k::unify_edges after the cut (names through ev.name_result): Part 12 64 edges as live. MATCHES.
+  - End cap circle: the signal 11 was k::offset_wire_2d on a lone circle; now the circle is built at radius + grow (no
+    wire offset; err_at offsetDistance if <= 0), manipulator base moved back by grow. Radius as std
+    generateProfileCircle: farthest point of the second-largest loop (box diagonal) when there are more, else the outer.
+    MATCHES.
+  - Gusset offset: std getOffsetDirection = the LAST edge's tangent for every gusset (`along`, first of refs.rev()).
+    Gusset offset flipped MATCHES.
+  - Gusset aligned flips (last diff, Part 19 y 12.86..22.86 vs live 22.86..32.86): JUST EDITED, NOT RUN: std
+    getAlignedOffset = first edge's line meets the alignment edge's line (closest point, `aligned` vector); extrude from
+    there back towards the edge middle, Flip away (s0 = s_al if away else s_al - th, away = (s_al >= 0) == flip).
+    Next: rerun ut3x.sh on the doc, then fr.sh (clippy model-core+ops, model sheetmetal_frames + std_oracle, ops lib
+    ui_parity::tests) on vibex6, commit "skasm: …" and land.
+- qa P2 UIS-ASM-START-FIRST-INSTANCE (same batch, crates/ops/src/ui_parity.rs build_assembly): name = made["instance"]
+  (inst:N of the one inserted; made["instances"] is the whole assembly's list). Test
+  a_starts_instances_each_take_their_own_place (Part 1 x3: <2> at z 10, <3> fixed). Not run yet (fr.sh). Mark the
+  TICKETS row fixed when landing (grep for duplicate rows first).
+- QUEUED 0cc55505: sketch gesture cells (sketch_gesture_feel_tests.rs: boxes, Ctrl window removes, ` = shared
+  Select other panel with the sketch's curves first, regions + planes by depth, own plane skipped; Ctrl+press on nothing
+  starts a box, unmoved release opens the menu, ui.sketch_ctrl_press) + CI 45022206585 e2e scratch name
+  (paste_centred_l.noshape). Watcher task polls land.sh --status for 0cc55505. 13f38500 LANDED 15:17.
+- Sketch long press: live = a release selects only if held < ~0.5 s (<= 504 ms selects, >= 533 nothing), same on a
+  sketch line. psui adds app-core Viewport `long_press_cancels` (Part Studio 520 ms) for Drag::Pending(Left) clicks;
+  sketch ToolDown/ToolUp picks (press_on_capture_pick / tool_captures_left) are mine once psui's change is on main.
+- Open: live lists "Face of Sketch 3" twice in sketch Select other (we list once); a circle centred level with the
+  Origin adds a construction Origin point a window box takes (not asked of live).
 - Model suite 14:2x (vibex6, suite-1122b.log): 130/188 docs, 2021/2680 features; no doc's first difference is a sketch.
 - REQUESTS: 12:32 length box side + midpoint vs crossing (live, open); 14:30 c2-constrained-surface refs (live, open).
 - After the gesture cells: my SM firsts: cov2-frame-corners (Trim group Part 12 66 vs 64 edges; End cap circle offset
