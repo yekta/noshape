@@ -378,3 +378,41 @@ fn along_line(cx: &mut TestAppContext, view: &Entity<PartStudioView>, line: nosh
         v.viewport.read(cx).project(ed.frame.to_world(a + (b - a) * 0.4)).expect("on screen")
     })
 }
+
+/// Live (behaviours "skasm point glyph placement", qa SKETCH-SELECTED-GLYPH-OFFSET): Show constraints off, a selected
+/// corner's glyph sits straight above it, its centre ~40 px up and +4..+9 px right, in screen space; with Show
+/// constraints on it keeps its box up-left of the point (behaviours 22938).
+#[gpui::test]
+fn a_selected_points_glyph_sits_above_it(cx: &mut TestAppContext) {
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "glyph-point-above", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (750., 420.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // A corner (a point with one Coincident glyph) selected, and where it is in viewport px.
+    let (corner, at) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().expect("sketch mode");
+        let data = v.sketch_data(cx).expect("sketch data");
+        let glyphs = ed.constraint_glyphs(&data);
+        let corner = data.sketch.entities().map(|e| e.id).find(|id| glyphs.iter().filter(|g| g.entity == *id && g.on_point).count() == 1).expect("a corner with one glyph");
+        let p = data.sketch.point(corner).unwrap();
+        (corner, v.viewport.read(cx).project(ed.frame.to_world(p)).unwrap())
+    });
+    let boxes = |cx: &mut TestAppContext, show: bool| {
+        cx.update(|cx| view.update(cx, |v, cx| {
+            let ed = v.sketch.as_mut().expect("sketch mode");
+            ed.set_show_constraints(show);
+            ed.selection = vec![corner];
+            cx.notify();
+        }));
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).ui.glyph_boxes.iter().filter(|b| b.1 == corner).map(|b| DVec2::new(f64::from(b.2) + 10.0, f64::from(b.3) + 10.0) - at).collect::<Vec<_>>())
+    };
+    let off = boxes(cx, false);
+    assert_eq!(off.len(), 1, "{off:?}");
+    assert!((3.0..=9.0).contains(&off[0].x) && (off[0].y + 40.0).abs() <= 1.5, "centred above the point: {off:?}");
+    let on = boxes(cx, true);
+    assert!(on.iter().any(|c| (c.x + 17.0).abs() <= 0.5 && (c.y + 16.0).abs() <= 0.5), "up-left with Show constraints on: {on:?}");
+}

@@ -4630,7 +4630,7 @@ impl PartStudioView {
             // Dragged glyphs sit centered on their stored offset. Live
             // (sketch/28; SKETCH-GLYPH-LAYOUT-LOST, 45690459 re-applied):
             // 20 px white boxes 22 px apart; a line's row is centred 20.5 px
-            // off its midpoint, a point's glyph sits up-left of it (top-left
+            // off its midpoint, a point's glyph (Show constraints on) sits up-left of it (top-left
             // at -27, -26) with a leader.
             let mut leader = false;
             let mut hang = false;
@@ -4651,7 +4651,11 @@ impl PartStudioView {
                     let n = counts.get(&g.entity.0).copied().unwrap_or(1) as f32;
                     let kf = *k as f32;
                     *k += 1;
-                    if g.on_point {
+                    if g.on_point && !show_all {
+                        // Show constraints off: a centred row straight above the point, ~40 px up, in screen space
+                        // (live, behaviours "skasm point glyph placement": 1 glyph (+4..+9, -39), 2 (-11 / +11, -39)).
+                        (x, y, -6.0 - 11.0 * (n - 1.0) + 22.0 * kf, -50.0)
+                    } else if g.on_point {
                         leader = true;
                         (x, y, -27.0 - 22.0 * kf, -26.0)
                     } else if let Some((nx, ny)) = line_side(g.entity) {
