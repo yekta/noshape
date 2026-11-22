@@ -29,8 +29,12 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   10 a hovered unselected table shows the selected grips (drawing_extra table_grip_overlay).
   Tests (feel.rs): a_lit_centerline_stays_dashed, the_dimension_tool_lights_a_centerline_from_8_px,
   the_hover_box_pads_the_glyphs_as_live, a_hovered_table_shows_its_grips.
-  b17 GREEN (check clean, drawing-ui lib 168/168, scene drawing_tools 11/11): committed + land.sh (see --status).
-- Open, to the lead / studios: 4 Note tool on a centerline (hourglass #ffac7f at 8 px = a leader attached to a
+  b17 GREEN (drawing-ui 168/168, scene drawing_tools 11/11): QUEUED fa3f2f31 14:5x (check land.sh --status; a failure is next).
+- 15:2x: lead relayed items 4 / 8-reach / 11 to studios. 5-region hatch angles: REQUESTS dx 15:21 (live, B1-B6 ->
+  live/dx/hatch5-1122/); model the rule when it is in (build.rs section_part_hatches).
+- NEXT (lead 15:2x): data exchange, drawings DXF rows vs live (In flight item 1 below): rerun the drawing DXF rows on
+  main (exch.sh), then per doc dxfdiff.py ours vs live (sm-louver MTEXT 52/54 and ELLIPSE 96/86 first).
+- Was open, to the lead / studios: 4 Note tool on a centerline (hourglass #ffac7f at 8 px = a leader attached to a
   centerline: needs a model reference, not there); 8 reach from the live-sized box (<8 px) vs studios' D1 tests;
   11 no-tool centerline reach live 7 px (ours lit at 6: SELECT_LINE_REACH_PX 7 exclusive is shared with views/edges).
 
