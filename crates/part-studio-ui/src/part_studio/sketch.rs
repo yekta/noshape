@@ -1660,7 +1660,7 @@ impl PartStudioView {
         let f32v = |p: glam::DVec3| [p.x as f32, p.y as f32, p.z as f32];
         let mut fill = noshape_render::MeshData::default();
         let mut ink = noshape_render::MeshData::default();
-        let mut quad = |m: &mut noshape_render::MeshData, (x0, y0, x1, y1): (f64, f64, f64, f64)| {
+        let quad = |m: &mut noshape_render::MeshData, (x0, y0, x1, y1): (f64, f64, f64, f64)| {
             let base = m.positions.len() as u32;
             for (x, y) in [(x0, y0), (x1, y0), (x1, y1), (x0, y1)] {
                 m.positions.push(f32v(centre + u * x + v * y));
