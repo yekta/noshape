@@ -124,6 +124,9 @@ pub struct SourceModel {
     /// Assemblies: the Reference designator (Instance properties) of each
     /// body's top-level instance (callouts' `{instance.designator}`).
     pub designators: HashMap<BodyId, String>,
+    /// Per solid body: its part as (Part Studio tab, place among the studio's parts), shared by every instance of the
+    /// part. A section's hatch angles follow it.
+    pub part_order: HashMap<BodyId, (u64, usize)>,
 }
 
 /// One row of a Structured BOM.
@@ -415,7 +418,8 @@ fn studio_model(ps: &PartStudio, name: &str, hash: u64, context: Arc<Context>) -
             _ => None,
         })
         .collect();
-    SourceModel { hash, context, name: name.to_string(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new(), designators: HashMap::new() }
+    let part_order = context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).enumerate().map(|(i, b)| (b.id.clone(), (0, i))).collect();
+    SourceModel { hash, context, name: name.to_string(), assembly: false, parts, bom: vec![], bom_structured: vec![], bom_columns: vec![], bom_cells: vec![], model_annotations: ps.annotations.clone(), own: None, sketch_colors, explode_trails: Vec::new(), designators: HashMap::new(), part_order }
 }
 
 /// A Part Studio source of `doc` from the regeneration its tab already shows
@@ -536,6 +540,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
     let mut parts = Vec::new();
     let mut occ_body: Vec<(usize, BodyId)> = Vec::new();
     let mut designators = HashMap::new();
+    let mut part_order = HashMap::new();
     for (i, o) in result.occurrences.iter().enumerate() {
         // Inserted sketches come as wire bodies (drawn only with Show
         // sketches; views otherwise show the solids).
@@ -557,6 +562,8 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
         };
         info.body = Some(id.clone());
         parts.push(info);
+        let place = o.context.bodies.iter().filter(|x| x.kind == BodyKind::Solid).position(|x| x.id == b.id).unwrap_or(usize::MAX);
+        part_order.insert(id.clone(), (o.studio.0, place));
         if let Some(d) = o.path.first().and_then(|top| designator_of(doc, *top)) {
             designators.insert(id.clone(), d);
         }
@@ -626,7 +633,7 @@ pub fn assembly_source(doc: &Document, result: &AssemblyResult, hash: u64, name:
     for (i, e) in bom.iter_mut().enumerate() {
         e.item = i + 1;
     }
-    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), bom_columns: Vec::new(), bom_cells: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone(), designators }
+    SourceModel { hash, context: Arc::new(ctx), name, assembly: true, parts, bom, bom_structured: Vec::new(), bom_columns: Vec::new(), bom_cells: Vec::new(), model_annotations: Vec::new(), own: None, sketch_colors: Vec::new(), explode_trails: result.explode_trails.clone(), designators, part_order }
 }
 
 /// Regenerate every source a drawing references (headless helper for
@@ -1381,6 +1388,8 @@ pub struct ViewGeometry {
     /// A section through several parts: where each part's `section_segments` end, in the parts' order (live hatches
     /// each its own way). Empty: one part.
     pub section_part_ends: Vec<usize>,
+    /// The body of each part in `section_part_ends`.
+    pub section_part_bodies: Vec<BodyId>,
     /// Detail crop circle (center, radius) in view coordinates.
     pub clip: Option<([f64; 2], f64)>,
     /// Detail crop polygon (rectangle / polygon / spline profiles), view
@@ -3761,9 +3770,11 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
         g.section_segments.extend(section_segments_of(&faces[start..start + group.len()], frame));
         start += group.len();
         g.section_part_ends.push(g.section_segments.len());
+        g.section_part_bodies.extend(group[0].map(|i| pbs[i].body.id.clone()));
     }
-    if g.section_part_ends.len() < 2 {
+    if g.section_part_ends.len() < 2 || g.section_part_bodies.len() != g.section_part_ends.len() {
         g.section_part_ends.clear();
+        g.section_part_bodies.clear();
     }
     if g.section_segments.is_empty() && full {
         // Fallback: planar section of the original bodies.
@@ -4269,6 +4280,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
     // hatch lines are clipped to the detail circle when the sheet is built.
     g.section_segments = parent.section_segments.clone();
     g.section_part_ends = parent.section_part_ends.clone();
+    g.section_part_bodies = parent.section_part_bodies.clone();
     for a in &parent.axes {
         for piece in clip(&[a[0], a[1]]) {
             if piece.len() >= 2 {

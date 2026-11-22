@@ -795,16 +795,25 @@ pub fn auto_hatch_spacing(segments: &[[[f64; 2]; 2]], poles: &[[f64; 2]]) -> f64
     ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / k).max(0.3)
 }
 
-/// A part's own hatch spacing in a section through several (mm): its cut's sheet box diagonal ÷ 13, as for a view of
-/// several regions (live wf23: the block's lines 14.6 px apart, its two halves' box 172 x 87 px; the pin's 10.6, its
-/// box 43 x 130).
-pub fn part_hatch_spacing(segments: &[[[f64; 2]; 2]]) -> f64 {
-    let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
-    for p in segments.iter().flatten() {
-        lo = [lo[0].min(p[0]), lo[1].min(p[1])];
-        hi = [hi[0].max(p[0]), hi[1].max(p[1])];
-    }
-    ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / 13.0).max(0.3)
+/// Each part's hatch in a section through several, given its part (`part_order`; None: a part of its own): whether its
+/// lines turn 90 degrees (135 instead of 45), and its spacing factor. Live dx hatch-1122: the angles follow the set of
+/// parts, not the insert order, the instances or the sheet: the last part in Part Studio order turned, then not / turned
+/// going back through the order; another copy of a part turned at 0.7 x the spacing, its first copy not turned.
+pub fn section_part_hatches(parts: &[Option<(u64, usize)>]) -> Vec<(bool, f64)> {
+    let keys: Vec<(u64, usize)> = parts.iter().enumerate().map(|(i, p)| p.unwrap_or((u64::MAX, i))).collect();
+    let mut distinct = keys.clone();
+    distinct.sort();
+    distinct.dedup();
+    keys.iter().enumerate().map(|(i, k)| {
+        if keys[..i].contains(k) {
+            return (true, 0.7);
+        }
+        if keys[i + 1..].contains(k) {
+            return (false, 1.0);
+        }
+        let rank = distinct.iter().position(|d| d == k).unwrap_or(0);
+        ((distinct.len() - 1 - rank) % 2 == 0, 1.0)
+    }).collect()
 }
 
 /// The regions a cut's boundary `segments` encloses: its loops (split where two touch, an aligned section's legs at
@@ -2178,14 +2187,17 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 match regions {
                     None if patterned.is_some() => {}
                     None => {
-                        // A section through several parts: each its own hatch (live wf23, block and pin: 45 degree lines
-                        // for the first, 135 for the next, each spaced by its own cut's size).
+                        // A section through several parts: each its own hatch, spaced by its own cut's size (live dx
+                        // hatch-1122: its sheet box diagonal ÷ 9, ÷ 13 for a cut in several pieces as wf23's block).
                         let ends = &geo.section_part_ends;
                         let ends: &[usize] = if ends.len() < 2 { &[segs.len()] } else { ends };
                         let parts: Vec<std::ops::Range<usize>> = (0..ends.len()).map(|i| if i == 0 { 0 } else { ends[i - 1] }..ends[i]).collect();
-                        for (i, part) in parts.iter().enumerate() {
-                            let (part, flipped) = (&segs[part.clone()], i % 2 == 1);
-                            let spacing = if parts.len() > 1 { part_hatch_spacing(part) } else { spacing };
+                        let src = views::view_source(sheet, v.id).and_then(|(key, _)| sources.get(&key));
+                        let order: Vec<Option<(u64, usize)>> = geo.section_part_bodies.iter().map(|b| src.and_then(|s| s.part_order.get(b).copied())).collect();
+                        let styles = if parts.len() > 1 { section_part_hatches(&order) } else { vec![(false, 1.0)] };
+                        for (part, &(flipped, factor)) in parts.iter().zip(&styles) {
+                            let part = &segs[part.clone()];
+                            let spacing = if parts.len() > 1 { (auto_hatch_spacing(part, &[]) * factor).max(0.3) } else { spacing };
                             let l0 = g.lines.len();
                             for l in if flipped { hatch_flipped(part, spacing) } else { hatch(part, spacing) } {
                                 push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
@@ -2662,18 +2674,19 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // scale or user label (live2 positions: SECTION A - A ~3.1 mm, SCALE 2:1 ~5.6 mm below the geometry;
             // drw-auxiliary-view-no-indicator: Auxiliary A - A 20.7 mm under the view's centre, as a section's).
             let aux_label = shown && matches!(v.kind, ViewKind::Auxiliary { .. }) && v.aux_ref.as_ref().is_some_and(|a| !a.letter.is_empty());
-            // A detail's label hangs 5.3 mm under its whole profile, centred on it, clipped border or not (live2
-            // labels-1118: DETAIL A / SCALE 2:1 39.2 mm under the centre of a 2:1 circle of radius 33.9 mm).
+            // A detail's label hangs under its whole profile, centred on it, clipped border or not: under a circle
+            // by 0.1 r + half the label height (live dx hatch-1122: r 10.04 / 25.09 / 39.64 -> 2.53 / 4.03 / 5.49 at
+            // 3.05 mm), under a drawn profile 5.3 mm.
             let profile = matches!(v.kind, ViewKind::Detail { .. }).then(|| match (&geo.clip_poly, geo.clip) {
-                (Some(poly), _) => poly.iter().map(|q| pl.to_sheet(*q)).fold(None, |b: Option<([f64; 2], [f64; 2])>, q| Some(b.map_or((q, q), |(lo, hi)| ([lo[0].min(q[0]), lo[1].min(q[1])], [hi[0].max(q[0]), hi[1].max(q[1])])))),
+                (Some(poly), _) => poly.iter().map(|q| pl.to_sheet(*q)).fold(None, |b: Option<([f64; 2], [f64; 2], f64)>, q| Some(b.map_or((q, q, 5.3), |(lo, hi, gap)| ([lo[0].min(q[0]), lo[1].min(q[1])], [hi[0].max(q[0]), hi[1].max(q[1])], gap)))),
                 (None, Some((c, r))) => {
                     let (c, r) = (pl.to_sheet(c), pl.len_to_sheet(r));
-                    Some(([c[0] - r, c[1] - r], [c[0] + r, c[1] + r]))
+                    Some(([c[0] - r, c[1] - r], [c[0] + r, c[1] + r], 0.1 * r + lh / 2.0))
                 }
                 _ => None,
             }).flatten();
             let (lo, hi, gap) = match profile {
-                Some((lo, hi)) => (lo, hi, 5.3),
+                Some(p) => p,
                 // A section's label top under its lowest geometry: 5.81 mm for a horizontal cut, 3.02 mm for a vertical
                 // one (live2 sec-label-1118, five DXFs: horizontal 5.81 / 5.81 / 5.16, vertical 3.02 / 3.52; neither
                 // the click, the width nor the height alone explains the rest). Auxiliary views as a vertical cut.

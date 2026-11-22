@@ -342,10 +342,15 @@ fn a_section_through_several_parts_hatches_each_its_own_way() {
     assert_eq!(sec.section_part_ends.len(), 3, "two plates and the pin: {:?}", sec.section_part_ends);
     let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
     let hatches = &built.geometry.hatches;
-    // In the parts' order (the assembly's instances: two plates, then the pin).
-    assert_eq!(hatches.iter().map(|h| h.flipped).collect::<Vec<_>>(), [false, true, false]);
+    // By the parts' Part Studio order, not the instances'.
+    let src = sources.values().find(|s| s.assembly).unwrap();
+    let order: Vec<_> = sec.section_part_bodies.iter().map(|b| src.part_order.get(b).copied()).collect();
+    assert!(order.iter().all(Option::is_some), "{order:?}");
+    let styles = build::section_part_hatches(&order);
+    assert_eq!(hatches.iter().map(|h| h.flipped).collect::<Vec<_>>(), styles.iter().map(|s| s.0).collect::<Vec<_>>());
+    assert!(styles.iter().any(|s| s.0) && styles.iter().any(|s| !s.0), "{styles:?}");
     // Each part's hatch lines at its own angle and spacing.
-    for h in hatches {
+    for (h, &(_, factor)) in hatches.iter().zip(&styles) {
         let lines = &built.geometry.lines[h.lines.clone()];
         assert!(!lines.is_empty());
         for l in lines {
@@ -355,8 +360,26 @@ fn a_section_through_several_parts_hatches_each_its_own_way() {
         }
         let box_of = h.loops.iter().flatten().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
         let diag = (box_of.1[0] - box_of.0[0]).hypot(box_of.1[1] - box_of.0[1]);
-        assert!((h.spacing - (diag / 13.0).max(0.3)).abs() < 1e-9, "{} vs {diag}", h.spacing);
+        let k = if h.loops.len() > 1 { 13.0 } else { 9.0 };
+        assert!((h.spacing - (diag / k * factor).max(0.3)).abs() < 1e-9, "{} vs {diag} / {k} x {factor}", h.spacing);
     }
+}
+
+/// Live dx hatch-1122 (assemblies of P1..P4 from one Part Studio, in that order): a section's angle per part follows
+/// the set of parts in Part Studio order; a second copy of a part turned at 0.7 x the spacing.
+#[test]
+fn section_hatch_angles_follow_the_part_studio_order() {
+    let p = |i: usize| Some((7, i));
+    let turned = |parts: &[Option<(u64, usize)>]| build::section_part_hatches(parts).iter().map(|s| s.0).collect::<Vec<_>>();
+    // A2: P1 0, P2 90; A5: the same with P1 moved to the other side.
+    assert_eq!(turned(&[p(0), p(1)]), [false, true]);
+    assert_eq!(turned(&[p(1), p(0)]), [true, false]);
+    // A3, A4.
+    assert_eq!(turned(&[p(0), p(1), p(2)]), [true, false, true]);
+    assert_eq!(turned(&[p(0), p(1), p(2), p(3)]), [false, true, false, true]);
+    assert_eq!(turned(&[p(3), p(0), p(2), p(1)]), [true, false, false, true]);
+    // A6: two copies of P1: one at 0, the other at 90 and 0.7 x.
+    assert_eq!(build::section_part_hatches(&[p(0), p(0)]), [(false, 1.0), (true, 0.7)]);
 }
 
 /// Live asb 10-23 views (4): Edit hatch section restyles one region of the
@@ -4006,8 +4029,8 @@ fn exact_export_clips_detail_views_to_their_circle() {
     }
 }
 
-/// Live2 labels-1118 (drw-detail-view-clip-border.dxf): a detail's label hangs 5.3 mm under its whole circle, centred
-/// on it, with Clip border to geometry too (live: 38.96 mm under the clipped border, under the unclipped circle).
+/// Live dx hatch-1122 (h6-det2.dxf): a detail's label top hangs 0.1 r + h/2 under its whole circle, centred on it,
+/// with Clip border to geometry too (detail E: under the full circle, not the clipped border).
 #[test]
 fn a_detail_label_hangs_under_its_whole_circle() {
     let (doc, mut drawing) = demo();
@@ -4022,7 +4045,7 @@ fn a_detail_label_hangs_under_its_whole_circle() {
         let (c, r) = (pl.to_sheet(center), pl.len_to_sheet(radius));
         let first = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(id))).expect("the label");
         assert!((first.pos[0] - c[0]).abs() < 1e-6, "clip {clip}: centred: {first:?} / {c:?}");
-        assert!((first.pos[1] - (c[1] - r - 5.3)).abs() < 1e-6, "clip {clip}: top 5.3 mm under the circle: {first:?} / {c:?} r {r}");
+        assert!((first.pos[1] - (c[1] - 1.1 * r - first.height / 2.0)).abs() < 1e-6, "clip {clip}: top 0.1 r + h/2 under the circle: {first:?} / {c:?} r {r}");
     }
     // A section's label: its top under the view's geometry, centred on it: 5.81 mm for a horizontal cut, 3.02 mm for
     // a vertical one (live2 sec-label-1118).
