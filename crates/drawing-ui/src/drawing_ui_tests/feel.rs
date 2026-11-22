@@ -634,6 +634,10 @@ fn a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange(cx: &mut T
     assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_SELECTED)], "off it, the selected view framed in orange");
     cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
     assert!(frames(cx).is_empty(), "nothing selected or hovered: no frame");
+    // Clicked on one of its edges (live drw-edge-view-hover-matrix e1, EDGE): the edge stays hovered, the frame tan.
+    let on_edge = (0..400).map(|i| [inside[0] - i as f64 * 0.25, inside[1]]).find(|p| matches!(lit_at(cx, window, &editor, *p), Some(Sel::Edge(v, _)) if v == pl.id)).expect("an edge left of the centre");
+    click_at(cx, window, &editor, on_edge, Modifiers::default());
+    assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_HOVER)], "clicked on an edge: the hover frame");
 }
 
 /// Live drw/dact-aa-d3, behaviours "drawing Dimension tool": with the Dimension tool a view's edge lights alone, in

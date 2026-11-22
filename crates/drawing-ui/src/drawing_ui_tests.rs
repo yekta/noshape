@@ -1896,6 +1896,13 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     .unwrap();
     draw(cx, window);
     assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "a click on its text: the palette stays");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: 2, first_mouse: false }, w, cx);
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: 2 }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "its second click (a double-click): the palette stays");
     let far = [8f32, 8f32];
     assert!(at[0] - far[0] > 150. || at[1] - far[1] > 150., "the far point is well away");
     hover_to(cx, far[0], far[1]);

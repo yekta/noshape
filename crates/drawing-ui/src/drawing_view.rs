@@ -1991,7 +1991,10 @@ impl DrawingEditor {
         let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
             // Its View properties open, a selected view keeps the selection frame under the pointer (live
             // drw-edge-view-hover-matrix v5).
-            Sel::View(v) | Sel::Edge(v, _) | Sel::CutLine(v) if select && !((self.view_props.is_some() || self.click_still.is_some()) && self.selection.contains(&Sel::View(v))) => Some(v),
+            // Just clicked inside a view (pointer unmoved) shows its selection frame; on one of its edges, the hover frame
+            // (live drw-edge-view-hover-matrix e1, ui-parity view vs view_edge clicks).
+            Sel::View(v) if select && !((self.view_props.is_some() || self.click_still.is_some()) && self.selection.contains(&Sel::View(v))) => Some(v),
+            Sel::Edge(v, _) | Sel::CutLine(v) if select && !(self.view_props.is_some() && self.selection.contains(&Sel::View(v))) => Some(v),
             Sel::View(v) if projecting && lit != Some(v) && !self.selection.contains(&Sel::View(v)) => Some(v),
             _ => None,
         });
