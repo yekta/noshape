@@ -20,10 +20,9 @@ all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/kn
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
 ## NEXT (lead 11-22 06:2x)
-1. Land the in-flight stack in order: wclip 6329aaae -> ruling 1d8788b5 (queued); arcpart/seambatch/bandbatch (bandbatch
-   gate DONE 06:15 vibe2 +0 -0, models 128 -> 128, dogbone noise only; knurls RUNNING 06:2x unit bool-kn-bandbatch ->
-   kn-bandbatch.out, then delete vibe2 ~/tmp/bool/kn-bandbatch, `git rebase --onto e6e55ac74 cbab7cfe5` -> land);
-   usdvol (gate vibex7 running -> knurls -> land).
+1. LANDED 06:34: wclip 6a0389fbf, ruling 61e4c748b. Stack arcpart/seambatch/bandbatch rebased on main, QUEUED 06:3x as
+   b240ce47 (worktree bool-bandbatch; gates + knurls clean). usdvol: gate vibex7 running (chain-bool-usdvol.out) ->
+   knurls -> land. bool-ptol must be rebased onto main (`git rebase --onto origin/main dfbc7eef1`) once b240ce47 lands.
 2. Then P1 BOOL-PER-PAIR-TOL (lead 06:2x: gamma Boolean 1 ~24 s cold vs live's doc ~0.25 s; mixed-tolerance imports
    common): per-pair tolerances in crates/brep, STAGED (data model first: each entity's own tolerance carried in
    BrepBody / the Boolean; then classification / merging by the pair's two), each stage through the full gate.
