@@ -22,7 +22,8 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
 - a8722d2a FAILED 09:27 (e2e a_moved_instance_brings_its_mated_followers: solve_placed's moved-part-alone trial snapped a
   Fastened part back). Fixed: followers solved first (fol2.log: e2e 281, assembly 168, assembly-ui 172, clippy 0).
-  Re-landed with Isolate + result store (see LAND line below); tell qa the sha when it lands.
+  QUEUED c4395d69 (22 commits, 10:0x: the a8722d2a stack + fix + Isolate + result store + TICKETS dedupe): don't land
+  again till it lands; then tell qa the sha (all workflow rows + MANIPULATOR-RING + ISOLATE) and psui (Isolate's PS half).
 - ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1) COMMITTED 2b04436c8 (r9-1122.log green; land after a8722d2a):
   app-core isolate_ui: ☐ Show internal geometry above Select transparent geometry (28 px rows, 220 × 231 as live
   ps-panel), Isolate's slider a plain line "Adjust opacity"; `isolate_alpha` (0 = not drawn .. 0.9, ticked x0.55);
@@ -41,7 +42,7 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   timings: an after app is building on vibex8 (~/tmp/asm/app-b/noshape, log /root/asm-scratch/build-app-b.log); the assembly reads studio StudioDisplay rows for
   its first frame when its own row is missing; dx: WRITE a row only if built by the same mesher/tolerance as the PS's
   for that fine level, else read-only. Before timings: vibex8 ~/agents/asm-keep/asm-open-times.sh (green 604e9158 app
-  at ~/tmp/asm/app/noshape, assembly tab seeded via last-viewed.json; out ot-before.out); isaac needs a saved doc.
+  at ~/tmp/asm/app/noshape, assembly tab seeded via last-viewed.json; out ot-before.out); isaac saved doc building (vibex8 ~/tmp/asm/isaac, /root/asm-scratch/isaac-save.sh); after run ot-after.out.
 - SPEED-ASM-OPEN profile (perf, vibex8 ~/tmp/asm/speed): the scissor open is the Part Studio regenerations, OCCT
   geometry (BSplCLib::Bohm 6.8 %, BSplSLib::RationalDerivative 3.7, Extrema_GenExtPS / math_FunctionSetRoot,
   IntPatch walking, BRepGProp); no mate-solver frames. 2x of live needs the open to show stored studio results
