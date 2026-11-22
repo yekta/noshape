@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 04:58 UTC.
+Updated 2026-11-22 05:11 UTC.
 
 ## In flight
 
@@ -20,33 +20,21 @@ tests on vibex7 (rb-hosts 6a36d3b1f; off it 02:00-04:00 UTC, qa's quiet window: 
 vibex8 with `rb.sh bash -c true`, then `ssh vibex8 "bash -s" < script`. Never vibe2. Every run under `timeout`;
 `touch -c` edited files before rb.sh; two rb.sh runs on one host share a target dir (one waits). Full ops e2e before a
 crates/drawing land. Never `git checkout <file>` over uncommitted work.
-- QUEUED 60f6ad8d (01:14 11-22; carries e41a7227: Esc rework, custom table listing, max/min edge, note colour (j),
-  DRW-BORDER-DRAG, APP-VULKAN-SEGV). Still "re-checked apart from a red batch" at 04:20 (an assembly-ui test, not mine).
-- COMMITTED, not landed: 8419bdc8e (live drwm-1..6 hover/select: palette tan + auto-close at 100 px, hover wins on a
-  selected dimension, BOM header/rows/cell looks, title-block click keeps the view, custom-table properties keep the
-  selection, 3 matrix scenarios) and 641159b57 (qa walk 9: note hover/selected look, palette arrowheads, FS stray-name
-  error). x184 (vibex7 04:20): drawing-ui 163/163, FS parser 8/8, clippy clean, app built. Shots (vibex8, shots1122d):
-  note matrix 32/32, edge/view 41/44 (was 20), dimension 28/31.
-- UNCOMMITTED (04:5x), x185 (drawing-ui tests + clippy) / x186 (variable-studio-ui) running on vibex7:
-  - FEEL-DRW-VIEW-HOVER-AFTER-PLACE: Insert view's just-placed view drawn picked (orange edges + orange frame, not
-    selected: `lit_parent`, from `projection_parent_lit`); while placing projected views the placed view under the
-    pointer gets the tan hover frame, edges plain (`projecting_hover` in update_hover; view_frames). Test
-    a_just_placed_view_is_lit_under_the_pointer (passes).
-  - FEEL-DRW-DIM-PLACE-DOTS: drawing_related push_related_highlights put snap discs on every vertex of a just-placed
-    dimension; now none (a 2 point one keeps its discs through dim_kept_points). The ±0.1 launcher's delay counts as
-    work still to show (`launcher_pending` in ui_busy). Test a_dimension_placed_on_an_edge_leaves_no_dots_on_its_ends.
-  - dimension matrix d7 (3 states): a click / double-click on the palette's own dimension keeps the palette
-    (select_click); assert in a_dimension_dragged_from_unselected_ends_unselected.
-  - edge/view matrix v5 (3 states): View properties open, a selected view under the pointer keeps the selection frame
-    (VIEW); assert in a_title_block_click_keeps_a_selected_view...
-  - BOM-CELL-TOOLBAR (P2): a BOM cell's panel row 1 = size icons, the cell's text, Override (moved off row 2, whose
-    overflow squeezed the text height to "0.‹"); anchored at the table's left for any cell (drawing_cell_panel).
-  - VS-NAME-FOCUS-BOX (qa P1, workflow 15): the focused empty Name cell outlined 2 px #1651b0 (`add_name_focused`);
-    test the_focused_add_row_name_is_outlined.
-  - x184b (vibex8, binary of the two commits): all drw doc docs ver vs fs rel -> ~/agents/studios-keep/uip1122h, log
-    x184b.log.
-  NEXT: x185/x186 green -> commit, rebase, mark the walk-9 / workflow 09 / 15 tickets in TICKETS, land (no ops e2e:
-  no crates/drawing change). Then a fresh app build and the 3 matrices again.
+- QUEUED b0964b52 (05:1x 11-22; carries 60f6ad8d / e41a7227 and everything since): APP-VULKAN-SEGV, DRW-BORDER-DRAG,
+  the Esc rework, live drwm-1..6 hover/select (8419bdc8e), qa walk 9 (641159b57), qa workflow 09 P0s (a just-placed
+  view drawn picked / the next projected view tan-framed: `lit_parent`, `projecting_hover`; no snap discs on a placed
+  dimension's edge ends, launcher delay in ui_busy), the palette kept on a click on its own dimension, View properties
+  keep the selection frame, the BOM cell panel's row 1 (BOM-CELL-TOOLBAR), VS-NAME-FOCUS-BOX (`add_name_focused`),
+  TICKETS marked. Checked: drawing-ui 164 + named tests, variable-studio-ui 12, FS parser 8/8, clippy clean (x185,
+  x186, vibex7); shots (vibex8, before the last fixes): note 32/32, edge/view 41/44, dimension 28/31 (the 6 left are
+  the two fixes after). Check `land.sh --status`; a failed land is the next task.
+- x184b (vibex8, binary without the last fixes): all drw doc docs ver vs fs rel -> ~/agents/studios-keep/uip1122h,
+  log x184b.log: read its score when done.
+- NEXT (in order): qa workflow 26 Feature Studio tickets (TICKETS "qa 03:4x" workflows; crops
+  /root/qa-scratch/tickets/wf26-*.png, live live/workflows-1122/26-*): P1 FS-NEW-FEATURE-TABSTOPS (New feature's
+  myFeature and both "// Define" comments boxed as snippet tab stops), P1 FS-TAB-UNCOMMITTED-STAR ("*Feature Studio 1"
+  until commit), P2 FS-OUTLINE-ANNOTATION-LINE, FS-FOLD-ARROWS, FS-COMMENT-OPERATOR-COLOURS (comments upright grey,
+  * and + blue). Then a fresh app build + the 3 matrices again.
 - Waiting on live: (k) exact-centre Ø8 click (REQUESTS 02:47), VIEW-FRAME-PAD rule (03:38), HISTORY-BRANCH-FILTER
   menu (04:39; qa P2 workflow 16: a funnel ▾ right of Search history once a branch exists; not built until answered).
 - Left P2s: VS-CHIP-ON-CLICK, FS-DRAG-SELECT-BAND (need vendored GPUI tooltip / editor patches, 3 platform copies).
