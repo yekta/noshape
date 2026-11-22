@@ -5292,3 +5292,15 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
     Unlooked: 17-24 coincident pieces differ, 6-25 point on another face, 31-38 ellipse near an axis, 38-39 invalid.
 - GEAR SPEED, whole feature (22:45, sc-prof2.sh, end cap off): Spur Gear 4.0 s: op_boolean 3.25 s (OCCT build 2.15,
   group_disjoint 0.78 = mesh 0.19 + pair check 0.47, our attempt 0.27), op_unify 0.54 (usd 0.45), mesh_prepare 0.15.
+
+## Moved from the handoff 11-22 17:48 UTC (bool-wclip stack, landed)
+- bool-wclip 59fb7a789 (from main a597c1393) gate DONE 03:55 vibex8: replay +0 -0 (differing 2 -> 2), suite 129 -> 129,
+  shells 6 -> 6, speed 0.99-1.01x, crate tests pass; knurls 05:26 vibex7 0 diff x5 (copies deleted). QUEUED 05:36 as
+  6329aaae (rebased: gpat's test and wclip's both appended to boolean_groups.rs; the first queue job b28b8ef9 had the
+  conflict); bool-ruling QUEUED 05:41 as 1d8788b5 (ruling e6e55ac74 on 6329aaae9). The arcpart / seambatch /
+  bandbatch stack still sits on the OLD ruling cbab7cfe5: at its land `git rebase --onto e6e55ac74 cbab7cfe5`.
+  Unify of wire-clip's Boolean 2 (case BK/wc/rec/678f4bf258e12c94 on vibe2): 2.9 -> 2.0 s on vibe2, same 889 faces;
+  merge_cylinder_groups: a round's merges (and circle swaps) in ONE ReShape, a group touching a face changed this
+  round waits (set `changed`); move_seams_off_holes: a loop, faces tried once unless changed, ef once a pass.
+  T1 boolean_groups::stacked_pins_unify_as_one_piece_pins. A/B: wc-ab.sh in bool-hat (PROBE_NO_BATCH=1
+  PROBE_NO_TRIED=1 = old). Left: 26 seam moves each a whole-part Apply (~0.6 s vibe2): batch them per pass next.

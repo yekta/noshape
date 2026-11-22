@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 15:41 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 17:48 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -19,36 +19,47 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (lead 11-22 15:2x; state 11-22 15:41 UTC)
-1. LANDED: usdvol c240175b, per-pair stage A ea0febb2 (13:03), stage B ee1c3bba as 02620804 (15:17). Stage C's gate
-   (A+B+C, vibex8, /root/bool-ptolc-scratch/gate-ad5674aa8.log): replay 3114 -> 3114 (+0 -0), differing 2 -> 2, shells
-   6 -> 6, suite 131 -> 131, speed 1.00x; knurls 0 diff x5; any-thread test flake 0/40 both (pre-existing).
-   cf-surface-pattern 385 -> 384 edges is stage A's: a follow-up.
-2. QUEUED 15:2x: stage C 980be2e8b + cd7ef8f0b (parity.rs: the reopen's feature_list / query_parts on the import's
-   studio, ModelResult.timed) as 77b5348b from worktree bool-ptolc (watcher b44b5ji42). When LANDED: tell qa (roster
-   id) SCORE's gamma time is real now (lead 14:2x); rm targets of bool-ptolb / bool-ptolc, gate tree bool-ptolc-gate
-   (vibex8), vibex8 $BK/wc/xbin-arc and $BK/gm/rec32. If FAILED: fix forward in bool-ptolc.
-3. bool-uni 857221953 (worktree bool-uni, on bool-ptolc's cd7ef8f0b): apply_band_merges computes the part's volume only
-   when dv > 1e-12 diag^3 (gamma B1 dv 1e-19: bands.bands 360 -> 180 ms, same 2652 faces / volume). GATE RUNNING:
-   unit bool-uni-gate (/root/bool-scratch/uni-gate.sh, vibex8, against main 07c6a110e, so it also covers B+C) ->
-   /root/bool-scratch/chain-bool-uni.out (watcher bxjk8c98m on "CHAIN DONE"). Then knurls (kn-run.sh vibex8 kn-uni,
-   k-main/k-br from the gate trees), rebase on main after C lands, land.sh, report.
-4. GAMMA B1 unify (case BK/gm/rec/f68f, probe tree bool-stages, scripts /root/bool-scratch/gm-*.sh, outputs gm-*.out):
-   ~1.5-2.3 s on vibex8, no share > 100 ms left after (3): usd.build 340 (PROBE_USD_SPLIT: USD edges-only 270, faces-only
-   75, nothing 20: ~170 faces rebuilt by ShapeFix after joins, ~130 of them circle arcs plane/cyl at hole rims),
-   groups.rounds 210-300 (4 whole-part ReShapes), usd.copy + groups.copy 220-340, unify.check + usd.check 230-350,
-   merge_planar 92-131, seams 80. TRIED, dropped: (a) USD on only candidate faces + vertex stars (diff
-   /root/bool-scratch/usdlocal.diff, NOSHAPE_USD_LOCAL): B1's candidates 1551 of 2658 (loose may_be_one_domain), B2's
-   k=0 result changed volume 6e-6 diag^3, k=1 crashed OCCT USD (signal 11) on open shells; (b) join_loop_pieces before
-   USD (PROBE_JOIN_FIRST): usd.build -70 but the join +115 ms. Live's 246 ms needs a unify on our own B-rep: decision
-   with the lead.
-   Move face 987 ms (OCCT defeature 899) told to core (15:3x).
-5. GAMMA B2 correctness (case 678f): inputs equal live's; live removes 54.556 mm3 / 47417.6 mm2, ours 56.947 / 47296.7
-   (889 faces vs 884). Thin layers: SKIN(3) x Micro Column(20, 21) 1.9986 mm3 each (~0.19 um), Chassis(2) x SKIN 0.055,
-   SKIN x Front Strengthing (r)(22) 0.026, SKIN x Front Strengthing(12) 3.88 (1.6 um). Waiting on live
-   (REQUESTS.md "bool ... gamma Boolean 2's thin overlaps", live/bool/gamma-b2-pairs/A..E.json, not there 15:35).
-6. STANDOFFS Revolve 2 is ours (Boolean 185 + unify 198 ms); sections-ahead isn't the lever (st-brep9.out).
-7. Decision b: NO local check after the second group merge.
+## NEXT (lead 11-22 16:4x; state 11-22 16:41 UTC)
+0. P0 (worktree bool-ptolc). Release v0.4.67 was cut without us (lead 16:5x: green 049f4e313 with ea0febb29 reverted).
+   - 7bfbf2b45 MAIN RED 85b2c04a2 (brep_results_are_the_same_on_any_thread: the replays' process env NOSHAPE_BOOL_SLAB
+     was one band for every Boolean since stage B; now thread-local set_boolean_slab / set_boolean_no_tree, env read
+     once). QUEUED ALONE 16:52 as 1de8fa6e from worktree bool-thr (g++-13 ok; no app change, so no corpus gate).
+   - 602310557 COMPAT-RINGS-LOFT-SLOWER: args_band(a, b) = max(sum of halves, min(arg_reach[a], arg_reach[b]))
+     (c2-rings-loft's 51 tools of 0.1 um on one plane cutting a ring of 6.1 um declined since stage A, OCCT 15 s ->
+     ours 0.8 s); test bool_patterns::patterned_tools_on_one_plane_cut_a_tolerant_ring (case 11cf6fc2ad8bd55b).
+     Knurls DONE 17:04 vibex8 kn-rl: 0 diff x5 (copies deleted). GATE RUNNING unit bool-rl-gate (rl-gate.sh, vibex8,
+     against main 6df3a218b) -> /root/bool-scratch/chain-bool-rl.out. When clean: land.sh from bool-ptolc (rebase drops
+     7bfbf2b45 once 1de8fa6e is on main), tell lead + qa. Then rm vibex8 ~/tmp/bool/kn-rl, thr, rl-case,
+     doc-prof-c2-rings-loft; worktree bool-thr after 1de8fa6e lands. Check cf-surface-pattern 384 -> 385 edges.
+1. LANDED: usdvol c240175b, stage A ea0febb2 (13:03), B 02620804 (15:17), C + cd7ef8f0b 4511db62 (16:21).
+2. bool-uni 857221953 (worktree bool-uni): apply_band_merges computes the part's volume only when dv > 1e-12 diag^3
+   (gamma B1 dv 1e-19: bands.bands 360 -> 180 ms, same 2652 faces / volume). Its gate was STOPPED 16:13 for the P0;
+   re-run it (/root/bool-scratch/uni-gate.sh as unit bool-uni-gate) after the P0 lands, rebased on main; then
+   knurls (kn-run.sh vibex8 kn-uni), land.sh, report.
+3. OWN UNIFY (lead 11-22 17:4x, decision (a)): gamma B1's unify (1.5-2.3 s vibex8, live 246 ms) is spread over OCCT:
+   USD build 340 ms, copies 220-340, checks 230-350, 4 whole-part ReShapes 210-300, ShapeFix of ~170 rebuilt arcs; no
+   step > 100 ms, cheap cuts tried and dropped (usdlocal.diff; PROBE_JOIN_FIRST). START AFTER the P0 (item 0) and
+   bool-uni (item 2) land. Plan (each stage its own land behind the brep gate + knurls; OCCT's unify the fallback until
+   ours covers the corpus):
+   U0 oracle: a brep_replay mode (NOSHAPE_BREP_UNIFY=1) that unifies each case's result both ways and diffs faces /
+      edges / vertices, volume, area, surface kinds per face and the history images (merged-from); T1 tests per kind.
+   U1 planes: on the Rust Boolean's own result (crates/brep, before the conversion in rust_boolean.cpp), adjacent
+      faces on one plane (within the pair's band) merged, their shared edges dropped, loops rebuilt; lines meeting
+      at a vertex of only those two edges joined. History: each new face/edge from its pieces. A result with any
+      other candidate pair (or ours failing valid + volume) goes to OCCT's unify on the original, as now.
+   U2 cylinders and cones on one axis and radius: bands, seams placed as live's (move_seams_off_holes,
+      merge_cylinder_bands, opposite frames, apex cones); circles / arcs joined at two-edge vertices.
+   U3 the remaining kinds (spheres, tori, B-spline faces of one surface) or kept on OCCT if the corpus has few;
+      then the OCCT post-passes (merge_planar, groups, join_loop_pieces) dropped for results ours unified.
+   Measure gamma B1 after U1 and U2 (target <= 300 ms vibex8); report ours/OCCT unify counts per corpus.
+4. GAMMA B2 correctness, PARKED (lead told 17:48): live's pairs A..K (live/bool/gamma-b2-pairs) equal ours except
+   G (Chassis leg-left x Induction SSB-Front, live 0.078 mm3 less) and C (Chassis 2 x SKIN 3): live fills a 5 um gap
+   at z 18.386 (306 faces, overlap -0.25 mm3, area removed 2101.9; ours = OCCT 312 faces, +0.055, 1981.0). The STEP's
+   uncertainty is 5.E-6 m, but both parts at 5 um tolerance over-fill in OCCT (-52 mm3, 304 faces; probe
+   PROBE_PAIR2=2,3 PROBE_TOL=5e-6, gm-p2t.sh in bool-stages): live's rule is narrower. ~2 mm3 of the full union's
+   2.39 is in no pair (live's union removes 2 less than its pairs' sum; ours equals ours). 889 faces vs live 884.
+5. STANDOFFS Revolve 2 is ours (Boolean 185 + unify 198 ms); sections-ahead isn't the lever (st-brep9.out).
+6. Decision b: NO local check after the second group merge.
    Probe tree bool-stages: uncommitted timers (groups.*, bands.*, unify.bands.*), PROBE_BANDS / PROBE_USDL /
    PROBE_USD_SPLIT / PROBE_JOINS / PROBE_JOIN_FIRST switches, the local USD; shell.rs PROBE_SHELLS / EACH / GAPS. Never
    commit them.
@@ -61,16 +72,6 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
 - GEAR SPEED / SHELL-HANG: history in archive (11-22 06:2x move). Gear: sweepcap landed (236 faces as live); end cap
   parked (END CAP RULED below). SHELL-HANG parked (lead OK): blockers are Part 3's own input defects (a corner
   B-spline hooking 38 um back; a 16 um step face); probes sh-pairs.sh (vibe2 BK/shh/tools17).
-- bool-wclip 59fb7a789 (from main a597c1393) gate DONE 03:55 vibex8: replay +0 -0 (differing 2 -> 2), suite 129 -> 129,
-  shells 6 -> 6, speed 0.99-1.01x, crate tests pass; knurls 05:26 vibex7 0 diff x5 (copies deleted). QUEUED 05:36 as
-  6329aaae (rebased: gpat's test and wclip's both appended to boolean_groups.rs; the first queue job b28b8ef9 had the
-  conflict); bool-ruling QUEUED 05:41 as 1d8788b5 (ruling e6e55ac74 on 6329aaae9). The arcpart / seambatch /
-  bandbatch stack still sits on the OLD ruling cbab7cfe5: at its land `git rebase --onto e6e55ac74 cbab7cfe5`.
-  Unify of wire-clip's Boolean 2 (case BK/wc/rec/678f4bf258e12c94 on vibe2): 2.9 -> 2.0 s on vibe2, same 889 faces;
-  merge_cylinder_groups: a round's merges (and circle swaps) in ONE ReShape, a group touching a face changed this
-  round waits (set `changed`); move_seams_off_holes: a loop, faces tried once unless changed, ef once a pass.
-  T1 boolean_groups::stacked_pins_unify_as_one_piece_pins. A/B: wc-ab.sh in bool-hat (PROBE_NO_BATCH=1
-  PROBE_NO_TRIED=1 = old). Left: 26 seam moves each a whole-part Apply (~0.6 s vibe2): batch them per pass next.
 - NEXT for wire-clip/gamma (bigger; our Boolean declines the fuse -> OCCT 1.9-2.4 s on vibe2):
   1. FIXED (uncommitted, in bool-hat AND bool-wclip crates/brep/src/boolean.rs c2_of `ruling`): an imported 1 mm pin's
      B-spline seam at th0 = -90° mapped to either side -> not taken as a ruling -> free::mapped ignored the seam copy
