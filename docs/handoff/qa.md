@@ -5,11 +5,14 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 15:11 (after the compaction, first)
-- **asm ec33215f (landed 14:40, NOT in green 27664aacf yet)**: score hover-list-1122 + drag-feel-1122 cells and FEEL-ASM-TRIAD-STILL-POINTER / DRAG-UNDO / FIXED-GLYPH. Kit hm2/asmfeel (gen.py -> starts hl3 / drag5 + hl-a01..a17 / dr-{Free,Slider,Arm,BaseR}; run.sh :478; one GLOB per run, back-to-back runs race on Xvfb). Fix before the run: drag5 mates need `"flip": true` (the Arm went into BaseR); the Origin row: `{"instance": "Origin"}` (list_row fails); dr-Free needs a first full drag so Undo has history (greyed only while held). Run: rsync asmfeel to vibex8:tmp/qa/, `GLOB='hl-*' bash asmfeel/run.sh ~/tmp/qa/apps/noshape-green $HOME/tmp/qa/out-af 1079` (stage green first as bin/b3run.sh does); compare with live/asm/{hover-list,drag-feel}-1122 crops (vp = page 202,36 1761x1053). Pre-fix test (3871292da): the fixed glyph still a screen icon.
-- asm 1420a57e scored 15:0x (8 verified, 2 reopened, P0 FEEL-GEAR-DIALOG-MATES-LOOK, P2 UIS-PATTERN-SECOND-DIRECTION); asm lands their fixes next: re-score wf08 step 7, wf25 steps 28/32, wf35 (bin/rescore-wf.sh <sha> 08 25 35).
-- psui: workflow-ticket batch 9ad9b5d6/91ae59a8 FAILED tests 14:04; qa-rs-ec2f (subject prefix) fires on its requeue. 7 psui feel tickets verified 12:4x.
-- Suite 1122-0657: assemblies stage on vibex8 since ~13:15; then the uip rerun (qa-uip-rerun) -> worse.txt, P0s, SCORE row (see Suites line). No waiter running: check suites/1122-0657-17157c2f/status.
+## IN FLIGHT 15:35 (after the compaction, first)
+- **asm ec33215f** (landed 14:40, not in green 27664aacf): unit qa-af-ec33 (bin/asmfeel.sh, WAIT=ec33215f) runs kit hm2/asmfeel hl-* then dr-* on vibex8 :478 -> hm2/out-af-ec33. Kit fixed and tried on 27664aacf: mate face points are PART coordinates (README 176) + `"flip": true`; Part 3 fixed by its row menu (P2 UIS-ASM-START-FIRST-INSTANCE, skasm told: a start's at/fixed all land on instance 0); dr-Free-undo = a full drag first. Compare with live/asm/{hover-list,drag-feel}-1122 (vp crop page 202,36 1761x1053): Undo greyed only while held, 36x16 ground glyph on the fixed face, no hover look mid-drag, triad unlit under a still pointer (a04); then mark FEEL-ASM-TRIAD-STILL-POINTER / DRAG-UNDO / FIXED-GLYPH, tell asm.
+- asm's next land (GEAR-DIALOG-MATES-LOOK, SECOND-PICK-HOVER, PATTERN-SECOND-DIRECTION): bin/rescore-wf.sh <sha> 08 25 35.
+- skasm: unit qa-rs-f33a (rescore-wf.sh f33a0b645 11) -> BEND-FACE-RECLICK-EMPTIES (wf11 12-16) + SM-FLAT-VIEW-FIT (wf11 18; 589cb6cbe same green; also variant 11v).
+- psui: workflow-ticket batch not requeued yet; qa-rs-ec2f (subject prefix) fires on it.
+- Cut 17:00: cut-verdict.sh at 16:15 / 16:50 (qa-cut timers). cut-must.txt now carries skasm 9f127c281 (tablet-stand Sketch 3 Warning vs 0.4.66 since 3871292d): HOLD if the cut green lacks it. Verdict to the lead by 16:45.
+- Suite 1122-0657: assemblies stage on vibex8 (parity_assemblies running 15:25); then qa-uip-rerun -> worse.txt, P0s, SCORE row.
+- wf31 quiet replay (Dimension timing) running 15:34 -> hm2/out-wf/31-*.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
