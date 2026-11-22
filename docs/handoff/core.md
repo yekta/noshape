@@ -9,6 +9,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   model-edge drags (block_centre), snaps row (normalize_or_zero), glyph walk; lit-end was main's, psui f8b0a2d8);
   3779e4f1 knifehandle Blade scatter (core-dock). LANDED 472eddd5 Loft 1 as c08ef29e (14:40; blend told to rerun
   Fillet 1), f94fdf98 isaac speed (volume_change, merge_cylinder_patches copy only for merging pairs; 00f1d4 19.9 -> 12.5 s).
+- **Next after VALID-SURFLOFTS-LOFT1: SPEED gamma Move face 1** (bool 11-22 14:5x): c2-gamma-imported's Move face 1
+  987 ms ours (vibex8, reopened doc, NOSHAPE_PARITY_SPLIT=1 + NOSHAPE_KERNEL_PROFILE=1), 899 ms in OCCT's defeature;
+  live regenerates the whole document in 246 ms. Not a Boolean, so core's.
 - **VALID-SURFLOFTS-LOFT1 (core-rf branch core-sfl, uncommitted):** op_loft's straight_edges_as_lines: a loft's own
   B-spline edges with collinear poles become Geom_Line (live: Loft 1 = 2 lines + 2 splines), pcurves re-projected
   (GeomProjLib::Curve2d; a re-ranged old pcurve failed BRepCheck SameParameter on solid lofts), vertex params set.
