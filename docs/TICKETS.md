@@ -703,6 +703,14 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   grips) match live. **A press-drag from it 50 mm right moves the line in live**, where it stays selected. Ours leaves it in place
   (selected-looking), and the ui-script state lists nothing selected. qa-scratch/tickets/drw-border-lit-w6.png (ours).
 - [x] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
+  not yet in the matrix.
+- [x] P0 **DRW-BORDER-DRAG (studios)** (live answered 22:54, behaviours "qa walk 6", qa/walk6-1121/walk6-5-border-*): block-drawing,
+  the sheet's left inner border line (x ≈ 9.6 mm). Hover (tan, grips), click and the selected look once the pointer leaves (orange,
+  grips) match live. **A press-drag from it 50 mm right moves the line in live**, where it stays selected. Ours leaves it in place
+  (selected-looking), and the ui-script state lists nothing selected. qa-scratch/tickets/drw-border-lit-w6.png (ours).
+  **Fixed (studios 11-22):** the line drags alone and stays selected; the frame's other lines, zone letters and ticks stay
+  (`FormatLineEdit.offset`, saved; ops `drawing_format_line` `move`; test `the_sheet_border_line_drags`).
+- [ ] P0 **FEEL-PREVIEW-HOVER-LIT (psui)** (live 22:54 (2), walk6-2-preview-hover-*): Extrude 2 open with its 25 mm preview. Resting
   on the translucent preview's front face lights nothing in live. Ours draws that face's outline thin orange (s8-ext-arrow-click 03,
   the pointer still on the picked top face inside the preview). psui 11-21 23:5x: hover follows the model before the feature; hover matrix test.
 - [x] P0 **FEEL-SHELL-RECLICK-REMOVED-FACE (psui)** (live 22:54 (3), walk6-3-shell-reclick-*): Shell with the top face in "Faces
