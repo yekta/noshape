@@ -2357,3 +2357,8 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
      05:00 cut 11-21: GO 04:3x on b3ece860 (prerel/cut05-b3ece860.txt all SAME, 0 px; compat on aa09396f = + dx IGES export only).
      cut-hold.txt empty; prerel-need (sha a prerel waits for) = 503396456: clear or replace it per cut.
    - Seat lip: a47534be5 (Ok in 0.4.43-0.4.61 + green; vibex7 ~/agents/qa-keep/seatlip-hat8-1120.txt).
+00b. **Live's 21 feel rows (11-20, lead 04:1x) DONE 04:3x** on green 9ae062180: 18 P0 feel tickets, all routed (rows FEEL-* in TICKETS
+   "qa, 2026-11-20 (live's feel coverage rows …)": 15e785522 sketch skasm 3 / psui 1, e79906b34 studios 8, 51d079b3c asm 3 / skasm 1 / psui 2).
+   Sketch rows ran as live's recordings (qa-bisect, uncommitted, suites/1120-feel-cov2; R4 inconclusive per live). Crops /root/qa-scratch/feel1120/.
+   Quiet-window re-time (02:00-04:00 11-21, vibex8 was at load 21-36): FAST-OFF-CLEAR (ours 141-260 ms, live 5-7), toolbar tooltip (208-242, live 15-45), D3 drawing wheel zoom (ours 208-392 ms, live 8-23), V1 cell edit
+   (150-200 vs 46), D1 release (470 vs 10 / 767), A1 per-move draw, A2 preview draws, S1 per-move draw; psui 51c01c9c first hover after a 3.5 s rest on 850efe (feel1120/psui5/abh.sh + hov.py: green vs b2b0cf9a9; 19:2x load 10 393 vs 561 ms, load 12 mixed).
