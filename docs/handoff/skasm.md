@@ -46,8 +46,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   the drawing direction, centred on the perpendicular through the middle, near edge ~13-14 px off (A right-to-left: below
   +25 px; B downward: right +41; C 2nd segment: above -27; D down-left: 35 px down-right on the normal); only the last
   finished segment has a box; in iso it lies in the sketch plane. Midpoint: from (20,15.5) the level wins (end (0,15.713),
-  HORIZONTAL + VERTICAL to the midpoint, no diamond); from (20,25) diamond + MIDPOINT, end exactly (0,15). TODO: compare
-  ours after the P0s.
+  HORIZONTAL + VERTICAL to the midpoint, no diamond); from (20,25) diamond + MIDPOINT, end exactly (0,15). Box side +
+  offset (13 + 27.5|nx| + 12.5|ny| px) done 18:4x (scene line_length_field). TODO (P1): ours ends level ∩ the EDGE
+  (coincident, glyphs horizontal + coincident: apply_external_snap's direction_onto with midpoint: true); live ends level ∩
+  the VERTICAL through the edge's midpoint, constraints HORIZONTAL (line) + VERTICAL (end, external midpoint), glyphs
+  — and |, dashed guides along the level and through the midpoint (E.json); differs on a slanted edge. Needs an external
+  midpoint point; test a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it to update.
 - REQUESTS 14:30 ANSWERED: /root/parity/models/c2-constrained-surface/refs.jsonl (1254 lines): feature 4's 1121 vertices
   refs resolved (id, VERTEX, point, body, createdBy: Linear pattern 1 960, Sketch 1 80, Sketch 2 80, Origin 1 IB) + the
   Sketch 1/2 constraint externals (IB origin, JEC mirror face, JDC angle face); Sketch 2's DISTANCE BEDuJiRx8D0e
