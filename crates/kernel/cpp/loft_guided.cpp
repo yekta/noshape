@@ -2028,7 +2028,7 @@ struct Pchip
 
 // A surface loft through closed profiles in order (a point may end it at either side) along two guides or more that
 // meet every one (c2-surf-workshop-knifehandle's Loft 1: P1..P6 to the tip between two side curves; live one face
-// through every profile and guide to 1 µm). Each profile runs from guide 0 by arc length between the guides' meets,
+// through every profile and guide to 1 µm). Each profile runs from guide 0 by its own parameter between the guides' meets,
 // the guides' nodes at their mean share of the loop; the skin interpolates the profiles cubically across stations (the
 // guides' mean share of their length between the end profiles); each guide's difference from the skin along its node
 // fades across u by periodic cubic Hermite tents, zero on every profile.
@@ -2067,7 +2067,7 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
   }
   // Each guide's meets: arc length along it and the point.
   std::vector<std::unique_ptr<Adaptor3d_Curve>> gc;
-  std::vector<std::vector<double>>              gs(m, std::vector<double>(n));
+  std::vector<std::vector<double>>              gs(m, std::vector<double>(n)), gt(m, std::vector<double>(n));
   std::vector<std::vector<gp_Pnt>>              gp(m, std::vector<gp_Pnt>(n));
   std::vector<double>                           glen(m);
   for (size_t j = 0; j < m; ++j)
@@ -2100,6 +2100,7 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
         at = points[i];
       }
       gs[j][i] = GCPnts_AbscissaPoint::Length(g, g.FirstParameter(), t);
+      gt[j][i] = t;
       gp[j][i] = at;
     }
     // Along the guide in the profiles' order, either way.
@@ -2130,16 +2131,12 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
     fail_op("loft_guided_multi: the profiles lie on one another");
   for (size_t i = 0; i < n; ++i)
     v[i] /= v[n - 1];
+  // A guide's point at v: its own parameter by a Hermite cubic through its meets, the ends' slopes those of the end spans
+  // (live's knifehandle Loft 1 along both guides within 2e-5 of their parameter).
   std::vector<Pchip> gmap;
   for (size_t j = 0; j < m; ++j)
-    gmap.emplace_back(v, gs[j]);
-  auto guide_at = [&](size_t j, double t) {
-    const Adaptor3d_Curve& g = *gc[j];
-    GCPnts_AbscissaPoint   ap(g, gmap[j](t), g.FirstParameter());
-    if (!ap.IsDone())
-      fail_op("loft: arc length on a guide failed");
-    return g.Value(ap.Parameter());
-  };
+    gmap.emplace_back(v, gt[j]);
+  auto guide_at = [&](size_t j, double t) { return gc[j]->Value(gmap[j](t)); };
   // Loops' direction: each loop's turning vector (its area normal) the first loop's way.
   auto turning = [](const Loop& l) {
     gp_XYZ       a(0, 0, 0);
@@ -2155,7 +2152,7 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
       first = i;
   const gp_XYZ        ref = turning(*loops[first]);
   std::vector<int>    dir(n, 1);
-  std::vector<std::vector<double>> abs_(n, std::vector<double>(m, 0.0));
+  std::vector<std::vector<double>> par(n, std::vector<double>(m, 0.0));
   for (size_t i = 0; i < n; ++i)
   {
     if (!loops[i])
@@ -2164,14 +2161,16 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
     for (size_t j = 0; j < m; ++j)
     {
       double d;
-      abs_[i][j] = loops[i]->abscissa(gp[j][i], d);
+      par[i][j] = loops[i]->param(loops[i]->abscissa(gp[j][i], d));
     }
   }
-  // Guides by their order round the first loop from guide 0; every loop must have them in that order.
+  // Guides by their order round the first loop from guide 0; every loop must have them in that order. A loop's share is
+  // by its own parameter, as live's (knifehandle's P1 by its Bézier halves, P2..P6 by their ellipses' angle, to 1 µm).
   auto share = [&](size_t i, size_t j) {
     const Loop&  l = *loops[i];
-    const double f = dir[i] > 0 ? forward(abs_[i][0], abs_[i][j], l.len) : forward(abs_[i][j], abs_[i][0], l.len);
-    return f / l.len;
+    const double p = l.t1 - l.t0;
+    const double f = dir[i] > 0 ? forward(par[i][0], par[i][j], p) : forward(par[i][j], par[i][0], p);
+    return f / p;
   };
   std::vector<size_t> order(m);
   for (size_t j = 0; j < m; ++j)
@@ -2193,7 +2192,7 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
     nodes[k] = sum / cnt;
   }
   nodes[m] = 1.0;
-  // A loop's point at u: between the guides' meets by arc length.
+  // A loop's point at u: between the guides' meets by its parameter.
   auto loop_at = [&](size_t i, double u) {
     if (!loops[i])
       return points[i];
@@ -2203,7 +2202,7 @@ std::unique_ptr<OcShape> loft_guided_multi(const OcShapeList& profiles, const Oc
       ++k;
     const double sa = share(i, order[k]), sb = k + 1 < m ? share(i, order[k + 1]) : 1.0;
     const double f  = sa + (sb - sa) * (u - nodes[k]) / (nodes[k + 1] - nodes[k]);
-    return l.at(abs_[i][0] + dir[i] * f * l.len);
+    return l.c->Value(l.t0 + forward(l.t0, par[i][0] + dir[i] * f * (l.t1 - l.t0), l.t1 - l.t0));
   };
   // The skin's column at u: a cubic through the stations.
   auto column = [&](double u) {

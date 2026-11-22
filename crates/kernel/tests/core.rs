@@ -1222,6 +1222,45 @@ fn a_guided_surface_loft_through_more_profiles_is_one_face() {
     }
 }
 
+/// c2-surf-workshop-knifehandle's Loft 1 itself (its sketches, in metres): P1 two Bézier halves, P2..P6 ellipses, to the
+/// tip, between the side profile's two Bézier guides. Live's face 21,477.23 mm²: each profile runs by its own parameter
+/// between the guides (P1 by its Bézier halves, not by arc length) and each guide by its own parameter.
+#[test]
+fn the_knifehandle_loft_through_six_profiles_has_lives_area() {
+    let mm = 1e-3;
+    let world = |x: f64, sy: f64| DVec3::new(x, 0.0, sy) * mm;
+    let bezier = |poles: Vec<DVec3>| {
+        let d = poles.len() as u32 - 1;
+        make_bspline(&poles, None, &[0.0, 1.0], &[d + 1, d + 1], d, false).unwrap()
+    };
+    // P1 on x = 13.088534 mm, sketch x along -y: a degree 6 half and its mirror, bottom to top.
+    let half = [(0.0, -39.929341001), (13.897868518, -39.929341001), (23.964719847, -18.368937075), (10.491231456, 9.514288045), (13.514378108, 11.358790092), (7.282994688, 11.358790092), (0.0, 11.358790092)];
+    let p1 = [1.0, -1.0].map(|side: f64| bezier(half.iter().map(|&(x, y)| DVec3::new(13.088533799892277, side * x, y) * mm).collect()));
+    let mut profiles = vec![make_wire(&p1).unwrap()];
+    // P2..P6: (x, centre's height, major radius, minor radius, major axis up), major axis vertical.
+    let ellipses = [
+        (56.76422151249488, -5.396874827, 18.589808577, 18.013450331, false),
+        (84.11949756067832, -7.409208184, 21.151688768, 19.936648229, true),
+        (117.97999101203521, -7.124904157, 20.671268574, 16.629852814, false),
+        (144.16767353635868, -5.876122036, 18.377846988, 15.809816512, false),
+        (176.41576262634834, -12.64299533, 21.675825829, 16.068877808, false),
+    ];
+    for &(x, c, a, b, up) in &ellipses {
+        let plane = Plane::new(DVec3::new(x, 0.0, 0.0) * mm, -DVec3::X, -DVec3::Y);
+        let e = Segment2d::Ellipse { center: DVec2::new(0.0, c) * mm, major_radius: a * mm, minor_radius: b * mm, rotation: if up { PI / 2.0 } else { -PI / 2.0 } };
+        profiles.push(make_wire_2d(&plane, &[e]).unwrap());
+    }
+    profiles.push(make_vertex(world(188.5745936940105, -0.09705362453543558)).unwrap());
+    let bottom = [(188.574593694, -0.097053625), (188.574593694, -23.949988974), (181.720774878, -43.860322652), (164.75575443, -55.288146106), (161.103565503, -32.196872724), (170.175139118, -4.86434097), (135.999543945, -3.809294856), (138.462661973, -33.982364275), (131.055951353, -36.872441924), (78.009917225, -39.019658758), (60.871466283, -53.459747556), (39.724033385, 16.181488802), (34.833628461, -10.011939084), (43.784817478, -43.290136078), (21.982817276, -46.04495312), (0.0, -36.650845871)];
+    let top = [(188.574593694, -0.097053625), (188.574593694, 9.330931271), (178.167120712, 10.424711799), (154.79101156, 11.999027016), (127.304970462, 15.763460889), (70.934995102, 14.814262678), (-2.308197176, 10.497376289)];
+    let guides = [&bottom[..], &top[..]].map(|g| bezier(g.iter().map(|&(x, y)| world(x, y)).collect()));
+    let s = loft_guided_multi(&profiles, &guides).unwrap();
+    assert!(s.is_valid());
+    assert_eq!(s.faces().len(), 1);
+    let area = s.area().unwrap() / (mm * mm);
+    assert!(close(area, 21477.23, 2e-3), "{area} mm², live 21,477.23");
+}
+
 /// That loft's first circle (its two edges) moved 5 mm on along the face (c2-surf-workshop-knifehandle's Extend handle):
 /// still two edges there, their ends carried along with them, 1/2/3 as live, where ours made the new end one edge.
 #[test]

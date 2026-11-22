@@ -38,7 +38,9 @@ fn storable(ctx: &Context) -> bool {
 
 fn frame<T: Serialize>(value: &T) -> Option<Vec<u8>> {
     let (json, blobs) = with_shape_blobs(Vec::new(), || serde_json::to_vec(value));
-    let json = zstd::encode_all(&json.ok()?[..], 3).ok()?;
+    // (Said, as a studio that isn't kept regenerates on every open: infento's 25 for 58 s while BodyId keys failed.)
+    let json = json.inspect_err(|e| log::warn!("regeneration cache: a result isn't kept: {e}")).ok()?;
+    let json = zstd::encode_all(&json[..], 3).ok()?;
     let mut out = Vec::with_capacity(json.len() + blobs.iter().map(|b| b.len() + 8).sum::<usize>() + 48);
     out.extend_from_slice(MAGIC);
     out.extend_from_slice(&(json.len() as u64).to_le_bytes());
