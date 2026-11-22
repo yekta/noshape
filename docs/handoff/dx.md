@@ -26,11 +26,10 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   change. It is the lower bar's top-back edge (y 0.5, z 3, x 9.6-10.47 mm) next to the hook; rays toward the iso eye
   (1,-1,1) from it pass through the hook's material (enter t 0.87-1.73, exit 1.732 mm) in ours.step AND in live.step
   (probe 19:5x on vibe2, /root/dx-scratch/hlr-probe.rs + hlrt3.sh). Ours hides it (correct). Parity, not shortcomings.
-- NOW: housing-draft 1.2 in "on another kind": NOT HLR. The four draft-corner edges (live STEP #121-#132, cubic Beziers in
-  vertical planes ~5 deg off YZ): live writes ONE LINE between the ends in Front (the curve bulges 0.012 in off it), a
-  4-LINE chain (chord ~0.002 in) in Right, SPLINEs in Iso; ours SPLINEs (cad_export.rs `straight` needs 1e-4). Rule
-  unknown: REQUESTS 19:3x "when does a drawing's DXF write a curved edge as LINEs" (live/dx/dxf-line-curves-1122/).
-  Tool /root/dx-scratch/bin/dxfsplsum.py (each SPLINE's ends).
+- housing-draft 1.2 in "on another kind": PARKED as TICKETS P3 DRW-DXF-DRAFT-EDGE-POLYLINE (live dxf-line-curves-1122
+  P1-P3: only those draft-corner edges are polylined in performance views, no rule found). Tool dxfsplsum.py.
+- NOW: full exchange suite on current main (vibex8 dx-keep/exa.sh a1 -> exa-a1.log, exs-a; runner
+  /root/dx-scratch/exa-run.sh, started 20:0x): the open list after it. The SAT read-back item below is DONE (59c0be35f).
 - Times: rings-loft Parasolid import/export over live's on loaded vibex7: host load.
 
 ## In flight: data exchange (lead 08:0x)

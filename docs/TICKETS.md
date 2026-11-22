@@ -325,6 +325,12 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   unchanged, 90 0 90 0 90). Ours ranks by the Part Studio's body order (views.rs part_order), which follows the feature
   order, so after a feature reorder the angles change. Feature ids are random and carry no insertion stamp: a creation key
   needs a stored counter (model-data). Also open there: B3 / B5 (copies of several parts: 145, 100, 10) fit no rule yet.
+- [ ] P3 DRW-DXF-DRAFT-EDGE-POLYLINE (dx 11-22; live/dx/dxf-line-curves-1122 P1-P3) c2-housing-draft's four draft-corner
+  edges (13.048 mm, procedural curves, bowing 0.30 mm in the Front projection) export from live's "performance" views
+  (Front / Right / Top, and turned 45 deg) as LINEs: one in Front, a 4-LINE chain in Right (chords ~0.05 mm), 2.37 / 1.60
+  / 2.50 / 2.40 mm at 45 deg; the "quality" Iso writes a SPLINE. Ours writes SPLINEs (1.2 in "on another kind" in the
+  exchange row). Live writes every other curve as one SPLINE in the same views (sketch splines at 5-85 deg, cylinder
+  intersections, the x=15.3 wall loop), so what marks these edges, and the view-dependent tolerance, are unknown.
 - [ ] P3 STL-SURFACE-EDGES (dx 11-21; live behaviours "dx (11-21 14:06)") An imported STL's surface in live has one
   closed edge per boundary loop and no vertices unless loops touch (duct S1 2 edges 0 vertices, S8 3 / 1; bottle every
   surface 1 / 0); its boundary is drawn and pickable. Ours: a mesh face without edges (mesh_body.cpp mesh_face), so
