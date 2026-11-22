@@ -67,6 +67,7 @@ pub fn project_hlr_with(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, 
     // Exact lines lie on each other within the model's precision (a curve's chords differ by up to the deflection).
     let line_tol = if exact { (size * 1e-6).max(1e-12) } else { cover_tol };
     let raw = hide_behind_own_torus(shape, view_dir, up, raw);
+    let raw = if exact { hide_outline_edges_behind_faces(shape, view_dir, up, raw) } else { raw };
     Ok(merge_fragments(drop_covered_hidden(raw, cover_tol, line_tol), join_tol))
 }
 
@@ -243,6 +244,57 @@ fn hide_behind_own_torus(shape: &Shape, view_dir: DVec3, up: DVec3, edges: Vec<P
         out.push(ProjectedEdge { visibility, polyline: piece, ..e });
     }
     out
+}
+
+/// The visible pieces of real edges drawn as outlines (an edge on its face's silhouette) that another face hides
+/// whole: OCCT leaves a spring bend's inner tangent edge visible behind the outer bend from one side and hides it from
+/// the other (c2-extension-spring's Right view, live hides it). A piece is hidden when the ray from each of its
+/// sample points toward the viewer crosses a face inside it (not at its boundary, not grazing).
+fn hide_outline_edges_behind_faces(shape: &Shape, view_dir: DVec3, up: DVec3, mut edges: Vec<ProjectedEdge>) -> Vec<ProjectedEdge> {
+    let candidate = |e: &ProjectedEdge| e.visibility == Visibility::Visible && e.class == EdgeClass::Outline && !e.freeform && e.source_edge.is_some() && e.polyline.len() >= 2;
+    if !edges.iter().any(candidate) {
+        return edges;
+    }
+    let Some(size) = shape.bounding_box(false).ok().map(|b| b.diagonal()).filter(|d| *d > 0.0) else { return edges };
+    let toward = -view_dir.normalize();
+    let y = (up - toward * up.dot(toward)).normalize();
+    let x = y.cross(toward);
+    let flat = |p: DVec3| DVec2::new(p.dot(x), p.dot(y));
+    let near = size * 1e-5;
+    for e in edges.iter_mut().filter(|e| candidate(e)) {
+        let Some(edge) = e.source_edge.and_then(|i| shape.sub_shape(ShapeType::Edge, i as usize).ok()) else { continue };
+        let Ok(info) = edge.edge_info() else { continue };
+        let (t0, t1) = (info.first_param, info.last_param);
+        const N: usize = 200;
+        let pts: Vec<DVec3> = (0..=N).filter_map(|k| edge.point_at(t0 + (t1 - t0) * k as f64 / N as f64).ok()).collect();
+        if pts.len() != N + 1 {
+            continue;
+        }
+        // The edge's point under a polyline point: the nearest sample in the view.
+        let lift = |q: DVec2| *pts.iter().min_by(|a, b| flat(**a).distance_squared(q).total_cmp(&flat(**b).distance_squared(q))).unwrap_or(&pts[0]);
+        let hidden_at = |p: DVec3| {
+            let Ok(hits) = shape.line_crossings(p, toward, 2.0 * size) else { return false };
+            hits.iter().any(|&(t, transition, on_boundary)| t > near && transition != 0 && !on_boundary)
+        };
+        if [0.2, 0.5, 0.8].iter().all(|&f| hidden_at(lift(along(&e.polyline, f)))) {
+            e.visibility = Visibility::Hidden;
+        }
+    }
+    edges
+}
+
+/// The point a fraction `f` of the way along a polyline.
+fn along(line: &[DVec2], f: f64) -> DVec2 {
+    let total: f64 = line.windows(2).map(|w| w[0].distance(w[1])).sum();
+    let mut left = total * f;
+    for w in line.windows(2) {
+        let l = w[0].distance(w[1]);
+        if left <= l && l > 0.0 {
+            return w[0] + (w[1] - w[0]) * (left / l);
+        }
+        left -= l;
+    }
+    line[line.len() - 1]
 }
 
 /// Runs `f` with this thread's exact HLR bounded by `steps` of work (OCCT's break-hook checks; tests), past which a
@@ -684,6 +736,23 @@ mod tests {
             source_edge: src,
             freeform: false,
         }
+    }
+
+    /// A U-bend (bars z 2..3 and 4..5 joined by a half ring of radii 0.5 and 1.5 about x = 0, z = 3.5, 1 thick in y)
+    /// seen from +x: the ring's inner tangent edge at z 3 drawn as a visible outline is hidden behind the outer ring
+    /// (c2-extension-spring's Right view, live); the outer one at z 2 on the silhouette stays visible.
+    #[test]
+    fn an_outline_edge_behind_another_face_is_hidden() {
+        let half = |r: f64| crate::make_cylinder(&crate::Plane::new(DVec3::new(0.0, -0.6, 3.5), DVec3::Y, DVec3::Z), r, 1.2, std::f64::consts::PI).unwrap();
+        let bars = crate::make_box_corners(DVec3::new(-10.0, -0.5, 2.0), DVec3::new(0.0, 0.5, 5.0)).unwrap();
+        let ring = crate::cut(&crate::make_box_corners(DVec3::new(0.0, -0.5, 1.0), DVec3::new(2.0, 0.5, 6.0)).unwrap(), &crate::cut(&crate::make_box_corners(DVec3::new(0.0, -1.0, 1.0), DVec3::new(2.0, 1.0, 6.0)).unwrap(), &half(1.5)).unwrap().shape).unwrap().shape;
+        let u = crate::fuse(&bars, &ring).unwrap().shape;
+        let u = crate::cut(&u, &half(0.5)).unwrap().shape;
+        let u = crate::cut(&u, &crate::make_box_corners(DVec3::new(-11.0, -1.0, 3.0), DVec3::new(0.0, 1.0, 4.0)).unwrap()).unwrap().shape;
+        let at = |z: f64| u.edges().iter().position(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Line { .. }) && [i.start, i.end].iter().all(|p| p.x.abs() < 1e-6 && (p.z - z).abs() < 1e-6))).unwrap_or_else(|| panic!("no edge at z {z}")) as u32;
+        let outline = |z: f64| ProjectedEdge { visibility: Visibility::Visible, class: EdgeClass::Outline, polyline: vec![DVec2::new(-0.5, z), DVec2::new(0.5, z)], source_edge: Some(at(z)), freeform: false };
+        let e = hide_outline_edges_behind_faces(&u, DVec3::NEG_X, DVec3::Z, vec![outline(3.0), outline(2.0)]);
+        assert_eq!(e.iter().map(|e| e.visibility).collect::<Vec<_>>(), [Visibility::Hidden, Visibility::Visible]);
     }
 
     #[test]

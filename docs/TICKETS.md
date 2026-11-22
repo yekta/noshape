@@ -314,6 +314,11 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   edge by orientation (interior side) doesn't work: their in / out sides don't alternate round the edges (54 of 112
   pairings not mutual), so the file doesn't say which triangles make which body. Ours kept. Repro: exchange suite,
   option STL-FINE (live-opt-fine.stl).
+- [ ] P3 DRW-HATCH-CREATION-ORDER (dx 11-22; live/dx/hatch5-1122 B6) A section through several parts hatches each part by
+  its place in the parts' creation order (live B6: P2's sketch and extrude moved to the top of the feature list, angles
+  unchanged, 90 0 90 0 90). Ours ranks by the Part Studio's body order (views.rs part_order), which follows the feature
+  order, so after a feature reorder the angles change. Feature ids are random and carry no insertion stamp: a creation key
+  needs a stored counter (model-data). Also open there: B3 / B5 (copies of several parts: 145, 100, 10) fit no rule yet.
 - [ ] P3 STL-SURFACE-EDGES (dx 11-21; live behaviours "dx (11-21 14:06)") An imported STL's surface in live has one
   closed edge per boundary loop and no vertices unless loops touch (duct S1 2 edges 0 vertices, S8 3 / 1; bottle every
   surface 1 / 0); its boundary is drawn and pickable. Ours: a mesh face without edges (mesh_body.cpp mesh_face), so

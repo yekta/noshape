@@ -798,18 +798,17 @@ pub fn auto_hatch_spacing(segments: &[[[f64; 2]; 2]], poles: &[[f64; 2]]) -> f64
 /// Each part's hatch in a section through several, given its part (`part_order`; None: a part of its own): whether its
 /// lines turn 90 degrees (135 instead of 45), and its spacing factor. Live dx hatch-1122: the angles follow the set of
 /// parts, not the insert order, the instances or the sheet: the last part in Part Studio order turned, then not / turned
-/// going back through the order; another copy of a part turned at 0.7 x the spacing, its first copy not turned.
+/// going back through the order; a part's copies alternate from not turned, the turned ones at 0.7 x the spacing (dx
+/// hatch5-1122 B4; a section with copies of several parts gives other angles, B3 / B5, not modelled).
 pub fn section_part_hatches(parts: &[Option<(u64, usize)>]) -> Vec<(bool, f64)> {
     let keys: Vec<(u64, usize)> = parts.iter().enumerate().map(|(i, p)| p.unwrap_or((u64::MAX, i))).collect();
     let mut distinct = keys.clone();
     distinct.sort();
     distinct.dedup();
     keys.iter().enumerate().map(|(i, k)| {
-        if keys[..i].contains(k) {
-            return (true, 0.7);
-        }
-        if keys[i + 1..].contains(k) {
-            return (false, 1.0);
+        let copy = keys[..i].iter().filter(|x| *x == k).count();
+        if copy > 0 || keys[i + 1..].contains(k) {
+            return if copy % 2 == 1 { (true, 0.7) } else { (false, 1.0) };
         }
         let rank = distinct.iter().position(|d| d == k).unwrap_or(0);
         ((distinct.len() - 1 - rank).is_multiple_of(2), 1.0)

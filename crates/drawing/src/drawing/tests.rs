@@ -380,6 +380,11 @@ fn section_hatch_angles_follow_the_part_studio_order() {
     assert_eq!(turned(&[p(3), p(0), p(2), p(1)]), [true, false, false, true]);
     // A6: two copies of P1: one at 0, the other at 90 and 0.7 x.
     assert_eq!(build::section_part_hatches(&[p(0), p(0)]), [(false, 1.0), (true, 0.7)]);
+    // dx hatch5-1122 B4: five copies of P1 alternate; B1 / B2: five and six distinct parts, the last turned.
+    let (a, b) = ((false, 1.0), (true, 0.7));
+    assert_eq!(build::section_part_hatches(&[p(0); 5]), [a, b, a, b, a]);
+    assert_eq!(turned(&[p(0), p(1), p(2), p(3), p(4)]), [true, false, true, false, true]);
+    assert_eq!(turned(&[p(0), p(1), p(2), p(3), p(4), p(5)]), [false, true, false, true, false, true]);
 }
 
 /// Live asb 10-23 views (4): Edit hatch section restyles one region of the
