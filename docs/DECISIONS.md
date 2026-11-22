@@ -189,3 +189,5 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-21 (user) Use the user's Mac up to half of it: two build slots of 3 jobs at nice 19 (6 of 12 cores); anyone
   may use it (NOSHAPE_RB_HOST=mac) and waits for the slot. Default routing (tools/tiers/rb-hosts) is the vibe hosts;
   vibe2 (16 cores) takes 3 agent build slots of 4 jobs besides the land queue. Older Mac slot rulings are void.
+- 11-22 (user) The user's Mac is closed to our builds, tests and app runs: the user could not reach it through Motile while
+  two of our builds ran there. No NOSHAPE_RB_HOST=mac until the user reopens it; speed on a real GPU waits for that.
