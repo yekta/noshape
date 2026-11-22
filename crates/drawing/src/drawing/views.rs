@@ -1378,6 +1378,9 @@ pub struct ViewGeometry {
     pub snaps: Vec<Snap>,
     /// Closed boundary loops (as segment soups) of section cut faces.
     pub section_segments: Vec<[[f64; 2]; 2]>,
+    /// A section through several parts: where each part's `section_segments` end, in the parts' order (live hatches
+    /// each its own way). Empty: one part.
+    pub section_part_ends: Vec<usize>,
     /// Detail crop circle (center, radius) in view coordinates.
     pub clip: Option<([f64; 2], f64)>,
     /// Detail crop polygon (rectangle / polygon / spline profiles), view
@@ -3123,6 +3126,156 @@ fn mesh_edges_drawn(compound: &Shape, faceted: &[Option<Shape>], dir: DVec3) -> 
     out
 }
 
+/// A view's mesh parts as triangles, for whether they cover a point of another part: a facet in front of it does,
+/// unless the point lies on the facet's plane within `tol` (an edge on the mesh's surface, or just inside where the
+/// facets cut a curve's chords: c2-hex-bookcase-derived's screw-hole rims round its mesh's polygonal holes, drawn
+/// where the hole shows them in Iso, hidden under the mesh's top face in Top).
+struct MeshCover {
+    tris: Vec<[DVec3; 3]>,
+    /// Triangles by the grid cells (of side `cell`, in the view plane) their boxes overlap.
+    cells: HashMap<(i64, i64), Vec<u32>>,
+    cell: f64,
+    frame: ViewFrame,
+    tol: f64,
+    lo: [f64; 2],
+    hi: [f64; 2],
+}
+
+impl MeshCover {
+    fn new(meshes: &[&Shape], frame: &ViewFrame, tol: f64) -> Option<MeshCover> {
+        let mut tris = Vec::new();
+        for m in meshes {
+            let Ok(t) = noshape_kernel::tessellate(m, tol, 0.5, false) else { continue };
+            let p = |i: u32| t.positions.get(i as usize).map(|v| DVec3::new(v[0] as f64, v[1] as f64, v[2] as f64));
+            tris.extend(t.indices.as_chunks::<3>().0.iter().filter_map(|c| Some([p(c[0])?, p(c[1])?, p(c[2])?])));
+        }
+        if tris.is_empty() {
+            return None;
+        }
+        let boxes: Vec<([f64; 2], [f64; 2])> = tris
+            .iter()
+            .map(|t| {
+                let q = t.map(|v| frame.project(v));
+                ([q[0][0].min(q[1][0]).min(q[2][0]), q[0][1].min(q[1][1]).min(q[2][1])], [q[0][0].max(q[1][0]).max(q[2][0]), q[0][1].max(q[1][1]).max(q[2][1])])
+            })
+            .collect();
+        let (lo, hi) = boxes.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), (a, b)| ([lo[0].min(a[0]), lo[1].min(a[1])], [hi[0].max(b[0]), hi[1].max(b[1])]));
+        let (w, h) = (hi[0] - lo[0], hi[1] - lo[1]);
+        let cell = (w * h / tris.len() as f64).sqrt().max(w.max(h) / 512.0).max(tol);
+        let ix = |x: f64| (x / cell).floor() as i64;
+        let mut cells: HashMap<(i64, i64), Vec<u32>> = HashMap::new();
+        for (i, (a, b)) in boxes.iter().enumerate() {
+            for x in ix(a[0])..=ix(b[0]) {
+                for y in ix(a[1])..=ix(b[1]) {
+                    cells.entry((x, y)).or_default().push(i as u32);
+                }
+            }
+        }
+        Some(MeshCover { tris, cells, cell, frame: *frame, tol, lo, hi })
+    }
+
+    fn covers(&self, p: DVec3) -> bool {
+        let q = self.frame.project(p);
+        let Some(ids) = self.cells.get(&((q[0] / self.cell).floor() as i64, (q[1] / self.cell).floor() as i64)) else { return false };
+        // Moller-Trumbore, the ray from the point toward the viewer.
+        let d = -self.frame.dir;
+        ids.iter().any(|&i| {
+            let [a, b, c] = self.tris[i as usize];
+            let (e1, e2) = (b - a, c - a);
+            let n = e1.cross(e2);
+            if n.length() <= 0.0 || (n.dot(p - a) / n.length()).abs() <= self.tol {
+                return false;
+            }
+            let h = d.cross(e2);
+            let det = e1.dot(h);
+            if det.abs() <= 1e-12 * n.length() {
+                return false;
+            }
+            let s = p - a;
+            let u = s.dot(h) / det;
+            let w = s.cross(e1);
+            let v = d.dot(w) / det;
+            (0.0..=1.0).contains(&u) && v >= 0.0 && u + v <= 1.0 && e2.dot(w) / det > 0.0
+        })
+    }
+
+    /// A visible piece of `edge`'s projection split where the meshes start or stop covering it: (visible, points)
+    /// runs in its order, each split point on the edge (bisected to 1/1024 of a sample step). None: left as it is
+    /// (away from the meshes, or the edge can't be sampled).
+    fn split(&self, points: &[DVec2], edge: &Shape, step: f64) -> Option<Vec<(bool, Vec<DVec2>)>> {
+        let (plo, phi) = points.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p.x), lo[1].min(p.y)], [hi[0].max(p.x), hi[1].max(p.y)]));
+        if phi[0] < self.lo[0] || plo[0] > self.hi[0] || phi[1] < self.lo[1] || plo[1] > self.hi[1] {
+            return None;
+        }
+        let info = edge.edge_info().ok()?;
+        let m = ((info.length / (step * 0.5)).ceil() as usize).clamp(8, 2000);
+        let t: Vec<f64> = (0..=m).map(|k| info.first_param + (info.last_param - info.first_param) * k as f64 / m as f64).collect();
+        let at = |t: f64| edge.point_at(t).ok().map(|p| (DVec2::from(self.frame.project(p)), self.covers(p)));
+        let samples: Vec<(DVec2, bool)> = t.iter().map(|t| at(*t)).collect::<Option<_>>()?;
+        if samples.iter().all(|s| !s.1) {
+            return None;
+        }
+        // The sample nearest a point: around the previous one's first (one curve point may project where another does).
+        let reach = samples.windows(2).map(|w| w[0].0.distance(w[1].0)).fold(0.0, f64::max) * 2.0;
+        let nearest = |q: DVec2, near: Option<usize>| {
+            let best = |r: std::ops::RangeInclusive<usize>| r.map(|k| (k, samples[k].0.distance(q))).min_by(|a, b| a.1.total_cmp(&b.1));
+            near.and_then(|k| best(k.saturating_sub(8)..=(k + 8).min(m)).filter(|b| b.1 <= reach)).or_else(|| best(0..=m)).map_or(0, |b| b.0)
+        };
+        let closed = info.closed && samples[0].0.distance(samples[m].0) <= step * 1e-3;
+        let mut runs: Vec<(bool, Vec<DVec2>)> = Vec::new();
+        let mut k0 = nearest(points[0], None);
+        let mut covered = samples[k0].1;
+        let mut run = vec![points[0]];
+        for q in &points[1..] {
+            let k1 = nearest(*q, Some(k0));
+            let mut d = k1 as i64 - k0 as i64;
+            if closed && d.unsigned_abs() as usize > m / 2 {
+                d -= d.signum() * m as i64;
+            }
+            for j in 0..d.unsigned_abs() as i64 {
+                let a = k0 as i64 + j * d.signum();
+                // Samples s and s + 1 (on a closed edge, m - 1 and m across its seam).
+                let s = a.min(a + d.signum()).rem_euclid(m as i64) as usize;
+                let (from, to) = if d > 0 { (s, s + 1) } else { (s + 1, s) };
+                if samples[to].1 == covered {
+                    continue;
+                }
+                let (mut ta, mut tb) = (t[from], t[to]);
+                for _ in 0..10 {
+                    let mid = (ta + tb) * 0.5;
+                    match at(mid) {
+                        Some((_, c)) if c == covered => ta = mid,
+                        _ => tb = mid,
+                    }
+                }
+                let Some((split, _)) = at((ta + tb) * 0.5) else { continue };
+                run.push(split);
+                runs.push((!covered, std::mem::replace(&mut run, vec![split])));
+                covered = samples[to].1;
+            }
+            run.push(*q);
+            k0 = k1;
+        }
+        runs.push((!covered, run));
+        runs.retain(|r| r.1.len() >= 2 && r.1.windows(2).any(|w| w[0].distance(w[1]) > 0.0));
+        // A run shorter than the tolerance (where the edge touches a facet's corner) takes its neighbours' side.
+        let length = |r: &[DVec2]| r.windows(2).map(|w| w[0].distance(w[1])).sum::<f64>();
+        if runs.iter().any(|r| length(&r.1) >= self.tol) {
+            for r in runs.iter_mut().filter(|r| length(&r.1) < self.tol) {
+                r.0 = !r.0;
+            }
+        }
+        let mut merged: Vec<(bool, Vec<DVec2>)> = Vec::new();
+        for (seen, pts) in runs {
+            match merged.last_mut() {
+                Some((s, prev)) if *s == seen => prev.extend(pts.into_iter().skip(1)),
+                _ => merged.push((seen, pts)),
+            }
+        }
+        Some(merged)
+    }
+}
+
 /// Pieces of a mesh part's lines joined end to end where exactly two meet (within `tol`), runs on one line collapsed:
 /// live draws a mesh's silhouettes and folds as polylines.
 fn chain_pieces(pieces: Vec<Vec<[f64; 2]>>, tol: f64) -> Vec<Vec<[f64; 2]>> {
@@ -3269,7 +3422,16 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     }
     let compound = if shapes.len() == 1 { shapes[0].clone() } else { Shape::compound(&shapes) };
     let mesh_drawn = mesh_edges_drawn(&compound, &faceted, frame.dir);
-    // Compound edge index -> (body index, body edge index).
+    // With mesh parts and other parts in the view, the other parts' lines come from a pass of their own, then hidden
+    // where a mesh covers them (`MeshCover`): in one pass with the mesh, the facets they lie on hid them.
+    let solids: Vec<Shape> = bodies.iter().zip(&faceted).filter(|(_, f)| f.is_none()).map(|(b, _)| b.shape.clone()).collect();
+    let mixed = !solids.is_empty() && solids.len() < shapes.len();
+    let edge_compound = match (mixed, solids.len()) {
+        (false, _) => compound.clone(),
+        (true, 1) => solids[0].clone(),
+        (true, _) => Shape::compound(&solids),
+    };
+    // Edge index in `edge_compound` -> (body index, body edge index).
     let mut cmap: HashMap<usize, (usize, usize)> = HashMap::new();
     for (bi, pb) in bodies.iter().enumerate().filter(|(bi, _)| faceted[*bi].is_none()) {
         for (i, e) in pb.shape.edges().iter().enumerate() {
@@ -3280,14 +3442,15 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
                 },
                 None => i,
             };
-            if let Some(ci) = compound.index_of(e, ShapeType::Edge) {
+            if let Some(ci) = edge_compound.index_of(e, ShapeType::Edge) {
                 cmap.insert(ci, (bi, src));
             }
         }
     }
     let diag = compound.bounding_box(false).map(|b| b.diagonal()).unwrap_or(0.1).max(1e-6);
     let defl = if exact { diag / 1500.0 } else { diag / 500.0 };
-    let projected = match noshape_kernel::project_hlr_with(&compound, frame.dir, frame.up, exact, defl) {
+    let hlr = |shape: &Shape| noshape_kernel::project_hlr_with(shape, frame.dir, frame.up, exact, defl);
+    let mut projected = match hlr(&compound) {
         Ok(p) => p,
         Err(e) => {
             g.error = Some(format!("Hidden line removal failed: {e}"));
@@ -3295,29 +3458,50 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             return g;
         }
     };
-    let mut models = ModelEdges { bodies, frame, topo: HashMap::new(), index: HashMap::new() };
     let mut mesh_pieces: Vec<(bool, Vec<[f64; 2]>)> = Vec::new();
-    // A part's edge behind a mesh glimpsed past the facets' corners, in pieces shorter than the projection's own
-    // deflection, is hidden (live: c2-hex-bookcase-derived's hole rims under its mesh's polygonal holes).
-    let edges = if faceted.iter().any(Option::is_some) { compound.edges() } else { Vec::new() };
-    let glimpse = |pe: &noshape_kernel::ProjectedEdge| {
-        let length: f64 = pe.polyline.windows(2).map(|w| w[0].distance(w[1])).sum();
-        pe.visibility == Visibility::Visible && length < defl && pe.source_edge.filter(|ci| !mesh_drawn.contains_key(&(*ci as usize))).and_then(|ci| edges.get(ci as usize)).and_then(|e| e.length().ok()).is_some_and(|l| l > defl)
-    };
-    for pe in projected {
-        if pe.polyline.len() < 2 || glimpse(&pe) {
-            continue;
+    projected.retain(|pe| {
+        let Some(drawn) = pe.source_edge.and_then(|ci| mesh_drawn.get(&(ci as usize))) else { return !mixed };
+        if *drawn && pe.polyline.len() >= 2 {
+            mesh_pieces.push((pe.visibility == Visibility::Visible, pe.polyline.iter().map(|p| [p.x, p.y]).collect()));
         }
-        if let Some(drawn) = pe.source_edge.and_then(|ci| mesh_drawn.get(&(ci as usize))) {
-            if *drawn {
-                mesh_pieces.push((pe.visibility == Visibility::Visible, pe.polyline.iter().map(|p| [p.x, p.y]).collect()));
+        false
+    });
+    let mut pieces: Vec<(noshape_kernel::ProjectedEdge, Option<bool>)> = projected.into_iter().map(|pe| (pe, None)).collect();
+    if mixed {
+        let own = match hlr(&edge_compound) {
+            Ok(p) => p,
+            Err(e) => {
+                g.error = Some(format!("Hidden line removal failed: {e}"));
+                g.update_bounds();
+                return g;
             }
+        };
+        let meshes: Vec<&Shape> = bodies.iter().filter(|b| b.shape.is_mesh()).map(|b| &b.shape).collect();
+        let cover = MeshCover::new(&meshes, frame, defl);
+        let edges = edge_compound.edges();
+        for pe in own {
+            let split = match (&cover, pe.visibility, pe.source_edge.and_then(|ci| edges.get(ci as usize))) {
+                (Some(cover), Visibility::Visible, Some(edge)) if pe.polyline.len() >= 2 => cover.split(&pe.polyline, edge, defl),
+                _ => None,
+            };
+            let Some(runs) = split else {
+                pieces.push((pe, None));
+                continue;
+            };
+            for (visible, polyline) in runs {
+                pieces.push((noshape_kernel::ProjectedEdge { polyline, visibility: pe.visibility, class: pe.class, source_edge: pe.source_edge, freeform: pe.freeform }, Some(visible)));
+            }
+        }
+    }
+    let mut models = ModelEdges { bodies, frame, topo: HashMap::new(), index: HashMap::new() };
+    for (pe, visible) in pieces {
+        if pe.polyline.len() < 2 {
             continue;
         }
         let model = pe.source_edge.and_then(|ci| cmap.get(&(ci as usize)).copied()).and_then(|(bi, ei)| models.of(&mut g, bi, ei));
         g.edges.push(ViewEdge {
             points: pe.polyline.iter().map(|p| [p.x, p.y]).collect(),
-            visible: pe.visibility == Visibility::Visible,
+            visible: visible.unwrap_or(pe.visibility == Visibility::Visible),
             class: pe.class,
             model,
             sketch: SketchEdge::None,
@@ -3328,7 +3512,7 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
     }
     join_pieces_of_one_edge(&mut g.edges, diag * 1e-7);
     if bodies.len() > 1 {
-        mark_shared_edges(&mut g, &models, &compound, &cmap, diag);
+        mark_shared_edges(&mut g, &models, &edge_compound, &cmap, diag);
     }
     let size = compound.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     for visible in [true, false] {
@@ -3570,7 +3754,17 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
     if g.error.is_none() {
         g.error = error;
     }
-    g.section_segments = section_segments_of(&faces, frame);
+    // Each part's cut faces together (they come in the parts' order).
+    let owner: Vec<Option<usize>> = faces.iter().map(|f| pbs.iter().position(|pb| pb.shape.index_of(f, ShapeType::Face).is_some())).collect();
+    let mut start = 0;
+    for group in owner.chunk_by(|a, b| a == b) {
+        g.section_segments.extend(section_segments_of(&faces[start..start + group.len()], frame));
+        start += group.len();
+        g.section_part_ends.push(g.section_segments.len());
+    }
+    if g.section_part_ends.len() < 2 {
+        g.section_part_ends.clear();
+    }
     if g.section_segments.is_empty() && full {
         // Fallback: planar section of the original bodies.
         for b in &bodies {
@@ -4074,6 +4268,7 @@ fn detail_geometry(id: ViewId, parent: &ViewGeometry, center: [f64; 2], radius: 
     // Section boundaries stay whole (closed loops) so hatching works; the
     // hatch lines are clipped to the detail circle when the sheet is built.
     g.section_segments = parent.section_segments.clone();
+    g.section_part_ends = parent.section_part_ends.clone();
     for a in &parent.axes {
         for piece in clip(&[a[0], a[1]]) {
             if piece.len() >= 2 {
@@ -4445,6 +4640,51 @@ mod tests {
         assert_eq!(alone.ends.len(), 1, "{:?}", alone.ends);
         let covered = project_bodies(ViewId(1), &pbs, &frame, true, &|_, _| true);
         assert!(covered.ends.is_empty(), "{:?}", covered.ends);
+    }
+
+    /// A mesh part hides another part's edge behind its facets, not one lying on them: a mesh copy of a plate with a
+    /// hole (an STL, the hole a polygon round its circle) on a plate with the same hole, whose top rim lies just
+    /// outside the polygon. Iso shows the rim's far half through the hole, Top none of it (live's
+    /// c2-hex-bookcase-derived: the far half an ELLIPSE, Top no CIRCLE).
+    #[test]
+    fn a_mesh_hides_what_lies_behind_its_facets_not_on_them() {
+        use noshape_kernel::{Plane, cut, make_box_corners, make_cylinder};
+        let f = crate::reference::FeatureId(1);
+        let body = |i: u32, s: Shape| Arc::new(Body::new(BodyId { feature: f, index: i }, format!("Part {i}"), BodyKind::Solid, s, Vec::new(), 0, f));
+        let r = 0.005;
+        let plate = |z0: f64, z1: f64| {
+            let block = make_box_corners(DVec3::new(-0.04, -0.04, z0), DVec3::new(0.04, 0.04, z1)).unwrap();
+            let tool = make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, z0 - 0.001), DVec3::Z, DVec3::X), r, z1 - z0 + 0.002, std::f64::consts::TAU).unwrap();
+            cut(&block, &tool).unwrap().shape
+        };
+        let dir = std::env::temp_dir().join(format!("noshape-view-mesh-cover-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let stl = dir.join("lid.stl");
+        noshape_kernel::write_stl(&plate(0.0, 0.001), &stl, 2e-5, noshape_kernel::StlFormat::Binary).unwrap();
+        let mesh = noshape_kernel::read_mesh_bodies(&stl, noshape_kernel::LengthUnit::Meter).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(mesh.is_mesh());
+        let bodies = [body(0, plate(-0.01, 0.0)), body(1, mesh)];
+        let pbs: Vec<ProjBody> = bodies.iter().map(|b| ProjBody { body: b, shape: b.shape.clone(), edge_map: None }).collect();
+        // The top rim's pieces (visible, points).
+        let rim = |frame: &ViewFrame| {
+            let g = project_bodies(ViewId(1), &pbs, frame, true, &|_, _| true);
+            assert!(g.error.is_none(), "{:?}", g.error);
+            let c = frame.project(DVec3::ZERO);
+            let top = |m: u32| matches!(g.model_edges[m as usize].geom, EdgeGeom::Circle { center, .. } if (center[0] - c[0]).hypot(center[1] - c[1]) < 1e-9);
+            g.edges.iter().filter(|e| !e.mesh && e.model.is_some_and(top)).map(|e| (e.visible, e.points.clone())).collect::<Vec<_>>()
+        };
+        let length = |p: &[[f64; 2]]| p.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
+        let iso = orientation_frame(ViewOrientation::Isometric);
+        let pieces = rim(&iso);
+        let (seen, all) = pieces.iter().fold((0.0, 0.0), |(s, a), (v, p)| (s + if *v { length(p) } else { 0.0 }, a + length(p)));
+        // The far half, less its ends where the hole's near wall (1 mm high) hides it: ~0.46.
+        assert!(all > 0.0 && (0.4..0.5).contains(&(seen / all)), "Iso shows {seen} of {all}: {pieces:?}");
+        // The far half: above the rim's centre on the sheet.
+        let c = iso.project(DVec3::ZERO);
+        assert!(pieces.iter().filter(|p| p.0).flat_map(|p| &p.1).all(|q| q[1] > c[1] - 1e-4), "{pieces:?}");
+        let top = rim(&orientation_frame(ViewOrientation::Top));
+        assert!(!top.is_empty() && top.iter().all(|p| !p.0), "Top: {top:?}");
     }
 
     /// A hole through a tube's wall: its rims (no circles in the model) are drawn on the hole's circle seen along the

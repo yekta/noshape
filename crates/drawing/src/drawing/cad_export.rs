@@ -1358,12 +1358,13 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
         for region in hatch_regions(&h.loops) {
             let mut e = Hatch::new();
             let mut pattern = HatchPattern::new("ANSI31");
-            let s = h.spacing * k;
-            pattern.add_line(HatchPatternLine { angle: std::f64::consts::FRAC_PI_4, base_point: Vector2::new(0.0, 0.0), offset: Vector2::new(-s / std::f64::consts::SQRT_2, s / std::f64::consts::SQRT_2), dash_lengths: Vec::new() });
+            let s = h.spacing * k / std::f64::consts::SQRT_2;
+            let (angle, offset) = if h.flipped { (3.0 * std::f64::consts::FRAC_PI_4, Vector2::new(-s, -s)) } else { (std::f64::consts::FRAC_PI_4, Vector2::new(-s, s)) };
+            pattern.add_line(HatchPatternLine { angle, base_point: Vector2::new(0.0, 0.0), offset, dash_lengths: Vec::new() });
             e.pattern = pattern;
             e.is_solid = false;
             e.pattern_type = HatchPatternType::Custom;
-            e.pattern_angle = 0.0;
+            e.pattern_angle = if h.flipped { std::f64::consts::FRAC_PI_2 } else { 0.0 };
             // ANSI31's lines are 0.125 in apart at scale 1.
             e.pattern_scale = h.spacing / 3.175;
             for lp in region.iter().map(|i| &h.loops[*i]) {
@@ -1786,7 +1787,7 @@ mod tests {
     fn each_hatched_region_is_its_own_hatch() {
         let sq = |x: f64, y: f64, w: f64| vec![[x, y], [x + w, y], [x + w, y + w], [x, y + w]];
         let mut g = sample();
-        g.hatches.push(crate::drawing::cad_layers::HatchRegion { loops: vec![sq(60.0, 60.0, 20.0), sq(100.0, 60.0, 20.0), sq(105.0, 65.0, 5.0)], spacing: 2.0, lines: 0..0 });
+        g.hatches.push(crate::drawing::cad_layers::HatchRegion { loops: vec![sq(60.0, 60.0, 20.0), sq(100.0, 60.0, 20.0), sq(105.0, 65.0, 5.0)], spacing: 2.0, flipped: false, lines: 0..0 });
         let doc = cad_document(&g, 4, DxfVersion::AC1032).unwrap();
         let loops: Vec<usize> = doc.entities().filter_map(|e| if let EntityType::Hatch(h) = e { Some(h.paths.len()) } else { None }).collect();
         assert_eq!(loops, [1, 2]);
@@ -2200,7 +2201,7 @@ mod tests {
             g.line(l[0], l[1], LineStyle::Thin);
         }
         assert!(g.lines.len() > l0);
-        g.hatches.push(crate::drawing::cad_layers::HatchRegion { loops, spacing: 2.5, lines: l0..g.lines.len() });
+        g.hatches.push(crate::drawing::cad_layers::HatchRegion { loops, spacing: 2.5, flipped: false, lines: l0..g.lines.len() });
         let dxf = String::from_utf8(to_dxf_version(&g, 4, DxfVersion::AC1032).unwrap()).unwrap();
         let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf.as_bytes().to_vec())).unwrap().read().unwrap();
         let hatches: Vec<&acadrust::entities::hatch::Hatch> = doc.entities().filter_map(|e| if let EntityType::Hatch(h) = e { Some(h.as_ref()) } else { None }).collect();

@@ -794,6 +794,18 @@ pub fn auto_hatch_spacing(segments: &[[[f64; 2]; 2]], poles: &[[f64; 2]]) -> f64
     ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / k).max(0.3)
 }
 
+/// A part's own hatch spacing in a section through several (mm): its cut's sheet box diagonal ÷ 13, as for a view of
+/// several regions (live wf23: the block's lines 14.6 px apart, its two halves' box 172 x 87 px; the pin's 10.6, its
+/// box 43 x 130).
+pub fn part_hatch_spacing(segments: &[[[f64; 2]; 2]]) -> f64 {
+    let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+    for p in segments.iter().flatten() {
+        lo = [lo[0].min(p[0]), lo[1].min(p[1])];
+        hi = [hi[0].max(p[0]), hi[1].max(p[1])];
+    }
+    ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / 13.0).max(0.3)
+}
+
 /// The regions a cut's boundary `segments` encloses: its loops (split where two touch, an aligned section's legs at
 /// their fold) that no other loop holds, or an even number do (holes don't count).
 fn hatch_region_count(segments: &[[[f64; 2]; 2]]) -> usize {
@@ -843,6 +855,13 @@ pub fn hatch(segments: &[[[f64; 2]; 2]], spacing: f64) -> Vec<[[f64; 2]; 2]> {
         }
     }
     out
+}
+
+/// [`hatch`] with its lines at 135 degrees.
+pub fn hatch_flipped(segments: &[[[f64; 2]; 2]], spacing: f64) -> Vec<[[f64; 2]; 2]> {
+    let m = |p: [f64; 2]| [-p[0], p[1]];
+    let mirrored: Vec<[[f64; 2]; 2]> = segments.iter().map(|s| [m(s[0]), m(s[1])]).collect();
+    hatch(&mirrored, spacing).into_iter().map(|l| [m(l[0]), m(l[1])]).collect()
 }
 
 fn circle_points(c: [f64; 2], r: f64, n: usize) -> Vec<[f64; 2]> {
@@ -2131,7 +2150,6 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             if !geo.section_segments.is_empty() {
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
-                let hatch_l0 = g.lines.len();
                 // A spline broken-out profile's pieces over the cut count by their control points.
                 let poles: Vec<[f64; 2]> = v.broken_out.iter().filter(|b| b.spline && b.profile.len() >= 3).flat_map(|b| broken_out_pieces(&pl, b, &segs)).flatten().collect();
                 let spacing = auto_hatch_spacing(&segs, &poles);
@@ -2156,13 +2174,23 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 match regions {
                     None if patterned.is_some() => {}
                     None => {
-                        for l in hatch(&segs, spacing) {
-                            push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
-                        }
-                        // An uncut, unbroken section: the boundary for the HATCH entity.
-                        if whole && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6) {
-                            let loops = loops.iter().flat_map(|l| super::cad_layers::split_at_touches(l, 1e-6)).collect();
-                            g.hatches.push(super::cad_layers::HatchRegion { loops, spacing, lines: hatch_l0..g.lines.len() });
+                        // A section through several parts: each its own hatch (live wf23, block and pin: 45 degree lines
+                        // for the first, 135 for the next, each spaced by its own cut's size).
+                        let ends = &geo.section_part_ends;
+                        let ends: &[usize] = if ends.len() < 2 { &[segs.len()] } else { ends };
+                        let parts: Vec<std::ops::Range<usize>> = (0..ends.len()).map(|i| if i == 0 { 0 } else { ends[i - 1] }..ends[i]).collect();
+                        for (i, part) in parts.iter().enumerate() {
+                            let (part, flipped) = (&segs[part.clone()], i % 2 == 1);
+                            let spacing = if parts.len() > 1 { part_hatch_spacing(part) } else { spacing };
+                            let l0 = g.lines.len();
+                            for l in if flipped { hatch_flipped(part, spacing) } else { hatch(part, spacing) } {
+                                push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
+                            }
+                            // An uncut, unbroken section: the boundary for the HATCH entity.
+                            if whole && let Some(loops) = super::cad_layers::chain_loops(part, 1e-6) {
+                                let loops = loops.iter().flat_map(|l| super::cad_layers::split_at_touches(l, 1e-6)).collect();
+                                g.hatches.push(super::cad_layers::HatchRegion { loops, spacing, flipped, lines: l0..g.lines.len() });
+                            }
                         }
                     }
                     Some(regions) => {

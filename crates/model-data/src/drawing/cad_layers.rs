@@ -279,6 +279,8 @@ impl SheetGeometry {
 pub struct HatchRegion {
     pub loops: Vec<Vec<[f64; 2]>>,
     pub spacing: f64,
+    /// Lines at 135 degrees, not 45 (every other part of a section through several).
+    pub flipped: bool,
     pub lines: std::ops::Range<usize>,
 }
 

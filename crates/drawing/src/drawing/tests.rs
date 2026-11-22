@@ -319,6 +319,46 @@ fn auto_hatch_spacing_follows_the_regions_size_on_paper() {
     assert!((s - in_(0.62795)).abs() < 1e-3, "{s}");
 }
 
+/// A section through several parts hatches each its own way (live wf23, pin-block-asm: the block's lines at 45
+/// degrees, the pin's at 135 and closer, each spaced by its own cut's size): the demo assembly cut through its pin.
+#[test]
+fn a_section_through_several_parts_hatches_each_its_own_way() {
+    let (doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let mut drawing = Drawing::default();
+    drawing.sheets[0].views.push(base_view(1, asm, ViewOrientation::Top, [150.0, 200.0]));
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let top = compute_view(&drawing, &drawing.sheets[0], ViewId(1), &sources, &cache, false);
+    let c = top.model_edges.iter().find_map(|m| match m.geom {
+        views::EdgeGeom::Circle { center, radius, .. } if (radius - 0.012).abs() < 1e-6 => Some(center),
+        _ => None,
+    });
+    let c = c.expect("the pin's circle");
+    let line = vec![[c[0] - 0.3, c[1]], [c[0] + 0.3, c[1]]];
+    drawing.sheets[0].views.push(DrawingView { id: ViewId(2), kind: ViewKind::Section { parent: ViewId(1), line, label: "A".into(), cuts: vec![] }, position: [150.0, 80.0], ..Default::default() });
+    let sec = compute_view(&drawing, &drawing.sheets[0], ViewId(2), &sources, &cache, true);
+    assert!(sec.error.is_none(), "{:?}", sec.error);
+    assert_eq!(sec.section_part_ends.len(), 3, "two plates and the pin: {:?}", sec.section_part_ends);
+    let built = render_sheet(&drawing, 0, &sources, &cache, true).unwrap();
+    let hatches = &built.geometry.hatches;
+    // In the parts' order (the assembly's instances: two plates, then the pin).
+    assert_eq!(hatches.iter().map(|h| h.flipped).collect::<Vec<_>>(), [false, true, false]);
+    // Each part's hatch lines at its own angle and spacing.
+    for h in hatches {
+        let lines = &built.geometry.lines[h.lines.clone()];
+        assert!(!lines.is_empty());
+        for l in lines {
+            let (a, b) = (l.points[0], l.points[l.points.len() - 1]);
+            let slope = (b[1] - a[1]) / (b[0] - a[0]);
+            assert!((slope - if h.flipped { -1.0 } else { 1.0 }).abs() < 1e-6, "{slope}");
+        }
+        let box_of = h.loops.iter().flatten().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), p| ([lo[0].min(p[0]), lo[1].min(p[1])], [hi[0].max(p[0]), hi[1].max(p[1])]));
+        let diag = (box_of.1[0] - box_of.0[0]).hypot(box_of.1[1] - box_of.0[1]);
+        assert!((h.spacing - (diag / 13.0).max(0.3)).abs() < 1e-9, "{} vs {diag}", h.spacing);
+    }
+}
+
 /// Live asb 10-23 views (4): Edit hatch section restyles one region of the
 /// cut; the others keep the drawing's hatch.
 #[test]
