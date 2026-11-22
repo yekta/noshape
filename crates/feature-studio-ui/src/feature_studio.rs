@@ -1182,7 +1182,7 @@ impl FeatureStudioView {
                     .when(self.outline.is_some(), |d| d.bg(pal.border))
                     .tooltip(crate::ui::tooltip("Module outline (cmd+shift+O / ctrl+shift+O)")).map(|d| crate::ui_script::mark(d, || "button:Module outline".into()))
                     .child(os::glyph(os::GLYPH_OUTLINE, 20., pal.text))
-                    .child(div().flex_grow().flex_shrink().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
+                    .child(div().flex_grow(1.).flex_shrink(1.).min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., pal.text))
                     .child(probe(&out_anchor))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_outline(window, cx))),

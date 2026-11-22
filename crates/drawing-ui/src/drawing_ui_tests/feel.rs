@@ -3383,7 +3383,11 @@ fn a_hovered_balloon_keeps_its_leader_black(cx: &mut TestAppContext) {
     use crate::drawing_view::{DRAWING_HOVER, DRAWING_SELECTED};
     SUGGESTED.set(true);
     SETUP.set(Some(|ctx, dw| {
-        call(ctx, "drawing_callout", json!({ "drawing": dw, "anchor": [200, 160], "position": [230, 185], "text": "1" }));
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let edge = g["views"][0]["edges"].as_array().and_then(|e| e.iter().find(|e| e["type"] == "line").cloned()).expect("a view edge");
+        let mid = [(num(&edge["a"][0]) + num(&edge["b"][0])) / 2.0, (num(&edge["a"][1]) + num(&edge["b"][1])) / 2.0];
+        call(ctx, "drawing_callout", json!({ "drawing": dw, "anchor": mid, "position": [mid[0] + 25.0, mid[1] + 25.0], "text": "1" }));
     }));
     let (window, editor) = drawing(cx, "feel-balloon-hover-leader");
     real_sheet(cx, window, &editor);
