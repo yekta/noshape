@@ -19,27 +19,27 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (lead 11-22 06:2x; state 11-22 12:20 UTC)
-1. QUEUED: usdvol f0929e9df as 6322eeca (11:01; gate vibex7 clean, knurls 0 diff x5); per-pair stage A as 7d1f338c
-   (12:00, requeued: a13ddb27 FAILED in the queue on psui's sketch_hover pixel test a_closed_sketchs_lit_end_goes_with_it
-   under load, >60 s tests beside it; A touches only boolean.rs). Check `land.sh --status`; then rm the worktrees'
-   targets (bool-ptol, bool-usdvol) on their hosts.
+## NEXT (lead 11-22 06:2x; state 11-22 13:40 UTC)
+1. LANDED 13:03: usdvol as c240175b, per-pair stage A as ea0febb2 (targets of bool-ptol / bool-usdvol / their gate
+   trees removed on vibe2, vibex8, vibex7).
 2. P1 BOOL-PER-PAIR-TOL (DECISIONS 17157c2fa), STAGED. Ctx.arg_tol (each arg's half), Ctx.arg_reach (widest band with
    args whose boxes meet); helpers own_band / band(f,g) / edge_band / args_band / face_band / reach_band.
-   - STAGE B ca0bb0156 (worktree bool-ptolb, on A 0b4f5ad47), FIXED: its first gate (a23eae9b3, vibex8) failed on
-     shells 26db61e922965935 / a237eca5d7832a0e and shfall ce16a730f6abf890, all from state_at (site 5: coplanar scan
-     AND ray_state's band). Cause: a Shell's slabs are each 0.1 um tolerant but a drafted wall's slab sits
-     tan(0.5 deg) x 1 mm = 8.7 um off its neighbour's plane: only the Boolean's one band (2e-5) holds them as one.
-     Gamma needs the narrow band (its clips are truly precise). Fix: the kernel's own Booleans (quick_boolean's,
-     t_slab; the replay's "direct" cases, NOSHAPE_BOOL_SLAB) pass flag bit 4 -> brep with_one_band -> arg_tols gives
-     every arg half the Boolean's. Tried and dropped: max with the piece's edge bands, max of reaches, scan-only
-     (probe tree switches PROBE_B=50/52/53/54, sh-b5*.sh).
-     Checked (vibex8, c-check.sh): both shells as OCCT (26db 37 faces), ce16a declines as main, gamma Boolean 1
-     equivalent, ours 423 ms vs OCCT 6422 ms.
-   - STAGE C ad5674aa8 (worktree bool-ptolc, on B ca0bb0156): pcurves of chords / off-axis arcs on cylinders.
-     GATE RUNNING: unit bool-ptolc-gate2 (local systemd, gate on vibex8, started 12:19, cold build ~2.5 h),
-     /root/bool-scratch/chain-bool-ptolc.out. Then knurls (kn-run.sh) -> land A (queued), B, C in order (B and C
-     rebased on A's landed commit first).
+   - STAGE B ca0bb0156 (worktree bool-ptolb, on A's pre-land 0b4f5ad47): a piece's state and the rays per pair; the
+     kernel's own Booleans (quick_boolean's t_slab; the replay's "direct" cases, NOSHAPE_BOOL_SLAB) pass flag bit 4 ->
+     brep with_one_band -> arg_tols gives every arg half the Boolean's (a Shell's slabs are 0.1 um tolerant but a
+     drafted wall's slab sits tan(0.5 deg) x 1 mm = 8.7 um off its neighbour's plane; gamma's clips are truly precise).
+   - STAGE C ad5674aa8 (worktree bool-ptolc, on B): pcurves of chords / off-axis arcs on cylinders.
+   - GATE of C (covers A+B+C; vibex8, run dir ~/agents/bool-gate/runs/bool-ptolc-ad5674aa8-1122-125137, log
+     /root/bool-ptolc-scratch/gate-ad5674aa8.log): replay 3114 -> 3114 (+0 -0), differing 2 -> 2, shells 6 -> 6, suite
+     to the end 131 -> 131, speed 1.00x (ours on the 3114 shared cases 86.9 -> 57.5 s, a hint). CHECK: cf-surface-pattern
+     "Surface Pattern 3" main 129/385/258 -> branch 129/384/257 faces/edges/vertices, live 131/387/258 (both off live;
+     see whether main with A has it). FAIL: crate test brep_replay::brep_results_are_the_same_on_any_thread (case
+     d466cefc7b984ccf on 8 threads != alone; /root/bool-ptolc-scratch/gate-tests.log:980). Passes 11/11 alone and in
+     a full kernel run; 40x branch vs 40x main flake count running (vibex8). If main flakes too: pre-existing, tell the
+     lead; else find the race (archive 10-28: the build mutated shared input edges; C's chord_pcurve UpdateEdge is on
+     the result's edges, like the code before it).
+   - Then knurls (kn-run.sh, k-main/k-br copies) -> rebase B and C on main (A landed as ea0febb2; drop 0b4f5ad47) ->
+     land B, then C.
 3. SPEED-STANDOFFS. Live whole doc 176 ms. Main on vibe2 (loaded): Revolve 2 541 ms (brep 207, unify 260 of which
    usd.volume 172 = usdvol, queued), Boolean 1 339 (brep 198, unify 117), Boolean 2 238 (brep 137, unify 74).
    brep on vibex8 (cases BK/st/rec 330d / de7a / e714, st-brep*.sh, probe tree bool-stages, PROBE_BREP_TIMES):
@@ -53,7 +53,8 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    48-73 -> 19-45 ms but the ahead pass takes 14-24 ms (uvs Mutex contention): net 10-30 ms a Boolean, under the
    100 ms bar alone. Next ideas: projections seeded from the previous sample's (u, v) without the shared cache in
    samples_on; seeded sections ahead too; then unify (the bigger share after usdvol). Probe tree also carries the
-   PROBE_B switches: drop with it.
+   PROBE_B switches: drop with it. Next run: /root/bool-scratch/st-brep9.sh (probe tree bool-stages, vibex8): PROBE_AHEAD
+   prints each sections-ahead job's ms (slowest 6, surface kinds) to see if one pair dominates the 55-73 ms.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
 ## In flight (11-21 21:35 UTC)
