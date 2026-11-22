@@ -837,7 +837,7 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 100 / 125** (01:0x: batch 4 12 / 20 on green 50772462b (asm's 8eb92415), cmp-b4asm. 23:3x: batch 3 4 / 15 on green 9f33d43 (psui's f411d924), qa-scratch/hm2/cmp-b3psui. 20:23: batch 5, other fields and the Dimension tool, 8 / 13 on green 6be52caf4. 20:18: batch 4, the assembly, 6 / 20 (live as2/, lane 4). 19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+**Matched: 109 / 125** (21:4x on green a08754b16 (psui 613b06bb7), qa-scratch/hm2/hmr-b + hmr-ips, evidence hm2/score-a087/ev: 7 fixed (Fillet picked / picked hovered, origin x4 via the +x edge, Extrude and Plane field hover, Fastened vertex), 2 Line-tool cells re-scored ≠ for the end dot (112 if the lead accepts it), no regression in the 100. 01:0x: batch 4 12 / 20 on green 50772462b (asm's 8eb92415), cmp-b4asm. 23:3x: batch 3 4 / 15 on green 9f33d43 (psui's f411d924), qa-scratch/hm2/cmp-b3psui. 20:23: batch 5, other fields and the Dimension tool, 8 / 13 on green 6be52caf4. 20:18: batch 4, the assembly, 6 / 20 (live as2/, lane 4). 19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
 face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
@@ -942,9 +942,9 @@ Line tool inference, sketch edit (4 / 5 on 6be52caf4; live sk/inference-*-at):
 |---|---|---|---|
 | Line tool from (45,−10): horizontal, under the point | — glyph; length label in the sketch plane (slanted, small, above the line's middle) | the same on 6be52caf4 | = |
 | … vertical | | glyph; label in the plane | the same on 6be52caf4 | = |
-| … onto the line's midpoint | line lit #FFC685 + a #FFCC34 square lying in the sketch plane (a rhombus here) at the midpoint, -•- glyph | the same on 6be52caf4 | = |
-| … onto the point | the point lit (light-orange disc) inside the in-plane #FFCC34 square; coincident cursor | the same on 6be52caf4 | = |
-| … onto the line away from its midpoint | line lit, blue through; coincident cursor | line lit, but opaque: no blue through (#ECB78A / #FFC685; the hover and selection bands elsewhere now blend as live) | ≠ P0 FEEL-SKETCH-BAND-MIDDLE |
+| … onto the line's midpoint | line lit #FFC685 + a #FFCC34 square lying in the sketch plane (a rhombus here) at the midpoint, -•- glyph | the same on 6be52caf4 | ≠ (qa 21:4x, a08754b16; my earlier = missed it): ours draws the new line's end as a solid 6 px #449CCD dot on top; live hides it under the lit target (#D6BD95 / #C3B99C). Decision asked of the lead |
+| … onto the point | the point lit (light-orange disc) inside the in-plane #FFCC34 square; coincident cursor | the same on 6be52caf4 | ≠ (qa 21:4x, a08754b16; my earlier = missed it): ours draws the new line's end as a solid 6 px #449CCD dot on top; live hides it under the lit target (#D6BD95 / #C3B99C). Decision asked of the lead |
+| … onto the line away from its midpoint | line lit, blue through; coincident cursor | line lit, but opaque: no blue through (#ECB78A / #FFC685; the hover and selection bands elsewhere now blend as live) | ≠ (qa 21:4x, a08754b16): FEEL-SKETCH-BAND-MIDDLE fixed (blue through the band, #CDA097 vs live #CC9F96); only the 6 px end dot differs, as the two rows above |
 
 
 A feature dialog's selection field, the origin and a mate connector (batch 3; psui 11-21 19:5x: 15 / 15 by the cell tests
@@ -958,13 +958,13 @@ A feature dialog's selection field, the origin and a mate connector (batch 3; ps
 | Fillet field, midpoint hovered | = the edge (no marker, no ring) | = our edge | = |
 | Fillet field, face hovered | 2 px #FFC685 boundary | the same (drawn after the model before the feature, whose edges covered it) | = |
 | Fillet field, vertex hovered | the top front edge lights (the field takes edges and faces) | the same: edges meeting under the pointer, the one most across the screen | = |
-| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | ≠ P0 FEEL-FILLET-PICKED-STRIP: the arrow = (blue on hover); the strip ours 3 px #FFA90A in the middle with the face showing to the tangent lines, live 5 px (#FFA90A at both tangent lines, #DDA027..#FFAF25 between) |
-| Fillet field, picked edge hovered | = picked | = our picked | ≠ P0 FEEL-FILLET-PICKED-STRIP |
-| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | ≠ P0 FEEL-FILLET-PICKED-STRIP (the face boundary =) |
-| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | ≠ P0 FEEL-ORIGIN-HOVER-EDGE: ours still the vertical edge |
-| origin, clicked | the +x edge selected | the +x edge selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE: ours the vertical edge |
-| origin, selected + hovered | = selected | = our selected | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
-| origin hovered, the right face selected | = hovered | = our hovered | ≠ P0 FEEL-ORIGIN-HOVER-EDGE |
+| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Fillet field, picked edge hovered | = picked | = our picked | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | ≠ P0 FEEL-FILLET-PICKED-STRIP (qa 21:4x, a08754b16): live's strip turns a uniform #FFAF25 under a dark tangent line; ours keeps the picked look (#DD9F26 core) plus a 1 px #FFC685 face-boundary line |
+| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin, clicked | the +x edge selected | the +x edge selected | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin, selected + hovered | = selected | = our selected | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin hovered, the right face selected | = hovered | = our hovered | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
 | mate connector (top back right corner) hovered | disc fill #F4DF99, the owner face's edges #E1EC87 / #CDD975, the rim soft (darkest #1D3E52..#26465B) | the same | ≠ P0 FEEL-MC-LOOK: crisp 1 px navy outline, a navy square at the ring's front, the centre white (live lit yellow-green) |
 | mate connector selected | fill #F6DA83, the same edges, the faces unchanged | the same: no owner tint, live's soft rim #1D3E52 | ≠ P0 FEEL-MC-LOOK: no owner tint now (=), the rim as hovered |
 | mate connector selected + hovered | = hovered | = our hovered | ≠ P0 FEEL-MC-LOOK (rim) |
@@ -973,28 +973,28 @@ A feature dialog's selection field, the origin and a mate connector (batch 3; ps
 | Fillet field, midpoint hovered | = the edge (no marker, no ring) | = our edge | = (fixed psui, qa to verify) |
 | Fillet field, face hovered | 2 px #FFC685 boundary | the same (drawn after the model before the feature, whose edges covered it) | = (fixed psui, qa to verify) |
 | Fillet field, vertex hovered | the top front edge lights (the field takes edges and faces) | the same: edges meeting under the pointer, the one most across the screen | = (fixed psui, qa to verify) |
-| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | = (fixed psui, qa to verify) |
-| Fillet field, picked edge hovered | = picked | = our picked | = (fixed psui, qa to verify) |
-| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | = (fixed psui, qa to verify) |
-| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | = (fixed psui, qa to verify) |
-| origin, clicked | the +x edge selected | the +x edge selected | = (fixed psui, qa to verify) |
-| origin, selected + hovered | = selected | = our selected | = (fixed psui, qa to verify) |
-| origin hovered, the right face selected | = hovered | = our hovered | = (fixed psui, qa to verify) |
+| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Fillet field, picked edge hovered | = picked | = our picked | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | ≠ P0 FEEL-FILLET-PICKED-STRIP (qa 21:4x, a08754b16): live's strip turns a uniform #FFAF25 under a dark tangent line; ours keeps the picked look (#DD9F26 core) plus a 1 px #FFC685 face-boundary line |
+| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin, clicked | the +x edge selected | the +x edge selected | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin, selected + hovered | = selected | = our selected | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin hovered, the right face selected | = hovered | = our hovered | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
 | mate connector (top back right corner) hovered | disc fill #F4DF99, the owner face's edges #E1EC87 / #CDD975, the rim soft (darkest #1D3E52..#26465B) | the same | = (fixed psui, qa to verify) |
 | mate connector selected | fill #F6DA83, the same edges, the faces unchanged | the same: no owner tint, live's soft rim #1D3E52 | = (fixed psui, qa to verify) |
 | mate connector selected + hovered | = hovered | = our hovered | = (fixed psui, qa to verify) |
 | mate connector hovered, the right face (an owner face) selected | = hovered: the selected face's fill plain #8DB0C5 while the pointer rests on the connector, #D9A235 again once it leaves (live b3/ps-mc-otherhover-r) | the same | = (fixed psui, qa to verify) |
-| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | = (fixed psui 11-22: the consumed pick drawn as the selected edge's 5 px band, `LineSegment::BAND`, the round showing through its core; qa to verify) |
-| Fillet field, picked edge hovered | = picked | = our picked | = (fixed psui 11-22, qa to verify) |
-| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | = (fixed psui 11-22, qa to verify) |
-| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | = (fixed psui 11-22: the origin's glyph covers the corner in the pick buffer, so the corner rule now reaches 3 px; the cells aim at the unrounded point, as the runner; qa to verify) |
-| origin, clicked | the +x edge selected | the +x edge selected | = (fixed psui 11-22, qa to verify) |
-| origin, selected + hovered | = selected | = our selected | = (fixed psui 11-22, qa to verify) |
-| origin hovered, the right face selected | = hovered | = our hovered | = (fixed psui 11-22, qa to verify) |
-| mate connector (top back right corner) hovered | disc fill #F4DF99, the owner face's edges #E1EC87 / #CDD975, the rim soft (darkest #1D3E52..#26465B) | the same | = (psui 11-22: its origin vertex lit under the glyph, a 10 px #F2FF80 disc, live's yellow-green centre; the crisp rim and the navy block at the ring's front are the software renderer's: no MSAA there, soft on a GPU, `crisp_navy` 0 in the cells; qa to verify) |
-| mate connector selected | fill #F6DA83, the same edges, the faces unchanged | the same: no owner tint, live's soft rim #1D3E52 | = (psui 11-22: its origin vertex lit under the glyph, a 10 px #F2FF80 disc, live's yellow-green centre; the crisp rim and the navy block at the ring's front are the software renderer's: no MSAA there, soft on a GPU, `crisp_navy` 0 in the cells; qa to verify) |
-| mate connector selected + hovered | = hovered | = our hovered | = (psui 11-22: its origin vertex lit under the glyph, a 10 px #F2FF80 disc, live's yellow-green centre; the crisp rim and the navy block at the ring's front are the software renderer's: no MSAA there, soft on a GPU, `crisp_navy` 0 in the cells; qa to verify) |
-| mate connector hovered, the right face (an owner face) selected | = hovered: the selected face's fill plain #8DB0C5 while the pointer rests on the connector, #D9A235 again once it leaves (live b3/ps-mc-otherhover-r) | the same | = (psui 11-22: its origin vertex lit under the glyph, a 10 px #F2FF80 disc, live's yellow-green centre; the crisp rim and the navy block at the ring's front are the software renderer's: no MSAA there, soft on a GPU, `crisp_navy` 0 in the cells; qa to verify) |
+| Fillet field, edge picked | at live's 1.3 mm radius: the #FFA90A strip between two dark tangent lines; the radius manipulator, a white 1 px outlined arrow (shaft + hollow head, ~17–19 px) from the band into the material along the faces' inward bisector (live b3w) | the same arrow (0.8 × Extrude's, screen-sized), blue when hovered | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Fillet field, picked edge hovered | = picked | = our picked | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Fillet field, face hovered with an edge picked | the edge #FFA90A, the face boundary #FFC685 | the same | ≠ P0 FEEL-FILLET-PICKED-STRIP (qa 21:4x, a08754b16): live's strip turns a uniform #FFAF25 under a dark tangent line; ours keeps the picked look (#DD9F26 core) plus a 1 px #FFC685 face-boundary line |
+| origin at the block's corner, hovered | the +x edge through it lights; the origin stays a black ring | the +x edge (the corner rule above) | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin, clicked | the +x edge selected | the +x edge selected | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin, selected + hovered | = selected | = our selected | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| origin hovered, the right face selected | = hovered | = our hovered | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| mate connector (top back right corner) hovered | disc fill #F4DF99, the owner face's edges #E1EC87 / #CDD975, the rim soft (darkest #1D3E52..#26465B) | the same | ≠ P0 FEEL-MC-LOOK (qa 21:4x, a08754b16): centre now as live; still the crisp 1 px navy rim + navy front square, and the lit disc hides the blue z-axis's foot (11 px shown, live 17 px: live draws the axis over the disc) |
+| mate connector selected | fill #F6DA83, the same edges, the faces unchanged | the same: no owner tint, live's soft rim #1D3E52 | ≠ P0 FEEL-MC-LOOK (qa 21:4x, a08754b16): centre now as live; still the crisp 1 px navy rim + navy front square, and the lit disc hides the blue z-axis's foot (11 px shown, live 17 px: live draws the axis over the disc) |
+| mate connector selected + hovered | = hovered | = our hovered | ≠ P0 FEEL-MC-LOOK (qa 21:4x, a08754b16): centre now as live; still the crisp 1 px navy rim + navy front square, and the lit disc hides the blue z-axis's foot (11 px shown, live 17 px: live draws the axis over the disc) |
+| mate connector hovered, the right face (an owner face) selected | = hovered: the selected face's fill plain #8DB0C5 while the pointer rests on the connector, #D9A235 again once it leaves (live b3/ps-mc-otherhover-r) | the same | ≠ P0 FEEL-MC-LOOK (qa 21:4x, a08754b16): centre now as live; still the crisp 1 px navy rim + navy front square, and the lit disc hides the blue z-axis's foot (11 px shown, live 17 px: live draws the axis over the disc) |
 
 An assembly (batch 4; qa 01:0x 12 / 20 on green 50772462b (asm 8eb92415, hm2/cmp-b4asm); 6 / 20 on green 6be52caf4; one Part 1 instance of the block with its mate connector at (40,30,20), after `f`:
 live 0.0506 mm/px, ours 0.0477 at 992 px (the same fit); live as2/ (lane 4, 20:11), ours qa-scratch/hm2/b4-score.png, cmp-b4/):
@@ -1044,12 +1044,12 @@ Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf
 | Cell | Live | Ours | Status |
 |---|---|---|---|
 | Extrude field, a sketch region hovered | the region's boundary #FFC685, the fill unchanged | the same | = |
-| Extrude field, face / edge hovered | 2 px #FFC685 boundary / 5 px #FFC685 band | muted thin boundary / band | ≠ P0 FEEL-FIELD-HOVER-DIM |
-| Plane field, edge hovered | 5 px #FFC685 band plus a dark ring at the edge's midpoint | the ring the same; the band muted | ≠ P0 FEEL-FIELD-HOVER-DIM |
-| Plane field, face hovered | 2 px #FFC685 boundary | muted | ≠ P0 FEEL-FIELD-HOVER-DIM |
+| Extrude field, face / edge hovered | 2 px #FFC685 boundary / 5 px #FFC685 band | muted thin boundary / band | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Plane field, edge hovered | 5 px #FFC685 band plus a dark ring at the edge's midpoint | the ring the same; the band muted | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
+| Plane field, face hovered | 2 px #FFC685 boundary | muted | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
 | Plane field, vertex hovered | ~11 px see-through disc | the same | = |
 | Fastened field, edge / face hovered | the band / nothing in the crop | the same | = |
-| Fastened field, vertex hovered | a white disc with a #FFC685 rim, no triad | a filled disc and the full connector triad | ≠ P0 FEEL-ASM-MATE-VERTEX |
+| Fastened field, vertex hovered | a white disc with a #FFC685 rim, no triad | a filled disc and the full connector triad | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
 | Dimension tool: line, its midpoint, a point, the circle | the #FFC685 band with the blue curve's darker line through, no midpoint marker; the point's ring fills #FFD8AC | the same | = |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
