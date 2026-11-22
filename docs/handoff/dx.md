@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 06:53 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 08:33 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,13 +13,18 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 06:53 11-22 (read first)
-- asm's land hit my prefs images_library flake (img-B before img-A): test made order-free, QUEUED 5b8abc89 alone
-  (worktree dx-flake; rm it + vibex7 ~/agents/dx-flake/target after it lands). Cause not found: import/save keep tab order.
-- qa wf39 P2 EXPORT-STORE-DETAILS (uncommitted in dx-open, goes with the drawing land): IGES ext "iges" (export.rs;
-  e2e export_store_file_in_a_new_tab), file tab menu: Move to document…/Export…/Release…/Download one group
-  (workspace.rs), STEP's Version-group checkboxes 31 px apart, Options group 39 (export.rs check_mt; UI test
-  export_dialog_opens_with_the_last_exports_choices). Running vibex7 b03w1sear: drawing lib, that UI test, ops e2e::.
+## STATE 08:33 11-22 (read first)
+- QUEUED c2e4fc1b (9 commits, vibe2): wf23 per-part section hatch + hex MeshCover (short runs < tol merged: rim touching
+  a facet corner), wf39 EXPORT-STORE-DETAILS, IMPORT-TAB-TOAST (DocModel::success_with_link, 5 s), tickets closed.
+  Tests green on vibex8: drawing lib 58, ops e2e:: 277, export dialog UI test, app an_import_translates_off_the_ui_thread.
+- QUEUED af0bd186 (dx-flake worktree): prefs images_library order-free. After it lands: git worktree remove dx-flake,
+  rm -rf vibex7 ~/agents/dx-flake/target.
+- export_dialog flake: cause = export_dialog_keys_as_live saving export_solid.json in parallel; psui's 454c71f2 fixes it.
+- RUNNING b4n0owrcu: vibex7 glb.sh + hex2.sh (hex DXF: want ELLIPSE 2, LINE/LWPOLYLINE vs live 206/25, Top no CIRCLE);
+  output /root/dx-scratch/fo/hex2.out.
+- asm (SPEED-ASM-OPEN): told one cache: display_cache::studio_key(doc, tab, config, fine) shared, StudioDisplay rows
+  written only with the Part Studio's own builder/tolerance; asm also feeds AssemblyEvaluator core's result_store.
+- OPEN: DETAIL B label P2 + 3+ part hatch rule wait for live (REQUESTS dx 05:35).
 ## STATE 05:55 (earlier) 11-22 (read first)
 TASK (lead 05:1x): watch lands (DONE: 3af018e0 + afd3220a landed 05:29 as 1519a1df, main GREEN 05:42); hex iso
 circles (in test); bottle DXF rerun (DONE 05:2x vibex7: "matches", Front no longer moved, Iso 0.002 in; ARC 18/24,
