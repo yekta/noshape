@@ -322,6 +322,24 @@ fn a_kept_regeneration_reopens_without_evaluating() {
     assert!(!e.from_store && e.result_key != Some(key));
 }
 
+/// A context with maps keyed by a part (an appearance, a Transform's placement) is kept too: JSON's keys are strings
+/// only, and such a studio (infento's) was never stored, regenerating on every open.
+#[test]
+fn a_regeneration_with_part_keyed_maps_is_kept() {
+    use noshape_model::regen::persist;
+    let (ps, units) = studio_with_block();
+    let first = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let mut ctx = (*first.context).clone();
+    let id = ctx.bodies.untracked()[0].id.clone();
+    ctx.part_appearance.insert(id.clone(), [0.2, 0.4, 0.6, 1.0]);
+    ctx.placements.insert(id, glam::DMat4::from_translation(glam::DVec3::new(0.01, 0.0, 0.0)));
+    let bytes = persist::encode_result(&ctx, &first.display.features).expect("encoded");
+    let (back, states) = persist::decode_result(&bytes).expect("decoded");
+    assert_eq!(back.part_appearance, ctx.part_appearance);
+    assert_eq!(back.placements, ctx.placements);
+    assert_eq!(states.len(), first.display.features.len());
+}
+
 /// The directory store: kept, read back, another build's entry not read, a missing key nothing, past its cap the
 /// least recently used gone.
 #[test]

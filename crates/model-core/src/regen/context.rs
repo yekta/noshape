@@ -772,11 +772,14 @@ pub struct Context {
     pub next_color: usize,
     // --- batch SM: sheet metal models and frame members ---
     /// Sheet metal models by body (see `crate::sheetmetal`).
+    #[serde(with = "pairs")]
     pub sheet_metal: BTreeMap<BodyId, Arc<crate::sheetmetal::SheetMetalData>>,
     /// Flat patterns of sheet metal parts built by the standard library
     /// (custom/host/sheetmetal.rs), in live's placement.
+    #[serde(with = "pairs")]
     pub sheet_metal_flats: BTreeMap<BodyId, Arc<crate::sheetmetal::FlatPattern>>,
     /// Frame members (frame segments, gussets, end caps) by body, for cut lists.
+    #[serde(with = "pairs")]
     pub frame_members: BTreeMap<BodyId, Arc<super::features::frames::FrameMember>>,
     /// Form tools tagged by Tag features (purpose Form), for sheet metal Form.
     pub form_tools: Vec<crate::sheetmetal::FormTool>,
@@ -787,6 +790,7 @@ pub struct Context {
     pub decals: Vec<DecalRecord>,
     /// Appearances features gave their parts (Import: the file's colours),
     /// linear RGBA; a part's own appearance (part properties) wins.
+    #[serde(with = "pairs")]
     pub part_appearance: BTreeMap<BodyId, [f32; 4]>,
     /// Appearances features gave single faces (Import), by body and face
     /// name: the body's faces descending from it keep it. Linear RGBA.
@@ -822,6 +826,7 @@ pub struct Context {
     /// The moves Transforms made of each part since it was built (a copy's: its source's, then its own): a sketch on
     /// one of its faces is in the face's frame from before, moved with it, as Parasolid's surfaces keep theirs (live
     /// c2-sm-hem-plus's Sketch 3 on a face Transform 1 turned).
+    #[serde(with = "pairs")]
     pub placements: BTreeMap<BodyId, DMat4>,
     /// Sketches on a sheet metal part's flat (live 2468) and the part: std's flat filters and opSMFlatOperation take
     /// their regions as the flat's.
@@ -1225,6 +1230,20 @@ impl Context {
 
 /// A body's names as stored: the pieces shown as one face share one Arc ([`join_face_names`], found by `Arc::ptr_eq`), so
 /// each name is written once and a piece sharing an earlier one's as its index.
+/// A map keyed by a struct ([`BodyId`]) as a list of pairs: JSON keys are strings only ([`super::persist`]).
+mod pairs {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::BTreeMap;
+
+    pub fn serialize<S: Serializer, K: Serialize, V: Serialize>(map: &BTreeMap<K, V>, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_seq(map.iter())
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>, K: Deserialize<'de> + Ord, V: Deserialize<'de>>(d: D) -> Result<BTreeMap<K, V>, D::Error> {
+        Ok(Vec::<(K, V)>::deserialize(d)?.into_iter().collect())
+    }
+}
+
 mod shared_names {
     use super::{Name, TopoName};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
