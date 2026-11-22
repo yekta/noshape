@@ -1569,9 +1569,10 @@ impl DrawingEditor {
         let ghost = self.placing_view().map(|id| ghost_picks(&built, id)).unwrap_or_default();
         // A detail's preview is a lighter grey than a projected or section view's (live2 place-1118: 164 / 159).
         let ghost_ink = if matches!(self.tool, Tool::Detail { .. }) { drawing_scene::GHOST_DETAIL_INK } else { drawing_scene::GHOST_INK };
+        let hidden = self.hidden_lines(&built);
         move |zoom, up| {
             let edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, false)))).collect();
-            let skip: Vec<std::ops::Range<usize>> = shaded.iter().map(|(_, r)| r.clone()).collect();
+            let skip: Vec<std::ops::Range<usize>> = shaded.iter().map(|(_, r)| r.clone()).chain(hidden.iter().cloned()).collect();
             (Some(up.upload_lines(&drawing_scene::sheet_lines(&built, zoom, &dangling, &skip, (&ghost, ghost_ink), paper))), edges)
         }
     }
@@ -2013,6 +2014,13 @@ impl DrawingEditor {
     }
 
     /// The picks whose texts aren't drawn: Edit section… open, its cutting line's letters (live workflows-1123 08 s7-9).
+    /// Sheet lines not drawn: a Connected detail's dashed line while Edit detail… is open (live qa wf23-09 step 22).
+    pub(crate) fn hidden_lines(&self, built: &BuiltSheet) -> Vec<std::ops::Range<usize>> {
+        let Some(editing) = self.detail_editing().map(PickTarget::DetailCircle) else { return Vec::new() };
+        let dashed = |l: &noshape_model::drawing::sheet::Polyline2| !l.closed && l.points.len() == 2 && l.style == noshape_model::drawing::sheet::LineStyle::Hidden;
+        built.geometry.lines.iter().enumerate().filter(|(_, l)| dashed(l) && built.picks.get(l.pick as usize) == Some(&editing)).map(|(i, _)| i..i + 1).collect()
+    }
+
     pub(crate) fn hidden_texts(&self, built: &BuiltSheet) -> HashSet<u32> {
         let Some(editing) = self.section_edit.as_ref().map(|e| PickTarget::SectionLine(e.view)) else { return HashSet::new() };
         built.picks.iter().enumerate().filter(|(_, t)| **t == editing).map(|(i, _)| i as u32).collect()

@@ -906,7 +906,8 @@ fn a_detail_views_preview_is_grey_with_the_parents_circle_plain(cx: &mut TestApp
         let e = editor.read(cx);
         let id = e.placing_view().expect("the detail previewed");
         let v = e.preview.as_ref().and_then(|d| d.sheets.get(e.sheet)).and_then(|s| s.view(id)).cloned().expect("in the preview");
-        assert!(v.hide_label && v.detail_hide_profile, "no label, no profile on the parent yet");
+        // qa wf23-09 step 7: its boundary circle drawn, no label or "SCALE" line.
+        assert!(v.hide_label && !v.scale_label_shown() && !v.detail_hide_profile, "no label or scale, the boundary drawn");
         assert!(e.overlay.tinted.iter().any(|(pts, rgb, _)| pts.len() > 60 && *rgb == [0, 0, 0, 255]), "the parent's plain solid circle");
     });
 }
@@ -1486,6 +1487,38 @@ fn edit_detail_clear_profile_picks_a_region_and_esc_closes(cx: &mut TestAppConte
     cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
     draw(cx, window);
     assert!(cx.update(|cx| editor.read(cx).detail_dlg.is_none()), "Esc closes the panel");
+}
+
+/// qa DRW-DETAIL-CONNECTED-OPTIONS (wf23-09 step 22): Edit detail… on a Connected detail hides its dashed line to the
+/// view and shows the circle's centre and quadrant handles light blue; ✕ brings the line back, the handles go.
+#[gpui::test]
+fn edit_detail_hides_the_connected_line_and_shows_the_circles_handles(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let front = g["views"].as_array().and_then(|v| v.iter().find(|v| v["orientation"] == "front").cloned()).expect("Front");
+        call(ctx, "drawing_detail_view", json!({ "drawing": dw, "parent": front["id"], "center": [0, 0], "radius": 8, "position": [300, 200], "style": "connected" }));
+    }));
+    let (window, editor) = drawing(cx, "feel-detail-edit-connected");
+    let detail = cx.update(|cx| editor.read(cx).current_sheet().views.iter().find(|v| matches!(v.kind, noshape_model::drawing::ViewKind::Detail { .. })).map(|v| v.id).expect("the detail"));
+    const BLUE: [u8; 4] = [144, 206, 241, 255];
+    let look = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let b = e.built.clone().expect("built");
+            let mut o = crate::drawing_scene::Overlay::default();
+            e.detail_circle_overlay(&mut o);
+            (e.hidden_lines(&b).len(), o.dots.iter().filter(|(_, k)| *k == BLUE).count())
+        })
+    };
+    draw(cx, window);
+    assert_eq!(look(cx), (0, 0), "at rest: the line drawn, no handles");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_detail_edit(detail, w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(look(cx), (1, 5), "editing: the dashed line hidden, five light-blue handles");
+    cx.update(|cx| editor.update(cx, |e, cx| e.close_detail_edit(false, cx)));
+    draw(cx, window);
+    assert_eq!(look(cx), (0, 0), "closed: the line back, no handles");
 }
 
 /// Live2 drw-centermark (behaviours "studios (11-17, P0 drawing feel)"): a hole's centre mark lights from its circle, its

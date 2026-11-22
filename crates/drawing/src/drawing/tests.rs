@@ -4034,6 +4034,30 @@ fn exact_export_clips_detail_views_to_their_circle() {
     }
 }
 
+/// qa DRW-DETAIL-CONNECTED-OPTIONS (wf23-09 steps 22-25): a Connected detail keeps its boundary circle; live greys
+/// out "Show detail view profile" (ticked) and "Clip border to geometry" for it. In line drops the circle for either.
+#[test]
+fn a_connected_detail_keeps_its_boundary_circle() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    let id = drawing.sheets[0].views.iter().find(|v| matches!(v.kind, ViewKind::Detail { .. })).expect("demo detail view").id;
+    let mut circles = |style: u8, hide: bool, clip: bool| {
+        let v = drawing.sheets[0].view_mut(id).unwrap();
+        (v.detail_style, v.detail_hide_profile, v.detail_clip_border) = (style, hide, clip);
+        let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+        let ViewKind::Detail { center, radius, .. } = drawing.sheets[0].view(id).unwrap().kind else { unreachable!() };
+        let pl = built.placement(id).unwrap();
+        let (c, r) = (pl.to_sheet(center), pl.len_to_sheet(radius));
+        built.geometry.lines.iter().filter(|l| l.closed && l.points.len() > 8 && l.points.iter().all(|p| (((p[0] - c[0]).powi(2) + (p[1] - c[1]).powi(2)).sqrt() - r).abs() < 1e-6)).count()
+    };
+    assert_eq!(circles(0, false, false), 1, "In line, the boundary");
+    assert_eq!(circles(0, false, true), 0, "In line, clipped: none");
+    assert_eq!(circles(0, true, false), 0, "In line, profile off: none");
+    assert_eq!(circles(1, false, true), 1, "Connected, clip ignored");
+    assert_eq!(circles(1, true, false), 1, "Connected, profile always shown");
+}
+
 /// Live dx hatch-1122 (h6-det2.dxf): a detail's label top hangs 0.1 r + h/2 under its whole circle, centred on it,
 /// with Clip border to geometry too (detail E: under the full circle, not the clipped border).
 #[test]

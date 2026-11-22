@@ -2307,9 +2307,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             // Detail boundary ("Show detail view profile"; none with "Clip
             // border to geometry"): solid, 0.15 mm (live's PDF and DXF
             // DETAIL_VIEW_BORDER; Detail profile lines style the parent's
-            // circle).
+            // circle). A Connected detail always has it (live greys both
+            // options out, qa wf23-09).
             let cad_mark = g.mark();
-            if !v.detail_hide_profile && !v.detail_clip_border {
+            if v.detail_style == 1 || (!v.detail_hide_profile && !v.detail_clip_border) {
                 if let Some(poly) = &geo.clip_poly {
                     g.lines.push(Polyline2 { points: poly.iter().map(|p| pl.to_sheet(*p)).collect(), style: LineStyle::Thin, closed: true, pick: view_pick });
                 } else if let Some((c, r)) = geo.clip {

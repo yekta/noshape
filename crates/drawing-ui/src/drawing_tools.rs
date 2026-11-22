@@ -950,8 +950,9 @@ impl DrawingEditor {
             if let Some(a) = v.aux_ref.as_mut() {
                 a.letter.clear();
             }
+            // A detail's preview: its boundary circle, no "SCALE" line (qa wf23-09 step 7).
             if matches!(self.tool, Tool::Detail { .. }) {
-                v.detail_hide_profile = true;
+                v.scale_label = Some(false);
             }
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 if insert {

@@ -181,6 +181,8 @@ impl DrawingEditor {
         self.detail_dlg = Some(DetailDlg { shape: if profile.is_some() { 3 } else { 0 }, pts: Vec::new(), view: Some(*parent), profile, scale: v.scale, label, style: v.detail_style, show_profile: !v.detail_hide_profile, clip_border: v.detail_clip_border, pick_region: false, picked: Vec::new(), edit: Some(id) });
         // (Nothing shown selected while it is open: live2 2442's drw-detail-edit.)
         self.selection.clear();
+        // (Its Connected line is hidden while it is open: hidden_lines.)
+        self.geometry_dirty = true;
         self.update_preview(cx);
         cx.notify();
     }
@@ -218,6 +220,7 @@ impl DrawingEditor {
     pub fn close_detail_edit(&mut self, ok: bool, cx: &mut Context<Self>) {
         let edited = if ok { self.detail_edit_drawing(cx) } else { None };
         self.detail_dlg = None;
+        self.geometry_dirty = true;
         self.tool = Tool::Select;
         self.set_preview(None, cx);
         if let Some(dr) = edited {
@@ -299,6 +302,19 @@ impl DrawingEditor {
             o.dots.push((g, ORANGE));
             o.dots.push((c, CENTRE));
         }
+        // Edit detail…: the profile circle's centre and quadrant handles, light blue (qa wf23-09 step 22).
+        if let Some(id) = self.detail_editing()
+            && let Some((c, r, _)) = self.detail_grip(id)
+        {
+            o.dots.push((c, BLUE));
+            o.dots.extend([[r, 0.], [0., r], [-r, 0.], [0., -r]].map(|d| ([c[0] + d[0], c[1] + d[1]], BLUE)));
+        }
+    }
+
+    /// The detail open in Edit detail… with its own circle (not while another profile shape is drawn).
+    pub(crate) fn detail_editing(&self) -> Option<ViewId> {
+        let id = self.detail_dlg.as_ref().filter(|d| d.view.is_some() && d.profile.is_none()).and_then(|d| d.edit)?;
+        (!matches!(self.tool, Tool::Detail { .. })).then_some(id)
     }
 
     /// Right-click on a detail circle (live asb 10-23 views (2)): Paste,
@@ -460,8 +476,8 @@ impl DrawingEditor {
         // white fields with a `#ddd` underline at the right edge.
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(26.)).pl(px(5.)).child(div().flex_1().text_size(px(12.)).child(label)).child(body).into_any_element();
         let field = |w: f32| div().w(px(w)).h(px(26.)).flex_none().bg(crate::theme::light().panel).border_b_1().border_color(gpui_kit::rgb(0xdddddd));
-        let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DetailDlg, bool), cx: &mut Context<Self>| {
-            div().h(px(26.)).flex().items_center().pl(px(7.)).child(crate::drawing_chrome::DrCheckbox::new(id).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
+        let check = |id: &'static str, label: &'static str, on: bool, off: bool, f: fn(&mut DetailDlg, bool), cx: &mut Context<Self>| {
+            div().h(px(26.)).flex().items_center().pl(px(7.)).child(crate::drawing_chrome::DrCheckbox::new(id).label(label).checked(on).disabled(off).on_click(cx.listener(move |this, v: &bool, _, cx| {
                 if let Some(d) = &mut this.detail_dlg {
                     f(d, *v);
                 }
@@ -504,8 +520,8 @@ impl DrawingEditor {
             let fields = serde_json::json!([
                 { "label": "View label", "kind": "text", "value": label_value, "placeholder": "Detail id" },
                 { "label": "Profile style", "kind": "select", "value": STYLES[style as usize] },
-                { "label": "Show detail view profile", "kind": "checkbox", "value": show },
-                { "label": "Clip border to geometry", "kind": "checkbox", "value": clip },
+                { "label": "Show detail view profile", "kind": "checkbox", "value": show || style == 1, "enabled": style != 1 },
+                { "label": "Clip border to geometry", "kind": "checkbox", "value": clip && style != 1, "enabled": style != 1 },
             ]);
             crate::drawing_panels::panel_text(serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "fields": fields, "texts": SHAPES.map(|s| s.0) }), text.0)
         });
@@ -606,8 +622,9 @@ impl DrawingEditor {
                 .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element()).into_any_element())))
                 .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))
                 // Live drawing/127: the checkbox rows start 3 px into the last field row.
-                .child(div().mt(px(-3.)).child(check("det-show", "Show detail view profile", show, |d, v| d.show_profile = v, cx)))
-                .child(check("det-clip", "Clip border to geometry", clip, |d, v| d.clip_border = v, cx))
+                // Connected: both greyed, the profile shown (live qa wf23-09 steps 22-25).
+                .child(div().mt(px(-3.)).child(check("det-show", "Show detail view profile", show || style == 1, style == 1, |d, v| d.show_profile = v, cx)))
+                .child(check("det-clip", "Clip border to geometry", clip && style != 1, style == 1, |d, v| d.clip_border = v, cx))
                 .into_any_element(),
         )
     }
