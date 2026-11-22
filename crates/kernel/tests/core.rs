@@ -1630,3 +1630,59 @@ fn a_volume_change_counts_only_the_faces_not_shared() {
     let other = make_box_corners(DVec3::ZERO, DVec3::new(20.0, 30.0, 10.0) * mm).unwrap();
     assert!((volume_change(&block, &other).unwrap() / (mm * mm * mm) + 6000.0).abs() < 1e-6, "no shared face: the whole difference");
 }
+
+/// A surface loft between two open curves: its edges from end to end are lines, as live's (c2-surfaces-lofts-projected's
+/// Loft 1 between two bridging curves: 2 LINE, 2 SPLINE edges; ours were 4 splines). T1.
+#[test]
+fn a_loft_between_two_open_curves_has_straight_lines_between_their_ends() {
+    let mm = 1e-3;
+    let bow = |z: f64| {
+        let pts: Vec<DVec3> = (0..=6).map(|i| {
+            let x = i as f64 / 6.0;
+            DVec3::new(10.0 * mm + 9.3 * mm * x, -36.3 * mm - 4.06 * mm * (PI * x).sin(), z)
+        }).collect();
+        make_interpolated_spline(&pts, &[], false).unwrap()
+    };
+    let (a, b) = (bow(-12.5 * mm), bow(12.5 * mm));
+    let len = a.edges()[0].length().unwrap();
+    let sheet = loft(&[a, b], &LoftOptions { solid: false, ..Default::default() }).unwrap().shape;
+    assert!(sheet.is_valid());
+    let edges = sheet.edges();
+    assert_eq!(edges.len(), 4);
+    let lines: Vec<f64> = edges.iter().filter_map(|e| {
+        let i = e.edge_info().unwrap();
+        matches!(i.curve, Curve::Line { .. }).then(|| e.length().unwrap())
+    }).collect();
+    assert_eq!(lines.len(), 2, "lines between the ends");
+    assert!(lines.iter().all(|l| (l - 25.0 * mm).abs() < 1e-9), "{lines:?}");
+    let area = sheet.area().unwrap();
+    assert!((area - len * 25.0 * mm).abs() < 1e-6 * area, "{} mm² vs {}", area * 1e6, len * 25.0 * mm * 1e6);
+}
+
+#[test]
+fn a_solid_loft_between_two_hexagons_is_a_frustum_with_line_sides() {
+    let mm = 1e-3;
+    let hexagon = |r: f64, z: f64| {
+        let p: Vec<DVec2> = (0..6).map(|i| DVec2::from_angle(PI / 3.0 * i as f64) * r).collect();
+        let segs: Vec<_> = (0..6).map(|i| Segment2d::Line { a: p[i], b: p[(i + 1) % 6] }).collect();
+        make_wire_2d(&Plane::xy().offset(z), &segs).unwrap()
+    };
+    let frustum = |r1: f64, r2: f64, h: f64| {
+        let (a1, a2) = (1.5 * 3f64.sqrt() * r1 * r1, 1.5 * 3f64.sqrt() * r2 * r2);
+        h / 3.0 * (a1 + a2 + (a1 * a2).sqrt())
+    };
+    let solid = |r1: f64, r2: f64| loft(&[hexagon(r1, 0.0), hexagon(r2, 30.0 * mm)], &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    let (outer, inner) = (solid(20.0 * mm, 10.0 * mm), solid(18.0 * mm, 8.0 * mm));
+    let wall = boolean(BooleanOp::Cut, std::slice::from_ref(&outer), std::slice::from_ref(&inner), &BooleanOptions::default()).unwrap().shape;
+    let v = wall.volume().unwrap();
+    let want = frustum(20.0 * mm, 10.0 * mm, 30.0 * mm) - frustum(18.0 * mm, 8.0 * mm, 30.0 * mm);
+    assert!((v - want).abs() < 1e-6 * want, "wall {} mm³ for {}", v * 1e9, want * 1e9);
+    for (s, r1, r2) in [(&outer, 20.0 * mm, 10.0 * mm), (&inner, 18.0 * mm, 8.0 * mm)] {
+        assert!(s.is_valid());
+        assert!(s.max_edge_tolerance() < 1e-6, "edge tolerance {}", s.max_edge_tolerance());
+        let v = s.volume().unwrap();
+        assert!((v - frustum(r1, r2, 30.0 * mm)).abs() < 1e-6 * v, "{} mm³", v * 1e9);
+        let lines = s.edges().iter().filter(|e| matches!(e.edge_info().unwrap().curve, Curve::Line { .. })).count();
+        assert_eq!(lines, 18, "sides and profiles");
+    }
+}

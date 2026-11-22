@@ -120,6 +120,7 @@
 #include <BRepTools_WireExplorer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_TFace.hxx>
+#include <BRep_CurveRepresentation.hxx>
 #include <BRep_TEdge.hxx>
 #include <BRep_TVertex.hxx>
 #include <BRep_Tool.hxx>
@@ -5362,6 +5363,92 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   return hb.finish();
 }
 
+// The loft's own straight edges (B-splines whose poles lie on one line, in order) as lines, in place: live's edges
+// between two profiles' ends are LINEs (c2-surfaces-lofts-projected's Loft 1: 2 lines, 2 splines; ours were 4 splines).
+// The sections' edges are left as they are.
+static void straight_edges_as_lines(const TopoDS_Shape& result, const OcShapeList& sections)
+{
+  ShapeIMap given;
+  for (const TopoDS_Shape& x : sections.items)
+    if (!x.IsNull())
+      TopExp::MapShapes(x, TopAbs_EDGE, given);
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(result, TopAbs_EDGE, TopAbs_FACE, ef);
+  BRep_Builder bb;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+    if (given.Contains(e) || BRep_Tool::Degenerated(e))
+      continue;
+    if (std::any_of(ef(i).begin(), ef(i).end(), [&](const TopoDS_Shape& f) { return BRep_Tool::IsClosed(e, TopoDS::Face(f)); }))
+      continue;
+    // (In the result's frame: the edge's location applied.)
+    double                        t0 = 0, t1 = 0;
+    const occ::handle<Geom_Curve> c  = BRep_Tool::Curve(e, t0, t1);
+    if (c.IsNull())
+      continue;
+    occ::handle<Geom_Curve> basis = c;
+    if (const auto tc = occ::down_cast<Geom_TrimmedCurve>(c); !tc.IsNull())
+      basis = tc->BasisCurve();
+    const auto bs = occ::down_cast<Geom_BSplineCurve>(basis);
+    if (bs.IsNull())
+      continue;
+    const gp_Pnt a = c->Value(t0), b = c->Value(t1);
+    const double len = a.Distance(b);
+    if (!(len > 1e-7))
+      continue;
+    const gp_Dir dir(gp_Vec(a, b));
+    const gp_Lin line(a, dir);
+    bool         straight = true;
+    double       last     = -1e300;
+    for (int k = 1; k <= bs->NbPoles() && straight; ++k)
+    {
+      const gp_Pnt q = bs->Pole(k);
+      const double s = gp_Vec(a, q).Dot(gp_Vec(dir));
+      straight = line.Distance(q) <= 1e-9 * (1 + len) && s >= last - 1e-12;
+      last     = s;
+    }
+    if (!straight)
+      continue;
+    const occ::handle<Geom_Curve> lc = new Geom_Line(line);
+    std::vector<std::pair<TopoDS_Face, occ::handle<Geom2d_Curve>>> on;
+    for (const TopoDS_Shape& f : ef(i))
+      on.emplace_back(TopoDS::Face(f), GeomProjLib::Curve2d(lc, 0, len, BRep_Tool::Surface(TopoDS::Face(f))));
+    if (std::any_of(on.begin(), on.end(), [](const auto& p) { return p.second.IsNull(); }))
+      continue;
+    const double tol = BRep_Tool::Tolerance(e);
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    // (A natural loft's planes replaced its B-spline faces: their p-curves are still on the edge, and re-ranged they
+    // would grow its tolerance to the edge's length.)
+    NCollection_List<occ::handle<BRep_CurveRepresentation>>& reps = occ::down_cast<BRep_TEdge>(e.TShape())->ChangeCurves();
+    for (NCollection_List<occ::handle<BRep_CurveRepresentation>>::Iterator r(reps); r.More();)
+    {
+      const occ::handle<BRep_CurveRepresentation>& rep = r.Value();
+      const bool                                   own = !rep->IsCurveOnSurface() || std::any_of(on.begin(), on.end(), [&](const auto& p) {
+        TopLoc_Location fl;
+        const occ::handle<Geom_Surface>& fs = BRep_Tool::Surface(p.first, fl);
+        return rep->IsCurveOnSurface(fs, fl.Predivided(e.Location()));
+      });
+      if (own)
+        r.Next();
+      else
+        reps.Remove(r);
+    }
+    bb.UpdateEdge(e, lc, TopLoc_Location(), tol);
+    bb.Range(e, 0, len);
+    for (const auto& [f, pc] : on)
+    {
+      bb.UpdateEdge(e, pc, f, tol);
+      bb.Range(e, f, 0, len);
+    }
+    if (!v0.IsNull()) bb.UpdateVertex(v0, 0, e, BRep_Tool::Tolerance(v0));
+    if (!v1.IsNull()) bb.UpdateVertex(v1, len, e, BRep_Tool::Tolerance(v1));
+    bb.SameParameter(e, false);
+    BRepLib::SameParameter(e, tol);
+  }
+}
+
 OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               rust::Slice<const double> start_points, rust::Slice<const double> conditions, const OcShape& path,
               int32_t path_count)
@@ -5372,7 +5459,10 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
     const auto& c = conditions;
     ends = {(int)c[0], c[1], gp_Vec(c[2], c[3], c[4]), (int)c[5], c[6], gp_Vec(c[7], c[8], c[9]), conditions.size() > 10 && c[10] != 0};
   }
-  return loft_impl(sections, solid, ruled, closed, start_points, ends, true, path.shape, path_count);
+  OpOut out = loft_impl(sections, solid, ruled, closed, start_points, ends, true, path.shape, path_count);
+  if (std::getenv("NOSHAPE_LOFT_SPLINE_EDGES") == nullptr)
+    straight_edges_as_lines(out.shape->shape, sections);
+  return out;
 }
 
 OpOut op_loft_tool(const OcShapeList& sections, bool closed, rust::Slice<const double> start_points)
