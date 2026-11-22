@@ -721,6 +721,9 @@ fn bend_keeps_flat_length() {
     let flat = noshape_model::sheetmetal::flat_pattern_for(&r.context, &r.context.bodies[part(&r)].id).expect("flat");
     let size = flat.size() * 1e3;
     assert!((size.x.max(size.y) - 60.0).abs() < 1e-6 && (size.x.min(size.y) - 40.0).abs() < 1e-6, "{size:?}");
+    // Its arc is a bend, not a hem, in the table (live workflow 11: "Bend B", qa SM-TABLE-HEM-NAME).
+    let data = r.context.sheet_metal.get(&r.context.bodies[part(&r)].id).expect("data");
+    assert!(data.bends.iter().all(|b| matches!(b.kind, noshape_model::sheetmetal::BendKind::Bend)), "{:?}", data.bends.iter().map(|b| &b.kind).collect::<Vec<_>>());
 }
 
 /// Corner break: a 5 mm fillet at a free corner of a 60 × 40 × 2 plate

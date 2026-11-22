@@ -26,7 +26,7 @@ use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::Value;
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 pub const NATIVES: &[(&str, NativeFn)] = &[
@@ -170,6 +170,8 @@ struct Definition {
     /// Rolled bends (a Hem's arc: a curved definition face with a BEND
     /// joint): inner radius by definition face index.
     rolled: BTreeMap<usize, f64>,
+    /// The rolled bends a Hem made (the table's "Hem", live ui sm4: Bend A, Bend B, Hem C; a Bend's arc is a "Bend").
+    hems: BTreeSet<usize>,
     /// Rip edges (definition edge indices) and the gap walls keep from them.
     rips: Vec<usize>,
     /// Rip styles other than EDGE (BUTT / BUTT2) by rip edge.
@@ -313,8 +315,8 @@ fn apply_corner_breaks(part: &mut Shape, pieces: &mut Vec<Piece>, def: &Definiti
 /// A definition body's bends (edge index → radius), rips (edge indices),
 /// rolled bends (face index → radius) and butt rip styles (edge → style).
 /// Bends (edge → radius), rips, rolled bends (face → radius), rip styles,
-/// and each joint's attribute id (edges, then rolled faces).
-pub(super) type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>, JointIds);
+/// each joint's attribute id (edges, then rolled faces), and the rolled bends a Hem made (bendType HEM).
+pub(super) type Joints = (BTreeMap<usize, f64>, Vec<usize>, BTreeMap<usize, f64>, BTreeMap<usize, String>, JointIds, BTreeSet<usize>);
 pub(super) type JointIds = (BTreeMap<usize, Arc<str>>, BTreeMap<usize, Arc<str>>);
 
 pub(super) fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
@@ -322,6 +324,7 @@ pub(super) fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
     let mut rips = Vec::new();
     let mut styles = BTreeMap::new();
     let mut rolled = BTreeMap::new();
+    let mut hems = BTreeSet::new();
     let mut ids: JointIds = (BTreeMap::new(), BTreeMap::new());
     let id_of = |j: &Value| j.get("attributeId").as_str().map(|s| Arc::<str>::from(&*s));
     for f in 0..st.ctx.bodies[b].faces.len() {
@@ -329,6 +332,9 @@ pub(super) fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
             && j.get("jointType").get("value").as_str().as_deref() == Some("BEND")
         {
             rolled.insert(f, length_field(&j, "radius"));
+            if enum_field(&j, "bendType").as_deref() == Some("HEM") {
+                hems.insert(f);
+            }
             if let Some(id) = id_of(&j) {
                 ids.1.insert(f, id);
             }
@@ -352,7 +358,7 @@ pub(super) fn joints(st: &CtxState, q: &QueryCx, b: usize) -> Joints {
             _ => {}
         }
     }
-    (bends, rips, rolled, styles, ids)
+    (bends, rips, rolled, styles, ids, hems)
 }
 
 /// An enum field of an SM attribute (stored bare: `defaultBendReliefStyle : OBROUND`).
@@ -619,7 +625,7 @@ impl Topo {
 /// Walls split by rips between coplanar pieces (a Rip across one wall) as one wall, as live (c2-cov-sm-rip: such a rip
 /// leaves the part as it was): the lowest piece's face becomes the whole wall, bounded by the pieces' own edges (so they
 /// stay definition edges), and the other pieces' edges are its. Returns the pieces merged away.
-fn merge_coplanar_rips(def: &Definition, topo: &mut Topo) -> std::collections::BTreeSet<usize> {
+fn merge_coplanar_rips(def: &Definition, topo: &mut Topo) -> BTreeSet<usize> {
     let mut merged = std::collections::BTreeSet::new();
     let mut root: Vec<usize> = (0..topo.faces.len()).collect();
     fn find(root: &mut [usize], i: usize) -> usize {
@@ -2647,7 +2653,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             if !changed_owners.is_empty() && !changed_owners.contains(&body.id) {
                 continue;
             }
-            let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
+            let (bends, rips, rolled, rip_styles, joint_ids, hems) = joints(&st, &q, b);
             // The part made from it before: the solid carrying its association.
             let own = associations(&st, &body_ref);
             let previous: Vec<BodyId> = st.ctx.bodies.iter().enumerate().filter(|(pb, p)| p.kind == BodyKind::Solid && !own.is_empty() && associations(&st, &q.to_ref(&Ent::Body(*pb))).iter().any(|x| own.contains(x))).map(|(_, p)| p.id.clone()).collect();
@@ -2662,7 +2668,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
             }
             let extracted = (0..body.faces.len()).any(|f| q.created_by(&Ent::Face(b, f)).and_then(|id| id.last().cloned()).is_some_and(|op| &*op == "extractSurface"));
-            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), flip_up: model.get("flipDirectionUp").as_bool().unwrap_or(false), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), extracted, breaks: corner_breaks(&st, &q, b) });
+            defs.push(Definition { forms, body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), flip_up: model.get("flipDirectionUp").as_bool().unwrap_or(false), bends, rolled, hems, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous, wall_ids, model_id: model.get("attributeId").as_str().map(|s| s.to_string()), extracted, breaks: corner_breaks(&st, &q, b) });
             let faces: Vec<Reference> = (0..body.faces.len()).map(|f| q.to_ref(&Ent::Face(b, f))).collect();
             let edges: Vec<Reference> = (0..body.edges.len()).map(|e| q.to_ref(&Ent::Edge(b, e))).collect();
             let vertices: Vec<Reference> = (0..body.vertices.len()).map(|v| q.to_ref(&Ent::Vertex(b, v))).collect();
@@ -3165,7 +3171,7 @@ fn sheet_data(def: &Definition, topo: &Topo, strips: &[Strip], part: &PartOf, fl
         let up = flat.and_then(|f| f.bend_lines.get(k)).is_some_and(|l| l.up);
         data.bends.push(SmBend {
             feature: def.body.feature,
-            kind: if st.rolled.is_some() { BendKind::Hem } else { BendKind::Bend },
+            kind: if st.rolled.is_some_and(|f| def.hems.contains(&f)) { BendKind::Hem } else { BendKind::Bend },
             parent: index(st.wall_a).unwrap_or(0),
             child: index(st.wall_b),
             origin: st.origin,
@@ -3759,9 +3765,9 @@ fn ev_sheet_metal_flat_transformation(i: &mut Interp, a: Vec<Value>) -> R<Value>
         });
         def_entity.map(|(e, b, model)| {
             let body = &st.ctx.bodies[b];
-            let (bends, rips, rolled, rip_styles, joint_ids) = joints(&st, &q, b);
+            let (bends, rips, rolled, rip_styles, joint_ids, hems) = joints(&st, &q, b);
             let k_factor = model.get("k-factor").get("value").as_number().unwrap_or(0.45);
-            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), flip_up: model.get("flipDirectionUp").as_bool().unwrap_or(false), bends, rolled, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, extracted: false, breaks: BTreeMap::new() };
+            let def = Definition { body: body.id.clone(), front: length_field(&model, "frontThickness"), back: length_field(&model, "backThickness"), flip_up: model.get("flipDirectionUp").as_bool().unwrap_or(false), bends, rolled, hems, rips, rip_styles, joint_ids, clearance: length_field(&model, "minimalClearance"), relief: BendRelief::of(&model), corner: CornerRelief::of(&model), corners: corner_overrides(&st, &q, b, &CornerRelief::of(&model)), reliefs: relief_overrides(&st, &q, b, &BendRelief::of(&model)), k_factor: model.get("k-factor").get("value").as_number().unwrap_or(0.45), k_factor_rolled: model.get("kFactorRolled").get("value").as_number().unwrap_or(0.5), active: model.get("active").as_bool().unwrap_or(true), default_radius: length_field(&model, "defaultBendRadius"), previous: Vec::new(), forms: Vec::new(), wall_ids: BTreeMap::new(), model_id: None, extracted: false, breaks: BTreeMap::new() };
             (e, body.shape.clone(), def, k_factor)
         })
     };
