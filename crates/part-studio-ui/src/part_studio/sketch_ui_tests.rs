@@ -6554,6 +6554,8 @@ mod sketch_label;
 mod sketch_glyph;
 #[path = "sketch_box_feel_tests.rs"]
 mod sketch_box;
+#[path = "sketch_gesture_feel_tests.rs"]
+mod sketch_gesture;
 #[path = "export_feel_tests.rs"]
 mod export_feel;
 

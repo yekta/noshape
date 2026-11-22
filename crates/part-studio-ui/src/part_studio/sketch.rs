@@ -1393,10 +1393,14 @@ impl PartStudioView {
                 let tool = self.sketch.as_ref().map(|s| s.tool);
                 let overlay_pressed = self.sketch.as_ref().is_some_and(|s| s.pressed_label.is_some() || s.pressed_glyph.is_some());
                 // Live2 "feel (sketch)" (3): Ctrl+click opens the sketch's context menu, as a right-click, for the
-                // selection and what is lit; it doesn't toggle the selection.
+                // selection and what is lit; it doesn't toggle the selection. On nothing lit it waits for the release:
+                // a Ctrl drag from there is a box that takes out of the selection (live sel-gestures-1122).
                 if !overlay_pressed && modifiers.control && !modifiers.platform && tool == Some(Tool::Select) {
-                    self.open_sketch_context_menu(window.mouse_position(), None, window, cx);
-                    return true;
+                    if self.hovered_sketch_entity(cx).is_some() {
+                        self.open_sketch_context_menu(window.mouse_position(), None, window, cx);
+                        return true;
+                    }
+                    self.ui.sketch_ctrl_press = Some(*position);
                 }
                 if !overlay_pressed && tool == Some(Tool::Use) {
                     // The GPU hover may lag a quick click: the edge under the pointer then.
@@ -1579,10 +1583,21 @@ impl PartStudioView {
                 }
                 true
             }
-            ViewportEvent::ToolUp { position, .. } => {
+            ViewportEvent::ToolUp { position, modifiers } => {
+                if let Some(at) = self.ui.sketch_ctrl_press.take()
+                    && (*position - at).length() < 3.0
+                {
+                    if let Some(ed) = &mut self.sketch {
+                        ed.cancel_box();
+                    }
+                    self.sync_sketch_dragging(cx);
+                    self.open_sketch_context_menu(window.mouse_position(), None, window, cx);
+                    return true;
+                }
                 let Some(p) = to_plane(self, *position, cx) else { return true };
+                // The release's own keys decide (as the Part Studio's box: Ctrl, Cmd on a Mac).
                 if let Some(ed) = &mut self.sketch {
-                    ed.box_remove = window.modifiers().control;
+                    ed.box_remove = modifiers.control || modifiers.platform;
                 }
                 // A point dropped on a model edge: the edge is used in the sketch, the point coincident with it.
                 if let Some(ExternalSnap::Edge { reference, .. }) = self.sketch.as_ref().and_then(|ed| ed.drag_external.clone())
@@ -5430,13 +5445,21 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// Select other: a list of the sketch entities under the cursor.
-    fn open_select_other(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(ed) = self.sketch.as_ref() else { return };
-        let (Some(c), wpp, frame) = (ed.cursor, ed.world_per_px, ed.frame) else { return };
-        let Some(data) = self.sketch_data(cx) else { return };
-        let r = wpp * 8.0;
-        let mut cands: Vec<(f64, noshape_sketch::EntityId)> = data
+    /// Select other in a sketch (live sel-gestures-1122, sketch/230): the open sketch's curves and points under the
+    /// ray come first, nearest first ("Edge of Sketch 3"); its regions there join `found` at the sketch plane's depth
+    /// ("Face of Sketch 3"), and the sketch's own plane leaves it (live lists Right and Front plane, not Top).
+    pub(super) fn sketch_select_other(&self, origin: DVec3, dir: DVec3, tol: f64, found: &mut Vec<noshape_model::interaction::RayHit>, cx: &App) -> Vec<Reference> {
+        let Some(ed) = self.sketch.as_ref() else { return Vec::new() };
+        let f = ed.frame;
+        let den = dir.dot(f.normal);
+        if den.abs() < 1e-12 {
+            return Vec::new();
+        }
+        let depth = (f.origin - origin).dot(f.normal) / den;
+        found.retain(|h| !self.is_own_sketch_plane(&h.reference, cx));
+        let c = f.to_local(origin + dir * depth);
+        let Some(data) = self.sketch_data(cx) else { return Vec::new() };
+        let mut near: Vec<(f64, u32)> = data
             .sketch
             .entities()
             .filter_map(|e| {
@@ -5444,45 +5467,30 @@ impl PartStudioView {
                     Some(q) => (q - c).length(),
                     None => data.sketch.curve(e.id)?.closest(c).2,
                 };
-                (d <= r).then_some((d, e.id))
+                (d <= tol).then_some((d, e.id.0))
             })
             .collect();
-        cands.sort_by(|a, b| a.0.total_cmp(&b.0));
-        // Live (shortcuts-sk-1118): nothing under the pointer opens the box with "(No selections found)".
-        if cands.is_empty() {
-            if let Some(at) = self.ui.pointer {
-                self.ui.select_other = Some(super::behaviors::SelectOther { hits: Vec::new(), index: None, at, in_zone: true, moved_out: false, scroll: ScrollHandle::new() });
-                cx.notify();
-            }
-            return;
+        near.sort_by(|a, b| a.0.total_cmp(&b.0));
+        if let Some(shown) = self.display.sketches.iter().find(|s| s.feature == ed.feature) {
+            let local = |q: &[f32; 3]| f.to_local(DVec3::new(q[0] as f64, q[1] as f64, q[2] as f64));
+            // On a region's boundary curve too: the pointer within half the reach of its inside.
+            let probes = [c, c + DVec2::X * tol * 0.5, c - DVec2::X * tol * 0.5, c + DVec2::Y * tol * 0.5, c - DVec2::Y * tol * 0.5];
+            let inside = |a: DVec2, b: DVec2, d: DVec2| {
+                probes.iter().any(|&q| {
+                    let s = |u: DVec2, v: DVec2| (v - u).perp_dot(q - u);
+                    let (x, y, z) = (s(a, b), s(b, d), s(d, a));
+                    (x >= 0.0 && y >= 0.0 && z >= 0.0) || (x <= 0.0 && y <= 0.0 && z <= 0.0)
+                })
+            };
+            let mut regions: Vec<_> = shown
+                .regions
+                .iter()
+                .filter(|r| !r.imprinted && r.indices.as_chunks::<3>().0.iter().any(|t| inside(local(&r.positions[t[0] as usize]), local(&r.positions[t[1] as usize]), local(&r.positions[t[2] as usize]))))
+                .collect();
+            regions.sort_by(|a, b| a.area.total_cmp(&b.area));
+            found.extend(regions.into_iter().map(|r| noshape_model::interaction::RayHit { reference: Reference::SketchRegion { sketch: ed.feature, key: r.key.clone() }, depth }));
         }
-        let Some(pos) = self.vp().read(cx).project(frame.to_world(c)) else { return };
-        let names: Vec<(noshape_sketch::EntityId, String)> = cands.iter().map(|(_, e)| (*e, entity_name(&data.sketch, *e))).collect();
-        let view = cx.entity();
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _window, _cx| {
-            for (e, name) in &names {
-                let (v, e) = (view.clone(), *e);
-                m = m.item(crate::os_menu::OsMenuItem::new(name.clone()).on_click(move |_, _, cx| {
-                    v.update(cx, |this, cx| {
-                        this.close_context_menu(cx);
-                        if let Some(ed) = &mut this.sketch {
-                            if let Some(i) = ed.selection.iter().position(|x| *x == e) {
-                                ed.selection.remove(i);
-                            } else {
-                                ed.selection.push(e);
-                            }
-                        }
-                        this.refresh_scene(false, cx);
-                        cx.notify();
-                    })
-                }));
-            }
-            m
-        });
-        let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
-        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
-        self.context_menu = Some((point(px(pos.x as f32), px(pos.y as f32)), menu, sub));
-        cx.notify();
+        near.into_iter().map(|(_, entity)| Reference::SketchEntity { sketch: ed.feature, entity }).collect()
     }
 
     /// Right-click in an active sketch: the sketch context menu (Onshape).
@@ -5689,7 +5697,7 @@ impl PartStudioView {
                         })))
                     });
                 }
-                m = m.item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))));
+                m = m.item(item("Select other…", Box::new(|this, _, cx| this.select_other_from_menu(cx))));
                 m = m.separator();
                 m = m.item(item("Zoom to fit", Box::new(|_, window, cx| window.dispatch_action(Box::new(ZoomToFit), cx))));
                 if let Some(r) = model_ref.clone() {
@@ -5751,7 +5759,7 @@ impl PartStudioView {
                     })))
                 });
                 return m
-                    .item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))))
+                    .item(item("Select other…", Box::new(|this, _, cx| this.select_other_from_menu(cx))))
                     .separator()
                     .item(item("Zoom to fit", Box::new(|_, window, cx| window.dispatch_action(Box::new(ZoomToFit), cx))))
                     .item(item("Zoom to selection", Box::new(move |this, _, cx| {
@@ -5876,7 +5884,7 @@ impl PartStudioView {
                     })))
                 });
             }
-            m = m.item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))));
+            m = m.item(item("Select other…", Box::new(|this, _, cx| this.select_other_from_menu(cx))));
             m = m.separator();
             m = m.item(item("Zoom to fit", Box::new(|_, window, cx| window.dispatch_action(Box::new(ZoomToFit), cx))));
             if curves_selected {
@@ -6081,9 +6089,9 @@ impl PartStudioView {
                     cx.stop_propagation();
                 }
             }))
-            // Select other (`): pick among the sketch entities under the cursor.
-            .capture_action(cx.listener(|this, _: &SelectOther, window, cx| {
-                this.open_select_other(window, cx);
+            // Select other (`): the shared panel, the sketch's entities first (sketch_select_other).
+            .capture_action(cx.listener(|this, _: &SelectOther, _, cx| {
+                this.select_other(false, cx);
                 cx.stop_propagation();
             }))
             // Live (shortcuts-sk-1118): Shift+N in a sketch edits the sketch dialog's name.

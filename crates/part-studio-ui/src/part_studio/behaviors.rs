@@ -243,6 +243,9 @@ pub struct UiState {
     pub inference: Option<super::inference::InferenceHover>,
     pub inference_task: Option<Task<()>>,
     pub select_other: Option<SelectOther>,
+    /// A Ctrl press on nothing in a sketch (viewport px): released there it opens the menu, dragged it is a box that
+    /// takes out of the selection (live sel-gestures-1122).
+    pub sketch_ctrl_press: Option<DVec2>,
     /// S shortcut toolbar position (viewport-local).
     pub mini_toolbar: Option<DVec2>,
     /// The open Camera and render options menu (its button shows pressed).
@@ -839,6 +842,7 @@ impl UiState {
             inference: None,
             inference_task: None,
             select_other: None,
+            sketch_ctrl_press: None,
             mini_toolbar: None,
             camera_menu: None,
             filter: None,
@@ -3466,11 +3470,11 @@ impl PartStudioView {
         let mut found = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, SELECT_OTHER_MAX);
         // The planes the pointer is over join them by depth (live face-menu-select-other: "Front plane" first).
         found.extend(interaction::planes_along_ray(&self.display, origin, dir));
+        let mut hits = self.sketch_select_other(origin, dir, tol, &mut found, cx);
         found.sort_by(|a, b| a.depth.total_cmp(&b.depth));
         found.truncate(SELECT_OTHER_MAX);
         // Live: each part follows its nearest face ("Face of Extrude 1",
         // "Part 1", "Face of Extrude 1" behind it).
-        let mut hits: Vec<Reference> = Vec::new();
         for h in found {
             let body = self.owning_body(&h.reference).filter(|_| matches!(h.reference, Reference::Face(_)));
             hits.push(h.reference);
@@ -3483,6 +3487,7 @@ impl PartStudioView {
         if let Some((_, filter, _)) = self.edit.as_ref().and_then(|e| e.dialog.read(cx).active_filter()) {
             hits.retain(|r| select_other_fits(r, filter));
         }
+        hits.truncate(SELECT_OTHER_MAX);
         let n = hits.len();
         let index = (!from_menu && n > 0).then(|| if backwards { n - 1 } else { 1 % n });
         self.hover = if from_menu { None } else { index.and_then(|i| hits.get(i).cloned()) };
@@ -3536,6 +3541,16 @@ impl PartStudioView {
         self.hover = None;
         if let Reference::Body(b) = r {
             self.pick_body(b, cx);
+            return;
+        }
+        // The open sketch's own entity or region goes into the sketch's selection.
+        if let Some(ed) = self.sketch.as_mut().filter(|ed| matches!(&r, Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } if *sketch == ed.feature)) {
+            match r {
+                Reference::SketchEntity { entity, .. } => toggle(&mut ed.selection, noshape_sketch::EntityId(entity)),
+                Reference::SketchRegion { key, .. } => toggle(&mut ed.selected_regions, key),
+                _ => {}
+            }
+            self.refresh_scene(false, cx);
             return;
         }
         let kind = if matches!(r, Reference::Edge(_)) { PickKind::Edge } else { PickKind::Face };
@@ -5030,6 +5045,16 @@ pub(super) fn surface_fits(s: &noshape_kernel::Surface, filter: QueryFilter) -> 
 /// (`box_select`).
 pub(super) fn box_takes(k: PickKind) -> bool {
     !matches!(k, PickKind::Plane | PickKind::Origin | PickKind::Connector)
+}
+
+/// Add `x` to `list`, or take it out if it's there.
+fn toggle<T: PartialEq>(list: &mut Vec<T>, x: T) {
+    match list.iter().position(|y| *y == x) {
+        Some(i) => {
+            list.remove(i);
+        }
+        None => list.push(x),
+    }
 }
 
 /// Whether a Select other entry (a face, edge, vertex or part along the ray) goes into a field of `filter`.

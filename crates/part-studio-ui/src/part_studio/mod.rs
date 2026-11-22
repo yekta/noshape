@@ -1878,7 +1878,14 @@ impl PartStudioView {
     fn labeler(&self, cx: &App) -> RefLabeler {
         // Chips name a feature as its row does (live: a Hole's chip is its
         // callout "Ø 6.35 mm ↧ 12 mm", behaviours "qa5 (10-25 p1)" (3)).
-        let names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, self.shown_feature_name(f, cx))).collect()).unwrap_or_default();
+        let mut names: Vec<(FeatureId, String)> = self.studio(cx).map(|s| s.features.iter().map(|f| (f.id, self.shown_feature_name(f, cx))).collect()).unwrap_or_default();
+        // A feature being created is named too (Select other in a new sketch: "Edge of Sketch 1").
+        if let Some(e) = &self.edit {
+            let f = &e.dialog.read(cx).feature;
+            if !names.iter().any(|(i, _)| *i == f.id) {
+                names.push((f.id, self.shown_feature_name(f, cx)));
+            }
+        }
         // A part the edited feature consumes (Delete part) is named as it was
         // before the feature (live part-studio/577, qa5 DEL1: "Part 1").
         let before = self.ui.preview_before.as_ref().map(|d| d.bodies.as_slice()).unwrap_or_default();

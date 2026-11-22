@@ -9374,6 +9374,15 @@ impl SketchEditor {
         matches!(self.drag, Some(DragState::Box { .. }))
     }
 
+    /// Drop a box selection that never moved (a Ctrl+click opens the menu instead).
+    pub fn cancel_box(&mut self) {
+        if self.box_dragging() {
+            self.drag = None;
+            self.box_end = None;
+            self.model_press = None;
+        }
+    }
+
     pub fn sketch_box(&self) -> (DVec2, DVec2) {
         self.frame_bounds.unwrap_or_else(|| {
             let h = SKETCH_FRAME_VIEWPORT_RATIO * 1000.0 * self.world_per_px;
