@@ -439,6 +439,14 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   documents), and refuse them in the agent API's generic feature_add the same way if it accepts them (tickets/extra-search-unfold.png,
   extra-search-refold-rip.png). Checked and absent as live: feature copy / paste (feature rows offer Copy sketch / Paste sketch only;
   Ctrl+C / Ctrl+V copy a part; no copy/paste-feature op), a drawing auto-dimension tool (no tool, menu or op), a Rip tool.
+- [ ] P1 **SPLIT-KEEP-TOOLS-AUTO (psui)** (workflow 38 step 37, overlap, green 984adcc30): Split › Part 1 to split, then a face of
+  Part 2 (Extrude 2) as Entity to split with: live **ticks Keep tools by itself** and splits (Parts (3), no message); ours leaves Keep
+  tools off and shows the info toast "Faces selected as split tools must be kept." (still Parts (3)). Match live: picking a part's
+  face as the split tool sets Keep tools (tickets/wf38-split-dialog.png row 37, wf38-split-face.png).
+- Workflow 38 (Boolean Union / Intersect / Subtract + Keep tools, Split, Delete…, Delete part; overlap) otherwise = live at all 51
+  steps: part counts 2 -> 1 -> undo 2 -> 1 -> undo 2 -> 2 (Keep tools) -> 3 (Split) -> 2 (Delete…) -> 1 (Delete part), the same
+  feature rows. FEEL-QUERY-PART-PICK-FILL still open on 984adcc30 here too (steps 5, 28, 29, 35: parts picked into Boolean / Split
+  fields filled tan, live orange silhouette only; tickets/wf38-bool.png).
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
