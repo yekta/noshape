@@ -247,6 +247,9 @@ pub struct UiState {
     /// In sketch mode: the GPU's last hover pick and the id it was resolved to (`sketch_hover_id`), so a move that
     /// keeps the GPU's pick (the plane behind a line) still re-resolves to what is in reach under the pointer.
     pub sketch_gpu_hover: Option<(Option<u32>, Option<u32>)>,
+    /// Where an entity was just mirrored: nothing hovers until the pointer leaves it (live workflow 22 step 35: the
+    /// source drawn plain under the still pointer).
+    pub sketch_hover_held_at: Option<DVec2>,
     /// Outside sketch mode, the GPU's hover pick and what the shown sketches' reach made of it
     /// (`shown_sketch_hover_id`), resolved again as the pointer moves.
     pub shown_sketch_gpu_hover: Option<(Option<u32>, Option<u32>)>,
@@ -854,6 +857,7 @@ impl UiState {
             pointer: None,
             hover_raw: None,
             sketch_gpu_hover: None,
+            sketch_hover_held_at: None,
             shown_sketch_gpu_hover: None,
             alt_held: false,
             hover_pick: None,

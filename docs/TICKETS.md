@@ -442,6 +442,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   Expand: connectivity, slider; ours has no Show internal geometry row. tickets/wf35-isolate-panel.png. Workflow 35 otherwise = live
   (Revolute offset 10, Fastened places Part 2 <2> as live, Hide/Show, Exit isolate, Section view, Turn off section view); runner gap: the
   second direction's fields (field index 1) are not found, px variant 35v-px.
+- [ ] P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10, sm-box): live's Form opens on the account's last form (Circle
+  emboss) and builds at the picked point; ours opens with "Select Part Studio…" empty, so Form 1 errors (and the flat view has no
+  emboss). Corner relief width likewise: live remembered 3 mm (warns "A corner relief is too small…"), ours 5 mm. Rest of 27 matches
+  (Corner 8 mm, Make joint refused, relief notch in the flat view; flat view fit is SM-FLAT-VIEW-FIT).
+  skasm 11-22: the app remembers both (formPartStudio, squareReliefWidth are REMEMBER_PREVIOUS_VALUE); the workflow runner
+  starts on an empty config: seed feature_settings.json + NOSHAPE_UI_REMEMBERED=1 as ui-parity's run.py does (sent to qa).
 - [ ] P0 **FEEL-SECTION-PLANE-LABEL-LOOK (psui)** (workflow 28 steps 24-25, bracket, green b5b414278): Section view, Right picked
   and after Enter: live keeps the plane labels solid blue (39,94,181) and the part's edges 1 px; ours draws "Right" / "Top" thin
   and pale mauve (138,117,129; blue 23,82,176 up to step 23) and outlines the wall face and part in thick dark ~3 px edges

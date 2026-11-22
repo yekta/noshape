@@ -422,3 +422,47 @@ fn trim_takes_a_short_end_near_its_end_point(cx: &mut TestAppContext) {
     assert!((after[1] - before[1]).abs() < 1e-9, "the vertical line kept: {before:?} → {after:?}");
     assert!((after[0] / before[0] * 220.0 - 200.0).abs() < 1.0, "the horizontal line 220 → 200 px: {before:?} → {after:?}");
 }
+
+/// Qa 11-22 (SKETCH-MIRROR-LINE-LOOK, live workflows-1122 22 s35): after an entity is mirrored, live draws it plain
+/// under the still pointer; it lights again once the pointer moves. Ours kept it hovered.
+#[gpui::test]
+fn a_mirrored_entity_is_plain_until_the_pointer_moves(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "st-mirror-hold", Tool::Line);
+    for (a, b) in [((400., 200.), (400., 400.)), ((450., 250.), (550., 350.))] {
+        click(cx, window, &view, a);
+        click(cx, window, &view, b);
+        keys(cx, window, &["escape"]);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    }
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Mirror, w, cx))).unwrap();
+    let send = |cx: &mut TestAppContext, at: (f64, f64), press: bool| {
+        let at = DVec2::new(at.0, at.1);
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                vp.update(cx, |vp, _| vp.place_pointer(at));
+                let m = Modifiers::default();
+                let mut evs = vec![ViewportEvent::PointerMove { position: at, modifiers: m }, ViewportEvent::Hover(None)];
+                if press {
+                    evs.extend([ViewportEvent::ToolDown { position: at, modifiers: m, click_count: 1 }, ViewportEvent::ToolUp { position: at, modifiers: m }, ViewportEvent::Hover(None)]);
+                }
+                for ev in &evs {
+                    v.on_viewport_event(&vp, ev, w, cx);
+                }
+            })
+        })
+        .unwrap();
+        cx.run_until_parked();
+    };
+    let hovered = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|ed| ed.hover));
+    send(cx, (400., 300.), true);
+    send(cx, (500., 300.), false);
+    assert!(hovered(cx).is_some(), "the line to mirror lights under the pointer");
+    let before = lines(cx, &view);
+    send(cx, (500., 300.), true);
+    assert_eq!(lines(cx, &view), before + 1, "mirrored");
+    assert_eq!(hovered(cx), None, "plain under the still pointer");
+    assert!(cx.update(|cx| view.read(cx).hover.is_none()));
+    send(cx, (502., 302.), false);
+    assert!(hovered(cx).is_some(), "lit again once the pointer moves");
+}

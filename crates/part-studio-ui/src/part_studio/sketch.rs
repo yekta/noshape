@@ -1095,7 +1095,21 @@ impl PartStudioView {
         matches!(id.and_then(|i| self.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|s| s.feature == *sketch))
     }
 
+    /// Nothing under the pointer hovers until it moves (an entity just mirrored).
+    fn hold_sketch_hover(&mut self, at: DVec2) {
+        self.ui.sketch_hover_held_at = Some(at);
+        self.hover = None;
+        if let Some(ed) = &mut self.sketch {
+            ed.hover = None;
+        }
+    }
+
     fn sketch_hover(&mut self, gpu_id: Option<u32>, vp: &Entity<Viewport>, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if let Some(at) = self.ui.sketch_hover_held_at {
+            self.hold_sketch_hover(at);
+            self.refresh_scene(false, cx);
+            return true;
+        }
         let id = &self.sketch_hover_id(gpu_id, cx);
         self.ui.sketch_gpu_hover = Some((gpu_id, *id));
         // A glyph's clear margin (not its tile) gives way to the open sketch's entity under the pointer (live sk2-1121
@@ -1282,6 +1296,9 @@ impl PartStudioView {
             }
             ViewportEvent::Hover(gpu_id) => self.sketch_hover(*gpu_id, vp, window, cx),
             ViewportEvent::PointerMove { position, modifiers } => {
+                if self.ui.sketch_hover_held_at.is_some_and(|h| h.distance(*position) > 0.5) {
+                    self.ui.sketch_hover_held_at = None;
+                }
                 let Some(p) = to_plane(self, *position, cx) else { return false };
                 let shift = modifiers.shift;
                 let was_shift = self.sketch.as_ref().is_some_and(|s| s.shift_held);
@@ -1520,7 +1537,11 @@ impl PartStudioView {
                     self.close_otf_input();
                 }
                 let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
+                let mirrors = self.sketch.as_ref().is_some_and(|ed| ed.tool == Tool::Mirror && ed.has_mirror_axis());
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
+                    if mirrors && out.changed {
+                        self.hold_sketch_hover(*position);
+                    }
                     self.apply_outcome(out, window, cx);
                 }
                 self.sync_otf_input();
