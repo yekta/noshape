@@ -2049,32 +2049,15 @@ impl PartStudioView {
         let held: Vec<Reference> = e.dialog.read(cx).selected_refs().into_iter().filter(|r| matches!(r, Reference::Face(_))).collect();
         let changed = self.changed_picks(&held);
         let (o, d) = self.viewport.read(cx).ray(position);
-        let r = changed.into_iter().find(|r| self.before_face_hit(r, o, d))?;
+        // (Not where the preview still has it: a Bend's face re-clicked stays in its field, live wf11 step 14, qa
+        // BEND-FACE-RECLICK-EMPTIES.)
+        let r = changed.into_iter().find(|r| self.before_face_hit(r, o, d) && !face_hit(&self.display, r, o, d))?;
         Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
     }
 
     /// Whether the ray from `o` along `d` meets face `r` as the model before the previewed feature has it.
     fn before_face_hit(&self, r: &Reference, o: glam::DVec3, d: glam::DVec3) -> bool {
-        let Some(before) = &self.ui.preview_before else { return false };
-        let hit = |a: glam::DVec3, b: glam::DVec3, c: glam::DVec3| {
-            let (e1, e2) = (b - a, c - a);
-            let p = d.cross(e2);
-            let det = e1.dot(p);
-            if det.abs() < 1e-18 {
-                return false;
-            }
-            let t = o - a;
-            let u = t.dot(p) / det;
-            let q = t.cross(e1);
-            let w = d.dot(q) / det;
-            u >= 0.0 && w >= 0.0 && u + w <= 1.0 && e2.dot(q) / det > 0.0
-        };
-        before.bodies.iter().filter(|b| !b.hidden).any(|b| {
-            let Some(fi) = b.face_refs.iter().position(|f| f == r) else { return false };
-            let Some(idx) = b.mesh.face_ranges.get(fi).and_then(|&(first, n)| b.mesh.indices.get(first as usize..(first + n) as usize)) else { return false };
-            let p = |i: u32| b.mesh.positions.get(i as usize).map(|p| glam::Vec3::from(*p).as_dvec3());
-            idx.as_chunks::<3>().0.iter().any(|t| matches!((p(t[0]), p(t[1]), p(t[2])), (Some(a), Some(b), Some(c)) if hit(a, b, c)))
-        })
+        self.ui.preview_before.as_ref().is_some_and(|before| face_hit(before, r, o, d))
     }
 
     fn on_viewport_event(&mut self, vp: &Entity<Viewport>, ev: &ViewportEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -8619,3 +8602,26 @@ const ROLLBACK_DRAG_PX: f32 = 7.5;
 /// How far a feature or folder row's press moves before it drags (live list-1119: the ghost and drop line from 6 px
 /// straight, not 5; from 7.1 diagonally, not 5.7; GPUI's default started past 2).
 const ROW_DRAG_PX: f32 = 5.8;
+
+/// Whether the ray from `o` along `d` meets face `r` as `display` draws it.
+fn face_hit(display: &noshape_model::display::StudioDisplay, r: &Reference, o: glam::DVec3, d: glam::DVec3) -> bool {
+    let hit = |a: glam::DVec3, b: glam::DVec3, c: glam::DVec3| {
+        let (e1, e2) = (b - a, c - a);
+        let p = d.cross(e2);
+        let det = e1.dot(p);
+        if det.abs() < 1e-18 {
+            return false;
+        }
+        let t = o - a;
+        let u = t.dot(p) / det;
+        let q = t.cross(e1);
+        let w = d.dot(q) / det;
+        u >= 0.0 && w >= 0.0 && u + w <= 1.0 && e2.dot(q) / det > 0.0
+    };
+    display.bodies.iter().filter(|b| !b.hidden).any(|b| {
+        let Some(fi) = b.face_refs.iter().position(|f| f == r) else { return false };
+        let Some(idx) = b.mesh.face_ranges.get(fi).and_then(|&(first, n)| b.mesh.indices.get(first as usize..(first + n) as usize)) else { return false };
+        let p = |i: u32| b.mesh.positions.get(i as usize).map(|p| glam::Vec3::from(*p).as_dvec3());
+        idx.as_chunks::<3>().0.iter().any(|t| matches!((p(t[0]), p(t[1]), p(t[2])), (Some(a), Some(b), Some(c)) if hit(a, b, c)))
+    })
+}

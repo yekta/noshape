@@ -44,6 +44,12 @@ fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {
         // std extrude.fs: OFFSET_WIRE_SELECT_WALL_PATH / EXTRUDE_NO_SELECTED_REGION.
         return crate::regen::eval::err_at(if thin { &["wallShape"] } else { &["entities"] }, if thin { "Select edges or faces to define the path of the thin wall." } else { "Select face or sketch region to extrude." });
     }
+    // std extrude.fs: a model-space solid Extrude of a sheet metal flat's sketch regions (live smflat-1122 Extrude 8).
+    let on_flat = |r: &Reference| matches!(r, Reference::SketchRegion { sketch, .. } if ev.ctx.flat_sketches.contains_key(sketch));
+    if !thin && refs.iter().any(on_flat) {
+        let message = if refs.iter().all(on_flat) { "Feature defined in model space cannot reference sheet metal flat geometry." } else { "Cannot select from the flattened sheet metal view and model view at the same time." };
+        return crate::regen::eval::err_at(&["entities"], message);
+    }
     let t0 = std::time::Instant::now();
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&|f, _| f.normal), false)? } else { ev.profiles(&ev.distinct_regions(refs))? };
     if profiles.is_empty() {

@@ -1134,6 +1134,52 @@ fn the_line_a_snap_lands_on_is_lit_as_hovered(cx: &mut TestAppContext) {
     assert!(through >= 8 && opaque == 0, "{through} of 13 samples blue through, {opaque} px #ecb78a");
 }
 
+const SK_LINESTART: [f64; 3] = [60., 5., 0.];
+
+fn sketch_blue(c: [u8; 3]) -> bool {
+    c[2] >= 180 && c[0] <= 90 && c[1] <= 90
+}
+
+// Combined states in sketch edit (live skasm/hm-sk-1122 c1a): a selected line's band covers its own unlit end point (the
+// blue line through its middle, #c78436, no blue dot on top); the end hovered, its light-orange disc (rim #fec788) lies
+// over the band.
+#[gpui::test]
+fn sk_a_selected_lines_band_covers_its_end_and_the_hovered_end_lies_over_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "linesel-hover-end");
+    m.edit_sketch(cx);
+    let line = m.screen(cx, SK_LINE);
+    m.pointer.move_to(cx, &m.view, line);
+    m.pointer.click(cx, &m.view, line);
+    m.park(cx);
+    let end = m.screen(cx, SK_LINESTART);
+    let c = m.crop(cx, end);
+    dump("cell-sk_c1a_before", &c);
+    assert!(shows(&c, 0xc88536, 1.0) && !near_centre(&c, 1.0).any(sketch_blue), "{:?}", near_centre(&c, 2.0).collect::<Vec<_>>());
+    approach(cx, &m, end);
+    let c = m.crop(cx, end);
+    dump("cell-sk_c1a", &c);
+    assert!(shows(&c, 0xfec788, 5.5) && !shows(&c, 0xc88536, 1.0) && band_beside_of(&c, 0xffa90a), "{:?}", near_centre(&c, 5.5).collect::<Vec<_>>());
+}
+
+// Line or Circle on, before the first click, over a line (live skasm/hm-sk-1122 c4a, c4d): the line's band with the blue
+// through it and the coincident glyph; no preview dot at the pointer.
+#[gpui::test]
+fn sk_a_drawing_tool_over_a_line_lights_it_without_a_preview_dot(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "tool-hover-line");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, SK_LINE);
+    for tool in [Tool::Line, Tool::Circle] {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.activate_tool(tool, w, cx))).unwrap();
+        approach(cx, &m, p);
+        let c = m.crop(cx, p);
+        dump("cell-sk_c4", &c);
+        assert!(shows(&c, 0xffc685, 3.0) && shows(&c, 0xc89c96, 1.5) && !shows(&c, 0x449ccd, 4.0), "{:?}: {:?}", tool, near_centre(&c, 4.0).collect::<Vec<_>>());
+        m.park(cx);
+    }
+}
+
 
 // Fillet's radius arrow stays at the edge's midpoint wherever the edge was picked (live qa walk 6 (5), walk6-m5: picks at
 // (40, 5, 10) and (40, 20, 10) give pixel-identical frames; std edgeBlendCommon.fs places it at the edge's parameter 0.5).

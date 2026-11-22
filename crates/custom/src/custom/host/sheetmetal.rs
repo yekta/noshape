@@ -89,10 +89,17 @@ fn op_sm_flat_operation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     let on = if tops.is_empty() { 0.0 } else { area(&k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tool), &[Shape::compound(&tops)], &k::BooleanOptions::default())?.shape) };
                     let eps = 1e-10;
                     if on > eps {
-                        // Within one wall: "Sheet metal model cannot be built."; across a bend or the outline: its own.
+                        // On a bend's zone: its own error; wholly within a wall: "Sheet metal model cannot be built."; on a
+                        // wall and past the flat's free edge: the whole region, i.e. what isn't material yet (live smflat-1122
+                        // Extrude 5: the tab and Extrude 3's notch under it).
                         let common = |w: &Shape| k::boolean(k::BooleanOp::Common, std::slice::from_ref(&tool), std::slice::from_ref(w), &k::BooleanOptions::default()).map_or(0.0, |r| area(&r.shape));
-                        let within = flat_walls.iter().any(|w| common(w) >= area(&tool) - eps);
-                        return Err(super::code_error(if within { "SHEET_METAL_REBUILD_ERROR" } else { "SM_FLAT_OP_ADD_CROSSES_EDGE" }));
+                        let on_walls: f64 = flat_walls.iter().map(common).sum();
+                        if on - on_walls > eps {
+                            return Err(super::code_error("SM_FLAT_OP_ADD_CROSSES_EDGE"));
+                        }
+                        if area(&tool) - on <= eps {
+                            return Err(super::code_error("SHEET_METAL_REBUILD_ERROR"));
+                        }
                     }
                 }
                 let off = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&tool), &flat_walls, &k::BooleanOptions::default())?.shape;
@@ -122,10 +129,8 @@ fn op_sm_flat_operation(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let names = ev.name_result(&[&body.names], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, names);
         }
-        // Added material touching no wall: live's info, the part as it was.
-        if !met && subtract {
-            return Err(super::code_error("SM_FLAT_OP_NO_INTERSECT"));
-        }
+        // Nothing on or touching a wall: live's info, the part as it was (q-flat-ops-1119 a floating Add; smflat-1122
+        // Extrude 4, a Remove wholly off the flat).
         Ok(!met)
     })?;
     if floating {

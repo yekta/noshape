@@ -3985,7 +3985,8 @@ impl PartStudioView {
         }
         let up = self.gpu.uploader();
         let points_at = |points: Vec<noshape_render::PointSprite>, layer: i32| Instance::new(Drawable::Points(up.upload_points(&PointData { points }))).per_primitive_color().unpickable().ignore_clip().layer(layer);
-        let Some(band) = self.midpoint_band_piece(cx) else { return vec![points_at(points, 22)] };
+        // (Drawn after the sketches' lit points: on top, its depth hid a hovered sketch point's own lit disc.)
+        let Some(band) = self.midpoint_band_piece(cx) else { return vec![points_at(points, 22).over_lines()] };
         // Live (hover-matrix-1121 edge-hovered, mid-hovered): the lit edge's band runs over the dark ring, which shows
         // only beside it; a fill sits over the band.
         let (under, over): (Vec<_>, Vec<_>) = points.into_iter().partition(|p| p.color[..3] == [0, 0, 0] && p.style & noshape_render::PointSprite::RING != 0);

@@ -303,6 +303,8 @@ pub struct Instance {
     /// Draws only its selected faces (state SELECTED), or of lines its
     /// selected, query-lit and hovered ones (see [`Instance::selected_only`]).
     pub selected_only: bool,
+    /// Lines and points: draws only its unlit ones (see [`Instance::unlit_only`]).
+    pub unlit_only: bool,
     /// A decal on a selected face: the image mixed 0.4 toward the selection
     /// amber (see [`Instance::decal_selected`]).
     pub decal_selected: bool,
@@ -455,6 +457,7 @@ impl Instance {
             ghost: 0.0,
             ambient: 0.0,
             selected_only: false,
+            unlit_only: false,
             decal_selected: false,
             layer: 0,
             line_scale: 1.0,
@@ -646,9 +649,16 @@ impl Instance {
     /// selection shows through the datum planes in front of it as live's
     /// (selection/04: a selected face under a plane (229,170,56), the plane
     /// alone would give (224,174,73)). Lines: only the selected, query-lit or
-    /// hovered ones (a preview's picked and hovered edges drawn whole over its mix).
+    /// hovered ones (a preview's picked and hovered edges drawn whole over its mix). Points: the hovered or selected.
     pub fn selected_only(mut self) -> Self {
         self.selected_only = true;
+        self
+    }
+
+    /// Lines and points: only those neither hovered nor selected (nor query-lit), the lit ones drawn by a
+    /// `selected_only().over_lines()` copy (a lit sketch curve's band over its end points).
+    pub fn unlit_only(mut self) -> Self {
+        self.unlit_only = true;
         self
     }
 
@@ -1191,7 +1201,7 @@ impl Scene {
             f(&mut h, &i.color);
             f(&mut h, &[i.ghost, i.ambient, i.line_scale]);
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
-            (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.decal_selected, i.layer).hash(&mut h);
+            (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);
             (i.hidden_only, i.over_transparent, i.over_lines, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self, i.outline_through).hash(&mut h);
         }

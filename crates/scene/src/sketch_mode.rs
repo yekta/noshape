@@ -1624,9 +1624,9 @@ impl SketchEditor {
             self.pattern_label_wpp = self.world_per_px;
             self.pointer_rests = self.tool.draws();
         }
-        // Choosing a drawing tool clears the selection (live: L with a line
-        // selected deselects it).
-        if self.tool.draws() {
+        // Choosing a drawing tool or Dimension clears the selection (live: L with a line selected deselects it;
+        // skasm/hm-sk-1122 c5a: D too, no dimension started).
+        if self.tool.draws() || self.tool == Tool::Dimension {
             self.selection.clear();
             self.selected_constraints.clear();
         }
@@ -6715,9 +6715,10 @@ impl SketchEditor {
                 }
                 _ => {}
             }
-            // (Not on a point the snap lands on before the first click: the lit point and the snap square show alone,
-            // live sketch/54, qa walk 1 w4-vertex, w4-mid; qa FEEL-LINE-SNAP-MODEL-LOOK.)
-            let on_point = self.clicks.is_empty() && self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant));
+            // (Not on a point or curve the snap lands on before the first click: the lit point and the snap square, or
+            // the lit curve, show alone, live sketch/54, qa walk 1 w4-vertex, w4-mid; qa FEEL-LINE-SNAP-MODEL-LOOK;
+            // skasm/hm-sk-1122 c4a, c4d.)
+            let on_point = self.clicks.is_empty() && self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant | InferenceKind::OnCurve));
             if self.tool.draws() && !on_point && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
                 points.points.push(PointSprite { position: w(c), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
             }
@@ -10907,6 +10908,11 @@ mod tests {
         ed.set_tool(Tool::Line);
         assert!(ed.selection.is_empty());
         assert_eq!(ed.tool, Tool::Line);
+        // Dimension too, starting no dimension (live skasm/hm-sk-1122 c5a).
+        ed.set_tool(Tool::Select);
+        ed.selection.push(line);
+        ed.set_tool(Tool::Dimension);
+        assert!(ed.selection.is_empty() && ed.picks.is_empty());
         // Non-drawing tools keep it (Transform acts on the selection).
         ed.set_tool(Tool::Select);
         ed.selection.push(line);

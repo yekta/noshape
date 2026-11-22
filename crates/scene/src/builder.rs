@@ -1091,8 +1091,12 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let m = glam::Mat4::from_cols(x.extend(0.0), y.extend(0.0), z.extend(0.0), ll.extend(1.0));
                 scene.instances.push(Instance::new(Drawable::Image(handle)).with_transform(m).ignore_clip().layer(8));
             }
-            scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().layer(10));
-            scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().ignore_clip().layer(11));
+            let curves = Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().layer(10);
+            let dots = Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().ignore_clip().layer(11);
+            // A lit curve's band over its unlit end points, a lit point over the band (live hover-matrix-1121 sk/line-*,
+            // ps/sketch-line-*: the band covers the end dot; skasm/hm-sk-1122 c1a: a hovered end on a selected line).
+            let lit = (curves.clone().unpickable().selected_only().over_lines(), dots.clone().unpickable().selected_only().over_lines());
+            scene.instances.extend([curves.unlit_only(), dots.unlit_only(), lit.0, lit.1]);
             // Graphics preferences "Underconstrained occluded color": the parts of
             // the edited sketch's underconstrained geometry hidden behind parts.
             if editing {
@@ -1688,7 +1692,8 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         scene.instances.extend(again);
     }
     if !overlay_pts.points.is_empty() {
-        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&overlay_pts))).per_primitive_color().unpickable().ignore_clip().layer(20));
+        // After the sketches' lit points (a hovered sketch vertex's disc over its own).
+        scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&overlay_pts))).per_primitive_color().unpickable().ignore_clip().over_lines().layer(20));
     }
     for (m, c, picked) in overlay_regions {
         let inst = Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(c).unpickable().ignore_clip().layer(HIGHLIGHT_FILL_LAYER);

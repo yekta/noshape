@@ -1709,7 +1709,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
     order (T1 tests::precedence_is_lives: live's 28 expressions).
     P1 FS-NATIVE-EVFACECURVATUREDERIVATIVES @evFaceCurvatureDerivatives: std's bridgingCurve (Bridging curve always
     runs by std when the host is loaded) through evFaceCurvatureDerivative.
-  - [ ] P1 FS-NATIVE-OPSMFLATOPERATION (dx 11-04 17:32: its only caller is std's SMFlatOp, the feature a sketch on a
+  - [ ] fixed (skasm 11-19: host op_sm_flat_operation, Add / Remove per live q-flat-ops-1119, e2e an_extrude_in_the_flat_cuts_and_adds; the flat Extrude form f1dd7113, ui extrude_on_a_flat_region_opens_the_flat_form; 11-22 live smflat-1122: model-space errors, Add past the free edge, Remove off = info, e2e an_extrude_in_the_flat_takes_flat_regions_only), to verify P1 FS-NATIVE-OPSMFLATOPERATION (dx 11-04 17:32: its only caller is std's SMFlatOp, the feature a sketch on a
     sheet metal flat makes; noshape has no such feature yet, so nothing reaches it) @opSMFlatOperation: std's SMFlatOp (sketching on a sheet metal flat; noshape
     has no such feature yet), its only caller.
   - [ ] P2 FS-NATIVE-OPIMPORTFOREIGN @opImportForeign: std's importForeign (ours runs natively): custom features only.

@@ -11033,6 +11033,51 @@ fn an_extrude_in_the_flat_cuts_and_adds() {
     assert!((num(&p["parts"][0]["volume"]) - v2).abs() < 1e-6, "unchanged: {p}");
 }
 
+/// An Extrude on the flat's regions, live skasm/smflat-1122 (behaviours "skasm SMFlatOp"): a flat region with a model face
+/// in one, or a model-space Extrude of a flat region, is an error; Add partly past the flat's free edge adds a tab; Remove
+/// wholly off the flat cuts nothing (an info).
+#[test]
+fn an_extrude_in_the_flat_takes_flat_regions_only() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-flat-extrude-2.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [30, 0, 2], "limit": 1 }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    let num = |v: &Value| v.as_str().and_then(|s| s.parse::<f64>().ok()).or_else(|| v.as_f64()).unwrap_or(f64::NAN);
+    let faces = call(&mut ctx, "sheetmetal_table", json!({}))["flat_faces"].as_array().expect("flat faces").clone();
+    let top = faces.iter().filter(|f| num(&f["normal"][2]) > 0.999).max_by(|a, b| num(&a["area"]).total_cmp(&num(&b["area"]))).expect("a top face").clone();
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    let v0 = volume(&mut ctx);
+    // Each in a sketch of its own on the flat's top, all its regions (live smferr.body.js).
+    let regions = |ctx: &mut Ctx, a: [f64; 2], b: [f64; 2]| {
+        let sk = call(ctx, "sketch_create", json!({ "plane": top["id"] }))["sketch"].clone();
+        let d = call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [a, b] }));
+        d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect::<Vec<Value>>()
+    };
+    let status = |f: &Value| (f["feature_status"]["status"].as_str().unwrap_or("").to_string(), f["feature_status"]["message"].as_str().unwrap_or("").to_string());
+    let hole = regions(&mut ctx, [-5., -5.], [5., 5.]);
+    let face = call(&mut ctx, "query_entities", json!({ "kind": "faces", "near": [50, 30, 2], "normal": [0, 0, 1], "limit": 1 }))["faces"][0]["id"].clone();
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "REMOVE", "entities": [hole[0], face] } }));
+    assert_eq!(status(&x).1, "Cannot select from the flattened sheet metal view and model view at the same time.", "{x}");
+    call(&mut ctx, "feature_delete", json!({ "features": [x["feature"].clone()] }));
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "MODEL", "operationType": "REMOVE", "entities": hole, "depth": "5 mm" } }));
+    assert_eq!(status(&x).1, "Feature defined in model space cannot reference sheet metal flat geometry.", "{x}");
+    call(&mut ctx, "feature_delete", json!({ "features": [x["feature"].clone()] }));
+    assert!((volume(&mut ctx) - v0).abs() < 1e-6);
+    let off = regions(&mut ctx, [40., 5.], [45., 10.]);
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "REMOVE", "entities": off } }));
+    assert_eq!(status(&x), ("Info".into(), "Some faces do not meet flattened sheet metal parts.".into()), "{x}");
+    assert!((volume(&mut ctx) - v0).abs() < 1e-6, "nothing cut");
+    call(&mut ctx, "feature_delete", json!({ "features": [x["feature"].clone()] }));
+    // Across the free x 60 edge, 5 of its 10 mm on the plate: the whole region is fused, so what isn't plate yet is added.
+    let tab = regions(&mut ctx, [25., 5.], [35., 15.]);
+    let x = call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "domain": "FLAT", "flatOperationType": "ADD", "entities": tab } }));
+    assert_eq!(status(&x).0, "Ok", "{x}");
+    let v = volume(&mut ctx);
+    assert!((v - v0 - 100.0).abs() < 1e-3, "the part off the plate added: {v0} -> {v}");
+}
+
 /// Corner break beside a bend (live q-flat-ops-1119, the 60 × 40 × 2 plate with a 20 mm Flange): 5 mm on the flange's
 /// outer corner, Fillet 7045.487 -> 7034.757 mm³, Chamfer 7020.487 (-25); the plate's corner at the bend's end is
 /// "Invalid input selections.".

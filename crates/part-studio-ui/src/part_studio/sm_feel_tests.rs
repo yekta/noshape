@@ -583,3 +583,34 @@ fn a_bends_filled_face_is_outlined_whole(cx: &mut TestAppContext) {
     }
     assert!(off.is_empty(), "the face to bend's outline not orange at:\n{}", off.join("\n"));
 }
+
+// Bend with its face filled from the line, that face clicked again where the preview still has it (qa workflow 11 step 14,
+// (20, 20, 2) on plate-bend): live keeps "Face of Sheet metal model 1" in the field and Bend 1 builds (qa
+// BEND-FACE-RECLICK-EMPTIES).
+#[gpui::test]
+fn a_bends_face_clicked_again_stays_in_its_field(cx: &mut TestAppContext) {
+    let Some(_gpu) = super::feel::gpu_pointer() else { return };
+    RENDERING.set(true);
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sm-bend-face-reclick", Some(starts["plate-bend"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let line = cx.update(|cx| {
+        let v = view.read(cx);
+        let sk = v.display.sketches.iter().find(|s| v.studio(cx).and_then(|st| st.features.iter().find(|f| f.id == s.feature)).is_some_and(|f| f.name == "Sketch 2")).expect("Sketch 2");
+        Reference::SketchEntity { sketch: sk.feature, entity: sk.curves.first().expect("the line").entity }
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sheetMetalBend", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Bend dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, _| d.user_focus_query("bendReference")));
+    cx.update(|cx| view.update(cx, |v, cx| v.pick(noshape_scene::builder::PickTarget { reference: line, kind: noshape_scene::builder::PickKind::SketchCurve, anchor: None }, cx)));
+    let faces = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).feature.params.query("face").len());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).ui.preview_before.is_some());
+    assert_eq!(faces(cx), 1, "the face filled from the line");
+    let pointer = super::feel::Pointer::new(cx, window, &view);
+    let p = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.020, 0.020, 0.002))).expect("on screen").round();
+    pointer.move_to(cx, &view, p);
+    pointer.frames(cx, &view);
+    pointer.click(cx, &view, p);
+    assert_eq!(faces(cx), 1, "the face kept after the click");
+}

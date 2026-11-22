@@ -1,20 +1,31 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 10:22 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 11:55 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 10:22 UTC)
-- LANDED 9164879d (10:02): FEEL-BEND-FACE-PICKED-LOOK, SKETCH-USE-VERTEX-OTHER-SKETCH, SKETCH-LENGTH-LABEL-IN-PLANE,
-  SM-TABLE-HEM-NAME, SKETCH-TRIM-SHORT-END, SKETCH-OFFSET-DEFAULT-SIDE, SKETCH-MIRROR-LINE-LOOK, PASTE-SKETCH-CENTRED,
-  EXTRA-UNFOLD-REFOLD-TOOLS, CORNER-RELIEF-TOO-SMALL-WARN, SKETCH-SELECTED-GLYPH-OFFSET (row 40 px above; not done:
-  moving off spots taken by lingering glyphs, an inference), SM-FLAT-VIEW-FIT's fit.
-- CHECKING acf660cb (TABLET-STAND-FACE-NAMES), QUEUED 47bfb052 (SM-FLAT-VIEW-FIT orientation: flat_place follows a
-  Bend's folding piece, live "skasm flat fixed piece"; T2 sheetmetal_std a_bent_plates_flat_lies_by_its_folding_piece).
-- Local, to land: SKETCH-ON-IN-FEATURE-MC: ui test a_sketch_on_its_own_in_feature_mate_connector (the Sketch plane field's
-  mate connector button makes the sketch's own connector, the sketch opens on it). The op (dx 00bc521ea) and the
-  translator (59d5c18ac, forms 21/21) were done; the 11-20 suite log predates them. TICKETS: every skasm ticket marked
-  fixed / to verify (the walk 3-4 P0s landed 05:29 in e8746d295 / bfce16794 but were never marked).
-- Replay kit: vibe2 ~/tmp/skasm/wf (run.sh, starts.json); its binary and shots deleted (copy a fresh green to run it).
+## In flight (11-22 11:55 UTC): sk/* hover cells + SMFlatOp + BEND-FACE-RECLICK-EMPTIES, one commit, verifying
+- Hover sk/* (live hm-sk-1122): all cells match but three combined states, now fixed:
+  c1a a lit curve's band over its unlit end dots, a lit end over the band: builder.rs draws a sketch's curves and points
+  `.unlit_only()` (params.x bit 4) plus lit-only copies `.selected_only().over_lines()` (drawn after the points); the lit
+  curve copy is lifted 9 px + 1.5 toward the eye (bits 2 + 5 in line_vertex: unlit dots lift size + 1.5 <= 8.5, lit >= 11);
+  ON_TOP discs drawn over a lit sketch point moved to over_lines so they stay after its lit copy (their nearest depth
+  hid it: sketch_lineend_* failed): psui's midpoint_overlay no-band disc (behaviors.rs, layer 22) and overlay_pts (20). c4a/c4d: no preview dot on InferenceKind::OnCurve. c5a:
+  Dimension clears the selection. Tests: hover_matrix sk_a_selected_lines_band..., sk_a_drawing_tool_over_a_line...,
+  sketch_mode choosing_a_drawing_tool_clears_the_selection. psui: params.x bit 6 is theirs (on_top silhouettes); their
+  next land puts pick_plane in normal_m.w_axis and plane_rise after the band's xy offset in line_vertex: merge carefully.
+- SMFlatOp (live smflat-1122 + vols.json): MODEL Extrude of a flat region = "Feature defined in model space cannot
+  reference sheet metal flat geometry." (extrude.rs), mixed flat + model = "Cannot select from the flattened ..."; Add
+  partly past the free edge fuses the whole region (live E5 +417.86: tab + Extrude 3's notch); Remove wholly off = INFO
+  SM_FLAT_OP_PARTIAL_INTERSECT ("Some faces do not meet flattened sheet metal parts." banner). e2e
+  an_extrude_in_the_flat_takes_flat_regions_only.
+- BEND-FACE-RECLICK-EMPTIES (qa P0): held_face_under skips a face the preview still has (mod.rs face_hit); test
+  sm_feel a_bends_face_clicked_again_stays_in_its_field.
+- Verify run: skasm-scratch/bin/hm4.sh on vibex6 (log hm-run5.log); then commit, mark TICKETS (BEND-FACE-RECLICK-EMPTIES,
+  FS-NATIVE-OPSMFLATOPERATION) after rebasing on origin/main (union rows: grep duplicates), land.
+- Queued: acf660cb (re-checked apart from a red batch: others' sketch_ui_tests shell / extrude tint), 47bfb052 (flat
+  orientation: SM-FLAT-VIEW-FIT reopened by qa waits on it), 53a54598 handoff.
+- Next: P1 SKETCH-LENGTH-LABEL-IN-PLANE residual (wf05 step 12: ours 20.001 on the far side, live 20 on the near side;
+  qa-scratch/tickets/wf05-length-label.png): the click on the face's edge should land exactly on it (20), label side.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline

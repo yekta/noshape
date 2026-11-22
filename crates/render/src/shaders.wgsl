@@ -1013,9 +1013,10 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let pick = global_pick(l.pick);
     let st = (state_of(pick) | state_add) & state_mask;
     // params.x bit 2 (Instance::selected_only): only its selected, query-lit or hovered lines; bit 4 too (on top):
-    // only the selected.
+    // only the selected. Bit 7 (Instance::unlit_only): only the others (all in the pick pass, which has no lit copy).
     let on_top = (inst.params.x & 16u) != 0u;
-    if ((inst.params.x & 4u) != 0u && (st & select(SELECTED | QUERY | HOVER, SELECTED, on_top)) == 0u) {
+    let lit_line = (st & select(SELECTED | QUERY | HOVER, SELECTED, on_top)) != 0u;
+    if (((inst.params.x & 4u) != 0u && !lit_line) || ((inst.params.x & 128u) != 0u && lit_line && g.viewport.w <= 0.0)) {
         var gone: LineOut;
         gone.pos = vec4(0.0, 0.0, -2.0, 1.0);
         return gone;
@@ -1057,6 +1058,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // (Picked lines too: the face side of an edge's pick band is in reach as much as the background side.)
     // (A picked band no nearer than a 3 px one's: a vertex's pick disc at the line's end stays in front of it.)
     if (lit || picking || (l.style & 32u) != 0u) { lift = 1.5 * select(half, min(half, max(1.5 * g.viewport.z, 0.5)), picking && width < 9.0); }
+    // Bits 2 + 5 (a sketch's lit curves, drawn after its points): nearer than its unlit points' discs (lifted by their
+    // size + 1.5 px, 7 px at most), farther than its lit ones' (11 px and up).
+    if ((inst.params.x & 36u) == 36u && !picking) { lift = max(lift, 9.0 * g.viewport.z + 1.5); }
     var ca = g.view_proj * vec4(wa, 1.0);
     var cb = g.view_proj * vec4(wb, 1.0);
     if (lift > 0.0) {
@@ -1271,6 +1275,10 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
     // Onshape's offsets: points 9 units, faces 27.
     if ((p.style & 2u) != 0u) { c.z = c.w; } else { c = in_front_of_faces(c, 18.0); }
+    // params.x bit 2 (Instance::selected_only): only its hovered or selected points.
+    // Bit 7 (Instance::unlit_only): only the others (all in the pick pass, which has no lit copy).
+    let lit_point = (st & (HOVER | SELECTED)) != 0u;
+    if (((inst.params.x & 4u) != 0u && !lit_point) || ((inst.params.x & 128u) != 0u && lit_point && g.viewport.w <= 0.0)) { c = vec4(0.0, 0.0, -2.0, 1.0); }
     var o: PointOut;
     o.slot = slot;
     o.pos = c;
