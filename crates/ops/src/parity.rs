@@ -3246,6 +3246,19 @@ impl<'a> Translator<'a> {
             }
             return Ok(found);
         }
+        // qClosestTo(qCreatedBy(makeId("F…"), EntityType.VERTEX), vector(x, y, z) * unit) without live's geometry: ours at
+        // that point (c2-cov2-curves' Fit spline start / end curvature, the ends of a sketch's line chain).
+        if let Some(rest) = text.split("qClosestTo(").nth(1)
+            && rest.contains("EntityType.VERTEX")
+            && let Some((nums, unit)) = rest.split("vector(").nth(1).and_then(|v| v.split_once(')'))
+            && let [x, y, z] = nums.split(',').filter_map(|x| x.trim().parse::<f64>().ok()).collect::<Vec<_>>()[..]
+        {
+            let scale = if unit.contains("millimeter") { 1e-3 } else if unit.contains("inch") { 0.0254 } else if unit.contains("centimeter") { 1e-2 } else { 1.0 };
+            let sketch = rest.split("qCreatedBy(makeId(\"").nth(1).and_then(|r| r.split('"').next()).is_some_and(|f| self.sketch_entities.keys().any(|(s, _)| s == f));
+            let key = (k, format!("point:{text}"));
+            self.refs.insert(key.clone(), LiveRef { kind: "VERTEX".into(), point: Some([x * scale, y * scale, z * scale]), sketch, ..Default::default() });
+            return self.by_geometry(k, &key.1).map(|e| vec![e]);
+        }
         Err(format!("query not mapped (no live geometry for {}): {}", if ids.is_empty() { "it".to_string() } else { ids.join(", ") }, text.chars().take(80).collect::<String>()))
     }
 

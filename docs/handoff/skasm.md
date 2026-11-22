@@ -1,23 +1,29 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 12:53 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 14:09 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 12:53 UTC): re-landing c572df92's content + the SKETCH-LENGTH-LABEL residual (df6391b5a)
-- c572df92 FAILED 12:28 (rebase conflict, renderer.rs / shaders.wgsl): asm took params.x bit 4 for on_top lines
-  (80a580be3). Rebased by hand: unlit_only moved to bit 7 (128); over_lines stays bit 5; psui's on_top silhouettes
-  (64, not on main yet) untouched. 53a54598 (47bfb052, tablet-stand content) still QUEUED; my next land carries all.
-- Branch = 9 commits over main: sk/* hover combined states, SMFlatOp per live smflat-1122, BEND-FACE-RECLICK-EMPTIES,
-  tablet-stand names, flat orientation, and df6391b5a (residual: a level/vertical/perp direction crossing a model edge
-  beats its MIDPOINT; a drawn line's length box lies left of its direction, verticals left; tests
-  a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it, a_drawn_lines_box_lies_left_of_its_direction).
-  Before the rebase: clippy + 416/416 sketch::ui_tests green (12:50).
-- Run on the rebased tree: skasm-scratch/bin/rbv.sh on vibex6 (clippy render/scene/psui/custom, render tests,
-  scene sketch_mode, sketch::ui_tests, e2e an_extrude_in_the_flat*), log /root/skasm-scratch/rbv-run.log. Green: land.
-- TICKETS rebuilt vs main (SKETCH-LENGTH residual note on row ~318; other duplicate IDs are on main itself, qa's).
+## In flight (11-22 14:09 UTC)
+- QUEUED cad1ad91 (13:5x, carries 94a986b1 = c572df92 rebased: sk/* hover combined states, SMFlatOp per live
+  smflat-1122, BEND-FACE-RECLICK-EMPTIES, tablet-stand names, flat orientation 47bfb052, SKETCH-LENGTH-LABEL residual
+  df6391b5a, + the saved Rip / Unfold / Refold fix). Rebase note: asm took params.x bit 4 (on_top lines, 80a580be3);
+  unlit_only is bit 7 (128), over_lines bit 5, psui's on_top silhouettes 64 (not on main yet). Watcher: background loop on
+  land.sh --status. If it fails: fix forward.
+- Regression of mine fixed (in cad1ad91): 3db660b89's feature_add refusal of Rip / Unfold / Refold also stopped the parity
+  translator (c2-cov-sm-rip, c2-cov-sm-unfold-refold: live builds them via std). Ctx::saved_features (set by the
+  translator around feature_add) lets them through; e2e a_saved_documents_unfold_refold_and_rip_are_added. Both docs 5/5, 6/6.
+- UNCOMMITTED: parity.rs query_with last-resort qClosestTo(qCreatedBy(F, VERTEX), vector(..)) -> ours at that point
+  (c2-cov2-curves Fit spline start / end curvature: "no live geometry for Ib"). Full suite on vibex6 running, log
+  /root/skasm-scratch/suite-1122b.log; baseline suite-1122.log (13:52: 128/188 docs, 2014/2680 features). No doc worse:
+  commit + land.
+- Model suite 13:52: no document's first difference is a sketch any more (loft-paths-guides 29/29). Remaining firsts are
+  others' (fillet / loft / boolean / fill) or mine in sheet metal: cov2-sm-hem-jog (flat collision INFO), cov2-sm-corner-break
+  model F, sm-loft-basic (apex), cov2-frame-corners Trim group 66 vs 64 edges; c2-constrained-surface (qCompressed vertices
+  query, Sketch 2 DISTANCE).
 - Asked live (REQUESTS 12:32 "length box side and model-edge midpoint vs a crossing"); adjust to the answer.
-- psui FYI (lead 12:5x): a_closed_sketchs_lit_end_goes_with_it broke from my Esc hold 438a9d313 (hover pick only on
-  id change); psui's f8b0a2d8 (queued) fixes it. Nothing for me.
+- Lead 13:2x: when live's selection-gesture capture lands (box select both directions in sketch, Shift/Ctrl, empty click),
+  its sketch side is mine. Not filed yet at 14:09.
+- psui's f8b0a2d8 fixes a_closed_sketchs_lit_end_goes_with_it (broken by my Esc hold 438a9d313): nothing for me.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
