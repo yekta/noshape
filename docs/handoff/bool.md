@@ -45,7 +45,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    cyl_cyl / intervals_on. Next: add arg_tol + band() in Ctx, env switches per site, find which one makes the far T1
    pass, then do them all properly (stage A within-arg, stage B cross-arg). A PROBE_NM port (bool-hat brep) shows the
    unbalanced edges. In flight at 06:29: wclip 6329aaae + ruling 1d8788b5 CHECKING; bandbatch knurls unit
-   bool-kn-bandbatch (vibe2 -> kn-bandbatch.out); usdvol gate vibex7 (chain-bool-usdvol.out).
+   DONE 06:3x 0 diff x5 (copies deleted): bandbatch READY to land after ruling (rebase --onto e6e55ac74 cbab7cfe5); usdvol gate vibex7 (chain-bool-usdvol.out).
 3. SPEED-STANDOFFS after.
 4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
