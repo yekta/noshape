@@ -20,7 +20,13 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   for blend; bisect the window <14:10 .. 19:26 11-21 if Extrude 18 still fails (notes /root/asm-scratch/notes-1121.md).
 - Infento rerun with the welding fix timed out at 7200 s in the mate checks (121 checked, ~32 s each on a loaded
   vibex8; weld/inf-fix.out). Rerun with the landed main binary and 10800 s; compare 157/167 occ, 204/206 mates, 64/64.
-- Next: SPEED-ASM-OPEN profiling; then xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5,
+- QUEUED a8722d2a (13 commits, 06:5x): don't land again till it lands; then tell qa the sha.
+- ISOLATE-SHOW-INTERNAL-GEOMETRY (qa wf35, P1): live REQUESTS "asm 07:08" asked what the checkbox does; then add
+  the row (app-core isolate_ui.rs is shared with the Part Studio: check its Isolate too).
+- Scissor on main started 07:0x in the vibex8 slot (sc-main-1122.out).
+- SPEED-ASM-OPEN: scissor open 78.8 s under perf on vibex8 (beside the scissor run); perf.data in vibex8
+  ~/tmp/asm/speed (perf report --no-children --sort dso,symbol takes minutes on the 700 MB binary).
+- Next: then xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5,
   tvc 41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
   weld/w0-p*.noshape and ~/tmp/asm/q copies; vibe2 ops-tc / ab1120e-*.out; local branch asm-rb-check.
