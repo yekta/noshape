@@ -462,6 +462,16 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   the same readouts and panel values (Min dist 39.051, X/Y/Z 0/30/25, Max dist 55.902, Length 40). MEASURE-VALUE-CLICK-PIN also
   holds inside the panel (variant 36v-measure-px, live's px): live's click on Min dist selects the value as 39.05125 with the full
   value in a chip above and the row lit, a second click 39.051 selected; ours changes nothing (rows 2-3).
+- [ ] P2 **EXPORT-STORE-DETAILS (dx)** (workflow 39, doc-tabs, green 984adcc30; variant 39v-short-waits, the 20 s waits cut to 3 s
+  because 7 x 20 s ran past the app's 180 s script budget): (1) the IGES export stored in a tab is "Part Studio 1.**igs**", live
+  "Part Studio 1.**iges**"; (2) STEP's four checkboxes under Version are 39 px apart, live 31 (Options and Export sit 24 px lower);
+  (3) a stored file tab's menu has a separator between Export… and Download, live none (tickets/wf39-tabs.png row 5,
+  wf39-step-options.png, wf39-stored-tab-menu.png).
+- Workflow 39 (Export… each of the 12 Part Studio formats, store STEP / x_t / IGES / ACIS / STL in tabs, import .step and .x_t back)
+  otherwise = live: the same 12 formats and per-format option rows, each stored tab right after Part Studio 1, each import's
+  Part Studio right after its source tab ("Part Studio 1 (1)" after .step, "(2)" after .x_t), the same "being prepared for export"
+  message. Not tickets: live's Create task… (a cloud feature); live's STEP Preprocessing / derived tolerances / Store file in a new
+  tab (account-remembered there). The import toast is IMPORT-TAB-TOAST (waiting on live).
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
