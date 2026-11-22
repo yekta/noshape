@@ -342,3 +342,23 @@ fn exact_hlr_on_8_threads_gives_the_single_threads_answer() {
     eprintln!("exact HLR answers unlike the reference: {serial} of 200 one after another, {parallel} of 1800 on 6 threads beside 2 meshing");
     assert_eq!((serial, parallel), (0, 0));
 }
+
+/// A bead (a torus fused round a cylinder's top) seen across its axis hides the inner top of its tube behind the
+/// tube's near side, on its seam's side as on the other (c2-bottle-split's lip: OCCT drew the seam's inner top, live
+/// 90..180 deg only).
+#[test]
+fn a_beads_inner_top_is_hidden_behind_its_near_side() {
+    let frame = Plane::new(DVec3::new(0.0, 0.0, -50.0), DVec3::Z, DVec3::X);
+    let neck = make_cylinder(&frame, 30.0, 52.0, 2.0 * PI).unwrap();
+    let bead = make_torus(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 30.0, 4.0, 2.0 * PI).unwrap();
+    let solid = fuse(&neck, &bead).unwrap().shape;
+    for dir in [DVec3::Y, DVec3::NEG_Y] {
+        for exact in [true, false] {
+            let edges = project_hlr(&solid, dir, DVec3::Z, exact).unwrap();
+            let inner = |e: &&ProjectedEdge| e.visibility == Visibility::Visible && e.polyline.iter().any(|p| (26.8..29.8).contains(&p.x.abs()) && (2.2..3.8).contains(&p.y));
+            assert_eq!(edges.iter().filter(inner).count(), 0, "{dir:?} exact={exact}:\n{}", dump(&edges));
+            // The outer top quarter stays drawn.
+            assert!(edges.iter().any(|e| e.visibility == Visibility::Visible && e.polyline.iter().any(|p| (31.0..33.5).contains(&p.x) && (1.0..3.5).contains(&p.y))), "{dir:?} exact={exact}");
+        }
+    }
+}

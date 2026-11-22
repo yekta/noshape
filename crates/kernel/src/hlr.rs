@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 use crate::ffi::ffi;
-use crate::geom::p3;
-use crate::shape::{Shape, ck};
+use crate::geom::{Curve, Surface, p3};
+use crate::shape::{Shape, ShapeType, ck};
 
 /// hlr.cpp's source for an outline whose face draws no line or conic in the view (`ProjectedEdge::freeform`).
 const SOURCE_FREEFORM_OUTLINE: i32 = -2;
@@ -66,7 +66,183 @@ pub fn project_hlr_with(shape: &Shape, view_dir: DVec3, up: DVec3, exact: bool, 
     let join_tol = (size * 1e-7).max(1e-12);
     // Exact lines lie on each other within the model's precision (a curve's chords differ by up to the deflection).
     let line_tol = if exact { (size * 1e-6).max(1e-12) } else { cover_tol };
+    let raw = hide_behind_own_torus(shape, view_dir, up, raw);
     Ok(merge_fragments(drop_covered_hidden(raw, cover_tol, line_tol), join_tol))
+}
+
+/// A torus face as an occluder: its surface and the face's parameter box (`[umin, umax, vmin, vmax]`), with the
+/// direction of `umin` about the axis.
+struct TorusFace {
+    center: DVec3,
+    axis: DVec3,
+    major: f64,
+    minor: f64,
+    uv: [f64; 4],
+    u0: DVec3,
+    /// -1 where u turns clockwise about `axis`.
+    sense: f64,
+}
+
+impl TorusFace {
+    fn of(face: &Shape) -> Option<TorusFace> {
+        let Surface::Torus { center, axis, major_radius, minor_radius } = face.face_surface().ok()? else { return None };
+        let axis = axis.try_normalize()?;
+        let uv = face.uv_bounds().ok()?;
+        let vm = (uv[2] + uv[3]) / 2.0;
+        let p = face.point_at_uv(uv[0], vm).ok()? - center;
+        let u0 = (p - axis * p.dot(axis)).try_normalize()?;
+        let mut t = TorusFace { center, axis, major: major_radius, minor: minor_radius.abs(), uv, u0, sense: 1.0 };
+        // The parameters' senses as this reads them (an indirect frame turns u the other way), checked on a point.
+        let (uq, vq) = (uv[0] + 0.3 * (uv[1] - uv[0]).min(std::f64::consts::PI), uv[2] + 0.3 * (uv[3] - uv[2]));
+        let q = face.point_at_uv(uq, vq).ok()?;
+        let same = |a: f64, b: f64| (a - b).rem_euclid(std::f64::consts::TAU).min((b - a).rem_euclid(std::f64::consts::TAU)) < 1e-6;
+        if !same(t.uv_of(q).0, uq) {
+            t.sense = -1.0;
+        }
+        let (u, v) = t.uv_of(q);
+        (same(u, uq) && same(v, vq)).then_some(t)
+    }
+
+    fn uv_of(&self, q: DVec3) -> (f64, f64) {
+        let d = q - self.center;
+        let h = d.dot(self.axis);
+        let radial = d - self.axis * h;
+        (self.sense * self.u0.cross(radial).dot(self.axis).atan2(self.u0.dot(radial)) + self.uv[0], h.atan2(radial.length() - self.major))
+    }
+
+    /// Negative inside the whole torus, zero on it.
+    fn inside(&self, q: DVec3) -> f64 {
+        let d = q - self.center;
+        let h = d.dot(self.axis);
+        let rho = (d - self.axis * h).length();
+        (rho - self.major).powi(2) + h * h - self.minor * self.minor
+    }
+
+    /// Whether surface point `q` lies within the face's parameter box.
+    fn on_face(&self, q: DVec3) -> bool {
+        let tau = std::f64::consts::TAU;
+        let within = |a: f64, lo: f64, hi: f64| hi - lo >= tau - 1e-9 || (a - lo).rem_euclid(tau) <= hi - lo + 1e-9;
+        let (u, v) = self.uv_of(q);
+        within(u, self.uv[0], self.uv[1]) && within(v, self.uv[2], self.uv[3])
+    }
+
+    /// Whether the face lies between `p` (on it) and the viewer (`toward`): the ray's crossings of the torus, each
+    /// counted where the face is.
+    fn hides(&self, p: DVec3, toward: DVec3) -> bool {
+        let r = self.minor;
+        let len = 2.0 * (self.major + 2.0 * r) + (p - self.center).length();
+        let n = (len / (r / 64.0)).ceil().clamp(1.0, 1e5) as usize;
+        let at = |k: usize| p + toward * (len * k as f64 / n as f64);
+        let deep = -1e-9 * r * r;
+        let mut was_in = false;
+        for k in 1..=n {
+            let is_in = self.inside(at(k)) < deep;
+            if is_in != was_in {
+                // The crossing between samples k - 1 and k.
+                let (mut a, mut b) = (len * (k - 1) as f64 / n as f64, len * k as f64 / n as f64);
+                for _ in 0..40 {
+                    let m = (a + b) / 2.0;
+                    if (self.inside(p + toward * m) < deep) == is_in { b = m } else { a = m }
+                }
+                if self.on_face(p + toward * b) {
+                    return true;
+                }
+            }
+            was_in = is_in;
+        }
+        false
+    }
+}
+
+/// The visible pieces of a torus face's own edges drawn as its outline that the face's near side hides: OCCT draws a
+/// bead's seam seen across the axis (it is the outline there) visible over the tube's inner top too, which the tube's
+/// near side covers (the outliner's outline on the other side is hidden right: c2-bottle-split's lip, live 90..180 deg).
+fn hide_behind_own_torus(shape: &Shape, view_dir: DVec3, up: DVec3, edges: Vec<ProjectedEdge>) -> Vec<ProjectedEdge> {
+    let mut ids: Vec<u32> = edges.iter().filter(|e| e.visibility == Visibility::Visible && e.class == EdgeClass::Outline).filter_map(|e| e.source_edge).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    // (A line on a torus is no outline.)
+    let curved: Vec<(u32, Shape, f64, f64)> = ids
+        .into_iter()
+        .filter_map(|i| {
+            let e = shape.sub_shape(ShapeType::Edge, i as usize).ok()?;
+            let info = e.edge_info().ok()?;
+            (!matches!(info.curve, Curve::Line { .. })).then_some((i, e, info.first_param, info.last_param))
+        })
+        .collect();
+    if curved.is_empty() {
+        return edges;
+    }
+    let Ok(edge_faces) = shape.edge_faces() else { return edges };
+    let on_tori: std::collections::HashMap<u32, (Vec<TorusFace>, Shape, f64, f64)> = curved
+        .into_iter()
+        .filter_map(|(i, e, t0, t1)| {
+            let faces: Vec<TorusFace> = edge_faces.get(i as usize)?.iter().filter_map(|&f| TorusFace::of(&shape.sub_shape(ShapeType::Face, f as usize).ok()?)).collect();
+            (!faces.is_empty()).then_some((i, (faces, e, t0, t1)))
+        })
+        .collect();
+    if on_tori.is_empty() {
+        return edges;
+    }
+    let toward = -view_dir.normalize();
+    let y = (up - toward * up.dot(toward)).normalize();
+    let x = y.cross(toward);
+    let flat = |p: DVec3| DVec2::new(p.dot(x), p.dot(y));
+    let mut out = Vec::with_capacity(edges.len());
+    for e in edges {
+        let Some((faces, edge, t0, t1)) = e.source_edge.filter(|_| e.visibility == Visibility::Visible && e.class == EdgeClass::Outline).and_then(|i| on_tori.get(&i)) else {
+            out.push(e);
+            continue;
+        };
+        let (t0, t1) = (*t0, *t1);
+        let point = |t: f64| edge.point_at(t).unwrap_or(DVec3::NAN);
+        const N: usize = 720;
+        let step = (t1 - t0) / N as f64;
+        let samples: Vec<DVec2> = (0..=N).map(|k| flat(point(t0 + step * k as f64))).collect();
+        // Each polyline point's parameter on the edge: the nearest sample's, refined.
+        let lift = |q: DVec2| {
+            let k = (0..=N).min_by(|a, b| samples[*a].distance_squared(q).total_cmp(&samples[*b].distance_squared(q))).unwrap_or(0);
+            let d = |t: f64| flat(point(t)).distance_squared(q);
+            let at = t0 + step * k as f64;
+            let (mut a, mut b) = ((at - step).max(t0), (at + step).min(t1));
+            for _ in 0..40 {
+                let (m1, m2) = (a + (b - a) / 3.0, b - (b - a) / 3.0);
+                if d(m1) < d(m2) { b = m2 } else { a = m1 }
+            }
+            (a + b) / 2.0
+        };
+        let hidden = |t: f64| faces.iter().any(|f| f.hides(point(t), toward));
+        let ts: Vec<f64> = e.polyline.iter().map(|q| lift(*q)).collect();
+        let hid: Vec<bool> = ts.iter().map(|&t| hidden(t)).collect();
+        if hid.iter().all(|h| !h) {
+            out.push(e);
+            continue;
+        }
+        // Split where the visibility changes, at the edge's point there (a closed edge's pieces may run over its ends).
+        let closed = samples[0].distance(samples[N]) < 1e-9 * (1.0 + samples[0].length());
+        let mut piece = vec![e.polyline[0]];
+        for k in 1..e.polyline.len() {
+            if hid[k] != hid[k - 1] {
+                let (mut a, mut b) = (ts[k - 1], ts[k]);
+                if closed && (b - a).abs() > (t1 - t0) / 2.0 {
+                    b += (t1 - t0) * (a - b).signum();
+                }
+                let wrap = |t: f64| if t < t0 { t + (t1 - t0) } else if t > t1 { t - (t1 - t0) } else { t };
+                for _ in 0..40 {
+                    let m = (a + b) / 2.0;
+                    if hidden(wrap(m)) == hid[k - 1] { a = m } else { b = m }
+                }
+                let cut = flat(point(wrap((a + b) / 2.0)));
+                piece.push(cut);
+                let visibility = if hid[k - 1] { Visibility::Hidden } else { Visibility::Visible };
+                out.push(ProjectedEdge { visibility, polyline: std::mem::replace(&mut piece, vec![cut]), ..e.clone() });
+            }
+            piece.push(e.polyline[k]);
+        }
+        let visibility = if hid[hid.len() - 1] { Visibility::Hidden } else { Visibility::Visible };
+        out.push(ProjectedEdge { visibility, polyline: piece, ..e });
+    }
+    out
 }
 
 /// Runs `f` with this thread's exact HLR bounded by `steps` of work (OCCT's break-hook checks; tests), past which a
