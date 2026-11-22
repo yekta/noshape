@@ -978,6 +978,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
 - Live's 19:54 answers also matched: (2) the grey "24.989" box on the finished first segment, as ours. 20:18 (2): Part 1's top
   face amber right after the second Fastened pick, as ours.
 - [x] P0 **FEEL-ASM-PS-MC-MISSING (asm)** (qa verified 01:0x, green 50772462b (asm 8eb92415), hm2/cmp-b4asm: the part's connector is drawn and lit; its crisp navy rim is psui's FEEL-MC-LOOK): hover matrix batch 4. The block's Part Studio mate connector "Mate connector 1" (origin
+- [x] fixed 8eb92415 (asm 11-21 23:31: a part's own mate connectors drawn and pickable in the assembly; hover matrix cell asm mc_* as live) P0 **FEEL-ASM-PS-MC-MISSING (asm)**: hover matrix batch 4. The block's Part Studio mate connector "Mate connector 1" (origin
   the vertex (40,30,20), made by the start's feature_add with only originQuery) is not drawn in the assembly (one Part 1 instance),
   so it can't be hovered or picked: the pointer on it lights the corner vertex. Live draws the part's connector there (disc, ring,
   axes; hovered fill #FFE79F, selected #FFE187, owner edges #DAB46B..#E9C177). If ours only drops it for a connector with no owner
@@ -991,11 +992,20 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   #F0C28C..#F8C58A with the edges showing through (as in the Part Studio, which we match); ours an ~7 px opaque disc. Also with
   another face selected. b4-score.png row 1, columns 1-2 and 7-8.
 - [x] P0 **FEEL-ASM-MATE-VERTEX (asm)** (qa verified 01:0x, green 50772462b, out-w2b/w2-as-fast-vertex: the white disc with an orange rim on the vertex, no triad): user walk 2. Fastened mate, first field active, pointer on Part 2's corner (80,0,10)
+- [ ] (asm 11-22: the hollow ring and its blue hover fixed in 8eb92415; open: the X shaft along a selected edge, live hides it under the edge band; live capture asked in REQUESTS "is the assembly move triad depth-tested?") P0 **FEEL-ASM-MANIPULATOR-RING (asm)**: batch 4. With a vertex, edge or face selected in the assembly, the move manipulator's
+  centre is a hollow white ring in live (the orange pick shows inside it); hovered, the same hollow ring turns blue
+  #6087BD..#85A3D0. Ours: a filled white disc in a grey ring, hovered a white disc in a bright blue ring; on a selected edge a white
+  dashed line runs along the edge right of the ring (live none). 8 cells; b4-score.png rows 1-4, columns 3-6.
+- [x] fixed 8eb92415 (asm 11-21 23:31: the ~11 px see-through disc; vertex_* cells as live) P0 **FEEL-ASM-VERTEX-LOOK (asm)**: batch 4. A vertex hovered in the assembly: live an ~11 px see-through disc
+  #F0C28C..#F8C58A with the edges showing through (as in the Part Studio, which we match); ours an ~7 px opaque disc. Also with
+  another face selected. b4-score.png row 1, columns 1-2 and 7-8.
+- [x] fixed 8eb92415 (asm 11-21 23:31: the corner hover reaches the vertex through the connector glyph (pick_through), the white mark over a depth-tested disc, no triad; fastened_vertex_hovered as live's crop) P0 **FEEL-ASM-MATE-VERTEX (asm)**: user walk 2. Fastened mate, first field active, pointer on Part 2's corner (80,0,10)
   (two-blocks): live shows only the inferred connector's white ellipse disc with a #FFC685 rim on the vertex, no triad (live
   feel/3d-asm/fastened-vertex-snap.png, fastened-near-vertex.png; hover-matrix b5/b5-fastened-vertex_f). Ours draws a filled light
   orange disc plus the full connector triad (ring, X/Y/Z) there. Faces and edges match live (centroid / midpoint triad, white
   dots). Ours qa-scratch/hm2/w2c/vv.png, out-w2/w2-as-fast-vertex (qa 20:18, green 2fb0ed1ac, kit qa-scratch/hm2/walk2).
 - [x] P0 **FEEL-ASM-DRAG-LIT (asm)** (qa verified 01:0x, green 50772462b, real xdotool drag: no hover look mid-drag, lit again after release; qa-scratch/tickets/asm-drag-lit-w7.png): user walk 2, real pointer (xdotool). Dragging free Part 2 by its top face (two-blocks): ours
+- [x] fixed 8eb92415 (asm 11-21 23:31: nothing lit while a part is dragged, the hover back after release; feel test) P0 **FEEL-ASM-DRAG-LIT (asm)**: user walk 2, real pointer (xdotool). Dragging free Part 2 by its top face (two-blocks): ours
   keeps the hover look on the moving part for the whole drag (the #FFC20E silhouette and the face's #FFC685 boundary). Live: "the
   hover highlight is off for the whole drag; after release the entity under the pointer lights again" (behaviours "feel (3D):
   assembly", feel/3d-asm/free-during-drag.png: no outline). Ours qa-scratch/hl/dr.png (before / mid-drag / released), green
