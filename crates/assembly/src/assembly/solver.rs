@@ -2150,7 +2150,14 @@ fn solve_driven(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[So
                         let iterations = levenberg_marquardt(&problem, &mut local, free, scale, dragged);
                         // (Not for mates that can't all hold: nothing moves then. Its eigendecompositions of a
                         // big group's Jacobian took most of infento-subs' 18 s solve.)
-                        if !dragged && free.iter().any(|&b| local[b] != bodies[b].pose) && group_conflict(&problem, start, &local, scale).is_empty() {
+                        // Nor when no part moved more than 1e-6 of the scale: the least change can't differ by more
+                        // (asm-infento-subs' open: a 1e-6 rad Parallel in live's saved poses, LM's 1e-7 m moves, and
+                        // 12 rounds of a 114-part group's eigendecomposition, 11-15 s).
+                        let moved = |k: usize, b: usize| {
+                            let (s, c) = (bodies[b].pose, local[b]);
+                            ((s.transform_point(anchors[k]) - c.transform_point(anchors[k])).length() / scale).max(log_rot(s.rotation * c.rotation.inverse()).length())
+                        };
+                        if !dragged && free.iter().enumerate().any(|(k, &b)| moved(k, b) > 1e-6) && group_conflict(&problem, start, &local, scale).is_empty() {
                             least_change(&problem, &mut local, free, scale, &anchors);
                         }
                         iterations

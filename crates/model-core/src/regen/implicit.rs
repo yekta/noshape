@@ -37,6 +37,10 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
             };
             match revolved {
                 Some((origin, axis)) => {
+                    let axis = match revolve_axis(ev, bi, fi) {
+                        Some(drawn) if drawn.normalize().dot(axis.normalize()).abs() > 1.0 - 1e-9 => -drawn.normalize(),
+                        _ => axis,
+                    };
                     let bb = face.bounding_box(true).ok()?;
                     let c = bb.center();
                     let t = (c - origin).dot(axis);
@@ -105,6 +109,25 @@ pub fn implicit_connector(ev: &EvalCtx, on: &Reference, inference: Inference) ->
         _ => {
             let _ = ShapeType::Face;
             None
+        }
+    }
+}
+
+/// A Revolve's face: the revolve's axis as drawn. Live (behaviours "core (2026-10-26) evSurfaceDefinition coordSystem
+/// of cylinder faces" (5) and (f), asm-infento-subs' tyre, Fastened 24): its frame's Z points against it, whichever way
+/// the kernel's surface runs (ours: a torus along it, a cylinder against it).
+fn revolve_axis(ev: &EvalCtx, bi: usize, fi: usize) -> Option<DVec3> {
+    use crate::reference::{Role, TopoName};
+    if ev.ctx.legacy_revolve_axes {
+        return None;
+    }
+    let mut n = ev.ctx.bodies[bi].faces.get(fi)?.as_ref();
+    loop {
+        match n {
+            TopoName::Split { parent, .. } => n = parent,
+            TopoName::Face { role: Role::Generated(inner), .. } => n = inner,
+            TopoName::Face { feature, role: Role::Side(_) } => return ev.ctx.revolve_axes.iter().find(|(f, _)| f == feature).map(|(_, a)| *a),
+            _ => return None,
         }
     }
 }

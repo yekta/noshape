@@ -40,6 +40,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
+    ev.ctx.revolve_axes.push((ev.feature, axis));
     // Live "psb (10-24 e)": an open wall's Thickness 1 follows the axis as
     // its edge is directed, not Opposite direction.
     let turning = |f: &crate::display::PlaneFrame, m: DVec3| {
@@ -75,6 +76,7 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
     }
     let Some(axis_ref) = ev.query("axis").first() else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
     let Some((origin, axis)) = ev.resolve_axis(axis_ref) else { return crate::regen::eval::err_at(&["axis"], "Select the axis to revolve around.") };
+    ev.ctx.revolve_axes.push((ev.feature, axis));
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
     let edges = resolve_curves(ev, &refs)?;
     if edges.is_empty() {

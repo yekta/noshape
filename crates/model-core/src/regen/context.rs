@@ -746,6 +746,9 @@ pub struct Context {
     /// The studio's sketches on a moved part's faces take the frame from the face where it is now
     /// ([`crate::partstudio::PartStudio::legacy_moved_face_frames`]).
     pub legacy_moved_face_frames: bool,
+    /// The studio's revolved faces' axis connectors along the revolve's axis
+    /// ([`crate::partstudio::PartStudio::legacy_revolve_axes`]).
+    pub legacy_revolve_axes: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -786,6 +789,10 @@ pub struct Context {
     // --- end batch SM ---
     /// Holes made by Hole features (drawings' hole / thread callouts).
     pub holes: Vec<HoleRecord>,
+    /// Each Revolve's axis as its axis entity is drawn (before Opposite direction): its faces' connectors point
+    /// against it ([`super::implicit`]).
+    #[serde(default)]
+    pub revolve_axes: Vec<(FeatureId, DVec3)>,
     /// Images Decal features put on faces (std decalUtils.fs DecalData).
     pub decals: Vec<DecalRecord>,
     /// Appearances features gave their parts (Import: the file's colours),
@@ -955,6 +962,7 @@ impl Context {
             legacy_pattern_seeds,
             legacy_remove_seeds,
             legacy_moved_face_frames,
+            legacy_revolve_axes,
             bodies: _,
             sketches,
             derived_sketches,
@@ -975,6 +983,7 @@ impl Context {
             frame_members,
             form_tools,
             holes,
+            revolve_axes,
             decals,
             part_appearance,
             face_appearance,
@@ -1001,6 +1010,7 @@ impl Context {
             && *legacy_pattern_seeds == o.legacy_pattern_seeds
             && *legacy_remove_seeds == o.legacy_remove_seeds
             && *legacy_moved_face_frames == o.legacy_moved_face_frames
+            && *legacy_revolve_axes == o.legacy_revolve_axes
             && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies
@@ -1018,6 +1028,7 @@ impl Context {
             && form_tools.is_empty()
             && o.form_tools.is_empty()
             && *holes == o.holes
+            && *revolve_axes == o.revolve_axes
             && *decals == o.decals
             && *part_appearance == o.part_appearance
             && *face_appearance == o.face_appearance

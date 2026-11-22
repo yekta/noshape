@@ -4080,6 +4080,55 @@ fn a_torus_face_has_its_axis_points_on_its_axis() {
     }
 }
 
+/// Live (behaviours "core (2026-10-26) evSurfaceDefinition coordSystem of cylinder faces" (5) and case (f); asm-infento-
+/// subs' Fastened 24: the tyre's MID_AXIS_POINT Z +X where ours was −X): a revolved face's connectors point against the
+/// revolve's axis as drawn, a torus's and a cylinder's alike; a studio saved before (ScopeRule < 19) keeps ours.
+#[test]
+fn a_revolved_faces_connectors_point_against_the_axis_as_drawn() {
+    use noshape_kernel::{ShapeType, Surface};
+    let units = UnitPrefs::default();
+    let torus = || revolved_studio(|sk| {
+        sk.add_circle(DVec2::new(0.02, 0.0), 0.005);
+    });
+    let cylinder = || revolved_studio(|sk| {
+        let p = [DVec2::new(0.01, 0.0), DVec2::new(0.02, 0.0), DVec2::new(0.02, 0.02), DVec2::new(0.01, 0.02)];
+        let ids: Vec<_> = p.iter().map(|q| sk.add_point(*q)).collect();
+        for i in 0..4 {
+            sk.add_line_between(ids[i], ids[(i + 1) % 4]).unwrap();
+        }
+    });
+    let mut legacy = torus();
+    legacy.legacy_revolve_axes = true;
+    // The axis is drawn up (sketch +Y on Front: world +Z).
+    for (name, studio, want, kind) in [("torus", torus(), -1.0, "torus"), ("cylinder", cylinder(), -1.0, "cylinder"), ("saved before", legacy, 1.0, "torus")] {
+        let f = doc_with(vec![studio]);
+        let mut ev = AssemblyEvaluator::new();
+        let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+        let b = &r.context.bodies[0];
+        let faces: Vec<Reference> = b
+            .faces
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| match b.shape.sub_shape(ShapeType::Face, *i).and_then(|s| s.face_surface()) {
+                Ok(Surface::Torus { .. }) => kind == "torus",
+                Ok(Surface::Cylinder { .. }) => kind == "cylinder",
+                _ => false,
+            })
+            .map(|(_, n)| Reference::Face((**n).clone()))
+            .collect();
+        assert!(!faces.is_empty(), "{name}: no {kind} face");
+        for face in faces {
+            // (A torus's centroid connector is along its normal there.)
+            let centroid = (kind == "cylinder").then_some(Inference::Centroid);
+            for inference in [Inference::MidAxis, Inference::TopAxis].into_iter().chain(centroid) {
+                let c = Reference::Implicit { on: Box::new(face.clone()), inference };
+                let z = super::eval::resolve_connector_in(&r.context, Some(&body), &c, &units).expect("a connector").z();
+                assert!((z.z - want).abs() < 1e-9, "{name} {inference:?}: Z {z:?} on {face:?}");
+            }
+        }
+    }
+}
+
 #[test]
 fn inference_points_on_cones_spheres_arcs_and_vertices() {
     use super::eval::inference_candidates;
