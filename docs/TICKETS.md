@@ -341,7 +341,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   live/qa/import-toast-1122/): live shows "Part Studio 1.step has been imported. Open document ×" top centre as a **green success**
   toast (check-circle icon, green ×), 9.6 s after the click, and **removes it by itself after 5.0 s**; ours shows the same text as a
   **blue info** toast ("i" icon, blue ×) and still shows it 15 s later (steps 10–12). tickets/wf17-import-toast-live.png,
-  wf17-import-toast-ours.png (qa 11-22 08:0x, green d0df2d56b). The Export dialog's Preprocessing / derived-tolerance defaults
+  wf17-import-toast-ours.png (qa 11-22 08:0x, green b5b414278). The Export dialog's Preprocessing / derived-tolerance defaults
   differ too (likely live's remembered settings, not filed).
 - [ ] P1 **SKETCH-SELECTED-GLYPH-OFFSET (skasm)**: workflow 13 steps 12–16 (empty, 25 × 25 rectangle on Top, Equal, Fix on the top-right corner, Show constraints off, corner selected): live draws the corner's glyph pair (Coincident, Fix) up-left with the Coincident ~61 px and the Fix ~39 px left of the corner; ours draws them ~23 px further right (Coincident ~38 px, Fix ~16 px). So live's click on the Fix glyph (px 1182, 525) hits **our Coincident**: Delete then removes a Coincident instead of the Fix, the corner stays fixed, the drag to (35, 35) pulls a split end off instead of growing the square (live 35.19, still square), and the dimension steps miss (tickets/wf13-glyph-offset.png). With only the Coincident shown (step 12) live's glyph sits ~37 px straight above the corner, ours ~20 px up-left.
 
