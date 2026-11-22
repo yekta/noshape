@@ -64,16 +64,21 @@ Model suite 02:00-02:14 alone on vibex8 (load 0.1-1.4): 118/174 documents, 1840/
 (regen ms ours vs live; live = parity corpus timings). Part Studio speed reference (CLI, vs live's server column, behaviours "Speed
 reference (11-20)"): ours is faster on every edit, undo and roll except c2-impeller-loft (below); screws, surfaces-lofts-projected
 and opt-mirror-pattern-ops rerun after a script error (results to follow).
-- [ ] P0 **SPEED-SPLIT-THICKEN (core)**: c2-surf-workshop-split regenerates in 410 ms vs live 112 (3.7x); Thicken 1 takes 316 ms.
+- [x] P0 **SPEED-SPLIT-THICKEN (core)**: c2-surf-workshop-split regenerates in 410 ms vs live 112 (3.7x); Thicken 1 takes 316 ms.
   It was 56-124 ms in 0.4.60 and 407-756 ms in 0.4.61 (the same alternating run, nightly/models-1120.jsonl), so this is a
   regression. Cause: core 7dd227351 ("Thicken of a sheet whose faces meet at an angle … c2-surf-workshop-split's Thicken 1"),
   the only Thicken change between them. Wanted: that shape at no more than 2x of live (<= ~220 ms) with its parts kept.
   core 11-21: OCCT's intersection-join offset is 100 ms of it (Mac; two full Inter3D passes); the result's volume is now computed
   once (-11 ms). The rest goes with THICKEN-DIRECT.
-- [ ] P1 **THICKEN-DIRECT (core)**: build a sheet's thicken directly (offset surfaces trimmed at concave sharp edges by their
+  Done (core 11-22 14:10 UTC): 2c630484e (direct thicken, 11-21 21:47, after the 03:19 measurement): c2-surf-workshop-split
+  140-143 ms vs live 112 (1.27x; 10 alternating runs on vibex7, Thicken 1 46-48 ms vs live 29), parts and volume as live.
+- [x] P1 **THICKEN-DIRECT (core)**: build a sheet's thicken directly (offset surfaces trimmed at concave sharp edges by their
   intersection curves, ruled walls, sewn) where its sharp edges are concave loops, OCCT's offset as the fallback (lead 11-21:
   after SPEED-VALVE-CONFIG and KNIFEHANDLE-LOFT1). Lands on correctness: the same faces, edges and volume as OCCT's result
   on every thicken in the model suite and corpora, plus a test per case.
+  Done (core 11-22 14:10 UTC): 2c630484e + gate: the 20 suite documents with a Thicken, direct vs OCCT's offset
+  (NOSHAPE_THICKEN_OCCT, not landed) twice each in one binary: the same feature matches in every document (253/368); T1
+  kernel a_sheet_with_sharp_edges_thickens_with_its_offsets_meeting.
 - [ ] P1 **SPEED-MUTUALTRIM-FILLET1 (blend)**: c2-surf-workshop-mutualtrim 384 ms vs live 76 (5.1x); Fillet 1 takes 308 ms. Not a
   regression: Fillet 1 failed until 0.4.61 (Error -> Ok), so this is its first cost.
 - [ ] P2 **FILLET-FAIL-SLOW (blend)**: cli-draft-hang2 (qa fuzz document, no live copy) Fillet 2 fails after 14.1 s. A

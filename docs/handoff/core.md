@@ -18,13 +18,13 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   0.4000 not 0.4007; all mirror guides. On knifehandle (two different guides) every guide-chord variant is worse
   (replica: guide0 -79.9, guide1 +66.0, seg mean -60.9, frac mean -57.6, side u.25 -49.4); only a surface u .3275 /
   .6725 chord fits (4e-4), unexplained. Scripts /root/core-scratch/kh: rep3.py (area per rule), st2-st7.py.
-  REQUESTS 11-22 13:0x: live loft-stations2 F (two different guides), G (one guide), H (F + point), I (top + side guide
-  round an ellipse) -> live/core/loft-stations2/. Settle the rule from those, then rerun rep3 + T1.
-- **THICKEN-DIRECT gate (P0 SPEED-SPLIT-THICKEN):** the direct builder landed 11-21 (2c630484e, thicken_direct.cpp:
-  workshop-split Thicken 1 11/24/16 14590.40 mm3 as live, 25-50 ms) but without the per-thicken OCCT gate. Running:
-  core-rf branch core-thg (temporary NOSHAPE_THICKEN_OCCT=1 skip of the direct path, never land it), .thg.sh on vibex7:
-  20 thicken docs' parity direct / occt / direct / occt -> ~/agents/core-keep/thg/*.log, /root/core-scratch/thg.out.
-  Then: per-doc features match equal (or better), workshop-split doc time vs the 220 ms bar -> close the P0 ticket.
+  live loft-stations2 (F..I): all 9 captures = chord fractions of the profile-point row with the shortest total chord;
+  knifehandle's shortest row is u .5 (err .018, replica +66): no fit (st8-st10.py). Its P4 misses both guides, so lead
+  (b): keep centre chord; REQUESTS loft-stations3 J/K (middle profile 3 mm off its guides). Then the rule fitting all.
+- **THICKEN-DIRECT + SPEED-SPLIT-THICKEN closed (11-22 14:10):** gate on 20 thicken docs, direct vs OCCT (temporary
+  NOSHAPE_THICKEN_OCCT in core-rf branch core-thg, reverted): same matches everywhere (253/368); workshop-split 140-143 ms
+  vs live 112 (A/B 10 runs; first gate's 239-253 was host load). Analytic offsets (Geom_OffsetSurface::Surface()) tried:
+  no change there (no cylinders), dropped. Logs vibex7 ~/agents/core-keep/thg*/.
 - **Persist:** a result the regeneration cache can't encode is now logged (persist.rs warn, in 472eddd5).
 - Probe kit for saved docs (vibex7 ~/tmp/core/l5): ts.py <cli> <doc> (feature statuses + Sketch 3), tn.py <cli> <doc>
   <copy> (faces/vertices with decoded names after Tab 1); face names are urlsafe-b64 raw-deflate JSON.
@@ -40,7 +40,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **Surf-intro Mutual trim 1 / Ruled surface 3 -> skasm (sent 11-21):** translator gives the sketch entity for Ruled
   surface 1's SWEPT_EDGE/FACE/BODY of edge Ao0Xs1GgygP800; repro vibex7 ~/agents/core-keep/mt.
 - Surf-intro builder side still mine: Boundary surface 1 WARNING (live OK), Fill 1 continuity.
-- **Queue after:** THICKEN-DIRECT gate (above), Face blend 1 (+VALID-SURFLOFTS-LOFT1), MANUALBLEND-BOUNDARY1, dx's
+- **Queue after:** Face blend 1 (+VALID-SURFLOFTS-LOFT1), MANUALBLEND-BOUNDARY1, dx's
   EDGE-CENTRE-SEAM (P2: props_linear centre of a seam-crossing ellipse rim; probe vibex6 ~/agents/dx-keep/sr/rlmid.py),
   live's 6 cov2 models (c2-cov2-*; error rules in behaviours "lead (11-21 13:59): coverage batch 2").
 - **MANUALBLEND-BOUNDARY1: Move boundary of a curved surface (MANUALBLEND-BOUNDARY1 part, queued 11-21 06:5x as 175c325c):** k::extend_face_at
@@ -143,7 +143,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    live/std-3132-vs-3112.diff, 14 files / 181 lines: SM pattern keeps collapsed walls V3128, hole error preview on a start
    plane, 7/8"-14 UNF tap drill 0.8125 in, thin extrude's new builtin @setThinWallOneSided: no-op unless annotations need
    it). Gate: model suite none worse + skasm's 25 SM docs; tell skasm when landed.
-00. THICKEN-DIRECT gate (P0 close); KNIFEHANDLE-LOFT1 station rule when loft-stations2 is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
+00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
    the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.
