@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 12:35 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 13:20 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -19,11 +19,13 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   last section at the tip is MIRRORED (edges 1.159/1.003/1.159 swap order: side1_first flips) and run 1's first is
   clipped (0.466 edge). The '7 um concave stretch' is that flip, not concavity. Live runs the round ~1.3 mm on past the
   tip (two 0.595 mm2 faces, 11/27/18, 31.026 mm3 off). The 11-19 run-on-over-the-tip fix (c87fec635, never landed)
-  rebased as blend10 branch blend-khtip bf3b914ee: FAILS on main (its test: "a run-on round not closed by the corner
-  past its end", the impeller's corner check be6f0ca8c; it also reroutes Fillet 3 through the run-on). Next: either
-  rework khtip so the tip's two run-ons skip the corner check (they meet each other, not a wall), or end the runs at the
-  tip with the side kept from the previous station (no mirror). Tools: bin/kh-topo.sh <cli> "<F>" (faces/edges/
-  vertices + volume after rollback; vibex7), bin/kh-f2b.sh (build + tests + list).
+  rebased as blend10 branch blend-khtip; 13:xx WIP on it: a run-on whose supports and end faces are free-form skips
+  closed_run_on's corner path (over_free_form). Result (bin/kh-tip2.sh, logs/kh-tip2.out): features_ tests 326/328:
+  Fillet 2's test still "Failed to fillet selections." (next: rerun it with NOSHAPE_BLEND_DEBUG to see the new stop)
+  and Fillet 3's test REGRESSES to 6/14/10 (live 6/12/8: c87fec635's ball run-on now takes Fillet 3's tip round;
+  restrict the run-on over the tip to Fillet 2's case or keep Fillet 3's old path). Doc: Fillet 2 11.1 s error.
+  Alternative kept: blend-khf2b (frame retries; its tip section mirrored). Tools: bin/kh-topo.sh <cli> "<F>",
+  bin/kh-f2b.sh, bin/kh-tip2.sh.
 - SUSPENSION tip cap (ZZ_TIPCAP=1, blend-cusp 429750f98, logs/zzsusp25): a ruled loft from the last ball section to
   the vanishing point is valid (8.6e-5 mm3) and fuses, but then the tools' union "lost one of its parts" -> 89/260/153.
   Ruled out.
