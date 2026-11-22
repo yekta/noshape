@@ -503,6 +503,9 @@ fn selected_zone(flat: &FlatPattern, l: &noshape_model::sheetmetal::FlatBendLine
     vec![fill, Instance::new(Drawable::Lines(gpu.uploader().upload_lines(&edge))).per_primitive_color().unpickable().layer(13)]
 }
 
+/// The flat's margin on the side that limits its fit, px (live "skasm flat view fit").
+const FLAT_FIT_MARGIN_PX: f64 = 12.0;
+
 /// A selected flat bend's fill (live sheetmetal-gaps2: rgb(214, 151, 30)).
 const FLAT_BEND_SELECTED_FILL: u32 = 0xd6971e;
 
@@ -531,6 +534,8 @@ impl Render for FlatView {
             self.fitted = Some(self.viewport.update(cx, |vp, cx| {
                 vp.camera.rotation = noshape_render::Camera::rotation_for(StandardView::Top);
                 vp.zoom_to_fit(false, cx);
+                // Live (behaviours "skasm flat view fit"): the flat fills the pane, 12 px clear on its limiting side.
+                vp.zoom_to_fit_margin(FLAT_FIT_MARGIN_PX, cx);
                 vp.camera
             }));
         } else if self.pending_fit && self.parts.is_some() && (size.x <= 0.0 || !can_fit) {

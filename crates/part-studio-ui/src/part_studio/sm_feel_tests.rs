@@ -272,6 +272,15 @@ fn rows() -> Vec<Row> {
             let top = noshape_render::Camera::rotation_for(noshape_render::StandardView::Top);
             expect(rot.angle_between(top).to_degrees() < 0.01, true, "the flat camera on Top")
         } },
+        Row { id: "flat view / fitted", live: "the flat fills the pane, 12 px clear on its limiting side, centred on the other (skasm flat view fit)", gap: false, check: |s, cx| {
+            let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).ok_or("no flat view")?;
+            let (drawn, size) = cx.update(|cx| (flat.read(cx).fit_box_px(), flat.read(cx).size()));
+            let Some((a, b)) = drawn else { return Err("no flat drawn".into()) };
+            let (lo, hi) = (a, size - b);
+            let fits = |l: f64, h: f64| (l - 12.0).abs() <= 1.0 && (h - 12.0).abs() <= 1.0;
+            let centred = |l: f64, h: f64| (l - h).abs() <= 1.0 && l >= 11.0;
+            expect((fits(lo.x, hi.x) && centred(lo.y, hi.y)) || (fits(lo.y, hi.y) && centred(lo.x, hi.x)), true, &format!("margins {lo:?} / {hi:?} in {size:?}"))
+        } },
         Row { id: "flat view / its own camera", live: "the wheel over the flat view zooms it alone; the main view doesn't move", gap: false, check: |s, cx| {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).viewport.clone())).ok_or("no flat view")?;
             let main = cx.update(|cx| s.view.read(cx).viewport.clone());

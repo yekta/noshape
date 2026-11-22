@@ -1289,6 +1289,30 @@ impl Viewport {
         }
     }
 
+    /// The model's box as drawn: its corners' screen box (viewport px), None with nothing to fit.
+    pub fn fit_box_px(&self) -> Option<(DVec2, DVec2)> {
+        let (lo, hi) = self.fit_bounds.or_else(|| self.scene_bounds.map(|(lo, hi)| (lo.as_dvec3(), hi.as_dvec3())))?;
+        let corners = (0..8).filter_map(|i| self.project(DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z })));
+        let (a, b) = corners.fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(a, b), p| (a.min(p), b.max(p)));
+        (a.x <= b.x).then_some((a, b))
+    }
+
+    /// Fit the model's box as drawn, `margin` px clear on the side that limits it, centred (the sheet metal flat
+    /// view: live "skasm flat view fit", 12 px top and bottom of a tall flat).
+    pub fn zoom_to_fit_margin(&mut self, margin: f64, cx: &mut Context<Self>) {
+        let size = self.size();
+        if size.x <= 2.0 * margin || size.y <= 2.0 * margin {
+            return;
+        }
+        let Some((a, b)) = self.fit_box_px() else { return };
+        let half = (b - a) * 0.5 * DVec2::new(size.x / (size.x - 2.0 * margin), size.y / (size.y - 2.0 * margin));
+        let c = (a + b) * 0.5;
+        let Some(to) = noshape_scene::camera_ops::zoom_to_window(&self.camera, c - half, c + half, size) else { return };
+        self.camera = to;
+        self.jump_camera();
+        self.camera_changed(cx);
+    }
+
     /// The camera was set in one step (a fit when a model first shows, a restored view), not by navigation: the next
     /// frame draws at full detail, not as an interactive frame (an opened model's first frames had no outline for
     /// 0.5 s).
