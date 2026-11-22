@@ -408,6 +408,11 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P1 **SURFACE-LOFT-GUIDE-FAILS (core)** (workflow 12 steps 18-25, curves, seeded Loft = Surface, green 17157c2fa): Surface Loft, New,
   profiles Edge of Sketch 2 + Edge of Sketch 3, Guides and continuity ticked, guide Edge of Sketch 4, ✓: live builds the surface
   ("Surfaces (1)", the preview shows it while the dialog is open); ours shows no preview and Loft 1 ends red. tickets/wf12-surface-loft-guide.png.
+- [ ] P0 **FEEL-PICK-SKETCH-LINE-THROUGH-FACE (psui)** (workflow 36 step 1, bracket, green 17157c2fa): with Measure, a click at
+  (1104, 484) on the base's top face where Sketch 3's line is drawn faintly across it (seen through the face): live selects the face
+  (Area 1000 mm²); ours selects the Sketch 3 line (Length 28.284 mm). Step 27, 7 px away, ours picks the face as live.
+  tickets/wf36-pick-sketch-line.png (live left; ours draws the line selected). Workflow 36's 65-step take otherwise = live:
+  selections at every step (Escape keeps the measure selection; a second click on a lone vertex clears it) and all 9 other readouts.
 - [ ] P1 **ISOLATE-SHOW-INTERNAL-GEOMETRY (asm)** (workflow 35 step 47, two-blocks asm, green 17157c2fa): the Isolate panel (instance menu >
   Isolate…): live lists Transparency controls, **Show internal geometry**, Select transparent geometry, slider, Component controls,
   Expand: connectivity, slider; ours has no Show internal geometry row. tickets/wf35-isolate-panel.png. Workflow 35 otherwise = live
