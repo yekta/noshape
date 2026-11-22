@@ -624,9 +624,21 @@ fn new_feature_boxes_its_tab_stops(cx: &mut TestAppContext) {
         (w, view.unwrap())
     });
     draw(cx, window);
+    // The workspace stars the tab on Edited ("*Feature Studio 1" from the first key, live workflow 26).
+    let edited = std::rc::Rc::new(std::cell::Cell::new(0));
+    let count = edited.clone();
+    cx.update(|cx| {
+        cx.subscribe(&view, move |_, e: &crate::feature_studio::FeatureStudioEvent, _| {
+            if matches!(e, crate::feature_studio::FeatureStudioEvent::Edited) {
+                count.set(count.get() + 1);
+            }
+        })
+        .detach()
+    });
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_new(w, cx))).unwrap();
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.insert_new_feature(w, cx))).unwrap();
     draw(cx, window);
+    assert!(edited.get() > 0 && cx.update(|cx| view.read(cx).uncommitted(cx)), "uncommitted before any save: the tab starred");
     let boxed = |cx: &mut TestAppContext| {
         cx.update(|cx| {
             let v = view.read(cx);
