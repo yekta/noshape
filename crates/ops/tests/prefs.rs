@@ -316,8 +316,14 @@ fn images_library(ctx: &mut Ctx, dir: &std::path::Path) {
     call(ctx, "documents_set_library", json!({ "library": "images", "folder": lib_dir.to_str().unwrap() })).unwrap();
     let lib = call(ctx, "documents_images_library", json!({})).unwrap()["images_library"].clone();
     assert_eq!(lib["name"], format!("{} images", noshape_store::local_user_name()), "{lib}");
-    let types: Vec<(Value, Vec<Value>)> = lib["types"].as_array().unwrap().iter().map(|t| (t["name"].clone(), t["images"].as_array().unwrap().iter().map(|i| i["name"].clone()).collect())).collect();
-    assert_eq!(types, vec![(json!("img doc two"), vec![json!("img-A.png"), json!("img-B.png")]), (json!("sub folder"), vec![json!("img-C.png")])], "{lib}");
+    // (A Type's images in any order: a land queue run listed img-B first.)
+    let sorted = |t: &Value| {
+        let mut names: Vec<String> = t["images"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_string()).collect();
+        names.sort();
+        names
+    };
+    let types: Vec<(Value, Vec<String>)> = lib["types"].as_array().unwrap().iter().map(|t| (t["name"].clone(), sorted(t))).collect();
+    assert_eq!(types, vec![(json!("img doc two"), vec!["img-A.png".to_string(), "img-B.png".to_string()]), (json!("sub folder"), vec!["img-C.png".to_string()])], "{lib}");
     // Insert image › Libraries › the user's images: the picked image, its 2:1 aspect kept.
     let value = lib["types"][1]["images"][0]["value"].clone();
     let mut user = Ctx::new();
