@@ -815,7 +815,7 @@ fn a_ctrl_click_on_a_part_opens_its_context_menu(cx: &mut TestAppContext) {
     let ctrl = Modifiers { control: true, ..Default::default() };
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, at), ctrl);
     settle(cx, window, &view);
-    assert!(cx.update(|cx| crate::os_menu::is_open(cx)), "the context menu open");
+    assert!(cx.update(|cx| view.read(cx).ui.ctx_menu.is_some()), "the context menu open");
     cx.update(|cx| {
         let v = view.read(cx);
         assert!(v.selected.is_empty() && v.ui.entity_sel.is_empty(), "nothing selected");
