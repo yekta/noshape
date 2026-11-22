@@ -1,6 +1,6 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 15:20 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 15:40 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
@@ -30,10 +30,10 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   (the top contact stays on the top face's extension, so off() never holds), kept flipped. Carrying that section
   straight on 9 um until off the part removes the cap, but then the direct build says "a tool's side off a face of its
   edge" and the Boolean splits into 3-5 solids: dropped.
-  NEXT: the long/tip boundary must follow where the side contact meets the crease p/qf, not the plane at the chain
-  vertex: try the joint ball at the crease point where the long round's own ball (square to its edge) touches p
-  on the crease, and give the tip round its own ball there; or make share_end_curve accept the tip's arc as part of
-  the long one's, ending on the crease. Then the cap: end the run-on loft on a vertex where the ball vanishes.
+  Tried 15:35 (WIP 1c3e5d9e5, ZZ_OWNJ=1: the tip round starts on its own ball, tangent to qf): direct build "a piece with no
+  point inside", Boolean unchanged 13/41/30. NEXT: the long/tip boundary must follow where the side contact meets the
+  crease p/qf (a ball pivoting on the crease between p's and qf's normals fills it); or make share_end_curve accept
+  the tip's arc as part of the long one's, ending on the crease. Then the cap: end the run-on loft on a vertex.
   Tools: bin/kh-j.sh (ZZJ joint balls), kh-n2.sh / kh-n3.sh (ZZ_NMIN, faces), kh-stride.sh, kh-topo.sh.
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
