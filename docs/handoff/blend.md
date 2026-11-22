@@ -1,17 +1,32 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 10:59 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-22 12:35 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-22 10:59 UTC)
+## Now (11-22 12:35 UTC)
 
-- ORDER: knifehandle Fillet 2 (land the frame_at retries/fallback + convexity split from blend-cusp cleanly, then the
-  slivers) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end -> scissor 2d82a0 F13 (tool dumps in vibex7
-  ~/tmp/blend/sc2/f13tool-*.brep; body dump needs cli-cusp rebuilt: ZZ_BODYDUMP added uncommitted in blend-cusp).
+- ORDER: knifehandle Fillet 2 (the tip end, below) -> Fillet 1 after core's Loft 1 land -> Suspension's cusp end ->
+  scissor 2d82a0 F13 (tool dumps vibex7 ~/tmp/blend/sc2/f13tool-*.brep; body dump: cli-cusp rebuilt with ZZ_BODYDUMP,
+  committed WIP 429750f98 in blend-cusp).
+- FILLET 2 (11-22 12:30): main fails "could not orient a face at the edge" near the blade's tip. blend10 branch
+  blend-khf2b (WIP 5f0967e24, never land as is): frame_at retries + one-side fallback (from blend-cusp) + a concave
+  end stretch < 0.05 r trimmed -> "Ok" in 2.9 s BUT a no-op (Blade stays 7/15/10, 10422.27 mm3): its two lofts 78 mm3
+  (cli-cusp's split ones 15.4), one invalid. ZZ_SECS probe (bin/kh-secs.sh, vibex7 ~/tmp/blend/kh/secs.err): run 2's
+  last section at the tip is MIRRORED (edges 1.159/1.003/1.159 swap order: side1_first flips) and run 1's first is
+  clipped (0.466 edge). The '7 um concave stretch' is that flip, not concavity. Live runs the round ~1.3 mm on past the
+  tip (two 0.595 mm2 faces, 11/27/18, 31.026 mm3 off). The 11-19 run-on-over-the-tip fix (c87fec635, never landed)
+  rebased as blend10 branch blend-khtip bf3b914ee: FAILS on main (its test: "a run-on round not closed by the corner
+  past its end", the impeller's corner check be6f0ca8c; it also reroutes Fillet 3 through the run-on). Next: either
+  rework khtip so the tip's two run-ons skip the corner check (they meet each other, not a wall), or end the runs at the
+  tip with the side kept from the previous station (no mirror). Tools: bin/kh-topo.sh <cli> "<F>" (faces/edges/
+  vertices + volume after rollback; vibex7), bin/kh-f2b.sh (build + tests + list).
+- SUSPENSION tip cap (ZZ_TIPCAP=1, blend-cusp 429750f98, logs/zzsusp25): a ruled loft from the last ball section to
+  the vanishing point is valid (8.6e-5 mm3) and fuses, but then the tools' union "lost one of its parts" -> 89/260/153.
+  Ruled out.
 - Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 and vibex8 are held for qa's speed window (cargo exit 75). vibex7's
   slot queue can sit for hours behind others' parity runs: light probes (one CLI feature) run outside it.
 - KNIFEHANDLE (core -> blend; core 10:0x: Sweep 2 is right, live's area reading is off; Blade matches live 7/15/10
@@ -32,10 +47,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   0.087/0.132 mm 'stray' edges are the tool's air corners, not contacts. Not robust: wait for core's Loft 1 fix
   (station spacing + end tangents; core tells me when it lands), then redo; 9 s vs live 200 ms needs another build. Our Handle in: 206033.639
   mm3 2/3/2 vs live 205332.687 2/1/1 (core 10:5x: Loft 1 runs 0.19 % wide at the sides; core fixes station spacing + end tangents and tells me; my 2/3/2 counted seam edges).
-  Fillet 2 (live 414 ms): main's ball path builds tools of 0.021 mm3 (the sections' 15.4 mm3: the balls are wrong,
-  refused as inside out), then frame_at fails. On cli-cusp (frame_at retries + one-side fallback + convexity split) it
-  regenerates in 10.1 s (vibex7 busy) to 18/37/21 (live 11/27/18): ~9 sliver faces < 2 mm2, from a 7 um chain edge
-  piece among others. Count faces: query_entities kind faces/edges/vertices after feature_rollback.
+  Count faces: bin/kh-topo.sh.
 - SCISSOR (asm 07:18 main 207/239). Doc vibex7 ~/agents/blend-keep/scissor.noshape. One feature: bin/sc-main2.sh <cli>
   <tab> "<F>" <out> "<env>" (prints only the last 50 lines of the block; grep ~/tmp/blend/sc2/prof-<tab>.txt for
   more). Probe CLI blend-cusp -> vibex7 ~/tmp/blend/cli-cusp (bin/sc-cusp5.sh builds + runs 3; sc-cusp6.sh first
@@ -63,7 +75,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   concave ball tools (5.566 mm3) stop at the last ball whose touches are >= 0.05 r apart (ZZ_NOTIP=1), short of the
   vanishing point (17.5, +-39.681, +-38.084) = live's patch corner; the gap leaves the slivers. Tip vertex on
   (ZZ_NOTIP unset, zzsusp24): OCCT's loft "incompatible sections" -> 28/61/39 wrong. Next: close the end another way
-  (a ruled last piece to the point, or the last sections' wires rebuilt degenerate), then a clean land branch.
+  (a ruled cap is ruled out, zzsusp25; try the last sections rebuilt degenerate), then a clean land branch.
 - blend-cusp env switches: ZZ_NOTIP, ZZ_CBALL, ZZ_FLIPMAP, ZZ_ORIENTDBG, ZZ_SOLIDS (+ZZONE), ZZ_BALLDUMP, ZZ_TOOLDUMP,
   ZZ_SECDIST, ZZ_RUNON.
 - RINGS Fillet 1 landed 18f929e78 (open: 10.4 mm leaves a 0.774 mm2 bore island).
