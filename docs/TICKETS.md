@@ -423,6 +423,15 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   views, section A-A, detail B 2:1, .787, BOM rows 1 / 2, balloons 1 / 2 at the same spots (tickets/wf23-sheet.png).
 - Workflow 30 (undo/redo storm, block) = live at all 51 steps: ten undos back to the start, ten redos to the post-edit state, every
   edit incl. appearance FF0000 and rename one step, colours to the level; ours settles 0.1-0.8 s per step vs live 0.5-2.6 s.
+- [ ] P1 **PASTE-SKETCH-CENTRED (skasm)** (workflow 29 steps 6-10, green b5b414278): Copy sketch on Part Studio 1's Sketch 1 (rectangle
+  from the origin), then Part Studio 2 › Top › Paste sketch: live centres the pasted rectangle on the origin; ours keeps the source
+  coordinates (corner on the origin). After deselecting, live draws the pasted sketch's edges grey with its 4 corner points; ours
+  draws faint edges and no points (tickets/wf29-paste.png rows 7 / 10, wf29-paste-points.png; live left). The extrude then sits
+  off-centre (row 17).
+- [ ] P1 **FEEL-PLANE-LIT-AFTER-MENU (psui)** (workflow 29 step 7): right after Paste sketch is clicked in the Top row's menu, ours
+  draws the Front plane orange (lit under the pointer where the menu was); live lights nothing there (tickets/wf29-paste.png row 7).
+  Rest of 29 = live: 4 entities selected after the paste, an empty click clears them, Extrude (Solid) on the pasted face, Suppress /
+  Unsuppress in both studios. Live's per-account remembered Surface tab is not a target.
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
