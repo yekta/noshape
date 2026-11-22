@@ -824,7 +824,7 @@ real app (green build, Xvfb, one app): our screen at live's camera (the ui-parit
 same crop round the pointer after live's rest, compared by shape, size at 1x and sampled colours: = or ≠. psui fixes,
 qa re-scores the cells on each land. Our crops: qa-scratch/hm/ (walk kit vibe2 ~/agents/qa-keep/walk3).
 
-**Matched: 94 / 125** (23:3x: batch 3 4 / 15 on green 9f33d43 (psui's f411d924), qa-scratch/hm2/cmp-b3psui. 20:23: batch 5, other fields and the Dimension tool, 8 / 13 on green 6be52caf4. 20:18: batch 4, the assembly, 6 / 20 (live as2/, lane 4). 19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
+**Matched: 100 / 125** (01:0x: batch 4 12 / 20 on green 50772462b (asm's 8eb92415), cmp-b4asm. 23:3x: batch 3 4 / 15 on green 9f33d43 (psui's f411d924), qa-scratch/hm2/cmp-b3psui. 20:23: batch 5, other fields and the Dimension tool, 8 / 13 on green 6be52caf4. 20:18: batch 4, the assembly, 6 / 20 (live as2/, lane 4). 19:57: batch 2 50 / 51 on green 6be52caf4 (psui's ee4c1f6a); Part Studio 26 / 26 and batch 3 0 / 15 unchanged. Before, 39 / 92 at 18:51: Part Studio 26 / 26 on green 1118a1b6f (psui's 1e44717c), batch 3 0 / 15 there too; sketch tables pending their re-run. Before, 18:26: 28 / 77 on green 5b9feb71a; 4f2cb3ce's green adds the three midpoint approach cells (along the edge, from the
 face, on a selected edge); batch 3 0 / 11 on 4f2cb3ce. Before psui's 1e44717c: Part Studio 18 / 26, sketch entities in the Part Studio 5 / 21,
 in sketch edit 8 / 25, Line-tool inference 0 / 5). Ours: live's document (block 40×30×20 + Sketch 2: point (60,25), line (60,5)–(90,5),
 arc c(75,15) r8 0.3..2.8 rad, circle c(100,20) r6), `f`, the same targets and states, a fresh app per cell; our fit matches live's camera
@@ -956,7 +956,7 @@ A feature dialog's selection field, the origin and a mate connector (batch 3; ps
 | mate connector selected + hovered | = hovered | = our hovered | ≠ P0 FEEL-MC-LOOK (rim) |
 | mate connector hovered, the right face (an owner face) selected | = hovered: the selected face's fill plain #8DB0C5 while the pointer rests on the connector, #D9A235 again once it leaves (live b3/ps-mc-otherhover-r) | the same | ≠ P0 FEEL-MC-LOOK (rim); the face plain = live |
 
-An assembly (batch 4; 6 / 20 on green 6be52caf4; one Part 1 instance of the block with its mate connector at (40,30,20), after `f`:
+An assembly (batch 4; qa 01:0x 12 / 20 on green 50772462b (asm 8eb92415, hm2/cmp-b4asm); 6 / 20 on green 6be52caf4; one Part 1 instance of the block with its mate connector at (40,30,20), after `f`:
 live 0.0506 mm/px, ours 0.0477 at 992 px (the same fit); live as2/ (lane 4, 20:11), ours qa-scratch/hm2/b4-score.png, cmp-b4/):
 
 | Cell | Live | Ours | Status |
@@ -964,10 +964,10 @@ live 0.0506 mm/px, ours 0.0477 at 992 px (the same fit); live as2/ (lane 4, 20:1
 | edge hovered; hovered with the right face selected | 5 px #FFC685 band, darker rim | the same | = |
 | midpoint hovered; with the right face selected | the edge band only, no midpoint marker | the same | = |
 | face hovered; with the right face selected | nothing inside the face | the same | = |
-| vertex hovered; with the right face selected | ~11 px see-through disc #F0C28C..#F8C58A, the edges through it | ~7 px opaque disc | ≠ P0 FEEL-ASM-VERTEX-LOOK |
-| vertex / edge / midpoint / face selected | the move manipulator's centre a hollow white ring (the orange pick shows inside) | a filled white disc in a grey ring; along a selected edge a white dashed line | ≠ P0 FEEL-ASM-MANIPULATOR-RING |
-| vertex / edge / midpoint / face selected + hovered | the hollow ring turns blue #6087BD..#85A3D0 | a white disc in a bright blue ring | ≠ P0 FEEL-ASM-MANIPULATOR-RING |
-| mate connector hovered / selected / selected + hovered / hovered with the right face selected | the part's connector drawn (disc, ring, axes); lit #FFE79F, selected #FFE187, owner edges #DAB46B..#E9C177; the right face stays selected | no connector drawn: the corner's vertex lights instead | ≠ P0 FEEL-ASM-PS-MC-MISSING |
+| vertex hovered; with the right face selected | ~11 px see-through disc #F0C28C..#F8C58A, the edges through it | the same (fixed asm 8eb92415) | = |
+| vertex / edge / midpoint / face selected | the move manipulator's centre a hollow white ring (the orange pick shows inside) | the hollow ring (fixed asm); along a selected edge / midpoint still a white dashed line | vertex, face =; edge, midpoint ≠ P0 FEEL-ASM-MANIPULATOR-RING |
+| vertex / edge / midpoint / face selected + hovered | the hollow ring turns blue #6087BD..#85A3D0 | the hollow ring turns blue (fixed asm); the dashed line on edge / midpoint | vertex, face =; edge, midpoint ≠ P0 FEEL-ASM-MANIPULATOR-RING |
+| mate connector hovered / selected / selected + hovered / hovered with the right face selected | the part's connector drawn (disc, ring, axes); lit #FFE79F, selected #FFE187, owner edges #DAB46B..#E9C177; the right face stays selected | drawn and lit (fixed asm), but the crisp navy rim and front square | ≠ P0 FEEL-MC-LOOK (psui) |
 
 Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf4; block doc after `f`, the field active; live b5/ (lane 4,
 20:13), ours qa-scratch/hm2/b5-score.png, cmp-b5/):
