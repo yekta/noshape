@@ -1302,6 +1302,9 @@ impl PartStudioView {
                 let released = self.ui.sketch_hover_held_at.is_some_and(|h| h.distance(*position) > 0.5);
                 if released {
                     self.ui.sketch_hover_held_at = None;
+                    // The pick at the new place lights it, also when it is the id the hold came with (CI's software
+                    // GPU: the hold's own pick may not have come back before the move).
+                    vp.update(cx, |v, _| v.say_hover_again());
                 }
                 let Some(p) = to_plane(self, *position, cx) else { return false };
                 let shift = modifiers.shift;
