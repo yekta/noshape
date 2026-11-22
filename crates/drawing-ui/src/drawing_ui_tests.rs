@@ -1896,13 +1896,18 @@ fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) 
     .unwrap();
     draw(cx, window);
     assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "a click on its text: the palette stays");
-    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
-        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: 2, first_mouse: false }, w, cx);
-        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: 2 }, w, cx);
-    }))
-    .unwrap();
+    // A double-click there through the window, as the ui-script sends it (drwm d7).
+    let halo = cx.update(|cx| editor.read(cx).palette.as_ref().and_then(|p| p.at)).expect("drawn");
+    assert!(f32::from(text.x - origin.x) > halo[0] - 40., "the text inside the palette's halo: {text:?} {halo:?} {origin:?}");
+    {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        for n in 1..=2 {
+            vcx.simulate_event(MouseDownEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: n, first_mouse: false });
+            vcx.simulate_event(MouseUpEvent { button: MouseButton::Left, position: text, modifiers: Modifiers::default(), click_count: n });
+        }
+    }
     draw(cx, window);
-    assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "its second click (a double-click): the palette stays");
+    assert_eq!(cx.update(|cx| editor.read(cx).palette.as_ref().map(|p| p.id)), Some(id), "a double-click on its text: the palette stays");
     let far = [8f32, 8f32];
     assert!(at[0] - far[0] > 150. || at[1] - far[1] > 150., "the far point is well away");
     hover_to(cx, far[0], far[1]);

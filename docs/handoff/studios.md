@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 08:17 UTC.
+Updated 2026-11-22 10:30 UTC.
 
 ## In flight
 
@@ -18,31 +18,25 @@ NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; read `git diff --stat origin
 tests on vibex7 (rb-hosts 6a36d3b1f; off it 02:00-04:00 UTC, qa's quiet window: vibex8 then). Scenarios on vibex8 via
 ~/bin/slot (<=3 apps): build on vibex7, `scp -3 vibex7:tmp/studios/noshape-uip vibex8:tmp/studios/noshape-uip`, sync
 vibex8 with `rb.sh bash -c true`, then `ssh vibex8 "bash -s" < script` (x184b.sh: all drw doc ver vs fs rel scenarios,
-score line "score: N/978"). Never vibe2. Every run under `timeout`; `touch -c` edited files before rb.sh; two rb.sh runs
-on one host share a target dir (one waits). Full ops e2e before a crates/drawing land (drawing-ui alone: not needed).
-- NOT LANDED (b0964b52 FAILED 06:01 and e41a7227 04:44: coverage::agent_api_reference_is_current; the regenerated
-  docs/AGENT_API.md is committed on the branch, 34d83b700-ish). The branch (rebased ~06:40) carries: APP-VULKAN-SEGV,
-  DRW-BORDER-DRAG, the Esc rework, live drwm-1..6 hover/select, qa walk 9, qa workflow 09 P0s (just-placed view lit,
-  no dots on a placed dimension's edge ends), balloon leader black when hovered (FEEL-DRW-BALLOON-HOVER-LEADER),
-  workflow 26 FS batch (snippet tab stops via vendored gpui-base insert_snippet/snippet_stops/end_snippet, tab "*",
-  fold arrows always, comment/operator colours, outline from the annotation line), DRW-TAB-MENU-CHANGE-TO-VERSION
-  (version_refs), TICKETS marked.
-- UNCOMMITTED (untested): (1) REGRESSION FIX: x184b scored 884/978 (6679/6854 states); 11 drw scenarios read EDGE for a
-  just-clicked view (b3b1be6ad's "hovered selected view reads EDGE"). Fix: `click_still` (drawing_view.rs field, set in
-  select_click, cleared on a pointer move): the clicked view keeps its selection frame until the pointer moves; test in
-  feel.rs a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange. (2) DRW-TITLEBLOCK-EDIT-BOX (qa wf31):
-  note_inplace_box spans the title cell (1 mm in), centred field text centred (drawing_inplace.rs); test in
-  a_title_field_edits_with_its_alignment; title_cell pub(crate). (3) FEEL-DRW-VIEW-FRAME-PAD (live drwm-7):
-  view_frame_box, 2 mm pad, min height 17.7 mm; unit test view_frame_tests. (4) HISTORY-BRANCH-FILTER being built by a
-  subagent in crates/history-ui (live behaviours "studios: history branch filter").
-- Runs: x189 (vibex7: app test a_feature_studio_tab_is_starred_until_commit, clippy, UPDATE_DOCS coverage) then x190
-  (/root/studios-scratch/bin/x190.sh: drawing-ui full + clippy + app build to ~/tmp/studios/noshape-uip), then x184b on
-  vibex8 again; then commit, mark DRW-TITLEBLOCK-EDIT-BOX / FEEL-DRW-VIEW-FRAME-PAD / HISTORY-BRANCH-FILTER, land.
+score line "score: N/978"; x184d.sh: drw only + the three hover matrices). Never vibe2. Every run under `timeout`;
+`touch -c` edited files before rb.sh; two rb.sh runs on one host share a target dir (one waits). Full ops e2e before a
+crates/drawing land (drawing-ui alone: not needed).
+- QUEUED 155f85da (11-22 10:2x, 25 commits): APP-VULKAN-SEGV, DRW-BORDER-DRAG, the Esc rework, live drwm-1..7
+  hover/select, qa walk 9, workflow 09 P0s (just-placed view lit, no dots on a placed dimension), balloon leader black
+  when hovered, workflow 26 FS batch, DRW-TAB-MENU-CHANGE-TO-VERSION, DRW-TITLEBLOCK-EDIT-BOX, FEEL-DRW-VIEW-FRAME-PAD,
+  HISTORY-BRANCH-FILTER (history-ui funnel), click_still (a click inside a view keeps its selection frame until the
+  pointer moves; a click on its edge keeps the tan hover frame: live's 75 view_edge clicks read EDGE), regenerated
+  AGENT_API.md, TICKETS rebuilt from main (a union merge had doubled psui/dx rows). Checked: drawing-ui 166, FS 29,
+  ops e2e 278, clippy clean; hover matrices 104/107 (3 = the palette below). Check `land.sh --status`.
+- UNCOMMITTED: the dimension palette's halo (40 px left of it) swallowed a click on its own dimension's text beside it,
+  closing an untouched palette (live drw-dimension-hover-matrix d7 keeps it). Fix: `on_palette_dimension` in
+  drawing_palette.rs lets that click through to the sheet; test a_dimension_dragged_from_unselected_ends_unselected
+  (double-click through the window, asserts the text is inside the halo). Run x193 then land.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre (behaviours "studios (k)
   follow-up"), Ø5 centres take: looks like live refusing a valid pick; ours takes it. Decision needed from the lead
   (copy or record as live's failure); not changed.
-- Left P2s: VS-CHIP-ON-CLICK, FS-DRAG-SELECT-BAND (need vendored GPUI tooltip / editor patches, 3 platform copies);
-  FS snippet: rounded box corners, Esc ending it.
+- Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. P2s
+  VS-CHIP-ON-CLICK, FS-DRAG-SELECT-BAND (vendored GPUI tooltip / editor patches); FS snippet rounded corners, Esc.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel

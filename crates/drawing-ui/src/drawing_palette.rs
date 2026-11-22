@@ -1074,16 +1074,35 @@ impl DrawingEditor {
                 .pl(px(40.))
                 .pr(px(20.))
                 .py(px(30.))
-                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                // Its own dimension under the halo takes the click as on the sheet (live drw-dimension-hover-matrix d7: a
+                // double-click on the dragged text, beside the palette, keeps it).
+                .on_mouse_down(MouseButton::Left, cx.listener(move |this, e: &MouseDownEvent, _, cx| {
+                    if this.on_palette_dimension(e.position, cx) {
+                        return;
+                    }
                     cx.stop_propagation();
                     if !touched {
                         this.close_palette(true, cx);
                     }
                 }))
-                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_up(MouseButton::Left, cx.listener(|this, e: &MouseUpEvent, _, cx| {
+                    if !this.on_palette_dimension(e.position, cx) {
+                        cx.stop_propagation();
+                    }
+                }))
                 .child(palette)
                 .into_any_element(),
         )
+    }
+}
+
+impl DrawingEditor {
+    /// The pointer on the open palette's own dimension.
+    fn on_palette_dimension(&mut self, at: Point<Pixels>, cx: &mut Context<Self>) -> bool {
+        let Some(id) = self.palette.as_ref().filter(|p| !p.hole).map(|p| p.id) else { return false };
+        self.cursor = self.to_sheet(self.local(at));
+        self.update_hover(cx);
+        self.hover.and_then(|h| self.sel_of_pick(h)) == Some(Sel::Annotation(id))
     }
 }
 
