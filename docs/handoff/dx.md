@@ -38,14 +38,24 @@ mac ~/noshape-host/dx-keep/gpu/macgpu.sh (watchdog 175 s, SIGKILL 3 s after SIGT
   quit_commit (cx.on_app_quit -> flush_pending) registered on the first deferred edit. Windows WM_ENDSESSION and macOS
   applicationWillTerminate already run gpui's shutdown (observers called synchronously, before exit_now's future).
   Tests: noshape bin quit_tests:: (fails without), T2 tests/quit_signal.rs (xvfb-run, 1.9 s): vibex7 pass.
-- NEXT 2 (in progress 05:xx): hex iso circles. Probe (diff /root/dx-scratch/fo/glimpse-probe.diff, env
-  NOSHAPE_GLIMPSE_DEBUG; out /root/dx-scratch/fo/glimpse.txt): the solid's 2 mm screw-hole rims (compound edges 1546,
-  1550) sit ~8 um behind the mesh's polygonal hole walls (chord sagitta, ~36 facets); our HLR hides the far half but
-  12 um glimpses at facet corners (dropped by the glimpse rule); live draws the far half as ELLIPSE (pi..2pi) and hides
-  the near half (under the mesh's top face) and all rims in Top. Plan: hidden pieces of a part edge whose only cover is
-  mesh facets within a depth tolerance (ray to the viewer vs the faceted mesh's triangles) count visible; calibrate the
-  tolerance on the probe's depths (far half ~9 um; near half = the top faces' gap). Data vibex7 ~/tmp/dx/exs-hex
-  (hex.sh, ops-gl probe binary in ~/agents/dx-keep: delete after).
+- NEXT 2 (in progress): hex iso circles (c2-hex-bookcase-derived drawing: live 2 ELLIPSE, ours 0). Probe (diff
+  /root/dx-scratch/fo/glimpse-probe.diff, env NOSHAPE_GLIMPSE_DEBUG; out /root/dx-scratch/fo/glimpse.txt): the solid's
+  2 mm screw-hole rims (compound edges 1546, 1550) lie just outside the mesh's inscribed polygonal holes (~36 facets,
+  chord sagitta 7.6 um). Iso: our HLR hides their far half but 12 um glimpses at facet corners (dropped by views.rs's
+  glimpse rule); the pieces between glimpses aren't even output (hlr.rs drops hidden lines under visible mesh lines).
+  Live draws the far half as ELLIPSE (pi..2pi) and hides the near half. Top: also only glimpses in ours, and live draws
+  nothing. So the rule is depth, not "a mesh is in front": in Top the cover is the mesh's top face, a hole depth above;
+  in Iso the far half is behind wall facets <= 7.6 um away from their planes (along the ray up to ~0.4 mm at the sides:
+  measure distance to the facet's PLANE, not along the ray).
+  Design (views.rs, views with a mesh part only): a second HLR pass of the non-mesh bodies alone; each non-mesh edge's
+  pieces come from it; its visible pieces split by a mesh test per polyline point (3D point = the edge's nearest dense
+  sample in 2D; ray toward the viewer vs the faceted mesh's triangles, Moller-Trumbore, 2D grid of the triangles'
+  boxes): covered when a facet it crosses lies farther than tol from the point (point-to-plane), tol ~ view defl
+  (diag/1500, 120 um here). This replaces the glimpse rule. Open point: pass 2's hidden pieces under visible mesh
+  lines would now be drawn (only with hidden lines shown). Check after: hex DXF ELLIPSE 2, LINE/LWPOLYLINE counts
+  (ours 178/17, live 206/25), Top 0 CIRCLE; drawing tests; full ops e2e (crates/drawing rule). Data vibex7
+  ~/tmp/dx/exs-hex, runner ~/agents/dx-keep/hex.sh (ops binary path inside; build with glb.sh, not on vibex8 while
+  qa holds it). Also seen: the hex views sit 0.0187 in (Front/Right) / 0.0246 in (Iso) off live's: check after.
 - GPU OPEN (Mac M6, ms from launch; r0 first open / rA another build's rows / rB own cached display): big-plate
   505/178/151; l30 160/156/151; pins-1000 147/152/156; rings 1069/1320/160; infento full 13.3 s / 17.3 s / cached
   frame 337 (display 282); isaac 15.6 s / 15.8 s / 170; scissor 56.5 s / 57.3 s / 187. Rows from the Linux build are
