@@ -75,8 +75,8 @@ fn a_view_lights_and_is_taken_within_its_reach_in_sheet_mm(cx: &mut TestAppConte
     }
 }
 
-/// Live2 feel/drawing.json D1: a dimension's line lights from 6 px, not 8 (ours 7), its text from 8 px outside the
-/// text's box, not 10 (ours 9); a click there selects the dimension.
+/// Live2 feel/drawing.json D1 and drw-hover-1122: a dimension's line lights from 7 px, not 8, its text from 8 px
+/// outside the text's box, not 10 (ours 9); a click there selects the dimension.
 #[gpui::test]
 fn a_dimensions_line_and_text_light_at_lives_reach(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
@@ -101,7 +101,7 @@ fn a_dimensions_line_and_text_light_at_lives_reach(cx: &mut TestAppContext) {
     let (a, b) = (line.points[0], line.points[1]);
     let on = [a[0] + (b[0] - a[0]) / 6.0, a[1]];
     // Below the line: away from the text above it.
-    for (off, lights) in [(6.0, true), (8.0, false)] {
+    for (off, lights) in [(7.0, true), (8.0, false)] {
         let s = [on[0], on[1] - off / zoom];
         let lit = lit_at(cx, window, &editor, s);
         assert_eq!(lit == Some(Sel::Annotation(id)), lights, "{off} px from the dimension line: lit {lit:?}");
@@ -114,6 +114,24 @@ fn a_dimensions_line_and_text_light_at_lives_reach(cx: &mut TestAppContext) {
     cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
     let sel = click_at(cx, window, &editor, [on[0], on[1] - 6.0 / zoom], Modifiers::default());
     assert_eq!(sel, vec![Sel::Annotation(id)], "the click takes the lit dimension");
+}
+
+/// Live drw-hover-1122: in Select the sheet border lights from 8 px inside the frame, not 9, and a click there takes it.
+#[gpui::test]
+fn the_sheet_border_lights_at_lives_reach(cx: &mut TestAppContext) {
+    let (window, editor) = drawing(cx, "feel-border-reach");
+    cx.update_window(window, |_, _, cx| editor.update(cx, |e, cx| e.edit("Formats", cx, |d| d.props.formats_locked = false))).unwrap();
+    real_sheet(cx, window, &editor);
+    let ([fx0, fy0, _, fy1], zoom) = cx.update(|cx| (editor.read(cx).current_sheet().size.frame_rect(), editor.read(cx).zoom));
+    let key = noshape_model::drawing::format_line_key([fx0, fy0], [fx0, fy1]);
+    // Off the zone ticks (one sits at the middle).
+    let y = (fy0 + fy1) / 2.0 + 10.0;
+    for (off, lights) in [(8.0, true), (9.0, false)] {
+        let lit = lit_at(cx, window, &editor, [fx0 + off / zoom, y]);
+        assert_eq!(lit == Some(Sel::FormatLine(key)), lights, "{off} px inside the border: lit {lit:?}");
+    }
+    let sel = click_at(cx, window, &editor, [fx0 + 8.0 / zoom, y], Modifiers::default());
+    assert_eq!(sel, vec![Sel::FormatLine(key)], "the click takes the lit border");
 }
 
 /// Live2 feel/drawing.json D6: a click, a Ctrl + click and a Shift + click each toggle what they land on: add it when

@@ -58,8 +58,12 @@ pub const PICKBOX_PX: f64 = 7.0;
 /// A grip's reach (screen px): GRIPSIZE 6 (live drawing-sysvars.json, XeGrip.IsMouseOver).
 pub const GRIPSIZE_PX: f64 = 6.0;
 
-/// Select's hover reach (screen px) for an annotation's lines and from a text's box (live2 feel/drawing.json D1).
-pub const SELECT_LINE_REACH_PX: f64 = 7.0;
+/// Select's hover reach (screen px) for a line, short of it (live drw-hover-1122: a centerline lights at 7 px, not 8;
+/// D1: a dimension line at 6, not 8), and from a text's box (live2 feel/drawing.json D1).
+pub const SELECT_LINE_REACH_PX: f64 = 8.0;
+/// Select's hover reach (screen px) for a format line, short of it: the sheet border lights at 8 px, not 9 (live
+/// drw-hover-1122).
+pub const SELECT_FORMAT_REACH_PX: f64 = 9.0;
 pub const SELECT_TEXT_REACH_PX: f64 = 9.0;
 /// Select's hover reach (screen px) from a note's leader: it lights the note at 8 px, not at 10 (live2 batch 1, 11-18
 /// 16:15; 11-13 had 10 / 12).
@@ -122,14 +126,15 @@ impl<'a> SheetPick<'a> {
 
     pub fn hover_at(&self) -> Option<u32> {
         let tol = self.tol_mm(PICKBOX_PX);
-        // Select (live2 feel/drawing.json D1): an annotation's lines light within 6 px (not at 8), its text within 8 px
-        // of its box (not at 10); the tools keep their own reach.
+        // Select: lines light within SELECT_LINE_REACH_PX, a text within 8 px of its box (not at 10), a format line
+        // within SELECT_FORMAT_REACH_PX; the tools keep their own reach.
         let hover = match self.tool {
             Tool::Select => self
                 .built
                 .and_then(|b| b.hit_reach(self.cursor, self.tol_mm(SELECT_LINE_REACH_PX), self.tol_mm(SELECT_TEXT_REACH_PX)))
                 .map(|h| self.centerline_on_edge(h).or_else(|| self.centermark_of_edge(h)).unwrap_or(h))
-                .or_else(|| self.leader_reach()),
+                .or_else(|| self.leader_reach())
+                .or_else(|| self.built?.hit_where(self.cursor, self.tol_mm(SELECT_FORMAT_REACH_PX), &|t| matches!(t, PickTarget::FormatLine(_)))),
             _ => self.built.and_then(|b| b.hit(self.cursor, tol)),
         };
         // Tools that take only view edges (or sketch geometry) look for those
