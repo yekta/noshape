@@ -15,9 +15,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   - 7f474e30d SKETCH-SELECTED-GLYPH-OFFSET: Show constraints off, a point's glyph row centred 40 px above it (+4 px;
     behaviours "skasm point glyph placement"); Show constraints on keeps up-left + leader. Not done: live moves the row
     when its spot is taken by lingering glyphs (an inference, not measured).
-  - bf9db14a8 SM-FLAT-VIEW-FIT (fit half): Viewport::zoom_to_fit_margin(12 px) for the flat's first fit; sm matrix
-    row "flat view / fitted". Orientation (live: model +X up, flat x = -Y for plate-bend's THICKEN plate) waits on
-    REQUESTS skasm 08:38 (evPlane x of a THICKEN face; first segment / long side?). flat_place uses PlaneFrame::face_x.
+  - bf9db14a8 + next: SM-FLAT-VIEW-FIT fit half: Viewport::zoom_to_fill(0.953) for the flat's first fit; sm matrix
+    row "flat view / fitted". Orientation: live (behaviours "skasm flat orientation") = our flat_place formula (face_x
+    gives live's x); the gap is which piece keeps the fixed face (the plate's original bottom) after a Bend: live's
+    x 0-30 piece (origin corner + picked face), ours the base. REQUESTS skasm 08:49 asks live to tell which decides.
   - 679420eb2 PASTE-SKETCH-CENTRED: centred on the mean of line end points (live's L). The corner dots are psui's
     (SKETCH-ON-FACE-EXITED-LOOK, builder.rs FreeEnds; psui confirmed 08:45).
 - Closed, no app change: FORM-REMEMBERED (runner seed, qa 17157c2fa), SKETCH-ESC-KEEPS-POINT-DELETE-LINES (P0 wf32:
