@@ -1,79 +1,27 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 04:50 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 06:15 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-21 04:30 UTC)
-- QUEUED ca26da57 (06:43): hem-plus Offset surface 1 (Mac-only; OCCT's joined offset fails in metres on the Mac,
-  op_offset_shape retries in millimetres: Mac 6/6, other offset docs unchanged; g++-13 build clean on vibex8).
-- Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
-  ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
-  8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- QUEUED f78f42fa 04:10 (10 commits: the 3 that failed on main's red prefs test + hem-jog curve_ends + handoffs).
-  Told lead, core (scissor mappings), qa (walk P0s; qa-skre re-runs them when green). If it fails: fix forward first.
-  overcut-dogbone 10/10; base ab6-base.out vibe2, new vibex7 ~/agents/skasm-keep/ab6-new.out):
-  - parity.rs: ruled_piece_from_query (mutualtrim SWEPT_*), region_query_sketch hint + pieces rule (scissor
-    b58244 Extrude 1 KICB 445 mm², 0139f2 Extrude 8 Sketch 6's regions); recheck sc-* in vibe2 ~/tmp/skasm/scm.
-  - sheetmetal.rs rolled_bend: k::thicken (exact; start-extrude 29 -> 34/34) on the face `tightened(1e-7)` (new
-    kernel Shape::tightened / tighten_tolerances: the hem corner trim leaves 6e-5 m edges, the fuse closed the 0.02 mm
-    R0.01 hem slot; hem-jog Part 1 27 -> 29 faces, 18904.9 -> 18842.05 mm³, live 18842.62; edges 56 vs 61, flat
-    "Collision" INFO left). SM docs otherwise unchanged (23/27). Curved-rip experiment dropped (no effect).
-  - equations.rs PointOnEllipse scaled by b as a constant (core 11-21: knifehandle P4's free minor radius moved
-    16.63 -> 15.95); test constraints_more::ellipse_held_at_its_major_ends_keeps_its_minor_radius.
-  - inference.rs Perpendicular reach (live "Reach brackets" 11-21, 13 takes): start within 22.5 px of the held line
-    (infinite) or 30 px of its midpoint -> Perpendicular; on it off the midpoint / chain from its end: Vertical.
-  - kernel common.cpp tighten_tolerances (ShapeFix_ShapeTolerance + SameParameter + UpdateTolerances on a copy).
-  - scissor single-docs (vibe2, base -> new2): 0139f2 13 -> 17/36 (Extrude 8 matches); b58244 norefs 2 -> 6/106.
-- Sketch-tool feel P0s (qa walk 3, TICKETS 11-21 20:5x), in the same land, scene tests green (203):
-  - FEEL-SKFILLET-FLOW: no arc on a hovered corner; the arrow / "R" leader only while pending (`fillet_handle`).
-  - FEEL-CHAIN-ORIGIN-DROP: a Line chain goes on through the Origin (not "closed"); FEEL-TANGENT-ARC-AT-ORIGIN: an
-    own point on the Origin wins over the Origin inference; Slot takes a hovered end point's one curve.
-  - FEEL-SPLINE-PREVIEW-VANISHES: the cursor point equal to the last click isn't added to the preview fit.
-  - FEEL-OFFSET-PREVIEW-LOOK (live 20:55 answer): end points drawn; hollow arrow's tail on the preview line; black
-    dimension line + 2 filled 5 px arrowheads; "d" label always (in the gap from 13.5 px, else on the picked line
-    with the line run past it); hover: arrow #4674af/#9bb2cc, label tan #ccb396 edge #d99c3e, arrowheads hidden
-    (`offset_label_hovered`, set by the label's on_hover). Open: the tiny "—" tick by the tail (x4-2-z1-hovers). FEEL-POLYGON-SPINNER-DRIFT closed (live 10-27).
-    FEEL-EXTEND-NO-EXTEND closed (two picks as live 2992); the stub's look unknown (live's (8) retake did nothing).
-  - FEEL-TEXT-BOX-PREVIEW (qa walk 4, in 6ef0420c): the Text tool draws only the dash-dot box between its two clicks and
-    4 corner points, no text, until ✓ (live sketch/132, 134). Live's box looked ~3.3:1 for 4:1 clicks: unconfirmed.
-- asm 11-21 22:0x: asm-scissor-lift fed22d (Top Openings 15.5 -> 23.0 mm, Sketch 32 PARALLEL left): not c721b3513
-  (draw-time inference only) nor 1d3541912's sketch-curve rule (A/B on vibe2 scm/sc-fed22d: same 28/60, 14.95 mm
-  both); its plane face query differs base vs main. Told asm (rerun after b3345866).
-- loft-paths-guides: Sketch 4 / 6 match now (16/29; first diff Loft 3 edges, Loft 4 ERROR: loft owner's).
-- hem-jog curve_ends COMMITTED ("skasm: sheet metal walls and bends ... curve ends", not landed): walls / bends from
-  the edges' curve ends. SM A/B 27 docs on vibex7 (~/tmp/skasm/smrun.sh <tags>, binaries ~/agents/skasm-keep/parity-<tag>,
-  built by vibex8 ~/tmp/skasm/bnew2.sh <tag> through rb.sh): base and new both 24/27, 328/353; only hem-jog changes:
-  volume 18842.051 -> matches live 18842.623. Clippy custom clean, custom + model sheetmetal tests green. Land with the re-queue.
-  Counts still 29/56/29 vs live 29/61/34: live keeps the plate corner (1.51, 78.49), hem corners (1.5241, 78.49) /
-  (1.51, 78.4759) and the R0.01 bend's 0.011 / 0.0276 edges apart; ours merges all in one ~0.02 mm vertex.
-  Tried: exact non-uniform transform (kernel AffineAxial for std closed hem's scaleNonuniformly; patch
-  /root/skasm-scratch/affine-axial.patch, test passed): counts unchanged, volume worse (18842.655), and live's corner
-  has SPLINE faces (Parasolid approximates too): DROPPED. Tolerances (SKDBG=1 with
-  /root/skasm-scratch/hj-dbg-only.patch, vibex7 ~/tmp/skasm/hj-dbg.out): std closed hem's scaleNonuniformly
-  (k::transform -> GTransform) turns the cylinder into a B-spline Extrusion at tol 5.2e-5 m; the definition carries
-  5.2e-5, two rolled bend faces 1.5e-5 (tightened(1e-7) can't lower them), the fuse 3.3e-5 > live's 0.014 mm gaps.
-  AffineAxial (exact) didn't change the counts, so a 2nd source: next = AffineAxial + the prints together. Then "Collision".
-- Core's scissor region mappings (b58244 KICB, 0139f2 Extrude 8; 665cf3 derives) and qa's walk 3-5 skasm P0s are all in
-  the 3 commits to re-queue; walks 6-9 have no skasm rows.
-- Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
-- LANDED 59d5c18a: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21).
-- asm-scissor-lift 0da59a: "our parts []" because its 6 Derived sources (other documents) were never fetched:
-  live REQUESTS skasm 11-21. Re-run scissor when live installs them.
-- P0 11-21 (tablet-stand Sketch 3 warning): f9ad07b50's exact-thicken step; core's 199faacf fixes (verified by
-  compat userdocs.py on vibex7). Compat repro: ~/tmp/skasm/compat on vibex7 (userdocs.py copy).
-- SM suite (Mac 11-21 12:30, my build after bc92cab1): 22/23 docs, 259/260 features; only c2-sm-loft-basic's apex left.
-- Loft apex (c2-sm-loft-basic 38 vs 40 faces): open; notes moved to the archive ("Loft apex 11-21").
-- Debug std: throw a custom regenError message (FS println goes to notices, not stderr); restore edited files with a
-  fresh mtime (rb.sh rsync keeps the old one and cargo skips the rebuild). NOSHAPE_FS_TRACE=1 names the throw's line.
-- Rejected: extract surface's faces in body order (hem-flange SM model 2 7 -> 4/8, frames BUTT/BUTT2 swap);
-  patch ~/agents/skasm-keep/extract-order.patch (local).
-- c2-hgr-riser-weldment: dx's (lead 11-20).
-- Rip 1 (c2-cov-sm-rip) 3 -> 5/5: host merge_coplanar_rips builds a wall split by a rip ending at real corners as one
-  face (the bends beside it square); not where the rip ends inside a straight run (louver's in-line walls stay pieces).
-- Tools: /root/skasm-scratch/pm.sh (ONLY=, SAVE=, build + run), pmrun.sh (TRACE run of the kept binary), smlist.txt
-  (24 SM docs), CLI batch on saved docs: ~/tmp/skasm/saved (copy .noshape + -wal), hemq*.sh / jq.sh / jogq.sh.
-- Feel stack 4e51cce3 verified by qa (green f380b6928); P2 drawn_failed LANDED 8fd60c7a.
-- cf-sheet-metal-model-plus P1 line (SUITE-REGRESSIONS-1108) closed: 318 ms vs live 917.
+## In flight (11-22 06:15 UTC)
+- LANDED 585a2064 (f78f42fa, 05:29): hem-jog curve_ends, scissor mappings, walk 3-5 feel P0s, handoffs.
+- TO LAND (worktree, checks green on vibex7/vibex8 unless noted):
+  - P0 FEEL-BEND-FACE-PICKED-LOOK: behaviors.rs consumed_picks_overlay draws a filled face's edges whole (a hidden_only
+    clone; lines can't use on_top), its fill on_top. Test sm::a_bends_filled_face_is_outlined_whole (GPU) green.
+  - P0 SKETCH-USE-VERTEX-OTHER-SKETCH: the Select click picks another shown sketch's point itself
+    (sketch.rs other_sketch_point_at, 5 px) before the model edge / hover. Test u_on_another_sketchs_vertex_projects_it.
+  - P1 SKETCH-LENGTH-LABEL-IN-PLANE + SM-TABLE-HEM-NAME (wip-0450.patch). bend_keeps_flat_length / hem T2 green.
+  - P0 SKETCH-TRIM-SHORT-END: Trim picks with trim_pick_at (a lone point, else the nearest curve in reach), also in
+    hover. Test trim_takes_a_short_end_near_its_end_point (fixed: iso view, the horizontal line is the shorter).
+  - P1 SKETCH-OFFSET-DEFAULT-SIDE: no region -> right of the first curve's direction; a placement click commits the
+    preview as is. Scene test a_click_in_space_places_the_offset_as_previewed.
+  - P1 SKETCH-MIRROR-LINE-LOOK: mirror line MIRROR_LINE 0xbdc764 2 px, no hover band, not drawn as selected.
+    Open: the source plain after the mirror click (UI hover persists; same as psui's FEEL-HOVER-AFTER-MODAL).
+  - P1 PASTE-SKETCH-CENTRED (half): sketch_mode::centre_pasted_sketch (Origin ties dropped, box centre to the
+    Origin) from ops studio::paste_sketches_onto; e2e paste_sketch_centres_the_copy_on_the_origin. The corner dots
+    after deselecting: REQUESTS skasm 05:57 (live's rule: pasted corners unshared, or all unconsumed corners dotted?).
+  - P1 EXTRA-UNFOLD-REFOLD-TOOLS: Unfold / Refold .hidden(); feature_add refuses Unfold / Refold / Rip (e2e).
+- App replays pending (vibe2 ~/tmp/skasm/wf): wf05 label width, wf11 Bend face, wf12 Use vertex, wf22, wf29.
 
 ## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
@@ -91,31 +39,13 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 
-## UNCOMMITTED (04:50; all in /root/skasm-scratch/wip-0450.patch; land.sh needs a clean tree)
-- qa P1 SKETCH-LENGTH-LABEL-IN-PLANE: the Line tool's active on-the-fly length box drawn in the sketch plane (sketch.rs
-  otf_box_in_plane, sketch_mode otf_active_in_plane; screen box skipped; the typing Input stays on screen): upright along
-  the sketch x (live wf05 box slants with the front edge = x, and a vertical line's box is horizontal in a normal view),
-  white 80 % fill, #788188 border + text. Seen on screen (wf05 step 10, in plane). Box width now from label_width_px
-  (it was ~25 % narrower than live's): CHECK on screen again, then land. Scene test only_a_line_length_box_lies_in_the_plane.
-- qa P1 SM-TABLE-HEM-NAME: a rolled bend is "Hem" only when std's joint has bendType HEM (Joints/Definition `hems`);
-  a Bend feature's arc is "Bend" (replay wf11: table now Bend A / Bend B). Test: bend_keeps_flat_length asserts it.
-- qa P0 SKETCH-USE-VERTEX-OTHER-SKETCH (wf12): a Select click on another sketch's entity (SketchEntity) now joins the
-  model selection, so u projects it (use_preselection). NOT built / replayed yet.
-- Build + check: vibex7 rb.sh `cargo build -p noshape`, clippy custom/part-studio-ui/model/scene, model test
-  `--ignored sheetmetal_std::bend_keeps_flat_length`. Replay kit: vibe2 ~/tmp/skasm/wf (qa's run.sh, starts.json, 05, 11
-  json; copy 12/13 from /root/qa-scratch/hm2/wf): `cd ~/tmp/skasm/wf && GLOB="05*" XD=:493 bash run.sh
-  ~/tmp/skasm/noshape ~/tmp/skasm/out-wf` (one app copy at ~/tmp/skasm/noshape, scp -3 from vibex7; a new XD per run).
-## qa tickets open (TICKETS "qa, 2026-11-22 03:4x", crops /root/qa-scratch/tickets/wf*.png, live left)
-- P0 FEEL-BEND-FACE-PICKED-LOOK (wf11 step 12): ours advances to "Sheet metal face to bend", filled by std onBendChange
-  with a Part 1 face, but lights only one edge of it under the preview; live outlines the whole pre-Bend plate face
-  (60 x 40) orange + tan fill. Find why the dialog highlight of a consumed input face draws only an edge.
-- P1 SM-FLAT-VIEW-FIT (wf11 step 18): ours lays the flat as in the model (bend lines along y, vertical) and the fit
-  runs off the pane (no margin, cube over it); live turns it 90° (flange strip at the top, bend lines across) and fits
-  with margins. Orientation = flat_place's fixed face (sheetmetal.rs flat_place): needs live's flat faces for wf11's
-  plate-bend (ask live). Fit: flat_view.rs pending_fit / zoom_to_fit(false).
-- P1 SKETCH-SELECTED-GLYPH-OFFSET (wf13): Show constraints off, fixed rectangle corner selected: our Coincident/Fix
-  glyph pair ~23 px right of live's (tickets/wf13-glyph-offset.png).
-- Host note: vibex8 still "held for a speed run" (qa, set 03:21) at 04:45.
+## qa tickets waiting
+- P1 SM-FLAT-VIEW-FIT (wf11 s18) and P1 SKETCH-SELECTED-GLYPH-OFFSET (wf13): REQUESTS skasm 11-22 05:1x (glyph rects per
+  corner in iso / normal view with 1-3 glyphs; wf11 flat camera + face). Live wf13 iso: 1 glyph centred (-3,-39) from
+  the corner, a pair (-60,-19) / (-38,-19); behaviours 22938 normal view: fixed (-27,-27)..(-8,-8). Ours: box top-left
+  (-27-22k, -26) (sketch.rs ~4580).
+- P2 FORM-REMEMBERED-PART-STUDIO (wf27): live's account remembered the last Form (Circle emboss) and corner relief 3 mm;
+  check Form's partStudio / relief params go through app-core feature_settings (REMEMBER_PREVIOUS_VALUE). Lead: P2.
 
 ## Next, in order
 00. lead 11-20 SM suite models / qa 00d: all match but c2-sm-loft-basic (apex, above). Mac 12:30: 22/23, 259/260.
