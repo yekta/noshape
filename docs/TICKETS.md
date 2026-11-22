@@ -408,6 +408,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P1 **SURFACE-LOFT-GUIDE-FAILS (core)** (workflow 12 steps 18-25, curves, seeded Loft = Surface, green 17157c2fa): Surface Loft, New,
   profiles Edge of Sketch 2 + Edge of Sketch 3, Guides and continuity ticked, guide Edge of Sketch 4, ✓: live builds the surface
   ("Surfaces (1)", the preview shows it while the dialog is open); ours shows no preview and Loft 1 ends red. tickets/wf12-surface-loft-guide.png.
+- [ ] P0 **SKETCH-ESC-KEEPS-POINT-DELETE-LINES (skasm)** (workflow 32 steps 38-43, block, green a50f763e8): Sketch 1 fully defined
+  (40 × 20), drag on the corner (40, 20) (doesn't move, as live), click the corner, Escape, hover away, click the 40 dimension, Delete:
+  live deletes only the 40 (the right line turns blue); ours keeps the corner selected through Escape (selection count 1 at steps 39-42,
+  the corner dot stays orange, the dimension click adds to it) and Delete removes the corner, the top and right lines and both
+  dimensions (2 lines left); the ✓ then gives no Extrude. tickets/wf32-escape-delete.png (live left). Also 35-45: the Front plane's
+  edge stays lit orange after the dimension edit box closes (re-check with psui's FEEL-HOVER-AFTER-MODAL, 454c71f2).
 - [ ] P1 **DRW-TITLEBLOCK-EDIT-BOX (studios)** (workflow 31 steps 38-42, holes-plate-drawing, green d15cec8db): dblclick the title
   block's TITLE cell (sheet (230, 37) mm): live's edit box spans the whole cell (the ruler bar the cell's width, text centred,
   "PLATE 60X40" centred while typing); ours opens a narrow box at the cell's left end (a short ruler, text left-aligned).
