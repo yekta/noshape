@@ -115,6 +115,7 @@ extern "C" int noshape_should_break();
 namespace noshape {
 
 bool rust_boolean_on() { return brep_enabled(); }
+bool boolean_no_tree() { return brep_no_tree(); }
 
 namespace {
 // While a caller tries noshape's Boolean one way before another (RustLenient): a decline returns, even in the
@@ -7085,13 +7086,13 @@ static bool edges_apart(const OcShape& a, const OcShape& b)
   return true;
 }
 
-// A Shell's slab Boolean (quick_boolean's; the replay's of one, NOSHAPE_BOOL_SLAB) with an input of OCCT's nominal
+// A Shell's slab Boolean (quick_boolean's; the replay's of one, set_boolean_slab) with an input of OCCT's nominal
 // tolerance, 1e-4: OCCT's (its tolerant interferences there are its own: on the Shell corpus ours kept a slab's end
 // vertex OCCT drops, unified otherwise; elsewhere such inputs come out as OCCT's, so only here).
 static thread_local bool t_slab = false;
 static bool slab_too_tolerant(const std::vector<TopoDS_Shape>& args)
 {
-  if (!t_slab && std::getenv("NOSHAPE_BOOL_SLAB") == nullptr)
+  if (!t_slab && !brep_slab())
     return false;
   for (const TopoDS_Shape& x : args)
     if (BRep_Tool::MaxTolerance(x, TopAbs_EDGE) >= 5e-5)
@@ -7469,7 +7470,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   {
     const KernelTimer     timer("boolean.rust.brep");
     const RustMemoryWatch watch;
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), rust::Slice<const uint32_t>(shared.data(), shared.size()), tol, fuzzy, static_cast<uint8_t>((touching_only ? 1 : 0) | (scaled_inputs ? 2 : 0) | (t_slab || std::getenv("NOSHAPE_BOOL_SLAB") != nullptr ? 4 : 0)), r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), rust::Slice<const uint32_t>(shared.data(), shared.size()), tol, fuzzy, static_cast<uint8_t>((touching_only ? 1 : 0) | (scaled_inputs ? 2 : 0) | (t_slab || brep_slab() ? 4 : 0)), r))
     {
       // (Declined "cancelled": stopped, not handed to OCCT; so past the memory budget, with OCCT's error.)
       stop();

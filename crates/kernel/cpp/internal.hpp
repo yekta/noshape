@@ -198,6 +198,8 @@ private:
 // fuzzy value `fuzzy` added to every tolerance. `srcs`
 // gets an OcShape for each argument (made in `own` where it has none), `out` the result, `hist` its history.
 bool rust_boolean_on();
+// Whether this thread's OCCT fuses of many tools run at once, not as a tree (set_boolean_no_tree: a replay's).
+bool boolean_no_tree();
 // noshape's own display mesher (mesh_rust.cpp): on unless NOSHAPE_MESH_RUST=0 (or set_rust_mesh(false) on this thread).
 bool rust_mesh_on();
 // A face noshape's mesher meshed: its nodes [n0, n1) and triangles [t0, t1) of `out` (global coordinates, the

@@ -468,6 +468,10 @@ pub(crate) mod ffi {
         fn brep_enabled() -> bool;
         /// Whether a decline fails the Boolean ([`crate::set_rust_boolean_only`]).
         fn brep_strict() -> bool;
+        /// Whether this thread's Booleans are a Shell's slab Boolean's ([`crate::set_boolean_slab`]).
+        fn brep_slab() -> bool;
+        /// Whether this thread's OCCT fuses run at once, not as a tree ([`crate::set_boolean_no_tree`]).
+        fn brep_no_tree() -> bool;
         /// Whether a decline fails the Boolean for the whole process, OCCT's Boolean never run after it
         /// (NOSHAPE_BOOL_FALLBACK=0; the end state once noshape's takes every case).
         fn brep_no_fallback() -> bool;
@@ -978,7 +982,7 @@ pub(crate) mod ffi {
 
 use crate::mesh_bridge::{brep_mesh, brep_mesh_on};
 use crate::ops::{legacy_blend_finish, legacy_blend_pairs, legacy_rim_seams, legacy_topology};
-use crate::brep_bridge::{brep_blend, brep_blend_enabled, brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_no_fallback, brep_record_direct, brep_recording, brep_strict};
+use crate::brep_bridge::{brep_blend, brep_blend_enabled, brep_boolean, brep_decline, brep_enabled, brep_last_decline, brep_no_fallback, brep_record_direct, brep_recording, brep_slab, brep_no_tree, brep_strict};
 
 // SAFETY: OcShape wraps an immutable TopoDS_Shape (handles with atomic
 // reference counts); its lazily-built maps are guarded by std::call_once.

@@ -10257,7 +10257,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
           }
     return free && faces >= 100;
   };
-  if (op == 0 && first.glue == 0 && !plain_at_once && facets.source.empty() && t.size() >= 3 && heavy() && std::getenv("NOSHAPE_BOOL_NO_TREE") == nullptr)
+  if (op == 0 && first.glue == 0 && !plain_at_once && facets.source.empty() && t.size() >= 3 && heavy() && !boolean_no_tree())
   {
     // At the working scale (in metres OCCT's fuses of those parts failed).
     std::vector<TopoDS_Shape>     all = concat(a, each);

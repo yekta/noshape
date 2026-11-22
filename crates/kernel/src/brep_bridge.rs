@@ -15,6 +15,10 @@ thread_local! {
     static MODE: Cell<Option<bool>> = const { Cell::new(None) };
     /// A decline fails the Boolean instead of running OCCT (the replay's quick mode).
     static STRICT: Cell<bool> = const { Cell::new(false) };
+    /// This thread's Booleans are a Shell's slab Boolean's ([`set_boolean_slab`]).
+    static SLAB: Cell<bool> = const { Cell::new(false) };
+    /// This thread's OCCT fuses run at once, not as a tree ([`set_boolean_no_tree`]).
+    static NO_TREE: Cell<bool> = const { Cell::new(false) };
 }
 
 /// With `on`, this thread's Booleans run noshape's own Boolean only: one it declines fails
@@ -26,6 +30,31 @@ pub fn set_rust_boolean_only(on: bool) {
 
 pub(crate) fn brep_strict() -> bool {
     STRICT.with(|s| s.get())
+}
+
+/// With `on`, this thread's Booleans are run as a Shell's slab Boolean (quick_boolean's: one band, OCCT's with an
+/// input of OCCT's nominal tolerance): the replay of a recorded one. (Each thread's own: a process's environment
+/// read by every thread's Booleans gave another test's Boolean one band, and another result, mid-run.)
+pub fn set_boolean_slab(on: bool) {
+    SLAB.with(|s| s.set(on));
+}
+
+/// Whether this thread's Booleans are a slab Boolean's ([`set_boolean_slab`], or NOSHAPE_BOOL_SLAB for the process).
+pub(crate) fn brep_slab() -> bool {
+    static ENV: OnceLock<bool> = OnceLock::new();
+    SLAB.with(|s| s.get()) || *ENV.get_or_init(|| std::env::var_os("NOSHAPE_BOOL_SLAB").is_some())
+}
+
+/// With `on`, this thread's OCCT fuses of many tools run at once, not as a tree (as quick_boolean's): the replay of
+/// a recorded one.
+pub fn set_boolean_no_tree(on: bool) {
+    NO_TREE.with(|s| s.set(on));
+}
+
+/// Whether this thread's OCCT fuses run at once ([`set_boolean_no_tree`], or NOSHAPE_BOOL_NO_TREE for the process).
+pub(crate) fn brep_no_tree() -> bool {
+    static ENV: OnceLock<bool> = OnceLock::new();
+    NO_TREE.with(|s| s.get()) || *ENV.get_or_init(|| std::env::var_os("NOSHAPE_BOOL_NO_TREE").is_some())
 }
 
 /// NOSHAPE_BOOL_FALLBACK=0: a Boolean noshape's own declines fails at once with the reason, OCCT's not run (with

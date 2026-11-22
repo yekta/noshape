@@ -340,14 +340,14 @@ fn occt_result(c: &Case) -> (Result<OpResult>, f64, Option<PathBuf>) {
         return (Err(KernelError::OperationFailed(e)), 0.0, cached);
     }
     if direct {
-        unsafe { std::env::set_var("NOSHAPE_BOOL_NO_TREE", "1") };
+        set_boolean_no_tree(true);
     }
     set_rust_boolean(Some(false));
     let t = Instant::now();
     let o = boolean(c.op, &c.objects, &c.tools, &c.opts);
     let ms = t.elapsed().as_secs_f64() * 1e3;
     if direct {
-        unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_TREE") };
+        set_boolean_no_tree(false);
     }
     // (Written aside and renamed: shards running at once may keep the same case.)
     if let Some(base) = &cached {
@@ -399,8 +399,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         // Declines fail at once (no OCCT run). (A Shell's slab Boolean, as quick_boolean runs ours.)
         let slab = c.path.starts_with("direct");
         if slab {
-            // SAFETY: read by this thread's Booleans; the replay runs on one thread.
-            unsafe { std::env::set_var("NOSHAPE_BOOL_SLAB", "1") };
+            set_boolean_slab(true);
         }
         set_rust_boolean_only(true);
         let t = Instant::now();
@@ -410,8 +409,7 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         let why = last_rust_decline();
         set_rust_boolean_only(false);
         if slab {
-            // SAFETY: as above.
-            unsafe { std::env::remove_var("NOSHAPE_BOOL_SLAB") };
+            set_boolean_slab(false);
         }
         if let Ok(names) = std::env::var("NOSHAPE_BREP_SHOW_OCCT")
             && names.split(',').any(|x| x == name)
@@ -663,8 +661,7 @@ fn brep_corpus_share() {
             }
             let slab = c.path.starts_with("direct");
             if slab {
-                // SAFETY: read by this thread's Booleans; the share runs on one thread.
-                unsafe { std::env::set_var("NOSHAPE_BOOL_SLAB", "1") };
+                set_boolean_slab(true);
             }
             set_rust_boolean_only(true);
             let ours = boolean(c.op, &c.objects, &c.tools, &c.opts);
@@ -672,13 +669,12 @@ fn brep_corpus_share() {
             let why = last_rust_decline();
             set_rust_boolean_only(false);
             if slab {
-                // SAFETY: as above.
-                unsafe { std::env::remove_var("NOSHAPE_BOOL_SLAB") };
+                set_boolean_slab(false);
             }
             // (OCCT the way the app ran it: op_boolean's, or OCCT's one Boolean of them all.)
             let direct = c.path.starts_with("direct");
             if direct {
-                unsafe { std::env::set_var("NOSHAPE_BOOL_NO_TREE", "1") };
+                set_boolean_no_tree(true);
             }
             set_rust_boolean(Some(false));
             let t = Instant::now();
@@ -686,7 +682,7 @@ fn brep_corpus_share() {
             let ms = t.elapsed().as_secs_f64() * 1e3;
             set_rust_boolean(None);
             if direct {
-                unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_TREE") };
+                set_boolean_no_tree(false);
             }
             if occt.is_err() {
                 continue;
