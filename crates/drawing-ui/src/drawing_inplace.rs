@@ -111,7 +111,7 @@ impl DrawingEditor {
 
     /// The open note editor's place on the canvas.
     pub fn note_inplace_box(&self, cx: &App) -> Option<InplaceBox> {
-        let Some(Panel::Note { input, pos, height, style, .. }) = &self.panel else { return None };
+        let Some(Panel::Note { input, pos, height, style, field, .. }) = &self.panel else { return None };
         let h = crate::drawing_note::parse_note_height(&height.read(cx).value(), self.drawing.units_mm).unwrap_or(3.5);
         let text = input.read(cx).value().to_string();
         let shown = if text.trim().is_empty() { "H".to_string() } else { note::fractions(&text) };
@@ -134,7 +134,12 @@ impl DrawingEditor {
         let base = l.runs.first().map(|r| self.sheet_to_local(r.0)[1]).unwrap_or(br[1]);
         // A text line centres the font's ascent + descent in its line height.
         let text_top = base - ((pitch_px - (asc + desc) * font_px) / 2.0 + asc * font_px);
-        Some(InplaceBox { left: tl[0], top: tl[1], width: (br[0] - tl[0]).max(font_px), height: (br[1] - tl[1]).max(pitch_px), font_px, pitch_px, family, bold, italic, text_top })
+        // A title block field's editor spans its cell, 1 mm in from each side (live workflow 31 s38-41).
+        let (left, width) = match field.as_deref().and_then(|k| self.title_cell(k)) {
+            Some((r, _)) => (self.sheet_to_local([r[0] + 1.0, r[3]])[0], (r[2] - r[0] - 2.0) * self.zoom),
+            None => (tl[0], br[0] - tl[0]),
+        };
+        Some(InplaceBox { left, top: tl[1], width: width.max(font_px), height: (br[1] - tl[1]).max(pitch_px), font_px, pitch_px, family, bold, italic, text_top })
     }
 
     /// Where a click at `p` (sheet mm) puts the caret in the open note editor: (line, character) at the nearest
@@ -164,9 +169,15 @@ impl DrawingEditor {
     /// thin solid box.
     pub fn render_note_inplace(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let b = self.note_inplace_box(cx)?;
-        let Some(Panel::Note { input, style, .. }) = &self.panel else { return None };
-        let (input, style) = (input.clone(), style.clone());
-        let lines = input.read(cx).value().split('\n').count().max(1);
+        let Some(Panel::Note { input, style, field, .. }) = &self.panel else { return None };
+        let (input, style, in_cell) = (input.clone(), style.clone(), field.is_some());
+        let value = input.read(cx).value().to_string();
+        let lines = value.split('\n').count().max(1);
+        // In a title block cell a centred field's text stays centred while typed: the Textarea as wide as its text,
+        // centred in the cell-wide box (a multi-line Textarea aligns left), as a table cell's editor.
+        let centred = in_cell && style.align == note::NoteAlign::Center;
+        let text_px = value.split('\n').map(|l| noshape_model::drawing::font::text_width(l, b.font_px * metrics(&b.family).0)).fold(0.0, f64::max) * if b.bold { 1.08 } else { 1.0 };
+        let text_w = if centred { (text_px + 2.0 * TEXT_PX + b.font_px).min(b.width) } else if in_cell { b.width } else { b.width + b.font_px * 2.0 + 2.0 * TEXT_PX };
         let pad = 3.0;
         // The ruler at the sheet's scale over the note's box (live 414).
         self.ruler.sheet_k = Some(self.zoom as f32);
@@ -178,7 +189,7 @@ impl DrawingEditor {
         let mut text = Textarea::new(&input)
             .appearance(false)
             .xsmall()
-            .w(px((b.width + b.font_px * 2.0 + 2.0 * TEXT_PX) as f32))
+            .w(px(text_w as f32))
             .h(px((b.pitch_px * lines as f64 + 2.0) as f32))
             .text_size(px(b.font_px as f32))
             .line_height(px(b.pitch_px as f32))
@@ -247,6 +258,7 @@ impl DrawingEditor {
                                 cx.stop_propagation();
                             }
                         }))
+                        .when(in_cell, |d| d.w(px((b.width + 2.0 * TEXT_PX) as f32)).flex().when(centred, |d| d.justify_center()))
                         .child(text),
                 )
                 .into_any_element(),

@@ -625,6 +625,10 @@ fn a_hovered_view_is_framed_in_tan_and_a_click_turns_its_edges_orange(cx: &mut T
     assert!(sel.iter().any(|s| view_of(&Some(*s)) == Some(pl.id)), "the click selects the view: {sel:?}");
     let (selected, all) = flags(cx, state::SELECTED);
     assert_eq!(selected, all, "every edge of the view in the selection colour");
+    // Live's reader: VIEW right after the click (the selection frame), EDGE once the pointer moves on it (tan).
+    assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_SELECTED)], "the pointer still where it clicked: the selection frame");
+    lit_at(cx, window, &editor, [inside[0] + 0.5, inside[1]]);
+    assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_HOVER)], "moved on the selected view: framed in tan");
     lit_at(cx, window, &editor, [5.0, 5.0]);
     assert_eq!(flags(cx, state::HOVER).0, 0, "off the view: nothing lit");
     assert_eq!(frames(cx), vec![(pl.id, crate::drawing_view::DRAWING_SELECTED)], "off it, the selected view framed in orange");

@@ -306,7 +306,7 @@ impl DrawingEditor {
     }
 
     /// A title block field's cell (sheet mm) and text height on the built sheet.
-    fn title_cell(&self, key: &str) -> Option<([f64; 4], f64)> {
+    pub(crate) fn title_cell(&self, key: &str) -> Option<([f64; 4], f64)> {
         let b = self.built.as_ref()?;
         let target = noshape_model::drawing::build::PickTarget::TitleField(key.to_string());
         let &(pick, r) = b.title_cells.iter().find(|(p, _)| b.picks.get(*p as usize) == Some(&target))?;

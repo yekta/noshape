@@ -1539,6 +1539,10 @@ impl DrawingEditor {
         let lp = self.local(e.position);
         self.cursor = self.to_sheet(lp);
         self.pointer_off = false;
+        if self.click_still.is_some_and(|c| c != self.cursor) {
+            self.click_still = None;
+            self.redraw(cx);
+        }
         // A dimension's palette closes by itself, keeping its changes, once the pointer is well away from it (live
         // drwm-5: open 25 px off it, closed 150 px off); the dimension is left unselected.
         if let Some(d) = self.palette.as_ref().filter(|d| !d.hole)
@@ -2214,6 +2218,7 @@ impl DrawingEditor {
 
     fn select_click(&mut self, pick: Option<u32>, m: Modifiers, cx: &mut Context<Self>) {
         let armed = std::mem::take(&mut self.copy_armed);
+        self.click_still = Some(self.cursor);
         if self.linestyle_click(cx) || self.hide_edges_click(cx) || self.section_edit_click(cx) || self.replicate_click(cx) {
             return;
         }

@@ -420,6 +420,9 @@ pub struct DrawingEditor {
     pub cursor: [f64; 2],
     /// The pointer is on a panel, palette or menu over the sheet: a rebuild hovers nothing at the last `cursor`.
     pub pointer_off: bool,
+    /// Where the last Select click was (sheet mm), until the pointer moves: a view it selected keeps its selection
+    /// frame under the pointer (live's reader: VIEW right after a click on a view, EDGE once hovered again).
+    pub click_still: Option<[f64; 2]>,
     pub overlay: Overlay,
     pub panel: Option<Panel>,
     /// View properties dialog (double-click a view; see `drawing_props`).
@@ -815,6 +818,7 @@ impl DrawingEditor {
             drag: Drag::None,
             cursor: [0.0, 0.0],
             pointer_off: false,
+            click_still: None,
             overlay: Overlay::default(),
             panel: None,
             view_props: None,
@@ -1845,12 +1849,12 @@ impl DrawingEditor {
         if frames.is_empty() {
             return;
         }
-        let (off, width) = (self.tol_mm(8.0), LIT_LINE_PX);
+        let width = LIT_LINE_PX;
         let mut lines = LineData::default();
         for (v, rgb) in frames {
             let Some(pl) = self.placement(v) else { continue };
             let color = [(rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8, 255];
-            let (a, c) = ([pl.min[0] - off, pl.min[1] - off], [pl.max[0] + off, pl.max[1] + off]);
+            let (a, c) = view_frame_box(pl.min, pl.max);
             let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
             for w in q.windows(2) {
                 lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
@@ -1987,7 +1991,7 @@ impl DrawingEditor {
         let hovered = self.hover.and_then(|h| self.sel_of_pick(h)).and_then(|s| match s {
             // Its View properties open, a selected view keeps the selection frame under the pointer (live
             // drw-edge-view-hover-matrix v5).
-            Sel::View(v) | Sel::Edge(v, _) | Sel::CutLine(v) if select && !(self.view_props.is_some() && self.selection.contains(&Sel::View(v))) => Some(v),
+            Sel::View(v) | Sel::Edge(v, _) | Sel::CutLine(v) if select && !((self.view_props.is_some() || self.click_still.is_some()) && self.selection.contains(&Sel::View(v))) => Some(v),
             Sel::View(v) if projecting && lit != Some(v) && !self.selection.contains(&Sel::View(v)) => Some(v),
             _ => None,
         });
@@ -2727,5 +2731,37 @@ mod frame_cam_tests {
         }
         assert_eq!(old.placed(old.center, old.zoom, old.size), None, "its own camera");
         assert_eq!(old.placed(center, zoom, [900.0, 600.0]), None, "a resized canvas");
+    }
+}
+
+/// How far a view's hover / selection frame stands out from its geometry (sheet mm), and the least height of that
+/// frame, the geometry centred in it (live drwm-7: 8-10 px at 4.3 px/mm on every side; Front and Right of a 10 mm
+/// block both 76 px tall, 17 px above and below).
+pub(crate) const VIEW_FRAME_PAD_MM: f64 = 2.0;
+pub(crate) const VIEW_FRAME_MIN_H_MM: f64 = 17.7;
+
+/// A view's frame (sheet mm, bottom-left and top-right) around its geometry's box.
+pub(crate) fn view_frame_box(min: [f64; 2], max: [f64; 2]) -> ([f64; 2], [f64; 2]) {
+    let (mut a, mut c) = ([min[0] - VIEW_FRAME_PAD_MM, min[1] - VIEW_FRAME_PAD_MM], [max[0] + VIEW_FRAME_PAD_MM, max[1] + VIEW_FRAME_PAD_MM]);
+    if c[1] - a[1] < VIEW_FRAME_MIN_H_MM {
+        let mid = (min[1] + max[1]) / 2.0;
+        (a[1], c[1]) = (mid - VIEW_FRAME_MIN_H_MM / 2.0, mid + VIEW_FRAME_MIN_H_MM / 2.0);
+    }
+    (a, c)
+}
+
+#[cfg(test)]
+mod view_frame_tests {
+    use super::view_frame_box;
+
+    /// Live drwm-7 (block-drawing at 4.3 px/mm): Top 172 x 129 px framed 190 x 148; Front 172 x 42 framed 190 x 76.
+    #[test]
+    fn a_view_frame_stands_2_mm_out_and_a_thin_view_gets_the_least_height() {
+        let px = |mm: f64| mm * 4.3;
+        let (a, c) = view_frame_box([0.0, 0.0], [40.0, 30.0]);
+        assert!((px(c[0] - a[0]) - 190.0).abs() < 2.0 && (px(c[1] - a[1]) - 148.0).abs() < 2.0, "Top: {a:?} {c:?}");
+        let (a, c) = view_frame_box([0.0, 0.0], [40.0, 10.0]);
+        assert!((px(c[1] - a[1]) - 76.0).abs() < 1.0, "Front: {} px tall", px(c[1] - a[1]));
+        assert!(((a[1] + c[1]) / 2.0 - 5.0).abs() < 1e-9, "Front: its geometry centred");
     }
 }

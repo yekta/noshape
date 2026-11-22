@@ -754,6 +754,12 @@ fn a_title_field_edits_with_its_alignment(cx: &mut TestAppContext) {
         _ => None,
     });
     assert_eq!(style, Some((NoteAlign::Center, NoteVAlign::Middle)), "{key}");
+    // The editor spans its cell, 1 mm in from each side (live workflow 31 s38: not a box at the cell's left end).
+    let (b, cell, zoom) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.note_inplace_box(cx).expect("the editor"), e.title_cell(&key).expect("the cell").0, e.zoom)
+    });
+    assert!((b.width - (cell[2] - cell[0] - 2.0) * zoom).abs() < 0.5, "{key}: {} px wide in a {} mm cell", b.width, cell[2] - cell[0]);
 }
 
 /// Live's note popups (dom drawing-note-popups, nt-pop-drawprop): Insert drawing property's 22 rows in a list 206 px
