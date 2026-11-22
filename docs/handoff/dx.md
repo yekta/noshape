@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 03:35 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 05:00 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -33,17 +33,19 @@ mac ~/noshape-host/dx-keep/gpu/macgpu.sh (watchdog 175 s, SIGKILL 3 s after SIGT
   (no abort: glibc's resets SIGABRT to default when it's blocked). Test kernel_core::a_recovered_fault_leaves_the_
   process_ending_on_sigterm fails on the Mac before. C repros mac ~/noshape-host/dx-keep/sig/jmprepro*.c.
   SIGTERM now ends the app by its default action (as on Linux / the plate); no quit handler added.
-- NEXT 1 (user 11-22 ~03:5x, follow-up to the SIGTERM fix): SIGTERM (logout / shutdown) must take the normal quit
-  path (commit + close) on all three OSes. Found: committed edits are safe on a kill (WAL write()s are in the OS on
-  commit; synchronous=NORMAL risks only power loss), but DocModel's PendingEdit (edit_tab_deferred: an assembly Insert
-  session's instances, assembly_view.rs:1963; the appearance editor, appearance.rs:476/540) lives in memory until its
-  flush; only DocModel's Drop commits it on quit, and on_app_quit (app/main.rs:602) calls exit_now right after gpui's
-  windows.clear() + flush_effects: Drop runs only if nothing else (a background task) still holds the entity.
-  Plan: (a) a quit hook that flush_pending()s every open DocModel (weak registry) before exit_now; (b) Unix: SIGTERM /
-  SIGHUP / SIGINT -> a self-pipe watched on the main thread -> cx.quit() (second signal: exit at once); Windows:
-  WM_QUERYENDSESSION / WM_ENDSESSION (gpui-pre-windows) and console CTRL_LOGOFF / SHUTDOWN -> the same quit; (c) tests:
-  a pending edit committed by the quit hook; a real-process T2 (app binary, pending edit, kill -TERM, reopen: present).
-- NEXT 2: hex iso circles (below).
+- SIGTERM quit path DONE (queued 3af018e0, 15 commits, carries afd3220a): crates/app/src/quit_signals.rs (Unix: TERM /
+  HUP / INT -> self-pipe -> cx.quit(); second signal or 10 s -> _exit; kept ignored if started ignored); DocModel's
+  quit_commit (cx.on_app_quit -> flush_pending) registered on the first deferred edit. Windows WM_ENDSESSION and macOS
+  applicationWillTerminate already run gpui's shutdown (observers called synchronously, before exit_now's future).
+  Tests: noshape bin quit_tests:: (fails without), T2 tests/quit_signal.rs (xvfb-run, 1.9 s): vibex7 pass.
+- NEXT 2 (in progress 05:xx): hex iso circles. Probe (diff /root/dx-scratch/fo/glimpse-probe.diff, env
+  NOSHAPE_GLIMPSE_DEBUG; out /root/dx-scratch/fo/glimpse.txt): the solid's 2 mm screw-hole rims (compound edges 1546,
+  1550) sit ~8 um behind the mesh's polygonal hole walls (chord sagitta, ~36 facets); our HLR hides the far half but
+  12 um glimpses at facet corners (dropped by the glimpse rule); live draws the far half as ELLIPSE (pi..2pi) and hides
+  the near half (under the mesh's top face) and all rims in Top. Plan: hidden pieces of a part edge whose only cover is
+  mesh facets within a depth tolerance (ray to the viewer vs the faceted mesh's triangles) count visible; calibrate the
+  tolerance on the probe's depths (far half ~9 um; near half = the top faces' gap). Data vibex7 ~/tmp/dx/exs-hex
+  (hex.sh, ops-gl probe binary in ~/agents/dx-keep: delete after).
 - GPU OPEN (Mac M6, ms from launch; r0 first open / rA another build's rows / rB own cached display): big-plate
   505/178/151; l30 160/156/151; pins-1000 147/152/156; rings 1069/1320/160; infento full 13.3 s / 17.3 s / cached
   frame 337 (display 282); isaac 15.6 s / 15.8 s / 170; scissor 56.5 s / 57.3 s / 187. Rows from the Linux build are
