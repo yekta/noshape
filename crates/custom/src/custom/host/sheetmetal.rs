@@ -577,6 +577,8 @@ struct Topo {
     edges: Vec<Shape>,
     edge_faces: Vec<Vec<u32>>,
     edge_ends: Vec<(DVec3, DVec3)>,
+    /// Each edge's curve's own ends, in `edge_ends`' order (see [`curve_ends`]).
+    curve_ends: Vec<(DVec3, DVec3)>,
     vertices: Vec<DVec3>,
     /// Edge indices by [`Shape::hash_code`] (a sheet of a thousand holes: no search of every edge per edge).
     edge_index: HashMap<u64, Vec<usize>>,
@@ -587,13 +589,14 @@ impl Topo {
         let faces = shape.faces();
         let edges = shape.edges();
         let edge_faces = shape.edge_faces().map_err(|e| fe(e.to_string()))?;
-        let edge_ends = edges.iter().map(|e| e.endpoints().unwrap_or_default()).collect();
+        let edge_ends: Vec<(DVec3, DVec3)> = edges.iter().map(|e| e.endpoints().unwrap_or_default()).collect();
+        let curve_ends = edges.iter().zip(&edge_ends).map(|(e, v)| curve_ends(e).unwrap_or(*v)).collect();
         let vertices = shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
         let mut edge_index: HashMap<u64, Vec<usize>> = HashMap::new();
         for (x, e) in edges.iter().enumerate() {
             edge_index.entry(e.hash_code()).or_default().push(x);
         }
-        Ok(Topo { faces, edges, edge_faces, edge_ends, vertices, edge_index })
+        Ok(Topo { faces, edges, edge_faces, edge_ends, curve_ends, vertices, edge_index })
     }
 
     /// The definition edge that is `e` (OCCT IsSame).
@@ -674,17 +677,47 @@ fn merge_coplanar_rips(def: &Definition, topo: &mut Topo) -> std::collections::B
 /// A face's outer loop (straight edges only), chained end to end.
 fn wall_loop(face: &Shape, topo: &Topo) -> FResult<Loop> {
     let wire = outer_wire(face).ok_or_else(|| fe("A sheet metal wall has no boundary"))?;
-    let mut segs: Vec<(DVec3, DVec3, usize, bool)> = Vec::new();
+    // Each side from its curve's own ends: a loose vertex shared by two walls (a hem's corner trim leaves them 0.06 mm
+    // loose) sits between their corners (c2-cov2-sm-hem-jog's closed corner, live's two corners 0.014 mm apart).
+    // Its vertices' points where the curves' ends don't close the loop.
+    let mut sides: Vec<Side> = Vec::new();
     for e in wire.edges() {
         let info = e.edge_info().map_err(|x| fe(x.to_string()))?;
         let idx = topo.edge_of(&e).ok_or_else(|| fe("Sheet metal wall edge not found"))?;
-        if matches!(info.curve, k::Curve::Line { .. }) {
-            segs.push((info.start, info.end, idx, false));
-        } else {
-            // Two chords through its middle.
-            let mid = e.point_at(info.first_param + (info.last_param - info.first_param) * 0.5).map_err(|x| fe(x.to_string()))?;
-            segs.push((info.start, mid, idx, true));
-            segs.push((mid, info.end, idx, true));
+        let ends = curve_ends(&e).ok_or_else(|| fe("Sheet metal wall edge has no curve"))?;
+        // Curved: two chords through its middle.
+        let mid = (!matches!(info.curve, k::Curve::Line { .. })).then(|| e.point_at(info.first_param + (info.last_param - info.first_param) * 0.5).map_err(|x| fe(x.to_string()))).transpose()?;
+        sides.push(Side { vertices: (info.start, info.end), ends, mid, edge: idx });
+    }
+    chain_loop(face, &sides, true).or_else(|_| chain_loop(face, &sides, false))
+}
+
+/// An edge's curve's ends, in its vertices' order: a loose vertex shared by two walls sits between their corners.
+fn curve_ends(e: &Shape) -> Option<(DVec3, DVec3)> {
+    let info = e.edge_info().ok()?;
+    let (p0, p1) = (e.point_at(info.first_param).ok()?, e.point_at(info.last_param).ok()?);
+    Some(if p0.distance(info.start) + p1.distance(info.end) <= p1.distance(info.start) + p0.distance(info.end) { (p0, p1) } else { (p1, p0) })
+}
+
+/// A side of a wall's loop: its vertices' points, its curve's ends (in the same order), a curved one's middle, its edge.
+struct Side {
+    vertices: (DVec3, DVec3),
+    ends: (DVec3, DVec3),
+    mid: Option<DVec3>,
+    edge: usize,
+}
+
+/// A wall's loop chained from its sides, by their curves' ends (`exact`) or their vertices'.
+fn chain_loop(face: &Shape, sides: &[Side], exact: bool) -> FResult<Loop> {
+    let mut segs: Vec<(DVec3, DVec3, usize, bool)> = Vec::new();
+    for sd in sides {
+        let ((s, e), idx) = (if exact { sd.ends } else { sd.vertices }, sd.edge);
+        match sd.mid {
+            None => segs.push((s, e, idx, false)),
+            Some(m) => {
+                segs.push((s, m, idx, true));
+                segs.push((m, e, idx, true));
+            }
         }
     }
     if segs.len() < 3 {
@@ -760,7 +793,7 @@ fn wall_side(face: &Shape, n: DVec3, dir: DVec3, at: DVec3, c: DVec3) -> DVec3 {
 
 /// Geometry of the bend at edge `e` between walls `fa` (seen from `a`) and `fb`.
 fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front: f64, back: f64) -> FResult<Bend> {
-    let (s, t) = topo.edge_ends[e];
+    let (s, t) = topo.curve_ends[e];
     let len = s.distance(t);
     let dir = (t - s) / len.max(1e-300);
     let into = |f: usize| -> FResult<(DVec3, DVec3)> {

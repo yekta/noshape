@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-21 22:39 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 03:30 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## In flight (11-21 04:30 UTC)
@@ -14,7 +14,8 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Handed to core 11-21 10:50: infento a3f7a1 Linear pattern 1's direction JMx = Chamfer 2's new edge on Extrude 1's
   ring (ours runs -y, live +y); and P0 c2-genesis-trunk-hanger 20 -> 12/73 = core's 18354ec79 (bisected; fixed by
   8631c5717, Mac 20/73 on that tree; main still 12/73 from a second cause core is bisecting).
-- QUEUED b3345866 + 6ef0420c + af26939c (Offset label hover; 22:4x; after they land tell core + qa, report to lead; A/B green: suite 127 -> 129/188 docs, 1986 -> 1999 features, no doc worse; start-extrude 34/34,
+- RE-QUEUE b3345866 + 6ef0420c + af26939c (committed, not on main): FAILED 01:54 on ops prefs::graphics_preferences_... = main RED
+  since dx 76f7b4926 (dx fix 281240db queued; lead 02:0x: re-queue once /tmp/lead/main-status is green). Then tell core + qa, report lead.
   overcut-dogbone 10/10; base ab6-base.out vibe2, new vibex7 ~/agents/skasm-keep/ab6-new.out):
   - parity.rs: ruled_piece_from_query (mutualtrim SWEPT_*), region_query_sketch hint + pieces rule (scissor
     b58244 Extrude 1 KICB 445 mm², 0139f2 Extrude 8 Sketch 6's regions); recheck sc-* in vibe2 ~/tmp/skasm/scm.
@@ -44,21 +45,25 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   (draw-time inference only) nor 1d3541912's sketch-curve rule (A/B on vibe2 scm/sc-fed22d: same 28/60, 14.95 mm
   both); its plane face query differs base vs main. Told asm (rerun after b3345866).
 - loft-paths-guides: Sketch 4 / 6 match now (16/29; first diff Loft 3 edges, Loft 4 ERROR: loft owner's).
-- hem-jog next: edges 56 vs 61 / vertices (live: 4 spline corner faces + mitre planes) and the flat "Collision".
+- hem-jog curve_ends COMMITTED ("skasm: sheet metal walls and bends ... curve ends", not landed): walls / bends from
+  the edges' curve ends. SM A/B 27 docs on vibex7 (~/tmp/skasm/smrun.sh <tags>, binaries ~/agents/skasm-keep/parity-<tag>,
+  built by vibex8 ~/tmp/skasm/bnew2.sh <tag> through rb.sh): base and new both 24/27, 328/353; only hem-jog changes:
+  volume 18842.051 -> matches live 18842.623. Clippy custom clean, custom + model sheetmetal tests green. Land with the re-queue.
+  Counts still 29/56/29 vs live 29/61/34: live keeps the plate corner (1.51, 78.49), hem corners (1.5241, 78.49) /
+  (1.51, 78.4759) and the R0.01 bend's 0.011 / 0.0276 edges apart; ours merges all in one ~0.02 mm vertex.
+  Tried: exact non-uniform transform (kernel AffineAxial for std closed hem's scaleNonuniformly; patch
+  /root/skasm-scratch/affine-axial.patch, test passed): counts unchanged, volume worse (18842.655), and live's corner
+  has SPLINE faces (Parasolid approximates too): DROPPED. Next: debug-print tolerances (patch
+  /root/skasm-scratch/hj-dbg-only.patch on top of the commit: definition, rolled bend, fuse inputs; the earlier dbg
+  build "failed" only because vibex8 was held for qa's 02:00-04:00 speed window). Then the flat "Collision".
+- Core's scissor region mappings (b58244 KICB, 0139f2 Extrude 8; 665cf3 derives) and qa's walk 3-5 skasm P0s are all in
+  the 3 commits to re-queue; walks 6-9 have no skasm rows.
 - Next after that (lead 11-21): the next item of "Next, in order"; sketch-solver parity rows if sheet metal has none.
-- LANDING: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21; Mac A/B vs 97df380f1: 108 -> 109/174 docs, 1779 -> 1790
-  features, no other doc changed): Sketch 3 connector at live's frame; Form 4 fuse skipped when adds add nothing;
-  Form 5 region_from_query derived branch; lance bends meeting at asin(1 - h/(rmi+rme)) with no wall, the lance
-  turned 90° (strip along the location's y); knockouts too small for their bridges only the hole; parity
-  names_the_origin (scissor 0da59a's sketch planes).
+- LANDED 59d5c18a: forms 21/21 (c2-sheet-metal-forms 10 -> 21/21).
 - asm-scissor-lift 0da59a: "our parts []" because its 6 Derived sources (other documents) were never fetched:
   live REQUESTS skasm 11-21. Re-run scissor when live installs them.
 - P0 11-21 (tablet-stand Sketch 3 warning): f9ad07b50's exact-thicken step; core's 199faacf fixes (verified by
   compat userdocs.py on vibex7). Compat repro: ~/tmp/skasm/compat on vibex7 (userdocs.py copy).
-- After landing: re-check 850efe (72fe51df1 now on main).
-- LANDED af717ef2: std Jog's two bends (c2-sm-jog-panel 5 -> 12/12; full parity 1723 -> 1730/2315, no other doc).
-- LANDED 381554f1: Hem 1 (c2-sm-hem-flange) keeps "Sheet metal model cannot be unfolded." (219 -> 222/295).
-- LANDED 9f5250bf: SM loft profiles with different corner counts walk the least total fold (host/loft.rs).
 - SM suite (Mac 11-21 12:30, my build after bc92cab1): 22/23 docs, 259/260 features; only c2-sm-loft-basic's apex left.
 - Loft apex (c2-sm-loft-basic 38 vs 40 faces): box rule still open after live's 12:32 copies. Samples:
   live/skasm/sm-loft-fans-1121/<name> (chordal 0.1 / 0.05 / 0.035 / 0.022 in = 3-6 bends; "-plane4" = Plane 1 at 4 in,
