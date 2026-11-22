@@ -370,6 +370,20 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   Step 26 is FEEL-TEXT-BOX-PREVIEW (queued). Otherwise 22 matches: lines, spline finished by the double-click, text "NS", mirror
   constraints; ours faster at every step.
 
+- [ ] P0 **EXPLODE-DRAG-NO-STEP-DIALOG (asm)** (workflow 24 steps 2-10, two-blocks asm, green b5b414278): Exploded views › Add,
+  click Part 2 <1>'s top face, drag the triad's z arrow up: live opens the **"Explode step"** dialog (Distance; 30 + Enter → "Explode
+  step 1", ✓). Ours moves the part (dotted trail) but opens no dialog ("field:Distance is not shown", no ✓), and leaves the triad
+  at the old place. qa-scratch/tickets/wf24-triad.png (live left).
+- [ ] P0 **FEEL-EXPLODE-PICKED-INSTANCE-LOOK (asm)** (workflow 24 step 3): the instance clicked in the exploded view: live draws the
+  **whole part** selected: top (242,182,72), sides (192,144,57) / (230,173,68); ours lights only the top face (230,164,35) and the
+  sides go dark grey (82,82,82) / (132,132,132). Hovered z arrow (step 4): live a thin dark-blue outline, ours a filled bright blue.
+  wf24-triad.png. Steps 12-27 (BOM, Configuration "Large", Configure suppression, Switch to) hit the runner's config_row gap
+  (UIS-CONFIG-ROW-MENU); up to there they match.
+- [ ] P2 **FORM-REMEMBERED-PART-STUDIO (skasm)** (workflow 27 step 10, sm-box): live's Form opens on the account's last form (Circle
+  emboss) and builds at the picked point; ours opens with "Select Part Studio…" empty, so Form 1 errors (and the flat view has no
+  emboss). Corner relief width likewise: live remembered 3 mm (warns "A corner relief is too small…"), ours 5 mm. Rest of 27 matches
+  (Corner 8 mm, Make joint refused, relief notch in the flat view; flat view fit is SM-FLAT-VIEW-FIT).
+
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
 - [ ] P0 **FEEL-DRW-TITLEBLOCK-CLICK (studios)**: the Front view selected (edges orange), click in the title block (sheet (200, 30) mm):
