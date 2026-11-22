@@ -32,7 +32,9 @@ if [ "${NOSHAPE_RB_LOCAL:-0}" = 1 ] || ! ssh -o BatchMode=yes -o ConnectTimeout=
   echo "== rb: here ($host unreachable or NOSHAPE_RB_LOCAL=1)" >&2; exec "$@"
 fi
 # Times (-t) kept so cargo rebuilds only what changed; deleted files go too (--delete).
-ssh -o BatchMode=yes "$host" "mkdir -p ~/$dir/src" && rsync -a --delete --exclude=.git --exclude=/target --exclude='/target-*' -e "ssh -o BatchMode=yes" ./ "$host:$dir/src/" \
+# On the user's Mac transfers are capped so they never crowd out the user's own connection (user 11-22).
+bw=(); [ "$host" = mac ] && bw=(--bwlimit=6000)
+ssh -o BatchMode=yes "$host" "mkdir -p ~/$dir/src" && rsync -a "${bw[@]}" --delete --exclude=.git --exclude=/target --exclude='/target-*' -e "ssh -o BatchMode=yes" ./ "$host:$dir/src/" \
   || { echo "== rb: sync to $host failed" >&2; exit 1; }
 cmd=$(printf '%q ' "$@")
 # The remote run stops when this ssh does (-tt gives it a terminal, so a killed rb.sh kills the build there too).
@@ -50,6 +52,6 @@ fi
 out="${CARGO_TARGET_DIR:-$PWD/target}/debug"
 for b in "${get[@]}"; do
   mkdir -p "$out"
-  rsync -a -e "ssh -o BatchMode=yes" "$host:$dir/target/debug/$b" "$out/$b" && echo "== rb: copied $b to $out/$b" >&2
+  rsync -a "${bw[@]}" -e "ssh -o BatchMode=yes" "$host:$dir/target/debug/$b" "$out/$b" && echo "== rb: copied $b to $out/$b" >&2
 done
 exit $rc
