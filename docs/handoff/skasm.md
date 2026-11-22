@@ -13,13 +13,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   2 mm off the line past the boundary drops the pick) not done: no clear rule.
 - asm will move EDGE_END_REACH_PX / the vertex pick in assembly/inference.rs for qa's FEEL-MC-EDGE-BEFORE-VERTEX-ASM
   after d2b509fc lands (shared: the Part Studio twin moves with it).
-- UNCOMMITTED (20:4x, compaction): VERTEX-FROM-FACE: part-studio inference.rs takes PickKind::Vertex, InferenceHover.glyph
-  = assembly::inference::vertex_glyph(on, before); marks' glyph only if reached from a face/edge; inference_choice()
-  None on a vertex (click / triad ball unchanged); #[cfg(test)] inference_glyph_shown; test hover_matrix_tests
-  a_vertex_reached_from_its_face_keeps_the_connector_glyph; assembly_view.rs update_inference now calls vertex_glyph
-  (same rule). Running: vibex8 ~/tmp/skasm/vg.sh (local /root/skasm-scratch/bin/vg.sh: clippy psui+asm-ui, psui
-  connector/infer/mate_/triad/vertex tests, asm-ui vertex/connector/infer). If green: commit, ticket "fixed, to
-  verify", land after d2b509fc. If the new test fails: check that rehover keeps a Vertex hover_pick in the Origin field.
+- COMMITTED (20:3x, not queued): VERTEX-FROM-FACE (part-studio inference.rs takes vertices, glyph via
+  assembly::inference::vertex_glyph; assembly_view.rs calls the same fn; test a_vertex_reached_from_its_face_keeps_the_
+  connector_glyph). Green on vibex8 (clippy, psui 26 + asm-ui 12 tests). Land after d2b509fc lands.
 - MC left (Part Studio):
   EDGE-TRIAD-HIDDEN (Z on top), PS-VERTEX-LOOK (white disc, orange rim), MARKER-SHAPES (midpoint squares in scene
   InferenceMarks), CAP-MARKER-HIDDEN (check asm's on-top dots from 3900b9e1), re-score SHIFT-NEAREST + PICKED-OWNER

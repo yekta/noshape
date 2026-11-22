@@ -21,6 +21,8 @@ pub(super) struct InferenceHover {
     marks: Option<Arc<scene_builder::InferenceMarks>>,
     /// Shift held: the points stay while the pointer leaves the entity.
     locked: bool,
+    /// A vertex reached from a face or an edge: its connector glyph shows ([`noshape_model::assembly::inference::vertex_glyph`]).
+    glyph: bool,
 }
 
 impl PartStudioView {
@@ -31,7 +33,7 @@ impl PartStudioView {
 
     /// Follows the hovered entity and the pointer; true when what is drawn changed.
     pub(super) fn update_inference(&mut self, shift: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let entity = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::SketchRegion)).map(|t| t.reference.clone());
+        let entity = self.ui.hover_pick.as_ref().filter(|t| matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex | PickKind::SketchRegion)).map(|t| t.reference.clone());
         let (Some(ctx), true) = (self.context.clone(), self.inference_applies(cx)) else {
             return self.ui.inference.take().is_some_and(|i| i.marks.is_some());
         };
@@ -42,8 +44,10 @@ impl PartStudioView {
                 return self.ui.inference.take().is_some_and(|i| i.marks.is_some());
             };
             if self.ui.inference.as_ref().is_none_or(|i| i.on != on || i.context != address) {
-                let had = self.ui.inference.take().is_some_and(|i| i.marks.is_some());
-                self.ui.inference = Some(InferenceHover { on: on.clone(), context: address, points: None, choice: None, marks: None, locked: false });
+                let before = self.ui.inference.take();
+                let had = before.as_ref().is_some_and(|i| i.marks.is_some());
+                let glyph = noshape_model::assembly::inference::vertex_glyph(&on, before.as_ref().map(|i| (&i.on, i.glyph)));
+                self.ui.inference = Some(InferenceHover { on: on.clone(), context: address, points: None, choice: None, marks: None, locked: false, glyph });
                 let units = self.doc.read(cx).session.doc.settings.units;
                 let task = cx.background_spawn(async move { inference_candidates(&ctx, None, &on, &units) });
                 self.ui.inference_task = Some(cx.spawn_in(window, async move |this, cx| {
@@ -91,7 +95,10 @@ impl PartStudioView {
         i.choice = choice;
         let corner = |r: &Reference| matches!(r, Reference::Implicit { inference: noshape_model::reference::Inference::Vertex, .. });
         let marks = points.iter().map(|p| scene_builder::InferenceMark { origin: p.frame.origin, x: p.frame.x(), z: p.frame.z(), corner: corner(&p.reference) });
-        i.marks = Some(scene_builder::InferenceMarks::new(marks, choice));
+        // A vertex: its white corner mark; its connector glyph only reached from its face or edge (live mc-infer-1122
+        // reach-ps-corner d=6..0, qa FEEL-MC-VERTEX-FROM-FACE).
+        let vertex = matches!(i.on, Reference::Vertex(_));
+        i.marks = Some(scene_builder::InferenceMarks::new(marks, choice.filter(|_| !vertex || i.glyph)));
         true
     }
 
@@ -100,10 +107,16 @@ impl PartStudioView {
         self.ui.inference.as_ref()?.marks.clone()
     }
 
-    /// The point under the pointer.
+    /// The point under the pointer (none on a vertex: a click or a dragged ball takes the vertex itself).
     pub(super) fn inference_choice(&self) -> Option<&InferencePoint> {
-        let i = self.ui.inference.as_ref()?;
+        let i = self.ui.inference.as_ref().filter(|i| !matches!(i.on, Reference::Vertex(_)))?;
         i.points.as_ref()?.get(i.choice?)
+    }
+
+    /// Whether the connector glyph shows at the chosen point (a hovered vertex: only reached from its face or edge).
+    #[cfg(test)]
+    pub(super) fn inference_glyph_shown(&self) -> bool {
+        self.ui.inference.as_ref().is_some_and(|i| i.marks.is_some() && i.choice.is_some() && (!matches!(i.on, Reference::Vertex(_)) || i.glyph))
     }
 
     /// The chosen point as the field stores it, when a click on `entity` picks it.

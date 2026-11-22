@@ -1757,6 +1757,47 @@ fn the_list_viewport_matrix_matches_live(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+// Live mc-infer-1122 reach-ps-corner d=6..0 (qa FEEL-MC-VERTEX-FROM-FACE): in the Mate connector feature a block's corner
+// reached across its top face keeps the connector glyph on the vertex; hovered straight from empty space it has none.
+#[gpui::test]
+fn a_vertex_reached_from_its_face_keeps_the_connector_glyph(cx: &mut TestAppContext) {
+    use noshape_scene::builder::{PickKind as K, PickTarget as T};
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } }
+    ] });
+    let m = matrix_studio_from(cx, "mc-vertex-glyph", start);
+    wait_until(cx, m.window, |cx| !m.view.read(cx).display.bodies.is_empty() && !m.view.read(cx).ui_busy());
+    let (top, corner) = cx.update(|cx| {
+        let b = &m.view.read(cx).display.bodies[0];
+        let on = |&(first, count): &(u32, u32)| b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][2] - 0.02).abs() < 1e-6);
+        let top = b.face_refs.iter().zip(&b.mesh.face_ranges).find(|(_, r)| on(r)).map(|(r, _)| r.clone()).expect("the top face");
+        let k = b.mesh.vertices.iter().position(|p| (p[0] - 0.04).abs() < 1e-6 && (p[1] - 0.03).abs() < 1e-6 && (p[2] - 0.02).abs() < 1e-6).expect("the corner");
+        (top, b.vertex_refs[k].clone())
+    });
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("mateConnector", w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    let at = m.exact(cx, [40., 30., 20.]);
+    let hover = |cx: &mut TestAppContext, on: Option<(&Reference, K)>| {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+            v.ui.pointer = Some(at);
+            v.ui.hover_raw = on.map(|(r, kind)| T { reference: r.clone(), kind, anchor: None });
+            v.rehover(cx);
+            v.update_inference(false, w, cx);
+        }))
+        .unwrap();
+        if on.is_some() {
+            wait_until(cx, m.window, |cx| m.view.read(cx).inference_marks().is_some());
+        }
+        cx.update(|cx| m.view.read(cx).inference_glyph_shown())
+    };
+    assert!(!hover(cx, Some((&corner, K::Vertex))), "straight from empty space: no glyph");
+    hover(cx, None);
+    assert!(hover(cx, Some((&top, K::Face))), "on the face");
+    assert!(hover(cx, Some((&corner, K::Vertex))), "reached across the face: the glyph kept on the vertex");
+}
+
 // Live mc-infer-1122, the Part Studio Mate connector feature (Part 1 block, Part 2 cylinder): Shift keeps the hovered face
 // (the glyph moves among its points; off it, its centroid; released over the cylinder, the cylinder's top); after its one
 // pick the feature infers no more, the placed connector's disc pale #d2e3ed, Part 1 outlined #ffc04c, and Part 2

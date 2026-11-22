@@ -3152,8 +3152,7 @@ impl AssemblyView {
             };
             let key = (h.path.clone(), h.reference.clone());
             if self.infer.as_ref().is_none_or(|(k, occ, _)| *k != key || *occ != h.occ) {
-                let from_entity = self.infer.as_ref().is_some_and(|((_, r), _, _)| !matches!(r, Reference::Vertex(_)) || self.infer_vertex_glyph);
-                self.infer_vertex_glyph = matches!(h.reference, Reference::Vertex(_)) && from_entity;
+                self.infer_vertex_glyph = noshape_model::assembly::inference::vertex_glyph(&h.reference, self.infer.as_ref().map(|((_, r), _, _)| (r, self.infer_vertex_glyph)));
                 let units = self.units(cx);
                 let cands = self.result.occurrences.get(h.occ).map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
                 self.infer = Some((key, h.occ, cands));
