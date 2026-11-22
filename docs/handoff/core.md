@@ -1,34 +1,36 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-22 11:24 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 13:05 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-22 11:24 UTC)
-- **Queue:** 8e3ffc49 rectangle (core-rf, checking 11:08); 3779e4f1 knifehandle Blade scatter (core-dock, queued).
-  LANDED: dd3b72fa thread on revolved cylinder, 9a99b420 loft guide continuity None. Landing now from core-cache:
-  isaac speed (volume_change + merge_cylinder_patches copy only for merging pairs).
-- **knifehandle Sweep 2 DONE:** live's own area scatter (scatter entry 3779e4f1); first real difference Fillet 2 (blend).
-  Saved translated doc: vibex7 ~/agents/core-keep/kh/save/; probes ~/tmp/core/l5/pf.py, pm.py, ph.py (Handle per feature).
-- **asm FYI 11:1x:** our result store's encode_result silently returned None for BodyId-keyed maps; asm fixed it in
-  6c5d2de2c (pairs). TODO: log a line when an encode fails.
+## Now (11-22 13:05 UTC)
+- **Queue:** c66e5963 rectangle test fixes (core-rf: 8e3ffc49's fix forward; ops e2e show_code/coincident, psui
+  model-edge drags (block_centre), snaps row (normalize_or_zero), glyph walk; lit-end was main's, psui f8b0a2d8);
+  472eddd5 Loft 1 (core-rmx branch core-loft1); 3779e4f1 knifehandle Blade scatter (core-dock). LANDED f94fdf98 isaac
+  speed (volume_change, merge_cylinder_patches copy only for merging pairs; 00f1d4 19.9 -> 12.5 s).
+  When 472eddd5 lands: tell blend (roster id) Loft 1 is in, so it reruns Fillet 1.
+- **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
+  parameter from guide 0, each guide by its own parameter (Pchip through (v_i, t_i)): 21504.09 mm2 vs live 21477.23
+  (was 21517.64), P1-P4 width within 0.02 mm, P5-tip +0.38 mm. T1 kernel the_knifehandle_loft_through_six_profiles_has_lives_area.
+  Remaining gap = station v rule. Stations now = chord of the profiles' centres (replica +20.0 mm2; live v -5.7).
+  live loft-stations (live/core/loft-stations, README): B/C/D = cumulative chord of the guide points, E (ellipse) =
+  0.4000 not 0.4007; all mirror guides. On knifehandle (two different guides) every guide-chord variant is worse
+  (replica: guide0 -79.9, guide1 +66.0, seg mean -60.9, frac mean -57.6, side u.25 -49.4); only a surface u .3275 /
+  .6725 chord fits (4e-4), unexplained. Scripts /root/core-scratch/kh: rep3.py (area per rule), st2-st7.py.
+  REQUESTS 11-22 13:0x: live loft-stations2 F (two different guides), G (one guide), H (F + point), I (top + side guide
+  round an ellipse) -> live/core/loft-stations2/. Settle the rule from those, then rerun rep3 + T1.
+- **THICKEN-DIRECT gate (P0 SPEED-SPLIT-THICKEN):** the direct builder landed 11-21 (2c630484e, thicken_direct.cpp:
+  workshop-split Thicken 1 11/24/16 14590.40 mm3 as live, 25-50 ms) but without the per-thicken OCCT gate. Running:
+  core-rf branch core-thg (temporary NOSHAPE_THICKEN_OCCT=1 skip of the direct path, never land it), .thg.sh on vibex7:
+  20 thicken docs' parity direct / occt / direct / occt -> ~/agents/core-keep/thg/*.log, /root/core-scratch/thg.out.
+  Then: per-doc features match equal (or better), workshop-split doc time vs the 220 ms bar -> close the P0 ticket.
+- **Persist:** a result the regeneration cache can't encode is now logged (persist.rs warn, in 472eddd5).
 - Probe kit for saved docs (vibex7 ~/tmp/core/l5): ts.py <cli> <doc> (feature statuses + Sketch 3), tn.py <cli> <doc>
   <copy> (faces/vertices with decoded names after Tab 1); face names are urlsafe-b64 raw-deflate JSON.
-- **KNIFEHANDLE LOFT 1 (blend waits to rerun Fillet 1):** ours 21517.64 mm2 vs live 21477.23 (+0.19%). Live's surface
-  decoded (scripts ~/core-scratch/kh/: rep.py replica = live to 0.0017 mm from live's loops + tents):
-  (a) structure = ours: natural cubic columns through the stations (y exact), guides' corrections by periodic Hermite
-  tents (x exact); (b) each loop's u is its OWN curve parameter (P1 Bezier t, P2..P6 ellipse angle), not arc length;
-  (c) each guide's point at v = its own parameter by Hermite cubic through (v_i, t_i), ends' slopes = end-span secants,
-  interior close to our Pchip's weighted harmonic (replica +0.5 mm2); (d) station v: live 0 .240444 .390257 .575656
-  .719091 .896735 1, rule NOT found (middle spans = plane spacing x 1.0018 to 3e-4, P1-P2 and P5-P6 +0.55%, tip span
-  18.89 vs 12.16 dx); chord v costs +26 mm2 in the replica, live v +0.5. Fix (b)+(c) in core-rmx branch core-loft1
-  (loft_guided_multi: par/share by loop parameter, gmap on guide parameter); building + ph.py on vibex7 (.lf.sh new ->
-  ~/core-scratch/lf-new.out). Next: v rule (a live capture of a 3-profile guided loop with offset centres would settle
-  it), T1 test vs 21477.23 (Extend handle 24150.49).
-- **REGEN-SPEED isaac (landing 11:2x from core-cache):** kernel volume_change(a, b) (only unshared faces integrated) in
-  eval.rs `unchanged`; merge_cylinder_patches checks the original faces, copies only for a merging pair. A/B vibex7
-  ~/tmp/core/vc: parity 129/188, 2012/2680 = base; isaac open 77.8 -> 75.7 s (serial 51 uses); 00f1d4 19.9 -> 12.5 s.
-  Next: Extrude 27 unify.reordered/usd (4 USD passes, 600 ms); Fillet 6 = blend.fallback.by_groups 917 ms (blend's).
+- **REGEN-SPEED isaac:** isaac-ball open is level with live (TICKETS SPEED-ASM-OPEN: 13.9 s vs 8.3-13.1). Extrude 27's
+  unify.reordered is 1.1 s of 76 s serial kernel time: not worth a change. Kernel totals over the open: op_boolean
+  12.9 s (bool), op_fillet 11.9 s (blend), op_unify 7.0, volume_change 3.8, min_distance 2.4.
 - **Hosts:** vibex8 still under qa's ~/.slot-quiet (cargo rc 75 "held"); told lead 04:5x. vibex7 load 9-12.
 - **SURF-INTRO-OFFSET-END:** live (behaviours "core (11-21 20:33) surf-intro", dom/core-surfintro-loft1.txt): Loft 1 pairs
   its profiles BY PARAMETER (as ours), ruled 3x1, 120x2 CPs, knots doubled at 1/64. So our 1 mm2 gap is the profiles'
@@ -38,12 +40,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **Surf-intro Mutual trim 1 / Ruled surface 3 -> skasm (sent 11-21):** translator gives the sketch entity for Ruled
   surface 1's SWEPT_EDGE/FACE/BODY of edge Ao0Xs1GgygP800; repro vibex7 ~/agents/core-keep/mt.
 - Surf-intro builder side still mine: Boundary surface 1 WARNING (live OK), Fill 1 continuity.
-- **Queue after:** THICKEN-DIRECT (below), Face blend 1 (+VALID-SURFLOFTS-LOFT1), MANUALBLEND-BOUNDARY1, dx's
+- **Queue after:** THICKEN-DIRECT gate (above), Face blend 1 (+VALID-SURFLOFTS-LOFT1), MANUALBLEND-BOUNDARY1, dx's
   EDGE-CENTRE-SEAM (P2: props_linear centre of a seam-crossing ellipse rim; probe vibex6 ~/agents/dx-keep/sr/rlmid.py),
   live's 6 cov2 models (c2-cov2-*; error rules in behaviours "lead (11-21 13:59): coverage batch 2").
-- **THICKEN-DIRECT:** core-bis2's .thv.sh (vibex7) dumps every thicken input of the 20 thicken docs
-  (NOSHAPE_DUMP_ONLY=thicken) into ~/agents/core-keep/thdump/<doc>; then the direct builder (offset faces trimmed at
-  concave sharp edges, ruled walls, sewn; OCCT fallback; same faces/edges/volume as OCCT on every dump).
 - **MANUALBLEND-BOUNDARY1: Move boundary of a curved surface (MANUALBLEND-BOUNDARY1 part, queued 11-21 06:5x as 175c325c):** k::extend_face_at
   (GeomLib::ExtendSurfByLength past the picked edges' uv sides; refuses faces trimmed inside their surface).
   manualblend 11 -> 12/19, Move boundary 1/2 +879.46 mm2 (live +879.47). Boundary surface 1 still ERROR: its U arcs miss
@@ -99,16 +98,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   118 -> 119 / 174 docs, 1840 -> 1848 features, none worse (c2-rib-wrap 10 -> 18). OPEN (P2, mine): a thin wrapped r3
   disc fuse loses the cylinder in OCCT (cut -> 0 volume, common empty); recording /root/core-scratch/wrap-disc-fuse-lost.bin
   (parts[0] objects, parts[1] tools; tool 1 fails alone).
-- **SPEED-SPLIT-THICKEN (P0, core-trim queued 11-21):** c2-surf-workshop-split Thicken 1 (Mac: offset 100 ms, ours doc
-  202 ms vs live 112). Trim: the sharp path's volume computed once while orienting (-11 ms). Real fix = DIRECT THICKEN
-  (lead 11-21, own ticket, after VALVE + KNIFEHANDLE): offset faces on Geom_OffsetSurface, concave sharp edges trimmed by
-  GeomAPI_IntSS (2-6 ms an edge), seams by IntCS, ruled walls, sew; only sheets whose sharp edges are concave loops,
-  OCCT fallback; lands on the same faces / edges / volume as OCCT on every thicken in suite + corpora, a test per case.
-- **SPEED-VALVE-CONFIG (P0, core-th):** Circular pattern 1 (Mac 98-102 ms vs live 67; x86 201): a drafted Through all
-  REMOVE ran 2 m (model_extent's floor), its cones met below the 150 mm disc -> rust_cut_one_by_one (7 x ~12 ms).
-  Fix: extrude.rs reach() = the parts' extent along the direction + 10% for a drafted Through all cut / intersect
-  (EvalCtx::seed_op carries the seed's operation into a pattern's New evaluation); T1 engine
-  reapplied_drafted_through_all_holes. Mac timing + crate tests running.
 - **KNIFEHANDLE-LOFT1 (qa P1 11-21, in progress):** Loft 1 = SURFACE through P1 (2 splines), P2-P6 ellipses, a point
   (tip 188.575), 2 guides (side profile splines; guide 1 runs on to x=0); live Handle 1/2/3, 21477.23 mm2, box x
   13.09..188.58, y +-19.958, z -39.98..13.80. Work: /root/core-scratch/gordon3.diff (k::loft_gordon = OCCT 8
@@ -154,7 +143,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    live/std-3132-vs-3112.diff, 14 files / 181 lines: SM pattern keeps collapsed walls V3128, hole error preview on a start
    plane, 7/8"-14 UNF tap drill 0.8125 in, thin extrude's new builtin @setThinWallOneSided: no-op unless annotations need
    it). Gate: model suite none worse + skasm's 25 SM docs; tell skasm when landed.
-00. SPEED-VALVE-CONFIG land; then KNIFEHANDLE-LOFT1 (P1, In flight); then DIRECT THICKEN (own ticket); then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
+00. THICKEN-DIRECT gate (P0 close); KNIFEHANDLE-LOFT1 station rule when loft-stations2 is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
    the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.
