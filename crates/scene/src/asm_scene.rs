@@ -587,10 +587,8 @@ pub struct Highlights {
     /// asm box crossing mid, qa FEEL-ASM-CROSSING-OUTLINE).
     pub crossing_tops: Vec<noshape_model::assembly::InstanceId>,
     /// The part whose own mate connector is hovered or selected: banded as a mate pick's part (live hover-matrix-1121
-    /// as2-mc-*: #dab46b..#e9c177, qa FEEL-ASM-MC-LOOK).
+    /// as2-mc-*: #dab46b..#e9c177, qa FEEL-ASM-MC-LOOK), not the #ffa033 instance band a selected face gives it.
     pub mc_owner: Option<InstancePath>,
-    /// That connector selected: no #ffa033 instance band on its part.
-    pub mc_owner_selected: bool,
     /// The selected entities are a dialog field's pick (a pattern's axis or direction): no instance band, the entity
     /// alone lit (live workflows-1123 04 / 05, qa FEEL-ASM-PATTERN-PICK-LOOK).
     pub entities_only: bool,
@@ -1140,7 +1138,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     // parts in front, its fill its own (live triad-depth-1122 t1, t2, e1: the part grey with an orange outline; hover
     // matrix batch 4).
     for (p, _) in &h.selected_entities {
-        if h.entities_only || h.selected_tops.contains(&p[0]) || (h.mc_owner_selected && h.mc_owner.as_ref().is_some_and(|o| o[0] == p[0])) {
+        if h.entities_only || h.selected_tops.contains(&p[0]) || h.mc_owner.as_ref().is_some_and(|o| o[0] == p[0]) {
             continue;
         }
         for &id in built.picks.faces_of(p[0]) {

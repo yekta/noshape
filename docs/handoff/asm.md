@@ -5,33 +5,22 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 22:05 UTC) — RESUME HERE
-- QUEUED (land.sh 22:05): one commit: fan-blade P1 (parity.rs keeps repeated `region:` ids; vibex6 48/53, impeller 27
-  = baseline, sm-rocker 28/28, duct 19/19); SHIFT release (window.modifiers on hover + workspace forwards
-  ModifiersChanged to active_assembly); mate-edit look; PICKED-REHOVER; CROSSING #FFC20E; RING-OVER-BAND (a copy of the
-  centre ring in sel_pts over the band: idle alpha 51, hovered 255); MC-LOOK part (Highlights.mc_owner /
-  mc_owner_selected: the owner gets BAND|PICKED, live's tan = the mate pick band); PATTERN-PICK-LOOK
-  (Highlights.entities_only: no instance band; pattern axes no longer push triads). assembly-ui 183/183 + clippy clean.
-- RUNNING vibex7 (queued in its slot): lc-t.sh timings (A ~/tmp/asm/app 20:09, B app-b 19:45) -> /root/asm-scratch/
-  lc-t.log: STOPPED at its 2 h limit (the A2 pass was still waiting in the slot; killed). A1 (app 20:09) evaluated
-  63.2 / 21.3 / 13.9 s; B1 (app-b 19:45) 41.0 / 15.8 / 19.9 s: noisy (loaded host), no clear A vs B gap; rerun A/B
-  interleaved off-peak before reporting, or report as inconclusive.
-- NOW (lead 22:1x ruling): MSAA on for software rendering, the GPU path's count: renderer.rs msaa_of drop the
-  `style.software` early return (line ~1658; also the 3326 comment "4x set was 100 ms of the render thread's start" and
-  test a_software_rasteriser_draws_without_msaa -> (4, 4)). Measure frame time before/after on a vibex (software;
-  NOSHAPE_PERF_MSAA=1 vs 4 on one binary gives both) + the render thread's start; numbers in the commit body. psui: go
-  ahead (their renderer.rs 670eb17e queued + draw_lists/InstUniform hunks uncommitted, different hunks).
-  Then P0 FEEL-ASM-SELECT-SAME-CONFIG-TRIAD.
-- OPEN MC-LOOK: selected + hovered live's centre ring blue (probably the triad's centre ring takes the hover; ours the
-  connector), and with a face selected the hovered connector keeps the face's #ffa90a (ours #ffc20e).
-- qa workflows-1123 rows (TICKETS 452-464): P0 FEEL-ASM-SELECT-SAME-CONFIG-TRIAD (wf07 s25 inserted instance selected:
-  no triad); P1 PATTERN-PREVIEW-LATE, SECOND-DIRECTION-EMPTY, INSERT-OK-KEEPS-SELECTION, INSERT-LAST-VIEWED-TOAST;
-  P2 UIS-MATE-PATTERN-ROW (assembly_behaviors.rs:1906 marks the pattern row instance:), ASM-INSERT-FILTER-BUTTONS
-  (2 in live, 3 ours). Evidence /root/qa-scratch/tickets/wf23-*.png.
+## State (2026-11-22 23:16 UTC) — RESUME HERE
+- LANDED 22:49 75a0b871 as f8301b7c. lc-t A/B inconclusive (loaded host); rerun interleaved off-peak if asked.
+- HELD IN THE TREE (uncommitted, waiting for the lead's ruling): software MSAA: renderer.rs msaa_of without the software
+  early return, test a_software_rasteriser_draws_with_the_gpus_msaa (4, 4); scene.rs Style::software doc. vibex6
+  many_parts::thousand_pins_frame_time (1000 pins, 284k tris, 1194x794; mf6.log / mf7.log), mean / worst:
+  AO on: 1x 105/206, 75/124, 82/136 ms; 4x 460/531, 625/970, 500/537 ms. AO off: 1x 62/117, 60/115; 4x 451/676,
+  453/495 ms. MSAA itself is the cost (~7x), not AO. Asked the lead: keep 4x / 2x / 1x? Commit body = these numbers.
+- QUEUED (23:1x): SELECT-SAME-CONFIG-TRIAD, INSERT-OK-KEEPS-SELECTION, PATTERN-SECOND-DIRECTION-EMPTY,
+  PATTERN-PREVIEW-LATE, UIS-MATE-PATTERN-ROW, INSERT-FILTER-BUTTONS (REQUESTS 23:04 asks live2 to confirm),
+  LAST-VIEWED-TOAST, MC-LOOK rest; tests; clippy + full assembly-ui lib (187) green on vibex6 (mf7).
+- vibex6 ~/target-asm 26 GB: clear debug/incremental after this batch.
 - MARKER-LOOK: skasm's stack is on main now (InferenceMark::new); add the circle-centre grey inner ring.
-- EDGE-BEFORE-VERTEX: probe first; shared chooser (tell skasm). FIXED-GLYPH-AA: software MSAA off -> lead decision.
+- EDGE-BEFORE-VERTEX: probe first; shared chooser (tell skasm). FIXED-GLYPH-AA: should be settled by software MSAA.
 - qa 18:3x ≠: TYRES (~1.6 m off), wf25 s28 Gear dialog yellow, wf08 s07 quadrant fill.
 - rb.sh after a rebase: touch -c the files main changed (git diff --name-only HEAD~60 HEAD -- crates), else stale.
+- vibex6 ~/target-asm is 26 GB: clear its debug/incremental after this batch (rule < 20 GB).
 - Next after: first frame from StudioDisplay rows; infento parity rerun; xdev-subs / pinslot reruns; bjr Fastened 3/4;
   pinslot Revolute 5; tvc 41/43; keyboard BOM 15/16. dx's e52b091a re-measure. Cleanup: /root/asm-scratch/solver.rs.keep,
   asm-base worktree, vibex7 ops-bis/ops-1120/ops-bt/ops-mc, vibex8 ops-subs/ops-mc/ops-tc/cli-tc, branch asm-rb-check.

@@ -68,6 +68,8 @@ struct CatalogStudio {
     sketches: Vec<(FeatureId, String)>,
     /// Composite parts among `parts` (Insert › Composite parts filter).
     composites: Vec<BodyId>,
+    /// It has a sheet metal model (Insert › Flat patterns filter).
+    sheet_metal: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1046,7 +1048,8 @@ impl AssemblyView {
                             })
                             .unwrap_or_default();
                         let sketches = r.as_ref().map(|r| r.context.sketches.iter().filter(|s| s.sketch.entities().any(|e| !e.construction)).map(|s| (s.feature, s.name.clone())).collect()).unwrap_or_default();
-                        catalog.studios.push(CatalogStudio { tab: t.id, name: t.name.clone(), parts, sketches, composites });
+                        let sheet_metal = ps.features.iter().any(|f| f.type_id == "sheetMetalStart");
+                        catalog.studios.push(CatalogStudio { tab: t.id, name: t.name.clone(), parts, sketches, composites, sheet_metal });
                     }
                     noshape_render::perf::record("a.eval_catalog", tc.elapsed());
                     log::info!(target: "perf", "assembly: evaluated in {:.0} ms, catalog {:.0} ms", tc.duration_since(t).as_secs_f64() * 1e3, tc.elapsed().as_secs_f64() * 1e3);
@@ -1556,6 +1559,8 @@ impl AssemblyView {
         // A part's own Part Studio mate connectors, on the part that owns them (live hover-matrix-1121 as2, qa
         // FEEL-ASM-PS-MC-MISSING): hovered or selected, the part outlined in tan; clicked, selected as its entity.
         let mut seen = HashSet::new();
+        // A selected one hovered: the triad on it lights its centre ring (live as2-mc-selhover: blue).
+        let mut mc_selected_hovered = false;
         for o in &self.result.occurrences {
             if o.hidden || !seen.insert(o.path.clone()) {
                 continue;
@@ -1566,9 +1571,9 @@ impl AssemblyView {
                 let key = (o.path.clone(), c.reference.clone());
                 let hl = hovered_overlay == Some(OverlayPick::Connector(i));
                 let look = if self.ui.entity_sel.contains(&key) { ConnectorLook::Selected } else if hl { ConnectorLook::Hovered } else { ConnectorLook::Rest };
+                mc_selected_hovered |= hl && look == ConnectorLook::Selected;
                 if look != ConnectorLook::Rest {
                     h.mc_owner = Some(o.path.clone());
-                    h.mc_owner_selected = look == ConnectorLook::Selected;
                 }
                 h.connectors.push((t.mul(&Frame::from_axes(c.origin, c.z, c.x)), size * 0.9, look, 1.0));
                 overlay_connectors.push(OverlayConnector::Part(key));
@@ -1783,7 +1788,8 @@ impl AssemblyView {
         // (Nothing is drawn at the pointer while placing: live2 asm-dialogs-1119 insz.)
         let frame = self.manipulator(cx);
         let unlit = self.manip_click.is_some_and(|(_, f)| f != frame);
-        h.manipulator = frame.map(|f| (f, self.manip_size(cx), self.manip_hover.filter(|_| !unlit).or(self.ui.manip_selected)));
+        let lit = self.manip_hover.filter(|_| !unlit).or(mc_selected_hovered.then_some(ManipHandle::Center));
+        h.manipulator = frame.map(|f| (f, self.manip_size(cx), lit.or(self.ui.manip_selected)));
         self.triad_drag_marks(&mut h, cx);
         h.section = self.section_glyph(cx);
         h.explode_triad = self.explode_edit;
@@ -3331,6 +3337,8 @@ impl AssemblyView {
                     p.active = Some(2);
                 }
             }
+            // The preview at once (live workflows-1123 04 s5 / s9, 05 s5: the instances by 350-780 ms).
+            self.update_pattern_preview(cx);
             return;
         }
         if self.snap.is_some() {
@@ -4209,6 +4217,7 @@ impl AssemblyView {
         self.update_entity_measure();
         self.triad = None;
         self.ui.manip_selected = None;
+        self.ui.inserted_selection.clear();
     }
 
     /// The bottom-right readout's measurements of the selected entities.
@@ -6382,6 +6391,7 @@ impl AssemblyView {
                 let has_surfaces = self.catalog.studios.iter().any(|s| s.parts.iter().any(|p| p.3));
                 // Live (assembly/01 vs 320): the Composite parts toggle only when a Part Studio has one.
                 let has_composites = self.catalog.studios.iter().any(|s| !s.composites.is_empty());
+                let has_sheet_metal = self.catalog.studios.iter().any(|s| s.sheet_metal);
                 let fk = self.ui.insert_sketches;
                 let fc = self.ui.insert_composites;
                 let (fp, fs) = self.ui.insert_filter;
@@ -6453,15 +6463,17 @@ impl AssemblyView {
                                 cx.notify();
                             })))
                         })
-                        // Sketches and Flat patterns always (live2 asm-dialogs-1119 q-ins: a document with no sheet metal).
                         .child(toggle("ins-f-sketch", "insert-sketches", "Sketches", fk, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.insert_sketches = !this.ui.insert_sketches;
                             cx.notify();
                         })))
-                        .child(toggle("ins-f-flat", "flat-pattern", "Flat patterns", fl, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.ui.insert_flat = !this.ui.insert_flat;
-                            cx.notify();
-                        })))
+                        // Flat patterns only with a sheet metal model (live workflows-1123 16 s2: Parts and Sketches alone).
+                        .when(has_sheet_metal, |d| {
+                            d.child(toggle("ins-f-flat", "flat-pattern", "Flat patterns", fl, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.insert_flat = !this.ui.insert_flat;
+                                cx.notify();
+                            })))
+                        })
                         .when(has_surfaces, |d| {
                             d.child(toggle("ins-f-surf", "surface-body", "Surfaces", fs, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.ui.insert_filter.1 = !this.ui.insert_filter.1;

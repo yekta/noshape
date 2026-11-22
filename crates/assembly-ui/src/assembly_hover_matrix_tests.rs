@@ -291,7 +291,7 @@ cells! {
         assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0x85a3d0, 24)));
     }
     mc_hovered_other_selected: MC, State::HoveredOtherSelected => |c| {
-        assert!(shows(&c, 0xffe79f, 14.0));
+        assert!(shows(&c, 0xffe79f, 14.0) && !shows(&c, 0xffa033, 40.0));
     }
 }
 

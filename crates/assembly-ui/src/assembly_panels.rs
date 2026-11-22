@@ -216,6 +216,21 @@ impl PatternSession {
         self.values_seen = t.values;
     }
 
+    /// A ticked Second (`n` 1) or Third direction (2): its empty Direction takes the picks unless the active field is
+    /// still empty (live workflows-1123 05 s10; asm-linear-pattern-third-direction kept the empty Instances active).
+    pub fn activate_new_direction(&mut self, n: usize) {
+        let filled = match self.active {
+            None => !self.seeds.is_empty(),
+            Some(0) => self.axis.is_some(),
+            Some(1) => self.axis2.is_some(),
+            Some(_) => self.axis3.is_some(),
+        };
+        let empty = if n == 1 { self.axis2.is_none() } else { self.axis3.is_none() };
+        if filled && empty {
+            self.active = Some(n);
+        }
+    }
+
     /// Before a toggle: remember the state for Undo (and enable ✓).
     pub fn note_toggle(&mut self) {
         let t = self.toggles();
@@ -1442,14 +1457,13 @@ impl AssemblyView {
         let kind = match s.kind {
             PatternDialogKind::Linear => {
                 let direction = s.axis.clone().ok_or("Select a direction (edge, face or mate connector)")?;
-                let second = if s.second {
-                    let d2 = s.axis2.clone().ok_or("Select the second direction")?;
+                // An empty extra direction is left out: the preview stays (live workflows-1123 05 s10).
+                let second = if s.second && let Some(d2) = s.axis2.clone() {
                     Some(noshape_model::assembly::LinearDirection { direction: d2, distance: ExprValue::new(text(&s.distance2)), count: count(&s.count2)?, opposite: s.opposite2, equal_spacing: s.equal2, centered: s.centered2 })
                 } else {
                     None
                 };
-                let third = if s.second && s.third {
-                    let d3 = s.axis3.clone().ok_or("Select the third direction")?;
+                let third = if s.second && s.third && let Some(d3) = s.axis3.clone() {
                     Some(Box::new(noshape_model::assembly::LinearDirection { direction: d3, distance: ExprValue::new(text(&s.distance3)), count: count(&s.count3)?, opposite: s.opposite3, equal_spacing: s.equal3, centered: s.centered3 }))
                 } else {
                     None
@@ -1664,6 +1678,8 @@ impl AssemblyView {
                 }
             }
             self.update_pattern_preview(cx);
+            // (Past this frame's eval check: the next frame starts it, not the next pointer move.)
+            cx.notify();
         }
         let strategy = self.render_mirror_strategy(StrategyHost::Pattern, cx);
         let pal = p();
@@ -1953,13 +1969,16 @@ impl AssemblyView {
                     })));
                 if !circular {
                     body = body.child(os::checkbox("pat-second", "Second direction", second).map(|d| crate::ui_script::mark(d, || "checkbox:Second direction".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        // Live (asm-linear-pattern-third-direction): the active field stays; the checkbox keeps the focus.
                         if let Some(p) = &mut this.pattern {
                             p.note_toggle();
                             p.second = !p.second;
+                            if p.second {
+                                p.activate_new_direction(1);
+                            }
                         }
                         this.ui.checkbox_focus = Some("Second direction");
                         this.update_capture(cx);
+                        this.update_pattern_preview(cx);
                         cx.notify();
                     })));
                     if second {
@@ -1969,6 +1988,9 @@ impl AssemblyView {
                             if let Some(p) = &mut this.pattern {
                                 p.note_toggle();
                                 p.third = !p.third;
+                                if p.third {
+                                    p.activate_new_direction(2);
+                                }
                             }
                             this.ui.checkbox_focus = Some("Third direction");
                             this.update_capture(cx);

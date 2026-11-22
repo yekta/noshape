@@ -297,6 +297,13 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         if let Some(b) = name.strip_prefix("dropdown:").and_then(|d| noshape_app_core::ui_script::bounds_of(&format!("button:{d}"))) {
             return Ok(b.center());
         }
+        // An assembly pattern live's runner names as a mate (its feature) that ours lists among the instances (qa
+        // UIS-MATE-PATTERN-ROW, workflows-1123 04 s13).
+        if let Some(row) = name.strip_prefix("mate:").map(|m| format!("instance:{m}"))
+            && let Some(b) = noshape_app_core::ui_script::bounds_of(&row)
+        {
+            return Ok(visible_center(b, noshape_app_core::ui_script::clip_of(&row)));
+        }
         // A toolbar button live's runner names as a tool that ours marks as a button (the shared Undo / Redo: live2
         // drw-toolbar-tips-view-showhide).
         if let Some(b) = name.strip_prefix("tool:").and_then(|d| noshape_app_core::ui_script::bounds_of(&format!("button:{d}"))) {

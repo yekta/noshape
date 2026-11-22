@@ -2116,6 +2116,29 @@ fn instances_with_a_mate_selected_have_lives_reduced_menu(cx: &mut TestAppContex
     .unwrap();
 }
 
+/// Live workflows-1123 07 s22-s25: Insert ✓ deselects the instance an empty assembly's insert selected; selected again
+/// (Select instances with same part and same configuration: the same selection) it shows the triad.
+#[gpui::test]
+fn insert_ok_deselects_the_first_instance_and_selecting_it_again_shows_the_triad(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "insert-ok-triad");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = v.assembly(cx).unwrap().instances.iter().find(|i| i.name == "Part 1 <1>").unwrap().id;
+            v.toggle_insert(w, cx);
+            v.ui.inserted_selection = vec![id];
+            v.selected = vec![id];
+            assert!(v.manipulator(cx).is_none(), "just inserted: no triad");
+            v.close_insert(w, cx);
+            assert!(v.selected.is_empty() && !v.insert_open, "✓ deselects it");
+            v.select_same_configuration(id, true, cx);
+            assert_eq!(v.selected, vec![id], "Part 1 alone selected again");
+            assert!(v.manipulator(cx).is_some(), "selected again: the triad");
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+}
+
 /// Live asm-insert-esc-pending: Esc drops the instance on the pointer (Redo offered, the dialog stays); a second Esc
 /// closes the dialog and leaves no Redo.
 #[gpui::test]
@@ -2691,7 +2714,7 @@ fn the_insert_dialog_leaves_out_an_empty_part_studio(cx: &mut TestAppContext) {
 
 /// Live2 asm-dialogs-1119 q-ins / q-ins-sort: Insert's Part Studios are listed by name A → Z by default, the Sort
 /// button right of the search box turns it to Z → A, kept when the dialog is closed and reopened; the filters are
-/// Parts, Sketches and Flat patterns, also with no sketches or sheet metal in the document.
+/// Parts and Sketches, also with no sketches, and Flat patterns only with sheet metal (live workflows-1123 16 s2).
 #[gpui::test]
 fn the_insert_dialogs_studios_sort_by_name_and_keep_the_sort(cx: &mut TestAppContext) {
     let path = two_parts_document(cx, "insert-sort", |ctx| {
@@ -2714,9 +2737,10 @@ fn the_insert_dialogs_studios_sort_by_name_and_keep_the_sort(cx: &mut TestAppCon
     };
     assert_eq!(first(cx), "Alpha studio", "A → Z by default");
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-    for id in ["ins-cur-sort", "ins-f-parts", "ins-f-sketch", "ins-f-flat"] {
+    for id in ["ins-cur-sort", "ins-f-parts", "ins-f-sketch"] {
         assert!(vcx.debug_bounds(id).is_some(), "{id} shown");
     }
+    assert!(vcx.debug_bounds("ins-f-flat").is_none(), "no Flat patterns without sheet metal");
     cx.update(|cx| view.update(cx, |v, cx| {
         v.pick_insert_sort(2, 1);
         v.insert_search_changed(cx);
@@ -3901,4 +3925,50 @@ fn a_pattern_direction_pick_lights_only_its_entity(cx: &mut TestAppContext) {
     draw(cx, window);
     let banded = cx.update(|cx| view.read(cx).viewport.read(cx).scene().body_outline);
     assert!(!banded, "no instance band for a pattern field's pick");
+}
+
+/// Live workflows-1123 05 s10: Second direction ticked with Direction filled activates the empty second Direction, and
+/// the pattern still builds (its preview stays) while that field is empty.
+#[gpui::test]
+fn ticking_second_direction_activates_its_empty_field_and_keeps_the_pattern(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "pattern-second-dir");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.open_pattern(super::PatternDialogKind::Linear, w, cx);
+            let asm = v.assembly(cx).unwrap();
+            let (part, seed) = (asm.instances[0].id, asm.instances[1].id);
+            let p = v.pattern.as_mut().unwrap();
+            p.seeds = vec![seed];
+            p.active = Some(0);
+            p.axis = Some(noshape_model::assembly::MateConnectorRef { instance: part, ..noshape_model::assembly::MateConnectorRef::origin() });
+            p.second = true;
+            p.activate_new_direction(1);
+            assert_eq!(p.active, Some(1), "the empty second Direction takes the picks");
+            let s = v.pattern.as_ref().unwrap();
+            assert!(v.pattern_from_session(s, cx).is_ok(), "an empty second direction is left out");
+        })
+    })
+    .unwrap();
+}
+
+/// Live workflows-1123 05 s5: a direction picked in the graphics previews the pattern at once (the evaluation asked
+/// for, not left to the next edit).
+#[gpui::test]
+fn a_picked_pattern_direction_previews_at_once(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "pattern-pick-preview");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.open_pattern(super::PatternDialogKind::Linear, w, cx);
+            let asm = v.assembly(cx).unwrap();
+            let (part, seed) = (asm.instances[0].id, asm.instances[1].id);
+            let p = v.pattern.as_mut().unwrap();
+            p.seeds = vec![seed];
+            p.active = Some(0);
+            v.ui.eval_requested = false;
+            v.deliver_connector(noshape_model::assembly::MateConnectorRef { instance: part, ..noshape_model::assembly::MateConnectorRef::origin() }, w, cx);
+            assert!(v.pattern.as_ref().unwrap().axis.is_some(), "the direction taken");
+            assert!(v.ui.eval_requested, "the preview's evaluation asked for");
+        })
+    })
+    .unwrap();
 }

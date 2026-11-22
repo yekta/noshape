@@ -1750,8 +1750,10 @@ impl AssemblyView {
     }
 
     /// Instance menu "Select instances with same (part and same) configuration".
-    fn select_same_configuration(&mut self, top: InstanceId, same_part: bool, cx: &mut Context<Self>) {
+    pub(super) fn select_same_configuration(&mut self, top: InstanceId, same_part: bool, cx: &mut Context<Self>) {
         let Some(ids) = self.assembly(cx).map(|a| noshape_ops::assembly::same_configuration(a, top, same_part)) else { return };
+        // (Its triad shown, a just-inserted instance's too: live workflows-1123 07 s25.)
+        self.ui.inserted_selection.clear();
         self.selected = ids;
         self.selected_mate = None;
         self.refresh_scene(false, cx);
@@ -3447,6 +3449,11 @@ impl AssemblyView {
             self.apply_solved(solved, cx);
             self.finish_placing(true, window, cx);
         }
+        // ✓ deselects the instance an empty assembly's insert selected (live workflows-1123 06 s20, 07 s22).
+        if !self.ui.inserted_selection.is_empty() && self.selected == self.ui.inserted_selection {
+            self.clear_selection();
+            self.refresh_scene(false, cx);
+        }
         self.insert_open = false;
         self.end_insert_step(cx);
         if let Some(step) = self.ui.insert_redo.take() {
@@ -4810,6 +4817,8 @@ impl AssemblyView {
                 Some(v) => {
                     this.set_config_panel_values(&v, window, cx);
                     this.ui.insert_config.insert(studio, v);
+                    // (Live workflows-1123 07 s20.)
+                    this.show_cfg_toast("Configuration parameters matched to last viewed value.".into(), true, cx);
                 }
                 None => this.show_cfg_toast("Could not find last viewed configuration.".into(), false, cx),
             }
@@ -4864,7 +4873,8 @@ impl AssemblyView {
                             cx.stop_propagation();
                             let (v1, v2) = (view.clone(), view.clone());
                             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                m.item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon_name("cfg-last-viewed").on_click(move |_, window, cx| v1.update(cx, |this, cx| set_last(this, window, cx))))
+                                // Bootstrap's dropdown, 29 px rows (live workflows-1123 07 s19).
+                                m.dropdown().row_height(29.).item(crate::os_menu::OsMenuItem::new("Set to last viewed").icon_name("cfg-last-viewed").on_click(move |_, window, cx| v1.update(cx, |this, cx| set_last(this, window, cx))))
                                     .item(crate::os_menu::OsMenuItem::new("Reset to default").icon_name("cfg-reset-default").on_click(move |_, window, cx| {
                                         v2.update(cx, |this, cx| {
                                             let inputs = this.insert_config_inputs(studio, cx);
@@ -4879,6 +4889,7 @@ impl AssemblyView {
                                                 let d = noshape_model::configuration::Configuration { inputs, configured: Vec::new() }.defaults();
                                                 this.set_config_panel_values(&d, window, cx);
                                             }
+                                            this.show_cfg_toast("Configuration parameters matched to default value.".into(), true, cx);
                                             cx.notify();
                                         })
                                     }))
@@ -4936,6 +4947,8 @@ impl AssemblyView {
                     // Live 595: the feature-dialog select (underlined, the list
                     // hanging under it with the current row in blue).
                     let cur = effective.0.get(&inp.id).cloned().unwrap_or_default();
+                    // (Live workflows-1123 07 s20: "Configuration: (Default: Default)".)
+                    let tip = format!("{}: (Default: {})", inp.name, inp.default_text());
                     let items: Vec<(SharedString, SharedString)> = options.iter().filter(|o| vis.options.contains(&o.id)).map(|o| (SharedString::from(o.id.clone()), SharedString::from(o.name.clone()))).collect();
                     let key = (studio, inp.id.clone());
                     let sel = match self.ui.insert_cfg_selects.get(&key) {
@@ -4954,7 +4967,7 @@ impl AssemblyView {
                         }
                     };
                     sel.update(cx, |s, _| s.set_items(items, cur));
-                    col = col.child(h_flex().min_h(px(28.)).items_start().child(div().pl(px(5.)).pt(px(6.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().id(SharedString::from(format!("inscfg-tt-{studio}-{}", id))).flex_1().min_w_0().tooltip(crate::ui::tooltip(inp.name.clone())).child(sel)));
+                    col = col.child(h_flex().min_h(px(28.)).items_start().child(div().pl(px(5.)).pt(px(6.)).flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().id(SharedString::from(format!("inscfg-tt-{studio}-{}", id))).flex_1().min_w_0().tooltip(crate::ui::tooltip(tip)).child(sel)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
