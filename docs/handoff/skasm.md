@@ -1,32 +1,22 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 18:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 22:05 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (20:4x, second compaction)
-- d2b509fc still CHECKING (since 20:22). After it lands: rebase --onto origin/main d2b509fc3 (local), land 0bf992280 +
-  6f76109c7 (handoffs) + 49d48df96 (VERTEX-FROM-FACE) + the UNCOMMITTED work below (grep TICKETS dup rows, diff --stat).
-- UNCOMMITTED (tests running on vibex8: ~/tmp/skasm/rr.sh -> /root/skasm-scratch/rr.log; read with tail/grep only):
-  * scene builder.rs: InferenceMark { shape: MarkShape (Corner / Midpoint / Point) } + InferenceMark::new(origin, x,
-    z, &Reference); edge midpoints drawn as 3.5 px half-side squares (FEEL-MC-MARKER-SHAPES). Call sites: part-studio
-    inference.rs, assembly_view.rs (~1709), assembly_panels.rs (~4038) (tell asm: their highlight-marks block).
-  * InferenceMarks::build -> compare::POST (drawn in a preview's top layer, over the lit edges redrawn there:
-    FEEL-MC-PS-EDGE-TRIAD-HIDDEN; also CAP-MARKER-HIDDEN with a preview).
-  * assembly/inference.rs: one FACE_REACH_PX 50 square for every marker, MIDPOINT_REACH_PX + face_reach removed;
-    test adds the 4x zoom rows (live mc-reach-1122 R1-R3: live's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX 50).
-    EDGE_END_REACH stays asm's (FEEL-MC-EDGE-BEFORE-VERTEX-ASM): tell asm the reach change after it lands.
-  * with_highlights: a hovered closed edge's polyline drawn again hidden_only (5 px, hover colour, layer
-    HIGHLIGHT_LINES_LAYER): live R5. GPU test edge_looks::a_hovered_rim_shows_its_hidden_back_half (new).
-  * TICKETS: CAP-MARKER-HIDDEN, EDGE-TRIAD-HIDDEN, PS-VERTEX-LOOK (by 49d48df96), MARKER-SHAPES, PS-MARKER-REACH,
-    PS-EDGE-PICK-RADIUS marked fixed, to verify. Edge reach NOT changed (7 px over a face stays: reach-px-1119 and R4's
-    block edge light at 7; only the rim stayed on the side face at 7) -> mention to the lead.
-  Commit subject idea: "skasm: mate connector inference as live: midpoint marks squares, glyph over lit edges in a
-  preview, one 50 px marker reach, a hovered rim drawn whole (live mc-reach-1122 R1-R5)".
-- S4 (Extend/Trim on circles) is done by what's queued: live's S4 is a line extended to a line + Trim pieces on a
-  circle; Extend of an arc keeps the old two-pick path (no live capture of an arc extend).
-- Left after this: re-score SHIFT-NEAREST + PICKED-OWNER (psui's batch landed); c2-constrained-surface (P2: op for
-  the pattern's sketch copies' points + e2e; ut3t.sh c2-constrained-surface on vibex8 via ~/bin/slot).
-- Report to the lead when the queue is empty (<=5 lines).
+## NEXT (22:0x)
+- LANDED today: d2b509fc (ff4a8ed0), e0fc1afc (mc-reach R1-R5: squares, POST layer glyph, 50 px reach, rim whole; asm
+  told; lead told: edge reach stays 7 px, asm's 1117 47.5 px test moved to 50).
+- QUEUED next (this land): 81af07285 query_entities `sketches` (pattern sketch copies' points; parity translator
+  sketch_copy_point_at; e2e sketch_points_a_pattern_copied_are_vertices), 33f314d8d Trim piece hover orange 5 px + dots
+  (S4 upper arc; sketch tools.rs upper-arc click test), 4dd5fc20e SM table: row lights bend as HOVER (Highlighting
+  faces_hovered), joint Type/Style list open lights its rip (ui.sm_joint_open; sm matrix row).
+- c2-constrained-surface parity pair NOT run yet (vibex8 slot queue 4 deep killed it at 30 min): run
+  `rb.sh bash -c '~/bin/slot bash ~/tmp/skasm/ut3t.sh c2-constrained-surface'` on a quiet host, timeout > 30 min.
+- qa 21:4x rows: BEND-LIT-LOOK + JOINT-LIT fixed (to verify); PANE-SPLIT: decision needed (live 40.5 % is likely a
+  remembered drag, default 50 %); SM-TABLE-CELL-EDIT (P1: blue focus box, centred, Enter -> next row's Radius, nothing
+  lit) and SM-TAB-MERGE-PICK (P1: Tab's Flange to merge click at (30,35,2) takes the wall in live, ours a plate face
+  behind; reproduce wf02 s5) still open: next.
+- Trim: live's tinted core (curve at ~1/3 over the band) not drawn (sketch mode has no curve states); minor.
 - Context: never cat task output files or logs whole; tail -40 / grep.
 
 ## In flight (11-22 17:45 UTC)
