@@ -1043,27 +1043,16 @@ impl PartStudioView {
 
     /// The GPU's hover pick in sketch mode (and again on each move while it stands: `sketch_gpu_hover`), resolved by
     /// [`Self::sketch_hover_id`] and applied.
-    /// Whether viewport point `at` is within the pick's reach (5 px, live's MOUSE_PICK_RADIUS_PX) of plane `p`'s outline.
-    /// The plane (not the sketch's own) whose outline lies nearest a viewport point, within 6 px, and its pick id.
-    fn plane_by_outline(&self, at: DVec2, vp: &Entity<Viewport>, cx: &App) -> Option<(Reference, u32)> {
+    /// The plane (not the sketch's own) whose outline lies nearest a viewport point, within `reach` px, and its pick id.
+    fn plane_by_outline(&self, at: DVec2, reach: f64, vp: &Entity<Viewport>, cx: &App) -> Option<(Reference, u32)> {
         let picks = &self.built.as_ref()?.picks;
         let vp = vp.read(cx);
-        let dist = |q: &noshape_model::display::PlaneDisplay| {
-            let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
-            (0..4)
-                .filter_map(|k| {
-                    let (a, b) = (c[k]?, c[(k + 1) % 4]?);
-                    let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
-                    Some((a + (b - a) * t).distance(at))
-                })
-                .fold(f64::INFINITY, f64::min)
-        };
         self.display
             .planes
             .iter()
             .filter(|q| !self.is_own_sketch_plane(&q.reference, cx))
-            .filter_map(|q| Some((dist(q), q.reference.clone(), *picks.ids_for(&q.reference).first()?)))
-            .filter(|(d, ..)| *d <= 6.0)
+            .filter_map(|q| Some((plane_outline_px(q, at, vp), q.reference.clone(), *picks.ids_for(&q.reference).first()?)))
+            .filter(|(d, ..)| *d <= reach)
             .min_by(|x, y| x.0.total_cmp(&y.0))
             .map(|(_, r, id)| (r, id))
     }
@@ -1104,12 +1093,16 @@ impl PartStudioView {
         }
         let mut r = id.and_then(|id| self.built.as_ref()?.picks.get(id).map(|t| t.reference.clone()));
         let mut pick = *id;
-        // Live plane-behind-1121: with an ellipse picked for a dimension a plane lights by its outline only, the
-        // nearest within reach, whichever plane's face is under the pointer.
-        if matches!(r, Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
-            && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| !ed.takes_plane_faces(&d)))
+        // With entities picked for a dimension a plane lights by its outline only, the nearest within reach, whichever
+        // plane's face is under the pointer: ~2 px (live dimplane-1122, behaviours "psui plane while dimensioning":
+        // qa walk 1's (72, -3) inside Front lights nothing), 6 px with an ellipse picked (live plane-behind-1121).
+        let reach = self.sketch.as_ref().filter(|ed| ed.tool == Tool::Dimension && !ed.tool_picks().is_empty()).map(|ed| {
+            if self.sketch_data(cx).is_some_and(|d| !ed.takes_plane_faces(&d)) { 6.0 } else { DIM_PLANE_OUTLINE_PX }
+        });
+        if let Some(reach) = reach
+            && matches!(r, Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
         {
-            (r, pick) = self.plane_by_outline(vp.read(cx).pointer_position(), vp, cx).map_or((None, None), |(r, id)| (Some(r), Some(id)));
+            (r, pick) = self.plane_by_outline(vp.read(cx).pointer_position(), reach, vp, cx).map_or((None, None), |(r, id)| (Some(r), Some(id)));
         }
         // Live Onshape: the sketch's own plane (or face) is never
         // pre-highlighted while sketching on it, except a face for
@@ -1709,13 +1702,10 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// The plane or face the edited sketch lies on (or a plane coincident with it).
     /// Whether the Dimension tool, with entities picked, places its dimension over plane `r` rather than picking it,
-    /// so the plane doesn't light either (live qa walk 1 w3-placing: nothing lit while placing over Front; qa
-    /// FEEL-PLANE-LIT-WHILE-DIMENSIONING). Live (ui-parity sketch-circle-dimension): with a circle picked, a click over
-    /// a plane places its dimension; with a line or point picked another plane is picked (sketch-fully-defined: a line,
-    /// then the Right plane: a distance to it), never the sketch's own nor one the picked lines lie in (qa
-    /// SKETCH-DIM-PLACE-CLICK-SELECTS: on Top, the bottom line in Front).
+    /// so the plane doesn't light either (its outline reached: [`Self::plane_by_outline`]). Never the sketch's own, nor
+    /// (ui-parity sketch-circle-dimension, qa SKETCH-DIM-PLACE-CLICK-SELECTS) with a circle picked or the plane the
+    /// picked lines lie in.
     pub(super) fn dimension_skips_plane(&self, r: &Reference, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref().filter(|s| s.tool == Tool::Dimension) else { return false };
         let picks = ed.tool_picks();
@@ -1726,6 +1716,7 @@ impl PartStudioView {
         round_pick || self.is_own_sketch_plane(r, cx) || self.plane_holds_lines(r, &picks, cx)
     }
 
+    /// Whether `r` is the plane or face the edited sketch lies on (or a plane coincident with it).
     fn is_own_sketch_plane(&self, r: &Reference, cx: &App) -> bool {
         let Some(ed) = self.sketch.as_ref() else { return false };
         let own = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
@@ -6249,4 +6240,19 @@ fn circumcentre(a: DVec2, b: DVec2, c: DVec2) -> Option<DVec2> {
     }
     let (a2, b2, c2) = (a.length_squared(), b.length_squared(), c.length_squared());
     Some(DVec2::new((a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d, (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d))
+}
+
+/// With entities picked, the Dimension tool's reach of a plane's outline (live dimplane-1122: ~2 px).
+const DIM_PLANE_OUTLINE_PX: f64 = 2.5;
+
+/// Viewport point `at`'s distance in px from plane `q`'s drawn outline.
+fn plane_outline_px(q: &noshape_model::display::PlaneDisplay, at: DVec2, vp: &Viewport) -> f64 {
+    let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, v)| vp.project(q.corner(u, v)));
+    (0..4)
+        .filter_map(|k| {
+            let (a, b) = (c[k]?, c[(k + 1) % 4]?);
+            let t = ((at - a).dot(b - a) / (b - a).length_squared().max(1e-9)).clamp(0.0, 1.0);
+            Some((a + (b - a) * t).distance(at))
+        })
+        .fold(f64::INFINITY, f64::min)
 }

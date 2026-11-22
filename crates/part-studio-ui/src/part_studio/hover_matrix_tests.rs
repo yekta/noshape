@@ -1093,3 +1093,28 @@ fn the_line_a_snap_lands_on_is_lit_as_hovered(cx: &mut TestAppContext) {
     assert!(through >= 8 && opaque == 0, "{through} of 13 samples blue through, {opaque} px #ecb78a");
 }
 
+
+// Fillet's radius arrow stays at the edge's midpoint wherever the edge was picked (live qa walk 6 (5), walk6-m5: picks at
+// (40, 5, 10) and (40, 20, 10) give pixel-identical frames; std edgeBlendCommon.fs places it at the edge's parameter 0.5).
+#[gpui::test]
+fn the_fillet_arrow_stays_at_the_edges_midpoint_wherever_it_was_picked(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "fillet-arrow-anchor");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    draw(cx, m.window);
+    m.park(cx);
+    let pick = |cx: &mut TestAppContext, at: [f64; 3]| {
+        let p = m.exact(cx, at);
+        approach(cx, &m, p);
+        m.pointer.click(cx, &m.view, p);
+        m.park(cx);
+        cx.update(|cx| m.view.read(cx).param_arrow(cx).map(|a| a.base))
+    };
+    let near = pick(cx, [40., 5., 20.]).expect("the radius arrow, picked near the front end");
+    let d = cx.update(|cx| m.view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Fillet dialog");
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(Vec::new()), cx)));
+    draw(cx, m.window);
+    let far = pick(cx, [40., 25., 20.]).expect("the radius arrow, picked near the back end");
+    let mid = DVec3::new(0.04, 0.015, 0.02);
+    assert!(near.distance(mid) < 1e-9 && far.distance(mid) < 1e-9, "{near:?} / {far:?}, the midpoint {mid:?}");
+}

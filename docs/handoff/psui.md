@@ -38,7 +38,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Now (02:54 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
 LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (qa re-score 4/15, matrix 94/125).
-QUEUED 38229ff2 (01:26, carries walk 6 2bc17f3e); walk 5 + walk 8 batch landing after it (one land.sh, 02:54).
+QUEUED 0fc65a29 (03:0x, 3 commits: walk 6, batch 3/walk 7, walk 5 + 8 below); lead + qa + live told.
+IN TREE (03:12, next land; run-t13.sh): FEEL-PLANE-LIT-WHILE-DIMENSIONING per live dimplane-1122 (behaviours "psui plane
+while dimensioning"): with Dimension picks a plane lights by its outline only (sketch.rs sketch_hover -> plane_by_outline,
+reach DIM_PLANE_OUTLINE_PX 2.5, 6 with an ellipse); test sketch_hover_feel a_line_picked_for_a_dimension_lights_a_plane_
+only_on_its_outline. KEYS-SHEET-DETAILS: "select rollback bar" a keycap (shortcuts.rs locked_row; SheetRow.prefix gone).
+Fillet arrow anchor pin test (hover_matrix the_fillet_arrow_stays_at_the_edges_midpoint…; lead re-raised it, told closed).
+SPEED-HEAVY-HOVER closed (Mac GPU: plate 22-86 ms, parts-1000 21-69 ms move-to-present vs live 42-53 / 265-270;
+kit ~/noshape-host/psui-keep run.sh / run2.sh ps1000, local psui-scratch/mac). TICKETS dup headers dropped.
 WALK 5 + 8 BATCH (part-studio-ui hover_matrix/menu/midpoint/snaps 116, list:: + dialogs + ui_script + assembly-ui
 green on vibe2, run-t9.sh / run-t10.sh):
 - live psui walk 5 (behaviours "psui walk 5", live/psui/walk5-1121/): in a sketch with no tool a part edge's midpoint
@@ -78,14 +85,8 @@ FEEL-NAV-INERTIA / FEEL-NAV-ANIM-LOW-FPS (walk 7): live's client (webgl bundle):
 performStopRotationAnimation skips when isInteractiveFramerateBelowThreshold: average of the last 5 draw-loop CPU times
 or rAF intervals > 1000/DETAIL_REDUCTION_THRESHOLD_FPS(20). SwiftShader draws in Chrome's GPU process, so live measures
 itself fast and animates; llvmpipe draws in ours (~100 ms), so ours jumps by the same rule. Proposed no change (lead).
-SPEED-HEAVY-HOVER: lead 00:1x: software GL is NOT a target; re-measure on the Mac, a ticket only if >=2x and >=100 ms
-behind live there. Mac: release app at ~/noshape-host/psui-keep/noshape (built 11-22 03:40 Mac time from this tree),
-plate.noshape, plate-hover.json (F, 18 hovers between the plate and empty), run.sh <n> (NOSHAPE_FRAME_LOG), local
-/root/psui-scratch/mac/stages.py. Run 1 (load 12, not quiet; targets unverified: NOSHAPE_UI_SHOTS doesn't work on
-macOS): hovers that changed the picture took 38-175 ms move-to-present (pick 0-86, frame 6-138 ms on an M6 at 5K).
-Next: a quiet run with verified targets ({"face": [x,y,z]} points from the plate) and live's number on a GPU.
 Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + b3 cells), compare.py oursN live-b1c|live-b2|live-b3 sxsN.
-Later: drop `at_bar` + list matrix row; full1 sketch-constraint-refusals (49) / sketch-entity-copy-paste (12).
+Later: drop `at_bar` + list matrix row (full1 refusals / copy-paste: both match in qa 1121-0935, closed).
 
 ### Earlier today
 

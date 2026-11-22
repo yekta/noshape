@@ -482,7 +482,6 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   Software-GL-only: ours jumps only below 20 fps (`view_change_duration`, ba389b093) and animates 500 ms above. Confirmed on the
   Mac GPU (qa 02:2x, v0.4.65, plate + scissor, frame log qa-scratch/w7/macnav): Shift+5, Shift+7, Shift+1, F each present 34–35
   frames over ~500 ms, the first 3–19 ms after the key; the cube's ArrowRight 20 frames. Ours animates there, as live does.
-- [ ] P0 **FEEL-CUBE-CORNER-HOVER (psui)**: the view cube at iso, pointer on the front-right-top corner (the vertex facing the
   Software-GL-only: ours jumps only below 20 fps (`view_change_duration`, ba389b093) and animates 500 ms above; qa-w7-macnav
   checks it on the Mac GPU (frame log per view change).
 - [x] P0 **FEEL-CUBE-CORNER-HOVER (psui)** (fixed psui 11-22 01:2x: the corner's disc drawn over the near faces, render test `the_cubes_near_corner_lights_a_whole_disc`): the view cube at iso, pointer on the front-right-top corner (the vertex facing the
@@ -539,7 +538,6 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
 - [x] **FEEL-FILLET-ARROW-ANCHOR**: no gap (psui 01:5x, qa check on green 04389f02d, hm2/out-w6a). Live's arrow tail sits at the
   edge's midpoint and its head ends by the front end (std edgeBlendCommon.fs: tangent line at 0.5); ours anchors at the midpoint too.
   Picks at (40, 5, 10) and (40, 25, 10) give pixel-identical frames in ours, as in live.
-- [ ] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
   feature in live (blue on hover, no flip, no change, no field focused: the focus leaves the dialog). Ours moves the focus into Radius.
   The 2 px dead zone =. psui 11-22 00:0x: toward the edge it shrinks to 0.02414 mm, the preview follows (field baseline), the focus stays; dialogs matrix row.
 - [x] P1 **FEEL-FILLET-ARROW-CLICK (psui)** (live 22:54 (4), walk6-4c-*): a plain click on the Fillet arrow does nothing to the
@@ -560,7 +558,7 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   - Document tabs: drag reorders, a double-click only switches (no rename, live fc-1121 (3)), menus of the active and an inactive
     Part Studio tab match live's lists, and the hover card shows.
 - Live 22:54 (1): ✓ clicked straight after typing a value applies it and leaves the dialog open, as ours does.
-- [ ] P0 **SPEED-HEAVY-HOVER (psui)** (live answered 20:18 (1) at 22:52: behaviours "qa 20:18 (1)", qa/walk2-1121/heavy-*.json).
+- [x] (closed psui 11-22 03:10, lead rule: re-measured on the Mac GPU (release, frame log, ~/noshape-host/psui-keep run.sh / run2.sh): hovers that change the picture take 22-86 ms move-to-present on the hole plate and 21-69 ms on parts-1000, vs live 42-53 / 265-270 ms (SwiftShader); no gap >= 2x and >= 100 ms. The 330+ ms here was llvmpipe.) P0 **SPEED-HEAVY-HOVER (psui)** (live answered 20:18 (1) at 22:52: behaviours "qa 20:18 (1)", qa/walk2-1121/heavy-*.json).
   Ours at 22:5x on green 68589d432, same method (hl.py: a hand-like pointer, ms to the first changed frame; ours llvmpipe on Xvfb,
   live SwiftShader):
   - The 806-face hole plate's top face: ours **330–373 ms**, live **42–53 ms** (frame 65–77), so about 5x and +280 ms. Side face:
@@ -605,7 +603,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   **Curve/surface analysis…**, **Zoom to selection** and **Align view with vertical axis**; live (11-17) has none of them. The top
   face (20,15,10): ours lacks **Section view…** and **View normal to** and adds **Curve/surface analysis…** (live sk-model-face).
   (Live's older sketch/204, a sketch on a part face, did show Use etc. on an edge: the set depends on the sketch plane.)
-- [ ] P1 **KEYS-SHEET-DETAILS (psui)**: the shortcut sheet's 7 tabs match live (live/shortcuts/02-tab-*) row for row, except: Part
+- [x] (fixed psui 11-22 03:10: "select rollback bar" a keycap before the arrows (shortcuts locked_row, test sheet_shows_customized_and_disabled_keys). Drawing's "Copy annotation" lock: live 02-tab-drawing HAS it, as ours: no change. qa to verify) P1 **KEYS-SHEET-DETAILS (psui)**: the shortcut sheet's 7 tabs match live (live/shortcuts/02-tab-*) row for row, except: Part
   Studio's "select rollback bar" is a bordered keycap in live (plain text in ours), and Drawing's "Copy annotation" has no lock in
   live (ours shows one). qa-scratch/tickets/keys-sheet-w5.png (Part Studio, Drawing; live left).
 - Assembly menus match live's dom/context-menus-assembly.txt: empty space, the instance row, Origin, the top row (Where used… in
@@ -769,7 +767,6 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   #FFC685), the origin glyph stays a black ring, and a click selects that edge. Ours lights the vertical edge, with its black midpoint
   marker, and a click selects the vertical edge. Also selected + hovered and with the right face selected. Live b3/ps-origin-*.
   The four: qa 18:17, green 4f2cb3ce, live's camera (kit qa-scratch/hm2/gen2 b3-*); ours qa-scratch/hm2/b3-4f2c.png.
-- [ ] P0 **FEEL-MC-LOOK (psui)** (psui 11-21 fix PARTLY verified qa 23:3x, green 9f33d43: the owner tint is gone (selected top #8DB0C5 as live #8EB1C6) and the owner stays plain while hovered. STILL OPEN: the crisp 1 px navy outline on the ring and disc, the navy square at the ring's front, and the disc centre white where live's is lit yellow-green; hm2/cmp-b3psui/ours-b3-ps-mc-*, qa-scratch/tmp/w6m/mc.png): a mate connector on the block's top back right corner, hovered: the disc fill and the owner face's
 - [x] P0 **FEEL-ORIGIN-HOVER-EDGE (psui)** (fixed psui 11-21: the same corner rule; qa to verify): the pointer on the origin at the block's corner. Live lights the +x edge through it (5 px
   #FFC685), the origin glyph stays a black ring, and a click selects that edge. Ours lights the vertical edge, with its black midpoint
   marker, and a click selects the vertical edge. Also selected + hovered and with the right face selected. Live b3/ps-origin-*.
@@ -793,7 +790,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   white and stays white 0.8, 3 and 9 s after the release (nothing else changed). Before the drag it is shaded. Live shades closed
   regions in sketch edit throughout (live confirmed 21:1x: shaded at 0 s and 3 s after the point drag, hover-matrix-1121/walk/w1-*). Ours qa-scratch/hm2/out-walk2/w-drag-point-long (04 vs
   05-10), drags2.png; qa 19:54, green 6be52caf4 (kit qa-scratch/hm2/walk, run.sh on vibe2 :481).
-- [ ] REOPENED (qa 02:5x, green 09de25e3b, hm2/out-w1b/w-dim-line-placing 08-09: with the line picked, hovering (72,-3) and (74,-6) to place still lights the Front plane's outline #FFC685; 07 before the move is dark) P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
+- [x] (fixed psui 11-22 03:25 per live dimplane-1122: with Dimension picks a plane lights only on its outline (~2 px), the nearest; never over its inside; test a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline; qa to verify) REOPENED (qa 02:5x, green 09de25e3b, hm2/out-w1b/w-dim-line-placing 08-09: with the line picked, hovering (72,-3) and (74,-6) to place still lights the Front plane's outline #FFC685; 07 before the move is dark) P0 **FEEL-PLANE-LIT-WHILE-DIMENSIONING (psui)**: user walk. Sketch 2 on Front (block doc), Dimension tool, pick the line
   (66,5), move to about (74,-6) to place it, the pointer over the Front plane: ours lights the plane's edge orange while placing;
   live lights nothing (hover-matrix-1121/walk/w3-placing.png, w3-front-wide.png). qa-scratch/tickets/plane-lit-dimensioning-w1.png
   (live left, ours right); ours out-walk/w-dim-line-placing.

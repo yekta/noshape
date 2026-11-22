@@ -985,6 +985,49 @@ fn an_ellipse_picked_for_a_dimension_takes_no_plane_face(cx: &mut TestAppContext
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// Live dimplane-1122 (behaviours "psui plane while dimensioning", qa FEEL-PLANE-LIT-WHILE-DIMENSIONING): with the
+/// Dimension tool's line picked a plane lights only with the pointer on its outline (~2 px), never over its inside;
+/// with nothing picked, over its face (any plane in front there).
+#[gpui::test]
+fn a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-dim-plane-outline", Tool::Line);
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (x, y) in [(0., 10.), (30., 10.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).highlighted_hover(cx));
+    let right = vec![Reference::Plane(DatumPlane::Right)];
+    // Inside the Right plane, 40 mm above the sketch plane; and 1 px inside its +y outline at that height.
+    let (inside, outline) = cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        let p = |y: f64| vp.project(glam::DVec3::new(0., y, 0.04)).unwrap();
+        let (o, c) = (p(0.075), p(0.0));
+        (p(0.04), o + (c - o).normalize() * 1.0)
+    });
+    pointer.move_to(cx, &view, inside);
+    assert!(matches!(lit(cx).as_slice(), [Reference::Plane(_)]), "nothing picked: a plane lights over its face, lit {:?}", lit(cx));
+    let on_line = screen(cx, 15., 10.);
+    pointer.move_to(cx, &view, on_line);
+    pointer.click(cx, &view, on_line);
+    pointer.move_to(cx, &view, inside);
+    assert!(lit(cx).is_empty(), "the line picked: inside the Right plane nothing lights, lit {:?}", lit(cx));
+    pointer.move_to(cx, &view, outline);
+    assert_eq!(lit(cx), right, "the line picked: on the Right plane's outline it lights");
+}
+
 /// The pixels across a point marker's middle row, drawn alone at a device pixel ratio of 2 (as the user's shots), from
 /// its centre out to `reach` px.
 fn marker_row(sprites: &[noshape_render::PointSprite], reach: i32) -> Vec<[u8; 3]> {

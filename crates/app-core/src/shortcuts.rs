@@ -522,8 +522,6 @@ fn drawing_interceptor(ev: &KeystrokeEvent, window: &mut Window, cx: &mut App) {
 pub struct SheetRow {
     /// Key groups (alternatives), each a list of chips.
     pub keys: Vec<Vec<String>>,
-    /// Text before the chips ("select rollback bar").
-    pub prefix: Option<&'static str>,
     pub name: &'static str,
     pub style: KeyStyle,
     pub locked: bool,
@@ -531,12 +529,16 @@ pub struct SheetRow {
 }
 
 fn locked_row(keys: &'static str, name: &'static str) -> SheetRow {
-    let (prefix, rest) = match keys.strip_prefix("select rollback bar ") {
+    // "select rollback bar" is one keycap before the arrows (live shortcuts 02-tab-part-studio).
+    let (first, rest) = match keys.strip_prefix("select rollback bar ") {
         Some(r) => (Some("select rollback bar"), r),
         None => (None, keys),
     };
-    let keys = rest.split(" / ").map(|g| g.split(' ').filter(|c| !c.is_empty()).map(str::to_string).collect()).collect();
-    SheetRow { keys, prefix, name, style: KeyStyle::Default, locked: true, conflict: false }
+    let mut keys: Vec<Vec<String>> = rest.split(" / ").map(|g| g.split(' ').filter(|c| !c.is_empty()).map(str::to_string).collect()).collect();
+    if let (Some(f), Some(g)) = (first, keys.first_mut()) {
+        g.insert(0, f.to_string());
+    }
+    SheetRow { keys, name, style: KeyStyle::Default, locked: true, conflict: false }
 }
 
 /// The Shift+/ sheet's rows of a tab: the Onshape-controlled ones and every
@@ -545,7 +547,7 @@ pub fn sheet_rows(s: &Shortcuts, tab: Tab) -> Vec<SheetRow> {
     let mut rows: Vec<SheetRow> = LOCKED.iter().filter(|(t, _, _)| *t == tab).map(|(_, k, n)| locked_row(k, n)).collect();
     for e in entries(tab) {
         let Some(key) = s.key(e) else { continue };
-        rows.push(SheetRow { keys: vec![key_chips(&key)], prefix: None, name: e.name, style: s.style(e), locked: false, conflict: s.has_conflict(e) });
+        rows.push(SheetRow { keys: vec![key_chips(&key)], name: e.name, style: s.style(e), locked: false, conflict: s.has_conflict(e) });
     }
     rows.sort_by_key(|r| r.name.to_lowercase());
     rows
@@ -778,5 +780,8 @@ mod tests {
         assert_eq!(locked_row("ctrl y / shift cmd z", "Redo").keys, vec![vec!["ctrl".to_string(), "y".into()], vec!["shift".into(), "cmd".into(), "z".into()]]);
         assert!(sheet_search(&s, "shift+q").iter().any(|r| r.name == "Symmetric"));
         assert!(sheet_search(&s, "ellip").iter().any(|r| r.name == "Ellipse"));
+        // Live 02-tab-part-studio: "select rollback bar" a keycap before the arrows (qa KEYS-SHEET-DETAILS).
+        let bar = sheet_rows(&s, Tab::PartStudio).into_iter().find(|r| r.name == "Move rollback bar").map(|r| r.keys);
+        assert_eq!(bar, Some(vec![vec!["select rollback bar".to_string(), "↑".into(), "↓".into()]]));
     }
 }

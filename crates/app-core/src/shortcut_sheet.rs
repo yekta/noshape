@@ -90,9 +90,6 @@ impl Render for ShortcutSheet {
         // Keys as chips (`span.key`); customized blue, disabled struck through.
         let keys_el = |r: &SheetRow| {
             let mut row = h_flex().gap(px(4.)).justify_end();
-            if let Some(prefix) = r.prefix {
-                row = row.child(div().text_size(px(14.)).text_color(pal.text).child(prefix));
-            }
             for (i, group) in r.keys.iter().enumerate() {
                 if i > 0 {
                     row = row.child(div().px(px(2.)).text_size(px(16.)).text_color(pal.text).child("/"));
