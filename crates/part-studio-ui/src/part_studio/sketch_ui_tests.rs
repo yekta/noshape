@@ -3518,17 +3518,19 @@ fn shift_i_isolates_the_selected_part_and_esc_ends_it(cx: &mut TestAppContext) {
         (v.ui.isolate.as_ref().map(|i| (i.mode == crate::part_studio::behaviors::IsolateMode::Isolate, i.bodies.clone())), v.selection.len())
     });
     assert_eq!(state(cx), (Some((true, vec![body.clone()])), 0), "(isolating Part 1, selected after)");
-    // Live (248, 79) 220 × 196: the graphics area's top left, 3 px down, as the feature dialogs.
+    // Live (248, 79): the graphics area's top left, 3 px down, as the feature dialogs; 220 × 231 with Show internal
+    // geometry (live asm/isolate-1122 ps-panel).
     draw(cx, window);
     let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ps-isolate").expect("the Isolate dialog");
     let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
     let f = |p: gpui_kit::Pixels| f32::from(p).round();
-    assert_eq!((f(panel.origin.x - origin.x), f(panel.origin.y - origin.y), f(panel.size.width), f(panel.size.height)), (0., 3., 220., 196.), "(x, y) in the graphics, its size");
+    assert_eq!((f(panel.origin.x - origin.x), f(panel.origin.y - origin.y), f(panel.size.width), f(panel.size.height)), (0., 3., 220., 231.), "(x, y) in the graphics, its size");
     keys(cx, window, &["escape"]);
     assert_eq!(state(cx).0, None, "Esc ends isolate");
 }
 
-/// Live keys-1118: Make transparent's slider reopens where it was left; Isolate's is its own (at the left).
+/// Live keys-1118: Make transparent's slider reopens where it was left; Isolate's is its own (live asm/isolate-1122: 30 %
+/// in a new account).
 #[gpui::test]
 fn the_transparency_slider_is_remembered_per_dialog(cx: &mut TestAppContext) {
     use crate::part_studio::behaviors::IsolateMode;
@@ -3551,7 +3553,7 @@ fn the_transparency_slider_is_remembered_per_dialog(cx: &mut TestAppContext) {
     };
     assert_eq!(open(cx, IsolateMode::Transparent, Some(0.3)), Some(0.0), "first open");
     assert_eq!(open(cx, IsolateMode::Transparent, None), Some(0.3), "Make transparent again");
-    assert_eq!(open(cx, IsolateMode::Isolate, None), Some(0.0), "Isolate");
+    assert_eq!(open(cx, IsolateMode::Isolate, None), Some(crate::isolate_ui::KNOB_START), "Isolate");
 }
 
 /// Live workflow 15 (qa EXTRUDE-ARROW-GONE-WITH-VARIABLE): Depth "#depth", a Variable Studio's 25 mm, keeps the depth

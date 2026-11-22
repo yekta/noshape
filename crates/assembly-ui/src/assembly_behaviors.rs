@@ -488,8 +488,11 @@ pub struct AsmUi {
     pub section_drag: Option<SectionDrag>,
     /// The section manipulator's value box (after a drag).
     pub section_value: Option<SectionValue>,
-    /// Isolate / Make transparent slider: opacity of the transparent instances.
+    /// Make transparent's slider: opacity of the transparent instances (Isolate's knob is
+    /// `isolate_ui::remembered_knob`).
     pub transparency: Option<f32>,
+    /// Isolate › Show internal geometry (unticked at each Isolate…).
+    pub iso_internal: bool,
     /// Camera menu render choices (Onshape's display modes, hidden and
     /// tangent edges) and View in high quality.
     pub display_mode: crate::scene_builder::DisplayMode,
@@ -768,6 +771,7 @@ impl AssemblyView {
         }
         if transparent {
             self.isolate = None;
+            self.ui.iso_internal = false;
         } else {
             self.ui.transparent = None;
         }
@@ -777,6 +781,10 @@ impl AssemblyView {
 
     pub(super) fn exit_isolate(&mut self, cx: &mut Context<Self>) -> bool {
         self.ui.iso_expand = None;
+        if self.isolate.is_some() {
+            let internal = std::mem::take(&mut self.ui.iso_internal);
+            crate::isolate_ui::remember_knob(internal, crate::isolate_ui::remembered_knob(internal, cx), true, cx);
+        }
         if self.isolate.take().is_none() && self.ui.transparent.take().is_none() {
             return false;
         }
@@ -803,23 +811,33 @@ impl AssemblyView {
             };
             self.assembly(cx).map(|a| analysis::isolate_expansion(&self.result, a, &seeds, connectivity).len()).unwrap_or(0)
         };
-        let alpha = self.ui.transparency.unwrap_or(if title == "Isolate" { crate::isolate_ui::ALPHA_MIN } else { 0.35 });
+        let isolate = title == "Isolate";
+        let internal = self.ui.iso_internal;
+        let knob = if isolate { crate::isolate_ui::remembered_knob(internal, cx) } else { crate::isolate_ui::alpha_t(self.ui.transparency.unwrap_or(0.35)) };
         let view = cx.entity();
         Some(crate::isolate_ui::dialog(
             crate::isolate_ui::IsoDialog {
                 key: "asm-isolate",
                 title,
+                show_internal: isolate.then_some(internal),
                 select_transparent: self.ui.select_transparent,
-                transparency: crate::isolate_ui::alpha_t(alpha),
+                transparency: knob,
                 expand: if max_steps == 0 { 0.0 } else { steps as f32 / max_steps as f32 },
                 expand_options: vec!["Expand: connectivity".to_string(), "Expand: distance".to_string()],
                 expand_disabled: Vec::new(),
                 expand_ix: if connectivity { 0 } else { 1 },
-                legend: true,
                 expand_tip: if connectivity { "Expand isolate by mate connectivity" } else { "Expand isolate by distance" },
                 drag: |v: &mut Self| &mut v.ui.iso_slider_drag,
                 close: |v: &mut Self, _, cx| {
                     v.exit_isolate(cx);
+                },
+                // Live: the knob jumps to the other state's own position.
+                toggle_internal: |v: &mut Self, _, cx| {
+                    let was = v.ui.iso_internal;
+                    crate::isolate_ui::remember_knob(was, crate::isolate_ui::remembered_knob(was, cx), true, cx);
+                    v.ui.iso_internal = !was;
+                    v.rebuild_scene(false, cx);
+                    cx.notify();
                 },
                 toggle_select: |v: &mut Self, _, cx| {
                     v.ui.select_transparent = !v.ui.select_transparent;
@@ -828,7 +846,11 @@ impl AssemblyView {
                     cx.notify();
                 },
                 set_transparency: std::rc::Rc::new(|v: &mut Self, f, _, cx| {
-                    v.ui.transparency = Some(crate::isolate_ui::t_alpha(f));
+                    if v.isolate.is_some() {
+                        crate::isolate_ui::remember_knob(v.ui.iso_internal, f, false, cx);
+                    } else {
+                        v.ui.transparency = Some(crate::isolate_ui::t_alpha(f));
+                    }
                     v.rebuild_scene(false, cx);
                     cx.notify();
                 }),

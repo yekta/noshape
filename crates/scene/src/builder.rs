@@ -502,6 +502,10 @@ pub struct SceneOptions {
     /// transparent geometry"); every other part is picked nearest-first even
     /// when translucent.
     pub pick_through_bodies: Vec<noshape_model::BodyId>,
+    /// Isolate › Show internal geometry (live asm/isolate-1122): the isolated parts drawn again over the see-through
+    /// ones (`front_bodies`), which show through them only as faint edges (`faint_through_bodies`).
+    pub front_bodies: Vec<noshape_model::BodyId>,
+    pub faint_through_bodies: Vec<noshape_model::BodyId>,
     /// How far the ghosts go toward white ([`ISOLATE_GHOST`] if unset;
     /// [`MAKE_TRANSPARENT_GHOST`] for Make transparent).
     pub ghost_mix: Option<f32>,
@@ -704,7 +708,15 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let plain = !opts.preview_bodies.contains(&b.id) && !opts.ghost_bodies.contains(&b.id);
                 let mesh = if b.kind == BodyKind::Solid && plain && cached.mesh_lines.is_none() && replaced.is_none() { mesh.closed() } else { mesh };
                 // Parts excluded from the section view are not cut.
-                scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
+                let mesh = if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh };
+                if opts.front_bodies.contains(&b.id) {
+                    scene.instances.push(mesh.clone().over_transparent());
+                }
+                scene.instances.push(mesh);
+            }
+            if opts.faint_through_bodies.contains(&b.id) {
+                let e = theme::lin(theme::viewport::EDGE);
+                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color([e[0], e[1], e[2], 0.08]).unpickable().hidden_only().layer(1));
             }
             let edge_color = match (b.kind, opts.display_mode) {
                 (BodyKind::Wire, _) => theme::lin(theme::viewport::EDGE),

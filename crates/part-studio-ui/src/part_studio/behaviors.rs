@@ -39,8 +39,11 @@ pub enum IsolateMode {
 pub struct Isolation {
     pub mode: IsolateMode,
     pub bodies: Vec<BodyId>,
-    /// The transparency slider, 0 to 1 (`iso_look`).
+    /// The transparency slider, 0 to 1: Isolate's "Adjust opacity" knob (`isolate_ui::isolate_alpha`), Make
+    /// transparent's `iso_look`.
     pub opacity: f32,
+    /// Isolate › Show internal geometry (unticked at each Isolate…).
+    pub show_internal: bool,
     /// "Select transparent geometry": picks may land on transparent parts.
     pub select_transparent: bool,
     /// "Expand: distance" slider step, 0 to 10: parts within a growing
@@ -2824,7 +2827,10 @@ impl PartStudioView {
                     }
                 }
             }
-            _ => self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity: self.remembered_transparency(mode), select_transparent: false, expand: 0 }),
+            _ => {
+                let opacity = if mode == IsolateMode::Isolate { crate::isolate_ui::remembered_knob(false, cx) } else { self.remembered_transparency(mode) };
+                self.ui.isolate = Some(Isolation { mode, bodies: targets, opacity, show_internal: false, select_transparent: false, expand: 0 })
+            }
         }
         // Isolating or making transparent the selected parts clears the selection (live 10-27; Make transparent:
         // shortcuts-ps-1118, Shift+T with Part 1 selected).
@@ -2835,7 +2841,11 @@ impl PartStudioView {
 
     pub(super) fn exit_isolate(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(iso) = self.ui.isolate.take() else { return false };
-        self.remember_transparency(iso.mode, iso.opacity);
+        if iso.mode == IsolateMode::Isolate {
+            crate::isolate_ui::remember_knob(iso.show_internal, iso.opacity, true, cx);
+        } else {
+            self.remember_transparency(iso.mode, iso.opacity);
+        }
         let d = self.display.clone();
         self.apply_display(d, window, cx);
         true
@@ -3178,7 +3188,13 @@ impl PartStudioView {
         // little (SceneOptions::dims_shown).
         let Some(iso) = &self.ui.isolate else { return self.display.clone() };
         let transparent = self.isolation_transparent();
-        let look = iso_look(iso.opacity);
+        let look = match iso.mode {
+            IsolateMode::Isolate => match crate::isolate_ui::isolate_alpha(iso.opacity, iso.show_internal) {
+                a if a <= 0.0 => IsoLook::Hidden,
+                a => IsoLook::SeeThrough(a),
+            },
+            IsolateMode::Transparent => iso_look(iso.opacity),
+        };
         let mut d = (*self.display).clone();
         // Isolate fades the planes to faint outlines and the ghosts are washed
         // out after shading (`scene_options`); the origin stays (live iso-901).
@@ -3247,6 +3263,7 @@ impl PartStudioView {
             crate::isolate_ui::IsoDialog {
                 key: "ps-isolate",
                 title,
+                show_internal: (iso.mode == IsolateMode::Isolate).then_some(iso.show_internal),
                 select_transparent: iso.select_transparent,
                 transparency: iso.opacity,
                 expand: iso.expand as f32 / 10.,
@@ -3255,10 +3272,21 @@ impl PartStudioView {
                 expand_disabled: vec![0],
                 expand_ix: 1,
                 expand_tip: "Expand isolate by physical proximity",
-                legend: true,
                 drag: |v: &mut Self| &mut v.ui.iso_slider_drag,
                 close: |v: &mut Self, window, cx| {
                     v.exit_isolate(window, cx);
+                },
+                // Live: the knob jumps to the other state's own position (shared with the assembly).
+                toggle_internal: |v: &mut Self, window, cx| {
+                    let Some((was, t)) = v.ui.isolate.as_ref().map(|i| (i.show_internal, i.opacity)) else { return };
+                    crate::isolate_ui::remember_knob(was, t, true, cx);
+                    let other = crate::isolate_ui::remembered_knob(!was, cx);
+                    if let Some(iso) = &mut v.ui.isolate {
+                        iso.show_internal = !was;
+                        iso.opacity = other;
+                    }
+                    let d = v.display.clone();
+                    v.apply_display(d, window, cx);
                 },
                 toggle_select: |v: &mut Self, _, cx| {
                     if let Some(iso) = &mut v.ui.isolate {
@@ -3269,6 +3297,9 @@ impl PartStudioView {
                 set_transparency: std::rc::Rc::new(|v: &mut Self, f, window, cx| {
                     if let Some(iso) = &mut v.ui.isolate {
                         iso.opacity = f;
+                    }
+                    if let Some(iso) = v.ui.isolate.as_ref().filter(|i| i.mode == IsolateMode::Isolate) {
+                        crate::isolate_ui::remember_knob(iso.show_internal, f, false, cx);
                     }
                     let d = v.display.clone();
                     v.apply_display(d, window, cx);

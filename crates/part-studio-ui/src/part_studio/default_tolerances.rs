@@ -98,7 +98,7 @@ impl PartStudioView {
                 if !this.exit_isolate(window, cx)
                     && let Some(b) = part.clone()
                 {
-                    this.ui.isolate = Some(Isolation { mode: IsolateMode::Isolate, bodies: vec![b], opacity: 0.0, select_transparent: false, expand: 0 });
+                    this.ui.isolate = Some(Isolation { mode: IsolateMode::Isolate, bodies: vec![b], opacity: crate::isolate_ui::remembered_knob(false, cx), show_internal: false, select_transparent: false, expand: 0 });
                     let d = this.display.clone();
                     this.apply_display(d, window, cx);
                 }

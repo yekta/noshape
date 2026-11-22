@@ -1210,8 +1210,14 @@ impl AssemblyView {
             o.isolate = Some(HashSet::new());
             o.pick_dimmed = true;
         }
-        if self.isolate.is_some() || self.ui.transparent.is_some() {
+        if self.isolate.is_some() {
+            let internal = self.ui.iso_internal;
+            o.dim_alpha = Some(crate::isolate_ui::isolate_alpha(crate::isolate_ui::remembered_knob(internal, cx), internal));
+            o.front_internal = internal;
+        } else if self.ui.transparent.is_some() {
             o.dim_alpha = self.ui.transparency;
+        }
+        if self.isolate.is_some() || self.ui.transparent.is_some() {
             // Select transparent geometry / Alt+click: pick through.
             o.pick_dimmed = self.ui.select_transparent || self.ui.alt_through;
         }

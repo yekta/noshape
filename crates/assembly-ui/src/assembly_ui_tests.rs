@@ -3822,3 +3822,59 @@ fn a_version_shows_the_view_only_bar_in_place_of_the_toolbar(cx: &mut TestAppCon
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
     assert!(vcx.debug_bounds("vb-text Versions are view only. Viewing V1.").is_some(), "its words, with the full stop");
 }
+
+/// Qa ISOLATE-SHOW-INTERNAL-GEOMETRY (live asm/isolate-1122): Isolate's panel has ☐ Show internal geometry above ☐
+/// Select transparent geometry (28 px rows, 220 × 231); the "Adjust opacity" knob starts at 30 % and keeps one position
+/// per box state, also after a close; ticked, the isolated part is drawn again over the see-through ones (they show
+/// through it as faint edges, lighter themselves); at the far left the others aren't drawn.
+#[gpui::test]
+fn isolate_shows_internal_geometry(cx: &mut TestAppContext) {
+    use noshape_render::Drawable;
+    let path = pattern_document(cx, "iso-internal");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    let part1 = cx.update(|cx| view.read(cx).assembly(cx).unwrap().instances.iter().find(|i| i.name == "Part 1 <1>").unwrap().id);
+    let isolate = |cx: &mut TestAppContext| {
+        cx.update(|cx| view.update(cx, |v, cx| v.isolate_cmd(false, vec![part1], cx)));
+        draw(cx, window);
+    };
+    isolate(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let (internal, select, panel) = (vcx.debug_bounds("asm-isolate-show-internal").expect("Show internal geometry"), vcx.debug_bounds("asm-isolate-select-transparent").expect("Select transparent geometry"), vcx.debug_bounds("asm-isolate-dialog").expect("the panel"));
+    let f = |p: gpui_kit::Pixels| f32::from(p).round();
+    assert_eq!((f(select.origin.y - internal.origin.y), f(internal.size.height), f(panel.size.width), f(panel.size.height)), (28., 28., 220., 231.), "rows 28 px apart, the panel's size");
+    // (dimmed alphas, front copies, faint edges through)
+    let look = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let scene = view.read(cx).viewport.read(cx).scene();
+            let mut alphas: Vec<f32> = scene.instances.iter().filter(|i| matches!(i.drawable, Drawable::Mesh(_)) && i.color[3] < 0.999 && !i.lod_box).map(|i| (i.color[3] * 1000.).round() / 1000.).collect();
+            alphas.dedup();
+            let fronts = scene.instances.iter().filter(|i| matches!(i.drawable, Drawable::Mesh(_)) && i.over_transparent).count();
+            let faint = scene.instances.iter().filter(|i| matches!(i.drawable, Drawable::Lines(_)) && i.hidden_only && i.color[3] < 0.1).count();
+            (alphas, fronts > 0, faint > 0)
+        })
+    };
+    let knob = |cx: &mut TestAppContext, internal: bool| cx.update(|cx| crate::isolate_ui::remembered_knob(internal, cx));
+    let ticked = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.iso_internal);
+    assert_eq!(knob(cx, false), 0.3, "the knob starts at 30 %");
+    assert_eq!(look(cx), (vec![0.27], false, false), "unticked: the others at 0.9 × 30 %, normal depth");
+    cx.update(|cx| crate::isolate_ui::remember_knob(false, 0.6, false, cx));
+    let click = |cx: &mut TestAppContext| {
+        let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("asm-isolate-show-internal").expect("the box");
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(b.center(), gpui_kit::Modifiers::default());
+        draw(cx, window);
+    };
+    click(cx);
+    assert!(ticked(cx), "ticked");
+    assert_eq!(look(cx), (vec![0.149], true, true), "ticked at its own 30 %: lighter, the part over them, their edges faint through it");
+    cx.update(|cx| {
+        crate::isolate_ui::remember_knob(true, 0.0, false, cx);
+        view.update(cx, |v, cx| v.rebuild_scene(false, cx));
+    });
+    draw(cx, window);
+    assert_eq!(look(cx), (vec![], true, false), "far left: the others not drawn");
+    click(cx);
+    assert!(!ticked(cx) && knob(cx, false) == 0.6, "unticked: back to its own 60 %");
+    cx.update(|cx| view.update(cx, |v, cx| v.exit_isolate(cx)));
+    isolate(cx);
+    assert!(!ticked(cx) && knob(cx, false) == 0.6 && knob(cx, true) == 0.0, "a new Isolate: unticked, both kept");
+}

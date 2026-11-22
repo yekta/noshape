@@ -191,6 +191,9 @@ pub struct AsmSceneOptions {
     /// Dimmed (transparent) instances stay pickable (Isolate › Select
     /// transparent geometry, Alt held).
     pub pick_dimmed: bool,
+    /// Isolate › Show internal geometry (live asm/isolate-1122): the isolated instances drawn again over the
+    /// see-through ones, which show through them only as faint edges.
+    pub front_internal: bool,
     /// Zebra stripes on the shaded parts, and whether edges are hidden.
     pub zebra: Option<noshape_render::Zebra>,
     /// Reflection analysis environment on the shaded parts.
@@ -228,6 +231,7 @@ impl AsmSceneOptions {
             && self.section_selected == other.section_selected
             && self.dim_alpha == other.dim_alpha
             && self.pick_dimmed == other.pick_dimmed
+            && self.front_internal == other.front_internal
             && self.zebra == other.zebra
             && self.hide_edges == other.hide_edges
             && self.display_mode == other.display_mode
@@ -322,6 +326,9 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
         // for the occurrence (`Instance::mesh_lod`).
         let levels = display_levels(o, opts.software);
         let previewed = opts.preview_tops.contains(&o.top());
+        // Isolate's knob at the far left: the others aren't drawn (live asm/isolate-1122 ps-01-off-0).
+        let gone = dimmed && !ghost && color[3] <= 0.0;
+        let front = opts.front_internal && opts.isolate.is_some() && !dimmed && !sketch;
         let edge_color = if sketch { theme::lin(0x999999) } else if previewed { theme::lin(0xf7c171) } else { theme::lin(theme::viewport::EDGE) };
         let mut finest_cached = None;
         for (li, mesh) in levels.iter().enumerate() {
@@ -336,7 +343,7 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                     c
                 }
             };
-            if !sketch || !mesh.indices.is_empty() {
+            if !gone && (!sketch || !mesh.indices.is_empty()) {
                 let mut inst = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(color).with_transform(t).pick_base(face_base).zebra(opts.zebra.filter(|_| !dimmed && !sketch)).reflection(opts.reflection.clone().filter(|_| !dimmed && !sketch)).depth_rank(oi);
                 // Sketch regions are pickable faces (live 601).
                 if dimmed && !opts.pick_dimmed {
@@ -354,7 +361,14 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 if opts.xray_tops.contains(&o.top()) {
                     inst = inst.see_through_self();
                 }
+                if front {
+                    scene.instances.push(inst.clone().over_transparent());
+                }
                 scene.instances.push(inst);
+            }
+            if dimmed && !gone && opts.front_internal {
+                let e = theme::lin(theme::viewport::EDGE);
+                scene.instances.push(Instance::new(Drawable::Lines(cached.edges.clone())).with_color([e[0], e[1], e[2], 0.08]).with_transform(t).unpickable().hidden_only().layer(1));
             }
             if opts.xray_tops.contains(&o.top()) {
                 let hidden = if previewed { 0xdcb971 } else { 0xffc04c };

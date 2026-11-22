@@ -1359,8 +1359,8 @@ impl PartStudioView {
         }
         o.display_only = self.ui.transform_ghost.clone();
         o.through_sketches = self.dblclick_sketches();
-        // Isolate (live ui/iso-901): the planes fade to faint outlines; below
-        // 10 % the other parts are solid washed-out ghosts.
+        // Isolate (live ui/iso-901): the planes fade to faint outlines; Make transparent below 10 %: solid
+        // washed-out ghosts.
         // Show dimensions: the parts' shadowed faces come up a little (live).
         o.dims_shown = self.ui.shown_dims.is_some();
         if let Some(iso) = &self.ui.isolate {
@@ -1368,9 +1368,14 @@ impl PartStudioView {
                 o.pick_through_bodies = self.isolation_transparent().into_iter().collect();
             }
             o.faint_planes = iso.mode == behaviors::IsolateMode::Isolate;
-            if matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
+            if iso.mode == behaviors::IsolateMode::Isolate && iso.show_internal {
+                let through = self.isolation_transparent();
+                o.front_bodies = self.display.bodies.iter().map(|b| b.id.clone()).filter(|b| !through.contains(b)).collect();
+                o.faint_through_bodies = through.into_iter().collect();
+            }
+            if iso.mode == behaviors::IsolateMode::Transparent && matches!(behaviors::iso_look(iso.opacity), behaviors::IsoLook::Ghost) {
                 o.ghost_bodies = self.isolation_transparent().into_iter().collect();
-                o.ghost_mix = (iso.mode == behaviors::IsolateMode::Transparent).then_some(scene_builder::MAKE_TRANSPARENT_GHOST);
+                o.ghost_mix = Some(scene_builder::MAKE_TRANSPARENT_GHOST);
             }
         }
         // Interference detection: the parts see-through around the red overlaps.

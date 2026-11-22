@@ -1,18 +1,60 @@
 //! Onshape's Isolate / Make transparent dialog, the same in the Part Studio
 //! and the assembly (live assembly/61, cursors/641-_Isolate,
 //! 641-_Make_transparent, dom/dialog-assembly-isolate.txt): 220 px, the
-//! title (it moves the dialog) and ✕; "Transparency controls" (☐ Select
-//! transparent geometry, the transparency slider); "Component controls"
-//! (the Expand select, the expand slider, ?).
+//! title (it moves the dialog) and ✕; "Transparency controls" (Isolate's ☐ Show
+//! internal geometry, ☐ Select transparent geometry, the transparency slider);
+//! "Component controls" (the Expand select, the expand slider, ?).
 
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use std::rc::Rc;
 
-/// The transparency slider's range: the opacity of the parts left out.
+/// Make transparent's slider range: the opacity of the parts left out.
 pub const ALPHA_MIN: f32 = 0.12;
 pub const ALPHA_MAX: f32 = 0.9;
+
+/// Isolate's "Adjust opacity" knob in a new account (live asm/isolate-1122: 30 % with the box ticked or not).
+pub const KNOB_START: f32 = 0.3;
+
+/// The left-out parts' opacity at Isolate's knob `t` (live asm/isolate-1122): none at the far left (not drawn), up to
+/// [`ALPHA_MAX`] at the right; with "Show internal geometry" ticked they're lighter (on-30 / on-100 against off-30 /
+/// off-100: 0.55 of the cover over white).
+pub fn isolate_alpha(t: f32, internal: bool) -> f32 {
+    ALPHA_MAX * t.clamp(0.0, 1.0) * if internal { 0.55 } else { 1.0 }
+}
+
+/// Isolate's knob, one position per "Show internal geometry" state, the same in both studios (live: a drag in the
+/// assembly shows next time in the Part Studio) and kept across sessions.
+#[derive(Default)]
+struct KnobMemory([Option<f32>; 2]);
+impl Global for KnobMemory {}
+
+fn knob_key(internal: bool) -> &'static str {
+    if internal { "view:isolateOpacityInternal" } else { "view:isolateOpacity" }
+}
+
+/// Where Isolate's knob sits for the box `internal`.
+pub fn remembered_knob(internal: bool, cx: &App) -> f32 {
+    if let Some(t) = cx.try_global::<KnobMemory>().and_then(|m| m.0[internal as usize]) {
+        return t;
+    }
+    match crate::feature_settings::get(knob_key(internal)).get("").and_then(|g| g.get("knob")) {
+        Some(noshape_model::params::ParamValue::Text(t)) => t.parse::<f32>().ok().filter(|f| (0.0..=1.0).contains(f)).unwrap_or(KNOB_START),
+        _ => KNOB_START,
+    }
+}
+
+/// Keeps Isolate's knob for the box `internal`; `save` also writes it to disk (on a toggle or a close, not per drag
+/// step).
+pub fn remember_knob(internal: bool, t: f32, save: bool, cx: &mut App) {
+    cx.default_global::<KnobMemory>().0[internal as usize] = Some(t);
+    if save {
+        let mut groups = crate::feature_settings::Groups::new();
+        groups.entry(String::new()).or_default().insert("knob".to_string(), noshape_model::params::ParamValue::Text(t.to_string()));
+        crate::feature_settings::put(knob_key(internal), &groups);
+    }
+}
 
 /// The slider position of opacity `alpha`.
 pub fn alpha_t(alpha: f32) -> f32 {
@@ -38,6 +80,9 @@ pub struct IsoDialog<V> {
     /// `PanelOffsets` key of the dialog (shared by both studios).
     pub key: &'static str,
     pub title: &'static str,
+    /// Isolate's ☐ Show internal geometry (live asm/isolate-1122); `None` in Make transparent, whose slider keeps
+    /// the legend fill and the old tooltip.
+    pub show_internal: Option<bool>,
     pub select_transparent: bool,
     /// Slider positions, 0 to 1.
     pub transparency: f32,
@@ -46,12 +91,10 @@ pub struct IsoDialog<V> {
     /// Options shown greyed (live Part Studio: connectivity, no mates).
     pub expand_disabled: Vec<usize>,
     pub expand_ix: usize,
-    /// The transparency slider's legend fill (live: `#777` to 10 %, then
-    /// `#3e94ff` fading to white).
-    pub legend: bool,
     pub expand_tip: &'static str,
     pub drag: SliderDrag<V>,
     pub close: Act<V>,
+    pub toggle_internal: Act<V>,
     pub toggle_select: Act<V>,
     pub set_transparency: SetT<V>,
     pub set_expand: SetT<V>,
@@ -62,10 +105,16 @@ pub struct IsoDialog<V> {
 pub fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyElement {
     let pal = crate::theme::p();
     let section = |t: &'static str| div().pl(px(3.)).h(px(15.)).mt(px(10.)).mb(px(10.)).text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x666666)).child(t);
-    let (close, toggle) = (d.close, d.toggle_select);
+    let (close, toggle, toggle_internal) = (d.close, d.toggle_select, d.toggle_internal);
+    // Isolate (live asm/isolate-1122 ps-panel): 28 px checkbox rows, the knob on a plain line 7 px under them, "Adjust
+    // opacity"; Make transparent: the legend track (live ui/iso-907, a `#777` stub then blue to white).
+    let isolate = d.show_internal.is_some();
+    let (tip, track, slider_mt) = if isolate { ("Adjust opacity", Track::Line, 7.) } else { ("Show/hide internal geometry", Track::Legend, 6.) };
+    let row_h = if isolate { 28. } else { 27. };
     let pick = d.pick_expand.clone();
     v_flex()
         .id(SharedString::from(format!("{}-dialog", d.key)))
+        .debug_selector(move || format!("{}-dialog", d.key))
         .occlude()
         .child(crate::ui::panel_probe(d.key))
         .w(px(220.))
@@ -93,12 +142,21 @@ pub fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyElement {
                 ),
         )
         .child(section("Transparency controls"))
+        .when_some(d.show_internal, |el, on| {
+            el.child(
+                crate::os_ui::checkbox(SharedString::from(format!("{}-show-internal", d.key)), "Show internal geometry", on)
+                    .h(px(row_h))
+                    .tooltip(crate::ui::tooltip("Show/hide internal geometry"))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| toggle_internal(this, window, cx))),
+            )
+        })
         .child(
             crate::os_ui::checkbox(SharedString::from(format!("{}-select-transparent", d.key)), "Select transparent geometry", d.select_transparent)
+                .h(px(row_h))
                 .tooltip(crate::ui::tooltip("Enable selection of parts, faces, and edges from transparent bodies"))
                 .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| toggle(this, window, cx))),
         )
-        .child(div().mt(px(6.)).child(slider(Slider { key: d.key, name: "transparency", t: d.transparency, tip: "Show/hide internal geometry", track: Track::Legend(d.legend) }, d.drag, d.set_transparency, cx)))
+        .child(div().mt(px(slider_mt)).child(slider(Slider { key: d.key, name: "transparency", t: d.transparency, tip, track }, d.drag, d.set_transparency, cx)))
         .child(section("Component controls"))
         .child(
             crate::os_ui::select_field_with(SharedString::from(format!("{}-type", d.key)), d.expand_options, d.expand_disabled, d.expand_ix, move |i, window, cx| pick(i, window, cx))
@@ -112,10 +170,11 @@ pub fn dialog<V: 'static>(d: IsoDialog<V>, cx: &mut Context<V>) -> AnyElement {
                 .text_size(px(13.33)),
         )
         .child(
-            // Live (dom dialog-assembly-isolate): an 18 px row 5 px under the select, the knob 5 px into it, the
-            // dialog's bottom right under it (220 × 196 in all).
+            // Live (dom dialog-assembly-isolate): an 18 px row 5 px under the select, the knob 5 px into it; Make
+            // transparent's bottom right under it (220 × 196 in all), Isolate's 5 px below (220 × 231, ps-panel).
             h_flex()
                 .mt(px(5.))
+                .when(isolate, |r| r.mb(px(5.)))
                 .h(px(18.))
                 .items_start()
                 .child(div().flex_1().pt(px(3.)).child(slider(Slider { key: d.key, name: "expand", t: d.expand, tip: d.expand_tip, track: Track::Line }, d.drag, d.set_expand, cx)))
@@ -137,7 +196,7 @@ struct Slider {
 /// A slider's track (live noUiSlider, 183 px, 11 px in).
 enum Track {
     /// 7 px, radius 6, a 2 px inset `#777` ring; with the legend fill.
-    Legend(bool),
+    Legend,
     /// A 2 px `#777` line.
     Line,
 }
@@ -162,7 +221,7 @@ fn slider<V: 'static>(spec: Slider, drag: SliderDrag<V>, set: SetT<V>, cx: &mut 
         .cursor_pointer()
         .tooltip(crate::ui::tooltip(tip))
         .child(match track_kind {
-            Track::Legend(legend) => div()
+            Track::Legend => div()
                 .absolute()
                 .left_0()
                 .right_0()
@@ -170,11 +229,8 @@ fn slider<V: 'static>(spec: Slider, drag: SliderDrag<V>, set: SetT<V>, cx: &mut 
                 .h(px(7.))
                 .rounded(px(6.))
                 .overflow_hidden()
-                .when(legend, |d| {
-                    d.child(div().absolute().top_0().bottom_0().left_0().w(relative(0.1)).bg(rgb(0x777777))).child(
-                        div().absolute().top_0().bottom_0().left(relative(0.1)).right_0().bg(linear_gradient(90., linear_color_stop(rgb(0x3e94ff), 0.), linear_color_stop(rgb(0xffffff), 1.))),
-                    )
-                })
+                .child(div().absolute().top_0().bottom_0().left_0().w(relative(0.1)).bg(rgb(0x777777)))
+                .child(div().absolute().top_0().bottom_0().left(relative(0.1)).right_0().bg(linear_gradient(90., linear_color_stop(rgb(0x3e94ff), 0.), linear_color_stop(rgb(0xffffff), 1.))))
                 .child(div().absolute().top_0().left_0().size_full().rounded(px(6.)).border_2().border_color(rgb(0x777777))),
             Track::Line => div().absolute().left_0().right_0().top(px(6.)).h(px(2.)).bg(rgb(0x777777)),
         })
