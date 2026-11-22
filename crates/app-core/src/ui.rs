@@ -596,25 +596,31 @@ impl Render for PlacedTooltip {
 /// button opening its panel) and shows again only after the pointer has left
 /// it (qa4 F22).
 pub fn with_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
-    tip_with(el, text.into(), side, false, Pixels::ZERO)
+    tip_with(el, text.into(), side, false, Pixels::ZERO, false)
+}
+
+/// [`with_tip`] whose tooltip stays when the element is clicked (live vsm-1: a Variable Studio value's chip over its
+/// column header).
+pub fn with_tip_kept_on_click(el: Stateful<Div>, text: impl Into<SharedString>, side: TipSide) -> Stateful<Div> {
+    tip_with(el, text.into(), side, false, Pixels::ZERO, true)
 }
 
 /// A list row's tooltip, beside the row (live part-studio/16, 95), showing
 /// its stored name (user text, never translated).
 pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
-    tip_with(row, text.into(), TipSide::Right, true, Pixels::ZERO)
+    tip_with(row, text.into(), TipSide::Right, true, Pixels::ZERO, false)
 }
 
 /// [`with_user_side_tooltip`] for a list row drawn [`LIST_ROW_INSET`] short of the list's right edge: the tooltip
 /// beside the list, as a feature row's (live list-1119: the Parts row's).
 pub fn with_list_row_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
-    tip_with(row, text.into(), TipSide::Right, true, LIST_ROW_INSET)
+    tip_with(row, text.into(), TipSide::Right, true, LIST_ROW_INSET, false)
 }
 
 /// How far the default geometry, Parts and curve rows stop short of the list's right edge.
 pub const LIST_ROW_INSET: Pixels = px(5.);
 
-fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool, reach: Pixels) -> Stateful<Div> {
+fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool, reach: Pixels, stays: bool) -> Stateful<Div> {
     // The parity suite clicks a button by its tooltip.
     let el = crate::ui_script::mark(el, || format!("button:{text}"));
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
@@ -637,7 +643,8 @@ fn tip_with(el: Stateful<Div>, text: SharedString, side: TipSide, user: bool, re
             .bottom_0()
             .right(-reach),
         )
-        .on_any_mouse_down(move |_, _, _| p3.set(true))
+        .on_any_mouse_down(move |_, _, _| p3.set(!stays))
+        .when(stays, |d| d.tooltip_stays_on_click())
         .tooltip(move |_, cx| {
             let (text, anchor, pressed) = (text.clone(), anchor.get(), pressed.clone());
             cx.new(|_| PlacedTooltip { text, side, anchor, width: Default::default(), pressed, expanded: None, user, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: false }).into()

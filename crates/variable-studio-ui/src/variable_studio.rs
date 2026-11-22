@@ -382,6 +382,13 @@ impl VariableStudioView {
     /// The grid's keys (live2 studios.json variableStudioGrid) on a selected cell: arrows move (↑ / ↓ wrap), Enter
     /// edits, Backspace clears into an edit (Delete does nothing). Tab: `grid_tab_action`.
     fn grid_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        // Esc while a row is dragged: the ghost and the drop line go, the release does nothing (live vs-rowdrag-1122).
+        if e.keystroke.key == "escape" && cx.has_active_drag() {
+            cx.stop_active_drag(window);
+            self.row_drop = None;
+            cx.notify();
+            return true;
+        }
         let m = &e.keystroke.modifiers;
         if m.control || m.alt || m.platform || self.completion.is_some() || self.type_search.is_some() {
             return false;
@@ -749,16 +756,20 @@ impl Render for VsColDrag {
     }
 }
 
-/// A variable row being dragged: its index and first letter (the badge).
+/// A variable row being dragged: its index, its name and where the press was in the row (the ghost is drawn from the
+/// row's origin).
 #[derive(Clone)]
 struct VsRowDrag {
     from: usize,
-    letter: String,
+    name: String,
+    offset: Point<Pixels>,
 }
 
 impl Render for VsRowDrag {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().size(px(28.)).rounded_full().bg(rgb(0x1651b0)).text_color(rgb(0xffffff)).text_size(px(14.)).font_weight(FontWeight::BOLD).flex().items_center().justify_center().child(self.letter.clone())
+        // Live vs-rowdrag-1122: a #1651b0 pill with the full name, 31 px high, 10 px right of the pointer and 5 px below.
+        let pill = div().debug_selector(|| "vs-row-ghost".into()).h(px(31.)).px(px(10.)).rounded(px(20.)).bg(rgb(0x1651b0)).text_color(rgb(0xffffff)).text_size(px(14.)).flex().items_center().whitespace_nowrap().child(self.name.clone());
+        div().pl(self.offset.x + px(10.)).pt(self.offset.y + px(5.)).child(pill)
     }
 }
 
@@ -1299,8 +1310,8 @@ impl VariableStudioView {
                         // Live2 vs-drag.png: a value that fails sits on live's invalid-field pink, its text unchanged.
                         .when(error.is_some(), |d| d.bg(crate::theme::themed(0xf9ebec, 0x4a2326)))
                         // (Its tooltip centred over the cell, on the column header: live vs-fs-feel-1117 v2-06, qa
-                        // VSFEEL; not at the pointer.)
-                        .map(|d| crate::ui::with_tip(d, tip, crate::ui::TipSide::Above))
+                        // VSFEEL; not at the pointer), kept on a click (live vsm-1 v10).
+                        .map(|d| crate::ui::with_tip_kept_on_click(d, tip, crate::ui::TipSide::Above))
                         .child(div().min_w_0().truncate().child(text))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
                             this.cell_selected = Some(format!("e{i}"));
@@ -1332,13 +1343,13 @@ impl VariableStudioView {
             let desc_cell = self.text_cell(format!("d{i}"), 3, &desc, desc_shown, window, cx);
             let kinds = view.clone();
             let menu_view = view.clone();
-            let letter: String = v.name.chars().take(1).collect();
+            let row_name = v.name.clone();
             let draggable = self.host.is_none() && self.cell_editing.is_none();
             rows.push(
                 h_flex()
                     .id(("vs-row", i))
-                    // Live2 studios.json variableStudioGrid: a pressed row drags as a round badge of its first letter.
-                    .when(draggable, |d| d.on_drag(VsRowDrag { from: i, letter }, |d, _, _, cx| cx.new(|_| d.clone())))
+                    // Live vs-rowdrag-1122: a row drags from 6 px, as a pill with its name.
+                    .when(draggable, |d| d.drag_threshold(5.5).on_drag(VsRowDrag { from: i, name: row_name, offset: Point::default() }, |d, offset, _, cx| cx.new(|_| VsRowDrag { offset, ..d.clone() })))
                     .border_l_1()
                     .border_color(rgb(RULE))
                     .bg(rgb(0xffffff))
@@ -1706,6 +1717,13 @@ impl VariableStudioView {
                 .child(probe)
                 .on_drag_move(cx.listener(|this, e: &DragMoveEvent<VsRowDrag>, _, cx| {
                     let (Some(clip), Some(n)) = (this.rows_clip.get(), this.studio(cx).map(|s| s.variables.len())) else { return };
+                    // Outside the table no drop line, and a release there does nothing (live vs-rowdrag-1122).
+                    if !e.bounds.contains(&e.event.position) {
+                        if this.row_drop.take().is_some() {
+                            cx.notify();
+                        }
+                        return;
+                    }
                     let gap = ((f32::from(e.event.position.y) - clip.top) / ROW_H).round().clamp(0., n as f32);
                     let at = (gap as usize, clip.top - f32::from(e.bounds.top()) + gap * ROW_H);
                     if this.row_drop != Some(at) {

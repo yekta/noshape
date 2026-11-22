@@ -144,6 +144,29 @@ fn a_value_cells_tooltip_sits_over_the_cell(cx: &mut TestAppContext) {
     assert!((tip.center().x - cell.center().x).abs() < px(1.), "centred on it, not on the pointer: {tip:?} {cell:?}");
 }
 
+/// Live vsm-1 v10 (qa FEEL-VS-CHIP-ON-CLICK): a value cell's chip stays when the cell is clicked with the pointer kept
+/// there.
+#[gpui::test]
+fn a_value_cells_tooltip_stays_on_a_click(cx: &mut TestAppContext) {
+    let (window, _view) = studio(cx, "value-tip-click");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let cell = vcx.debug_bounds("vs-val-0").expect("the value cell");
+    let at = gpui_kit::point(cell.left() + px(10.), cell.center().y);
+    vcx.simulate_mouse_move(at, None, gpui_kit::Modifiers::default());
+    for _ in 0..4 {
+        vcx.executor().advance_clock(std::time::Duration::from_millis(300));
+        draw(&mut vcx, window);
+    }
+    assert!(vcx.debug_bounds("placed-tooltip").is_some(), "shown on hover");
+    vcx.simulate_click(at, gpui_kit::Modifiers::default());
+    for _ in 0..3 {
+        vcx.executor().advance_clock(std::time::Duration::from_millis(300));
+        draw(&mut vcx, window);
+    }
+    assert!(vcx.debug_bounds("vs-val-0").is_some());
+    assert!(vcx.debug_bounds("placed-tooltip").is_some(), "kept after the click");
+}
+
 /// Live behaviours "feel coverage (11-20)" V2: while a value cell is edited, its old value sits in a grey chip over the
 /// row above (26 px, 2 px above the cell, its right 46 px in from the cell's), whatever is typed; gone after the edit.
 #[gpui::test]
@@ -308,4 +331,42 @@ fn the_focused_add_row_name_is_outlined(cx: &mut TestAppContext) {
     keys(cx, window, &["d", "enter"]);
     assert_eq!(names(cx, &view), ["w", "d"], "Enter adds it");
     assert!(outlined(cx), "after Enter: outlined again");
+}
+
+/// Live vs-rowdrag-1122: a row drags from 6 px (not 5) as a pill with its full name 10 px right of the pointer and 5 px
+/// below; Esc drops the drag (the release moves nothing); released over the first row's top, the row goes first.
+#[gpui::test]
+fn a_row_drags_from_6_px_as_a_named_pill_and_esc_cancels(cx: &mut TestAppContext) {
+    use gpui_kit::{Modifiers, MouseButton};
+    let (window, view) = studio(cx, "row-drag");
+    keys(cx, window, &["d", "enter"]);
+    assert_eq!(names(cx, &view), ["w", "d"]);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let (first, last) = (vcx.debug_bounds("vs-val-0").expect("row w"), vcx.debug_bounds("vs-val-1").expect("row d"));
+    let start = gpui_kit::point(last.left() - px(30.), last.center().y);
+    let top = gpui_kit::point(start.x, first.top() + px(2.));
+    let drag = |vcx: &mut gpui_kit::VisualTestContext, esc: bool| {
+        vcx.simulate_mouse_down(start, MouseButton::Left, Modifiers::default());
+        vcx.simulate_mouse_move(start + gpui_kit::point(px(0.), px(-5.)), Some(MouseButton::Left), Modifiers::default());
+        vcx.run_until_parked();
+        assert!(vcx.debug_bounds("vs-row-ghost").is_none(), "5 px: no drag yet");
+        vcx.simulate_mouse_move(start + gpui_kit::point(px(0.), px(-6.)), Some(MouseButton::Left), Modifiers::default());
+        vcx.simulate_mouse_move(top, Some(MouseButton::Left), Modifiers::default());
+        vcx.run_until_parked();
+        let ghost = vcx.debug_bounds("vs-row-ghost").expect("the ghost from 6 px");
+        assert!((ghost.left() - (top.x + px(10.))).abs() < px(1.) && (ghost.top() - (top.y + px(5.))).abs() < px(1.), "beside the pointer: {ghost:?} {top:?}");
+        assert!((ghost.size.height - px(31.)).abs() < px(0.5), "31 px high: {ghost:?}");
+        if esc {
+            vcx.simulate_keystrokes("escape");
+            assert!(vcx.debug_bounds("vs-row-ghost").is_none(), "Esc: the ghost gone");
+        }
+        vcx.simulate_mouse_up(top, MouseButton::Left, Modifiers::default());
+        vcx.run_until_parked();
+    };
+    drag(&mut vcx, true);
+    assert_eq!(names(cx, &view), ["w", "d"], "after Esc the release moves nothing");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.executor().advance_clock(std::time::Duration::from_millis(600));
+    drag(&mut vcx, false);
+    assert_eq!(names(cx, &view), ["d", "w"], "dropped over the first row's top");
 }

@@ -1360,7 +1360,7 @@ impl Element for InteractiveText {
                         (interactive_state.tooltip_pressed.clone(), {
                             let hitbox = hitbox.clone();
                             Rc::new(move |window: &Window| hitbox.is_hovered(window))
-                        }, hitbox.bounds, Some(self.element_id.clone())),
+                        }, hitbox.bounds, Some(self.element_id.clone()), false),
                         None,
                         window,
                     );
