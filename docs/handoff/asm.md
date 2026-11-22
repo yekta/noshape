@@ -29,7 +29,8 @@ docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action
   (Part Studio half) when it lands.
 - Scissor on main started 07:0x in the vibex8 slot (sc-main-1122.out).
 - SPEED-ASM-OPEN: scissor open 78.8 s under perf on vibex8 (beside the scissor run); perf.data in vibex8
-  ~/tmp/asm/speed (perf report --no-children --sort dso,symbol takes minutes on the 700 MB binary).
+  ~/tmp/asm/speed (perf report --no-children --sort dso,symbol ran past 30 min on the 700 MB binary and was stopped: use
+  `perf report --no-inline -g none --sort symbol` or perf script + a stack collapse).
 - Next: then xdev-subs / pinslot reruns, bjr Sub c1e15f Fastened 3/4, pinslot Revolute 5,
   tvc 41/43, keyboard BOM 15/16.
 - Cleanup: asm-base worktree; vibex7 ops-bis / ops-1120 / ops-bt / ops-mc; vibex8 ops-subs / ops-mc / ops-tc / cli-tc,
