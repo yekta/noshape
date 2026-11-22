@@ -2366,10 +2366,13 @@ impl SketchEditor {
             return;
         }
         let distance = |q: DVec2| self.cursor.map(|c| (c - q).length()).unwrap_or(0.0);
-        // (A parallel doesn't meet a model edge: live2 combo parEdge, Lb woken, the end only on the edge.)
-        if let ExternalSnap::Edge { position, tangent, midpoint: false, .. } = &snap
+        // (A parallel doesn't meet a model edge: live2 combo parEdge, Lb woken, the end only on the edge.) The crossing
+        // beats the edge's midpoint too: on the edge then, not at its middle (live workflow 05 step 11: horizontal and
+        // coincident over the left edge's midpoint, the segment exactly 20).
+        if let ExternalSnap::Edge { position, tangent, midpoint, reference } = &snap
             && let Some(combined) = self.inference.as_ref().filter(|i| i.kind != InferenceKind::Parallel).and_then(|i| self.direction_onto(i, *position, *tangent))
         {
+            let snap = if *midpoint { ExternalSnap::Edge { position: combined.position, tangent: *tangent, reference: reference.clone(), midpoint: false } } else { snap };
             self.inference = Some(combined);
             self.external_snap = Some(snap);
             return;
@@ -3678,7 +3681,7 @@ impl SketchEditor {
                     self.chain_end = Some(b);
                     self.left_chain_end = false;
                 }
-                self.set_otf(data, vec![line_length_field(&data.sketch, line, self.world_per_px)]);
+                self.set_otf(data, vec![line_length_field(&data.sketch, line, self.world_per_px, true)]);
                 EditOutcome::changed()
             }
             Tool::MidpointLine => {
@@ -3699,7 +3702,7 @@ impl SketchEditor {
                 attach(sk, mid, None, &m);
                 attach(sk, pb, Some(line), &click);
                 self.finish_create(data, &[line]);
-                self.set_otf(data, vec![line_length_field(&data.sketch, line, self.world_per_px)]);
+                self.set_otf(data, vec![line_length_field(&data.sketch, line, self.world_per_px, false)]);
                 EditOutcome::changed()
             }
             Tool::CornerRect | Tool::CenterRect => {
@@ -7449,14 +7452,17 @@ fn rim_autos(sk: &mut Sketch, circle: EntityId, click: &Click) {
 
 /// A lone line's length box and dimension (live, behaviours "skasm
 /// (2026-10-28) dimension labels vs glyph rows"): off the line's middle above
-/// a slanted or horizontal line, left of a vertical one.
-fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64) -> OtfField {
+/// a slanted or horizontal line, left of a vertical one. A line drawn from `a` to
+/// `b` (`drawn`, the Line tool): left of its drawing direction unless vertical (live
+/// workflow 05: a level segment drawn right to left has its box below).
+fn line_length_field(sk: &Sketch, line: EntityId, wpp: f64, drawn: bool) -> OtfField {
     let mut f = length_field(sk, line, wpp);
     if let Some(Curve2::Line { a, b }) = sk.curve(line) {
         let n = (b - a).try_normalize().unwrap_or(DVec2::X).perp();
         // Above a slanted or horizontal line, left of a vertical one (live,
         // SKETCH-VDIM-SIDE-ARROWS).
-        let n = if n.y < -1e-9 || (n.y.abs() <= 1e-9 && n.x > 0.0) { -n } else { n };
+        let vertical = n.y.abs() <= 1e-9;
+        let n = if (drawn && !vertical) || !(n.y < -1e-9 || (vertical && n.x > 0.0)) { n } else { -n };
         // 26 px above a horizontal line, 39 px left of a vertical one (live2 11-17 value-box: the 100 px box centred there).
         let off = 26.0 * n.y.abs() + 39.0 * n.x.abs();
         f.label = (a + b) * 0.5 + n * wpp * off;
@@ -10811,6 +10817,22 @@ mod tests {
         let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
         assert!((d.sketch.curve(line).unwrap().length() - 0.025).abs() < 1e-9);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Length { .. }) && c.driving));
+    }
+
+    /// Live workflow 05 (qa SKETCH-LENGTH-LABEL-IN-PLANE): a level segment's box lies left of its drawing direction,
+    /// above one drawn rightward (live2 11-17 value-box), below one drawn leftward; a vertical one's left of it.
+    #[test]
+    fn a_drawn_lines_box_lies_left_of_its_direction() {
+        let side = |from: DVec2, to: DVec2| {
+            let (mut ed, mut d) = editor(Tool::Line);
+            click(&mut ed, &mut d, from);
+            click(&mut ed, &mut d, to);
+            ed.otf_boxes(&d, &UnitPrefs::default())[0].0 - (from + to) * 0.5
+        };
+        assert!(side(v(0.01, 0.012), v(0.03, 0.012)).y > 0.0, "rightward: above");
+        assert!(side(v(0.03, 0.012), v(0.01, 0.012)).y < 0.0, "leftward: below");
+        assert!(side(v(0.02, 0.01), v(0.02, 0.03)).x < 0.0, "upward: left");
+        assert!(side(v(0.02, 0.03), v(0.02, 0.01)).x < 0.0, "downward: left too");
     }
 
     #[test]

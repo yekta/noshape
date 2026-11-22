@@ -1,31 +1,28 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 11:55 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 12:41 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## In flight (11-22 11:55 UTC): sk/* hover cells + SMFlatOp + BEND-FACE-RECLICK-EMPTIES, one commit, verifying
-- Hover sk/* (live hm-sk-1122): all cells match but three combined states, now fixed:
-  c1a a lit curve's band over its unlit end dots, a lit end over the band: builder.rs draws a sketch's curves and points
-  `.unlit_only()` (params.x bit 4) plus lit-only copies `.selected_only().over_lines()` (drawn after the points); the lit
-  curve copy is lifted 9 px + 1.5 toward the eye (bits 2 + 5 in line_vertex: unlit dots lift size + 1.5 <= 8.5, lit >= 11);
-  ON_TOP discs drawn over a lit sketch point moved to over_lines so they stay after its lit copy (their nearest depth
-  hid it: sketch_lineend_* failed): psui's midpoint_overlay no-band disc (behaviors.rs, layer 22) and overlay_pts (20). c4a/c4d: no preview dot on InferenceKind::OnCurve. c5a:
-  Dimension clears the selection. Tests: hover_matrix sk_a_selected_lines_band..., sk_a_drawing_tool_over_a_line...,
-  sketch_mode choosing_a_drawing_tool_clears_the_selection. psui: params.x bit 6 is theirs (on_top silhouettes); their
-  next land puts pick_plane in normal_m.w_axis and plane_rise after the band's xy offset in line_vertex: merge carefully.
-- SMFlatOp (live smflat-1122 + vols.json): MODEL Extrude of a flat region = "Feature defined in model space cannot
-  reference sheet metal flat geometry." (extrude.rs), mixed flat + model = "Cannot select from the flattened ..."; Add
-  partly past the free edge fuses the whole region (live E5 +417.86: tab + Extrude 3's notch); Remove wholly off = INFO
-  SM_FLAT_OP_PARTIAL_INTERSECT ("Some faces do not meet flattened sheet metal parts." banner). e2e
-  an_extrude_in_the_flat_takes_flat_regions_only.
-- BEND-FACE-RECLICK-EMPTIES (qa P0): held_face_under skips a face the preview still has (mod.rs face_hit); test
-  sm_feel a_bends_face_clicked_again_stays_in_its_field.
-- Verify run: skasm-scratch/bin/hm4.sh on vibex6 (log hm-run5.log); then commit, mark TICKETS (BEND-FACE-RECLICK-EMPTIES,
-  FS-NATIVE-OPSMFLATOPERATION) after rebasing on origin/main (union rows: grep duplicates), land.
-- Queued: acf660cb (re-checked apart from a red batch: others' sketch_ui_tests shell / extrude tint), 47bfb052 (flat
-  orientation: SM-FLAT-VIEW-FIT reopened by qa waits on it), 53a54598 handoff.
-- Next: P1 SKETCH-LENGTH-LABEL-IN-PLANE residual (wf05 step 12: ours 20.001 on the far side, live 20 on the near side;
-  qa-scratch/tickets/wf05-length-label.png): the click on the face's edge should land exactly on it (20), label side.
+## In flight (11-22 12:41 UTC): P1 SKETCH-LENGTH-LABEL-IN-PLANE residual, UNCOMMITTED, run going
+- QUEUED c572df92 (12:28, #4): sk/* hover combined states + SMFlatOp (live smflat-1122) + BEND-FACE-RECLICK-EMPTIES +
+  the tablet-stand names (acf660cb's content; acf660cb itself FAILED on a handoff rebase conflict) + flat orientation
+  47bfb052. Older 53a54598 was CHECKING at 12:28. If c572df92 fails: fix forward, land again.
+  (Its hover fix: lit-only sketch copies drawn after the points, the lit curve lifted 9 px + 1.5; ON_TOP discs over
+  a lit sketch point (psui's midpoint_overlay no-band disc, overlay_pts) moved to over_lines. psui told via the lead.)
+- Residual (qa: wf05 step 12, ours "20.001" on the far side, live "20" on the near side), two causes, both fixed:
+  1. sketch_mode apply_external_snap: a direction (H/V/perp) crossing a model edge now beats the edge's MIDPOINT too
+     (live wf05 s11: pointer on the left edge's midpoint (0,15), level 2.6 px off: glyphs horizontal + coincident,
+     segment exactly 20). New ui test a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it;
+     a_model_edge_on_the_sketch_plane_snaps_unhovered's start moved 20 px off the level (live 11-17's was 17 px off).
+  2. line_length_field(.., drawn): the Line tool's box lies left of the drawing direction unless vertical (verticals
+     stay left; live 11-17 chain and wf05 agree; MidpointLine keeps the old rule). Unit test
+     a_drawn_lines_box_lies_left_of_its_direction.
+- Run: skasm-scratch/bin/lbl2.sh on vibex6 (full sketch::ui_tests + clippy), log /root/skasm-scratch/lbl-run2.log
+  (started ~12:38). Green: commit "skasm: ..." + mark SKETCH-LENGTH-LABEL-IN-PLANE row (main's row is "[x] verified ...;
+  left: ..." line ~318: add a fixed-to-verify note for the residual), land.
+- Asked live (REQUESTS 12:32 "length box side and model-edge midpoint vs a crossing"): box side for leftward /
+  downward / clockwise / slanted lines, and the midpoint-vs-crossing rule with and without a level near. Adjust to it.
+- TICKETS union rows: rebuild from origin/main + own marks (script pattern: compare rows by **ID (agent)** key) before land.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline

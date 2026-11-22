@@ -1823,9 +1823,10 @@ fn a_model_edge_on_the_sketch_plane_snaps_unhovered(cx: &mut TestAppContext) {
         at
     };
     let inference = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().inference.as_ref().map(|i| (i.kind, i.position)));
-    let start = on_screen(cx, &view, (a + z) * 0.5 + DVec2::new(0.02, 0.003));
-    click(cx, window, &view, (start.x, start.y));
     let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    // (Clear of the level's 7 px band at the middle, as live's start: a level crossing the edge there is taken instead.)
+    let start = on_screen(cx, &view, (a + z) * 0.5 + DVec2::new(0.02, 20.0 * wpp));
+    click(cx, window, &view, (start.x, start.y));
     let mid = (a + z) * 0.5;
     pointer(cx, mid + DVec2::new(3.0 * wpp, 0.0));
     let at_mid = inference(cx);
@@ -6653,6 +6654,56 @@ fn a_line_ending_on_a_lit_model_edge_lands_on_it(cx: &mut TestAppContext) {
     assert!(off < 1e-6, "the end is on the edge: {off} m off");
     assert!(on_edge, "coincident with the edge's used curve");
     assert!(perpendicular, "the direction inferred kept");
+}
+
+/// Live workflow 05 step 11 (qa SKETCH-LENGTH-LABEL-IN-PLANE): a line drawn level toward a lit model edge, the pointer
+/// on the edge's midpoint 2 px off the level: live shows horizontal and coincident and ends the line where the level
+/// meets the edge (exactly 20 there), not at the edge's midpoint.
+#[gpui::test]
+fn a_level_line_onto_a_model_edges_midpoint_ends_where_the_level_meets_it(cx: &mut TestAppContext) {
+    let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "level-onto-edge-midpoint", Tool::Line);
+    let along = (b - a).normalize();
+    let inward = {
+        let centre = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().frame.to_local(glam::DVec3::ZERO));
+        let n = along.perp();
+        if (centre - a).dot(n) > 0.0 { n } else { -n }
+    };
+    let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let mid = (a + b) * 0.5;
+    let s0 = mid + inward * 60.0 * wpp + along * 2.0 * wpp;
+    let (p0, target) = (on_screen(cx, &view, s0), on_screen(cx, &view, mid));
+    click(cx, window, &view, (p0.x, p0.y));
+    let icons = cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(target));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: target, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(pick)), w, cx);
+            v.sketch.as_ref().unwrap().snap_icons()
+        })
+    })
+    .unwrap();
+    assert_eq!(icons.last().copied(), Some("coincident"), "on the edge, not its midpoint: {icons:?}");
+    assert!(icons.len() == 2 && matches!(icons[0], "horizontal" | "vertical"), "{icons:?}");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: target, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: target, modifiers: Modifiers::default() }, w, cx);
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let (start, end, midpoint) = cx.update(|cx| {
+        let data = view.read(cx).sketch_data(cx).unwrap();
+        let line = data.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && !e.external && !e.construction).map(|e| e.id).max().unwrap();
+        let (start, end) = data.sketch.endpoints(line).unwrap();
+        let midpoint = data.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Midpoint { point, .. } if point == end));
+        (data.sketch.point(start).unwrap(), data.sketch.point(end).unwrap(), midpoint)
+    });
+    // (Against the display mesh's f32 edge; the start where its click landed.)
+    assert!((end - a).perp_dot(along).abs() < 1e-6 && (end - start).dot(along).abs() < 1e-9, "where the level meets the edge: {start:?} -> {end:?}");
+    assert!(!midpoint && (end - mid).length() > wpp, "not the edge's midpoint: {end:?}, midpoint {mid:?}");
 }
 
 /// User P0 11-14 (hat15, a chain on a face): the next segment square to the previous one, ending where that square
