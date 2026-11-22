@@ -1296,3 +1296,29 @@ fn a_failing_feature_patterns_direction_stays_orange_and_its_instance_shows_red(
     assert!(off.is_empty() && red >= 5, "the Direction edge not orange at {off:?}; {red} of 9 samples red up the instance's axis; the pattern's state {state:?}");
 }
 
+// Section view through Right (live workflow 28, qa FEEL-SECTION-PLANE-LABEL-LOOK): the planes' names stay their solid
+// blue (live (39, 94, 181)), never the pale mauve ours drew (138, 117, 129).
+#[gpui::test]
+fn plane_names_keep_their_blue_in_a_section_view(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "section-plane-names");
+    let at = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let pl = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Top))?;
+        let asc = 0.031 * 2.0 * pl.half_height;
+        v.viewport.read(cx).project(pl.corner(-1.0, 1.0) + pl.frame.x * (1.2 * asc) - pl.frame.y * (0.5 * asc))
+    });
+    let at = at.expect("Top's name on screen").round();
+    let blue = |c: &[[u8; 3]]| c.iter().filter(|p| close(**p, 0x275eb5, 48)).count();
+    let plain = blue(&m.crop(cx, at));
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+        v.selection.clear();
+        v.section_through(Reference::Plane(DatumPlane::Right), w, cx);
+        v.end_section_dialog(true, w, cx);
+    })).unwrap();
+    m.park(cx);
+    let crop = m.crop(cx, at);
+    let sectioned = blue(&crop);
+    let mauve = crop.iter().filter(|p| close(**p, 0x8a7581, 20)).count();
+    assert!(plain > 20 && sectioned * 10 >= plain * 8 && mauve < 5, "Top's name: {plain} blue px plain, {sectioned} in the section view, {mauve} mauve");
+}

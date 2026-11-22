@@ -413,8 +413,9 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     }
     // A light selection tint over the shading, mixed in sRGB (state TINT).
     if ((st & TINT) != 0u) { c = srgb_to_linear(mix(linear_to_srgb(c), linear_to_srgb(g.select.rgb), 0.2)); }
-    // Back faces revealed by a section cut are tinted so cut solids read well.
-    if (!front && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }
+    // Back faces revealed by a section cut are tinted so cut solids read well (not the planes and their names: live
+    // workflow 28 keeps them blue).
+    if (!front && !unlit && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }
     // params.y bit 7: Isolate ghost, mixed toward white in sRGB (extra.y).
     if ((inst.params.y & 128u) != 0u) { c = srgb_to_linear(mix(linear_to_srgb(c), vec3(1.0), inst.extra.y)); }
     var a = inst.color.a;

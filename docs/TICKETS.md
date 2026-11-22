@@ -599,7 +599,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   (Corner 8 mm, Make joint refused, relief notch in the flat view; flat view fit is SM-FLAT-VIEW-FIT).
   skasm 11-22: the app remembers both (formPartStudio, squareReliefWidth are REMEMBER_PREVIOUS_VALUE); the workflow runner
   starts on an empty config: seed feature_settings.json + NOSHAPE_UI_REMEMBERED=1 as ui-parity's run.py does (sent to qa).
-- [ ] P0 **FEEL-SECTION-PLANE-LABEL-LOOK (psui)** (workflow 28 steps 24-25, bracket, green b5b414278): Section view, Right picked
+- [ ] (psui 11-22 10:51: labels half fixed, plane names and fills keep their blue in a section view, hover_matrix plane_names_keep_their_blue_in_a_section_view; the part's thick dark edges still open) P0 **FEEL-SECTION-PLANE-LABEL-LOOK (psui)** (workflow 28 steps 24-25, bracket, green b5b414278): Section view, Right picked
   and after Enter: live keeps the plane labels solid blue (39,94,181) and the part's edges 1 px; ours draws "Right" / "Top" thin
   and pale mauve (138,117,129; blue 23,82,176 up to step 23) and outlines the wall face and part in thick dark ~3 px edges
   (tickets/wf28-section.png, wf28-section-zoom.png; live left).
