@@ -357,6 +357,11 @@ pub fn paste_sketches_onto(ps: &mut PartStudio, sketches: &[noshape_model::parts
             f.params.set("sketchPlane", noshape_model::params::ParamValue::Query(vec![plane.clone()]));
             // Shown, whatever the copied sketch was (live ui-parity sketch-row-copy-paste-onto-front).
             f.hidden = false;
+            if let Some(noshape_model::params::ParamValue::Sketch(d)) = f.params.get("sketch") {
+                let mut d = (**d).clone();
+                noshape_scene::sketch_mode::centre_pasted_sketch(&mut d);
+                f.params.set("sketch", noshape_model::params::ParamValue::Sketch(std::sync::Arc::new(d)));
+            }
         }
     }
     ids

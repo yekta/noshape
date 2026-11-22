@@ -8031,6 +8031,28 @@ pub fn prune_reference_only(data: &mut SketchData) {
     data.use_ends.retain(|k, _| data.external_refs.contains_key(k));
 }
 
+/// Paste sketch onto a plane: the copy loses its ties to the Origin and is centred on it (live workflows-1122 29:
+/// a 40 × 30 rectangle drawn from the origin lands at −20..20 × −15..15).
+pub fn centre_pasted_sketch(data: &mut SketchData) {
+    let origin: Vec<EntityId> = data.sketch.entities().filter(|e| is_origin(&data.sketch, e.id)).map(|e| e.id).collect();
+    // (A point curves share with the Origin stays theirs.)
+    let (shared, lone): (Vec<EntityId>, Vec<EntityId>) = origin.into_iter().partition(|o| !data.sketch.users_of_point(*o).is_empty());
+    for o in shared {
+        let _ = data.sketch.set_external(o, false);
+        let _ = data.sketch.set_reference_only(o, false);
+    }
+    data.sketch.remove_entities(&lone);
+    let own: Vec<EntityId> = data.sketch.entities().filter(|e| !e.external).map(|e| e.id).collect();
+    let b = own.iter().filter_map(|e| data.sketch.entity_bbox(*e)).fold(noshape_sketch::BBox::EMPTY, |a, b| a.union(&b));
+    if !b.is_empty() && b.center().length() > 1e-12 && data.sketch.transform(&own, Transform::Translate(-b.center())).is_ok() {
+        for l in data.dimension_labels.values_mut() {
+            *l = [l[0] - b.center().x, l[1] - b.center().y];
+        }
+    }
+    prune_exprs(data);
+    data.sketch.solve();
+}
+
 fn prune_exprs(data: &mut SketchData) {
     prune_reference_only(data);
     data.prune_texts();

@@ -5338,6 +5338,26 @@ fn drawing_export_formats_and_options() {
     assert!(!std::fs::read_to_string(&csv).unwrap().is_empty());
 }
 
+/// Paste sketch centres the copy on the Origin, its tie to the Origin dropped (live workflows-1122 29: a 40 × 30
+/// rectangle from the origin lands at −20..20 × −15..15).
+#[test]
+fn paste_sketch_centres_the_copy_on_the_origin() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "paste_centred.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let corner = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "point" && num(&e["at"][0]).abs() < 1e-6 && num(&e["at"][1]).abs() < 1e-6).unwrap_or_else(|| panic!("{r}"))["id"].clone();
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "coincident", "entities": [corner, "origin"] }));
+    let p = call(&mut ctx, "sketch_paste", json!({ "sketch": sk, "plane": "plane:top" }));
+    let es = p["entities"].as_array().unwrap();
+    assert_eq!(es.iter().filter(|e| e["type"] == "line").count(), 4, "{p}");
+    let mut xs: Vec<f64> = es.iter().filter(|e| e["type"] == "point").map(|e| num(&e["at"][0])).collect();
+    let mut ys: Vec<f64> = es.iter().filter(|e| e["type"] == "point").map(|e| num(&e["at"][1])).collect();
+    xs.sort_by(f64::total_cmp);
+    ys.sort_by(f64::total_cmp);
+    let (x0, x1, y0, y1) = (xs[0], xs[xs.len() - 1], ys[0], ys[ys.len() - 1]);
+    assert!((x0 + 20.0).abs() < 1e-6 && (x1 - 20.0).abs() < 1e-6 && (y0 + 15.0).abs() < 1e-6 && (y1 - 15.0).abs() < 1e-6, "{x0} {x1} {y0} {y1}: {p}");
+}
+
 /// Context menus: Copy sketch → Paste sketch on another plane; Export as
 /// DXF/DWG… of a sketch and of a planar face; the Sketch dialog's Disable
 /// imprinting.
