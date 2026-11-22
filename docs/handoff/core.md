@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-22 13:05 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 14:40 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -20,7 +20,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   .6725 chord fits (4e-4), unexplained. Scripts /root/core-scratch/kh: rep3.py (area per rule), st2-st7.py.
   live loft-stations2 (F..I): all 9 captures = chord fractions of the profile-point row with the shortest total chord;
   knifehandle's shortest row is u .5 (err .018, replica +66): no fit (st8-st10.py). Its P4 misses both guides, so lead
-  (b): keep centre chord; REQUESTS loft-stations3 J/K (middle profile 3 mm off its guides). Then the rule fitting all.
+  (b): keep centre chord. loft-stations3 J/K (profile 3 mm off its guides): live REFUSES (LOFT_FAILED), so P4 "off its
+  guides" was a sketch misread; the shortest-row test already used live's own surface loops (err .018 stands). PARKED at
+  +0.13 % (lead 11-22). Todo: ours must refuse J/K as live (check loft_guided_multi's meet tolerance).
 - **THICKEN-DIRECT + SPEED-SPLIT-THICKEN closed (11-22 14:10):** gate on 20 thicken docs, direct vs OCCT (temporary
   NOSHAPE_THICKEN_OCCT in core-rf branch core-thg, reverted): same matches everywhere (253/368); workshop-split 140-143 ms
   vs live 112 (A/B 10 runs; first gate's 239-253 was host load). Analytic offsets (Geom_OffsetSurface::Surface()) tried:
@@ -55,8 +57,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   cylinder is blend's; they'll say if our seam (lowest vertex pair) must move. Experiments: core-scratch/cylmerge-modes.cpp.
 - **SUSPENSION-CIRCPAT1 -> blend (lead 11-21):** root is 805e29's Fillet 3 (OCCT refuses R2.5 on 7 of 17 edges);
   dump vibex7:~/agents/core-keep/susp/fillet-19.
-- **VALID-SURFLOFTS-LOFT1:** first difference is Face blend 1 ERROR ("Cannot attach blended face"); Loft 1's invalid
-  sheet is downstream (Bridging curves on wrong geometry). Goes with the Face blend 1 item.
+- **VALID-SURFLOFTS-LOFT1 (in progress, core-rf branch core-sfl):** Face blend 1 is fixed (ca9c74200); first difference
+  now Loft 1 (feature 9, between Bridging curves 1/2 at z +-12.5): ours 4 spline edges, live 2 LINE (25 mm) + 2 SPLINE.
+  Change: features.cpp straight_edges_as_lines after op_loft (the loft's own straight B-spline edges -> Geom_Line in place,
+  SameParameter; sections' edges untouched; NOSHAPE_LOFT_SPLINE_EDGES=1 = old). T1 kernel core::
+  a_loft_between_two_open_curves_has_straight_lines_between_their_ends. Next: kernel loft tests (.sl.sh), then a model
+  suite pair (lofts in many docs change edge kinds) + NOSHAPE_PARITY_VALIDITY=1 on surfaces-lofts-projected.
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
 
