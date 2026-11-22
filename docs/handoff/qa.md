@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-22 05:16)
+# QA handoff (agent qa; current state only, updated 2026-11-22 11:56)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -24,7 +24,8 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Restarted 11-17 07:31: the lead's $HOME fix of the CLI pair (11-17's row INVALID: `~` after a comma isn't expanded, 1 of
   84 timed) and a guard: < 90 % of the docs timed or < 6 opens -> alert, no SCORE row. Earlier, 03:33: the clean A/B step (nightly/ab-<mmdd>.args) and the latency step now
   `cd … || exit 1;` (the A/B's `cd … && ( load loop ) &` backgrounded the cd, ab-feat.py ran in ~ and the loop held the ssh).
-- 11-22 06:57 (lead 06:5x: vibe2 at load 66, keep it for the land queue): fresh full suites = suites/1122-0657-17157c2f (green 17157c2f), ALL stages on vibex8 via slot (unit qa-suites, QA_UI_HOST=QA_SUITES_HOST=QA_SPEED_HOST=vibex8; ui stage got the slot ~07:05; 1122-0634-d0df2d56 INVALID, stopped). When status lands: worse.txt (vs 1120-2308-8feaade1) -> regressed scenarios / documents P0 to owners; qa-index-daily adds the 11-22 Parity index row (speed column vibex8). Workflow replays (bin/wf.sh, rescore-wf.sh) also moved to vibex8 (WF_HOST, WF_XD; one upload at a time via flock) = a 4th app there while the suite runs.
+- 11-22 06:57 suites/1122-0657-17157c2f (green 17157c2f, all stages vibex8 via slot, unit qa-suites): ui 2099/2230 (LOADED, peak 27); models stage running 11:5x. Unit qa-uip-rerun (bin/uip-rerun.sh <suite> tmp/uip-rerun.txt) reruns the 50 non-FS new failures + fs-open on vibex8 :481 once <suite>/status exists -> <suite>/uip-rerun.log. THEN: re-score uip with `run.py --compare-only --out <suite>/uip` (FS version now normalized: 77 FS scenarios match), suites-diff vs last run, file the still-failing ones as P0s (candidates: psui plane/sketch-entity menus 0102516b3, routing Points 88f31a8d2; asm face menu; studios drawing tab menu row 7; skasm gusset/bend titles + 4 sketch; 9 not-run), SCORE 11-22 row, lead report. Skip live-re-recorded: asm-root-menu-unfix-all(-mated), drw-custom-table-*, drw-export-formats, drw-note-format-lists, drw-table-cell-menu.
+- FS VERSION (lead 11-22 11:4x, pushed 11:5x): ui-parity run.py fs_version_line(): "FeatureScript NNNN;" + std imports' version compared as <v>, except fs-open, where live reads LIVE_FS_VERSION (3132) and ours must match (a difference = studios ticket); bump LIVE_FS_VERSION when live's std moves. README "Comparison".
 - **qa-suites**: bin/qa-suites-loop.sh, every 4 h: interaction suite, model suite (speed, debug) and assembly / exchange
   suites of the newest green, each through `~/bin/slot`: ui + models on **vibex7**, assemblies / exchange (suites-rest) on
   **vibex6** beside them since 11-17 04:51 (vibex7's slot was held 4 h by dx). 1117-0227-ecf8c33a's stage re-run as unit
@@ -38,8 +39,6 @@ Local units are transient (`systemctl list-units 'qa-*'`); restart one with the 
   Fixed 11-17 04:25: cut-check waits for the loop's run under vibe5.lock (two runs at once gave "Text file busy" and a void GO);
   cut-verdict says NO VERDICT unless the green's compat file has COMPAT-DONE, 4 USERDOCS lines and no Traceback. Ticket documents
   are listed, not blocking, in the script, but read them: a ticket doc's wrong geometry is a HOLD (11-17 f197).
-- tab-B hover-card A/B DONE 10:29 (units qa-tabab-verify2, qa-tabab-rel finished): B's first open ~5.0 s green vs ~6.4 s 0.4.53
-  (hint, load 2-14); the ~700 ms trailing frames after a switch are in 0.4.54-0.4.56 too -> P2 DOCK-TAB-SWITCH-TRAILING-FRAMES (psui).
 - **qa-index-daily** (lead 11-20): bin/index-daily.sh "<since>": every 30 min, the first full suite run of the day (suites/<run>/index.json +
   a models score) -> one "Parity index" row in docs/parity/SCORE.md (bin/index-row.py; header order = index.json's areas), pushed, and a
   qa-alerts line. Started 07:3x with since "2026-11-20 07:30" (today's row from suite 1120-0407-81d23c9b or later).
