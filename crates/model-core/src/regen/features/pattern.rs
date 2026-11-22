@@ -966,6 +966,8 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
             return err(NOT_ON_BODY);
         }
         if !tools.is_empty() && tools.iter().all(off) {
+            // The copies it couldn't make, drawn red where they'd be (live workflow 07: a see-through red boss).
+            ev.error_shapes = tools.iter().map(|t| t.shape.clone()).collect();
             return crate::regen::eval::err_at(&["fullFeaturePattern"], SWITCH_TO_PER_INSTANCE);
         }
     }

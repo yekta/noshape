@@ -393,6 +393,7 @@ const SK_POINT: [f64; 3] = [60., 25., 0.];
 const SK_CENTRE: [f64; 3] = [100., 20., 0.];
 const SK_LINE: [f64; 3] = [66., 5., 0.];
 const SK_LINEMID: [f64; 3] = [75., 5., 0.];
+const SK_LINEEND: [f64; 3] = [90., 5., 0.];
 const SK_ARC: [f64; 3] = [75.5659, 22.98, 0.];
 
 /// Pixels of the crop within `r` px of its centre (the pointer's hotspot).
@@ -408,6 +409,13 @@ fn close(c: [u8; 3], rgb: u32, tol: i32) -> bool {
 /// Whether a colour of live's (within 24 per channel) is drawn within `r` px of the target.
 fn shows(crop: &[[u8; 3]], rgb: u32, r: f64) -> bool {
     near_centre(crop, r).any(|c| close(c, rgb, 24))
+}
+
+/// The share of the crop's pixels from `r0` to `r1` px off its centre close to `rgb` (a disc's size: all of its rim).
+fn ring_of(crop: &[[u8; 3]], rgb: u32, r0: f64, r1: f64) -> f64 {
+    let off = |i: usize| DVec2::new((i % 80) as f64 - 40.0, (i / 80) as f64 - 40.0).length();
+    let ring: Vec<[u8; 3]> = crop.iter().enumerate().filter(|(i, _)| (r0..=r1).contains(&off(*i))).map(|(_, c)| *c).collect();
+    ring.iter().filter(|c| close(**c, rgb, 24)).count() as f64 / ring.len().max(1) as f64
 }
 
 /// The edge's #ffc685 hover band past an 11 px point marker (7 to 12 px out; the marker's own disc is near its colour).
@@ -610,6 +618,18 @@ cells! {
     }
     sketch_region_selected_hovered: SK_CENTRE, State::SelectedHovered => |c| {
         assert!(shows(&c, 0xffa90a, 5.0) && !shows(&c, 0xffc685, 5.0));
+    }
+    // A line's free end in the Part Studio (a 4 px grey dot at rest): lit an 11 px disc as a centre's (live workflow 12:
+    // another sketch's end selected under the pointer ~12 px across).
+    sketch_lineend_hovered: SK_LINEEND, State::Hovered => |c| {
+        assert!(ring_of(&c, 0xffc685, 4.0, 5.0) >= 0.75, "{:?}", near_centre(&c, 5.0).collect::<Vec<_>>());
+    }
+    // Its size, ~12 px: orange to 5 px out (live's shot is in a sketch, its colour there not yet compared).
+    sketch_lineend_selected_hovered: SK_LINEEND, State::SelectedHovered => |c| {
+        let off = |i: usize| DVec2::new((i % 80) as f64 - 40.0, (i / 80) as f64 - 40.0).length();
+        let ring: Vec<[u8; 3]> = c.iter().enumerate().filter(|(i, _)| (4.0..=5.0).contains(&off(*i))).map(|(_, p)| *p).collect();
+        let orange = ring.iter().filter(|p| p[0] >= 240 && (160..=215).contains(&p[1]) && p[2] <= 170).count();
+        assert!(orange * 5 >= ring.len() * 4, "{:?}", near_centre(&c, 5.0).collect::<Vec<_>>());
     }
     // Sketch edit: the band over the blue line, which shows through its middle (#c89c96 hovered, #c88536 selected); no
     // midpoint marker; a click on the line's middle takes the line.
@@ -963,6 +983,27 @@ fn a_model_edges_midpoint_in_a_sketch_lights_and_has_lives_menu(cx: &mut TestApp
     assert_eq!(rows, ["Confirm Sketch 2", "Use", "Hide Part 1", "Curve/surface analysis…", "Isolate…", "Make transparent…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis"]);
 }
 
+// Live workflow 05 step 4 (qa FEEL-MENU-EDGE-STAYS-LIT): in a sketch a part edge right-clicked stays lit while its menu is
+// open, the pointer gone onto the menu (ours dropped it); "Hide Part 1" has the eye-slash (MENU-HIDE-PART-ICON).
+#[gpui::test]
+fn a_model_edge_right_clicked_in_a_sketch_stays_lit_under_its_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "sk-model-edge-menu-lit");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, EDGE);
+    approach(cx, &m, p);
+    let edge = cx.update(|cx| m.view.read(cx).hover.clone()).filter(|r| matches!(r, Reference::Edge(_))).expect("the edge lit");
+    m.pointer.right_click(cx, &m.view, p);
+    m.pointer.move_to(cx, &m.view, p + DVec2::new(60.0, 40.0));
+    draw(cx, m.window);
+    let (lit, icon) = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let icon = v.context_menu.as_ref().and_then(|(_, menu, _)| menu.read(cx).named_icon("Hide Part 1").map(|n| n.to_string()));
+        (v.highlighted_hover(cx), icon)
+    });
+    assert_eq!((lit, icon.as_deref()), (vec![edge], Some("eye-off")), "(lit with the menu open, Hide Part 1's icon)");
+}
+
 // The Part Studio, the top face selected: the hand path to an edge's midpoint lights it, the click adds it to the face,
 // and the right-click gives the part's menu ending in "Add appearance to face…" (live psui walk 5 p2a-p2d).
 #[gpui::test]
@@ -1117,4 +1158,73 @@ fn the_fillet_arrow_stays_at_the_edges_midpoint_wherever_it_was_picked(cx: &mut 
     let far = pick(cx, [40., 25., 20.]).expect("the radius arrow, picked near the back end");
     let mid = DVec3::new(0.04, 0.015, 0.02);
     assert!(near.distance(mid) < 1e-9 && far.distance(mid) < 1e-9, "{near:?} / {far:?}, the midpoint {mid:?}");
+}
+
+// Live workflow 07 (qa FEEL-PATTERN-FAIL-EDGE-RED, PATTERN-FAIL-PREVIEW): a Feature pattern of the boss whose instance
+// lands off the block fails; its picked Direction edge keeps the selection orange and the instance it couldn't make is
+// drawn as a red see-through body at its place (ours drew the edge #842228 and no instance).
+#[gpui::test]
+fn a_failing_feature_patterns_direction_stays_orange_and_its_instance_shows_red(cx: &mut TestAppContext) {
+    use noshape_model::params::ParamValue;
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[-20, -15], [20, 15]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[10, 0], [14, 0]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "ADD", "defaultScope": true } },
+    ] });
+    let (window, view) = part_studio_from(cx, "pattern-fail-look", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let (boss, edge) = cx.update(|cx| {
+        let v = view.read(cx);
+        let boss = v.studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Extrude 2").map(|f| f.id)).expect("Extrude 2");
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let front_top = |a: &[f32; 3]| (a[1] + 0.015).abs() < 1e-6 && (a[2] - 0.010).abs() < 1e-6;
+        let edge = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| matches!((pl.first(), pl.last()), (Some(a), Some(z)) if front_top(a) && front_top(z) && (a[0] - z[0]).abs() > 0.039));
+        (boss, edge.expect("the block's front top edge").0.clone())
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("linearPattern", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Linear pattern dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("patternType", ParamValue::Enum("FEATURE".into()), cx);
+        d.set_value("instanceFunction", ParamValue::Query(vec![Reference::Feature(boss)]), cx);
+        d.user_focus_query("directionOne");
+        d.add_pick(edge.clone(), cx);
+    }));
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        let d = dialog.read(cx);
+        !v.ui_busy() && d.feature.params.query("directionOne").len() == 1 && matches!(d.status, Some((noshape_model::display::FeatureStatus::Error, _)))
+    });
+    let state = cx.update(|cx| {
+        let v = view.read(cx);
+        let id = dialog.read(cx).feature.id;
+        v.display.feature_state(id).map(|s| (s.message.clone(), s.faulty.clone(), s.error_mesh.is_some()))
+    });
+    let (px, w) = super::sketch_hover::settled_frame(cx, window, &view);
+    let scale = w as f64 / cx.update(|cx| view.read(cx).viewport.read(cx).size().x).round();
+    let rgb = |x: i32, y: i32| -> Option<[i32; 3]> {
+        let o = (y.max(0) as usize * w + x.max(0) as usize) * 4;
+        px.get(o..o + 3).map(|b| [b[2] as i32, b[1] as i32, b[0] as i32])
+    };
+    let screen = |cx: &mut TestAppContext, p: DVec3| cx.update(|cx| view.read(cx).viewport.read(cx).project(p)).map(|s| ((s.x * scale).round() as i32, (s.y * scale).round() as i32));
+    const SELECT: [i32; 3] = [0xFF, 0xA9, 0x0A];
+    let mut off = Vec::new();
+    for k in 1..10 {
+        let Some((x, y)) = screen(cx, DVec3::new(-0.020 + 0.004 * k as f64, -0.015, 0.010)) else { continue };
+        let r = (2.0 * scale).ceil() as i32;
+        let near = (-r..=r).flat_map(|dy| (-r..=r).map(move |dx| (dx, dy))).filter_map(|(dx, dy)| rgb(x + dx, y + dy)).any(|c| (0..3).all(|i| (c[i] - SELECT[i]).abs() <= 24));
+        if !near {
+            off.push(format!("x {} mm: {:?}", -20 + 4 * k, rgb(x, y)));
+        }
+    }
+    // The instance 25 mm on: a disc of 8 mm at (35, 0), 0..20 mm high. Red where it's seen over the white background.
+    let red = (0..=8)
+        .filter_map(|k| screen(cx, DVec3::new(0.035, 0.0, 0.0025 * k as f64)))
+        .filter(|&(x, y)| rgb(x, y).is_some_and(|c| c[0] > c[1] + 50 && c[0] > c[2] + 40))
+        .count();
+    assert!(off.is_empty() && red >= 5, "the Direction edge not orange at {off:?}; {red} of 9 samples red up the instance's axis; the pattern's state {state:?}");
 }

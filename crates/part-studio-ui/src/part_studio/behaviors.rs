@@ -1253,9 +1253,16 @@ impl PartStudioView {
         surface.is_none_or(|s| surface_fits(&s, filter))
     }
 
+    /// The feature whose row (or menu, or Instance inspector row) is hovered: never the one open in the dialog (live
+    /// workflow 10: Extrude 1 double-clicked, the pointer still on its row, lights only its picked region).
+    pub(super) fn row_hovered_feature(&self, cx: &App) -> Option<FeatureId> {
+        let editing = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+        self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature).filter(|f| Some(*f) != editing)
+    }
+
     /// Hover target in the graphics area, expanded like the selection.
     pub(super) fn highlighted_hover(&self, cx: &App) -> Vec<Reference> {
-        if let Some(f) = self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature) {
+        if let Some(f) = self.row_hovered_feature(cx) {
             return self.feature_geometry(f);
         }
         if self.ui.var_hover.is_some() {

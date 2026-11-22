@@ -1099,6 +1099,16 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 if !hidden_pts.points.is_empty() {
                     scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&hidden_pts))).per_primitive_color().unpickable().hidden_only().ignore_clip().layer(11));
                 }
+            } else if !through {
+                // A shown sketch's curves behind a part: dashed in their colour (live workflow 11: a line under the
+                // plate's top face; Shift+H 1673: "dashed through the part").
+                let mut hidden = LineData::default();
+                for c in sk.curves.iter().filter(|c| !c.handle) {
+                    hidden.push_polyline(&c.points, sketch_curve_color(opts, sk, c), 0, opts.graphics.inactive_line_width, LineSegment::DASHED);
+                }
+                if !hidden.segments.is_empty() {
+                    scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&hidden))).per_primitive_color().unpickable().hidden_only().ignore_clip().layer(10));
+                }
             }
             // Regions: invisible, pickable; highlight overlay added on hover/selection.
             // All regions of a sketch share one mesh (vertices carry their region's

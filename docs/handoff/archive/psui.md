@@ -2992,3 +2992,39 @@ the staged green), on vibex7 (copies in /root/psui-scratch); scenarios ~/tmp/psu
 6. Not to build: 3D Sketch, Fault analysis. Cleanup: vibex7 ~/tmp/psui/priv/dock.noshape when the tab work is over;
    vibe2 ~/tmp/psui/hv binaries. Branch psui-backup-1119 (all landed; delete).
 
+
+## Moved 2026-11-22 04:10 UTC (11-21 afternoon)
+
+LANDED c2e4094c as 9ffded3f 14:13 (3dd4f04b's circle-rims + ellipse rule, parity ellipse labels, plane-face rule,
+Section view… back on a sketch row's plain right-click; qa verified the 15 UIP-SKETCH-ROW-SECTION-VIEW scenarios on
+28d58d209, 75/75). Kept off: the sketch right above a rolled-back bar (rollback-menus; live REQUESTS 13:49 to recheck).
+IN TREE (to land): real-app fixes from vibex8 shots (shots-run.sh, ~/agents/psui-keep/shots6):
+- circle-rims step 22 (27/27 now): a glyph takes a press only when it is lit (its tile, or the hovered constraint); the
+  pointer-move path no longer lights a glyph from the lagging glyph_boxes while the sketch's entity is under its margin.
+- ellipse-axes step 12: with faces off, the plane lit is the nearest outline within 6 px (plane_by_outline), whichever
+  face is under; re-resolved on every move (the GPU id doesn't change along one face). Test probes live's (40, 5).
+- ellipse-axes step 18: ui_script exports an ellipse axis dimension as live's MAJOR_/MINOR_DIAMETER constraint.
+sk12d (the 21 sk12 takes, sk12-names.txt, uip-some.sh on vibex8 -> ~/agents/psui-keep/sk12d): 21/21, 344/344.
+Not done: Front's face not picked 3.3 mm above the sketch plane (live picks it at 13-17 mm).
+split-at-crossing PERPENDICULAR: skasm's queue (crates/sketch square_at_mid). Shots: vibex8
+~/agents/psui-keep/shots2/<take> (shots-run.sh in psui-scratch: build + one app, frames every 0.4 s).
+
+qa P1 FEEL-ROW-DBLCLICK-DISTANCE: closed by qa (xev-measured gaps on vibe2: 80 px opens to ~380 ms, not ~420, as one spot).
+
+
+## Moved 2026-11-22 (11-21 earlier items)
+std 3132 vs 3112 (reported to lead 06:5x): our crates/featurescript/std is exactly 3112; 14 files / 181 lines differ
+(live/std-3132, live/std-3132-vs-3112.diff, stddiff.py in psui-scratch/std). Geometry ones (SM pattern collapsed
+walls V3128, hole error tool axes on start plane, 7/8"-14 UNF tap drill 0.8125, thin extrude @setThinWallOneSided
+host builtin) -> core with the suite gate. Hole V2 diameter is in 3112 too (legacy V2 holes only): no gap.
+
+8. NOW (lead 05:3x) a) Sketch tool coverage: all 55 sketch tools have >= 1 uip take (coverage.py; per tool
+   /root/psui-scratch/sk/tools.json, union 169 in sk/names.txt). The 169 on main (vibex8 06:2x): 169/169, 1946/1946
+   states. sk-1 (10 dimension kinds): live has 7 takes good, parallel-lines / circle-rims / circle-centres miss a
+   pick (live checking). sk-2 (10 second takes for the thin tools) recording. When they land in tests/ui-parity: run
+   them (psui-shards.sh on vibex8), fix the differences, most-used first. skasm: tell before a crates/sketch or
+   sketch_mode fix.
+   b) Feature dialog audit DONE 10:46: docs/parity/feature-dialogs.md regenerated on green 4553fc38a against live's
+   dlg-1121 specs (std 3132) and empty errors: 81/86 specs, 85/87 errors; the rest explained there (Hole = std skew).
+   Scripts /root/psui-scratch/dlg/ (specdiff.py, empty_errors.py, gen_table.py). Open: Variable conversionFactor.
+

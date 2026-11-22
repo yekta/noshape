@@ -5352,6 +5352,7 @@ impl PartStudioView {
         let owner = midpoint_of.clone().or_else(|| model_ref.clone());
         let model_body = owner.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
         let model_ref = model_ref.filter(|_| midpoint_of.is_none());
+        let lit_model = model_ref.clone().filter(|_| hovered.is_none() && dim.is_none());
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
         // A model face: Section view… and, planar, View normal to; no Curve/surface analysis… (live ctx-menus-1117 sk-model-face).
         let model_face = model_ref.clone().filter(|r| matches!(r, Reference::Face(_)));
@@ -5478,7 +5479,7 @@ impl PartStudioView {
                     m = m.item(item(&format!("Hide {name}"), Box::new(move |this, _, cx| {
                         this.set_part_hidden(&b1, true, cx);
                         this.hover = None;
-                    })));
+                    })).icon_name("eye-off"));
                     if model_face.is_none() && model_ref.is_some() {
                         m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))));
                     }
@@ -5761,7 +5762,8 @@ impl PartStudioView {
         let sub = cx.subscribe(&menu, |this: &mut Self, _, _: &DismissEvent, cx| this.close_context_menu(cx));
         menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
         self.context_menu = Some((position, menu, sub));
-        self.ui.menu_target = lit_plane;
+        // The right-clicked model edge or face stays lit while the menu is open (live workflow 05 step 4).
+        self.ui.menu_target = lit_plane.or(lit_model);
         self.refresh_scene(false, cx);
         cx.notify();
     }

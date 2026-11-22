@@ -1223,9 +1223,9 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     // Live (behaviours "icons2 plane/origin highlight"): the hovered or
     // selected origin (style 4) is a 13 px filled disc; other points grow.
     if ((st & (HOVER | SELECTED)) != 0u) { size = select(size * 1.5 + 1.0, size + 2.0, (p.style & 4u) != 0u); }
-    // A lit sketch centre (style 128 + 256): at least 11 px, from the Part Studio's 4 px dot (live hover-matrix-1121
-    // ps/sketch-region-*).
-    if ((st & (HOVER | SELECTED)) != 0u && (p.style & (128u | 256u)) == (128u | 256u)) { size = max(size, 11.0); }
+    // A lit sketch centre (style 128 + 256) or a Part Studio sketch's 4 px dot (a line's free end): at least 11 px
+    // (live hover-matrix-1121 ps/sketch-region-*; workflow 12: another sketch's end selected and hovered ~12 px).
+    if ((st & (HOVER | SELECTED)) != 0u && (p.style & 128u) != 0u && ((p.style & 256u) != 0u || p.size <= 4.0)) { size = max(size, 11.0); }
     // A lit spline handle tip (style 64): a 14 px disc hovered, 15 px selected (live 2221), whatever its size at rest.
     if ((st & (HOVER | SELECTED)) != 0u && (p.style & 64u) != 0u) { size = select(14.0, 15.0, (st & SELECTED) != 0u); }
     // The pick pass: a point's disc 1 px smaller, at most 5 px, lit or not (a vertex or a sketch point lights from

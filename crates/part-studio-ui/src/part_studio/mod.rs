@@ -1635,7 +1635,7 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some(), untinted_parts: self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))) }, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))) }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
@@ -1681,7 +1681,7 @@ impl PartStudioView {
         // Live (selection/10): a feature hovered in the list outlines its
         // part's silhouette in the hover orange, on the outline itself; its
         // faces keep their shading and its inner edges stay black.
-        if let Some(f) = self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature) {
+        if let Some(f) = self.row_hovered_feature(cx) {
             let mut faces = Vec::new();
             for g in self.feature_geometry(f) {
                 let face = matches!(g, Reference::Face(_));
@@ -1699,39 +1699,23 @@ impl PartStudioView {
             }
             scene.instances.extend(scene_builder::hover_silhouette(&self.display, &faces, self.gpu.uploader()));
         }
-        // Live (lp wall over 2258): the pattern's other inputs (its
-        // Direction) are drawn red; the seed keeps the selection colors.
+        // A failed Feature pattern's seed keeps its shading with a light selection tint, outlined orange, its hidden edges
+        // dashed (live #717560 end face, #ffa90a edges); its other inputs (the Direction) keep the selection's orange
+        // (live workflow 07; the red lines in "lp wall over" 2258 were its ghosts' and a REST-made query's).
         if error_mesh.is_some()
             && let Some(e) = &self.edit
         {
             let d = e.dialog.read(cx);
-            for r in d.active_refs().into_iter().chain(d.selected_refs()) {
-                match r {
-                    // The seed keeps its shading with a light selection
-                    // tint, outlined orange, its hidden edges dashed (live
-                    // #717560 end face, #ffa90a edges).
-                    Reference::Feature(f) => {
-                        let faces: Vec<Reference> = self.feature_geometry(f).into_iter().filter(|g| matches!(g, Reference::Face(_))).collect();
-                        for g in &faces {
-                            for &id in built.picks.ids_for(g) {
-                                if let Some(s) = scene.states.get_mut(id as usize) {
-                                    *s = (*s & !(noshape_render::state::SELECTED | noshape_render::state::ACCENT)) | noshape_render::state::TINT;
-                                }
-                            }
-                        }
-                        scene.instances.extend(scene_builder::hidden_edges_dashed(&self.display, &faces, self.gpu.uploader()));
-                    }
-                    // Red, not selected: a selected stroke draws over the
-                    // error color (qa4 gate v0.4.7: the edge was orange).
-                    r => {
-                        for &id in built.picks.ids_for(&r) {
-                            if let Some(s) = scene.states.get_mut(id as usize) {
-                                *s &= !(noshape_render::state::SELECTED | noshape_render::state::ACCENT | noshape_render::state::BODY);
-                            }
-                            scene.add_flag(id, noshape_render::state::ERROR);
+            for f in d.active_refs().into_iter().chain(d.selected_refs()).filter_map(|r| if let Reference::Feature(f) = r { Some(f) } else { None }) {
+                let faces: Vec<Reference> = self.feature_geometry(f).into_iter().filter(|g| matches!(g, Reference::Face(_))).collect();
+                for g in &faces {
+                    for &id in built.picks.ids_for(g) {
+                        if let Some(s) = scene.states.get_mut(id as usize) {
+                            *s = (*s & !(noshape_render::state::SELECTED | noshape_render::state::ACCENT)) | noshape_render::state::TINT;
                         }
                     }
                 }
+                scene.instances.extend(scene_builder::hidden_edges_dashed(&self.display, &faces, self.gpu.uploader()));
             }
         }
         // Parts picked in a dialog field: outlined, not filled (live part-studio/440).

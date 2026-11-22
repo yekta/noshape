@@ -335,6 +335,13 @@ pub struct Viewport {
     /// The previous hover move ([`prehighlight_delay`]), the average GPU
     /// pick time (ms), and the pre-highlight pick waiting for a pause.
     last_move_at: Option<Instant>,
+    /// Where the pointer rested when what covered the graphics went (a modal, a menu): nothing lights there until the
+    /// pointer moves (live workflows 16 and 17).
+    hover_waits_at: Option<DVec2>,
+    /// The hover went while the pointer stayed over the graphics: something came over them.
+    covered: bool,
+    /// The window's last input was a pointer move (not a press, release or key).
+    last_input_move: bool,
     avg_pick_ms: f64,
     paused_hover: Option<Task<()>>,
     /// The pointer is over the viewport (hover is cleared when it leaves).
@@ -537,6 +544,9 @@ pub struct Viewport {
     /// kept the old theme's until the next hover or camera change, its axis
     /// labels for good).
     _theme: Subscription,
+    /// Any key in the app: the window's last input wasn't a move (`last_input_move`; key listeners only hear the
+    /// focused path, a modal's when one is open).
+    _keys: Subscription,
     /// Frames presented so far.
     frames_presented: u64,
     /// Of them, shown again from [`Viewport::frame_cache`].
@@ -723,6 +733,9 @@ impl Viewport {
             hover_query_again: false,
             hover_query_newest: (0, (0, 0)),
             last_move_at: None,
+            hover_waits_at: None,
+            covered: false,
+            last_input_move: false,
             avg_pick_ms: -1.0,
             paused_hover: None,
             pointer_inside: false,
@@ -813,6 +826,16 @@ impl Viewport {
             axis_tag: AxisTag::None,
             _frames: frames,
             _picks: picks,
+            _keys: {
+                let this = cx.weak_entity();
+                cx.intercept_keystrokes(move |_, _, cx| {
+                    if let Some(this) = this.upgrade()
+                        && this.read(cx).last_input_move
+                    {
+                        this.update(cx, |this, _| this.last_input_move = false);
+                    }
+                })
+            },
             _theme: cx.observe_global::<crate::graphics_prefs::GraphicsGlobal>(|this, cx| {
                 // The X / Y / Z labels are rasterized in the theme's colours: again on the next frame.
                 this.axis_masks = None;
@@ -1393,7 +1416,7 @@ impl Viewport {
     /// query in flight at a time).
     fn request_hover(&mut self) {
         // Live: nothing pre-highlights while a box is dragged either.
-        if matches!(self.drag, Drag::Nav | Drag::Box) || self.anim.is_some() || !self.pointer_inside {
+        if matches!(self.drag, Drag::Nav | Drag::Box) || self.anim.is_some() || !self.pointer_inside || self.hover_waits_at == Some(self.last_pos) {
             return;
         }
         let (x, y) = self.device_px(self.last_pos);
@@ -2579,12 +2602,13 @@ impl Viewport {
     fn on_hover_change(&mut self, hovered: &bool, window: &mut Window, cx: &mut Context<Self>) {
         let back = *hovered && !self.pointer_inside;
         self.pointer_inside = *hovered;
-        // Back over the graphics with no move (what covered them went, or the view changed under a resting pointer:
-        // live shortcuts-ps-1118, a view key): what is under the pointer lights.
-        if back && self.drag == Drag::None {
+        // Back over the graphics by a click or key, not a move (what covered them went: a modal or menu closed):
+        // nothing lights until the pointer moves (live workflows 16, 17 and 29).
+        if back && self.covered && !self.last_input_move && self.drag == Drag::None {
             self.last_pos = self.local(window.mouse_position());
-            self.request_hover();
+            self.hover_waits_at = Some(self.last_pos);
         }
+        self.covered = !*hovered && self.bounds.contains(&window.mouse_position());
         if !*hovered {
             self.hover_query_again = false;
             self.paused_hover = None;
@@ -2627,6 +2651,9 @@ impl Viewport {
                 cx.notify();
             }
             return;
+        }
+        if self.hover_waits_at.is_some_and(|q| q != p) {
+            self.hover_waits_at = None;
         }
         // Moves outside the bounds arrive while a button is held (drags).
         self.pointer_inside = self.bounds.contains(&e.position);
@@ -3443,11 +3470,31 @@ impl Render for Viewport {
                             // A press that started here follows the pointer
                             // over the rest of the window (capture phase: no
                             // panel under it can swallow the move).
-                            window.on_mouse_event(move |e: &MouseMoveEvent, phase, window, cx| {
-                                if phase == DispatchPhase::Capture && entity.read(cx).drag != Drag::None {
-                                    entity.update(cx, |this, cx| this.on_mouse_move(e, window, cx));
+                            window.on_mouse_event({
+                                let entity = entity.clone();
+                                move |e: &MouseMoveEvent, phase, window, cx| {
+                                    if phase != DispatchPhase::Capture {
+                                        return;
+                                    }
+                                    if !entity.read(cx).last_input_move {
+                                        entity.update(cx, |this, _| this.last_input_move = true);
+                                    }
+                                    if entity.read(cx).drag != Drag::None {
+                                        entity.update(cx, |this, cx| this.on_mouse_move(e, window, cx));
+                                    }
                                 }
                             });
+                            // A press or release (keys: `_keys`): the next return of the hover isn't the pointer's own.
+                            let not_a_move = move |entity: &Entity<Self>, cx: &mut App| {
+                                if entity.read(cx).last_input_move {
+                                    entity.update(cx, |this, _| this.last_input_move = false);
+                                }
+                            };
+                            window.on_mouse_event({
+                                let entity = entity.clone();
+                                move |_: &MouseDownEvent, phase, _, cx| if phase == DispatchPhase::Capture { not_a_move(&entity, cx) }
+                            });
+                            window.on_mouse_event(move |_: &MouseUpEvent, phase, _, cx| if phase == DispatchPhase::Capture { not_a_move(&entity, cx) });
                         }
                     },
                 )

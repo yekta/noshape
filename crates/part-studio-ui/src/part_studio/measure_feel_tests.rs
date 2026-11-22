@@ -225,6 +225,15 @@ fn rows() -> Vec<Row> {
             b.click_value(cx, "Min dist")?;
             Ok(five.into_iter().chain(b.readout(cx, &[V40, V60], &[])?).collect())
         } },
+        Row { id: "a value clicked, the details panel opened and closed: 3 decimals again", live: &["Min dist: 20.00000 mm", "Min dist: 20.000 mm"], gap: false, check: |b, cx| {
+            // Live workflow 20 steps 4-8 (qa MEASURE-VALUE-CLICK-PIN): "[" twice, the readout back at 10.000.
+            b.readout(cx, &[V40, V60], &[])?;
+            b.click_value(cx, "Min dist")?;
+            let five = b.readout(cx, &[V40, V60], &[])?;
+            b.panel(cx, true);
+            b.panel(cx, false);
+            Ok(five.into_iter().chain(b.readout(cx, &[V40, V60], &[])?).collect())
+        } },
         Row { id: "a value clicked: its text selected, Ctrl+C copies it", live: &["20.00000"], gap: false, check: |b, cx| {
             b.readout(cx, &[V40, V60], &[])?;
             b.click_value(cx, "Min dist")?;

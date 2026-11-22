@@ -3552,6 +3552,29 @@ fn the_transparency_slider_is_remembered_per_dialog(cx: &mut TestAppContext) {
     assert_eq!(open(cx, IsolateMode::Isolate, None), Some(0.0), "Isolate");
 }
 
+/// Live workflow 15 (qa EXTRUDE-ARROW-GONE-WITH-VARIABLE): Depth "#depth", a Variable Studio's 25 mm, keeps the depth
+/// arrow, 25 mm long.
+#[gpui::test]
+fn an_extrude_depth_from_a_variable_studio_keeps_its_arrow(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "depth-variable-arrow");
+    cx.update(|cx| {
+        let doc = view.read(cx).doc.clone();
+        doc.update(cx, |d, _| {
+            let depth = noshape_model::variables::VariableDef { name: "depth".into(), expr: noshape_units::ExprValue::new("25 mm"), kind: Some(noshape_model::variables::VarKind::Length), description: String::new(), description_expr: false, import: None, other_values: Default::default() };
+            let vs = noshape_model::variables::VariableStudio { variables: vec![depth], insert_into_all: true, ..Default::default() };
+            d.session.doc.add_tab("Variable Studio 1", noshape_model::document::TabContent::VariableStudio(vs));
+        })
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![top]), cx)));
+    let arrow = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).current_arrow(cx).map(|a| (a.param, a.length)));
+    assert!(arrow(cx).is_some_and(|(p, _)| p == "depth"), "the face's depth arrow: {:?}", arrow(cx));
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("depth", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("#depth")), cx)));
+    let a = arrow(cx);
+    assert!(a.is_some_and(|(p, l)| p == "depth" && (l - 0.025).abs() < 1e-9), "#depth: {a:?}");
+}
+
 /// Fillet's drag arrow as std edgeBlendCommon.fs addFilletControlManipulator: on a block's top edge (a 90° convex edge)
 /// its tip where the round crosses the faces' bisector (offset radius × (1/cos 45° − 1)), into the material; Width
 /// drives the width (offset × |n₀ − n₁| = √2 per width), a conic section its own radius; none for a variable radius.
@@ -4413,6 +4436,57 @@ fn a_selected_part_outlines_through_parts_in_front(cx: &mut TestAppContext) {
     assert_eq!((before, through(cx)), (false, true), "outline through: nothing selected, the part selected");
 }
 
+/// Live workflow 11 (qa SKETCH-LINE-ON-FACE-HIDDEN): a shown sketch's line under a plate's top face is drawn dashed
+/// where the plate hides it (one dashed copy of its curves, drawn only behind the parts); the consumed sketch, hidden,
+/// has none.
+#[gpui::test]
+fn a_shown_sketch_behind_a_part_is_dashed(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "2 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "line": [[30, -10], [30, 50]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "sketch-dashed-behind", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.sketches.iter().any(|s| !s.hidden));
+    draw(cx, window);
+    let dashed = cx.update(|cx| view.read(cx).viewport.read(cx).scene().instances.iter().filter(|i| i.hidden_only && matches!(i.drawable, noshape_render::Drawable::Lines(_))).count());
+    assert_eq!(dashed, 1, "Sketch 2's dashed copy only");
+}
+
+/// Live workflow 19 (qa FEEL-QUERY-PART-PICK-FILL): a part picked into a dialog's field (Mirror's Entities) keeps its own
+/// colour, only its outline drawn (through the parts in front); selected outside a dialog it takes the part amber.
+#[gpui::test]
+fn a_part_in_a_dialog_field_is_outlined_not_tinted(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "part-pick-outline");
+    let look = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let body = &v.display.bodies[0];
+            let id = v.built.as_ref().and_then(|b| b.picks.ids_for(&body.face_refs[0]).first().copied()).expect("a face's pick");
+            let s = v.viewport.read(cx).scene();
+            let st = s.states.get(id as usize).copied().unwrap_or(0);
+            (st & noshape_render::state::BODY != 0, s.body_outline)
+        })
+    };
+    let body = cx.update(|cx| view.read(cx).display.bodies[0].id.clone());
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Body(body.clone())];
+        v.refresh_scene(false, cx);
+    }));
+    draw(cx, window);
+    let selected = look(cx);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selection.clear();
+        v.refresh_scene(false, cx);
+    }));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("mirror", w, cx))).unwrap();
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("entities", noshape_model::ParamValue::Query(vec![Reference::Body(body.clone())]), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    assert_eq!((selected, look(cx)), ((true, true), (false, true)), "((tinted, outlined) selected, in Mirror's Entities)");
+}
+
 /// Live 1990 (3.18): a double-click on a shown sketch's line in the graphics doesn't open the sketch; the first click
 /// selects the line, the second deselects it.
 #[gpui::test]
@@ -4912,6 +4986,26 @@ struct ExportDialog {
     exported: std::rc::Rc<std::cell::RefCell<Vec<noshape_ops::export::ExportSettings>>>,
 }
 
+/// The export options a test remembers, in its own scratch file: one run's test binaries share the settings directory
+/// (a parallel test's export or an agent API export would change them under it).
+struct OwnExportPrefs(std::path::PathBuf);
+
+impl OwnExportPrefs {
+    fn new(test: &str) -> Self {
+        let p = std::env::temp_dir().join(format!("psui-export-prefs-{test}-{}.json", std::process::id()));
+        let _ = std::fs::remove_file(&p);
+        noshape_ops::export::SolidExportPrefs::use_file(Some(p.clone()));
+        Self(p)
+    }
+}
+
+impl Drop for OwnExportPrefs {
+    fn drop(&mut self) {
+        noshape_ops::export::SolidExportPrefs::use_file(None);
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
 impl ExportDialog {
     fn open(&self, cx: &mut TestAppContext, assembly: bool) {
         let exported = self.exported.clone();
@@ -4965,16 +5059,7 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     let (window, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Page))).unwrap();
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     draw(cx, window);
-    // One run's test binaries share the settings directory (tools/tiers): the remembered options go with the test,
-    // or later exports through the agent API would take them.
-    struct Forget(std::path::PathBuf);
-    impl Drop for Forget {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_file(&self.0);
-        }
-    }
-    let _forget = Forget(noshape_scene::config_dir().join("export_solid.json"));
-    let _ = std::fs::remove_file(noshape_scene::config_dir().join("export_solid.json"));
+    let _prefs = OwnExportPrefs::new("last-choices");
     let d = ExportDialog { window, exported: Default::default() };
     d.open(cx, false);
     let first = d.export(cx);
@@ -5033,6 +5118,7 @@ fn export_dialog_keys_as_live(cx: &mut TestAppContext) {
     let (window, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Page))).unwrap();
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     draw(cx, window);
+    let _prefs = OwnExportPrefs::new("keys");
     let names = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
     let open = |cx: &mut TestAppContext| {
         let names = names.clone();
@@ -6693,6 +6779,35 @@ fn enter_in_a_configured_value_moves_down_a_row(cx: &mut TestAppContext) {
     assert_eq!(framed, Some(format!("cp-0-{}", rows[1])), "the cell below framed");
 }
 
+/// Live workflow 14 (qa CONFIG-NAME-FOCUS-BOX): the add row's Name input taking the keys has the blue focus box, and
+/// after a name + Enter the next empty Name row has it.
+#[gpui::test]
+fn the_configuration_add_rows_name_has_the_focus_box(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-name-focus", &[("width", "30 mm")]);
+    let input = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut input = String::new();
+            v.edit_config("Configure", cx, |ps| input = noshape_ops::config::add_input(ps, "List"));
+            v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+            input
+        })
+    });
+    let selector: &'static str = Box::leak(format!("cfg-new-focus-{input}").into_boxed_str());
+    let boxed = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(selector).is_some();
+    draw(cx, window);
+    let before = boxed(cx);
+    view.update(cx, |v, cx| {
+        v.ui.cfg_focus_new_row = Some(input.clone());
+        cx.notify();
+    });
+    draw(cx, window);
+    let focused = boxed(cx);
+    keys(cx, window, &["l", "a", "r", "g", "e", "enter"]);
+    draw(cx, window);
+    draw(cx, window);
+    assert_eq!((before, focused, boxed(cx)), (false, true, true), "(the box: at rest, the add row focused, after a name + Enter)");
+}
+
 /// Live2 ps-feel2-1118: a List's rows by keys. A name + Tab in the add row adds the row and frames the first row's
 /// name; typing on a framed name replaces it and Return commits and frames the row below; Up / Down move the frame;
 /// Down from the last row gives the add row the keyboard.
@@ -7602,6 +7717,28 @@ fn a_hovered_edge_tints_no_list_row(cx: &mut TestAppContext) {
         (v.highlighted_hover(cx).is_empty(), v.related_features(cx).len(), v.selected_features.len(), v.ui.list_hover, rows)
     });
     assert_eq!(state, (false, 0, 0, None, 0), "(nothing lit, related rows, selected rows, list hover, tinted part rows)");
+}
+
+/// Live workflow 10 (qa FEEL-ROW-HOVER-IN-OWN-DIALOG): Extrude 1 double-clicked to edit, the pointer still on its row,
+/// lights only the region its dialog picked: the row of the feature being edited pre-highlights nothing (ours outlined
+/// the whole extrude); another row hovered still does.
+#[gpui::test]
+fn the_edited_features_own_row_hovered_lights_nothing(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "own-row-hover");
+    let (sketch, extrude) = cx.update(|cx| {
+        let st = view.read(cx).studio(cx).expect("the studio");
+        let id = |ty: &str| st.features.iter().find(|f| f.type_id == ty).map(|f| f.id).expect(ty);
+        (id("sketch"), id("extrude"))
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(extrude, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_some());
+    let lit = |cx: &mut TestAppContext, row: noshape_model::reference::FeatureId| {
+        view.update(cx, |v, _| v.ui.list_hover = Some(row));
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).highlighted_hover(cx).len())
+    };
+    let (own, other) = (lit(cx, extrude), lit(cx, sketch));
+    assert!(own == 0 && other > 0, "{own} entities lit by Extrude 1's own row, {other} by Sketch 1's");
 }
 
 /// Live 1.223 (rn-1222-1223 st4.json, sticky-h-*.png; TABLES-STICKY-HEADER-HSCROLL): the Cut list is live's table

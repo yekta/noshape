@@ -1731,12 +1731,13 @@ impl PartStudioView {
                     let mut row = h_flex()
                         .id(SharedString::from(format!("cfg-row-{iid}-{rk}")))
                         .debug_selector(move || row_selector)
-                        .map(|d| crate::ui_script::mark(d, || format!("config_row:{rname}")))
                         .on_mouse_down(MouseButton::Right, cx.listener(|this, _, window, cx| window.focus(&this.panel_row_focus, cx)))
                         .border_l_1()
                         .border_color(grid)
                         .child(
                             cell(name_w)
+                                // The runner's row: its Name cell, where live's runner clicks (qa UIS-CONFIG-ROW-MENU).
+                                .map(|d| crate::ui_script::mark(d, || format!("config_row:{rname}")))
                                 .relative()
                                 .cursor_pointer()
                                 .pl(px(6.))
@@ -1814,6 +1815,8 @@ impl PartStudioView {
                     let a = iid.clone();
                     // Keyed by the row count, so the row is empty again after adding.
                     let key = format!("opt-new-{iid}-{}", rows.len());
+                    // Live workflow 14: a name + Enter adds the row and the next empty Name row takes the keys.
+                    self.ui.cfg_enter_next.insert(key.clone(), format!("{CFG_ADD_ROW}{iid}"));
                     let first = rows.first().map(|(k, _)| format!("opt-{iid}-{k}"));
                     let st = self.cell_input(key, String::new(), window, cx, move |this, v, cx| {
                         let name = v.trim().to_string();
@@ -1834,6 +1837,8 @@ impl PartStudioView {
                         st.update(cx, |s, cx| s.focus(window, cx));
                     }
                     let tab_from = iid.clone();
+                    // Live workflow 14: the Name input taking the keys has the blue focus box (#1651b0, 2 px).
+                    let focused = st.read(cx).focus_handle(cx).is_focused(window);
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
                             cell(name_w)
@@ -1842,7 +1847,11 @@ impl PartStudioView {
                                 .capture_action(cx.listener(move |this, _: &gpui_kit::component::input::IndentInline, _, _| {
                                     this.ui.cfg_tab_from_new = Some(tab_from.clone());
                                 }))
-                                .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(13.33)).pl(px(3.))),
+                                .child(crate::ui::input_with_placeholder(&st, "Name", cx).appearance(false).text_size(px(13.33)).pl(px(3.)))
+                                .when(focused, |d| {
+                                    let at = iid.clone();
+                                    d.child(div().debug_selector(move || format!("cfg-new-focus-{at}")).absolute().inset_0().border_2().border_color(p().accent))
+                                }),
                         ),
                     );
                 }

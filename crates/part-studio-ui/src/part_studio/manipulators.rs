@@ -167,7 +167,7 @@ impl PartStudioView {
         let p = &d.feature.params;
         let move_face = d.feature.type_id == "moveFace";
         let units = self.doc.read(cx).session.doc.settings.units;
-        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         // moveFace.fs: the rotate manipulator turns the first face about
         // the axis.
         let anchor = if move_face {
@@ -209,7 +209,7 @@ impl PartStudioView {
         }
         // The arc as for a Blind end: its anchor and axis serve the flips too.
         let units = self.doc.read(cx).session.doc.settings.units;
-        let angle_of = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)));
+        let angle_of = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)));
         let arc = self.revolve_arc(cx)?;
         // flipManipulator: at the profile, across the turn (the arc's start direction).
         let flip = |flip: &'static str, opposite: bool, secondary: bool| {
@@ -250,7 +250,7 @@ impl PartStudioView {
             return None;
         }
         let units = self.doc.read(cx).session.doc.settings.units;
-        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         let axis = if p.bool("pullDirection") { -axis } else { axis };
         Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians() })
     }
@@ -282,7 +282,7 @@ impl PartStudioView {
         let radial = (rel - axis * axis.dot(rel)).try_normalize()?;
         let size = self.display.planes.iter().find(|pl| pl.reference == Reference::FeaturePlane(d.feature.id)).map(|pl| pl.half_width * 2.0)?;
         let units = self.doc.read(cx).session.doc.settings.units;
-        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         let axis = if p.bool("oppositeDirection") { -axis } else { axis };
         Some(ArcHandle { origin: o, axis, radial: radial * size / 4.0, angle, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })
     }
@@ -297,7 +297,7 @@ impl PartStudioView {
         let (lo, hi) = self.parts_box("entities", cx)?;
         let c = (lo + hi) * 0.5;
         let units = self.doc.read(cx).session.doc.settings.units;
-        let value = |id: &str, dim: Dim| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, dim, &units, &self.display.variables).ok().map(|q| q.value)));
+        let value = |id: &str, dim: Dim| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, dim, &units, &self.edit_scope(cx)).ok().map(|q| q.value)));
         let opposite = p.bool("oppositeDirection");
         if p.is("transformType", "ROTATION") {
             let (o, axis) = self.axis_of(p.query("transformAxis").first()?)?;
@@ -350,8 +350,15 @@ impl PartStudioView {
         }
     }
 
+    /// The variables the feature being edited sees: a Variable Studio's too (live workflow 15: Depth "#depth" keeps its
+    /// arrow).
+    fn edit_scope(&self, cx: &App) -> std::collections::BTreeMap<String, Quantity> {
+        let at = self.edit.as_ref().and_then(|e| self.studio(cx)?.index_of(e.dialog.read(cx).feature.id));
+        self.scope_variables(at, cx)
+    }
+
     /// The extrude depth arrow.
-    fn current_arrow(&self, cx: &App) -> Option<Arrow> {
+    pub(super) fn current_arrow(&self, cx: &App) -> Option<Arrow> {
         let e = self.edit.as_ref()?;
         let d = e.dialog.read(cx);
         if d.feature.type_id != "extrude" || d.feature.params.is("bodyType", "SURFACE") {
@@ -365,7 +372,7 @@ impl PartStudioView {
         } else {
             d.feature.params.expr("depth").and_then(|x| x.cached.map(|q| q.value)).or_else(|| {
                 let units = self.doc.read(cx).session.doc.settings.units;
-                d.feature.params.expr("depth").and_then(|x| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok()).map(|q| q.value)
+                d.feature.params.expr("depth").and_then(|x| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.edit_scope(cx)).ok()).map(|q| q.value)
             })?
         };
         // Profile center and normal from the first selected region, or a
@@ -404,7 +411,7 @@ impl PartStudioView {
             return Some(Arrow { base: first.base, dir, length: 0.0, param: "", flip: Some("secondDirectionOppositeDirection"), secondary: true, small: false, tangential: false, scale: 1.0 });
         }
         let units = self.doc.read(cx).session.doc.settings.units;
-        let depth = p.expr("secondDirectionDepth").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)))?;
+        let depth = p.expr("secondDirectionDepth").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         Some(Arrow { base: first.base, dir, length: depth, param: "secondDirectionDepth", flip: Some("secondDirectionOppositeDirection"), secondary: true, small: false, tangential: false, scale: 1.0 })
     }
 
@@ -463,7 +470,7 @@ impl PartStudioView {
         let d = self.edit.as_ref()?.dialog.read(cx);
         let p = &d.feature.params;
         let units = self.doc.read(cx).session.doc.settings.units;
-        let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.display.variables).ok().map(|q| q.value)));
+        let value = |id: &str| p.expr(id).and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::LENGTH, &units, &self.edit_scope(cx)).ok().map(|q| q.value)));
         // Edges/faces the feature consumes only exist before it.
         let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
         match d.feature.type_id.as_str() {
@@ -1302,12 +1309,14 @@ const ARROW_DEAD_PX: f64 = 3.0;
 fn handle_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
     // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo
     // at #6A767D 0.75 (145–158 over white, darker than a face over one); hovered
-    // as icons2; while dragged, one solid blue stroke (≈ #2c61a3,
-    // dialogs/extrude-06).
+    // live's manipulator hover tokens, outline #134e96 round a #a2b9df line, 4 px across (live workflow 02 step 29);
+    // while dragged, one solid blue stroke (≈ #2c61a3, dialogs/extrude-06).
     if dragging {
         (crate::theme::rgb8(0x2c61a3), crate::theme::rgb8(0x2c61a3), 2.0, 2.0)
+    } else if hover {
+        (crate::theme::rgb8(0x134e96), crate::theme::rgb8(0xa2b9df), 4.0, 2.0)
     } else {
-        (if hover { crate::theme::rgb8(0x3e6eb0) } else { [0x6a, 0x76, 0x7d, 191] }, crate::theme::rgb8(0xffffff), if hover { 4.0 } else { 3.0 }, 1.5)
+        ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 3.0, 1.5)
     }
 }
 
@@ -1506,13 +1515,13 @@ mod snap_tests {
     }
 
     /// Live manip-feel-1118 / dialogs extrude-06: a dragged arrow or arc is one solid blue stroke (#2c61a3), a hovered
-    /// one a blue halo round its white core, at rest a grey halo.
+    /// one a #134e96 outline round a #a2b9df core (live workflow 02 step 29), at rest a grey halo round a white core.
     #[test]
     fn a_dragged_handle_is_one_solid_blue_stroke() {
         let blue = crate::theme::rgb8(0x2c61a3);
         assert_eq!(handle_style(true, true), (blue, blue, 2.0, 2.0));
         assert_eq!(handle_style(false, true), (blue, blue, 2.0, 2.0));
-        assert_eq!(handle_style(true, false), (crate::theme::rgb8(0x3e6eb0), crate::theme::rgb8(0xffffff), 4.0, 1.5));
+        assert_eq!(handle_style(true, false), (crate::theme::rgb8(0x134e96), crate::theme::rgb8(0xa2b9df), 4.0, 2.0));
         assert_eq!(handle_style(false, false), ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 3.0, 1.5));
     }
 

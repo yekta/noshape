@@ -828,6 +828,38 @@ fn a_view_key_lights_what_comes_under_the_resting_pointer(cx: &mut TestAppContex
     assert!(lit_after.is_some(), "nothing lit under the resting pointer after the view key");
 }
 
+/// Live workflows 16 and 17 (qa FEEL-HOVER-AFTER-MODAL): a modal closed over the graphics leaves nothing lit under the
+/// still pointer; the first move lights what is under it.
+#[gpui::test]
+fn a_modal_closed_over_the_graphics_lights_nothing_until_the_pointer_moves(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view, _, _) = block_part(cx, "hover-after-modal");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let mid = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let (lo, hi) = b.bounds.unwrap();
+        v.viewport.read(cx).project((lo + hi) * 0.5).unwrap()
+    });
+    pointer.move_to(cx, &view, mid);
+    assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the part lights under the pointer before the modal");
+    let run: crate::part_studio::export::RunExport = std::rc::Rc::new(|_, _, _, _| {});
+    cx.update_window(window, |_, w, cx| crate::part_studio::export::open_export_modal("Part Studio 1".into(), false, run, w, cx)).unwrap();
+    pointer.frames(cx, &view);
+    assert!(cx.update(|cx| view.read(cx).hover.is_none()), "the modal covers the graphics");
+    keys(cx, window, &["escape"]);
+    let shown = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| gpui_kit::component::WindowExt::has_active_dialog(w, cx)).unwrap();
+    assert!(!shown(cx), "Esc closes Export");
+    for _ in 0..20 {
+        pointer.frames(cx, &view);
+    }
+    assert!(cx.update(|cx| view.read(cx).hover.is_none()), "nothing lit under the still pointer after the modal closed");
+    pointer.move_to(cx, &view, mid + DVec2::new(1.0, 0.0));
+    assert!(cx.update(|cx| view.read(cx).hover.is_some()), "the first move lights the part");
+}
+
 /// Live2 submenu-diag-1119 (qa face-rclick-select-fillet-faces): a click beside an open context menu only closes it:
 /// the plane under it isn't selected (live: selection 0); the next click there selects the plane.
 #[gpui::test]

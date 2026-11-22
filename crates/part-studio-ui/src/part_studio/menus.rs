@@ -1208,6 +1208,14 @@ impl PartStudioView {
                 .child(crate::ui::measure_value(num).text_color(pal.text))
                 .child(div().child(unit))
         };
+        // A value clicked to 5 decimals: its number selected, white on blue (live workflow 20 step 4).
+        let picked_value = |text: String| {
+            let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
+            h_flex()
+                .gap(px(2.))
+                .child(crate::ui::measure_value(num).bg(gpui_kit::rgb(0x3367d1)).text_color(gpui_kit::rgb(0xffffff)))
+                .child(div().child(unit))
+        };
         // The ui-parity state's readout (live: "Area", "1200.000", "mm2").
         let l = |x: f64| self.measure_fmt(Quantity::new(x, Dim::LENGTH), cx);
         let readout: Vec<serde_json::Value> = line
@@ -1299,7 +1307,7 @@ impl PartStudioView {
                             let v = div()
                                 .id(SharedString::from(format!("readout-{label}")))
                                 .debug_selector(move || format!("measure_value:{l1}"))
-                                .child(value(five(&label, text, full)))
+                                .child(if precise.contains(&label) { picked_value(five(&label, text, full)) } else { value(five(&label, text, full)) })
                                 .tooltip(crate::ui::tooltip(numbers.1.clone()))
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     let set = &mut this.ui.measure_precise.1;
@@ -1341,7 +1349,11 @@ impl PartStudioView {
         let readout = if !measure_on && self.edit.is_none() && (mass_ref || (!mass_on && !self.selection.is_empty())) {
             self.selection_readout(cx)
         } else {
-            // (The state's readout goes with it: a dialog's OK clears the selection, live's measure is then null.)
+            // (The state's readout goes with it: a dialog's OK clears the selection, live's measure is then null.) The
+            // Measure panel opened, a value clicked to 5 decimals is back to 3 once it closes (live workflow 20 step 7).
+            if measure_on {
+                self.ui.measure_precise.1.clear();
+            }
             self.ui.measure_readout.clear();
             self.ui.measure_last_line = None;
             None

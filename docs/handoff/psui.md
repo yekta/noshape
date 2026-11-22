@@ -1,12 +1,11 @@
 # psui (Part Studio UI): current state
-
-Updated 2026-11-22 02:54 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-22 04:10 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Builds and crate tests on vibe2 (user 11-21): `NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh bash -c "$(cat script)"`,
+- Builds and crate tests on vibe2 or vibex8 (lead 11-22: no waiting on vibe2's one slot): `NOSHAPE_RB_HOST=… tools/tiers/rb.sh bash -c "$(cat script)"`,
   CARGO_INCREMENTAL=0; `git diff --name-only origin/main | xargs touch -c` first. ~/bin/slot
   only for suites, gates, timing pairs (DECISIONS 9e5b481d4). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
@@ -33,10 +32,72 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Compare without rerunning: `python3 tools/ui-parity/run.py --compare-only --out <dir> <names…>` (through rb.sh).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
-- sbs.py: side-by-side crops (ours offset (242, 90)); mirror-sxs/ holds the Mirror side by sides with README.
-- vibe ~/tmp is pruned after 6-12 h: keep results in ~/agents/psui-keep.
 
-## Now (02:54 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
+## Now (06:20 UTC 11-22): lead order: export_solid.json flake, qa P0s (modal hover, vertex dot), workflow P0s, P1 arrow
+LANDED 768e0e85 05:29 as c70136f5 (with 2bc17f3e, 0fc65a29, 30d77c0f, 38229ff2); lead told 06:35.
+IN WORK (uncommitted, one batch): t27 on vibe2 06:27: 152/155 (3 mine, fixed: modal rule scope, line-end row colour,
+config Enter refocus via cfg_enter_next) + scene 200 + clippy clean; t28 (run-t28.sh: feel::, sketch_lineend,
+configuration, the two new tests, clippy app-core/psui, app ui_script + clippy -p noshape) on vibe2. Green: commit
+"psui: ...", land.sh, tick TICKETS rows, tell qa + lead (matrix score). Lead 06:10: vibe2, don't end the turn on runs.
+- Flake (core's ed773d89 land): export-dialog tests shared config_dir/export_solid.json with parallel binaries. ops
+  export.rs SolidExportPrefs::use_file (thread-local file); tests' OwnExportPrefs guard (sketch_ui_tests.rs).
+- FEEL-PATTERN-FAIL-EDGE-RED + PATTERN-FAIL-PREVIEW: mod.rs failed-pattern branch tints only the seed; pattern.rs
+  apply_tools: all copies off the part -> ev.error_shapes = the copies (red ghost). Test hover_matrix
+  a_failing_feature_patterns_direction_stays_orange_and_its_instance_shows_red (t19 green).
+- FEEL-ROW-HOVER-IN-OWN-DIALOG: behaviors.rs row_hovered_feature; test the_edited_features_own_row_hovered_lights_nothing.
+- FEEL-MENU-EDGE-STAYS-LIT + MENU-HIDE-PART-ICON; FEEL-EXTRUDE-ARROW-HOVER-LOOK; MEASURE-VALUE-CLICK-PIN (part).
+- FEEL-HOVER-AFTER-MODAL: viewport.rs hover_waits_at: back over the graphics with no move (a cover went) lights
+  nothing until a move; was a re-pick (1dd4033be, meant for view keys, which InputModalityIndependent already keeps).
+  Test feel a_modal_closed_over_the_graphics_lights_nothing_until_the_pointer_moves (+ the view-key test re-run).
+- FEEL-VERTEX-SELECTED-HOVER-DOT: shaders.wgsl: a lit Part Studio sketch dot (style 128, rest 4 px) at least 11 px, as
+  centres. Matrix rows sketch_lineend_hovered / _selected_hovered (ring_of 4-5 px).
+- EXTRUDE-ARROW-GONE-WITH-VARIABLE: manipulators.rs edit_scope (scope_variables at the edited feature: Variable
+  Studio tables) for every manipulator value; test an_extrude_depth_from_a_variable_studio_keeps_its_arrow.
+- FEEL-QUERY-PART-PICK-FILL: mod.rs untinted_parts also while a feature dialog is open (outline through, no amber);
+  test a_part_in_a_dialog_field_is_outlined_not_tinted.
+- SKETCH-LINE-ON-FACE-HIDDEN: builder.rs a shown (not edited, not through) sketch's curves get a dashed hidden_only
+  copy; test a_shown_sketch_behind_a_part_is_dashed.
+- CONFIG-NAME-FOCUS-BOX: config_panel.rs the add row's focused Name input gets a 2 px #1651b0 box overlay (live
+  sampled); test the_configuration_add_rows_name_has_the_focus_box.
+- UIS-CONFIG-ROW-MENU: config_panel.rs config_row mark on the Name cell (live clicks there); app ui_script.rs
+  menu_row_matches (a quoted name after the menu name matches); test ui_script::tests::a_menu_name_matches_as_lives_runner.
+  t24 (run-t24.sh: configuration + app ui_script tests + clippy app) after t23.
+- 06:10: vibex8 (no GPU) too slow and 15 failures: t26 found the modal rule blocked hover on first entry and two tests
+  wrong (Boolean single tool fails; Extrude had no region). Fixed: viewport `covered` (hover lost with the pointer in
+  bounds) + `last_input_move` (window capture listeners) scope the wait to a cover closed by a click/key; tests use
+  Mirror and a picked face. t27 = full set on vibe2 (lead: GPU tests ran green there).
+- Prepared, apply after the batch commits: /root/psui-scratch/next/helix-tint.py (dialog face SELECTED|TINT + shader,
+  tests a_face_in_a_dialog_field_is_lightly_tinted, parts_in_booleans_tools_stay_untinted_under_the_preview),
+  rgb-scroll.py (vendor gpui-base on_blur reset_scroll_to_start + test), split-keep.py (SPLIT-KEEP-TOOLS-AUTO test;
+  std splitEditLogic is in STD_EDITING_LOGIC: find why it doesn't tick). Helix arrow direction = the revolve axis
+  (core/skasm, told lead 06:35); live's "start disc" is the world origin drawn through the part (ours occluded).
+  Open: in the Part Studio a click on a sketch line's free end seems to select the line (its band under the lit end):
+  check live (hover_matrix sketch_lineend_selected_hovered now checks only the 11 px size).
+NEXT (qa wf21, green b5b414278; crops qa-scratch/tickets/wf21-helix.png, wf21-parts.png, live left): P0
+FEEL-HELIX-FACE-PICKED-LOOK (a cylinder face picked into Helix: live faint tint (141,152,137), ours tan (182,150,73);
+Helix arrow: live mid -> down to a start disc at the bottom, ours up at the top, no disc); P1 PARTS-ROW-OF-PICK (Parts
+list: the new part bold in Revolve's preview; a grey row + blue underline while its face/edge is in a field). qa wf28
+(live/workflows-1122/28, crops qa-scratch/tickets/wf28-*.png): P0 FEEL-SECTION-PLANE-LABEL-LOOK (Section view, Right
+picked: our plane labels pale mauve (138,117,129), live solid blue (39,94,181); our part edges ~3 px dark, live 1 px);
+P1 APPEARANCE-RGB-FIELD-SCROLL (R reads "00" after mod+a, 200, Tab; live "200"); note: right-click 7-8 px from Sketch
+3's line takes the line, live the face (edge of reach). qa wf29: P1 FEEL-PLANE-LIT-AFTER-MENU (Paste sketch from the
+Top row's menu: ours lights Front under the pointer where the menu was, live nothing; wf29-paste.png row 7): likely
+the same path as FEEL-HOVER-AFTER-MODAL (hover_waits_at): check once landed. qa wf38: P1 SPLIT-KEEP-TOOLS-AUTO;
+FEEL-QUERY-PART-PICK-FILL still on green 984adcc30 (fix not landed; wf38-bool.png steps 5/28/29/35). qa wf36
+(wf36-measure-decimals.png, live left): P1 MEASURE-READOUT-VARIABLE-ICON (status readout: live's (x) after the unit);
+MEASURE-VALUE-CLICK-PIN in the Measure panel too (click Min dist: live's row light blue, value full precision 39.05125
+selected, a chip above; ours nothing). qa wf40 (wf40-*.png): P0 FEEL-SKETCH-RCLICK-PLANE-LIT (right-click empty
+sketch space: live lights the sketch plane orange while the menu is open); P1 CTX-MENU-FLIP-UP (a menu that doesn't fit
+below opens above the click; ours slides up under the pointer / over the tab bar; drawing view menu opens a submenu at
+once). qa wf33: P1 FEAT-MISSING-REF-CHIP (lost reference: live's chip red "Missing Edge of Extrude 1", menu Clear
+all / Clear missing references / Edit healthy moment; ours plain, Clear all only; wf33-fillet-fix.png); wf37: P2
+EXPR-AUTOCOMPLETE-LOOK (suggestion rows/position, wf37-*.png). Then the
+tooltip-after-press opt-out (below), UIS-WORLD-TARGET P2. Crops qa-scratch/tickets.
+OPEN: tooltip after a press (row name tip, measure chip, FEEL-ROW-DEPENDENCY-TIP-IN-DIALOG): gpui-pre div.rs
+TooltipPressGate needs a per-element opt-out restarting the timer at release. Asked live: SKETCH-ON-FACE-EXITED-LOOK,
+MEASURE-PANEL-POSITION. SKETCH-DIM-PLACE-PICKS-PLANE: qa re-scores with 30d77c0f.
+
+## Before (02:54 UTC 11-22): USER P0, the hover x selection look matrix + qa's walk tickets
 LANDED: batch 1 (5b7743f97), batch 2 (6be52caf), batch 3 666d9c47 as f411d924 (qa re-score 4/15, matrix 94/125).
 QUEUED 0fc65a29 (03:0x, 3 commits: walk 6, batch 3/walk 7, walk 5 + 8 below); lead + qa + live told.
 QUEUED 30d77c0f (03:12, carries 0fc65a29; run-t13.sh green): FEEL-PLANE-LIT-WHILE-DIMENSIONING per live dimplane-1122 (behaviours "psui plane
@@ -65,27 +126,9 @@ green on vibe2, run-t9.sh / run-t10.sh):
 - qa ask 2: ui-script drag "hold": true + "release" lets go (ui_script.rs `held`, README): tell qa when it lands.
 - Ticked: FINAL-BUTTON, RENAME-INPUT-LOOK, MENU-SK-MODEL-ENTITY; dropped FIELD-VERTEX-EDGE's union duplicate row.
 FEEL-FILLET-ARROW-ANCHOR: CLOSED by qa as no gap (ours edge_mid; pixel-identical picks on green 04389f02d).
-IN 38229ff2 (render 17, scene 200, part-studio-ui 453 green on vibe2; run-full5.sh):
-- FEEL-ORIGIN-HOVER-EDGE: renderer.rs pick_reaching's corner rule reaches 3 px (d2 <= 10): the origin glyph (a 5x5
-  pick id under the edges' priority) covers the corner, the edges' nearest pixels were 3 px off. b3_cell aims at
-  `m.exact` (unrounded, as the ui-parity runner); the rounded point hid it.
-- FEEL-CUBE-CORNER-HOVER (walk 7): overlay.rs view_cube::build draws a hovered corner's highlight over the near faces
-  (no white fill: live #B1D9F0 over a gap); test render `the_cubes_near_corner_lights_a_whole_disc` (CPU composite).
-- FEEL-MC-LOOK: builder.rs connector_origin_lit, a 10 px #F2FF80 point under a lit connector whose originQuery is a
-  vertex (connector_look.rs connector_on_vertex); cells check 30+ lit px within 5 px (live 39, ours was 18). The crisp
-  rim / navy block at the ring's front = no MSAA under llvmpipe (style.software), not ours to fix (lead: software GL
-  isn't a target).
-- FEEL-FILLET-PICKED-STRIP: LineSegment::BAND (1024) + CORE: an overlay line drawn as a lit edge's 5 px band, no plain
-  line under the core (shaders.wgsl own_edge); behaviors.rs consumed_picks_overlay uses it for picked edges of a Fillet
-  edit only (a flange's edge under its wall stays the bright 3 px line: sm test, the band's 78% core is dim over the
-  blend). Cell b3_field_edge_picked: 4-6 amber px across (live 4, ours was 3).
-- FEEL-NAMED-VIEW-AFTER-SAVE (walk 7, P1): a saved view is the picked one (part studio view_tools.rs, assembly
-  assembly_view.rs); test sketch_ui_tests a_saved_named_view_is_the_picked_one.
-- qa ask: ui-script "drag" takes "button" right|middle, "moves", "interval_ms" (crates/app/src/ui_script.rs drag_plan,
-  README); right/middle let go right after the last move (a flick). Tell qa when green.
-- TICKETS: tick the 3 batch-3 ones (done) + after a rebase onto main CUBE-CORNER and NAMED-VIEW. NAV-INERTIA /
-  ANIM-LOW-FPS: qa re-ranked them P2 software-GL-only (qa checks the Mac); nothing of ours.
-- FEEL-FILLET-ARROW-DRAG: in 2bc17f3e (queued), qa re-scores when it lands.
+IN 38229ff2 (queued, carried by 768e0e85): FEEL-ORIGIN-HOVER-EDGE, FEEL-CUBE-CORNER-HOVER, FEEL-MC-LOOK,
+FEEL-FILLET-PICKED-STRIP, FEEL-NAMED-VIEW-AFTER-SAVE, ui-script drag button/moves/interval (tell qa when green); commit
+message has the details. FEEL-FILLET-ARROW-DRAG in 2bc17f3e: qa re-scores when it lands.
 FEEL-NAV-INERTIA / FEEL-NAV-ANIM-LOW-FPS (walk 7): live's client (webgl bundle): animateTo jumps and
 performStopRotationAnimation skips when isInteractiveFramerateBelowThreshold: average of the last 5 draw-loop CPU times
 or rAF intervals > 1000/DETAIL_REDUCTION_THRESHOLD_FPS(20). SwiftShader draws in Chrome's GPU process, so live measures
@@ -94,38 +137,6 @@ Score kit: run-hm7.sh (vibe2 crops ~/tmp/psui/hm3 + b3 cells), compare.py oursN 
 Later: drop `at_bar` + list matrix row (full1 refusals / copy-paste: both match in qa 1121-0935, closed).
 
 ### Earlier today
-
-LANDED c2e4094c as 9ffded3f 14:13 (3dd4f04b's circle-rims + ellipse rule, parity ellipse labels, plane-face rule,
-Section view… back on a sketch row's plain right-click; qa verified the 15 UIP-SKETCH-ROW-SECTION-VIEW scenarios on
-28d58d209, 75/75). Kept off: the sketch right above a rolled-back bar (rollback-menus; live REQUESTS 13:49 to recheck).
-IN TREE (to land): real-app fixes from vibex8 shots (shots-run.sh, ~/agents/psui-keep/shots6):
-- circle-rims step 22 (27/27 now): a glyph takes a press only when it is lit (its tile, or the hovered constraint); the
-  pointer-move path no longer lights a glyph from the lagging glyph_boxes while the sketch's entity is under its margin.
-- ellipse-axes step 12: with faces off, the plane lit is the nearest outline within 6 px (plane_by_outline), whichever
-  face is under; re-resolved on every move (the GPU id doesn't change along one face). Test probes live's (40, 5).
-- ellipse-axes step 18: ui_script exports an ellipse axis dimension as live's MAJOR_/MINOR_DIAMETER constraint.
-sk12d (the 21 sk12 takes, sk12-names.txt, uip-some.sh on vibex8 -> ~/agents/psui-keep/sk12d): 21/21, 344/344.
-Not done: Front's face not picked 3.3 mm above the sketch plane (live picks it at 13-17 mm).
-split-at-crossing PERPENDICULAR: skasm's queue (crates/sketch square_at_mid). Shots: vibex8
-~/agents/psui-keep/shots2/<take> (shots-run.sh in psui-scratch: build + one app, frames every 0.4 s).
-
-qa P1 FEEL-ROW-DBLCLICK-DISTANCE: closed by qa (xev-measured gaps on vibe2: 80 px opens to ~380 ms, not ~420, as one spot).
-
-std 3132 vs 3112 (reported to lead 06:5x): our crates/featurescript/std is exactly 3112; 14 files / 181 lines differ
-(live/std-3132, live/std-3132-vs-3112.diff, stddiff.py in psui-scratch/std). Geometry ones (SM pattern collapsed
-walls V3128, hole error tool axes on start plane, 7/8"-14 UNF tap drill 0.8125, thin extrude @setThinWallOneSided
-host builtin) -> core with the suite gate. Hole V2 diameter is in 3112 too (legacy V2 holes only): no gap.
-
-8. NOW (lead 05:3x) a) Sketch tool coverage: all 55 sketch tools have >= 1 uip take (coverage.py; per tool
-   /root/psui-scratch/sk/tools.json, union 169 in sk/names.txt). The 169 on main (vibex8 06:2x): 169/169, 1946/1946
-   states. sk-1 (10 dimension kinds): live has 7 takes good, parallel-lines / circle-rims / circle-centres miss a
-   pick (live checking). sk-2 (10 second takes for the thin tools) recording. When they land in tests/ui-parity: run
-   them (psui-shards.sh on vibex8), fix the differences, most-used first. skasm: tell before a crates/sketch or
-   sketch_mode fix.
-   b) Feature dialog audit DONE 10:46: docs/parity/feature-dialogs.md regenerated on green 4553fc38a against live's
-   dlg-1121 specs (std 3132) and empty errors: 81/86 specs, 85/87 errors; the rest explained there (Hole = std skew).
-   Scripts /root/psui-scratch/dlg/ (specdiff.py, empty_errors.py, gen_table.py). Open: Variable conversionFactor.
-
 
 3714e6ce FAILED 04:40 (row_keys test: the sketch under the bar now shown, not only drawn); fixed forward,
 LANDED a071525a as 7de5b356 05:33 with live's Section view rule: the whole fc-1120 batch (item 6 b) + CUTLIST-WHEEL-SIDEWAYS + rollback-bar row menus

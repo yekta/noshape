@@ -260,6 +260,17 @@ fn control_name(t: &Value) -> Option<String> {
 type Studio = Option<Entity<PartStudioView>>;
 
 /// Where target `t` shows now, in window coordinates.
+/// Whether the menu row `row` is the one a script names `name` (both lowercase): a part of its text, but never the start
+/// of a longer row ("Open" is not "Open in new browser tab": qa session-studio-1119 opened a second window that way, the
+/// merge dialog then hidden in the first); a row's shortcut after it is still that row ("Coincident (i)"), as is a
+/// quoted name after it ("Switch to" for Switch to "Large", as live's runner: qa UIS-CONFIG-ROW-MENU).
+fn menu_row_matches(name: &str, row: &str) -> bool {
+    if row.strip_prefix(&format!("{name} ")).is_some_and(|rest| !rest.starts_with(['(', '"'])) {
+        return false;
+    }
+    row.contains(name)
+}
+
 fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_view::AssemblyView>>, drawing: &Option<Entity<crate::drawing_view::DrawingEditor>>, cx: &App) -> Result<Point<Pixels>, String> {
     if let Some(mut name) = control_name(t) {
         // The shared Undo / Redo buttons are marked as buttons; live names them as the drawing toolbar's tools.
@@ -310,13 +321,11 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
             if let Some(f) = name.strip_prefix(kind).map(str::to_lowercase) {
                 let has = |k: &str| {
                     let k = k[kind.len()..].to_lowercase();
-                    // A menu name is never the start of a longer row ("Open" is not "Open in new browser tab": qa
-                    // session-studio-1119 opened a second window that way, the merge dialog then hidden in the first);
-                    // a row's shortcut after it is still that row ("Coincident (i)").
-                    if kind == "menu:" && k.strip_prefix(&format!("{f} ")).is_some_and(|rest| !rest.starts_with('(')) {
-                        return false;
+                    match kind {
+                        "menu:" => menu_row_matches(&f, &k),
+                        "button:" => f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)),
+                        _ => k.contains(&f),
                     }
-                    if kind != "button:" { k.contains(&f) } else { f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)) }
                 };
                 let near: Vec<_> = noshape_app_core::ui_script::named(kind).into_iter().filter(|(k, _)| has(k)).collect();
                 if let [(_, b)] = near.as_slice() {
@@ -1434,6 +1443,15 @@ fn drag_plan(step: &Value) -> DragPlan {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+
+    /// A menu row named by part of its text, never by the start of a longer row, unless what follows is its shortcut
+    /// or a quoted name (qa UIS-CONFIG-ROW-MENU: "Switch to" for Switch to "Large").
+    #[test]
+    fn a_menu_name_matches_as_lives_runner() {
+        let m = super::menu_row_matches;
+        assert!(m("switch to", "switch to \"large\"") && m("coincident", "coincident (i)") && m("company settings", "loopelf company settings"));
+        assert!(!m("open", "open in new browser tab") && !m("delete", "rename"));
+    }
 
     /// A drag step's button, moves and interval: the left drag as live's runner's unless said; a right one a flick.
     #[test]

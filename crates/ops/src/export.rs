@@ -274,9 +274,19 @@ impl Default for SolidExportPrefs {
     }
 }
 
+thread_local! {
+    static PREFS_FILE: std::cell::RefCell<Option<std::path::PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
 impl SolidExportPrefs {
+    /// Keeps this thread's remembered options in `file` instead (a test's own scratch file: the test binaries of one
+    /// run share the settings directory).
+    pub fn use_file(file: Option<std::path::PathBuf>) {
+        PREFS_FILE.with(|f| *f.borrow_mut() = file);
+    }
+
     fn path() -> std::path::PathBuf {
-        noshape_scene::config_dir().join("export_solid.json")
+        PREFS_FILE.with(|f| f.borrow().clone()).unwrap_or_else(|| noshape_scene::config_dir().join("export_solid.json"))
     }
 
     /// The remembered options, else live's first-time ones.
