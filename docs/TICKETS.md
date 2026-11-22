@@ -630,6 +630,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P2 **FEEL-DRW-VIEW-FRAME-PAD (studios)**: the hovered / selected view's tan frame round the Front view (block-drawing): live
   17 px above and below the geometry, 9 px at the sides; ours 9 px all round.
   **Fixed (studios 11-22 09:01):** frames 2 mm out from the geometry (sheet mm, not 8 px), at least 17.7 mm tall with the geometry centred (live drwm-7).
+  **Amended (studios 11-22 12:59):** the box stands out 5.5 % of the view's longer side (live drw-hover-1122: Front at 2:1 19 px out, Isometric 12), and Select lights and takes the view to 1 mm past it (22-24 px there).
 - [x] P0 **FEEL-DRW-DIM-HOVER-ON-SELECTED (studios)**: the 1.575 dimension selected, pointer back on it: live returns to the light tan
   hover look (hover wins, d3); ours keeps the dark orange box. w9-drw-dimension.png.
   **Fixed (studios 11-22):** hover wins on a selected dimension (`hovered_dim`).
