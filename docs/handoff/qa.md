@@ -5,14 +5,14 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 15:35 (after the compaction, first)
-- **asm ec33215f** (landed 14:40, not in green 27664aacf): unit qa-af-ec33 (bin/asmfeel.sh, WAIT=ec33215f) runs kit hm2/asmfeel hl-* then dr-* on vibex8 :478 -> hm2/out-af-ec33. Kit fixed and tried on 27664aacf: mate face points are PART coordinates (README 176) + `"flip": true`; Part 3 fixed by its row menu (P2 UIS-ASM-START-FIRST-INSTANCE, skasm told: a start's at/fixed all land on instance 0); dr-Free-undo = a full drag first. Compare with live/asm/{hover-list,drag-feel}-1122 (vp crop page 202,36 1761x1053): Undo greyed only while held, 36x16 ground glyph on the fixed face, no hover look mid-drag, triad unlit under a still pointer (a04); then mark FEEL-ASM-TRIAD-STILL-POINTER / DRAG-UNDO / FIXED-GLYPH, tell asm.
-- asm's next land (GEAR-DIALOG-MATES-LOOK, SECOND-PICK-HOVER, PATTERN-SECOND-DIRECTION): bin/rescore-wf.sh <sha> 08 25 35.
-- skasm: unit qa-rs-f33a (rescore-wf.sh f33a0b645 11) -> BEND-FACE-RECLICK-EMPTIES (wf11 12-16) + SM-FLAT-VIEW-FIT (wf11 18; 589cb6cbe same green; also variant 11v).
-- psui: workflow-ticket batch not requeued yet; qa-rs-ec2f (subject prefix) fires on it.
-- Cut 17:00: cut-verdict.sh at 16:15 / 16:50 (qa-cut timers). cut-must.txt now carries skasm 9f127c281 (tablet-stand Sketch 3 Warning vs 0.4.66 since 3871292d): HOLD if the cut green lacks it. Verdict to the lead by 16:45.
-- Suite 1122-0657: assemblies stage on vibex8 (parity_assemblies running 15:25); then qa-uip-rerun -> worse.txt, P0s, SCORE row.
-- wf31 quiet replay (Dimension timing) running 15:34 -> hm2/out-wf/31-*.
+## IN FLIGHT 16:00 (after the compaction, first)
+- **17:00 cut: GO/NO-GO to the lead by 16:45.** Green 049f4e313 (15:36): user docs ALL-SAME, hat15 known; corpus section running (waiter -> read compat/049f4e31.txt: tablet-stand Sketch 3 should be Ok now, 9f127c281 in it). cut-verdict.sh 16:15 / 16:50; cut-must.txt carries 9f127c281. Tell the lead too: P0 COMPAT-RINGS-LOFT-SLOWER (bool ea0febb29 stage A: Circular pattern 1's 51-tool cut declined by ours -> OCCT 15 s; c2-rings-loft 3x, cf-surface-pattern 1.5-2x vs 0.4.66 since 07c6a110; bool fixing, will say when landed) = a speed regression vs 0.4.66 in any cut from 07c6a110 on.
+- asm ec33215f DONE 15:5x on 049f4e313 (hm2/asmfeel -> out-af-ec33, out-af-ec33b; screen 2560x1600, window at 562,350): DRAG-UNDO + TRIAD-STILL-POINTER verified; FIXED-GLYPH reopened (flat screen icon vs in-plane); P0 ORIGIN-ROW-HOVER, ROW-EYE-ICON, P2 ROW-SHIFT-CLICK; asm told. Kit notes: mate face points are PART coords + "flip": true; P2 UIS-ASM-START-FIRST-INSTANCE (skasm told) -> Part 3 fixed by row menu; multi-select: runner "mod" = Ctrl = context menu (as live), live used Meta (no runner mod for it).
+- asm's next land (GEAR-DIALOG-MATES-LOOK, SECOND-PICK-HOVER, PATTERN-SECOND-DIRECTION): bin/rescore-wf.sh <sha> 08 25 35. Then rerun asmfeel for the reopened rows (bin/asmfeel.sh <out> 'dr-BaseR' 'hl-a0[13]*').
+- skasm DONE 15:4x on 049f4e313: SM-FLAT-VIEW-FIT verified (11v), BEND-FACE-RECLICK-EMPTIES reopened (wf11 step 14), told.
+- psui: workflow-ticket batch not requeued (no psui job in the queue 16:00); qa-rs-ec2f fires on it.
+- wf31 quiet replay DONE 15:35: Dimension tool 71-156 ms first frame (live 0.86-0.96 s): the old 4.3 s was load. "settled" over typing is caret/shot presents, not a gap.
+- Suite 1122-0657: assemblies stage on vibex8 (asm-isaac-ball 16:00); then qa-uip-rerun -> worse.txt, P0s, SCORE row.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
