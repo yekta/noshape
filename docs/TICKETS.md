@@ -331,8 +331,9 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   screen shows 2–4 changed frames. Ours jumps: one changed frame (150–300 ms) plus the edge refinement ~500 ms later, at ~10 fps. The
   cube's ▶ arrow animates in both (ours 4 frames over ~330 ms). This contradicts live nav-1117 (one frame for these keys on the same
   renderer); psui to settle it from live's client (when `animateTo` jumps) and match.
-  Software-GL-only: ours jumps only below 20 fps (`view_change_duration`, ba389b093) and animates 500 ms above; qa-w7-macnav
-  checks it on the Mac GPU (frame log per view change).
+  Software-GL-only: ours jumps only below 20 fps (`view_change_duration`, ba389b093) and animates 500 ms above. Confirmed on the
+  Mac GPU (qa 02:2x, v0.4.65, plate + scissor, frame log qa-scratch/w7/macnav): Shift+5, Shift+7, Shift+1, F each present 34–35
+  frames over ~500 ms, the first 3–19 ms after the key; the cube's ArrowRight 20 frames. Ours animates there, as live does.
 - [ ] P0 **FEEL-CUBE-CORNER-HOVER (psui)**: the view cube at iso, pointer on the front-right-top corner (the vertex facing the
   viewer). Live draws a light-blue disc on the corner. Ours lights nothing there: a 5 × 5 grid of points (±8 px) round the corner
   lights only the neighbouring edges' bands (qa-scratch/tickets/cube-hover-w7.png).
@@ -346,7 +347,7 @@ for a wheel notch, F, Shift+5 / 7 and a cube click, against live's 340–1800 ms
   and a rotate arrow (light blue).
 - Heavy documents on the Mac GPU (Apple M6, Metal, v0.4.65, 2388×1588 device px, 300-frame bench, qa-scratch/w7/mac): orbit
   plate 109.0 fps, scissor (1829 instances) 112.6, infento (1414) 110.4; zoom plate 116.9. No frame over 16.7 ms in any run (max
-  14.96 ms). First frame presented 250–540 ms after start. All above PLAN 2.7's 60 fps: no speed ticket.
+  14.96 ms); zoom scissor 105.4 fps, 9 frames of ~300 over 16.7 ms (max 29.7 ms). First frame presented 250–540 ms after start. All above PLAN 2.7's 60 fps: no speed ticket.
 - [ ] P2 **APP-SIGTERM-IGNORED-MAC (dx)**: on the Mac, `timeout 170` (SIGTERM) quits the app on the plate but not on scissor or
   infento (both regenerate through the kernel): the app stays idle in its run loop with SIGTERM neither blocked nor pending, and a
   second `kill -TERM` does nothing; only SIGKILL ends it. Something installs a SIGTERM handler that doesn't quit. Sample:
