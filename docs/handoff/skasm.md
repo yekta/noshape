@@ -1,24 +1,34 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 22:12 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 22:41 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (22:1x)
+## NEXT (22:4x)
 - LANDED today: d2b509fc (ff4a8ed0), e0fc1afc (mc-reach R1-R5; asm + lead told).
-- QUEUED 37df74ed (supersedes 4179663c, 5 commits): query_entities `sketches` (c2-constrained-surface op + e2e), Trim
-  piece hover orange 5 px + dots (S4), SM table row lights bend as HOVER (Highlighting faces_hovered), joint Type/Style
-  list open lights its rip (ui.sm_joint_open), SM cells: blue outline after the grid border, editor text centred, Enter
-  moves the box down (ui.sm_edit_enter), no row lit. sm matrix rows added (sm_feel_tests.rs).
-- NEXT: SM-TAB-MERGE-PICK (P1): workflow 02 s5, Tab dialog, "Flange to merge" click at model (30,35,2): live takes the
-  flange wall in front ("Face of Flange 1"), ours a second plate face behind (picks through?). Reproduce in a UI test
-  (sm-box-like start, Tab), check the field's filter / the reclick-through rule (BEND-FACE-RECLICK, 09b4b72b).
+- QUEUED (both CHECKING at 22:3x): 4179663c (handoff) and 37df74ed (5 commits: query_entities `sketches` op + e2e,
+  Trim hover look S4, SM table row lights bend as HOVER, joint list open lights rip, SM cells outline/centre/Enter down).
+  Local unlanded on top: 5b91051d3 (handoff) + this handoff.
+- IN PROGRESS, UNCOMMITTED: SM-TAB-MERGE-PICK (P1). Diagnosis (GPU test, live's zoom 194 px / 60 mm, sm-box):
+  the click (30,35,2) sits ~1 px above Flange 1's inner top edge (live s04/our 04 pixel column 1240 identical: plate
+  475-484, inner top edge line 485-486, top side face 487-489, outer edge 490, outer face 491+). Live lit the OUTER face
+  (s05 column: olive from 491). Ours took (a) before: the plate top (another "Face of Sheet metal model 1"); (b) after
+  muting: the wall's INNER face New(6) (wall 2 ref side, y=0 box) via back-face slivers in the pick buffer.
+  Fix (3 files): behaviors.rs sync_pick_filter: sm dialog + face-only field mutes side faces (no wall, no bend);
+  while previewing, faces of a held wall (either side) the preview changed are muted (changed_picks). renderer.rs: new
+  mesh_pick_closed pipeline (cull Back), order_solid computes runs in pick too (no reorder when pick), pick pass draws
+  opaque_runs (Closed -> culled). Test sm_feel_tests.rs a_tabs_merge_click_on_the_walls_top_edge_takes_the_wall
+  (chips + the stored ref == the face hovered at the outer face's middle). Run b59ow2nx3 (vibex8 slot: clippy render
+  + psui, the test, render tests, full psui lib) was going at 22:35: script ~/tmp/skasm/tm.sh (local copy
+  /root/skasm-scratch/bin/tm.sh). If the full-lib output is lost, rerun it. Green -> commit "skasm: ..." (tab merge
+  pick + pick pass culls closed solids' back faces), TICKETS SM-TAB-MERGE-PICK fixed (to verify), land. The
+  renderer change touches every pick: tell psui in the report (render is psui's area).
 - c2-constrained-surface parity pair NOT run (vibex8 slot queue killed it at 30 min): rb.sh bash -c '~/bin/slot bash
   ~/tmp/skasm/ut3t.sh c2-constrained-surface' with run_in_background timeout >= 60 min, quiet host.
 - PANE-SPLIT: lead 22:0x: REQUESTS row 22:07 (live: the fresh-document split, per doc/account memory). 50 % default
   -> ours stays, replay seeded 0.405; else change SPLIT's default (sheet_metal_panel.rs SPLIT unwrap_or(0.5)).
 - JOINT-LIT: the list above the cell is the pane fit (lists stay in the tables pane) -> after the split answer.
 - Trim: live's tinted core (curve ~1/3 over the band) not drawn (sketch mode has no curve states); minor.
-- Context: never cat task output files or logs whole; tail -40 / grep.
+- Report to lead at queue empty (<=5 lines). Context: never cat task output files or logs whole; tail -40 / grep.
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
