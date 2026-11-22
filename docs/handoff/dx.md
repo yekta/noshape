@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 11:08 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-22 19:3x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,26 +13,28 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 17:4x 11-22 (read first)
-- LANDED e52b091a as f09411c5 (agent API batch), fa3f2f31 as 52cfbc54 15:47 (drw-hover-1122 annotation cells 2, 3,
-  8 box, 10; items 4 / 8-reach / 11 with studios via the lead). asm re-measures the infento display key (waits).
+## STATE 19:3x 11-22 (read first)
+- LANDED e52b091a as f09411c5 (agent API batch), fa3f2f31 as 52cfbc54 (drw-hover-1122 annotation cells), 002ec9fd as
+  88caeaa7 19:23 (kernel hlr.rs hide_outline_edges_behind_faces: extension-spring Right view fixed; hatch copies of one
+  part alternate (0, 1.0) / (90, 0.7), live hatch5-1122 B4; TICKETS P3 DRW-HATCH-CREATION-ORDER: no stored stamp, B6;
+  B3/B5 145/100/10 unexplained). asm re-measures the infento display key (waits).
 - !! /root/dx-scratch/env.sh does `cd /root/projects/noshape-wt/dx` : scripts must `. env.sh; cd
   /root/projects/noshape-wt/dx-open`. ssh remote ~ paths in quotes; rb.sh remote scripts as `bash -c 'bash $HOME/..'`.
-- Drawings DXF rerun on main 16:1x (vibex8 dx-keep/exd.sh m1; local copies /root/dx-scratch/exd-m1/): 1/4.
-  sm-louver MATCHES now. extension-spring: (a) Right view, ours drew the inner bend's tangent edge (z 3, 1 mm)
-  visible behind the outer bend; OCCT exact HLR misses it from -X only (kernel probe on ours.step);
-  (b) Isometric 0.06 in "on another kind" (live short Visible LINE ~(8.47, 5.93), ours a spline there): open.
-  housing-draft 1.2 in "on another kind"; rings-loft model geometry (core/bool).
-- UNCOMMITTED on dx-open (testing, vibex7 dx-keep/exd2.sh via /root/dx-scratch/exd2-run.sh: drawing lib, ops e2e,
-  hidden_edges, then exd.sh h1 = the 4 docs -> vibex7 dx-keep/exd-h1.log):
-  1 kernel hlr.rs hide_outline_edges_behind_faces (exact only): a Visible Outline piece with a source edge is hidden
-    when rays toward the viewer from 0.2/0.5/0.8 along it all cross a face inside (shape.line_crossings); unit test
-    an_outline_edge_behind_another_face_is_hidden (U-bend); kernel hlr lib 8/8 + tests 15/15 green.
-  2 hatch5 (live/dx/hatch5-1122): a part's copies alternate (0, 1.0) / (90, 0.7) (B4); B1/B2 already matched;
-    test section_hatch_angles_follow_the_part_studio_order extended (green).
-  3 TICKETS P3 DRW-HATCH-CREATION-ORDER (lead 17:2x: no stored creation stamp; B6 + B3/B5 unexplained).
-  Land when green (kernel change: queue tests everything above it).
-- Was open, to the lead / studios: hover items 4, 8-reach, 11 (see archive 11-22).
+- Drawings DXF (vibex7 dx-keep/exd-h1.log; local /root/dx-scratch/exd-m1/): sm-louver MATCHES; rings-loft model
+  geometry (core/bool).
+- NOW: extension-spring Isometric: live has a Visible LINE (8.4702, 5.9285)-(8.4943, 5.9145) (0.028 in): the visible
+  end of a straight edge along model X, from the TANGENT line's end (8.4943, 5.9145) to where it meets the silhouette
+  spline (ours pole 2 is (8.4702, 5.9284) after +0.0076 y); ours hides it all (HLR visibility, not a kind issue; ours'
+  29-pole spline there passes within 0.010 in, hence "on another kind"). Live also splits that spline at (8.4978,
+  5.9246). Probe: /root/dx-scratch/hlr-probe.rs (copy over crates/kernel/tests/hlr.rs; probe_step_hlr, ignored:
+  straight X edges' visibility in 4 iso directions); run /root/dx-scratch/hlrt.sh (vibex7 slot, STEP
+  ~/agents/dx-keep/probe/spring.step); a run was waiting for vibex7's slot 19:3x. Remove the probe before committing.
+- housing-draft 1.2 in "on another kind": NOT HLR. The four draft-corner edges (live STEP #121-#132, cubic Beziers in
+  vertical planes ~5 deg off YZ): live writes ONE LINE between the ends in Front (the curve bulges 0.012 in off it), a
+  4-LINE chain (chord ~0.002 in) in Right, SPLINEs in Iso; ours SPLINEs (cad_export.rs `straight` needs 1e-4). Rule
+  unknown: REQUESTS 19:3x "when does a drawing's DXF write a curved edge as LINEs" (live/dx/dxf-line-curves-1122/).
+  Tool /root/dx-scratch/bin/dxfsplsum.py (each SPLINE's ends).
+- Times: rings-loft Parasolid import/export over live's on loaded vibex7: host load.
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
