@@ -377,19 +377,24 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - [ ] P2 **IMPORT-TAB-TOAST (dx; live asked, REQUESTS qa 04:35)**: workflow 17 steps 9–12 (doc-tabs: Export… STEP to a new tab "Part Studio 1.step", that tab's Import… › Import to this document › Import): ours shows the toast "Part Studio 1.step has been imported. Open document ×" and keeps it; live's shots at 0.3 s and ~15 s show no toast (the new tab "Part Studio 1 (1)" lands right after the .step tab in both). The Export dialog's Preprocessing / derived-tolerance defaults differ too (live "Remove small entities only…", tolerances ticked; ours None, unticked), likely live's remembered settings, not filed.
 - [ ] P1 **SKETCH-SELECTED-GLYPH-OFFSET (skasm)**: workflow 13 steps 12–16 (empty, 25 × 25 rectangle on Top, Equal, Fix on the top-right corner, Show constraints off, corner selected): live draws the corner's glyph pair (Coincident, Fix) up-left with the Coincident ~61 px and the Fix ~39 px left of the corner; ours draws them ~23 px further right (Coincident ~38 px, Fix ~16 px). So live's click on the Fix glyph (px 1182, 525) hits **our Coincident**: Delete then removes a Coincident instead of the Fix, the corner stays fixed, the drag to (35, 35) pulls a split end off instead of growing the square (live 35.19, still square), and the dimension steps miss (tickets/wf13-glyph-offset.png). With only the Coincident shown (step 12) live's glyph sits ~37 px straight above the corner, ours ~20 px up-left.
 
-- [ ] P1 **FS-NEW-FEATURE-TABSTOPS (studios)** (workflow 26 step 6, green b5b414278): New feature in a Feature Studio: live inserts
+- [x] P1 **FS-NEW-FEATURE-TABSTOPS (studios)** (workflow 26 step 6, green b5b414278): New feature in a Feature Studio: live inserts
   the template as a snippet: "My Feature" selected, and `myFeature` (line 7) and both `// Define …` comments boxed as tab stops
   (grey fill, thin outline). Ours selects "My Feature" only, no boxes. Crop qa-scratch/tickets/wf26-template.png (live left).
-- [ ] P1 **FS-TAB-UNCOMMITTED-STAR (studios)** (workflow 26 steps 5-13): live's tab reads "*Feature Studio 1" from the first
+  **Fixed (studios 11-22 05:43):** New feature inserts the template as a snippet: "My Feature" selected, it, `myFeature` and both comments boxed (fill f6f2f8, outline d1c0dd as live); Tab moves on, a caret outside every box ends it. Not yet: rounded box corners, Esc ending it.
+- [x] P1 **FS-TAB-UNCOMMITTED-STAR (studios)** (workflow 26 steps 5-13): live's tab reads "*Feature Studio 1" from the first
   uncommitted edit until mod+s commits; ours always "Feature Studio 1" (our state has committed=false meanwhile).
   qa-scratch/tickets/wf26-tabs.png.
-- [ ] P2 **FS-OUTLINE-ANNOTATION-LINE (studios)** (workflow 26 step 6): with the caret on the new annotation line, live's outline
+  **Fixed (studios 11-22 05:43):** the tab reads "*Feature Studio 1" from the first key until Commit.
+- [x] P2 **FS-OUTLINE-ANNOTATION-LINE (studios)** (workflow 26 step 6): with the caret on the new annotation line, live's outline
   button reads "myFeature(context, i…" at once; ours "Module outline" until the caret is in the body (step 8). Ours' button is
   also narrower: "myFeature(co…". qa-scratch/tickets/wf26-toolbar.png, wf26-outline-ours.png.
-- [ ] P2 **FS-FOLD-ARROWS (studios)** (workflow 26): live's gutter has a fold ▾ on each line opening a block (template lines 9,
+  **Fixed (studios 11-22 05:43):** the caret on an annotation line names the symbol below it; the button grows 149 to 204 px before truncating, as live.
+- [x] P2 **FS-FOLD-ARROWS (studios)** (workflow 26): live's gutter has a fold ▾ on each line opening a block (template lines 9,
   12); ours has none. wf26-template.png.
-- [ ] P2 **FS-COMMENT-OPERATOR-COLOURS (studios)** (workflow 26 step 11): live draws comments upright grey and `*` / `+` in blue;
+  **Fixed (studios 11-22 05:43):** fold arrows on every foldable line, not only under the pointer (vendored editor: every code editor).
+- [x] P2 **FS-COMMENT-OPERATOR-COLOURS (studios)** (workflow 26 step 11): live draws comments upright grey and `*` / `+` in blue;
   ours draws comments italic and the operators black. wf26-template.png.
+  **Fixed (studios 11-22 05:43):** comments upright; live's comment green is ours (#4c886b sampled, not grey); `+ - * / % ^` in live's rgb(104,118,135), `=` black.
   (Workflow 26 otherwise matches: typed fCuboid text as live, mod+s commits, "My Feature" from Custom features → MF My Feature 1,
   Part 1; ours faster at every step with a real time.)
 
@@ -497,10 +502,12 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   turns both (gear 2:1, tilted squares in s32); ours shows no Part 2 outside Part 1 and the drag changes no pixel, with or without
   the Gear relation (variant 25v-nogear, hm2/out-wfv): placement of Part 2 <2> or the drag pick (tickets/wf25-placement.png,
   wf25-drag.png). Gear 1 dialog = live (Mate(s) Revolute 1 / 2, ratio 2).
-- [ ] P0 **FEEL-DRW-BALLOON-HOVER-LEADER (studios)** (workflow 23 step 24, pin-block-asm-drawing, green b5b414278): balloon 2 hovered
+- [x] P0 **FEEL-DRW-BALLOON-HOVER-LEADER (studios)** (workflow 23 step 24, pin-block-asm-drawing, green b5b414278): balloon 2 hovered
   after Esc (attached to Section A-A's edge): live tints only the balloon (tan ring + fill), its leader stays black with a filled black
   arrowhead at the edge; ours draws the whole leader tan and thin, with no arrowhead (tickets/wf23-hatch-balloon.png, bottom; live left).
 - [x] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (fixed dx 11-22, queued: each part of a section its own hatch, 45 / 135 deg alternating in part order, spacing = the part's box diagonal / 13 as live s05's pixels; 3+ parts and repeated instances asked of live, REQUESTS dx 05:35; the DETAIL B label P2 stays open, waits for that answer) (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
+  **Fixed (studios 11-22 05:43):** a hovered balloon's leaders stay out of the tan hover overlay: black, with the arrowhead (selected unchanged).
+- [ ] P1 **DWG-SECTION-HATCH-PER-PART (dx)** (workflow 23 steps 2-5): Section A-A through the block and pin: live hatches the pin at
   the opposite angle and closer spacing than the block, so adjacent parts read apart; ours hatches both at the same angle and spacing
   (tickets/wf23-hatch-balloon.png, top). Also P2: "DETAIL B SCALE 2:1" sits at y 11.2 mm vs live 14.0. The rest of 23 = live:
   views, section A-A, detail B 2:1, .787, BOM rows 1 / 2, balloons 1 / 2 at the same spots (tickets/wf23-sheet.png).
