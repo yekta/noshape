@@ -6945,8 +6945,7 @@ impl SketchEditor {
             let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
             dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, pos, half)));
         }
-        // Trim: the hovered curve's piece between its intersections, thick
-        // light orange with its end dots (live, qa5 sketch tools).
+        // Trim: the hovered curve's piece between its intersections, lit with its end dots (live, qa5 sketch tools).
         if self.tool == Tool::Trim
             && self.drag.is_none()
             && let (Some(h), Some(c)) = (self.hover, self.cursor)
@@ -6958,9 +6957,10 @@ impl SketchEditor {
             let period = b - a;
             let at = |t: f64| curve.point(if curve.is_periodic() && t > b { t - period } else { t });
             let pts: Vec<DVec2> = (0..=n).map(|i| at(t0 + (t1 - t0) * i as f64 / n as f64)).collect();
-            // The piece tan (live2 sktools-1118: rgb(214, 189, 149)), its end dots orange.
-            wide.push((pts, crate::palette::rgb8(crate::palette::viewport::TRIM_PIECE), 4.0));
+            // The piece the hover orange, 5 px, its end dots orange (live sketch-edit-feel-1122 S4: lit like any hovered
+            // curve; live2 sktools-1118's rgb(214, 189, 149) was the curve showing through the band's middle).
             let color = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+            wide.push((pts, color, 5.0));
             for q in [at(t0), at(t1)] {
                 points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
             }
@@ -13124,6 +13124,29 @@ mod tests {
             assert!((hi - v(b.x, -b.y)).length() < 1e-6, "{off}: {hi:?}");
             assert!(lo.x > 670.0 && lo.x < 700.0, "{off} px off the corner: it starts at the third segment's crossing, not by the corner: {lo:?}");
             assert_eq!(count(&data, EntityKind::Line), 4);
+        }
+    }
+
+    /// Live sketch-edit-feel-1122 S4 (trim-hover-upper-arc.png): Trim's hovered piece of a circle (its upper arc between
+    /// the line's crossings) is lit like any hovered curve: the hover orange, 5 px, with an orange dot at each crossing.
+    #[test]
+    fn trims_hovered_piece_is_the_hover_orange_with_a_dot_at_each_crossing() {
+        let (mut ed, mut data) = editor(Tool::Trim);
+        let units = UnitPrefs::default();
+        let mm = |x: f64, y: f64| v(x, y) * 1e-3;
+        data.sketch.add_line(mm(0.0, 0.0), mm(40.0, 0.0));
+        let c = data.sketch.add_circle(mm(14.0, 3.0), 6e-3);
+        (ed.hover, ed.cursor) = (Some(c), Some(mm(14.0, 9.0)));
+        let (lines, points) = ed.overlay(&data, &units);
+        let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+        let band: Vec<&LineSegment> = lines.segments.iter().filter(|g| g.color == orange && g.width == 5.0).collect();
+        assert!(band.len() > 10 && band.iter().all(|g| g.a[1].min(g.b[1]) > -1e-6), "the upper arc's band: {} segments", band.len());
+        let x = 27.0_f64.sqrt();
+        let dots: Vec<[f32; 3]> = points.points.iter().filter(|p| p.color == orange).map(|p| p.position).collect();
+        assert_eq!(dots.len(), 2, "{dots:?}");
+        for q in [mm(14.0 - x, 0.0), mm(14.0 + x, 0.0)] {
+            let w = PlaneFrame::TOP.to_world(q);
+            assert!(dots.iter().any(|d| (glam::DVec3::new(d[0] as f64, d[1] as f64, d[2] as f64) - w).length() < 1e-5), "a dot at {q:?}: {dots:?}");
         }
     }
 

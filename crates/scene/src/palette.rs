@@ -13,8 +13,6 @@ pub mod viewport {
     pub const INACTIVE: u32 = 0x999999;
     /// Pre-highlight (`PRE_HIGHLIGHT_COLOR_BORDER`).
     pub const PREHIGHLIGHT: u32 = 0xffc685;
-    /// The Trim tool's hovered piece (live2 sktools-1118: rgb(214, 189, 149) along it).
-    pub const TRIM_PIECE: u32 = 0xd6bd95;
     /// A part a feature removes, outlined over its preview's ghost (live
     /// 10-27 Delete part: its silhouette, 2 px, at any slider position).
     pub const REMOVED_OUTLINE: u32 = 0xffc04c;

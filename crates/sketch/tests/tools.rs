@@ -102,6 +102,20 @@ fn trim_hover_pieces_of_a_circle_on_a_line_end_at_the_crossings() {
     assert!(near(ends(l, v(14.0, 0.0)), (left, right)), "the chord");
     assert!(near(ends(l, v(4.0, 0.0)), (v(0.0, 0.0), left)), "left of the circle");
     assert!(near(ends(l, v(30.0, 0.0)), (right, v(40.0, 0.0))), "right of it");
+    // A click on the upper arc (live S4 retry, trim-upper-arc-reach-and-click.png): it goes, the lower arc stays between
+    // the crossings, each end coincident with the line; the line whole.
+    sk.trim(c, v(14.0, 9.0)).unwrap();
+    let (a, b) = sk.endpoints(c).expect("an arc");
+    let mut got = [sk.point(a).unwrap(), sk.point(b).unwrap()];
+    got.sort_by(|p, q| p.x.total_cmp(&q.x));
+    assert!(near((got[0], got[1]), (left, right)), "{got:?}");
+    let arc = sk.curve(c).unwrap();
+    assert!(arc.point(0.5 * (arc.domain().0 + arc.domain().1)).y < 0.0, "the lower arc kept");
+    let line = sk.curve(l).unwrap();
+    assert!((line.point(line.domain().0) - v(0.0, 0.0)).length() < 1e-9 && (line.point(line.domain().1) - v(40.0, 0.0)).length() < 1e-9, "the line whole");
+    for p in [a, b] {
+        assert!(sk.constraints().any(|k| matches!(k.kind, ConstraintKind::Coincident { a: x, b: y } if (x == p && y == l) || (x == l && y == p))), "end {p:?} coincident with the line");
+    }
 }
 
 #[test]
