@@ -1,23 +1,23 @@
 {
  "scenario": "drw-table-cells-insert-row",
- "recorded": "2026-11-16T08:49:33.566Z",
+ "recorded": "2026-11-22T15:20:03.210Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
    1079
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-16.1"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "20fe68cea4fa78a309e27555",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "c15ebc8b2a5369b8e6e2d57f",
   "start": "block-drawing",
-  "startElement": "fec75b9b8f06f7e2fe8fa56f",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (2)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -98,7 +98,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     378,
+     113,
+     1580,
+     1042
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.23245
+   }
   }
  },
  "steps": [
@@ -111,6 +124,10 @@
     }
    },
    "ok": true,
+   "ti": 211621,
+   "tmove": 211698,
+   "moves": 1,
+   "tdown": 212005,
    "at": [
     858,
     59
@@ -164,7 +181,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -217,10 +234,26 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 226296
+   "t": 237467,
+   "menus": [],
+   "te": 237495,
+   "shot": "drw-table-cells-insert-row-s01.png"
   },
   {
    "step": 2,
@@ -230,6 +263,7 @@
     "ms": 1000
    },
    "ok": true,
+   "ti": 237942,
    "state": {
     "focus": {
      "kind": "other",
@@ -279,7 +313,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -332,10 +366,25 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 252519
+   "t": 264206,
+   "menus": [],
+   "te": 264227
   },
   {
    "step": 3,
@@ -349,6 +398,10 @@
     }
    },
    "ok": true,
+   "ti": 264227,
+   "tmove": 265301,
+   "moves": 1,
+   "tdown": 265603,
    "at": [
     1023,
     397
@@ -402,7 +455,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -455,10 +508,26 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 279600
+   "t": 291687,
+   "menus": [],
+   "te": 291704,
+   "shot": "drw-table-cells-insert-row-s03.png"
   },
   {
    "step": 4,
@@ -469,6 +538,10 @@
     }
    },
    "ok": true,
+   "ti": 292046,
+   "tmove": 292158,
+   "moves": 1,
+   "tdown": 292450,
    "at": [
     198,
     90
@@ -589,7 +662,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -642,10 +715,26 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 304387
+   "t": 317258,
+   "menus": [],
+   "te": 317279,
+   "shot": "drw-table-cells-insert-row-s04.png"
   },
   {
    "step": 5,
@@ -655,6 +744,7 @@
     "ms": 500
    },
    "ok": true,
+   "ti": 317626,
    "state": {
     "focus": {
      "kind": "other",
@@ -771,7 +861,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -824,10 +914,25 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 329652
+   "t": 342813,
+   "menus": [],
+   "te": 342830
   },
   {
    "step": 6,
@@ -836,6 +941,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 342830,
    "pointer": {
     "at": [
      952,
@@ -844,6 +950,7 @@
     "hover": [],
     "element": "div.navbar-document-and-workspace-names.os-row"
    },
+   "tdown": 342833,
    "state": {
     "focus": {
      "kind": "other",
@@ -870,7 +977,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -932,10 +1039,26 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 355855
+   "t": 370132,
+   "menus": [],
+   "te": 370149,
+   "shot": "drw-table-cells-insert-row-s06.png"
   },
   {
    "step": 7,
@@ -944,6 +1067,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 370419,
    "pointer": {
     "at": [
      952,
@@ -952,6 +1076,7 @@
     "hover": [],
     "element": "div.navbar-document-and-workspace-names.os-row"
    },
+   "tdown": 370425,
    "state": {
     "focus": {
      "kind": "other",
@@ -978,7 +1103,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1040,10 +1165,26 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 381734
+   "t": 397656,
+   "menus": [],
+   "te": 397672,
+   "shot": "drw-table-cells-insert-row-s07.png"
   },
   {
    "step": 8,
@@ -1057,6 +1198,10 @@
     }
    },
    "ok": true,
+   "ti": 397967,
+   "tmove": 398939,
+   "moves": 1,
+   "tdown": 399230,
    "at": [
     1015,
     405
@@ -1202,7 +1347,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1264,10 +1409,26 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 408975
+   "t": 425680,
+   "menus": [],
+   "te": 425698,
+   "shot": "drw-table-cells-insert-row-s08.png"
   },
   {
    "step": 9,
@@ -1281,6 +1442,10 @@
     }
    },
    "ok": true,
+   "ti": 426047,
+   "tmove": 427085,
+   "moves": 1,
+   "tdown": 427376,
    "at": [
     1015,
     405
@@ -1469,7 +1634,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1531,10 +1696,159 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 434010
+   "t": 453726,
+   "menus": [
+    {
+     "frame": "https://production-drawing-euw1a-102921.onshape.com/editor",
+     "rect": [
+      1014,
+      370,
+      88,
+      201
+     ],
+     "rows": [
+      {
+       "label": "Insert",
+       "rect": [
+        1015,
+        372,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "Remove",
+       "rect": [
+        1015,
+        395,
+        86,
+        23
+       ],
+       "hover": true,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "Duplicate",
+       "rect": [
+        1015,
+        419,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "",
+       "rect": [
+        1015,
+        442,
+        86,
+        3
+       ],
+       "hover": false,
+       "cls": "divider"
+      },
+      {
+       "label": "Size",
+       "rect": [
+        1015,
+        445,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "",
+       "rect": [
+        1015,
+        469,
+        86,
+        3
+       ],
+       "hover": false,
+       "cls": "divider"
+      },
+      {
+       "label": "Merge",
+       "rect": [
+        1015,
+        472,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "disabled dropdown-submenu"
+      },
+      {
+       "label": "Unmerge",
+       "rect": [
+        1015,
+        495,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "disabled"
+      },
+      {
+       "label": "Resize...",
+       "rect": [
+        1015,
+        519,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      },
+      {
+       "label": "",
+       "rect": [
+        1015,
+        542,
+        86,
+        3
+       ],
+       "hover": false,
+       "cls": "divider"
+      },
+      {
+       "label": "Copy",
+       "rect": [
+        1015,
+        545,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      }
+     ]
+    }
+   ],
+   "te": 453743,
+   "shot": "drw-table-cells-insert-row-s09.png"
   },
   {
    "step": 10,
@@ -1546,6 +1860,9 @@
     "ms": 600
    },
    "ok": true,
+   "ti": 454080,
+   "tmove": 454128,
+   "moves": 1,
    "at": [
     1058,
     384
@@ -1713,7 +2030,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1775,10 +2092,214 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 459743
+   "t": 480107,
+   "menus": [
+    {
+     "frame": "https://production-drawing-euw1a-102921.onshape.com/editor",
+     "rect": [
+      1014,
+      370,
+      88,
+      201
+     ],
+     "rows": [
+      {
+       "label": "Insert",
+       "rect": [
+        1015,
+        372,
+        86,
+        23
+       ],
+       "hover": true,
+       "cls": "dropdown-submenu active"
+      },
+      {
+       "label": "Remove",
+       "rect": [
+        1015,
+        395,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "Duplicate",
+       "rect": [
+        1015,
+        419,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "",
+       "rect": [
+        1015,
+        442,
+        86,
+        3
+       ],
+       "hover": false,
+       "cls": "divider"
+      },
+      {
+       "label": "Size",
+       "rect": [
+        1015,
+        445,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "dropdown-submenu"
+      },
+      {
+       "label": "",
+       "rect": [
+        1015,
+        469,
+        86,
+        3
+       ],
+       "hover": false,
+       "cls": "divider"
+      },
+      {
+       "label": "Merge",
+       "rect": [
+        1015,
+        472,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "disabled dropdown-submenu"
+      },
+      {
+       "label": "Unmerge",
+       "rect": [
+        1015,
+        495,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": "disabled"
+      },
+      {
+       "label": "Resize...",
+       "rect": [
+        1015,
+        519,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      },
+      {
+       "label": "",
+       "rect": [
+        1015,
+        542,
+        86,
+        3
+       ],
+       "hover": false,
+       "cls": "divider"
+      },
+      {
+       "label": "Copy",
+       "rect": [
+        1015,
+        545,
+        86,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      }
+     ]
+    },
+    {
+     "frame": "https://production-drawing-euw1a-102921.onshape.com/editor",
+     "rect": [
+      1101,
+      371,
+      106,
+      98
+     ],
+     "rows": [
+      {
+       "label": "Column Left",
+       "rect": [
+        1102,
+        373,
+        104,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      },
+      {
+       "label": "Column Right",
+       "rect": [
+        1102,
+        396,
+        104,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      },
+      {
+       "label": "Row Above",
+       "rect": [
+        1102,
+        420,
+        104,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      },
+      {
+       "label": "Row Below",
+       "rect": [
+        1102,
+        443,
+        104,
+        23
+       ],
+       "hover": false,
+       "cls": ""
+      }
+     ]
+    }
+   ],
+   "te": 480130,
+   "shot": "drw-table-cells-insert-row-s10.png"
   },
   {
    "step": 11,
@@ -1789,6 +2310,10 @@
     }
    },
    "ok": true,
+   "ti": 480472,
+   "tmove": 480520,
+   "moves": 2,
+   "tdown": 481659,
    "at": [
     1154,
     455
@@ -1819,7 +2344,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (2)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1881,10 +2406,27 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       378,
+       113,
+       1580,
+       1042
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.23245
+     }
     }
    },
-   "t": 485046
+   "t": 507465,
+   "menus": [],
+   "te": 507490,
+   "shot": "drw-table-cells-insert-row-s11.png"
   }
- ]
+ ],
+ "t0_epoch_ms": 1795360604773
 }
