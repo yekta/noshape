@@ -1,15 +1,20 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-22 14:40 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-22 14:42 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-22 13:05 UTC)
 - **Queue:** c66e5963 rectangle test fixes (core-rf: 8e3ffc49's fix forward; ops e2e show_code/coincident, psui
   model-edge drags (block_centre), snaps row (normalize_or_zero), glyph walk; lit-end was main's, psui f8b0a2d8);
-  472eddd5 Loft 1 (core-rmx branch core-loft1); 3779e4f1 knifehandle Blade scatter (core-dock). LANDED f94fdf98 isaac
-  speed (volume_change, merge_cylinder_patches copy only for merging pairs; 00f1d4 19.9 -> 12.5 s).
-  When 472eddd5 lands: tell blend (roster id) Loft 1 is in, so it reruns Fillet 1.
+  3779e4f1 knifehandle Blade scatter (core-dock). LANDED 472eddd5 Loft 1 as c08ef29e (14:40; blend told to rerun
+  Fillet 1), f94fdf98 isaac speed (volume_change, merge_cylinder_patches copy only for merging pairs; 00f1d4 19.9 -> 12.5 s).
+- **VALID-SURFLOFTS-LOFT1 (core-rf branch core-sfl, uncommitted):** op_loft's straight_edges_as_lines: a loft's own
+  B-spline edges with collinear poles become Geom_Line (live: Loft 1 = 2 lines + 2 splines), pcurves re-projected
+  (GeomProjLib::Curve2d; a re-ranged old pcurve failed BRepCheck SameParameter on solid lofts), vertex params set.
+  NOSHAPE_LOFT_SPLINE_EDGES=1 turns it off. T1 core::a_loft_between_two_open_curves_has_straight_lines_between_their_ends
+  + all 37 kernel loft tests pass. Running (.lp.sh, vibex7 ~/tmp/core/g): validity on surfaces-lofts-projected
+  (val-lines/val-splines.log), then model suite splines vs lines same binary (run-splines/run-lines.log). Then land.
 - **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
   parameter from guide 0, each guide by its own parameter (Pchip through (v_i, t_i)): 21504.09 mm2 vs live 21477.23
   (was 21517.64), P1-P4 width within 0.02 mm, P5-tip +0.38 mm. T1 kernel the_knifehandle_loft_through_six_profiles_has_lives_area.
