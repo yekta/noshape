@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-22 10:58 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-22 14:35 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -19,43 +19,34 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (lead 11-22 06:2x; state 11-22 13:40 UTC)
-1. LANDED 13:03: usdvol as c240175b, per-pair stage A as ea0febb2 (targets of bool-ptol / bool-usdvol / their gate
-   trees removed on vibe2, vibex8, vibex7).
-2. P1 BOOL-PER-PAIR-TOL (DECISIONS 17157c2fa), STAGED. Ctx.arg_tol (each arg's half), Ctx.arg_reach (widest band with
-   args whose boxes meet); helpers own_band / band(f,g) / edge_band / args_band / face_band / reach_band.
-   - STAGE B ca0bb0156 (worktree bool-ptolb, on A's pre-land 0b4f5ad47): a piece's state and the rays per pair; the
-     kernel's own Booleans (quick_boolean's t_slab; the replay's "direct" cases, NOSHAPE_BOOL_SLAB) pass flag bit 4 ->
-     brep with_one_band -> arg_tols gives every arg half the Boolean's (a Shell's slabs are 0.1 um tolerant but a
-     drafted wall's slab sits tan(0.5 deg) x 1 mm = 8.7 um off its neighbour's plane; gamma's clips are truly precise).
-   - STAGE C ad5674aa8 (worktree bool-ptolc, on B): pcurves of chords / off-axis arcs on cylinders.
-   - GATE of C (covers A+B+C; vibex8, run dir ~/agents/bool-gate/runs/bool-ptolc-ad5674aa8-1122-125137, log
-     /root/bool-ptolc-scratch/gate-ad5674aa8.log): replay 3114 -> 3114 (+0 -0), differing 2 -> 2, shells 6 -> 6, suite
-     to the end 131 -> 131, speed 1.00x (ours on the 3114 shared cases 86.9 -> 57.5 s, a hint). CHECK: cf-surface-pattern
-     "Surface Pattern 3" main 129/385/258 -> branch 129/384/257 faces/edges/vertices, live 131/387/258 (both off live;
-     see whether main with A has it). FAIL: crate test brep_replay::brep_results_are_the_same_on_any_thread (case
-     d466cefc7b984ccf on 8 threads != alone; /root/bool-ptolc-scratch/gate-tests.log:980). Passes 11/11 alone and in
-     a full kernel run; 40x branch vs 40x main flake count running (vibex8). If main flakes too: pre-existing, tell the
-     lead; else find the race (archive 10-28: the build mutated shared input edges; C's chord_pcurve UpdateEdge is on
-     the result's edges, like the code before it).
-   - Then knurls (kn-run.sh, k-main/k-br copies) -> rebase B and C on main (A landed as ea0febb2; drop 0b4f5ad47) ->
-     land B, then C.
-3. SPEED-STANDOFFS. Live whole doc 176 ms. Main on vibe2 (loaded): Revolve 2 541 ms (brep 207, unify 260 of which
-   usd.volume 172 = usdvol, queued), Boolean 1 339 (brep 198, unify 117), Boolean 2 238 (brep 137, unify 74).
-   brep on vibex8 (cases BK/st/rec 330d / de7a / e714, st-brep*.sh, probe tree bool-stages, PROBE_BREP_TIMES):
-   OCCT ahead sections 49-61 ms (src.sections later 0.3-0.6 ms: all prefetched) + the pair loop 40-73 ms, all
-   nurbs_pair: same-surface pairs' edge_over_free_face 21-58 ms, of it stretches_over's 257 samples per edge
-   (free::surface_distance -> uv_of: a Newton projection each, memoised per point under one Mutex per face) 16-64
-   ms, free::projected 3-9 ms; occt_sections' boundaries_meet + seeded (copied tools) 11-20 ms; rims 0-17 ms.
-   Tried (probe tree, diff saved /root/bool-scratch/stages-probe-1122-1100.diff, PROBE_NOAHEAD switch): (a) samples
-   in parallel runs of 33 inside stretches_over: ~1.5x only; (b) all same-surface pairs' samples ahead in one
-   par_map_each (free_samples cache keyed (e, f, t0, t1 bits), samples_on / free_path / path_at helpers): pair loop
-   48-73 -> 19-45 ms but the ahead pass takes 14-24 ms (uvs Mutex contention): net 10-30 ms a Boolean, under the
-   100 ms bar alone. Next ideas: projections seeded from the previous sample's (u, v) without the shared cache in
-   samples_on; seeded sections ahead too; then unify (the bigger share after usdvol). Probe tree also carries the
-   PROBE_B switches: drop with it. Next run: /root/bool-scratch/st-brep9.sh (probe tree bool-stages, vibex8): PROBE_AHEAD
-   prints each sections-ahead job's ms (slowest 6, surface kinds) to see if one pair dominates the 55-73 ms.
-4. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
+## NEXT (lead 11-22 14:0x; state 11-22 14:35 UTC)
+1. LANDED 13:03: usdvol c240175b, per-pair stage A ea0febb2. Stage C's gate (A+B+C, vibex8, log
+   /root/bool-ptolc-scratch/gate-ad5674aa8.log): replay 3114 -> 3114 (+0 -0), differing 2 -> 2, shells 6 -> 6, suite
+   131 -> 131, speed 1.00x. The any-thread crate test's one failure (d466 centroids differing ~1e-15): 0 of 40 on the
+   branch and 0 of 40 on main: a rare flake, not B/C (they add no shared state). cf-surface-pattern 385 -> 384 edges
+   is stage A's (its own gate showed it), B/C don't move it: a follow-up. Knurls (vibex8, 14:01): 0 diff x5, copies
+   deleted. Real docs (vibex8, whole-document A/B, 5 alternating rounds, binaries before usdvol): gamma's suite run
+   43.6 -> 37.3 s (Boolean 1 by ours), standoffs 854 vs 889 ms (noise; live 203).
+2. QUEUED 14:06: stage B as ee1c3bba (worktree bool-ptolb, rebased on main). Then stage C (worktree bool-ptolc,
+   980be2e8b on B) + the parity.rs fix (uncommitted in bool-ptolc: Translator::tab() in crates/ops/src/parity.rs,
+   the reopen's feature_list / query_parts on the import's studio, ModelResult.timed + the assertion in
+   an_import_feature_imports_lives_file; its test building on vibex8 via rb.sh). Land C + fix after B lands, then
+   tell qa (roster) that SCORE's gamma time is real now (lead 14:2x).
+3. GAMMA (lead 14:0x: biggest Boolean/Shell share, then Boolean 2 correctness). Reopened document regenerates
+   2.5 s (features 2.45 s) vs live 246 ms (NOSHAPE_PARITY_SPLIT=1; the suite's 30-37 s is its per-feature build and
+   compare). Features: Import 223, Transform 110, Move face 987 (OCCT defeature 899), Boolean 1 2752 (unify 2280, ours
+   415), Boolean 2 1258 (unify 857, ours 375). Boolean 1's unify (case BK/gm/rec/f68f, probe tree bool-stages with
+   groups.* timers; gm-uni.sh): unify.usd 970 (usd.build = OCCT USD 568, usd.copy 168, usd.check 144), unify.bands
+   540 (groups.copy 156, groups.rounds 316 in 4 rounds), bands.bands 490, unify.check 193, merge_planar 138, seams
+   121. No one dominant share; two whole-part copies ~320 ms. Live's 246 ms needs a unify on our own body (no OCCT
+   round trip): a decision for the lead.
+   Boolean 2 (case 678f, fuse of 24 bodies): inputs equal live's to 4 decimals (V, A, faces of all 24); live removes
+   54.556 mm3 / 47417.6 mm2, ours and OCCT 56.947 / 47296.7 (889 faces vs 884). One shell; no 0.04 mm gaps (pairwise
+   gaps: touching or 0.4-1 mm design gaps). Running: per touching pair fuse overlap / contact vs common volume
+   (PROBE_GAPS in bool_case_probe, gm-gaps.sh, out gm-pairs.out) to find the pair whose overlap differs.
+4. STANDOFFS: Revolve 2 is ours (Boolean 185 + unify 198 ms, binary before usdvol: usd.volume 102 of it gone on main).
+   sections-ahead: 20 jobs 187 ms summed, 38-56 ms wall, one q/bs job 33 ms sets it (st-brep9.out): not the lever.
+5. Decision b: NO local check after the second group merge (150 ms of ~2 s is under the bar; changes a result).
 
 ## In flight (11-21 21:35 UTC)
 - Mac: usable via ONE 4-job nice-19 slot (DECISIONS a16b39297; mac-run.sh / NOSHAPE_RB_HOST=mac wait for it), never
