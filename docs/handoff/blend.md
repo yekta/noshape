@@ -45,8 +45,11 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   OTHER 29.098/29.272 (live one OTHER 29.602 each); (b) -4: live puts an OTHER 25.287 corner patch where three
   r 2.5 rounds meet at x -27.5..-30.1, |y| 26..29.4, |z| 67..74.3 (its tori there: 127.912 x4, 353.558 x2, 1031.193
   x2; ours 155.732 x4, 405.639 x2, 1148.690 x2, no patch); (c) +2 planes, one of our pairs 173.406 [-30,0,+-88.09] or
-  270.177 [-25,0,+-80] (live's planes adjacent to created edges: 2297.29, 3040.244, 923.16 x2). Next: (a) first
-  (drop the slivers at the cusp refill), then a clean land branch (ZZ_CBALL + 0.05 r + fallback, no probes).
+  270.177 [-25,0,+-80] (live's planes adjacent to created edges: 2297.29, 3040.244, 923.16 x2). (a)'s cause: the
+  concave ball tools (5.566 mm3) stop at the last ball whose touches are >= 0.05 r apart (ZZ_NOTIP=1), short of the
+  vanishing point (17.5, +-39.681, +-38.084) = live's patch corner; the gap leaves the slivers. Tip vertex on
+  (ZZ_NOTIP unset, zzsusp24): OCCT's loft "incompatible sections" -> 28/61/39 wrong. Next: close the end another way
+  (a ruled last piece to the point, or the last sections' wires rebuilt degenerate), then a clean land branch.
 - blend-cusp env switches: ZZ_NOTIP, ZZ_CBALL, ZZ_FLIPMAP, ZZ_ORIENTDBG, ZZ_SOLIDS (+ZZONE), ZZ_BALLDUMP, ZZ_TOOLDUMP,
   ZZ_SECDIST, ZZ_RUNON.
 - RINGS Fillet 1 landed 18f929e78 (open: 10.4 mm leaves a 0.774 mm2 bore island).
