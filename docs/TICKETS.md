@@ -488,6 +488,14 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   row, face / edge / vertex, empty canvas, view cube, sketch line, Part Studio and Assembly tabs, the tab bar's empty end (no menu),
   instance and root rows, the drawing view. Not tickets: live's Add comment / Create task… (cloud). Runner gaps: "Parts (1)" header
   (step 10) not found by our runner; step 4's plane target hit the plane in graphics (variant 40v-plane-row at live's px: the Front row's menu = live, Rename … Show dependencies…).
+- [ ] P2 **EXPR-AUTOCOMPLETE-LOOK (psui)** (workflow 37 steps 25 / 42, vs-vars, green d0df2d56b): typing "#w * 2 + 5 mm" in a
+  sketch dimension or "#w + 3 mm" in Extrude's Depth opens the suggestion list: live's rows are "mm" with a ruler icon, "(f) max(x,y)",
+  "(f) min(x,y)", the list's left edge left of the field; ours shows "mm" with a different icon, "f max( x , y )" / "f min( x , y )"
+  (spaced arguments, bare f), the list starting at the field's left and wider (tickets/wf37-dims.png row 1, wf37-depth.png row 1).
+  Also: after Extrude 2 (step 45) live draws the origin glyph over the new block, ours half-hidden behind it (wf37-regen.png row 1).
+- Workflow 37 (variable #w = 12 mm, sketch dimensions "#w * 2 + 5 mm" -> 29 and "#height / 2" -> 15 with the fx mark, Extrude depth
+  "#w + 3 mm" -> 15, then #w -> 20 and Variable Studio height -> 50) otherwise = live: values, feature rows and both regenerations
+  (wf37-regen.png). Dimension text screen-aligned = SKETCH-LENGTH-LABEL-IN-PLANE (skasm, open).
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
