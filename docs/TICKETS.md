@@ -496,6 +496,14 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
 - Workflow 37 (variable #w = 12 mm, sketch dimensions "#w * 2 + 5 mm" -> 29 and "#height / 2" -> 15 with the fx mark, Extrude depth
   "#w + 3 mm" -> 15, then #w -> 20 and Variable Studio height -> 50) otherwise = live: values, feature rows and both regenerations
   (wf37-regen.png). Dimension text screen-aligned = SKETCH-LENGTH-LABEL-IN-PLANE (skasm, open).
+- [ ] P1 **FEAT-MISSING-REF-CHIP (psui)** (workflow 33 steps 23-29, block-fillet, green d0df2d56b): Chamfer 1 dragged above Fillet 1,
+  rolled back, edited to take Fillet 1's edge; rolling forward leaves Fillet 1 red (both). Editing Fillet 1: live's chip reads
+  "**Missing** Edge of Extrude 1" in red; ours "Edge of Extrude 1" plain (the field red). Right-click the chip: live **Clear all /
+  Clear missing references / Edit healthy moment**; ours **Clear all** only, so the fix (Clear missing references, a new edge, ✓)
+  can't be done and Fillet 1 stays red (tickets/wf33-fillet-fix.png rows 23/25/26). Not confirmed: live's hover tooltip "Fillet 1
+  did not regenerate properly: Select edges or faces to fillet / 1 missing selection" (step 22) didn't show in ours after a 1.5 s
+  hover (variant 33v-hover-tip, wf33v-hover-tip.png); the runner's hover may not raise tooltips.
+- Workflow 33 steps 1-22 = live: Chamfer 1 (2 mm), the drag above Fillet 1, rollback, the edit, Fillet 1 red after rolling forward.
 
 ## qa, 2026-11-22 03:3x (USER P0 walk 9, lead: drawing / Variable Studio / Feature Studio hover-select; live's own scenarios drwm-*, vsm-1, fsm-1 (live/qa/drw-matrix-1121, behaviours "drawing / VS / FS hover-select matrix") replayed as is on green e97ac7f1c, vibe2, kit qa-scratch/hm2/w9 (bin/w9.sh, w9crop.sh), shots hm2/out-w9m; crops qa-scratch/tickets/w9-*.png, live left)
 
