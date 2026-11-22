@@ -1,7 +1,21 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 17:45 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-22 18:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
+
+## NEXT (18:56, compaction): FAILED LAND FIRST
+- FAILED 18:46 ab6987cc (and everything stacked: 2c5bffa7, 12befd2f, b6342565, b8015e9d, the length box 4abdbe370):
+  part-studio-ui sm_feel_tests::a_bends_face_clicked_again_stays_in_its_field: "the face kept after the click" left 0
+  on the land host (passed on vibex8 16:1x). Suspect a race: the click before the preview display is in (held_face_under
+  in mod.rs ~2054: `now` = current display lacks a face at the held face's depth) or the preview naming the face the
+  same (a plain toggle-off). Repeat script vibex8:~/tmp/skasm/bf.sh (5x the test, --nocapture), local copy
+  /root/skasm-scratch/bin/bf.sh; run it via tools/tiers/rb.sh bash -c 'bash ~/tmp/skasm/bf.sh'. Fix on top, land.sh.
+- Running at 18:56: se2 (vibex8, /root/skasm-scratch/se2.log: clippy scene+psui, scene lib, psui `sketch` tests) for
+  the sketch-edit-feel commit below (lit_picks with the edited dimension's entities). Check it before landing.
+- Waiting on psui 3ff88768b + asm f028bfc94 to reach main, then wire assembly::inference::choose (committed a2c066149)
+  into assembly_view.rs (~3150) and part-studio-ui inference.rs; then the FEEL-MC-* list below.
+- REQUESTS 18:08 (live, open): mc-reach-1122 R1-R6 (reach rule, edge reach with the tool, rim back half, Extend past
+  the boundary).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
@@ -19,6 +33,17 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   "with" layer) and asm f028bfc94 (dots on top = CAP-MARKER-HIDDEN, infer_vertex_glyph) land (asm keeps off the chooser
   meanwhile). Then MARKER-SHAPES (midpoints squares), EDGE-TRIAD-HIDDEN (Z on top), PS-VERTEX-LOOK, EDGE-PICK-RADIUS
   (~6 px, rim back half), MARKER-REACH (REQUESTS 18:08), PICKED-OWNER / SHIFT-NEAREST re-scored after psui's land.
+- Live sketch-edit-feel-1122 (lead P0 feel set item 1; behaviours "skasm sketch editing feel gaps"), IN PROGRESS:
+  S1 dim box: applies only on Enter; a canvas click keeps it open, unfocused, formatted (format_dim_box, commit_text);
+  Tab (SketchDimBoxTab in key context "SketchDimBox") formats, stays focused; Esc reverts to dim_box_focus_text;
+  underline #1651B0 focused / #d7d7d7; a press on the unfocused box refocuses all selected. Test
+  dimension_box_applies_only_on_enter. S2: radial_dim leaders (outside: text→rim, arrow in; inside: Ø whole diameter,
+  R centre→arc; off an arc's ends: leader to the nearer end); angles keep the placed sector (Sketch::
+  orient_angle_sector at add_dimension, Hints.sector flag so old docs keep the label sector) and the arc runs on to
+  text outside it. S3: selected glyph's entities unlit with the pointer away (SketchEditor::lit_picks); #fab601, box
+  never picks glyphs, tiles drag: already so. S4: Trim circle pieces already so; Extend two clicks already so, but
+  past the boundary: 11-18 (click 42 px past stops at the crossing) vs 11-22 (preview runs past): REQUESTS 18:08 R6.
+  Open: the dimensioned line lit light orange while the box is open (check).
 - (landed or queued) SK-BOX-FILL (scene SketchEditor::box_ends; psui sketch.rs render_sketch_labels draws app-core
   box_overlay, the polyline box gone; screen_to_plane cfg(test)); test backtick_on_a_clicked_sketch_line_opens_select_
   other_by_the_pointer. qa's SK-CTRL-BOX / SK-SELECT-OTHER were on green dc779d69f (15:58), before 905188129 (16:21)

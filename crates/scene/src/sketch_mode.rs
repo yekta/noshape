@@ -5945,7 +5945,7 @@ impl SketchEditor {
             }
             let Some(pos) = self.label_pos(data, c.id, &c.kind) else { continue };
             let mut segs = Vec::new();
-            dim_segments(sk, &c.kind, pos, s, &mut segs);
+            dim_segments(sk, &c.kind, Some(&c.hints), pos, s, &mut segs);
             out.push(DimGraphic { constraint: c.id, driving: c.driving, segments: segs });
         }
         out
@@ -6821,7 +6821,7 @@ impl SketchEditor {
             for (cid, at) in chamfer_dim_labels(&pd.sketch, &dims, self.world_per_px) {
                 let Some(c) = pd.sketch.constraint(cid) else { continue };
                 let mut segs = Vec::new();
-                dim_segments(&pd.sketch, &c.kind, at, self.world_per_px, &mut segs);
+                dim_segments(&pd.sketch, &c.kind, Some(&c.hints), at, self.world_per_px, &mut segs);
                 let text = dim_value_text(&c.kind, c.kind.value().unwrap_or(0.0) / dim_display_scale(&c.kind), units);
                 let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
                 dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, at, half)));
@@ -6853,7 +6853,7 @@ impl SketchEditor {
                 && let Some(c) = pd.sketch.constraint(cid)
             {
                 let mut segs = Vec::new();
-                dim_segments(&pd.sketch, &c.kind, at, self.world_per_px, &mut segs);
+                dim_segments(&pd.sketch, &c.kind, Some(&c.hints), at, self.world_per_px, &mut segs);
                 let text = dim_value_text(&c.kind, c.kind.value().unwrap_or(0.0) / dim_display_scale(&c.kind), units);
                 let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
                 dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, at, half)));
@@ -6869,7 +6869,7 @@ impl SketchEditor {
         // black, the line broken around the 16 px value at the cursor).
         if let Some((kind, pos, v)) = self.dimension_preview(data) {
             let mut segs = Vec::new();
-            dim_segments(&data.sketch, &kind, pos, self.world_per_px, &mut segs);
+            dim_segments(&data.sketch, &kind, None, pos, self.world_per_px, &mut segs);
             let text = dim_value_text(&kind, v / dim_display_scale(&kind), units);
             let half = DVec2::new(label_width_px(&text) * 0.5 + 3.0, 10.0) * self.world_per_px;
             dim_preview.extend(segs.iter().flat_map(|sg| clip_outside_box(*sg, pos, half)));
@@ -7320,9 +7320,20 @@ impl SketchEditor {
     }
 
     pub fn picked(&self, data: Option<&SketchData>) -> Vec<EntityId> {
+        self.picks_with(data, &self.selected_constraints)
+    }
+
+    /// What lights as picked: the tool's picks, the hovered glyph's entities (a selected glyph's light only under the
+    /// pointer) and those of a dimension whose box is open on it (live sketch-edit-feel-1122 S1, S3).
+    pub fn lit_picks(&self, data: Option<&SketchData>) -> Vec<EntityId> {
+        let editing: Vec<ConstraintId> = self.dim_edit.iter().filter(|d| !d.created).map(|d| d.constraint).collect();
+        self.picks_with(data, &editing)
+    }
+
+    fn picks_with(&self, data: Option<&SketchData>, constraints: &[ConstraintId]) -> Vec<EntityId> {
         let mut v: Vec<EntityId> = self.picks.iter().map(|p| p.0).collect();
         if let Some(data) = data {
-            for cid in self.selected_constraints.iter().chain(self.hover_constraint.iter()) {
+            for cid in constraints.iter().chain(self.hover_constraint.iter()) {
                 if let Some(e) = use_glyph_entity(*cid) {
                     v.push(e);
                 } else if let Some(p) = shared_glyph_point(*cid) {
@@ -7341,6 +7352,10 @@ pub fn add_dimension(data: &mut SketchData, kind: ConstraintKind, label: Option<
     // Added as a reference first so it takes the measured value, then made
     // driving unless that over-constrains the sketch (Onshape behavior).
     let cid = data.sketch.add_reference(kind).ok()?;
+    // An angle keeps the sector it was placed in (live sketch-edit-feel-1122).
+    if let Some(p) = label {
+        data.sketch.orient_angle_sector(cid, p);
+    }
     let _ = data.sketch.set_driving(cid, true);
     let report = data.sketch.solve();
     if report.conflicting().contains(&cid) || report.redundant.contains(&cid) {
@@ -8319,35 +8334,33 @@ fn linear_dim(out: &mut Vec<[DVec2; 2]>, p1: DVec2, p2: DVec2, u: Option<DVec2>,
     arrow(out, q2, dir, s);
 }
 
+/// A radius or diameter dimension as its text sits (live sketch-edit-feel-1122 S2): outside the curve a leader from
+/// the text to it, the arrow pointing in; inside a circle the whole diameter through the text, an arrow at each end;
+/// inside an arc the radius from the centre through the text, its arrow at the arc; off an arc's ends a short leader
+/// to the nearer end.
 fn radial_dim(out: &mut Vec<[DVec2; 2]>, c: DVec2, r: f64, pos: DVec2, diameter: bool, span: Option<(f64, f64)>, s: f64) {
     let v = (pos - c).try_normalize().unwrap_or(DVec2::X);
-    let dl = (pos - c).length();
     let tip = c + v * r;
-    let far = if dl > r { pos } else { tip };
-    if diameter && span.is_some() && dl > r {
-        // An arc's diameter (live sketch/1946, a slot's end cap): one leader
-        // from the label to the near side, its arrow pointing in.
-        out.push([tip, far]);
+    if let Some((a0, a1)) = span
+        && noshape_sketch::geom::angle_in_range(v.to_angle(), a0, a1 - a0, 1e-9).is_none()
+    {
+        let (e0, e1) = (c + DVec2::from_angle(a0) * r, c + DVec2::from_angle(a1) * r);
+        let end = if e0.distance(pos) <= e1.distance(pos) { e0 } else { e1 };
+        out.push([end, pos]);
+        arrow(out, end, end - pos, s);
+        return;
+    }
+    if (pos - c).length() > r {
+        out.push([tip, pos]);
         arrow(out, tip, -v, s);
     } else if diameter {
         let t2 = c - v * r;
-        out.push([t2, far]);
+        out.push([t2, tip]);
         arrow(out, tip, v, s);
         arrow(out, t2, -v, s);
     } else {
-        out.push([c, far]);
+        out.push([c, tip]);
         arrow(out, tip, v, s);
-        // Extension arc when the leader lies outside the arc's span.
-        if let Some((a0, a1)) = span {
-            let a = v.to_angle();
-            let sweep = a1 - a0;
-            if noshape_sketch::geom::angle_in_range(a, a0, sweep, 1e-9).is_none() {
-                let to_start = noshape_sketch::geom::ccw_sweep(a, a0);
-                let from_end = noshape_sketch::geom::ccw_sweep(a1, a);
-                let pts = if to_start < from_end { arc_points(c, r, a, to_start) } else { arc_points(c, r, a1, from_end) };
-                polyline(out, &pts);
-            }
-        }
     }
 }
 
@@ -8395,7 +8408,8 @@ fn chamfer_dim_labels(sk: &Sketch, dims: &[ConstraintId], px: f64) -> Vec<(Const
         .collect()
 }
 
-fn dim_segments(sk: &Sketch, k: &ConstraintKind, pos: DVec2, s: f64, out: &mut Vec<[DVec2; 2]>) {
+/// `hints`: the placed constraint's (an angle's sector); a dimension being placed has none and follows the pointer.
+fn dim_segments(sk: &Sketch, k: &ConstraintKind, hints: Option<&noshape_sketch::Hints>, pos: DVec2, s: f64, out: &mut Vec<[DVec2; 2]>) {
     match k {
         // Centerline: from the entity to its mirror image across the axis.
         ConstraintKind::Distance { a, b, mode: DistanceMode::Centerline, .. } => {
@@ -8476,19 +8490,29 @@ fn dim_segments(sk: &Sketch, k: &ConstraintKind, pos: DVec2, s: f64, out: &mut V
             let c = la.0 + da * t;
             let r = (pos - c).length().max(s * 10.0);
             let th = (pos - c).to_angle();
-            // Rays sorted ccw; the sector containing the label is drawn.
-            let mut rays = [da, db, -da, -db];
-            rays.sort_by(|x, y| x.to_angle().rem_euclid(TAU).total_cmp(&y.to_angle().rem_euclid(TAU)));
-            let mut chosen = (rays[0], rays[1]);
-            for i in 0..4 {
-                let (s1, s2) = (rays[i], rays[(i + 1) % 4]);
-                let a0 = s1.to_angle();
-                if noshape_sketch::geom::angle_in_range(th, a0, noshape_sketch::geom::ccw_sweep(a0, s2.to_angle()), 1e-12).is_some() {
-                    chosen = (s1, s2);
-                    break;
-                }
-            }
+            // A placed angle keeps its sector, its rays as the solve measures it (live sketch-edit-feel-1122); while
+            // placing, the sector holding the label (rays sorted ccw).
+            let placed = hints.filter(|h| h.sector).map(|h| {
+                let u = if h.flip_a { -da } else { da };
+                let v = if h.flip_b { -db } else { db };
+                if h.reverse { (v, u) } else { (u, v) }
+            });
+            let chosen = placed.unwrap_or_else(|| {
+                let mut rays = [da, db, -da, -db];
+                rays.sort_by(|x, y| x.to_angle().rem_euclid(TAU).total_cmp(&y.to_angle().rem_euclid(TAU)));
+                (0..4)
+                    .map(|i| (rays[i], rays[(i + 1) % 4]))
+                    .find(|(s1, s2)| noshape_sketch::geom::angle_in_range(th, s1.to_angle(), noshape_sketch::geom::ccw_sweep(s1.to_angle(), s2.to_angle()), 1e-12).is_some())
+                    .unwrap_or((rays[0], rays[1]))
+            });
             angle_arc(out, c, chosen.0, chosen.1, r, s);
+            // The text outside its sector: the arc runs on past the nearer line to it.
+            let (a0, sweep) = (chosen.0.to_angle(), noshape_sketch::geom::ccw_sweep(chosen.0.to_angle(), chosen.1.to_angle()));
+            if noshape_sketch::geom::angle_in_range(th, a0, sweep, 1e-12).is_none() {
+                let (past, before) = (noshape_sketch::geom::ccw_sweep(a0 + sweep, th), noshape_sketch::geom::ccw_sweep(th, a0));
+                let pts = if past <= before { arc_points(c, r, a0 + sweep, past) } else { arc_points(c, r, th, before) };
+                polyline(out, &pts);
+            }
             // Extension lines where the lines don't reach the arc.
             for (ray, l) in [(chosen.0, if chosen.0.dot(da).abs() > 0.5 { la } else { lb }), (chosen.1, if chosen.1.dot(da).abs() > 0.5 { la } else { lb })] {
                 let tmax = ((l.0 - c).dot(ray)).max((l.1 - c).dot(ray));
@@ -13191,6 +13215,43 @@ mod tests {
         assert!(!g[0].external, "the Origin's glyph isn't tinted as an external reference");
     }
 
+    /// Live sketch-edit-feel-1122 S2: a Ø dimension's text outside the circle has one leader to the near rim (not the
+    /// whole diameter); inside it, the whole diameter through the text. An R's text off its arc's ends: a short leader to
+    /// the nearer end.
+    #[test]
+    fn radial_dimension_leaders_follow_the_text_as_live() {
+        let (ed, mut d) = editor(Tool::Select);
+        let c = d.sketch.add_circle(v(0.0, 0.0), 0.01);
+        let cid = add_dimension(&mut d, ConstraintKind::Diameter { curve: c, value: 0.02 }, Some(v(0.03, 0.0)), None).unwrap();
+        let segs = |d: &SketchData| ed.dimension_graphics(d).into_iter().find(|g| g.constraint == cid).unwrap().segments;
+        let reach = |d: &SketchData| segs(d).iter().flatten().fold(f64::MAX, |m, p| m.min(p.x));
+        assert!(reach(&d) > 0.009, "outside: from the near rim only, nothing past the centre: {}", reach(&d));
+        d.dimension_labels.insert(cid.0, [0.003, 0.0]);
+        assert!(reach(&d) < -0.0099, "inside: the whole diameter: {}", reach(&d));
+        let arc = d.sketch.add_arc_angles(v(0.1, 0.0), 0.01, 0.0, std::f64::consts::PI);
+        let rid = add_dimension(&mut d, ConstraintKind::Radius { curve: arc, value: 0.01 }, Some(v(0.08, -0.004)), None).unwrap();
+        let g = ed.dimension_graphics(&d).into_iter().find(|g| g.constraint == rid).unwrap().segments;
+        assert!(g.iter().flatten().all(|p| p.x < 0.0905 && p.y < 0.0005), "off the arc's ends: a leader to the left end only: {g:?}");
+    }
+
+    /// Live sketch-edit-feel-1122 S2: an angle keeps the sector it was placed in; its text dragged outside it (into the
+    /// vertically opposite sector), the arc runs on past the line to the text, the sector still drawn.
+    #[test]
+    fn an_angle_keeps_its_placed_sector() {
+        let (ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        let dir = DVec2::from_angle(58.57f64.to_radians());
+        let b = d.sketch.add_line(v(0.0, 0.0), dir * 0.04);
+        let inside = DVec2::from_angle(29f64.to_radians()) * 0.02;
+        let cid = add_dimension(&mut d, ConstraintKind::Angle { a, b, value: 58.57f64.to_radians() }, Some(inside), None).unwrap();
+        let opposite = DVec2::from_angle(233f64.to_radians()) * 0.02;
+        d.dimension_labels.insert(cid.0, [opposite.x, opposite.y]);
+        let g = ed.dimension_graphics(&d).into_iter().find(|g| g.constraint == cid).unwrap().segments;
+        let at = |deg: f64| g.iter().flatten().any(|p| (p.length() - 0.02).abs() < 1e-4 && (p.to_angle().to_degrees().rem_euclid(360.0) - deg).abs() < 3.0);
+        assert!(at(29.0), "the placed sector's arc is still drawn");
+        assert!(at(233.0), "the arc runs on to the text");
+    }
+
     /// Live (behaviours "skasm (2026-10-28) dimension labels vs glyph rows"):
     /// a line's length 25.5 px above it (its glyph goes below; lenbox-1122: 25–27); a corner
     /// rectangle's width 42 px below the bottom edge (past the edge's glyph)
@@ -13239,6 +13300,7 @@ mod tests {
         assert!(corners.iter().all(|g| g.on_point && !g.external));
         ed.selected_constraints.push(corners[0].constraint);
         assert_eq!(ed.picked(Some(&d)).len(), 2, "the two edges meeting there");
+        assert!(ed.lit_picks(Some(&d)).is_empty(), "a selected glyph's edges don't light with the pointer away (live sketch-edit-feel-1122)");
         ed.selected_constraints.clear();
         let corner = corners[0].anchor;
         assert!(ed.delete_constraint(&mut d, corners[0].constraint));

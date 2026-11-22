@@ -119,6 +119,33 @@ impl Sketch {
         self.constraints.get(&id)
     }
 
+    /// Turns an angle's rays to the sector holding `at` (both rays flipped: the same angle, the opposite sector), so
+    /// its drawing keeps the sector picked at placement (live sketch-edit-feel-1122). The solve doesn't change.
+    pub fn orient_angle_sector(&mut self, id: ConstraintId, at: glam::DVec2) {
+        let Some(c) = self.constraints.get(&id) else { return };
+        let crate::ConstraintKind::Angle { a, b, .. } = c.kind else { return };
+        let (Some((a0, a1)), Some((b0, b1))) = (self.line_pts(a), self.line_pts(b)) else { return };
+        let (da, db) = (a1 - a0, b1 - b0);
+        let den = da.perp_dot(db);
+        if den.abs() < 1e-18 {
+            return;
+        }
+        let vertex = a0 + da * ((b0 - a0).perp_dot(db) / den);
+        let h = &c.hints;
+        let u = if h.flip_a { -da } else { da };
+        let v = if h.flip_b { -db } else { db };
+        let (x, y) = if h.reverse { (v, u) } else { (u, v) };
+        // Inside the ccw sector from x to y, or its opposite.
+        let w = at - vertex;
+        let inside = |x: glam::DVec2, y: glam::DVec2| x.perp_dot(w) >= 0.0 && w.perp_dot(y) >= 0.0;
+        let flip = !inside(x, y) && inside(-x, -y);
+        if let Some(c) = self.constraints.get_mut(&id) {
+            c.hints.flip_a ^= flip;
+            c.hints.flip_b ^= flip;
+            c.hints.sector = true;
+        }
+    }
+
     pub fn constraints(&self) -> impl Iterator<Item = &Constraint> {
         self.constraints.values()
     }

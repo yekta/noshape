@@ -31,7 +31,7 @@ use std::sync::Arc;
 /// NOSHAPE_SNAP_TRACE: log each pointer move's snap in viewport px.
 static SNAP_TRACE: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var_os("NOSHAPE_SNAP_TRACE").is_some());
 
-actions!(sketch_entry, [SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab]);
+actions!(sketch_entry, [SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab, SketchDimBoxTab]);
 
 /// Keys of the on-the-fly value box: Tab (the value with its unit,
 /// selected, or the other box), Esc. Alt+arrows do nothing (live).
@@ -40,6 +40,9 @@ pub(super) fn entry_key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("tab", SketchEntryTab, Some("SketchEntry")),
         KeyBinding::new("shift-tab", SketchEntryBackTab, Some("SketchEntry")),
         KeyBinding::new("escape", SketchEntryCancel, Some("SketchEntry")),
+        // The dimension box: Tab formats its text (live sketch-edit-feel-1122).
+        KeyBinding::new("tab", SketchDimBoxTab, Some("SketchDimBox")),
+        KeyBinding::new("shift-tab", SketchDimBoxTab, Some("SketchDimBox")),
         // With no input open (the hints showing): the other hint (live).
         KeyBinding::new("tab", SketchHintTab, Some("Sketch")),
         KeyBinding::new("shift-tab", SketchHintBackTab, Some("Sketch")),
@@ -1418,11 +1421,10 @@ impl PartStudioView {
                     // Clicking the canvas leaves option/value fields.
                     window.focus(&self.focus, cx);
                 }
-                if !overlay_pressed && self.dim_input.take().is_some() {
-                    // ... and drops an open dimension value field.
-                    if let Some(ed) = &mut self.sketch {
-                        ed.dim_edit = None;
-                    }
+                // ... and an open dimension box stays, unfocused, its text formatted but not applied (live
+                // sketch-edit-feel-1122: only Enter applies it).
+                if !overlay_pressed && let Some((cid, st)) = self.dim_input.as_ref().map(|(c, st, _)| (*c, st.clone())) {
+                    self.format_dim_box(cid, &st, window, cx);
                 }
                 let Some(p) = to_plane(self, *position, cx) else { return true };
                 // What is lit is within live's reach (the hover checks it too); the GPU hover pick may lag behind a
@@ -1653,7 +1655,7 @@ impl PartStudioView {
         // (amber) while the dimension is placed.
         let tool_picks = if ed.tool == Tool::Dimension { ed.tool_picks() } else { Vec::new() };
         selection.extend(tool_picks.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
-        accent.extend(ed.picked(data.as_deref()).iter().filter(|e| !tool_picks.contains(e)).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
+        accent.extend(ed.lit_picks(data.as_deref()).iter().filter(|e| !tool_picks.contains(e)).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         let Some(data) = data else { return Vec::new() };
         let units = self.doc.read(cx).session.doc.settings.units;
         let (lines, points) = ed.overlay(&data, &units);
@@ -2111,6 +2113,7 @@ impl PartStudioView {
                 if let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) {
                     dialog.update(cx, |d, cx| d.close_external_create_variable(DIM_BOX_FIELD, cx));
                 }
+                self.ui.dim_box_focus_text = Some(state.read(cx).value().to_string());
                 self.dim_input = Some((cid, state, sub));
                 self.ui.dim_box_offset = Point::default();
                 self.ui.dim_invalid = false;
@@ -2152,6 +2155,23 @@ impl PartStudioView {
         }
         cx.notify();
         true
+    }
+
+    /// The dimension box's text as it would be applied ("41" → "41 mm"), left in the box without applying it: a click
+    /// outside it or Tab (live sketch-edit-feel-1122). Text that doesn't evaluate stays as typed.
+    fn format_dim_box(&mut self, cid: noshape_sketch::ConstraintId, st: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let vars = self.sketch_variables(cx);
+        let Some(dim) = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::dim_unit(&c.kind))) else { return };
+        let typed = st.read(cx).value().trim().trim_start_matches('=').trim().to_string();
+        if noshape_units::evaluate_as(&typed, dim, &units, &vars).is_err() {
+            return;
+        }
+        let text = noshape_model::quantity_text::commit_text(&typed, dim, &units, &vars);
+        if text != st.read(cx).value().as_ref() {
+            st.update(cx, |s, cx| s.set_value(text, window, cx));
+        }
+        cx.notify();
     }
 
     fn commit_dimension(&mut self, cid: noshape_sketch::ConstraintId, text: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -4241,6 +4261,7 @@ impl PartStudioView {
             {
                 let allowed = data.sketch.constraint(cid).is_some_and(|c| crate::sketch_mode::tolerance_allowed(&c.kind));
                 let dim_invalid = self.ui.dim_invalid;
+                let box_focused = st.read(cx).focus_handle(cx).is_focused(window);
                 // The Create variable popup for an unknown `#name`, level with
                 // the box and right of it (left of it when the graphics area
                 // ends first). It is drawn 107 px right of its anchor (as next
@@ -4260,6 +4281,21 @@ impl PartStudioView {
                     // The box is centered on the label position (live sketch/12-13).
                     v_flex()
                         .id("dim-box")
+                        .key_context("SketchDimBox")
+                        // Tab formats the text (units added) and keeps the box, all selected; nothing applies (live
+                        // sketch-edit-feel-1122).
+                        .on_action(cx.listener({
+                            let st = st.clone();
+                            move |this, _: &SketchDimBoxTab, window, cx| {
+                                // (The autofill list takes Tab first: its entry.)
+                                if this.ui_ref().is_some_and(|u| u.dim_completion.is_some()) {
+                                    this.accept_dim_completion(cid, None, window, cx);
+                                    return;
+                                }
+                                this.format_dim_box(cid, &st, window, cx);
+                                st.update(cx, |s, cx| s.select_all(window, cx));
+                            }
+                        }))
                         .absolute()
                         .left(px(x - 104.0) + self.ui.dim_box_offset.x)
                         .top(px(y - 30.0) + self.ui.dim_box_offset.y)
@@ -4307,7 +4343,8 @@ impl PartStudioView {
                                         this.sketch_cancel(cx);
                                         return;
                                     }
-                                    if let Some(text) = committed {
+                                    // (Back to what the box held when it took the focus: live sketch-edit-feel-1122.)
+                                    if let Some(text) = this.ui.dim_box_focus_text.clone().or(committed) {
                                         st.update(cx, |s, cx| s.set_value(text, window, cx));
                                     }
                                     cx.notify();
@@ -4381,7 +4418,24 @@ impl PartStudioView {
                                         .w(px(100.))
                                         .h(px(24.))
                                         .border_b_1()
-                                        .border_color(pal.accent)
+                                        // Live sketch-edit-feel-1122: #1651B0 while focused, grey once the focus left.
+                                        .border_color(if box_focused { gpui_kit::rgb_static(0x1651b0) } else { gpui_kit::rgb_static(0xd7d7d7) })
+                                        // A press on the unfocused box takes it back, all selected.
+                                        .capture_any_mouse_down(cx.listener({
+                                            let st = st.clone();
+                                            move |this, _: &MouseDownEvent, window, cx| {
+                                                if st.read(cx).focus_handle(cx).is_focused(window) {
+                                                    return;
+                                                }
+                                                cx.stop_propagation();
+                                                this.ui.dim_box_focus_text = Some(st.read(cx).value().to_string());
+                                                st.update(cx, |s, cx| {
+                                                    s.focus(window, cx);
+                                                    s.select_all(window, cx);
+                                                });
+                                                cx.notify();
+                                            }
+                                        }))
                                         // Live sketch/141: right-aligned, ~13.33 px, ending 7 px from the field's edge.
                                         .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).h(px(24.))),
                                     dim_invalid,

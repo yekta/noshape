@@ -403,6 +403,9 @@ pub struct Hints {
     /// Symmetric lines: the lines mirrored, their ends free (live's MIRROR), not their ends paired.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub lines_only: bool,
+    /// Angle: flip_a / flip_b give the sector it was placed in ([`Sketch::orient_angle_sector`]), drawn there.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub sector: bool,
 }
 
 impl Default for Hints {
@@ -418,6 +421,7 @@ impl Default for Hints {
             internal: false,
             anchor: Vec::new(),
             lines_only: false,
+            sector: false,
         }
     }
 }

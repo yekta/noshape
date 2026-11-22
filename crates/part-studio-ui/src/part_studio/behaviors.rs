@@ -723,6 +723,8 @@ pub struct UiState {
     /// The dimension box's text doesn't evaluate (live: the field's invalid
     /// state, ✓ disabled, the box stays open; cleared by typing).
     pub dim_invalid: bool,
+    /// The dimension box's text when it last took the focus: its Esc goes back to it (live sketch-edit-feel-1122).
+    pub dim_box_focus_text: Option<String>,
     /// The translate triad's hovered handle and running drag (triad.rs).
     pub triad_hover: Option<usize>,
     /// Routing curve Multiple: the point under the pointer (its ring dark blue).
@@ -1062,6 +1064,7 @@ impl UiState {
             sized_for_wpp: 0.0,
             dim_box_offset: Point::default(),
             dim_invalid: false,
+            dim_box_focus_text: None,
             triad_hover: None,
             routing_point_hover: None,
             triad_box: None,

@@ -2353,6 +2353,34 @@ fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));
 }
 
+/// Live sketch-edit-feel-1122 S1: the dimension box applies only on Enter. A click on empty canvas keeps it open,
+/// unfocused, its text formatted ("41" → "41 mm"); Tab formats it too and keeps it focused; neither applies it.
+#[gpui::test]
+fn dimension_box_applies_only_on_enter(cx: &mut TestAppContext) {
+    let (window, view) = line_then_dimension_tool(cx, "dim-enter-only");
+    click(cx, window, &view, (570., 380.));
+    click(cx, window, &view, (570., 330.));
+    keys(cx, window, &["escape"]);
+    let measured = dimensions(cx, &view);
+    let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.read(cx).dim_input.as_ref().map(|d| (d.1.read(cx).value().to_string(), d.1.read(cx).focus_handle(cx).is_focused(w)))).unwrap()
+    };
+    keys(cx, window, &["4", "1"]);
+    click(cx, window, &view, (200., 150.));
+    assert_eq!(state(cx), Some(("41 mm".into(), false)), "a click outside: open, unfocused, formatted");
+    assert!(near(&dimensions(cx, &view), &measured), "nothing applied: {:?}", dimensions(cx, &view));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| if let Some((_, st, _)) = &v.dim_input { st.update(cx, |s, cx| s.focus(w, cx)) })).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["secondary-a", "4", "2", "tab"]);
+    assert_eq!(state(cx), Some(("42 mm".into(), true)), "Tab: formatted, still focused");
+    assert!(near(&dimensions(cx, &view), &measured), "nothing applied: {:?}", dimensions(cx, &view));
+    keys(cx, window, &["enter"]);
+    assert!(near(&dimensions(cx, &view), &[0.042]), "Enter applies it: {:?}", dimensions(cx, &view));
+}
+
 /// The number of sides typed before the polygon's rim click (live: digits set
 /// the side count while the polygon tool waits for its circumference); the
 /// click after the rim's commits it.
