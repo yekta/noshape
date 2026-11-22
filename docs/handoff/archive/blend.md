@@ -1402,3 +1402,46 @@ Next: equal-radius rounds whose spines meet (cylinder axis through the torus' ce
   blend-models, blend-mtdump; Mac blend10 back to branch blend-p1c-wip.
 - Agent ids: only in /root/lead-scratch/roster.md; read it before every message_agent, never copy ids here.
 
+
+### Superseded 11-22 08:19 UTC
+## Now (11-22 03:35 UTC)
+
+- Hosts: builds on vibex7 (lead); 02:00-04:00 vibex7 AND vibex8 are held for qa's speed window (cargo exits 75 "held
+  for a speed run"): use the Mac's gated slot then (NOSHAPE_RB_HOST=mac). Heavy runs via ~/bin/slot.
+- QUEUED fb4ce0ee (blend-sc, #4 at 00:34): scissor 2d82a0 Fillet 13 runs joined per connected run + chain_ordered
+  `behind` + convex->concave run refused (fast error). Watch `tools/tiers/land.sh --status` from blend-sc.
+- KNIFEHANDLE Fillet 1: blend10 branch blend-khair commit a7bf86f2c (on 97c7179ec): a convex round on a free-form face
+  (B-spline/Bezier, round not chamfer) puts its section corner in the air (Frame.air, as chamfers do); test
+  features_c::a_conic_round_on_a_lofted_handles_rim_cuts_valid + data/knifehandle-handle.brep (core-kh's Handle before
+  Fillet 1; 4.5 mm conic rho 0.5; valid, 6 faces, removed 100..200 mm3, live 166.9). Fails on main ("Failed to fillet
+  selections."), passes with the fix; model tests 600 ok. Gate: bin/gate4.sh 97c7179ec a7bf86f2c kh (builds + suites on
+  vibex8 via slot, waiting in its queue since 02:37; logs logs/gate-kh.out, then suite-kh.cmp). Userdocs still to run
+  (private docs live on vibex7): copy vibex8 ~/tmp/blend/cli-kh{base,fix} to vibex7 as cli-fixbase / cli-khfix, then
+  bin/ud-pair-fix.sh khfix kh /root/blend-scratch/ud-kh.log. Then land (diff --stat first). Parity effect shows only
+  after core's knifehandle (ed773d89) lands. Open after: topology (ours 6/14/12 vs live 6/10/7: live splits the top in 3
+  faces, ours leaves slivers), speed 6.4 s vs 204 ms, Blade Fillet 2 errors on core-kh.
+- SUSPENSION Fillet 3 (asm-suspension 805e29, R2.5, 17 edges; live 53/98/46, 393486.60): blend-cusp (probe, never
+  land; HEAD = WIP commit 5a299e6fc + fb4ce0ee cherry-picked as 4612260e4, plus uncommitted concave-ball work).
+  - Found 11-22 02:30: the root chain [9,10,11,14,15,16] is TWO runs (bottom root arc cusp->cusp, top arc cusp->cusp);
+    one loft through both jumped across a cusp (section 0.02 mm) and bulged 5.9 mm off the faces -> "union lost one of
+    its parts". With fb4ce0ee's one-loft-per-run + every run end a vanish candidate (`runs` flag) and ZZ_NOTIP=1:
+    Fillet 3 OK, valid, 89/260/153, 393431.448 mm3 (-55 vs live) (logs/zzsusp13.out). With the tip vertex the loft
+    raises NCollection_DataMap::Find (OCCT can't loft these to a point).
+  - Contacts on the torus faces are off up to 0.83 mm (section_wire puts t1/t2 on tangent lines, ZZ_SECDIST print):
+    "face sides from the face itself" = exact rolling balls. Uncommitted: ball_tools for concave edges under ZZ_CBALL
+    (ball_edge flips the supports' sides, BallEdge.convex, concave tools -> adds, no run-on at concave ends, vanishing
+    ends: stations packed toward the end (0.02..0.6 of a station), tip vertex unless ZZ_NOTIP; section_blend tries
+    ball sections first). Tip run: "loft failed (incompatible sections?)"; no-tip run blocked by the speed window ->
+    next: bin/zzsusp4.sh with ZZ_NOTIP=1 (move it to vibex7 after 04:00: sed vibex8->vibex7).
+  - Then: 89 vs 53 faces (refill/run-on pieces not merged), the -55 mm3 (gap before each cusp), clean branch for land.
+- SCISSOR 2d82a0 Fillet 13: same structure (probe zz_scwalls on vibex8 ~/tmp/blend/sc/f13-in.step = Middle Cover before
+  Fillet 13, exported with bin/sc-dump8.sh; logs/zzscw1.out): each picked wall (y=-4.25 plane, and the slanted one) is a
+  tab's flat end; its outline runs convex (top, the tab's R1.5 root-fillet arcs) then reverses at a cusp where that
+  root fillet turns tangent to the plate x=103.736, and runs concave along the wall/plate edge. So: split runs at
+  convexity flips into convex (cut) and concave (add, ZZ_CBALL tools) runs with vanishing ends, as Suspension.
+- 9cbb0e Fillet 23 / 665cf3 Fillet 4: parked until asm sends the first bad commit (bisect after skasm b3345866 and bool
+  21754bd8 land).
+- RINGS Fillet 1 landed 18f929e78 (open: 10.4 mm leaves a 0.774 mm2 bore island).
+- isaac-ball a04711 Chamfer 1 / Fillet 1: wait on bool's Extrude 14. Halter faces: parked (61 vs 39; archive).
+- Agent ids: only from /root/lead-scratch/roster.md.
+
