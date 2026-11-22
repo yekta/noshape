@@ -791,7 +791,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res = k::fillet(&body.shape, &shapes, radius).map_err(kerr("Failed to blend faces."))?;
+        let res = k::fillet_checked(&body.shape, &shapes, &[radius]).map_err(kerr("Failed to blend faces."))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
         ev.replace_body(bi, res.shape, face_names);

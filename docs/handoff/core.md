@@ -31,10 +31,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   LOFT3-EDGES / LOFT-PATHS-TOPOLOGY rows.
 - **Lands to watch (11-21 23:25):** 45fb8d24 LANDED 23:21 as 1ca9f153. ed773d89 + 05b06fe3e checking (batch of 4 at
   23:21); f10fbdb6 re-queued on its own; 4866d14d (Loft 4) queued 23:43. Then land core-cache's handoff commits. Report at queue empty or a failed land.
-- **FACE BLEND 1 (core-cache, landing with this handoff):** sides on two solid parts are fused first (live joins
-  Thicken 1's slabs): surfaces-lofts-projected Face blend 1 ERROR -> 1 part, 14 faces as live; left: its 2 blend faces
-  are rational B-splines (live cylinders; SurfToAna gap?), so the doc stays 3/45. A/B vibex7 ~/agents/core-keep/fb
-  (4 blend docs, none worse); test a_face_blend_across_overlapping_parts_joins_them (features_c, after FB6).
+- **FACE BLEND 1 (core-cache):** QUEUED 1a5b61c3: sides on two solid parts are fused first (live joins Thicken 1's
+  slabs: 1 part, 14 faces; test a_face_blend_across_overlapping_parts_joins_them). On top: face blend's plain rolling
+  ball uses fillet_checked (unchecked k::fillet skipped finish_blend_faces, so its blend faces stayed B-splines; live
+  cylinders): surfaces-lofts-projected 3 -> 8/45 (next: Loft 1 = VALID-SURFLOFTS-LOFT1), other 3 blend docs same, face
+  blend tests pass (A/B vibex7 ~/agents/core-keep/fb/ab2-*.log). Test wanted: 3 tries (lens, valley, two slabs) didn't
+  reproduce a B-spline blend from OCCT.
 - **QUEUED 4866d14d (core-th, ed9b6ef3f on top of 05b06fe3e): LOFT-PATHS Loft 4:**
   Mirror 1's 65 vs live 67 edges = two 0.07 mm edges live has where Loft 2's top seam meets the cylinder end (x 0,
   y -254.03, z +-50.8): tolerance sliver, not chased. The real next difference was **Loft 4 failing** ("the loft's sections
