@@ -1184,11 +1184,11 @@ fn boxes_meet(alo: DVec3, ahi: DVec3, blo: DVec3, bhi: DVec3, tol: f64) -> bool 
 
 /// Each argument's half of a band ([`Ctx::arg_tol`]): half the Boolean's for the most tolerant one and for bodies
 /// without tolerances, the arguments' own for the others (c2-gamma-imported: precise clips of 0.2 um fused with an
-/// imported pin of 2.45 um were each held to the pin's band).
+/// imported pin of 2.45 um were each held to the pin's band); all half the Boolean's under [`crate::with_one_band`].
 fn arg_tols(args: &[&Body], tol: f64) -> Vec<f64> {
     let own = |b: &Body| b.vertex_tol.iter().chain(&b.edge_tol).chain(&b.face_tol).fold(0.0f64, |m, &t| m.max(t));
     let most = args.iter().map(|b| own(b)).fold(0.0f64, f64::max);
-    args.iter().map(|b| if b.vertex_tol.is_empty() || own(b) >= most { 0.5 * tol } else { (own(b).max(1e-7) + crate::fuzzy()).min(0.5 * tol) }).collect()
+    args.iter().map(|b| if crate::one_band() || b.vertex_tol.is_empty() || own(b) >= most { 0.5 * tol } else { (own(b).max(1e-7) + crate::fuzzy()).min(0.5 * tol) }).collect()
 }
 
 /// Each argument's widest band ([`Ctx::arg_reach`]): its own twice, or the sum with another argument's whose box meets
@@ -4041,7 +4041,7 @@ impl Ctx<'_> {
 
     /// Whether cone face `fc` reaches its apex (the apex's height within its vertices' heights).
     fn apex_on_face(&self, fc: usize) -> bool {
-        let band = self.tol;
+        let band = self.own_band(self.faces[fc].arg);
         let Surf::Cyl { o, a, r0, k, .. } = self.faces[fc].s else { unreachable!() };
         let hs = self.faces[fc].edges.iter().flat_map(|&(e, _)| self.edges[e].v).map(|w| (self.p(w) - o).dot(a));
         let (h0, h1) = hs.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), h| (lo.min(h), hi.max(h)));
@@ -4545,8 +4545,9 @@ impl Ctx<'_> {
             .collect()
     }
 
-    /// Where 3D point `p` (not on any of solid `s`'s faces) is against solid `s`, by a ray's crossings.
-    fn ray_state(&self, p: DVec3, s: usize) -> R<State> {
+    /// Where 3D point `p` (not on any of solid `s`'s faces) is against solid `s`, by a ray's crossings, `band` the
+    /// tolerance between `p`'s argument and `s`'s.
+    fn ray_state(&self, p: DVec3, s: usize, band: f64) -> R<State> {
         // (Then the other way (a point 3 um below a knurl's end, every ray up passing a groove's corner there).)
         const DIRS: [DVec3; 8] = [
             DVec3::new(0.5773502691896258, 0.5773502691896258, 0.5773502691896258),
@@ -4558,7 +4559,7 @@ impl Ctx<'_> {
             DVec3::new(0.8017837257372732, -0.2672612419124244, -0.5345224838248488),
             DVec3::new(-0.5345224838248488, 0.8017837257372732, -0.2672612419124244),
         ];
-        let tol = self.tol;
+        let tol = band;
         let sol = &self.solids[s];
         if sol.sheet || !boxes_meet(p, p, sol.lo, sol.hi, tol) {
             return Ok(State::Out);
@@ -5482,21 +5483,22 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     continue;
                 }
                 let ws: HashSet<u32> = cx.solids[s].faces.iter().flat_map(|&f| cx.faces[f].edges.iter().flat_map(|&(e, _)| cx.edges[e].v)).collect();
+                let band = cx.args_band(cx.solids[s].arg, cx.solids[t].arg);
                 // Clear of all of the solid's surfaces (a vertex on one, or near one, or a free-form face: not this way).
                 let clear = |p: DVec3| {
                     cx.solids[t].faces.iter().all(|&f| match cx.faces[f].s {
-                        Surf::Plane { n, d, .. } => (n.dot(p) - d).abs() > 100.0 * cx.tol,
+                        Surf::Plane { n, d, .. } => (n.dot(p) - d).abs() > 100.0 * band,
                         Surf::Cyl { o, a, r0, k, .. } => {
                             let w = p - o;
                             let h = w.dot(a);
-                            ((w - a * h).length() - (r0 + k * h)).abs() / (1.0 + k * k).sqrt() > 100.0 * cx.tol
+                            ((w - a * h).length() - (r0 + k * h)).abs() / (1.0 + k * k).sqrt() > 100.0 * band
                         }
                         Surf::Nurbs { .. } => false,
                     })
                 };
                 for w in ws {
                     // (A ray that can't tell: not this way.)
-                    if cx.pool.inputs[w as usize].len() == 1 && clear(cx.p(w)) && matches!(cx.ray_state(cx.p(w), t), Ok(State::In)) {
+                    if cx.pool.inputs[w as usize].len() == 1 && clear(cx.p(w)) && matches!(cx.ray_state(cx.p(w), t, band), Ok(State::In)) {
                         return Err(Decline("pattern instances overlapping"));
                     }
                 }
@@ -7026,6 +7028,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // signed distances agree (and some of them are past noise); else None (coincident: the signs mixed).)
     let tangent_side = |pi: usize, t: usize| -> Option<State> {
         let f = pieces[pi].face;
+        let tol = cx.args_band(cx.faces[f].arg, cx.solids[t].arg);
         // (A plane's or a cylinder's piece only (a pin's 10 um strip on a floor it dips 9 nm into, c2-wire-clip-imported):
         // a round's torus along a boss's wall it touches splits as OCCT's at its seam. A cylinder's strip standing off
         // the faces within the band OCCT takes as on them (shfall 5e2cededd0026ac2's, 40 nm off a slab's side): None.)
@@ -7073,6 +7076,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // of a sheet's flat over another part's bend where it starts, tangent).)
     let lies_on = |pi: usize, t: usize| -> Option<State> {
         let f = pieces[pi].face;
+        let tol = cx.args_band(cx.faces[f].arg, cx.solids[t].arg);
         let q = pieces[pi].inside;
         if !other_points(pi).is_empty() {
             return None;
@@ -7111,6 +7115,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if cx.solids[t].arg == arg {
                 continue;
             }
+            let tol = cx.args_band(arg, cx.solids[t].arg);
             let mut st = None;
             let on = &coplanar_of[f];
             let from = on.partition_point(|&g| cx.faces[g].solid < t);
@@ -7193,7 +7198,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 // (In a cut, a tool's piece outside every object isn't kept whatever it is against another tool: on
                 // that tool's face by the rays (a 3 um strip of a knurl groove's flank outside the cylinder, between
                 // its corner edge and the cylinder's section, 0.6 um from another groove's flank) it is as outside.)
-                None => match cx.ray_state(at, t) {
+                None => match cx.ray_state(at, t, tol) {
                     Err(Decline(w))
                         if w == "a piece's point on another solid's face"
                             && op == Op::Cut
@@ -7232,7 +7237,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let f = pieces[pi].face;
         pieces[pi].loops.iter().flatten().any(|&(s, _)| {
             let lo = section_faces.partition_point(|x| x.0 < s);
-            section_faces[lo..].iter().take_while(|x| x.0 == s).any(|&(_, g)| g != f && cx.faces[g].solid != cx.faces[f].solid && free::surface_distance(&cx.faces[g], pieces[pi].inside) <= GREY * tol)
+            section_faces[lo..].iter().take_while(|x| x.0 == s).any(|&(_, g)| g != f && cx.faces[g].solid != cx.faces[f].solid && free::surface_distance(&cx.faces[g], pieces[pi].inside) <= GREY * cx.band(f, g))
         })
     };
     let state_of = |pi: usize| -> R<Vec<(usize, State)>> {

@@ -46,6 +46,22 @@ pub(crate) fn fuzzy() -> f64 {
     FUZZY.with(|f| f.get())
 }
 
+std::thread_local!(static ONE_BAND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
+
+/// Runs `run` with every argument of its Booleans held to the Boolean's one band, not each pair to its arguments' own:
+/// the kernel's own Booleans (a Shell's slabs and cuts are pieces of one part: a drafted wall's slab 8.7 um off its
+/// neighbour's plane at 1 mm, each slab's own tolerance 0.1 um).
+pub fn with_one_band<T>(one: bool, run: impl FnOnce() -> T) -> T {
+    let before = ONE_BAND.with(|f| f.replace(one));
+    let r = run();
+    ONE_BAND.with(|f| f.set(before));
+    r
+}
+
+pub(crate) fn one_band() -> bool {
+    ONE_BAND.with(|f| f.get())
+}
+
 std::thread_local!(static SCALED_INPUTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
 
 /// Runs `run` as a Boolean whose OCCT path would cut scaled copies of the inputs (op_boolean's ScaledInputs, asked

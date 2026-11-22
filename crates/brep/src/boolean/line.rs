@@ -311,7 +311,7 @@ pub(super) fn line_common(cx: &Ctx, tol: f64) -> R<Output> {
         inside.push(if on_edge.is_some() || on_face {
             true
         } else {
-            match cx.ray_state(m, 0)? {
+            match cx.ray_state(m, 0, cx.tol)? {
                 State::In => true,
                 State::Out => false,
                 _ => return Err(Decline("a line piece on the solid's boundary")),
