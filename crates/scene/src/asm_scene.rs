@@ -1061,6 +1061,16 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             inst.outline_through = true;
         }
     }
+    // An instance selected through a face, edge or vertex: its silhouette #ffa033, 2 px, its fill its own (live
+    // triad-depth-1122 t1, e1: the part grey with an orange outline; hover matrix batch 4).
+    for (p, _) in &h.selected_entities {
+        if h.selected_tops.contains(&p[0]) {
+            continue;
+        }
+        for &id in built.picks.faces_of(p[0]) {
+            scene.add_flag(id, state::OUTLINE | state::INSTANCE);
+        }
+    }
     for top in &h.selected_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::SELECTED | state::BODY | state::OUTLINE);

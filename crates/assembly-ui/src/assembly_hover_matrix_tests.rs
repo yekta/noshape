@@ -313,6 +313,30 @@ fn edge_band_over_triad(cx: &mut TestAppContext) {
     assert!(line.iter().all(|c| c[0] >= 190 && c[2] <= 70 && !close(*c, 0xf7f7f8, 40)), "the band along the edge, over the shaft: {line:?}");
 }
 
+/// Live triad-depth-1122 t1 (hover matrix batch 4: "#ffa033 once selected"): a face selected selects its instance too,
+/// the part keeping its own colour inside a 2 px #ffa033 silhouette (here along the right face's back edge); where the
+/// silhouette runs along the selected face, the face's own #ffa90a boundary (live (255,169,10) on the top's back edge).
+/// Before, no outline.
+#[gpui::test]
+fn entity_selected_instance_outlined(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix(cx, "entity_selected_instance_outlined");
+    let side = m.screen(cx, [40., 30., 10.]);
+    let back = m.screen(cx, [20., 30., 20.]);
+    let before = m.crop(cx, side);
+    assert!(!shows(&before, 0xffa033, 3.0), "no outline at rest");
+    let p = m.screen(cx, FACE);
+    m.click(cx, p);
+    m.park(cx);
+    let crop = m.crop(cx, side);
+    dump("entity_selected_instance_outlined", &crop);
+    assert!(between(&crop, 0.0, 3.0).filter(|c| close(*c, 0xffa033, 12)).count() >= 2, "the silhouette #ffa033");
+    assert!(!shows(&crop, 0xffc04c, 3.0), "not a whole part's #ffc04c");
+    let crop = m.crop(cx, back);
+    dump("entity_selected_instance_outlined_face", &crop);
+    assert!(between(&crop, 0.0, 3.0).filter(|c| close(*c, 0xffa90a, 12)).count() >= 2, "the face's boundary over it");
+}
+
 /// Live b5-fastened-vertex (qa FEEL-ASM-MATE-VERTEX): Fastened's first field active, the pointer on the corner
 /// (40, 0, 20): the vertex's ~11 px light orange disc (#f8c58a) with the white corner mark of the inferred connector
 /// over it, no connector glyph (no triad's blue Z, no ring).

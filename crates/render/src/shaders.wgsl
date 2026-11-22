@@ -62,6 +62,7 @@ const TINT: u32 = 512u;
 const NO_PICK: u32 = 1024u;
 const BAND: u32 = 2048u;
 const PICKED: u32 = 4096u;
+const INSTANCE: u32 = 8192u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -138,6 +139,8 @@ const FACE_PICKED: vec3<f32> = vec3<f32>(0.887, 0.534, 0.021);
 // Its boundary (state PICKED | OUTLINE on the edges): live #FFC20E (qa asm-mate-preview-0bc7: (255,194,14)).
 const PICKED_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.5395, 0.0044);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
+// An instance selected through an entity (state INSTANCE): #ffa033.
+const INSTANCE_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.3515, 0.0331);
 
 // ---------------------------------------------------------------- background
 
@@ -519,6 +522,7 @@ fn fs_outline(i: MeshOut) -> @location(0) vec4<f32> {
     // Hovered, not selected: drawn inside the part's image instead (`fs_hover_mask`, hover_outline.wgsl).
     if (hover_outlined(st)) { discard; }
     if ((st & BODY) != 0u) { return enc(vec4(BODY_OUTLINE, 1.0)); }
+    if ((st & INSTANCE) != 0u) { return enc(vec4(INSTANCE_OUTLINE, 1.0)); }
     return enc(vec4(g.select.rgb, 1.0));
 }
 
