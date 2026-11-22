@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 17:56 UTC.
+Updated 2026-11-22 19:26 UTC.
 
 ## In flight
 
@@ -27,31 +27,60 @@ crates/drawing land (drawing-ui alone: not needed).
 - LANDED cd7b7401 as 634aa1f1 (15:21): Select line reach 8 px (lit at 7, not 8), SELECT_FORMAT_REACH_PX 9 (sheet border
   lit at 8, not 9). vibex8 drw run on it (uip1122k): 371/374, same 3 diffs; hover matrices 3/3.
 - LANDED dd49dc0f as 1a9112ed (15:47): TICKETS stale rows.
-- COMMITTED 3806ff953 (not queued): dx's 3 cells from drw-hover-1122. (1) text reach 8 px from live's tan box (glyphs +
-  0.5 h every side; `font::text_hover_box` / `text_hover_distance`, SELECT_TEXT_REACH_PX 8); (2) no-tool centerline 7 px
-  (the 8 px line reach; check in the centerline feel test); (3) Note tool lights a centerline from 8 px
-  (NOTE_CENTERLINE_REACH_PX 9) and its leader attaches there (`note_leader_point`; ops drawing_note too, AGENT_API
-  regenerated; e2e note check at the END of drawing_lists_silhouettes, it adds an annotation). Tests green on vibex7
-  (x202: drawing-ui 166, scene 11, model-data 124, drawing 268, ops 489 full, clippy incl. ops clean).
-- COMMITTED c1b5a6a07 (not queued): live's re-record (0a3ac2eee, page live/studios/drw-table-insert-row-1122/): the
-  straight move to Row Below crosses Remove, Insert ▸ closes, the click lands on the sheet: live ends the cell edit
-  (dialog null). Entering sideways, Row Below inserts and the Cell panel STAYS on the cell. Done: Insert ▸ keeps
-  cell_sel (shifted for Row Above / Column Left); DrawingEditor::on_mouse_down: with cell_sel and frame_menu open, a
-  left press beside ends the edit, a right press only closes. 3 feel tests (cell_menu_open helper) pass, 168 green.
-  BUT the real app still fails both scenarios (insert-row s11 dialog Cell; cell-menu s27 menu still open; at s27 our
-  menu starts at x 981 so the rclick at 980 is beside it, same cause). The branch doesn't fire in the app.
-  RUNNING at the cap: x209.sh (blvor77uy) = debug build with an UNCOMMITTED eprintln "DBGSTUDIOS down ..." in
-  on_mouse_down (drawing_tools.rs, after `let menu_open`), then insert-row on vibex8 with NOSHAPE_UIP_LOGS=1; read
-  `ssh vibex8 'grep -E "UI-SCRIPT|DBGSTUDIOS" ~/agents/studios-keep/shots-drw-table-cells-insert-row/*.stderr'`.
-  Suspects: the press doesn't reach the editor, or the host already let go (is_open_menu false). REMOVE the eprintln
-  (`git checkout crates/drawing-ui/src/drawing_tools.rs`) before committing the fix.
-  vibex8 drw run with both commits (uip1122k, live re-records scp'd into vibex8 src): 370/374: centerline Ø8, the two
-  table ones, drw-title-block-dblclick s1 (dialog null, likely load 23 on vibex8; recheck when quieter).
-  Then land both (fetch, rebase, diff --stat, TICKETS duplicates; full ops e2e already ran).
+- COMMITTED 3806ff953 (not queued): dx's 3 cells from drw-hover-1122 (text reach 8 px from live's tan box: glyphs +
+  0.5 h every side, `font::text_hover_box` / `text_hover_distance`, SELECT_TEXT_REACH_PX 8; no-tool centerline 7 px;
+  Note tool lights a centerline from 8 px, NOTE_CENTERLINE_REACH_PX 9, leader attaches there, ops too, AGENT_API
+  regenerated). Tests + full ops e2e green (x202).
+  REGRESSION it causes: drw-title-block-dblclick s1: our dblclick at sheet (240, 20) (8 px under the DWG NO. row's
+  top line) SELECTS a title-block line (orange, 3 grips, x 1422-1726 y 957 in shots) instead of opening the field's
+  Note editor (live: dialog "Note"). In `BuiltSheet::hit_reach` (crates/drawing/src/drawing/build.rs ~283) a `best`
+  that is not TitleBlock/FormatLine now beats `title_cells`; likely a text (field note / empty field text) reached
+  by the bigger hover box. Probe test ADDED (uncommitted) at the end of drawing-ui feel.rs:
+  `a_double_click_in_a_title_cell_by_its_line_edits_the_field` (zoom 1084/279.4, asserts Panel::Note field Some, its
+  message prints the lit pick). RUNNING at the cap: x212.sh on vibex7 (task busyfkfva, waiter b2at92r0z): that probe,
+  variable_feel_tests::, clippy vs-ui/app-core/gpui-pre. Fix so the cell wins, then rerun the 3 scenarios
+  (x210.sh: build + x210r.sh on vibex8).
+- COMMITTED c1b5a6a07 (not queued): live's table re-record (0a3ac2eee): Insert ▸ keeps the Cell panel on its cell; a
+  left press beside the cell's open menu ends the edit, a right press only closes it. App CHECKED 18:24 on vibex8:
+  drw-table-cells-insert-row 12/12, drw-table-cell-menu 31/31 (the earlier 370/374 run had a stale binary). The
+  debug eprintln is removed.
+- UNCOMMITTED, untested beyond the build error fix: FEEL-VS-CHIP-ON-CLICK (P2; live vsm-1 v10: a value cell's chip
+  stays on a click). vendor/gpui-pre div.rs: `Interactivity::tooltip_stays_on_click` (+ fluent), its mouse-down
+  skips the press gate inside the element and the hover checks ignore pending_mouse_down; text.rs passes `false`
+  (that missing arg failed the first build). app-core ui.rs `with_tip_kept_on_click` (tip_with gains `stays`);
+  variable_studio.rs value cell uses it. Test `a_value_cells_tooltip_stays_on_a_click`.
+- UNCOMMITTED, untested: live vs-rowdrag-1122 (row drag): drag_threshold(5.5) (starts at 6 px), ghost = #1651b0 pill
+  with the full name, 31 px, 10 px right / 5 px below the pointer (VsRowDrag gets name + offset; debug "vs-row-ghost");
+  no drop line outside the table; Esc in grid_key stops the drag (cx.stop_active_drag). Live's ~550 ms drop delay
+  is server slowness, not copied. Test `a_row_drags_from_6_px_as_a_named_pill_and_esc_cancels` (if Esc doesn't
+  reach grid_key, focus isn't in the grid during the drag: move the check to a window-level handler).
+- TICKETS on main: VS-NAME-FOCUS-BOX (studios) is there twice (line ~445 "[ ]", ~451 "[x]"; fixed in c2e9546c3):
+  drop the "[ ]" copy in the land. No open studios P0s.
+- Then land all (fetch, rebase, diff --stat, TICKETS duplicates; full ops e2e ran for 3806ff953; rerun it if the
+  title-block fix touches crates/drawing).
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
   it. Decision needed from the lead (copy or record as live's failure); not changed.
-- Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. P2s
-  VS-CHIP-ON-CLICK (vendored GPUI tooltip patch); FS snippet rounded corners, Esc.
+- QUEUE after the land (lead / live 11-22, all mine; pages under /root/onshape-research/live/studios/):
+  1. drw-drag-feel-1122 (dimension text drag: black while dragged, arrows flip outside and the dimension line runs on
+     to the text, red + / mark on the other dimensions and red ✕ at the dragged text's centre, pink dotted guide
+     rgb(222,142,222) snapping the text to another dimension's line height within 3 px; radial text inside the hole:
+     leader from outside; leader arrow-end drag: target edge #CC925C, released on empty sheet stays free, note stays
+     selected; press-drag on an unselected note: not moved, selected after (one run only: don't change ours on it);
+     view drag colours, Esc mid-drag puts the view back). Our copy of live's kit: /root/studios-scratch/drag/
+     drw-drag-feel.json, runner script x213r.sh (vibex8; shots ~/agents/studios-keep/shots-drw-drag-feel, local copies
+     drag/s/, montage drag/m1.png). First run: our hover tan + grips match; the Right view's dimension was NOT placed
+     by the setup (check its step), the 2nd text drag started a box select (the annotation locator after a drag
+     points off the text?), ".197" not found by the annotation locator (ours "R.197": check the locator's match).
+  2. vs-rowdrag-1122: done above (uncommitted).
+  3. fs-editor-feel-1122: no hover docs; error tooltip at once on the underlined char (1 char off: nothing); AC band
+     #D0DBE5, typed letters darker, mouse hover doesn't move the highlight, wheel scrolls; Find prefills the
+     selection and searches as you type (~75 ms); Ctrl+H keeps focus in find; no box on an unmatched bracket.
+  4. history-gaps-1122: change-row tooltip (one stage, fade from ~50 ms), change-row menu (no Restore to Main…),
+     Restore dialog (Esc closes, Enter does nothing).
+  5. docs-page-gaps-1122: folder tile hover, "Click to open …" tooltips, thumbnail popover, menu look; ↓ closes the
+     menu and moves the list selection.
+- Left: ui_doc_state doesn't read HistoryPanel::ui_branch_filter() yet; Esc doesn't close the filter menu. FS snippet
+  rounded corners, Esc.
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
