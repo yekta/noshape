@@ -640,7 +640,7 @@ fn param_decl(module: &Arc<CompiledModule>, e: &ast::Expr, a: &Ann, ann_expr: &a
         ExprKind::Is(x, q) => {
             let id = param_path(module, x, roots)?;
             let kind = match &*q.name {
-                "Query" => ParamKindFs::Query { filter: filter_of(a.get("Filter")), max_picks: a.get("MaxNumberOfPicks").and_then(|v| v.as_num()).map(|n| n as usize) },
+                "Query" => ParamKindFs::Query { filter: filter_of(a.get("Filter")), max_picks: a.get("MaxNumberOfPicks").and_then(|v| v.as_num()).map(|n| n as usize), accept: a.get("Filter").cloned().map(Arc::new) },
                 // Feature pattern's "Features to pattern".
                 "FeatureList" => ParamKindFs::FeatureList { max_picks: a.get("MaxNumberOfPicks").and_then(|v| v.as_num()).map(|n| n as usize) },
                 "TableData" | "ImageData" | "JSONData" | "TextData" | "PartStudioData" | "VariableStudioData" | "CADImportData" => {
@@ -852,7 +852,7 @@ fn param_spec(d: &ParamDecl, siblings: Arc<Vec<ParamDecl>>) -> ParamSpec {
     let id = intern(&d.id);
     let label = intern(&d.label);
     let mut spec = match &d.kind {
-        ParamKindFs::Query { filter, max_picks } => {
+        ParamKindFs::Query { filter, max_picks, .. } => {
             let mut s = ParamSpec::query(id, label, *filter);
             if let ParamKind::Query { max_picks: m, .. } = &mut s.kind {
                 *m = *max_picks;

@@ -109,7 +109,9 @@ fn variables_of(ctx: &crate::regen::context::Context) -> crate::regen::context::
 }
 
 /// Build the definition map for `params`.
-fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev: &EvalCtx, provider: Option<&dyn super::CustomFeatureProvider>) -> FResult<Value> {
+/// `refused`: where the selections a parameter's Filter refuses go, left out (`None`: all kept, as editing logic sees
+/// them).
+fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev: &EvalCtx, provider: Option<&dyn super::CustomFeatureProvider>, mut refused: Option<&mut Vec<crate::reference::Reference>>) -> FResult<Value> {
     let mut m = Map::new();
     for d in decls {
         let v = match &d.kind {
@@ -130,8 +132,20 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
                 let o = info.ordinal(s).or_else(|| info.ordinal(default)).unwrap_or(0);
                 Value::Enum(*tag, o)
             }
-            ParamKindFs::Query { filter, .. } => {
-                let refs = values.query(&d.id);
+            ParamKindFs::Query { filter, accept, .. } => {
+                let all = values.query(&d.id);
+                let kept: Vec<crate::reference::Reference>;
+                let refs = match (accept, refused.as_deref_mut()) {
+                    (Some(a), Some(out)) => {
+                        let st = cx.state.lock();
+                        let (k, r): (Vec<_>, Vec<_>) = all.iter().cloned().partition(|r| host::accept::accepts(&st, a, r));
+                        drop(st);
+                        out.extend(r);
+                        kept = k;
+                        &kept[..]
+                    }
+                    _ => all,
+                };
                 // A whole sketch in a curve field ("Edges of Sketch 1"): its curves, as live's qCreatedBy(sketch, EDGE).
                 use crate::params::QueryFilter as F;
                 let curves_only = filter.intersects(F::SKETCH_EDGE) && !filter.intersects(F(F::SKETCH.0 | F::BODY.0 | F::WIRE_BODY.0));
@@ -157,7 +171,7 @@ fn definition(cx: &Arc<FsContext>, decls: &[ParamDecl], values: &ParamValues, ev
             ParamKindFs::Array { items, .. } => {
                 let mut arr = Vec::new();
                 for it in values.array(&d.id) {
-                    arr.push(definition(cx, items, it, ev, provider)?);
+                    arr.push(definition(cx, items, it, ev, provider, refused.as_deref_mut())?);
                 }
                 Value::array(arr)
             }
@@ -272,7 +286,10 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     ev.ctx = variables_of(&ctx);
     let cx = FsContext::new(ctx, ev.feature, ev.name.to_string(), *ev.units, ev.outer_vars.clone(), ev.xform);
     cx.state.lock().feature_order = ev.features.order();
-    let definition = match definition(&cx, params, &values, ev, provider) {
+    let mut refused = Vec::new();
+    let definition = definition(&cx, params, &values, ev, provider, Some(&mut refused));
+    ev.refused.append(&mut refused);
+    let definition = match definition {
         Ok(d) => d,
         Err(e) => {
             ev.ctx = cx.take_context();
@@ -433,8 +450,8 @@ pub(crate) fn run_editing_logic(
     // (std cPlaneLogic and holeEditLogic act on preselection only then).
     // Reference parameters read the document's tabs (Routing curve's CSV).
     let provider = super::fallback_provider();
-    let old_def = if old.0.is_empty() { Value::map(Map::new()) } else { definition(&cx, decls, &olds, &ev, Some(&*provider)).ok()? };
-    let new_def = definition(&cx, decls, &news, &ev, Some(&*provider)).ok()?;
+    let old_def = if old.0.is_empty() { Value::map(Map::new()) } else { definition(&cx, decls, &olds, &ev, Some(&*provider), None).ok()? };
+    let new_def = definition(&cx, decls, &news, &ev, Some(&*provider), None).ok()?;
     let mut flags = Map::new();
     for d in decls {
         flags.insert(Value::str(d.id.as_str()), Value::bool(specified.contains(&d.id)));
@@ -483,7 +500,7 @@ pub(crate) fn run_manipulator_change(
     let ev = EvalCtx::new(feature, name, &news, units, variables_of(&ctx), &outer);
     let cx = FsContext::new(ctx, feature, name.to_string(), *units, outer.clone(), None);
     let provider = super::fallback_provider();
-    let new_def = definition(&cx, decls, &news, &ev, Some(&*provider)).ok()?;
+    let new_def = definition(&cx, decls, &news, &ev, Some(&*provider), None).ok()?;
     let mut moved = Map::new();
     moved.insert(Value::str(key), host::manipulator_value(manipulator)?);
     let args = vec![cx.value(), new_def.clone(), Value::map(moved)];

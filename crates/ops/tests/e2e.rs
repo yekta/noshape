@@ -2042,6 +2042,30 @@ fn sheet_metal_other_joint_ops() {
     assert_eq!(n, 1, "the same Modify joint");
 }
 
+/// A std feature's selection its parameter's Filter refuses is left out, a missing selection (live flange/fl-face,
+/// ERR-SM-FILTER-FACE: a wall face in Flange's edges, "Select edges to flange.", 1 missing selection); Hem's and
+/// Corner's alike; an edge still flanges.
+#[test]
+fn a_selection_a_std_filter_refuses_is_missing() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "sheet-metal-filter.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalStart", "params": { "process": "THICKEN", "regions": [r["regions"][0]["id"]], "thickness": "2 mm", "radius": "2 mm" } }));
+    let wall = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "near": [30, 20, 2], "limit": 1 }))["faces"][0]["id"].clone();
+    for (ty, param, words) in [("sheetMetalFlange", "edges", "Select edges to flange."), ("sheetMetalHem", "edges", "Select edges to hem."), ("sheetMetalCorner", "corner", "Select a corner to modify.")] {
+        let f = call(&mut ctx, "feature_add", json!({ "type": ty, "params": { param: [wall.clone()] } }));
+        let list = call(&mut ctx, "feature_list", json!({}));
+        let row = list["features"].as_array().unwrap().last().unwrap().clone();
+        assert_eq!((row["status"].as_str(), row["message"].as_str(), row["missing_selections"].as_u64()), (Some("Error"), Some(words), Some(1)), "{ty}: {row}");
+        call(&mut ctx, "feature_delete", json!({ "features": [f["feature"].clone()] }));
+    }
+    let e = call(&mut ctx, "query_entities", json!({ "kind": "edges", "direction": [1, 0, 0], "near": [30, 0, 2], "limit": 1 }))["edges"][0]["id"].clone();
+    call(&mut ctx, "feature_add", json!({ "type": "sheetMetalFlange", "params": { "edges": [e], "distance": "20 mm" } }));
+    let list = call(&mut ctx, "feature_list", json!({}));
+    let row = list["features"].as_array().unwrap().last().unwrap().clone();
+    assert_eq!((row["status"].as_str(), row["missing_selections"].as_u64()), (Some("Ok"), None), "{row}");
+}
+
 /// A Part Studio created in context follows its assembly (live "dx
 /// (2026-10-26, P2) Modeling in context"): the plate made thicker shows the
 /// update dot, Update context moves the cover up, and the cover's own

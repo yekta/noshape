@@ -171,6 +171,8 @@ pub struct EvalCtx<'a> {
     pub outer_vars: &'a BTreeMap<String, Quantity>,
     /// Warnings to surface without failing.
     pub warnings: Vec<String>,
+    /// Selections a parameter's Filter refused, left out: missing selections (live ERR-SM-FILTER-FACE).
+    pub refused: Vec<Reference>,
     /// Information messages (Onshape's `reportFeatureInfo`: a blue bubble,
     /// the feature still succeeds).
     pub infos: Vec<String>,
@@ -458,7 +460,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), error_refs: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, seed_op: None, probe_touched: false }
+        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), refused: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), error_refs: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, seed_op: None, probe_touched: false }
     }
 
     /// Puts the merged faces' other names noted while naming into the context's bodies (before the context is handed

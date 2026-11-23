@@ -697,6 +697,8 @@ impl Regenerator {
                         if aborted() {
                             return cancelled();
                         }
+                        state.missing += ev.refused.len();
+                        state.missing_refs.append(&mut ev.refused);
                         match result {
                             Ok(Ok(())) => {
                                 if state.missing > 0 && ev.warnings.is_empty() {

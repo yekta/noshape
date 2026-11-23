@@ -1,35 +1,29 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-23 05:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (06:30 UTC 11-23) — read first
-- QUEUED 7d729d65 (06:2x): 0cae2e75e SKT batch on top of ef72904e6 (Offset box P0; lead has it on release/v0.4.68). Lead
-  reports land results; never poll.
-- UNCOMMITTED in worktree (tm16 running on vibex6, log /root/skasm-scratch/tm16-run.log; script ~/tmp/skasm/tm16.sh =
-  clippy sketch/scene/psui/ops + sketch all, scene all, ops e2e::sketch, psui chamfer/fillet/text/offset serial). If green:
-  commit "skasm: two picked lines fillet / chamfer as live, chamfer box B keeps the keys, chamfers stored as live, Text
-  Enter is a new line", diff --stat, TICKETS dup check, land.sh. Changes:
-  - sketch tools.rs: Sketch::fillet_picked / chamfer_picked / cut_at_crossing (crossing lines cut at the crossing keeping
-    the picked sides; fillet drops the visualSharp), EditResult::absorb; chamfer() now adds 2 construction legs
-    sharp->end with LENGTH (live distanceAId/B) instead of 2 Distance dims. Tests tools.rs picked_crossing_lines_*,
-    onshape_ux chamfer test updated; ops e2e sketch_fillet_chamfer_offset expects 3 lines (2 construction).
-  - scene sketch_mode.rs: chamfer_dim_ends (Distance or construction Length) used by chamfer_dims/frame/labels/places;
-    corner_click two-line picks use *_picked, both lines selected (first pick too), commit/Esc clear them; test
-    two_picked_lines_fillet_on_enter.
-  - psui sketch.rs: commit_dimension Ok path refocuses canvas only if no box open (box B bug); Text field is a
-    TextareaState (SketchUi.text_area, text_area(), set_sketch_text); option_input/option_text/set_option/OptKind/
-    apply_pattern removed (unused). Tests a_chamfers_second_box_takes_the_keys_after_the_first, text dialog test +Enter.
-  - TICKETS rows FILLET-PENDING-SET / CHAMFER-BOX-B / TEXT-KEYS annotated (06:3x).
-- REQUESTS (live) filed 06:16: rings arcs capture (Extruded ring geometry before/after Ø21.32 + minimal free-arc cases);
-  multi-line Text layout in its box. Rings P1 cause: arcs wZIh/MirrorCS under-defined; ours r3.0703 (980.743), live keeps
-  r3.1374 (989.99); next = solver rule from the capture (radius aux param + weights, crates/sketch/src/solver.rs); probe
-  /root/skasm-scratch/rings-edit-probe.patch (tmrings.sh on vibex6).
-- Decision (lead, DECISIONS 07264069e): Use of a used edge and Mirror of a mirrored entity make duplicates as live
-  (SKT-MIRROR-AGAIN P1: implement).
-- Remaining SKT: two-line chamfer preview look unknown (we draw it); P1s INFER-STORED, VB-PLACE-LENGTH, MENU-HEAD,
-  PATTERN-DESELECT, MIRROR-AGAIN, TANGENT-ARC-DOT. psui owns POSTCOMMIT-HOVER, USE-HOVER.
-- Later: bend-twice naming, ERR-SM-FILTER-FACE, FEEL-MC-PS-MARKER-REACH, c2-constrained-surface pair.
+## NOW (08:4x UTC 11-23) — read first (Yekta account at 97% weekly: keep this current after every step)
+- QUEUED 24ca4c6e (07:4x; 5 commits: 57a1e066e, c9f825c58, 7d1dfe56d, b0079f2c4 rings/SKT batch, TICKETS dup-row
+  drop). Lead reports land results; never poll.
+- LANDING (08:4x) two commits on top: (1) bend-twice ERR-SM-BEND-WORDS: custom/host/sheetmetal.rs `name_split_pieces`
+  (part rebuild names both pieces of a definition face this feature split as Split pieces of the one old name kept ->
+  std getSMDefinitionEntities size 2 -> "Select a planar sheet metal face."), case "bend twice" in sheetmetal_std
+  failures test, sm_feel_tests bend row click checks HOVER|FILLED (SM-TABLE-BEND-LIT-LOOK). (2) ERR-SM-FILTER-FACE
+  filter-at-evaluation (lead's ruling): ParamKindFs::Query.accept (Filter Ann), custom/host/accept.rs (EntityType +
+  SheetMetalDefinitionEntityType decided, others accept; def type = entity on the non-solid definition body sharing the
+  SMAssociationAttribute), run.rs definition() puts refused refs in EvalCtx.refused -> regen/mod.rs state.missing.
+  ops e2e a_selection_a_std_filter_refuses_is_missing. tm32 (vibex6) green: bend twice, 3 e2e, matrix 23/23,
+  sheetmetal_std 87/87. Both TICKETS rows "fixed, to verify". Tell dx when queued (FS host is theirs).
+- TICKETS: BEND-LIT / JOINT-LIT / CELL-EDIT annotated (fixes in queued 24ca4c6e, qa tested ed11f7c48); superseded dup
+  rows dropped (old SM-TABLE-* x4, SKETCH-USE-VERTEX-OTHER-SKETCH, SM-TAB-MERGE-PICK x2, MC-PS-ORIGIN-CORNER-MARKER,
+  SK-LONGPRESS).
+- Next: remaining SM P0s (ERR-SM-HEM-LONG awaits qa; ERR-SM-BAD-SELECTION-RED is psui's; SM-TABLE-* await 24ca4c6e).
+- c2-constrained-surface: done on my side (the fit is core's; SUITE-NEW-INDEX-1120-CORE annotated).
+- SKT-VB-PLACE-LENGTH / SKT-INFER-STORED: every sub-item fixed in 24ca4c6e; waiting on qa verify.
+- MARKER-REACH: fine sweep agrees with ours; REQUESTS skasm 07:22 asks live for the back-midpoint / edge-to-corner
+  sweeps (TICKETS row annotated). Nothing to change until answered.
+
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
   Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =

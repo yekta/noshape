@@ -43,7 +43,8 @@ impl std::fmt::Display for Diagnostic {
 /// Kind of a feature parameter (from its precondition statement).
 #[derive(Clone, Debug)]
 pub enum ParamKindFs {
-    Query { filter: QueryFilter, max_picks: Option<usize> },
+    /// `accept`: its Filter, applied when the feature runs too (a selection it refuses is missing).
+    Query { filter: QueryFilter, max_picks: Option<usize>, accept: Option<Arc<noshape_featurescript::annot::Ann>> },
     /// `definition.x is FeatureList`: picked features, passed as a map from
     /// feature Id to feature function.
     FeatureList { max_picks: Option<usize> },
