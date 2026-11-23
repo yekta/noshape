@@ -5878,6 +5878,28 @@ fn move_face_on_the_boss_block_as_live() {
     }
 }
 
+/// Live errors-1123 lp-dist0: an Add part pattern 0 mm apart changes nothing: an info ("Boolean resulted in no geometry
+/// change. …") and its instances drawn dark red over the part.
+#[test]
+fn an_add_pattern_changing_nothing_draws_its_instances_red() {
+    let mut s = boss_block();
+    let part = s.ok().context.bodies[0].id.clone();
+    s.add("linearPattern", move |p| {
+        p.set("entities", q(Reference::Body(part)));
+        p.set("directionOne", q(Reference::Plane(DatumPlane::Right)));
+        p.set("distance", expr("0 mm"));
+        p.set("instanceCount", expr("3"));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let res = s.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.clone().unwrap_or_default()), (FeatureStatus::Info, "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained.".to_string()));
+    let m = st.error_mesh.as_ref().expect("the instances");
+    let (lo, hi) = m.positions.iter().map(|p| p[2] as f64).fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
+    assert!((lo - 0.0).abs() < 1e-6 && (hi - mm(20.0)).abs() < 1e-6, "{lo} {hi}");
+}
+
 /// Live errors-1123 mirror mi-face-off: the boss's faces mirrored about the block's -x side land off the part ("Pattern
 /// could not be created on the same part."), the mirrored faces drawn dark red beside the block.
 #[test]

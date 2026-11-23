@@ -1552,7 +1552,8 @@ impl PartStudioView {
         // A failed Feature pattern shows the instances it couldn't make, and
         // its inputs keep the usual selection colors (the user's live shot
         // 2026-10-23: the seed wall orange, the instances red).
-        let failed_state = self.edit.as_ref().filter(|_| failing).and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id));
+        // (An Add pattern that changes nothing, an info, shows its instances so too: live lp-dist0.)
+        let failed_state = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id)).filter(|s| failing || s.status == noshape_model::display::FeatureStatus::Info);
         let error_mesh = failed_state.and_then(|s| s.error_mesh.clone());
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, true, self.gpu.uploader()));

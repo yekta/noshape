@@ -709,6 +709,9 @@ impl Regenerator {
                                 } else if !ev.infos.is_empty() {
                                     state.status = FeatureStatus::Info;
                                     state.message = Some(ev.infos.join("\n"));
+                                    if !ev.error_shapes.is_empty() {
+                                        state.error_mesh = Some(display::tessellate_error(&noshape_kernel::Shape::compound(&ev.error_shapes), opts));
+                                    }
                                 }
                                 if f.type_id == "sketch"
                                     && let Some(s) = ev.ctx.sketch(f.id)

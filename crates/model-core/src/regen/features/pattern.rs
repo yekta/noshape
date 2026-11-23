@@ -736,7 +736,14 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     };
     // std (subfeatureToolsTargets): an Add with nothing in its merge scope unions the instances with the seed.
     let scope = if op == "ADD" && scope.is_none() { Some(bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect()) } else { scope };
-    ev.apply_operation(tools, &op, scope, BodyKind::Solid)
+    // Live lp-dist0 / cp-angle0: an Add that changes nothing draws its instances dark red.
+    let shapes: Vec<Shape> = if op == "ADD" { tools.iter().map(|t| t.shape.clone()).collect() } else { Vec::new() };
+    let n = ev.infos.len();
+    ev.apply_operation(tools, &op, scope, BodyKind::Solid)?;
+    if ev.infos[n..].iter().any(|i| i == crate::regen::eval::NO_GEOMETRY_CHANGE) {
+        ev.error_shapes = shapes;
+    }
+    Ok(())
 }
 
 /// A pattern of one: std's booleans still take the seeds as tools into the merge scope's other parts
