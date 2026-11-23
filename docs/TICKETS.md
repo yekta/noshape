@@ -500,26 +500,28 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 Same as live: the dialog (cards, 4 boxes and defaults, Combine hides composite), tab placement, the toast, Rule 1 on clamp/c2/o-ring/hose/USB-C,
 NEMA's Rule 2 tabs and order, part names/order/colours on the 4 corpus files. Ours is faster everywhere (to the tab ≤7.5 s vs live 6.3-154 s). Not
 checked: NEMA BOM elements, the toast's duration, the dialog's focus (state says "other"; live focuses Import, drawn pale, ours solid blue).
-- [ ] P0 **IMP-NEMA-SCREWS-SURFACE (dx)**: live imports NEMA 17's 4 M2.5 screws as solids inside "Screw" (16 occurrences); ours makes 4 surfaces
+- [x] verified (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: 10 parts all solid, names / colours / order as live in both modes; Screw assembly holds the 4 M2.5x25 in live's order; Combine tab Parts (10), no Surfaces) P0 **IMP-NEMA-SCREWS-SURFACE (dx)**: live imports NEMA 17's 4 M2.5 screws as solids inside "Screw" (16 occurrences); ours makes 4 surfaces
   (250 faces each), so Screw is empty and Combine lists Parts (6) + Surfaces (4). live raw/nema17-{default,combine}.json; IMP-NEMA17-TREE/COMBINE-1123.png
-- [ ] P0 **IMP-FACE-OVERRIDE-READ (dx)**: live keeps the face colours KiCad's USB-C and the Mac mini put on single faces (USB-C #4c4c4c body,
+- [ ] PARTLY (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: USB-C as live (Part 1 #4c4c4c, Part 2 #262525, 3-34 #dbbc7e; specks #131414 / #3F4142 / #4D4E4E vs live #1A1A1B / #3E4041 / #4D4E4E); Mac mini dark logo px 6183 vs live 5528, but 0 face appearances vs live 166: IMP-FACE-APPEARANCE-ROWS) P0 **IMP-FACE-OVERRIDE-READ (dx)**: live keeps the face colours KiCad's USB-C and the Mac mini put on single faces (USB-C #4c4c4c body,
   #262525, gold #dbbc7e pins; Mac mini black logo, 152+14 face appearances); ours draws every face in the solid's colour (USB-C all #cccccc) with
   0 face appearances (train-joe's are read). See IMPORT-SOLID-COLOUR-ON-EVERY-FACE. raw/{usbc,macmini}-default.json; IMP-USBC-COLOUR, IMP-MACMINI-COLOUR-1123.png
-- [ ] P1 **IMP-MULTISOLID-PRODUCT (dx)**: a STEP product holding several solids: live names the parts after the solids (Main, Fan) or Part 1..34
+- [x] verified (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: USB-C Part 1..34, Mac mini Main / Fan: names, colours, order as live) P1 **IMP-MULTISOLID-PRODUCT (dx)**: a STEP product holding several solids: live names the parts after the solids (Main, Fan) or Part 1..34
   and makes each solid's colour its part appearance; ours names every part after the product ("root" ×2, "USB_C_Receptacle_GCT_USB4085" ×34) with
   palette colours. IMP-USBC-NAMES-1123.png
-- [ ] P1 **IMP-UNIFORM-FACE-TO-PART (dx)**: train-joe: a colour on every face of a solid becomes the part appearance (#ba401b/#83bc68/#1651b0/#e8922a),
+- [x] verified (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: train-joe part colours as live, 0 face appearances; saturated px R/G/B 139 / 707 / 4953 vs live 124 / 744 / 5049) P1 **IMP-UNIFORM-FACE-TO-PART (dx)**: train-joe: a colour on every face of a solid becomes the part appearance (#ba401b/#83bc68/#1651b0/#e8922a),
   0 face appearances; ours draws the faces right but the parts keep the solid styles (#9dcfed/#a5a5a5/#3b61b4). IMP-TRAINJOE-COLOUR-1123.png
-- [ ] P1 **IMP-NOAPP-KEEP-PART (dx)**: Import appearances off: live keeps the part colours (Mac mini #ececec/#4a4848); ours drops them and draws
+- [x] verified (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: Main #ececec, Fan #4a4848, 0 face appearances; light px 171556 vs live 172951) P1 **IMP-NOAPP-KEEP-PART (dx)**: Import appearances off: live keeps the part colours (Mac mini #ececec/#4a4848); ours drops them and draws
   palette blue #8CB9D4. raw/macmini-noapp.json; IMP-MACMINI-NOAPP-1123.png
-- [ ] P1 **IMP-COMPOSITE (dx)**: "Create a composite part" makes one composite named after the file, a generated colour (#3b61b4 / #7f7f7f), drawn
+- [ ] PARTLY (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: USB-C as live (one composite named after the file, Parts (0) + Composite parts (1)); Mac mini: ours #3b61b4, live a generated #7f7f7f: IMP-COMPOSITE-GENERATED-COLOUR) P1 **IMP-COMPOSITE (dx)**: "Create a composite part" makes one composite named after the file, a generated colour (#3b61b4 / #7f7f7f), drawn
+- [ ] P1 (raised qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green) **IMP-FACE-APPEARANCE-ROWS (dx)**: live turns the Mac mini's mixed face colours into 166 face appearances (Main 152, Fan 14, source Import 1); ours draws them but part_appearances / the Appearance panel lists 0. live raw/macmini-default.json; qa-scratch/tickets/IMP-FACE-OVERRIDE-READ-ver-1123.png
+- [ ] P1 (raised qa 06:5x) **IMP-COMPOSITE-GENERATED-COLOUR (dx)**: live gives the Mac mini composite a generated #7f7f7f and draws it mid-grey; ours always uses #3b61b4 (USB-C matches by chance). live raw/macmini-composite.json; tickets/IMP-COMPOSITE-ver-1123.png
   in it, under "Composite parts (1)"; ours ignores the option for solids (createComposite never read). IMP-USBC/MACMINI-COMPOSITE-1123.png
-- [ ] P1 **IMP-NO-FEEDBACK (dx)**: live shows the CAD Imports tab ~1.6-2.7 s after Import; ours shows nothing until the tabs come (Mac mini 2.5-5.7 s,
+- [ ] STILL OPEN (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: nothing between the Import click and the new tabs + toast: Mac mini 2.5-5.6 s, NEMA 4.0-5.6 s, live CAD Imports tab at 1.6-2.7 s; dx 538aa4b0 queued) P1 **IMP-NO-FEEDBACK (dx)**: live shows the CAD Imports tab ~1.6-2.7 s after Import; ours shows nothing until the tabs come (Mac mini 2.5-5.7 s,
   NEMA 5.8-7.5 s): against "feedback within a frame". IMP-NEMA17-FEEDBACK-1123.png
-- [ ] P1 **IMP-FEATURE-PARAMS (dx)**: live's Import 1 has compositeName=<file>, maxAssembliesToCreate=0, flatten=true with Combine,
+- [x] verified (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: compositeName / flatten / maxAssembliesToCreate / dependsOnBlob as live on all 17 runs) P1 **IMP-FEATURE-PARAMS (dx)**: live's Import 1 has compositeName=<file>, maxAssembliesToCreate=0, flatten=true with Combine,
   dependsOnBlob=true; ours "", 10, false, false. imp/cli/cmp-6110.txt
-- [ ] P1 **IMP-CLI-TAB-ORDER (dx)**: the app (as live) puts the new tabs after the active tab; ops import_files without `after` appends them at the end.
-- [ ] P1 **IMP-ASM-ROW-ICON (asm)**: NEMA's assembly tree: live's imported instance rows have no icon; ours draws a triad icon after each
+- [x] verified (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: no `after`: Part Studio 1, the new tabs, Assembly 1, CAD Imports, as live) P1 **IMP-CLI-TAB-ORDER (dx)**: the app (as live) puts the new tabs after the active tab; ops import_files without `after` appends them at the end.
+- [ ] STILL OPEN (qa 06:5x, green 3bfecbbda, dx cf9f959a, qa-scratch/imp cli/cmp-green.txt + ui/out-green: NEMA tree unchanged, AE 132 px of 99000 vs the old run) P1 **IMP-ASM-ROW-ICON (asm)**: NEMA's assembly tree: live's imported instance rows have no icon; ours draws a triad icon after each
   sub-assembly row that cuts the names ("Aluminum front…"). live shots/nema17-default-open.png; IMP-NEMA17-TREE-1123.png
 - P3 note: c2-duct opens smaller than live's framing (other files framed alike). IMP-CORPUS-OPEN-1123.png
 
