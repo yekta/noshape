@@ -5,14 +5,17 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 04:0x (after a compaction, first)
+## IN FLIGHT 04:5x (new thread 04:1x, first)
 - **DONE 01:2x-03:0x** (TICKETS, owners told): errors-1123 a/b/c (37 rows), appearance (12), wf-1123 01-12 (02:1x) and 13-20 (03:0x),
   import fidelity "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm; data qa-scratch/imp; Xvfb :496 on vibe2 is the subagent's, left running).
-- **Subagent 03:4x**: sketch tools vs live/sketch-tools-1123 (brief qa-scratch/brief-sk23.md, vibe2 :498, scratch qa-scratch/sk23) -> file SKT-* (skasm), tell skasm. dx 3b6086ed + psui 0c1d80e6/7e017ac17 on main 03:39, waiting for green.
-- **CUT v0.4.68 (lead 03:5x)**: unit qa-cut0468 (tmp/cut0468.sh): first green with 0c1d80e6c -> qa-compat-loop (now 0.4.67) checks it ->
-  CUT_G=<g> cut-verdict.sh -> qa-alerts; if none by 04:30, 0c1d80e6c CLI built in qa-bisect (qa-cand0468) + COMPAT_BIN compat-check. Timers
-  qa-cut-0415/0450 stopped today, restarted 05:02 by qa-timers-back. Add the verdict + rings-loft/impeller/surface-pattern lines for the lead.
-  dx 79b0abcb (import fidelity) -> qa-wimp "IN-GREEN" -> subagent from qa-scratch/brief-impver.md.
+- **sk23**: replay done 04:39 on green 975bab060 (37 cells, sk23/out/all); a subagent analyses it (brief qa-scratch/brief-sk23.md) -> file SKT-* (skasm), tell skasm.
+- **CUT v0.4.68 DONE 04:5x: GO posted (0c1d80e6c build, all SAME, 3 docs valid; lead decides on red asm)**. Was: main RED at 45dc53023 04:34 (asm tests: assembly_feel a_hovered_cylinder_side…, ops ui_parity an_assembly_start_builds;
+  likely dff49b598) -> fallback: 0c1d80e6c CLI (qa-bisect, built 04:30 on vibex7, unit qa-cand0468b) + COMPAT_BIN compat-check -> cut-verdict.sh
+  -> qa-alerts (unit qa-cut0468, log tmp/cut0468.log "CUT-DONE"). Add rings-loft/impeller/surface-pattern lines; decision to lead: cut on red asm?
+  Timers qa-cut-0415/0450 restarted 05:02 by qa-timers-back. dx 79b0abcb (not on main 04:4x) -> qa-wimp "IN-GREEN" -> subagent brief-impver.md.
+- **qa-wait-5191** (blend 51916f785, c2-rings-loft Chamfer 1 "Overlapping chamfers." after the Ø20.5 edit): in green + compat -> qa-alerts line,
+  then the Ø20.5 edit (t23 cli_dim.py, +4/8/12 %) 0.4.67 vs green on vibex7 -> tmp/wait-5191.log "DIM-DONE". Close SPEED-RINGS-SHELL if
+  ~live (5.1 s) and Chamfer 1 errors as live; tell blend the numbers.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
   wf-1122 12 out-wfv4: ROTATE-EDGE-SENSE, EDIT-BODY-SHADE, CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN);
