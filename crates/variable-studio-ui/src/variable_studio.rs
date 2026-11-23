@@ -270,6 +270,7 @@ impl VariableStudioView {
         let Some((st, _)) = self.inputs.get(key).cloned() else { return };
         self.cell_editing = Some(key.to_string());
         self.cell_selected = Some(key.to_string());
+        let typed_key = typed.is_some();
         // (Value fields don't select on focus: the caret stays after the typed key.)
         st.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -282,7 +283,23 @@ impl VariableStudioView {
                 None => s.select_all(window, cx),
             }
         });
+        // A typed key opens the list at once (live shortcuts-1123 vsfoc: "a" shows abs(x)).
+        if typed_key
+            && let Some(row) = key.strip_prefix('e').and_then(|n| n.parse::<usize>().ok())
+        {
+            self.value_completion(key, row, st.read(cx), cx);
+        }
         cx.notify();
+    }
+
+    /// A Value cell's list for its text: the variables above the row, as the Part Studio's table (no "New variable…").
+    fn value_completion(&mut self, key: &str, row: usize, st: &InputState, cx: &App) {
+        let (scope, dim) = self.scope_above(row, cx);
+        let c = crate::var_complete::VarCompletion::compute(key, st, &scope, dim).map(|mut c| {
+            c.new_variable = None;
+            c
+        });
+        self.set_completion(c);
     }
 
     /// Esc in a cell's editor: back to the committed text, the cell
@@ -550,12 +567,7 @@ impl VariableStudioView {
             if let Some(row) = k.strip_prefix('e').and_then(|n| n.parse::<usize>().ok()) {
                 match ev {
                     InputEvent::Change if this.cell_editing.as_deref() == Some(k.as_str()) => {
-                        let (scope, dim) = this.scope_above(row, cx);
-                        let c = crate::var_complete::VarCompletion::compute(&k, st.read(cx), &scope, dim).map(|mut c| {
-                            c.new_variable = None;
-                            c
-                        });
-                        this.set_completion(c);
+                        this.value_completion(&k, row, st.read(cx), cx);
                         cx.notify();
                     }
                     InputEvent::Blur | InputEvent::PressEnter { .. } => this.set_completion(None),

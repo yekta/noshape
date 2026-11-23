@@ -318,6 +318,10 @@ pub(crate) fn compile_and_runtime_errors_become_feature_errors() {
     fx.set_source(&studio(&BLOCK.replace("fCuboid(", "throw regenError(\"Nope, not today\");\nfCuboid(")));
     let (st, msg) = status(&fx.regen(&mut reg, &ps));
     assert_eq!((st, msg.as_str()), (FeatureStatus::Error, "Nope, not today"));
+    // Live's "Runtime information" (workflows-1123 12: the navbar's notices icon stays a grey ✓).
+    let out = custom::run::output_of(ps.features[0].id).expect("the run's notices");
+    let thrown: Vec<String> = out.notices.iter().map(|n| format!("{:?} {}", n.kind, n.message)).collect();
+    assert_eq!(thrown, ["Info throw Nope, not today"]);
 
     // A failing operation: the ErrorStringEnum text.
     fx.set_source(&studio(&BLOCK.replace("fCuboid(context, id + \"box\"", "opFillet(context, id + \"f\", { \"entities\" : qNothing(), \"radius\" : 1 * millimeter });\nfCuboid(context, id + \"box\"")));

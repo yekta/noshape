@@ -1215,6 +1215,12 @@ fn edit_sections_esc_keeps_the_panel_while_a_ticked_checkbox_has_the_focus(cx: &
     draw(cx, window);
     let open = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).section_edit.is_some());
     assert!(open(cx), "Edit section open");
+    // Live workflows-1123 08 s7: its Section id field focused, the letter selected.
+    let (focused, selected) = cx.update(|cx| {
+        let e = editor.read(cx).section_edit.as_ref().expect("open");
+        (e.label_focused, e.label.0.read(cx).selected_text().to_string())
+    });
+    assert_eq!((focused, selected.as_str()), (true, "A"), "the Section id focused with its letter selected");
     // Live workflows-1123 08 s7-9: the section framed orange, its cut point a filled orange dot (no ring).
     let (framed, dots, rings) = cx.update(|cx| editor.update(cx, |e, cx| {
         e.update_preview(cx);

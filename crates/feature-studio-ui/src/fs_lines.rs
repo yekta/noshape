@@ -34,6 +34,11 @@ fn block(text: &str, sel: &Range<usize>) -> Range<usize> {
     start..end.max(start)
 }
 
+/// Ace's ⌃O (a Mac): a line break after the caret, the caret staying.
+pub fn split_line(at: usize) -> LineEdit {
+    LineEdit { range: at..at, text: "\n".into(), sel: at..at }
+}
+
 pub fn apply(text: &str, sel: Range<usize>, op: LineOp) -> Option<LineEdit> {
     let b = block(text, &sel);
     let lines = &text[b.clone()];

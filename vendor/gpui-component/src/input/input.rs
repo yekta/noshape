@@ -133,6 +133,8 @@ pub struct Input {
     role: RoleOverride,
     accessibility_id: Option<SharedString>,
     aria_label: Option<SharedString>,
+    /// NOSHAPE PATCH: the selection colour, instead of the theme's.
+    selection_color: Option<Hsla>,
 
     /// An optional context menu builder to allow a custom context menu on the input.
     ///
@@ -204,6 +206,12 @@ impl Input {
         self
     }
 
+    /// NOSHAPE PATCH: paint the selection in `color` instead of the theme's.
+    pub fn selection_color(mut self, color: Hsla) -> Self {
+        self.selection_color = Some(color);
+        self
+    }
+
     /// Sets the GPUI identity of the input frame. By default it uses the state entity ID.
     pub fn id(mut self, id: impl Into<ElementId>) -> Self {
         self.id = Some(id.into());
@@ -246,6 +254,7 @@ impl Input {
             role: RoleOverride::default(),
             accessibility_id: None,
             aria_label: None,
+            selection_color: None,
             context_menu_builder: None,
             paste_handler: None,
             token_renderer: None,
@@ -567,7 +576,7 @@ impl RenderOnce for Input {
                 muted_foreground: cx.theme().muted_foreground,
                 background: cx.theme().editor_background(),
                 border: cx.theme().border,
-                selection: cx.theme().selection,
+                selection: self.selection_color.unwrap_or(cx.theme().selection),
                 caret: cx.theme().caret,
                 diagnostics: gpui_base::input::DiagnosticColors {
                     error: cx.theme().highlight_theme.style.status.error(cx),

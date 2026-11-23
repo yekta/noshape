@@ -270,7 +270,8 @@ impl PartStudioView {
                 div()
                     .id(("ct-section-more", index))
                     .map(|d| crate::ui_script::mark(d, || format!("button:Table more:{}", t.title)))
-                    .child(crate::os_ui::glyph(crate::os_ui::GLYPH_OVERFLOW, 20., gpui_kit::rgb(0x094174)))
+                    // Dark as the text, not link blue (live workflows-1123 14 s2).
+                    .child(crate::os_ui::glyph(crate::os_ui::GLYPH_OVERFLOW, 20., pal.text))
                     .on_click(move |e: &ClickEvent, window, cx| {
                         cx.stop_propagation();
                         let tsv = tsv.clone();
@@ -345,7 +346,8 @@ impl PartStudioView {
                     .text_color(pal.text)
                     .when(text.contains('\n'), |d| d.py(px(6.)).child(v_flex().children(text.lines().map(|l| div().child(l.to_string())).collect::<Vec<_>>())))
                     .when(!text.contains('\n'), |d| d.child(div().truncate().child(text.clone())))
-                    .when_some(info, |d, tip| d.child(div().id(SharedString::from(format!("ct-info-{index}-{ri}-{ci}"))).pl(px(3.)).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph("info", 14., gpui_kit::rgb(0x888888)))))
+                    // Live workflows-1123 14 s2: an 11 px ⓘ at the cell's right edge.
+                    .when_some(info, |d, tip| d.child(div().id(SharedString::from(format!("ct-info-{index}-{ri}-{ci}"))).debug_selector(|| "ct-info".into()).ml_auto().pl(px(3.)).tooltip(crate::ui::tooltip(tip)).child(crate::ui::glyph("info", 11., gpui_kit::rgb(0x888888)))))
                     .when_some(error, |d, tip| d.tooltip(crate::ui::tooltip(tip)));
                 r = r.child(cell(widths[ci], content.into_any_element()));
             }

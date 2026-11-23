@@ -820,6 +820,12 @@ fn a_vertical_sections_cut_is_fixed_only_on_an_inference_point(cx: &mut TestAppC
         });
         ([(pl.min[0] + pl.max[0]) / 2.0, (pl.min[1] + pl.max[1]) / 2.0], m.expect("a straight edge"))
     });
+    let right = cx.update(|cx| {
+        let e = editor.read(cx);
+        let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).map(|v| v.id).expect("a base view");
+        let pl = e.placement(v).expect("placed");
+        [pl.max[0] + 80.0, (pl.min[1] + pl.max[1]) / 2.0]
+    });
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }, cx)));
     draw(cx, window);
     assert!(cx.update(|cx| editor.read(cx).section_axis().is_some()), "Vertical by default");
@@ -833,6 +839,29 @@ fn a_vertical_sections_cut_is_fixed_only_on_an_inference_point(cx: &mut TestAppC
     assert_eq!(state(cx), (true, false, false), "again away from one: nothing");
     click_at(cx, window, &editor, mid, Modifiers::default());
     assert_eq!(state(cx), (true, true, true), "on an edge's midpoint: the cut fixed");
+    // qa wf23-08 step 3 (live): the pointer still in the parent, only the cutting line, its arrows and the picked
+    // point's dot; the view previews once the pointer leaves the parent.
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = editor.read(cx);
+        let Tool::Section { parent: Some(pid), p0: Some(p0), .. } = &e.tool else { panic!("the cut fixed") };
+        let at = e.placement(*pid).expect("placed").to_sheet(*p0);
+        let dot = e.overlay.marks.iter().any(|(p, k, _)| *k == crate::drawing_scene::SnapMark::Disc && (p[0] - at[0]).hypot(p[1] - at[1]) < 1e-6);
+        (e.section_in_parent(), dot, e.placing_view().is_some())
+    });
+    let move_to = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, _, cx| {
+            editor.update(cx, |e, cx| {
+                e.cursor = at;
+                e.update_preview(cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+    };
+    move_to(cx, inside);
+    assert_eq!(shown(cx), (true, true, true), "in the parent: the view held back, the picked point's dot");
+    move_to(cx, right);
+    assert_eq!(shown(cx), (false, false, true), "out of the parent: the view previews");
 }
 
 /// Live2 place-1118: a projected view is the orthographic one within 22.5° of the parent's axes, locked to its row
@@ -893,9 +922,14 @@ fn a_detail_views_preview_is_grey_with_the_parents_circle_plain(cx: &mut TestApp
         let v = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Base { .. })).expect("a base view");
         (v.id, v.position)
     });
-    cx.update_window(window, |_, _, cx| {
+    cx.update_window(window, |_, w, cx| {
         editor.update(cx, |e, cx| {
             e.set_tool(Tool::Detail { parent: Some(base), center: Some([0.0, 0.0]), radius: Some(0.005) }, cx);
+            // Connected (qa wf23-09).
+            e.sync_detail_dlg(w, cx);
+            if let Some(d) = e.detail_dlg.as_mut() {
+                d.style = 1;
+            }
             e.cursor = [centre[0] + 80.0, centre[1]];
             e.update_preview(cx);
         })
@@ -909,6 +943,15 @@ fn a_detail_views_preview_is_grey_with_the_parents_circle_plain(cx: &mut TestApp
         // qa wf23-09 step 7: its boundary circle drawn, no label or "SCALE" line.
         assert!(v.hide_label && !v.scale_label_shown() && !v.detail_hide_profile, "no label or scale, the boundary drawn");
         assert!(e.overlay.tinted.iter().any(|(pts, rgb, _)| pts.len() > 60 && *rgb == [0, 0, 0, 255]), "the parent's plain solid circle");
+        // qa wf23-09 step 7: a Connected detail's dashed line isn't drawn while it's placed.
+        assert_eq!(v.detail_style, 1, "Connected");
+        let b = e.built.as_ref().expect("built");
+        let dashed: Vec<usize> = b.geometry.lines.iter().enumerate()
+            .filter(|(_, l)| l.points.len() == 2 && l.style == noshape_model::drawing::sheet::LineStyle::Hidden && b.picks.get(l.pick as usize) == Some(&noshape_model::drawing::build::PickTarget::DetailCircle(id)))
+            .map(|(i, _)| i)
+            .collect();
+        let hidden = e.hidden_lines(b);
+        assert!(!dashed.is_empty() && dashed.iter().all(|i| hidden.iter().any(|r| r.contains(i))), "the connector hidden: {dashed:?} vs {hidden:?}");
     });
 }
 

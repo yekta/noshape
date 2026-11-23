@@ -292,6 +292,21 @@ fn the_focused_cells_column_header_turns_grey(cx: &mut TestAppContext) {
     assert_eq!(crate::theme::p().table_header_focus, gpui_kit::rgb(0xd7d7d7), "live's grey");
 }
 
+/// Live shortcuts-1123 vsfoc: a letter typed in a focused Value cell starts its edit with the list open ("a": abs(x)).
+#[gpui::test]
+fn a_letter_in_a_focused_value_cell_opens_the_list(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "value-letter");
+    keys(cx, window, &["h", "enter"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_cell_edit("e0", Some("a".into()), w, cx))).unwrap();
+    draw(cx, window);
+    let got = cx.update(|cx| {
+        let v = view.read(cx);
+        let abs = v.completion.as_ref().is_some_and(|c| c.entries.iter().any(|e| matches!(e, crate::var_complete::Entry::Function("abs", _))));
+        (v.cell_editing.clone(), abs)
+    });
+    assert_eq!(got, (Some("e0".to_string()), true), "editing, abs( listed");
+}
+
 /// Live feel cov-1120 V2: "#" in a Value cell lists only the variables above its row, with no "New variable…".
 #[gpui::test]
 fn the_value_cells_hash_list_holds_the_variables_above_only(cx: &mut TestAppContext) {

@@ -289,6 +289,8 @@ fn the_feedback_matrix_matches_live(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_linked_notice_stays_while_the_user_works(cx: &mut TestAppContext) {
     let (window, view) = part_studio_from(cx, "feedback-merge-toast", None);
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
     let doc = cx.update(|cx| view.read(cx).doc.clone());
     let msg = "Merged B1 into Main.".to_string();

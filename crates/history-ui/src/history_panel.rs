@@ -1461,7 +1461,9 @@ impl Render for HistoryPanel {
         // A filter's hidden branches give up their lanes' places (each keeps its colour).
         let visible: Vec<usize> = (0..lanes.len()).filter(|l| shown_branches.as_ref().is_none_or(|s| s.contains(&lanes[*l]))).collect();
         let nl = visible.len().max(1) as f32;
-        let lane_pos: Rc<Vec<f32>> = Rc::new((0..lanes.len()).map(|l| GRAPH_W / 2. - 7. * (nl - 1.) + 14. * visible.iter().position(|v| *v == l).unwrap_or(0) as f32).collect());
+        // Live workflows-1123 18 s15 / s17: lanes 12 px apart; the open workspace's line 4 px, the others 2 px.
+        let lane_pos: Rc<Vec<f32>> = Rc::new((0..lanes.len()).map(|l| GRAPH_W / 2. - 6. * (nl - 1.) + 12. * visible.iter().position(|v| *v == l).unwrap_or(0) as f32).collect());
+        let open_lane = lanes.iter().position(|x| *x == current_branch);
         let lane_x = move |l: usize| lane_pos.get(l).copied().unwrap_or(GRAPH_W / 2.);
         let lane_names: Vec<SharedString> = lanes.iter().map(|b| graph.branches.iter().find(|x| x.id == *b).map(|x| SharedString::from(x.name.clone())).unwrap_or_default()).collect();
         let lane_name = |l: usize| lane_names.get(l).cloned().unwrap_or_default();
@@ -1497,6 +1499,17 @@ impl Render for HistoryPanel {
                 }
             }
         }
+        // A merge's line from the point it took up to its node, in the source's lane (live workflows-1123 18 s21, 19 s6):
+        // (source lane, merge lane, source y, merge y).
+        let merge_lines: Vec<(usize, usize, f32, f32)> = placed
+            .iter()
+            .filter(|p| p.row.kind == RowKind::Merge)
+            .filter_map(|m| {
+                let src = *info.get(&m.row.mv)?.parents.get(1)?;
+                let s = placed.iter().find(|p| p.row.mv == src && !matches!(p.row.kind, RowKind::Workspace(_)) && p.y > m.y)?;
+                (s.row.lane != m.row.lane).then_some((s.row.lane, m.row.lane, s.y + 13., m.y + 13.))
+            })
+            .collect();
         // The current branch's line runs down to the Branched from row's dot: (lane, parent's lane, y).
         let stub = branched.as_ref().and_then(|((_, _, parent), y)| {
             let l = lanes.iter().position(|b| *b == current_branch)?;
@@ -1557,9 +1570,10 @@ impl Render for HistoryPanel {
                 let clip = window.content_mask().bounds;
                 let (top, bottom) = (f32::from(clip.origin.y - o.y) - 30., f32::from(clip.origin.y + clip.size.height - o.y) + 30.);
                 let shown = |a: f32, b: f32| a.min(b) <= bottom && a.max(b) >= top;
+                let width = |l: usize| px(if open_lane.is_none_or(|o| o == l) { 4. } else { 2. });
                 for &(l, a, b) in segs.iter().filter(|(_, a, b)| shown(*a, *b)) {
                     let (a, b) = (a.max(top), b.min(bottom));
-                    let mut pb = PathBuilder::stroke(px(4.));
+                    let mut pb = PathBuilder::stroke(width(l));
                     pb.move_to(pt(lane_x(l), a));
                     pb.line_to(pt(lane_x(l), b));
                     if let Ok(path) = pb.build() {
@@ -1569,11 +1583,21 @@ impl Render for HistoryPanel {
                 for &(l, parent, from_y, to_y) in forks.iter().filter(|(_, _, a, b)| shown(*a, *b)) {
                     let (x0, x1) = (lane_x(l), lane_x(parent));
                     let mid = (to_y - 13.).max(from_y);
-                    let mut pb = PathBuilder::stroke(px(4.));
+                    let mut pb = PathBuilder::stroke(width(l));
                     pb.move_to(pt(x0, from_y));
                     pb.line_to(pt(x0, (mid - 22.).max(from_y)));
                     pb.cubic_bezier_to(pt(x1, mid), pt(x0, mid - 8.), pt(x1, mid - 14.));
                     pb.line_to(pt(x1, to_y));
+                    if let Ok(path) = pb.build() {
+                        window.paint_path(path, color(l));
+                    }
+                }
+                for &(l, merge_lane, from_y, to_y) in merge_lines.iter().filter(|(_, _, a, b)| shown(*a, *b)) {
+                    let (x0, x1) = (lane_x(l), lane_x(merge_lane));
+                    let mut pb = PathBuilder::stroke(width(l));
+                    pb.move_to(pt(x0, from_y));
+                    pb.line_to(pt(x0, (to_y + 22.).min(from_y)));
+                    pb.cubic_bezier_to(pt(x1, to_y), pt(x0, to_y + 8.), pt(x1, to_y + 14.));
                     if let Ok(path) = pb.build() {
                         window.paint_path(path, color(l));
                     }
@@ -2388,10 +2412,10 @@ impl Render for HistoryPanel {
                                         v_flex()
                                             .flex_none()
                                             .items_center()
-                                            // Live: rows 33 px apart; the last one 82 px above the hint bar
-                                            // (Onshape's cloud "Upgrade" button sits in between).
+                                            // Live: rows 33 px apart, the last one 35 px above the hint bar's text (workflows-1123 19 s21; a
+                                            // free account's "Upgrade" button sat in between, 50 px more).
                                             .gap(px(10.))
-                                            .pb(px(71.))
+                                            .pb(px(20.))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false)).child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false)).child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true)))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false)))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)).child(legend_item(crate::assets::icon("hide-auto-versions", 20., cx), "Automatic version", false))),

@@ -28,7 +28,7 @@ const ACE_DRAWN_ROWS: usize = 9;
 /// A popup anchor: the trigger's bounds from the last paint.
 type BoundsCell = Rc<std::cell::Cell<Bounds<Pixels>>>;
 
-actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown, FindNext, FindPrevious, JumpToMatching, NextError, PreviousError, BlockComment, SortLines, NumberUp, NumberDown, TransposeLetters, SelectOrFindNext, SelectOrFindPrevious]);
+actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackReference, ForwardReference, ToggleComment, RemoveLine, DuplicateSelection, MoveLinesUp, MoveLinesDown, CopyLinesUp, CopyLinesDown, FindNext, FindPrevious, JumpToMatching, NextError, PreviousError, BlockComment, SortLines, NumberUp, NumberDown, TransposeLetters, SplitLine, SelectOrFindNext, SelectOrFindPrevious]);
 
 /// Onshape's Feature Studio shortcuts (live dom/keyboard-shortcuts.txt):
 /// Commit, Commit all, Top level symbols dropdown (the Module outline),
@@ -36,21 +36,24 @@ actions!(feature_studio, [Commit, CommitAll, SearchStudios, ModuleOutline, BackR
 /// (outdent / indent) give way to the references, as in Onshape, so those
 /// are bound again at the editor (registered after the kit's, they win).
 pub fn bind_keys(cx: &mut App) {
+    cx.bind_keys(fs_bindings(cfg!(target_os = "macos")));
+}
+
+/// The Feature Studio's keys on a Mac (`mac`) or elsewhere.
+fn fs_bindings(mac: bool) -> Vec<KeyBinding> {
     let c = Some("FeatureStudio");
     let code = Some("FeatureStudio > Input");
     // Each a Control/Meta pair in live's map: both keys on a Mac, Control elsewhere (behaviours "Keys on macOS").
-    let mac = cfg!(target_os = "macos");
     let mut bindings = Vec::new();
-    for k in noshape_app_core::actions::ctrl_cmd("s", mac) {
-        bindings.push(KeyBinding::new(&k, Commit, c));
-    }
-    for k in noshape_app_core::actions::ctrl_cmd("shift-s", mac) {
-        bindings.push(KeyBinding::new(&k, CommitAll, c));
-    }
-    for k in noshape_app_core::actions::ctrl_cmd("shift-f", mac) {
-        bindings.push(KeyBinding::new(&k, SearchStudios, c));
-    }
+    // Commit: ⌘S / ⇧⌘S on a Mac (⌃S only focuses the editor), Ctrl elsewhere (live shortcuts-1123 fsed / fsno).
+    let cmd = if mac { "cmd" } else { "ctrl" };
+    bindings.push(KeyBinding::new(&format!("{cmd}-s"), Commit, c));
+    bindings.push(KeyBinding::new(&format!("{cmd}-shift-s"), CommitAll, c));
     for ctx in [c, code] {
+        // (In the editor too: the input's own ⇧⌘F is Replace.)
+        for k in noshape_app_core::actions::ctrl_cmd("shift-f", mac) {
+            bindings.push(KeyBinding::new(&k, SearchStudios, ctx));
+        }
         for k in noshape_app_core::actions::ctrl_cmd("shift-o", mac) {
             bindings.push(KeyBinding::new(&k, ModuleOutline, ctx));
         }
@@ -86,9 +89,21 @@ pub fn bind_keys(cx: &mut App) {
     ]);
     // Windows / Linux: Ace's Alt+← / → go to the line's start / end (a Mac keeps Option for words), Alt+Backspace /
     // Delete remove to them.
+    // A Mac: Ace's Control keys (live shortcuts-1123 fsed: ⌃B back a letter, ⌃P up a line, ⌃H / ⌃D delete back /
+    // forward, ⌃O splits the line; ⌃A / ⌃E are the input's).
+    if mac {
+        use gpui_kit::component::input::{Backspace, Delete, MoveLeft, MoveUp};
+        bindings.extend([
+            KeyBinding::new("ctrl-b", MoveLeft, code),
+            KeyBinding::new("ctrl-p", MoveUp, code),
+            KeyBinding::new("ctrl-h", Backspace, code),
+            KeyBinding::new("ctrl-d", Delete, code),
+            KeyBinding::new("ctrl-o", SplitLine, code),
+        ]);
+    }
     if !mac {
         use gpui_kit::component::input::{DeleteToBeginningOfLine, DeleteToEndOfLine, MoveHome, MoveEnd, SelectToStartOfLine, SelectToEndOfLine};
-        cx.bind_keys([
+        bindings.extend([
             KeyBinding::new("alt-left", MoveHome, code),
             KeyBinding::new("alt-right", MoveEnd, code),
             KeyBinding::new("alt-shift-left", SelectToStartOfLine, code),
@@ -97,7 +112,7 @@ pub fn bind_keys(cx: &mut App) {
             KeyBinding::new("alt-delete", DeleteToEndOfLine, code),
         ]);
     }
-    cx.bind_keys(bindings);
+    bindings
 }
 
 /// Pause after the last keystroke before the text is saved (not committed).
@@ -164,13 +179,24 @@ impl NavEntry {
 #[derive(Clone)]
 struct Symbol {
     name: String,
-    params: String,
+    /// None for a table or value: it is named alone.
+    params: Option<String>,
     line: usize,
     /// 0-based column of the name.
     column: usize,
     /// 1-based line its annotation starts on (`line` without one): the toolbar names the symbol there too (live
     /// workflow 26).
     from: usize,
+}
+
+impl Symbol {
+    /// "myFeature(context, id, definition)", a table "partFaces".
+    fn label(&self) -> String {
+        match &self.params {
+            Some(p) => format!("{}({p})", self.name),
+            None => self.name.clone(),
+        }
+    }
 }
 
 /// [`outline`] of an editor's text, parsed again only when the text changes:
@@ -216,20 +242,26 @@ fn outline(src: &str) -> Vec<Symbol> {
         .iter()
         .enumerate()
         .filter_map(|(i, l)| {
-            let t = l.trim_start();
-            let t = t.strip_prefix("export ").unwrap_or(t);
+            // Top level only: an indented `const columns = […]` in a body is no symbol (live workflows-1123 14 s5).
+            if l.starts_with(char::is_whitespace) {
+                return None;
+            }
+            let t = l.strip_prefix("export ").unwrap_or(l);
             if let Some(rest) = t.strip_prefix("const ") {
                 let (name, value) = rest.split_once('=')?;
+                // A table is named alone ("partFaces"), a feature or function with its parameters.
+                let value = value.trim_start();
+                let callable = value.starts_with("defineFeature") || value.starts_with("function");
                 let inner = value.split_once("function").map(|(_, r)| r).unwrap_or("");
                 let name = name.trim().to_string();
                 let column = column_of(l, &name);
-                return Some(Symbol { name, params: params_of(inner), line: i + 1, column, from: from(i) });
+                return Some(Symbol { name, params: callable.then(|| params_of(inner)), line: i + 1, column, from: from(i) });
             }
             let rest = t.strip_prefix("function ").or_else(|| t.strip_prefix("predicate "))?;
             let open = rest.find('(')?;
             let name = rest[..open].trim().to_string();
             let column = column_of(l, &name);
-            Some(Symbol { name, params: params_of(rest), line: i + 1, column, from: from(i) })
+            Some(Symbol { name, params: Some(params_of(rest)), line: i + 1, column, from: from(i) })
         })
         .collect()
 }
@@ -742,7 +774,8 @@ impl FeatureStudioView {
             let mut st = EditorState::new(window, cx)
                 .language("featurescript")
                 .line_number(true)
-                .soft_wrap(false)
+                // Ace wraps a long line at the editor's edge, its continuation without a number (live workflows-1123 12 s9).
+                .soft_wrap(true)
                 .tab_size(TabSize { tab_size: 4, hard_tabs: false })
                 // Live's editor doesn't close brackets as you type (fs-auto-close-paren: "f(", fs-enter-indent).
                 .auto_close(false)
@@ -1147,7 +1180,7 @@ impl FeatureStudioView {
         let cell = |id: SharedString| h_flex().id(id).relative().flex_none().h(px(32.)).px(px(6.)).gap(px(2.)).rounded(px(3.)).cursor_pointer().hover(|d| d.bg(pal.border));
         let pos = self.editor.read(cx).cursor_position();
         let symbols = outline_of(self.editor.read(cx));
-        let current = symbols.iter().rev().find(|s| s.from <= pos.line as usize + 1).map(|s| format!("{}({})", s.name, s.params));
+        let current = symbols.iter().rev().find(|s| s.from <= pos.line as usize + 1).map(Symbol::label);
         let (can_back, can_fwd) = (self.nav_at > 0, self.nav_at + 1 < self.nav.len());
         // Kept across renders: the outline popover is placed before this
         // frame paints the button (opened by ctrl+shift+O as well).
@@ -1194,7 +1227,7 @@ impl FeatureStudioView {
                     )
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.navigate(1, window, cx))),
             )
-            .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)))
+            .child(div().flex_none().relative().px(px(8.)).text_size(px(14.)).text_color(pal.text).debug_selector(|| "fs-line-column".into()).child(format!("Line {} , Column {}", pos.line + 1, pos.character + 1)).child(probe(&self.tb.end)))
     }
 
     /// The Ctrl link under the pointer (Ctrl held: `ctrl`); notifies when it changes.
@@ -1767,7 +1800,8 @@ impl FeatureStudioView {
         // Onshape: pale (Bootstrap disabled look) while there is nothing to commit.
         let clean = !self.uncommitted(cx);
         // Pale #8aa8d7 (live document/70: the primary blue at 50%); with the pointer on it (a commit just clicked) darker,
-        // (85,127,194) (live workflows-1123 13 s6, 14 s7).
+        // (85,127,194), and the ▾ beside it (128,158,205) (live workflows-1123 13 s3, s6, 14 s7). The fill is set
+        // solid: a custom variant draws its colour at 20%.
         let pale = clean.then(|| ButtonCustomVariant::new(cx).color(rgb(0x8aa8d7).into()).foreground(rgb(0xffffff).into()).hover(rgb(0x557fc2).into()).active(rgb(0x557fc2).into()).shadow(false));
         let anchor: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
         let probe = anchor.clone();
@@ -1778,26 +1812,28 @@ impl FeatureStudioView {
             .child(
                 Button::new("fs-commit")
                     .primary()
+                    .group("fs-commit")
                     .h(px(30.))
-                    .px(px(10.5))
+                    .px(px(10.))
                     .rounded_l(px(5.25))
                     .rounded_r(px(0.))
                     .child(div().text_size(px(14.)).child("Commit"))
-                    .when_some(pale, |b, v| b.custom(v))
+                    .when_some(pale, |b, v| b.custom(v).bg(rgb(0x8aa8d7)))
+                    .debug_selector(|| "fs-commit".into())
                     .tooltip("Commit Feature Studio (cmd+s/ctrl+s)").map(|d| crate::ui_script::mark(d, || "button:Commit Feature Studio".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit(cx))),
             )
-            .child(div().w(px(1.)).h(px(30.)).bg(rgb(0x0e3f8c)).when(clean, |d| d.opacity(0.5)))
             .child(
                 Button::new("fs-commit-menu")
                     .primary()
                     .h(px(30.))
-                    .w(px(24.))
+                    .w(px(18.))
                     .p_0()
                     .rounded_r(px(5.25))
                     .rounded_l(px(0.))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., gpui_kit::rgb_static(0xffffff)))
-                    .when_some(pale, |b, v| b.custom(v))
+                    .when_some(pale, |b, v| b.custom(v).bg(rgb(0x8aa8d7)).group_hover("fs-commit", |s| s.bg(rgb(0x809ecd))))
+                    .debug_selector(|| "fs-commit-menu".into())
                     .map(|d| crate::ui_script::mark(d, || "caret:Commit Feature Studio".into()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         // Live fs-commit-menu: with nothing to commit the ▾ is disabled, no menu.
@@ -1885,7 +1921,7 @@ impl FeatureStudioView {
             .enumerate()
             .map(|(i, s)| {
                 let line = s.line;
-                let label = format!("Symbol - {}({})", s.name, s.params);
+                let label = format!("Symbol - {}", s.label());
                 let column = s.column;
                 h_flex()
                     .id(SharedString::from(format!("sym-{i}")))
@@ -1895,7 +1931,7 @@ impl FeatureStudioView {
                     .cursor_pointer()
                     .hover(|d| d.bg(rgb(0xdef1fb)))
                     .child(os::glyph(os::GLYPH_FUNCTION, 16., pal.text))
-                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(format!("{}({})", s.name, s.params)))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(s.label()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         this.outline = None;
                         let here = NavEntry::caret(this.editor.read(cx).cursor_position());
@@ -2204,7 +2240,9 @@ impl FeatureStudioView {
         })
         .absolute()
         .size(px(1.));
+        // The window's width: the spacer puts Monitor, Module outline… at the right edge (live workflows-1123 12 s9).
         let mut toolbar = crate::ui::toolbar()
+            .w_full()
             .relative()
             .child(probe(&self.tb.toolbar))
             .child(watch)
@@ -2251,6 +2289,7 @@ impl FeatureStudioView {
             .child(
                 h_flex()
                     .id("fs-monitor")
+                    .debug_selector(|| "fs-monitor".into())
                     .map(|d| crate::ui_script::mark(d, || "button:Monitor".into()))
                     .relative()
                     .flex_none()
@@ -2358,6 +2397,10 @@ impl Render for FeatureStudioView {
                 let (text, at) = (this.editor.read(cx).value().to_string(), this.editor.read(cx).selected_range().end);
                 this.apply_edit(crate::fs_lines::transpose(&text, at), window, cx);
             }))
+            .on_action(cx.listener(|this, _: &SplitLine, window, cx| {
+                let at = this.editor.read(cx).selected_range().end;
+                this.apply_edit(Some(crate::fs_lines::split_line(at)), window, cx);
+            }))
             .on_action(cx.listener(|this, _: &SelectOrFindNext, _, cx| this.select_or_find(false, cx)))
             .on_action(cx.listener(|this, _: &SelectOrFindPrevious, _, cx| this.select_or_find(true, cx)))
             .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
@@ -2377,7 +2420,7 @@ impl Render for FeatureStudioView {
                         // Live document/70 (Ace): 13 px monospace on 16 px lines, the first
                         // line right under the toolbar. The kit editor keeps an 8 px top
                         // padding (its size's), clipped off here.
-                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().map(|d| crate::ui_script::mark(d, || "editor:code".into())).child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(14.)).line_height(px(16.))),
+                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().map(|d| crate::ui_script::mark(d, || "editor:code".into())).child(Editor::new(&self.editor).readonly(read_only).selection_color(ace_selection()).bordered(false).h_full().text_size(px(14.)).line_height(px(16.))),
                     )
                     .children(self.render_profile(cx))
                     // The diagnostic tooltip follows the pointer (re-render only
@@ -2474,9 +2517,14 @@ impl ReadonlyCode {
     }
 }
 
+/// Ace's selection: #90bbf1 (live workflows-1123 14 s5), twilight's white at 20% in the dark theme.
+fn ace_selection() -> Hsla {
+    if gpui_kit::hex_theme_active() { gpui_kit::rgba(0xddf0ff33).into() } else { gpui_kit::rgb(0x90bbf1).into() }
+}
+
 impl Render for ReadonlyCode {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        Editor::new(&self.editor).readonly(true).bordered(false).h_full().text_size(px(14.)).line_height(px(16.))
+        Editor::new(&self.editor).readonly(true).selection_color(ace_selection()).bordered(false).h_full().text_size(px(14.)).line_height(px(16.))
     }
 }
 
@@ -2765,8 +2813,11 @@ mod tests {
         assert!(kinds.contains(&Tok::Comment) && kinds.contains(&Tok::Keyword) && kinds.contains(&Tok::String) && kinds.contains(&Tok::Number));
         assert_eq!(kinds.iter().filter(|k| **k == Tok::Variable).count(), 2);
         let outline = super::outline(super::NEW_FEATURE);
-        assert_eq!((outline[0].name.as_str(), outline[0].params.as_str()), ("myFeature", "context, id, definition"));
+        assert_eq!(outline[0].label(), "myFeature(context, id, definition)");
         assert_eq!((outline[0].from, outline[0].line), (1, 2), "the toolbar names it on its annotation line too (live workflow 26)");
+        let table = "annotation { \"Table Type Name\" : \"Part faces\" }\nexport const partFaces = defineTable(function(context is Context, definition is map) returns Table\n    {\n        const columns = [tableColumnDefinition(\"faces\", \"Faces\")];\n    });";
+        let names: Vec<String> = super::outline(table).iter().map(super::Symbol::label).collect();
+        assert_eq!(names, ["partFaces"], "a table alone, by name; a body's const is no symbol (live workflows-1123 14 s5)");
     }
 
     #[::core::prelude::v1::test]
@@ -2811,3 +2862,32 @@ mod import_notice_tests {
 #[cfg(test)]
 #[path = "feature_studio_bench.rs"]
 mod bench;
+
+#[cfg(test)]
+mod key_tests {
+    use super::*;
+    use gpui_kit::{Action as _, KeyContext, Keymap, Keystroke};
+
+    /// Live shortcuts-1123 fsed / fsno: ⌘S / ⇧⌘S commit on a Mac (⌃S doesn't), Ctrl+S elsewhere; ⇧⌘F searches from
+    /// the editor too; a Mac's editor takes Ace's ⌃B / ⌃P / ⌃H / ⌃D / ⌃O.
+    #[test]
+    fn the_feature_studio_takes_lives_keys_per_os() {
+        let action = |mac: bool, editor: bool, key: &str| {
+            let keymap = Keymap::new(fs_bindings(mac));
+            let names: &[&str] = if editor { &["FeatureStudio", "Input"] } else { &["FeatureStudio"] };
+            let stack: Vec<KeyContext> = names.iter().map(|n| KeyContext::parse(n).unwrap()).collect();
+            let (found, _) = keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &stack);
+            found.first().map(|b| b.action().name())
+        };
+        assert_eq!(action(true, false, "cmd-s"), Some(Commit.name()));
+        assert_eq!(action(true, false, "cmd-shift-s"), Some(CommitAll.name()));
+        assert_eq!(action(true, false, "ctrl-s"), None, "⌃S doesn't commit on a Mac");
+        assert_eq!(action(false, false, "ctrl-s"), Some(Commit.name()));
+        assert_eq!(action(true, true, "cmd-shift-f"), Some(SearchStudios.name()), "from the editor");
+        assert_eq!(action(true, true, "ctrl-o"), Some(SplitLine.name()));
+        assert_eq!(action(true, true, "ctrl-b"), Some(gpui_kit::component::input::MoveLeft.name()));
+        assert_eq!(action(true, true, "cmd-d"), Some(RemoveLine.name()));
+        assert_eq!(action(false, true, "ctrl-d"), Some(RemoveLine.name()));
+        assert_eq!(action(false, true, "ctrl-o"), None);
+    }
+}

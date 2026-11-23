@@ -7096,7 +7096,8 @@ impl PartStudioView {
             let w = window.viewport_size().width;
             out.push(
                 deferred(anchored().position_mode(gpui_kit::AnchoredPositionMode::Window).position(point(px(0.), px(85.))).child(div().w(w).flex().justify_center().child(bubble)))
-                    .with_priority(1)
+                    // Over modal dialogs (drawn at 10 + their layer; live workflows-1123 19 s8: the Merge toast over them), under menus (100).
+                    .with_priority(50)
                     .into_any_element(),
             );
         }

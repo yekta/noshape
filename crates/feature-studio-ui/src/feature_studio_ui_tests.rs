@@ -719,3 +719,44 @@ fn an_errors_tooltip_shows_under_its_line_only_over_the_underline(cx: &mut TestA
     assert!(v.debug_bounds("fs-squiggle-tip").is_none(), "nothing one character past the underline");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live workflows-1123 13 s3–s6: the Commit split button's ▾ is 18 px, against the main face with no divider.
+#[gpui::test]
+fn the_commit_caret_is_18_px_and_the_right_group_ends_at_the_edge(cx: &mut TestAppContext) {
+    use gpui_kit::VisualTestContext;
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-commit-caret-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let window = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        w
+    });
+    draw(cx, window);
+    let mut vcx = VisualTestContext::from_window(window, cx);
+    let main = vcx.debug_bounds("fs-commit").expect("the Commit button");
+    let caret = vcx.debug_bounds("fs-commit-menu").expect("its ▾");
+    assert_eq!((caret.size.width, caret.left()), (px(18.), main.right()), "18 px, no divider");
+    // Live workflows-1123 12 s9: Monitor, Module outline, back / forward and Line, Column end at the window's right edge.
+    let monitor = vcx.debug_bounds("fs-monitor").expect("Monitor");
+    let line_col = vcx.debug_bounds("fs-line-column").expect("Line, Column");
+    assert!(line_col.right() > px(1580.), "the right group ends at the edge: {line_col:?}");
+    assert!(monitor.left() > caret.right() + px(300.), "a gap before Monitor: {monitor:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

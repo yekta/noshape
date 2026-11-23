@@ -48,6 +48,8 @@ pub struct SectionEdit {
     /// the last thing clicked (live section-probe-1121: Esc with the just-ticked checkbox focused leaves it open).
     pub panel_focus: FocusHandle,
     pub check_focused: bool,
+    /// The Section id field has the focus: a 2 px underline (live workflows-1123 08 s7: it opens focused, "A" selected).
+    pub label_focused: bool,
 }
 
 impl DrawingEditor {
@@ -69,7 +71,10 @@ impl DrawingEditor {
             }
         });
         let up_to = depth_ref.is_some();
-        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0), exclude_on: !exclude.is_empty(), exclude, exclude_picking: false, panel_focus: cx.focus_handle(), check_focused: false });
+        let field = st.clone();
+        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text, flip, up_to, depth_ref, picking: false, offset: None, offset_value: None, offset_flip: offset.is_some_and(|o| o < 0.0), exclude_on: !exclude.is_empty(), exclude, exclude_picking: false, panel_focus: cx.focus_handle(), check_focused: false, label_focused: false });
+        field.update(cx, |s, cx| s.focus(window, cx));
+        cx.defer_in(window, move |_, window, cx| field.update(cx, |s, cx| s.select_all(window, cx)));
         self.geometry_dirty = true;
         if depth.is_some() || up_to {
             self.toggle_edit_depth(depth, window, cx);
@@ -294,6 +299,7 @@ impl DrawingEditor {
         let excluded: Vec<(usize, String)> = e.exclude.iter().enumerate().map(|(i, b)| (i, self.part_name_in(e.parent, b))).collect();
         let label = e.label.0.clone();
         let label_text = e.label_text.clone();
+        let label_focused = e.label_focused;
         let panel_focus = e.panel_focus.clone();
         let (cut_only, flip, up_to, picking, has_ref, offset_flip) = (e.cut_only, e.flip, e.up_to, e.picking, e.depth_ref.is_some(), e.offset_flip);
         let depth = e.depth.as_ref().map(|(st, _)| st.clone());
@@ -378,11 +384,12 @@ impl DrawingEditor {
                         .pl(px(10.))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Section view"))
                         .child(div().id("se-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(16.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(true, cx))))
-                        .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
+                        .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
                 // Rows placed as live's (drw-section-exclude-from-cut / -edit-depth-direction clicks: the input at y 121, the flip
                 // row 153, Exclude from cut 234).
-                .child(div().px(px(10.)).pt(px(8.)).child(Input::new(&label).xsmall()))
+                // As the creating dialog's: an underline, 2 px while focused (live drawing/20, workflows-1123 08 s7).
+                .child(div().px(px(10.)).pt(px(8.)).child(gpui_kit::base::input::input_frame(div().h(px(25.)).flex().items_end().map(|d0| if label_focused { d0.border_b_2() } else { d0.border_b_1() }).border_color(pal.accent).child(Input::new(&label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()))))
                 // The tool button (live 499–504, as in the creating dialog): the cutting line's points are being picked,
                 // so it shows active; Opposite direction at the row's right end, its arrow turned by each click (live2
                 // drw-section-edit-depth-direction, live section-probe-1121).

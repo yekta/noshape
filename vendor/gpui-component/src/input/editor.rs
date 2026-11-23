@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use gpui::{
-    App, DefiniteLength, Entity, IntoElement, RenderOnce, SharedString, StyleRefinement, Styled,
+    App, DefiniteLength, Entity, Hsla, IntoElement, RenderOnce, SharedString, StyleRefinement, Styled,
     Window, prelude::FluentBuilder as _, relative,
 };
 
@@ -26,6 +26,7 @@ pub struct Editor {
     tab_index: isize,
     role: RoleOverride,
     aria_label: Option<SharedString>,
+    selection_color: Option<Hsla>,
 
     /// An optional context menu builder to allow a custom context menu.
     ///
@@ -48,6 +49,7 @@ impl Editor {
             tab_index: 0,
             role: RoleOverride::default(),
             aria_label: None,
+            selection_color: None,
             context_menu_builder: None,
             paste_handler: None,
         }
@@ -80,6 +82,12 @@ impl Editor {
     /// made by the user.
     pub fn readonly(mut self, readonly: bool) -> Self {
         self.readonly = readonly;
+        self
+    }
+
+    /// NOSHAPE PATCH: paint the selection in `color` instead of the theme's.
+    pub fn selection_color(mut self, color: Hsla) -> Self {
+        self.selection_color = Some(color);
         self
     }
 
@@ -152,6 +160,7 @@ impl RenderOnce for Editor {
             .role(self.role)
             .when_some(self.height, |this, height| this.h(height))
             .when_some(self.aria_label, |this, label| this.aria_label(label))
+            .when_some(self.selection_color, |this, color| this.selection_color(color))
             .when_some(self.context_menu_builder, |this, build| {
                 this.context_menu(move |menu, window, cx| build(menu, window, cx))
             })

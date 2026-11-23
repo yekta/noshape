@@ -184,6 +184,16 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
     }
     // Redo: Ctrl+Y, and Shift+⌘Z on a Mac (not Ctrl+Shift+Z anywhere).
     pairs.push(KeyBinding::new("ctrl-y", Redo, doc_mod));
+    // A drawing (live shortcuts-1123 drw): ⌘Z, ⇧⌘Z and ⌘Y on a Mac, its ⌃Z / ⌃Y nothing; Ctrl+Z, Ctrl+Y and
+    // Ctrl+Shift+Z elsewhere.
+    let drw = Some("Drawing");
+    if mac {
+        pairs.push(KeyBinding::new("ctrl-z", gpui_kit::NoAction, drw));
+        pairs.push(KeyBinding::new("ctrl-y", gpui_kit::NoAction, drw));
+        pairs.push(KeyBinding::new("cmd-y", Redo, drw));
+    } else {
+        pairs.push(KeyBinding::new("ctrl-shift-z", Redo, drw));
+    }
     if mac {
         pairs.push(KeyBinding::new("cmd-shift-z", Redo, doc_mod));
         // Ctrl+Enter in a dialog's field is Enter (live2 dialog-keys-1118): the input binds secondary-enter, Ctrl+Enter
@@ -482,6 +492,31 @@ mod mac_key_tests {
             assert_eq!(action_for(mac, "alt-t"), Some(TabManager.name()));
         }
         assert_eq!(action_for(true, "cmd-m"), None, "Control-only on a Mac");
+    }
+}
+
+#[cfg(test)]
+mod drawing_key_tests {
+    use super::*;
+    use gpui_kit::{Action, KeyContext, Keymap, Keystroke};
+
+    /// Live shortcuts-1123 drw: a drawing undoes with ⌘Z and redoes with ⇧⌘Z / ⌘Y on a Mac (⌃Z / ⌃Y do nothing), with
+    /// Ctrl+Z and Ctrl+Y / Ctrl+Shift+Z elsewhere.
+    #[test]
+    fn a_drawing_takes_lives_undo_keys_per_os() {
+        let action = |mac: bool, key: &str| {
+            let keymap = Keymap::new(key_bindings_for(mac));
+            let stack: Vec<KeyContext> = ["Workspace", "Drawing"].iter().map(|n| KeyContext::parse(n).unwrap()).collect();
+            let (found, _) = keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &stack);
+            found.first().map(|b| b.action().name()).filter(|n| *n != gpui_kit::NoAction.name())
+        };
+        let (undo, redo) = (Some(Undo.name()), Some(Redo.name()));
+        for (key, want) in [("cmd-z", undo), ("cmd-shift-z", redo), ("cmd-y", redo), ("ctrl-z", None), ("ctrl-y", None)] {
+            assert_eq!(action(true, key), want, "mac {key}");
+        }
+        for (key, want) in [("ctrl-z", undo), ("ctrl-y", redo), ("ctrl-shift-z", redo)] {
+            assert_eq!(action(false, key), want, "{key}");
+        }
     }
 }
 

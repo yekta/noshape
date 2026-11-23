@@ -1570,7 +1570,10 @@ impl DrawingEditor {
         let ghost = self.placing_view().map(|id| ghost_picks(&built, id)).unwrap_or_default();
         // A detail's preview is a lighter grey than a projected or section view's (live2 place-1118: 164 / 159).
         let ghost_ink = if matches!(self.tool, Tool::Detail { .. }) { drawing_scene::GHOST_DETAIL_INK } else { drawing_scene::GHOST_INK };
-        let hidden = self.hidden_lines(&built);
+        let mut hidden = self.hidden_lines(&built);
+        if self.section_in_parent() {
+            hidden.extend(built.geometry.lines.iter().enumerate().filter(|(_, l)| ghost.contains(&l.pick)).map(|(i, _)| i..i + 1));
+        }
         move |zoom, up| {
             let edges = shaded.iter().map(|(v, r)| (*v, up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, true)), up.upload_lines(&drawing_scene::range_lines(&built, r.clone(), zoom, false)))).collect();
             let skip: Vec<std::ops::Range<usize>> = shaded.iter().map(|(_, r)| r.clone()).chain(hidden.iter().cloned()).collect();
@@ -1907,9 +1910,23 @@ impl DrawingEditor {
         shown.views.iter().map(|v| v.id).find(|id| have.view(*id).is_none())
     }
 
+    /// A section's cutting line placed, the pointer still in its parent: only the cutting line, its arrows and the picked
+    /// point's dot show; the view previews once the pointer leaves the parent (qa wf23-08 step 3).
+    pub(crate) fn section_in_parent(&self) -> bool {
+        let Tool::Section { parent: Some(p), line: Some(_), .. } = &self.tool else { return false };
+        if self.section_dlg.as_ref().is_some_and(|d| d.placed.is_some()) {
+            return false;
+        }
+        let c = self.cursor;
+        self.placement(*p).is_some_and(|pl| (pl.min[0]..=pl.max[0]).contains(&c[0]) && (pl.min[1]..=pl.max[1]).contains(&c[1]))
+    }
+
     /// The placed projected view's box: a 1 px frame rgb(154,165,175), as far out as a selected view's frame.
     fn push_placing_frame(&self, scene: &mut Scene) {
         use noshape_render::{LineData, LineSegment};
+        if self.section_in_parent() {
+            return;
+        }
         let Some(pl) = self.placing_view().and_then(|v| self.placement(v)) else { return };
         // A detail's frame stands 12 px clear of its circle (live2 place-1118).
         let off = self.tol_mm(if matches!(self.tool, Tool::Detail { .. }) { 12.0 } else { 8.0 });
@@ -2017,9 +2034,11 @@ impl DrawingEditor {
     }
 
     /// The picks whose texts aren't drawn: Edit section… open, its cutting line's letters (live workflows-1123 08 s7-9).
-    /// Sheet lines not drawn: a Connected detail's dashed line while Edit detail… is open (live qa wf23-09 step 22).
+    /// Sheet lines not drawn: a Connected detail's dashed line while Edit detail… is open (live qa wf23-09 step 22) or
+    /// while the detail is being placed (its profile plain, qa wf23-09 step 7).
     pub(crate) fn hidden_lines(&self, built: &BuiltSheet) -> Vec<std::ops::Range<usize>> {
-        let Some(editing) = self.detail_editing().map(PickTarget::DetailCircle) else { return Vec::new() };
+        let placing = self.placing_view().filter(|_| matches!(self.tool, Tool::Detail { .. }));
+        let Some(editing) = self.detail_editing().or(placing).map(PickTarget::DetailCircle) else { return Vec::new() };
         let dashed = |l: &noshape_model::drawing::sheet::Polyline2| !l.closed && l.points.len() == 2 && l.style == noshape_model::drawing::sheet::LineStyle::Hidden;
         built.geometry.lines.iter().enumerate().filter(|(_, l)| dashed(l) && built.picks.get(l.pick as usize) == Some(&editing)).map(|(i, _)| i..i + 1).collect()
     }
@@ -2548,6 +2567,9 @@ impl DrawingEditor {
         }
         self.first_lit = self.first_field.is_focused(window);
         self.sync_section_dlg(window, cx);
+        if let Some(e) = self.section_edit.as_mut() {
+            e.label_focused = e.label.0.read(cx).focus_handle(cx).is_focused(window);
+        }
         self.sync_aligned_dlg(window, cx);
         self.sync_target_dims_preview(cx);
         self.sync_sf_panel(window, cx);

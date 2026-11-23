@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-23 02:41 UTC.
+Updated 2026-11-23 03:58 UTC.
 
 ## In flight
 
@@ -33,21 +33,44 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
     preview; ✕/Esc/tool/sheet props/reopen go through `drop_view_props`. Feel test
     `enter_in_view_properties_scale_previews_until_ok`.
 - QUEUED 14f567d6 (02:35) carries 58eda2cb: one result for both.
-- UNCOMMITTED (02:41), x256 on vibex8 (log /root/studios-scratch/x256.log, x254r.sh = drawing-ui tests + clippy;
-  x255 green on the first three; x256: the move-sheet test fixed (Sheet2 gets 2 views: assert non-empty), x257 reruns): DRW-TABLE-MID-HANDLES (10 x 10 grips, BOM header test), DRW-SHEETS-CHEVRON-STATE +
-  EMPTY-CHEVRON (`drawing_extra::sheet_caret`: open while views listed, none when empty), DRW-DETAIL-ROTATION-ANGLE
-  (`view_rotation_editable`, section test), DRW-MOVE-TO-SHEET-PREVIEW (MoveSheetDlg from/before/preview,
-  `pick_move_sheet`, `cancel_move_sheet`, `move_sheet_preview` in update_preview's chain, `drawing_custom_table::move_table`;
-  test `move_to_sheet_shows_the_picked_sheet_before_ok`). TICKETS [x] for those + DRW-SCALE-ENTER-LABEL. If green:
-  commit, land.
-- Next: DRW-CALLOUT-DIALOG-LOOK (live: centre box preset with a "Table: Item No." token, focused, ~66 px; resolves to
-  "1" after the anchor click; ours an italic placeholder), then FS / HIST / TOAST rows below.
-- qa 01:1x block left (TICKETS "qa, 2026-11-23 01:1x"): DRW-DETAIL-ROTATION-ANGLE, DRW-CALLOUT-DIALOG-LOOK,
-  DRW-TABLE-MID-HANDLES, DRW-MOVE-TO-SHEET-PREVIEW, DRW-SHEETS-CHEVRON-STATE, FS-NOTICES-ICON-RED-ON-REGEN-ERROR,
-  FS-OUTLINE-ENCLOSING-SYMBOL, FS-TOOLBAR-RIGHT-GROUP, FS-EDITOR-SELECTION-COLOUR, HIST-MERGE-DIALOG-LOOK,
-  TOAST-ABOVE-MODAL, HIST-LEGEND-LOOK. Evidence /root/qa-scratch/tickets/wf23b-*.png: pixel counts by script only.
-- Mac check of the P0: no studios target on the Mac, load 7.3 at 00:47 (gate 6): verify on the next release build
-  (scratch folder under ~/noshape-host, GUI only when HIDIdleTime >= 600 s), not the user's documents.
+- QUEUED 52b9cfb9 (02:44, #2, carries 14f567d6 + 58eda2cb): DRW-TABLE-MID-HANDLES, DRW-SHEETS-CHEVRON-STATE /
+  EMPTY-CHEVRON, DRW-DETAIL-ROTATION-ANGLE, DRW-MOVE-TO-SHEET-PREVIEW. qa's 02:5x "still open" FEEL-PRIMARY-BUTTON-HOVER
+  and HIST-COMPARE-EXIT-CAMERA are in it (not on main when scored).
+- COMMITTED 11-23 04:0x (x260 green: drawing-ui 169, clippy 5 crates; x259 ops e2e 297 green), queued with the next
+  commit: move-to-sheet test, DRW-CALLOUT-DIALOG-LOOK (+ P3 DRW-CALLOUT-DIALOG-ICONS), HIST-TOAST-DROPPED-ON-RCLICK
+  (DocModel.notice_input; part studio notice stays 35 s after the last input).
+- Second commit (x261 + x262: part-studio feedback, feature-studio-ui, featurescript, model custom_features,
+  history-ui, clippy): FEEL-FS-COMMIT-DISABLED-HOVER (▾ 18 px, no divider, hover (128,158,205)); FS-EDITOR-SELECTION-
+  COLOUR #90bbf1 (vendor gpui-component Input/Editor `selection_color` patch; the caret claim not reproduced: left
+  open); FS-OUTLINE-ENCLOSING-SYMBOL (top-level symbols only, a table named alone: `Symbol::label`);
+  FS-TOOLBAR-RIGHT-GROUP (toolbar `w_full`: qa's run had the right group end at x 1640); FS-NOTICES-ICON-RED-ON-REGEN-
+  ERROR (featurescript `raise_noted` notices are Info = live's "Runtime/Modeling information"; dx's crate, tell dx);
+  FS-EDITOR-SOFT-WRAP (soft_wrap on); HIST-LEGEND-LOOK position (pb 20; the pin glyphs still open);
+  HIST-MERGE-DIALOG-LOOK (body min_h 432, a version source plain bold, select borderless); HIST-GRAPH-LOOK (lanes 12 px
+  apart, open lane 4 px / others 2 px, merge line source -> Merge node; version dot size not changed);
+  CUSTOM-TABLE-INFO-CELL (ⓘ 11 px at the right edge, section … #333).
+- STATE 04:05: commit ed2946eac (callout dialog, linked-notice 35 s, move-to-sheet test) not landed yet. Its test
+  feedback::a_linked_notice_stays_while_the_user_works now passes (it had to wait for the studio's load: the overlay
+  timer never started); DBG lines removed. Uncommitted second set (FS rows, HIST rows, CUSTOM-TABLE-INFO-CELL,
+  DRW-SECTION-EDIT-DIALOG, TOAST-ABOVE-MODAL = toast priority 50 over gpui-base dialogs' 10+layer,
+  DRW-SECTION-PREVIEW-IN-PARENT = `section_in_parent`: placing view's lines + frame hidden, p0 dot; asserted in
+  feel.rs a_vertical_sections_cut…) in x262 (`bin/x262.sh`, log x262.log). Then commit, rebase, TICKETS rows against
+  main's text, land. Then x263-build.sh on vibex7 + x263-run.sh on vibex8 (workflows 08/12/14/18/19 replay), pixel
+  check by script. DRW-DETAIL-PREVIEW-LOOK: Connected connector hidden while placing (hidden_lines), test in feel.rs
+  a_detail_views_preview…; drawing-ui needs x262b (`bin/x262b.sh`) as it changed after x262 started.
+- Shortcuts (live shortcuts-1123, lead's ask 04:2x): Drawing context: Mac ⌃Z/⌃Y NoAction, ⌘Y redo; elsewhere
+  Ctrl+Shift+Z redo (app-core actions.rs, test drawing_key_tests). FS: Commit/CommitAll ⌘ only on a Mac; ⇧⌘F search
+  also in the editor (input's own was Replace); Mac ⌃B/⌃P/⌃H/⌃D/⌃O (SplitLine, fs_lines::split_line). FS Mac keys
+  untested on Linux (cfg!(macos) in bind_keys: refactor to fs_bindings(mac) + test). VS: a typed key opens the value
+  list at once (value_completion; test a_letter_in_a_focused_value_cell_opens_the_list). Run x264 (vibex7).
+- NEXT after the land: DRW-BOM-DIALOG-INSERT-ROW needs a "Select a BOM" chooser mode (live behaviours 6168: Insert ›
+  Select a BOM › Current document › Assemblies): like `chooser.studio` / `composite` in drawing_chooser.rs (Assemblies
+  tab = tab 1), pick sets the table dialog's source; then drop the "Other documents… / BOM data…" link row and make
+  Insert a button with the insert icon (as the cut list's, drawing_table_dlg.rs ~765). FS caret: the FS editor is not
+  a code_editor input; Ace's caret is 2 px; skipped for now.
+- Lead's extra: after v0.4.68 (05:00 release) is published, on the Mac (idle >= 10 min only): Finder-copy a scratch
+  .noshape in ~/noshape-host/studios-keep, rename the copy, open it with the release app: new name, not a copy.
+  Report <= 3 lines.
 - USER P0 (lead 11-22 23:45, macOS ~/Documents/noshape): DOC-COPY-IDENTITY + DOC-SIDE-FILES:
   - No per-document id exists: windows (OpenDocs, canonical path), recents, last-viewed are keyed by path, so a Finder
     copy is already its own document; only its name was the original's. store `Document::meta().name` =

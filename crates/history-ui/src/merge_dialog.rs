@@ -179,6 +179,14 @@ fn chip(name: &str, lane: usize, size: f32) -> Div {
     div().px(px(3.)).rounded(px(3.)).border_1().border_color(rgb(border)).bg(fill).text_size(px(size)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child(crate::ui::user_text(name.to_string()))
 }
 
+/// The source's name: a workspace's chip, a version's name plain and bold (live workflows-1123 18 s20: "Rev B").
+fn source_chip(plan: &Plan, size: f32) -> Div {
+    if plan.from_branch.is_some() {
+        return chip(&plan.source, plan.source_lane, size);
+    }
+    div().text_size(px(size)).font_weight(FontWeight::BOLD).text_color(rgb(0x333333)).child(crate::ui::user_text(plan.source.clone()))
+}
+
 /// A strategy's icon for a row (icons2 from live: Keep shows the discard ×
 /// only when the source changed the tab, Replace only when the target did).
 fn strategy_icon(s: Strategy, row: &Row) -> &'static str {
@@ -261,7 +269,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             .child(if plan.restore { "Restoring changes into" } else { "Merging changes into" })
             .child(chip(&plan.target, plan.target_lane, 18.))
             .child("from")
-            .child(chip(&plan.source, plan.source_lane, 18.))
+            .child(source_chip(&plan, 18.))
             .child(div().flex_1())
             .child(div().flex_none().child(gpui_kit::component::dialog::DialogClose::new().child(div().id("modal-close").size(px(22.)).flex().items_center().justify_center().cursor_pointer().text_color(pal.text_faint).child(gpui_kit::component::Icon::empty().data(os::GLYPH_CLOSE).size(px(16.))))));
         // Overall merge strategy: Keep · Merge changes (when a tab can merge) · Replace.
@@ -283,7 +291,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             let first = match s {
                 Strategy::Keep => h_flex().gap(px(4.)).child("Keep").child(chip(&plan.target, plan.target_lane, 13.)),
                 Strategy::Merge => h_flex().child("Merge changes"),
-                Strategy::Replace => h_flex().gap(px(4.)).child("Replace with").child(chip(&plan.source, plan.source_lane, 13.)),
+                Strategy::Replace => h_flex().gap(px(4.)).child("Replace with").child(source_chip(&plan, 13.)),
             };
             let count = match s {
                 Strategy::Keep if plan.restore => "No changes".to_string(),
@@ -385,12 +393,9 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                 .px(px(6.))
                 .gap(px(6.))
                 .cursor_pointer()
-                // Live os-select: a bordered button; a tab whose strategy
-                // differs from the overall one gets a yellow corner (mg-908).
+                // Live: no border, on the row's stripe (workflows-1123 18 s20); a tab whose strategy differs from
+                // the overall one gets a yellow corner (mg-908).
                 .rounded(px(3.))
-                .border_1()
-                .border_color(rgb(0xaaaaaa))
-                .bg(crate::theme::p().panel)
                 // Greyed while a protected target refuses the merge (live wp-937).
                 .when(plan.protected_with_changes, |d| d.opacity(0.5))
                 .when(differs, |d| {
@@ -473,7 +478,7 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             .text_color(pal.text)
             .child(div().w(px(COL_NAME)).flex_none().child(tabs_have_changes(plan.changed.len())))
             .child(h_flex().w(px(COL_CHANGE)).flex_none().gap(px(4.)).child("Changes in").child(chip(&plan.target, plan.target_lane, 14.)))
-            .when(!plan.restore, |d| d.child(h_flex().w(px(COL_CHANGE)).flex_none().gap(px(4.)).child("Changes in").child(chip(&plan.source, plan.source_lane, 14.))))
+            .when(!plan.restore, |d| d.child(h_flex().w(px(COL_CHANGE)).flex_none().gap(px(4.)).child("Changes in").child(source_chip(&plan, 14.))))
             .child(div().child(if plan.restore { "Tab restore strategy" } else { "Tab merge strategy" }));
         let n_same = plan.unchanged.len();
         let unchanged_open = st.unchanged_open;
@@ -516,9 +521,10 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
         } else {
             None
         };
+        // Live workflows-1123 18 s20, 19 s5, 20 s3: the box ends at y 573 with two tabs or four (548 px tall).
         let body = v_flex()
             .w_full()
-            .min_h(px(340.))
+            .min_h(px(432.))
             .child(div().px(px(10.)).child(overall))
             .child(div().px(px(10.)).pt(px(14.)).pb(px(6.)).text_size(px(18.)).line_height(px(27.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Tabs"))
             .child(header)

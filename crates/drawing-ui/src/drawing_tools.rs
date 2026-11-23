@@ -882,12 +882,18 @@ impl DrawingEditor {
             }
             // A placed cutting line: hovering another snap point of the view
             // previews the jog through it (help drawing_section_view step 7).
-            Tool::Section { parent: Some(pid), line: Some((a, b)), partial: false, jogs, .. } => {
+            Tool::Section { parent: Some(pid), p0, line: Some((a, b)), partial: false, jogs } => {
                 if let (Some(q), Some(pl)) = (self.section_jog_at(*pid, c), self.placement(*pid)) {
                     let mut js = jogs.clone();
                     js.push(q);
                     let pts = noshape_scene::drawing_tools::jogged_line(*a, *b, &js);
                     overlay.lines.push((pts.iter().map(|p| pl.to_sheet(*p)).collect(), true));
+                }
+                // The pointer still in the parent: the picked point's dot (qa wf23-08 step 3).
+                if self.section_in_parent()
+                    && let (Some(p0), Some(pl)) = (p0, self.placement(*pid))
+                {
+                    overlay.marks.push((pl.to_sheet(*p0), crate::drawing_scene::SnapMark::Disc, 0.0));
                 }
             }
             // Vertical / horizontal section: once a view is picked the cutting line follows the pointer 1:1 across it,

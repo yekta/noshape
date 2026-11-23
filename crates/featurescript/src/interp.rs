@@ -475,12 +475,13 @@ impl Interp {
         e
     }
 
-    /// Raise `value` with `notice` as the notice text.
+    /// Raise `value` with `notice` as the notice text: an information notice, as live's "Runtime information" for a
+    /// thrown value and "Modeling information" for a native's error (behaviours.md fs part 3).
     pub fn raise_noted(&mut self, value: Value, notice: String) -> Box<Exception> {
         let value = value.materialized();
         let e = Box::new(Exception { value, module: self.module.clone(), pos: self.pos, trace: self.frames.clone(), internal: false });
         if self.silent == 0 && self.notices.len() < MAX_NOTICES {
-            self.notices.push(Notice { kind: NoticeKind::Error, message: notice, module: e.module.clone(), pos: e.pos, trace: e.trace.clone() });
+            self.notices.push(Notice { kind: NoticeKind::Info, message: notice, module: e.module.clone(), pos: e.pos, trace: e.trace.clone() });
         }
         e
     }
