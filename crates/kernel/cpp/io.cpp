@@ -216,35 +216,69 @@ struct Leaf
   Quantity_Color color;
   // Faces with their own colour (TopExp::MapShapes order).
   std::vector<std::pair<int, Quantity_Color>> faceColors;
+  // Solids with their own colour (TopExp_Explorer order): their parts' colours.
+  std::vector<std::pair<int, Quantity_Color>> solidColors;
 };
 
-// The faces of `s` (TopExp::MapShapes order) with a colour of their own,
-// from its label's sub-shape labels. (Looking each face up by shape searched
-// the whole document: quadratic in the parts, 2.9 s of 4.3 s for 2000.)
-std::vector<std::pair<int, Quantity_Color>> face_colors(const occ::handle<XCAFDoc_ColorTool>& ct, const TDF_Label& ref,
-                                                        const TopoDS_Shape& s)
+// The faces and solids of `s` with a colour of their own, from its label's sub-shape labels. A solid's colour (on
+// the solid or its shell: a STEP MANIFOLD_SOLID_BREP's style) is its part's, never its faces' (live: a part
+// appearance; Mac-mini-2024.step's two solids under one product had every face coloured, so a part appearance set
+// later changed nothing, psui P0 11-23); a face's own style is its face appearance. (Looking each face up by shape
+// searched the whole document: quadratic in the parts, 2.9 s of 4.3 s for 2000.)
+void sub_colors(const occ::handle<XCAFDoc_ColorTool>& ct, const TDF_Label& ref, const TopoDS_Shape& s, Leaf& leaf)
 {
   ShapeIMap faces;
   TopExp::MapShapes(s, TopAbs_FACE, faces);
+  std::vector<TopoDS_Shape> solid_order;
+  for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
+    solid_order.push_back(e.Current());
+  // A shell's solid (its colour is the solid's).
+  ShapeAncMap shell_solids;
+  TopExp::MapShapesAndAncestors(s, TopAbs_SHELL, TopAbs_SOLID, shell_solids);
   NCollection_Sequence<TDF_Label> subs;
   XCAFDoc_ShapeTool::GetSubShapes(ref, subs);
-  std::vector<std::pair<int, Quantity_Color>> found;
+  std::vector<std::pair<int, Quantity_Color>> found, solid_found;
+  const auto solid_index = [&](const TopoDS_Shape& so) {
+    for (size_t k = 0; k < solid_order.size(); ++k)
+      if (solid_order[k].IsSame(so))
+        return (int)k;
+    return -1;
+  };
   for (int k = 1; k <= subs.Length(); ++k)
   {
     Quantity_Color fc;
     if (!(ct->GetColor(subs(k), XCAFDoc_ColorSurf, fc) || ct->GetColor(subs(k), XCAFDoc_ColorGen, fc)))
       continue;
-    // A sub-shape label holds one face or several (a shell, a compound).
-    for (TopExp_Explorer e(XCAFDoc_ShapeTool::GetShape(subs(k)), TopAbs_FACE); e.More(); e.Next())
+    const TopoDS_Shape sub = XCAFDoc_ShapeTool::GetShape(subs(k));
+    std::vector<int>   of_solids;
+    for (TopExp_Explorer e(sub, TopAbs_SOLID); e.More(); e.Next())
+      of_solids.push_back(solid_index(e.Current()));
+    if (sub.ShapeType() == TopAbs_SHELL && shell_solids.Contains(sub))
+      for (NCollection_List<TopoDS_Shape>::Iterator it(shell_solids.FindFromKey(sub)); it.More(); it.Next())
+        of_solids.push_back(solid_index(it.Value()));
+    if (!of_solids.empty())
+    {
+      for (int so : of_solids)
+        if (so >= 0)
+          solid_found.emplace_back(so, fc);
+      continue;
+    }
+    // A sub-shape label holds one face or several (a compound of faces, a sheet's shell).
+    for (TopExp_Explorer e(sub, TopAbs_FACE); e.More(); e.Next())
     {
       const int i = faces.FindIndex(e.Current());
       if (i > 0)
         found.emplace_back(i - 1, fc);
     }
   }
-  std::stable_sort(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
-  found.erase(std::unique(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first == y.first; }), found.end());
-  return found;
+  const auto first_each = [](std::vector<std::pair<int, Quantity_Color>>& v) {
+    std::stable_sort(v.begin(), v.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    v.erase(std::unique(v.begin(), v.end(), [](const auto& x, const auto& y) { return x.first == y.first; }), v.end());
+  };
+  first_each(found);
+  first_each(solid_found);
+  leaf.faceColors  = std::move(found);
+  leaf.solidColors = std::move(solid_found);
 }
 
 void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc_ColorTool>& ct,
@@ -302,7 +336,7 @@ void collect(const occ::handle<XCAFDoc_ShapeTool>& st, const occ::handle<XCAFDoc
   leaf.color    = c;
   // Face colours sit on the prototype's sub-shape labels; a placed copy
   // keeps their order.
-  leaf.faceColors = face_colors(ct, ref, s);
+  sub_colors(ct, ref, s, leaf);
   out.push_back(leaf);
 }
 
@@ -827,6 +861,15 @@ StepImport read_step(rust::Str path)
           out.face_colors.push_back((float)fg);
           out.face_colors.push_back((float)fb);
         }
+        for (const auto& [solid, sc] : l.solidColors)
+        {
+          double sr, sg, sb;
+          sc.Values(sr, sg, sb, Quantity_TOC_sRGB);
+          out.solid_color_part.push_back((uint32_t)(out.names.size() - 1));
+          out.solid_color_index.push_back((uint32_t)solid);
+          for (const double v : {sr, sg, sb})
+            out.solid_colors.push_back((float)v);
+        }
       }
       // Each solid's own name and body (MANIFOLD_SOLID_BREP), by its transferred shape: a split solid's pieces are
       // named "<part>__<solid>" (live2 q-step-twopiece).
@@ -995,7 +1038,7 @@ void walk_tree(TreeWalk& w, const TDF_Label& label, const TopLoc_Location& loc,
     }
     leaf.hasColor   = hasColor;
     leaf.color      = c;
-    leaf.faceColors = face_colors(w.ct, ref, s);
+    sub_colors(w.ct, ref, s, leaf);
     w.protos.push_back(ref);
     w.parts.push_back(leaf);
   }
@@ -1088,6 +1131,15 @@ StepTree read_step_tree(rust::Str path)
       out.parts.face_colors.push_back((float)fr);
       out.parts.face_colors.push_back((float)fg);
       out.parts.face_colors.push_back((float)fb);
+    }
+    for (const auto& [solid, sc] : l.solidColors)
+    {
+      double sr, sg, sb;
+      sc.Values(sr, sg, sb, Quantity_TOC_sRGB);
+      out.parts.solid_color_part.push_back((uint32_t)(out.parts.names.size() - 1));
+      out.parts.solid_color_index.push_back((uint32_t)solid);
+      for (const double v : {sr, sg, sb})
+        out.parts.solid_colors.push_back((float)v);
     }
   }
   out.instances = std::move(w.instances);
@@ -2034,7 +2086,7 @@ StepTree read_iges_tree(rust::Str path)
       // Else its solid's (an IGES solid points to its colour definition).
       for (TopExp_Explorer ex(leaf.shape, TopAbs_SOLID); ex.More() && !leaf.hasColor; ex.Next())
         leaf.hasColor = ct->GetColor(ex.Current(), XCAFDoc_ColorGen, leaf.color) || ct->GetColor(ex.Current(), XCAFDoc_ColorSurf, leaf.color);
-      leaf.faceColors = face_colors(ct, roots(i), leaf.shape);
+      sub_colors(ct, roots(i), leaf.shape, leaf);
     }
     const gp_Trsf t = s.Location().Transformation();
     PvzInstance   inst;
@@ -2087,6 +2139,15 @@ StepTree read_iges_tree(rust::Str path)
       out.parts.face_colors.push_back((float)fr);
       out.parts.face_colors.push_back((float)fg);
       out.parts.face_colors.push_back((float)fb);
+    }
+    for (const auto& [solid, sc] : l.solidColors)
+    {
+      double sr, sg, sb;
+      sc.Values(sr, sg, sb, Quantity_TOC_sRGB);
+      out.parts.solid_color_part.push_back((uint32_t)(out.parts.names.size() - 1));
+      out.parts.solid_color_index.push_back((uint32_t)solid);
+      for (const double v : {sr, sg, sb})
+        out.parts.solid_colors.push_back((float)v);
     }
   }
   app->Close(doc);

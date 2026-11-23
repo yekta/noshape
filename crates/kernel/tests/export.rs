@@ -1577,9 +1577,69 @@ fn dump_step_pmi() {
 #[ignore = "debug aid"]
 fn dump_step_colours() {
     let Some(p) = std::env::var_os("NOSHAPE_STEP_READ") else { return };
-    for s in read_step(std::path::Path::new(&p), LengthUnit::Meter).unwrap() {
-        println!("part {:?} colour {:?} face colours {:?}", s.name, s.color, s.face_colors);
+    for s in split_connected_pieces(read_step(std::path::Path::new(&p), LengthUnit::Meter).unwrap()) {
+        println!("part {:?} colour {:?} {} faces, {} face colours", s.name, s.color, s.shape.count(ShapeType::Face), s.face_colors.len());
     }
+}
+
+/// One STEP product of two solids, each styled its own colour, and one face of the first styled again (psui's Mac
+/// mini: the solid's style landed on every face): each solid is a part in its solid's colour, and only the styled face
+/// has a face colour.
+#[test]
+fn step_solid_colours_are_part_colours_and_face_styles_stay_on_their_face() {
+    let dir = std::env::temp_dir().join(format!("noshape-step-solid-colours-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("pair.step");
+    let a = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
+    let b = make_box_corners(DVec3::new(0.05, 0.0, 0.0), DVec3::new(0.07, 0.02, 0.02)).unwrap();
+    write_step(&path, &[ExportShape { shape: Shape::compound(&[a, b]), name: Some("Pair".into()), color: None }], LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let entity = |line: &str| line.trim().strip_prefix('#').and_then(|l| l.split_once('=')).map(|(id, rest)| (id.trim().parse::<usize>().unwrap(), rest.trim().to_string()));
+    let entities: Vec<(usize, String)> = text.split(';').map(|e| e.split_whitespace().collect::<Vec<_>>().join(" ")).filter_map(|e| entity(&e)).collect();
+    let refs = |body: &str| body.split('#').skip(1).map(|r| r.chars().take_while(char::is_ascii_digit).collect::<String>().parse::<usize>().unwrap()).collect::<Vec<_>>();
+    let body_of = |id: usize| entities.iter().find(|(i, _)| *i == id).map(|(_, b)| b.clone()).unwrap();
+    let solids: Vec<usize> = entities.iter().filter(|(_, b)| b.starts_with("MANIFOLD_SOLID_BREP")).map(|(i, _)| *i).collect();
+    assert_eq!(solids.len(), 2, "{text}");
+    let first_face = refs(&body_of(refs(&body_of(solids[0]))[0]))[0];
+    assert!(body_of(first_face).starts_with("ADVANCED_FACE"));
+    let context = entities.iter().find(|(_, b)| b.contains("GEOMETRIC_REPRESENTATION_CONTEXT(3)")).map(|(i, _)| *i).unwrap();
+    let mut next = entities.iter().map(|(i, _)| *i).max().unwrap() + 1;
+    let mut added = String::new();
+    let mut styled = Vec::new();
+    for (item, rgb) in [(solids[0], "1.,0.,0."), (solids[1], "0.,0.,1."), (first_face, "0.,1.,0.")] {
+        let n = next;
+        added += &format!("#{}=COLOUR_RGB('',{rgb});\n#{}=FILL_AREA_STYLE_COLOUR('',#{});\n#{}=FILL_AREA_STYLE('',(#{}));\n", n, n + 1, n, n + 2, n + 1);
+        added += &format!("#{}=SURFACE_STYLE_FILL_AREA(#{});\n#{}=SURFACE_SIDE_STYLE('',(#{}));\n", n + 3, n + 2, n + 4, n + 3);
+        added += &format!("#{}=SURFACE_STYLE_USAGE(.BOTH.,#{});\n#{}=PRESENTATION_STYLE_ASSIGNMENT((#{}));\n", n + 5, n + 4, n + 6, n + 5);
+        added += &format!("#{}=STYLED_ITEM('color',(#{}),#{item});\n", n + 7, n + 6);
+        styled.push(format!("#{}", n + 7));
+        next += 8;
+    }
+    added += &format!("#{next}=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',({}),#{context});\n", styled.join(","));
+    // The solids named as a CAD system does (one product, two named bodies).
+    let rename = |l: &str| {
+        let Some(name) = entity(l).and_then(|(id, _)| [(solids[0], "Cube"), (solids[1], "Block")].into_iter().find(|(s, _)| *s == id)).map(|(_, n)| n) else { return l.to_string() };
+        let open = l.find("MANIFOLD_SOLID_BREP('").unwrap() + "MANIFOLD_SOLID_BREP('".len();
+        let close = open + l[open..].find('\'').unwrap();
+        format!("{}{name}{}", &l[..open], &l[close..])
+    };
+    let text = text.lines().map(rename).collect::<Vec<_>>().join("\n");
+    let end = text.rfind("ENDSEC;").unwrap();
+    std::fs::write(&path, format!("{}{added}{}\n", &text[..end], &text[end..])).unwrap();
+    let parts = split_connected_pieces(read_step(&path, LengthUnit::Meter).unwrap());
+    assert_eq!(parts.len(), 2, "{:?}", parts.iter().map(|p| (&p.name, p.color, p.face_colors.len())).collect::<Vec<_>>());
+    let near = |c: Option<[f32; 3]>, want: [f32; 3]| c.is_some_and(|c| c.iter().zip(want).all(|(x, y)| (x - y).abs() < 0.01));
+    let red = parts.iter().find(|p| near(p.color, [1.0, 0.0, 0.0])).expect("the red solid's part");
+    let blue = parts.iter().find(|p| near(p.color, [0.0, 0.0, 1.0])).expect("the blue solid's part");
+    assert_eq!(red.face_colors.len(), 1, "{:?}", red.face_colors);
+    assert!(near(Some(red.face_colors[0].1), [0.0, 1.0, 0.0]));
+    assert!(blue.face_colors.is_empty(), "{:?}", blue.face_colors);
+    // Live names a body's solids' parts after them (Mac-mini-2024.step: "Main" and "Fan" of product "root").
+    assert_eq!((red.name.as_deref(), blue.name.as_deref()), (Some("Cube"), Some("Block")));
+    // Each part is its solid: the cube of 10 mm and the block of 20 mm.
+    assert!((volume_properties(&red.shape).unwrap().mass - 1e-6).abs() < 1e-9);
+    assert!((volume_properties(&blue.shape).unwrap().mass - 8e-6).abs() < 1e-9);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// NIST's cap screw, healed on import, written to STEP and read back: each
