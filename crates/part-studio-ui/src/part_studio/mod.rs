@@ -401,6 +401,8 @@ pub struct PartStudioView {
     compare_gfx: crate::compare_graphics::CompareGraphics,
     /// Compare just opened: its zoom to fit is due, refitted while the viewport's size (the size fitted at) settles.
     compare_fit: Option<glam::DVec2>,
+    /// The camera from before Compare opened: back to it when Compare ends (qa HIST-COMPARE-EXIT-CAMERA).
+    before_compare: Option<noshape_render::Camera>,
     /// Versions and history › View in repair: the Repair panel's graphics while it is open.
     repair_view: Option<Entity<repair_view::RepairView>>,
     pub viewport: Entity<Viewport>,
@@ -609,6 +611,7 @@ impl PartStudioView {
             gpu,
             compare_gfx: Default::default(),
             compare_fit: None,
+            before_compare: None,
             repair_view: None,
             viewport,
             display: Arc::new(StudioDisplay::defaults()),
@@ -7654,6 +7657,10 @@ impl Render for PartStudioView {
         if self.compare_gfx.changed(&self.doc, cx) {
             if !comparing && self.compare_gfx.comparing() {
                 self.compare_fit = Some(glam::DVec2::ZERO);
+                self.before_compare = Some(self.viewport.read(cx).camera);
+            } else if comparing && !self.compare_gfx.comparing() && let Some(cam) = self.before_compare.take() {
+                self.compare_fit = None;
+                self.viewport.update(cx, |vp, cx| vp.animate_to(cam, cx));
             }
             self.refresh_scene(false, cx);
         }

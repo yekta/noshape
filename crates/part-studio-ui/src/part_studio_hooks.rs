@@ -233,6 +233,8 @@ thread_local! {
     pub static TEST_COMPARE: std::cell::Cell<Option<f32>> = const { std::cell::Cell::new(None) };
     /// Tests: the features Compare's panel was told to select, in order.
     pub static TEST_COMPARE_SELECTED: std::cell::RefCell<Vec<Option<FeatureId>>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// Tests: the compared documents (base, target).
+    pub static TEST_COMPARE_SIDES: std::cell::RefCell<Option<(Arc<Document>, Arc<Document>)>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Inert hooks for UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"): nothing above the Part
@@ -260,7 +262,7 @@ pub fn register_for_tests() {
         variable_panel_footer: |_, _, _| div().into_any_element(),
         variable_type_cell: |_, _, _, _| div(),
         compare_blend: |_, _| TEST_COMPARE.with(|c| c.get()),
-        compare_documents: |_, _| None,
+        compare_documents: |_, _| TEST_COMPARE_SIDES.with(|c| c.borrow().clone()).map(|(b, t)| (b, ConfigValues::default(), t, ConfigValues::default())),
         compare_panel: |_, _, _| None,
         compare_slider: |_, _| None,
         compare_select: |_, f, _| TEST_COMPARE_SELECTED.with(|c| c.borrow_mut().push(f)),

@@ -3143,7 +3143,7 @@ fn synchronized_breaks_come_from_the_parent() {
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let pl = |b: &super::build::BuiltSheet| b.placements.iter().find(|p| p.id == child).unwrap().nbreaks;
     assert_eq!(pl(&built), 0, "not synchronized: none");
-    drawing.sheets[0].view_mut(child).unwrap().sync_breaks = true;
+    drawing.sheets[0].view_mut(child).unwrap().sync_breaks = Some(true);
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let p = built.placements.iter().find(|p| p.id == child).unwrap();
     assert_eq!(p.nbreaks, 1, "the vertical break only");
@@ -3156,6 +3156,10 @@ fn synchronized_breaks_come_from_the_parent() {
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let p = built.placements.iter().find(|p| p.id == id).unwrap();
     assert!(p.breaks().iter().any(|b| b.inherited && b.axis == 0 && (b.b - b.a - 0.02).abs() < 1e-9), "{:?}", p.breaks());
+    // Unticked (qa workflow 08 s16: the section's row is ticked at first): whole again.
+    drawing.sheets[0].view_mut(id).unwrap().sync_breaks = Some(false);
+    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    assert_eq!(built.placements.iter().find(|p| p.id == id).unwrap().nbreaks, 0, "an unsynchronized section: no breaks");
 }
 
 /// GD&T leaders take nodes like a note's (help A5) and publish their

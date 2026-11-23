@@ -2037,6 +2037,45 @@ fn a_placed_bom_tables_corner_snaps_to_the_frames_corner_within_10_px(cx: &mut T
     }
 }
 
+/// qa DRW-TABLE-PREVIEW-UNDER-PANEL (workflow 10 s3-5): placing a BOM table, live draws nothing while the pointer is on
+/// the table's panel; back over the sheet the table follows it again.
+#[gpui::test]
+fn a_bom_table_being_placed_is_not_drawn_while_the_pointer_is_on_its_panel(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-bom-under-panel");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.sources.values_mut().for_each(|s| s.assembly = true);
+            e.tool = Tool::Table { kind: noshape_scene::drawing_tools::TableTool::Bom, view: None, origin: None };
+            e.sync_table_dlg();
+        })
+    });
+    draw(cx, window);
+    let shown = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let tables = |d: &noshape_model::drawing::Drawing| d.sheets.get(e.sheet).map_or(0, |s| s.tables.len());
+            (e.preview.as_ref().map_or(0, tables) > tables(&e.drawing), e.infer_lines.len())
+        })
+    };
+    let sheet = cx.update(|cx| {
+        let [x0, y0, x1, y1] = editor.read(cx).current_sheet().size.frame_rect();
+        [x0 + (x1 - x0) * 0.6, y0 + (y1 - y0) * 0.5]
+    });
+    let on_sheet = at_window(cx, &editor, sheet);
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(on_sheet, None, Modifiers::default());
+    draw(cx, window);
+    assert!(shown(cx).0, "over the sheet the table follows the pointer");
+    let panel = VisualTestContext::from_window(window, cx).debug_bounds("dr-table-dlg").expect("the table panel");
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(panel.center(), None, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(shown(cx), (false, 0), "on the panel: no table, no guide");
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(on_sheet, None, Modifiers::default());
+    draw(cx, window);
+    assert!(shown(cx).0, "back over the sheet it follows again");
+}
+
 /// Live2 place-1118: Crop view (Spline): the profile being drawn is black and open through the points to the pointer,
 /// with a red ✕ and a pink inference line while the pointer is in line with the first point; it closes onto the first point at 5 and 3 px, not at 8,
 /// and a click there ends it.
@@ -4168,6 +4207,81 @@ fn a_dragged_leader_end_lights_the_edge_it_lands_on(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "the note stays selected");
 }
 
+/// Live viewprops-scale-enter-1123: Enter in View properties' Scale redraws the view and the views following its scale
+/// at once, the field reads "2:1", Scale label ticks itself and the view stays selected; the drawing changes only at
+/// ✓. On a detail typed 1:1 Scale label unticks itself, and ✕ undoes the Enter.
+#[gpui::test]
+fn enter_in_view_properties_scale_previews_until_ok(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{ViewKind, sheet::format_scale, views::view_scale};
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let front = g["views"].as_array().and_then(|v| v.iter().find(|v| v["orientation"] == "front").cloned()).expect("Front");
+        call(ctx, "drawing_detail_view", json!({ "drawing": dw, "parent": front["id"], "center": [0, 0], "radius": 8, "position": [300, 200] }));
+    }));
+    let (window, editor) = drawing(cx, "feel-viewprops-scale-enter");
+    let (front, children, detail) = cx.update(|cx| {
+        let sh = editor.read(cx).current_sheet();
+        let detail = sh.views.iter().find(|v| matches!(v.kind, ViewKind::Detail { .. })).map(|v| v.id).expect("the detail");
+        let front = sh.parent_of(detail).expect("the detail's parent");
+        let children: Vec<_> = sh.views.iter().filter(|v| matches!(v.kind, ViewKind::Projected { .. }) && sh.parent_of(v.id) == Some(front)).map(|v| v.id).collect();
+        (front, children, detail)
+    });
+    assert!(!children.is_empty(), "the Front view has projected children");
+    let enter = |cx: &mut TestAppContext, view, text: &str| {
+        cx.update_window(window, |_, w, cx| {
+            editor.update(cx, |e, cx| {
+                e.selection = vec![Sel::View(view)];
+                e.open_view_props(view, w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let field = cx.update(|cx| editor.read(cx).view_props.as_ref().map(|p| p.scale_state().0)).expect("View properties");
+        cx.update_window(window, |_, w, cx| w.focus(&field.focus_handle(cx), cx)).unwrap();
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_keystrokes("secondary-a");
+        v.simulate_input(text);
+        v.simulate_keystrokes("enter");
+        draw(cx, window);
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            let (f, label) = e.view_props.as_ref().map(|p| p.scale_state()).expect("the dialog stays open");
+            (f.read(cx).value().to_string(), label, e.selection.clone())
+        })
+    };
+    let shown = |cx: &mut TestAppContext, preview: bool, v| cx.update(|cx| {
+        let e = editor.read(cx);
+        let d = if preview { e.preview.as_ref().expect("Enter's preview") } else { &e.drawing };
+        let sh = &d.sheets[e.sheet];
+        (view_scale(sh, v), sh.view(v).expect("the view").scale_label_shown())
+    });
+    // Twice the sheet's scale (the suggested views' sheet scale follows the part), then the sheet's own.
+    let sheet = cx.update(|cx| editor.read(cx).current_sheet().scale);
+    let (twice, own) = (format_scale(sheet * 2.0), format_scale(sheet));
+    let before = shown(cx, false, front).0;
+    assert_eq!(enter(cx, front, &twice), (twice.clone(), true, vec![Sel::View(front)]), "N:N, Scale label ticked, still selected");
+    assert!((shown(cx, true, front).0 - sheet * 2.0).abs() < 1e-9, "redrawn at twice the scale at once");
+    let at = |x: (f64, bool), scale: f64, label: bool| (x.0 - scale).abs() < 1e-9 && x.1 == label;
+    assert!(children.iter().all(|c| at(shown(cx, true, *c), sheet * 2.0, true)), "its projected children follow, labelled");
+    assert_eq!(shown(cx, false, front).0, before, "the drawing unchanged until ✓");
+    cx.update(|cx| editor.update(cx, |e, cx| e.apply_view_props(cx)));
+    draw(cx, window);
+    assert!(at(shown(cx, false, front), sheet * 2.0, true), "✓ keeps it");
+    assert!(children.iter().all(|c| at(shown(cx, false, *c), sheet * 2.0, true)));
+    assert!(cx.update(|cx| editor.read(cx).selection.is_empty() && editor.read(cx).preview.is_none()), "✓ deselects");
+    let kept = shown(cx, false, detail);
+    assert!(kept.1, "the detail shows its scale");
+    assert_eq!(enter(cx, detail, &own), (own.clone(), false, vec![Sel::View(detail)]), "at the sheet's scale Scale label unticks itself");
+    assert!(at(shown(cx, true, detail), sheet, false));
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.drop_view_props(cx);
+    }));
+    draw(cx, window);
+    assert!(cx.update(|cx| editor.read(cx).preview.is_none()), "✕ undoes the Enter");
+    assert_eq!(shown(cx, false, detail), kept);
+}
+
 /// qa DRW-SECTION-DETAIL-VIEW-PROPS-ROWS (live workflows-1123 08 s16, 09 s11): a section's View properties open on
 /// Scale with "1:1 (Parent)" selected, Name "Section"; a Connected detail's Name "Detail" with View label clear (only
 /// its scale is drawn); neither has a View orientation row.
@@ -4212,4 +4326,24 @@ fn section_and_detail_view_properties_open_as_live(cx: &mut TestAppContext) {
     assert!(focused && !first, "Scale focused, not the first select");
     assert!(value.ends_with("(Parent)"), "the parent's scale: {value}");
     assert_eq!(selected, value, "its text selected");
+    assert!(cx.update(|cx| editor.read(cx).view_props.as_ref().is_some_and(|p| p.sync_breaks)), "Synchronize breaks from parent ticked");
+    // Focus elsewhere, then back into Scale (a click): all of it selected again.
+    cx.update_window(window, |_, w, cx| {
+        let first = editor.read(cx).first_field.clone();
+        w.focus(&first, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        let s = editor.read(cx).view_props.as_ref().and_then(|p| p.scale_first()).expect("Scale");
+        let scale = s.read(cx).focus_handle(cx);
+        w.focus(&scale, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let (value, selected) = cx.update(|cx| {
+        let st = editor.read(cx).view_props.as_ref().and_then(|p| p.scale_first()).expect("Scale").read(cx);
+        (st.value().to_string(), st.selected_value().to_string())
+    });
+    assert_eq!(selected, value, "a click in Scale selects all of it");
 }

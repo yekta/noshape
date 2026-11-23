@@ -53,7 +53,7 @@ impl DrawingEditor {
         // Live (request 1566, qa DWG-PANEL-ESC-STACK): starting a tool closes
         // View properties first, its pending edits discarded.
         if !matches!(tool, Tool::Select) {
-            self.view_props = None;
+            self.drop_view_props(cx);
         }
         self.woken_points.clear();
         self.woken_plus.clear();
@@ -212,7 +212,7 @@ impl DrawingEditor {
         }
         // View properties: one Esc closes it as a cancel (live request 1566), the view no longer selected (live
         // drw-view-properties).
-        if self.view_props.take().is_some() {
+        if self.drop_view_props(cx) {
             self.selection.clear();
             self.redraw(cx);
             return;
@@ -990,7 +990,9 @@ impl DrawingEditor {
                 s.annotations.push(a);
             }
             preview = Some(d);
-        } else if let Some(t) = self.hole_table_preview().or_else(|| self.table_dlg_preview()) {
+        // A table follows the pointer only over the sheet: live draws nothing while it is on the table's panel (qa
+        // DRW-TABLE-PREVIEW-UNDER-PANEL).
+        } else if let Some(t) = (!self.pointer_off).then(|| self.hole_table_preview().or_else(|| self.table_dlg_preview())).flatten() {
             let mut d = self.drawing.clone();
             if let Some(s) = d.sheets.get_mut(self.sheet) {
                 s.tables.push(t);
@@ -1000,7 +1002,7 @@ impl DrawingEditor {
             preview = base;
         }
         // Edit detail / Edit section: the edited view as the dialog has it.
-        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()).or_else(|| self.break_preview()) {
+        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()).or_else(|| self.break_preview()).or_else(|| self.view_props_preview()) {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());

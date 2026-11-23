@@ -515,11 +515,11 @@ pub struct DrawingView {
     /// the view are drawn red.
     #[serde(skip)]
     pub cut_lost: bool,
-    /// View properties › Synchronize breaks from parent (projected views;
-    /// live request 1630): the view shows its parent's breaks, which only
-    /// the parent edits.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub sync_breaks: bool,
+    /// View properties › Synchronize breaks from parent (projected views, live request 1630; section views, ticked
+    /// at first: qa workflow 08 s16): the view shows its parent's breaks, which only the parent edits. None: the
+    /// kind's default (`syncs_breaks`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sync_breaks: Option<bool>,
     /// Section views: "Show cut geometry only" (just the cut faces).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub cut_only: bool,
@@ -757,6 +757,15 @@ impl DrawingView {
     }
 
     /// View properties › View label: the label is drawn.
+    /// Synchronize breaks from parent: a projected view when ticked, a section view unless unticked.
+    pub fn syncs_breaks(&self) -> bool {
+        match self.kind {
+            ViewKind::Section { .. } => self.sync_breaks != Some(false),
+            ViewKind::Projected { .. } => self.sync_breaks == Some(true),
+            _ => false,
+        }
+    }
+
     pub fn view_label_shown(&self) -> bool {
         if self.auto_label() { !self.hide_label } else { self.label.as_ref().is_some_and(|l| !l.is_empty()) }
     }
@@ -861,7 +870,7 @@ impl Default for DrawingView {
             partial: false,
             cut_anchor: None,
             cut_lost: false,
-            sync_breaks: false,
+            sync_breaks: None,
             cut_only: false,
             section_depth: None,
             flip: false,

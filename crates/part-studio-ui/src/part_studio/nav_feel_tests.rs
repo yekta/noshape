@@ -511,8 +511,33 @@ fn the_navigation_matrix_matches_live(cx: &mut TestAppContext) {
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
 
+/// qa HIST-REVERSE-COMPARE-BAND (workflow 20 s21): Reverse compare swaps the sides and the graphics follow (ours kept
+/// drawing the old sides: only the blend and the selected row were watched).
+#[gpui::test]
+fn reverse_compare_draws_the_swapped_sides(cx: &mut TestAppContext) {
+    use crate::part_studio_hooks::{TEST_COMPARE, TEST_COMPARE_SIDES};
+    let nav = Nav::open(cx, "compare-reverse", 1.0);
+    let doc = cx.update(|cx| nav.view.read(cx).doc.read(cx).session.doc.clone());
+    let (a, b) = (std::sync::Arc::new(doc.clone()), std::sync::Arc::new(doc));
+    let ptr = |d: &std::sync::Arc<noshape_model::document::Document>| std::sync::Arc::as_ptr(d) as usize;
+    TEST_COMPARE_SIDES.with(|c| *c.borrow_mut() = Some((a.clone(), b.clone())));
+    TEST_COMPARE.with(|c| c.set(Some(0.5)));
+    draw(cx, nav.window);
+    nav.settle(cx);
+    let first = cx.update(|cx| nav.view.read(cx).compare_gfx.sides());
+    TEST_COMPARE_SIDES.with(|c| *c.borrow_mut() = Some((b.clone(), a.clone())));
+    draw(cx, nav.window);
+    nav.settle(cx);
+    let reversed = cx.update(|cx| nav.view.read(cx).compare_gfx.sides());
+    TEST_COMPARE.with(|c| c.set(None));
+    TEST_COMPARE_SIDES.with(|c| *c.borrow_mut() = None);
+    assert_eq!(first, Some((ptr(&a), ptr(&b))), "the compared sides drawn");
+    assert_eq!(reversed, Some((ptr(&b), ptr(&a))), "reversed: the swapped sides drawn");
+}
+
 /// Live ver-compare-hover-part 3: Versions and history › Compare zooms to fit the parts (0.25 -> 0.0475 mm/px on the
-/// 40 mm block, centred on it; no planes); the compare slider moving later leaves the camera alone.
+/// 40 mm block, centred on it; no planes); the compare slider moving later leaves the camera alone; Compare ended, the
+/// camera goes back.
 #[gpui::test]
 fn compare_zooms_to_fit_the_parts(cx: &mut TestAppContext) {
     let nav = Nav::open(cx, "compare-fit", 1.0);
@@ -530,4 +555,9 @@ fn compare_zooms_to_fit_the_parts(cx: &mut TestAppContext) {
     let slid = nav.cam(cx);
     crate::part_studio_hooks::TEST_COMPARE.with(|c| c.set(None));
     assert_eq!((slid.target, slid.distance), (after.target, after.distance), "the slider doesn't refit");
+    // qa HIST-COMPARE-EXIT-CAMERA (workflow 20 s23): Compare ended, back to the camera from before it.
+    draw(cx, nav.window);
+    nav.settle(cx);
+    let back = nav.cam(cx);
+    assert!((back.target - before.target).length() < 1e-9 && (back.distance - before.distance).abs() < 1e-9, "the camera from before Compare: {:?} / {}", back.target, back.distance);
 }

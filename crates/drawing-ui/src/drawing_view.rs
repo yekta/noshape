@@ -2435,7 +2435,12 @@ impl DrawingEditor {
             return;
         }
         cx.stop_propagation();
-        self.pointer_off = true;
+        let was_on = !std::mem::replace(&mut self.pointer_off, true);
+        // A table being placed is drawn only over the sheet (qa DRW-TABLE-PREVIEW-UNDER-PANEL).
+        if was_on && self.placing_table() {
+            self.infer_lines.clear();
+            self.update_preview(cx);
+        }
         if self.hover.take().is_some() {
             self.redraw(cx);
         }

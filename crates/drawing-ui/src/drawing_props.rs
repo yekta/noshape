@@ -95,8 +95,8 @@ pub struct ViewProps {
     unaligned: bool,
     /// Apply parent view section cut (projected views of section views).
     parent_cut: bool,
-    /// Synchronize breaks from parent (projected views).
-    sync_breaks: bool,
+    /// Synchronize breaks from parent (projected and section views).
+    pub(crate) sync_breaks: bool,
     /// Show sketch appearances, Show annotations from model.
     sketch_appearances: bool,
     model_annotations: bool,
@@ -126,12 +126,20 @@ pub struct ViewProps {
     /// Tangent edges / View simplification chosen in the panel.
     tangent_pick: bool,
     simp_pick: bool,
+    /// Enter in Scale: the drawing with the fields applied, shown until ✓ or ✕ (live viewprops-scale-enter-1123).
+    entered: Option<Drawing>,
 }
 
 impl ViewProps {
     /// The Scale field when the dialog opens on it: a section's or detail's (no View orientation row).
     pub(crate) fn scale_first(&self) -> Option<Entity<InputState>> {
         (self.orientation.is_none() && self.affixes.is_some() && self.multi.is_none()).then(|| self.scale_input.clone())
+    }
+
+    /// The Scale field and Scale label.
+    #[cfg(test)]
+    pub(crate) fn scale_state(&self) -> (Entity<InputState>, bool) {
+        (self.scale_input.clone(), self.scale_label)
     }
 }
 
@@ -576,6 +584,7 @@ impl DrawingEditor {
 
     pub fn open_view_props(&mut self, id: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(v) = self.current_sheet().view(id).cloned() else { return };
+        self.drop_view_props(cx);
         self.panel = None;
         // Rotation angle 0–360 (counter-clockwise).
         let deg = v.rotation.to_degrees().rem_euclid(360.0);
@@ -592,12 +601,11 @@ impl DrawingEditor {
             _ => v.label.clone().unwrap_or_default(),
         };
         let input = |text: String, window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
-        let scale_input = input(scale_text, window, cx);
-        // Enter in Scale keeps the dialog but the view's selection frame goes (live2 drw-view-properties-scale-typed).
-        cx.subscribe_in(&scale_input, window, |this, _, ev: &InputEvent, _, cx| {
+        // A click in Scale selects all of it (qa DRW-SCALE-CLICK-SELECTS, workflow 11 s15).
+        let scale_input = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false).default_value(scale_text));
+        cx.subscribe_in(&scale_input, window, |this, _, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. }) {
-                this.selection.clear();
-                this.redraw(cx);
+                this.enter_view_scale(window, cx);
             }
         })
         .detach();
@@ -615,7 +623,7 @@ impl DrawingEditor {
             rot_reverse: false,
             unaligned: v.unaligned,
             parent_cut: v.cut_from_section,
-            sync_breaks: v.sync_breaks,
+            sync_breaks: v.syncs_breaks(),
             sketch_appearances: v.sketch_appearances,
             model_annotations: v.model_annotations,
             tangent: TangentMode::of(&v),
@@ -638,6 +646,7 @@ impl DrawingEditor {
             multi: None,
             tangent_pick: false,
             simp_pick: false,
+            entered: None,
         });
         self.first_due = true;
         cx.notify();
@@ -746,7 +755,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn apply_view_props(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn apply_view_props(&mut self, cx: &mut Context<Self>) {
         let Some(p) = self.view_props.take() else { return };
         if let Some(m) = p.multi.clone() {
             return self.apply_view_props_multi(p, m, cx);
@@ -754,6 +763,26 @@ impl DrawingEditor {
         let id = p.view;
         // OK leaves nothing selected (live drw-views-props-mixed s5, -scale-typed, -synchronize-breaks).
         self.selection.clear();
+        let values = self.view_prop_values(&p, cx);
+        let mut d = p.entered.clone().unwrap_or_else(|| self.drawing.clone());
+        noshape_ops::drawing::apply_view_props(&self.doc.read(cx).session.doc, &mut d, self.sheet, id, &values);
+        if p.sheet != self.sheet {
+            // Live (behaviours "Views linked across sheets"): the view moves alone, linked to its parent.
+            match d.move_views_to_sheet_linked(self.sheet, &[id], p.sheet) {
+                Ok(_) => {
+                    self.commit("View properties", d, cx);
+                    self.switch_sheet(p.sheet, cx);
+                }
+                Err(e) => self.status = Some(e.into()),
+            }
+        } else {
+            self.commit("View properties", d, cx);
+        }
+        cx.notify();
+    }
+
+    /// The dialog's fields as the op takes them.
+    fn view_prop_values(&self, p: &ViewProps, cx: &App) -> noshape_ops::drawing::ViewPropValues {
         // Scale: "(Sheet)" / "(Parent)" keep the inherited scale; a typed N:N
         // or N/N sets the view's own.
         let typed = p.scale_input.read(cx).value().trim().to_string();
@@ -766,7 +795,7 @@ impl DrawingEditor {
         // Rotation angle: 0–360; the reverse button turns it clockwise.
         let rotation = p.rotation.read(cx).value().trim().trim_end_matches('°').parse::<f64>().ok().filter(|a| (0.0..=360.0).contains(a)).map(|a| if p.rot_reverse { -a } else { a });
         let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
-        let values = noshape_ops::drawing::ViewPropValues {
+        noshape_ops::drawing::ViewPropValues {
             orientation: p.orientation,
             named: p.named.clone(),
             scale,
@@ -789,22 +818,41 @@ impl DrawingEditor {
             prefix: p.affixes.as_ref().map(|a| a.0.read(cx).value().trim().to_string()).unwrap_or_default(),
             suffix: p.affixes.as_ref().map(|a| a.1.read(cx).value().trim().to_string()).unwrap_or_default(),
             scale_label: p.scale_label,
-        };
-        let mut d = self.drawing.clone();
-        noshape_ops::drawing::apply_view_props(&self.doc.read(cx).session.doc, &mut d, self.sheet, id, &values);
-        if p.sheet != self.sheet {
-            // Live (behaviours "Views linked across sheets"): the view moves alone, linked to its parent.
-            match d.move_views_to_sheet_linked(self.sheet, &[id], p.sheet) {
-                Ok(_) => {
-                    self.commit("View properties", d, cx);
-                    self.switch_sheet(p.sheet, cx);
-                }
-                Err(e) => self.status = Some(e.into()),
-            }
-        } else {
-            self.commit("View properties", d, cx);
         }
-        cx.notify();
+    }
+
+    /// Enter in Scale (live viewprops-scale-enter-1123): the view and the views following its scale are redrawn at
+    /// once, the field reads the scale as N:N and Scale label follows "scale ≠ sheet scale"; the view stays selected
+    /// and the drawing changes only at ✓.
+    fn enter_view_scale(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(p) = self.view_props.as_ref().filter(|p| p.multi.is_none()) else { return };
+        let (id, values) = (p.view, self.view_prop_values(p, cx));
+        let mut d = p.entered.clone().unwrap_or_else(|| self.drawing.clone());
+        noshape_ops::drawing::apply_view_props(&self.doc.read(cx).session.doc, &mut d, self.sheet, id, &values);
+        let Some(v) = d.sheets.get(self.sheet).and_then(|s| s.view(id)) else { return };
+        let shown = v.scale_label_shown();
+        let text = v.scale.map(|s| noshape_model::drawing::sheet::scale_text(s, v.scale_text.as_deref()));
+        let Some(p) = self.view_props.as_mut() else { return };
+        p.scale_label = shown;
+        if let Some(t) = text {
+            p.scale_input.update(cx, |s, cx| s.set_value(t, window, cx));
+        }
+        p.entered = Some(d);
+        self.update_preview(cx);
+    }
+
+    /// View properties closed unapplied: a scale previewed by Enter goes.
+    pub(crate) fn drop_view_props(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(p) = self.view_props.take() else { return false };
+        if p.entered.is_some() {
+            self.update_preview(cx);
+        }
+        true
+    }
+
+    /// Enter's drawing while View properties is open.
+    pub(crate) fn view_props_preview(&self) -> Option<Drawing> {
+        self.view_props.as_ref()?.entered.clone()
     }
 
     /// A child view on another sheet than its parent's (Move to sheet: linked to it).
@@ -1075,8 +1123,8 @@ impl DrawingEditor {
         if has_parent && multi.is_none() && !matches!(v.kind, ViewKind::Detail { .. }) {
             rows.push(check("vp-unaligned", "Suppress alignment with parent", props.unaligned || apart, |p, on| p.unaligned = on, cx));
         }
-        // Live request 1630: under Suppress alignment, projected views only.
-        if multi.is_none() && matches!(v.kind, ViewKind::Projected { .. }) {
+        // Live request 1630: under Suppress alignment, projected and section views (qa workflow 08 s16).
+        if multi.is_none() && matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Section { .. }) {
             rows.push(check("vp-sync-breaks", "Synchronize breaks from parent", props.sync_breaks, |p, on| p.sync_breaks = on, cx));
         }
         // Rotation angle (0–360) with the reverse-direction button: editable
@@ -1316,7 +1364,7 @@ impl DrawingEditor {
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
                     if e.keystroke.key == "escape" {
                         cx.stop_propagation();
-                        this.view_props = None;
+                        this.drop_view_props(cx);
                         this.selection.clear();
                         this.redraw(cx);
                     }
@@ -1341,8 +1389,10 @@ impl DrawingEditor {
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("View properties"))
                         .child(div().id("vp-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(gpui_kit::rgb(0x009500)).cursor_pointer().child(crate::drawing_chrome::ok_check(18.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_view_props(cx))))
                         .child(div().id("vp-cancel").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.view_props = None;
-                            cx.notify();
+                            // ✕ leaves nothing selected, an Enter's scale undone (live viewprops-scale-enter-1123).
+                            this.drop_view_props(cx);
+                            this.selection.clear();
+                            this.redraw(cx);
                         }))),
                 )
                 .child(v_flex().p(px(3.)).pb(px(6.)).children(rows))

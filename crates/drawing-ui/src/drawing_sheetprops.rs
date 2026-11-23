@@ -111,8 +111,11 @@ impl DrawingEditor {
     }
 
     pub fn open_sheet_props(&mut self, sheet: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(s) = self.drawing.sheets.get(sheet) else { return };
-        self.view_props = None;
+        if self.drawing.sheets.get(sheet).is_none() {
+            return;
+        }
+        self.drop_view_props(cx);
+        let s = &self.drawing.sheets[sheet];
         self.panel = None;
         let text = noshape_model::drawing::sheet::scale_text(s.scale, s.scale_text.as_deref());
         let (w, h) = s.size.size_mm();

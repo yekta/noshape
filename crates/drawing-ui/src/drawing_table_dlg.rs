@@ -701,6 +701,7 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-table-dlg")
+                .debug_selector(|| "dr-table-dlg".into())
                 .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
                     if e.keystroke.key == "escape" {
                         cx.stop_propagation();

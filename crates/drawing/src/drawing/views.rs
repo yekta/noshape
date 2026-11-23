@@ -858,7 +858,7 @@ pub fn effective_breaks(sheet: &Sheet, id: ViewId, frame_of: &dyn Fn(ViewId) -> 
     let Some(v) = sheet.view(id) else { return Vec::new() };
     let own = || v.breaks.iter().cloned().enumerate().map(|(i, b)| (b, Some(i))).collect::<Vec<_>>();
     let section = matches!(v.kind, ViewKind::Section { .. });
-    if !(section || v.sync_breaks && matches!(v.kind, ViewKind::Projected { .. })) {
+    if !v.syncs_breaks() {
         return own();
     }
     let (Some(p), Some(fc)) = (sheet.parent_of(id), frame_of(id)) else { return own() };

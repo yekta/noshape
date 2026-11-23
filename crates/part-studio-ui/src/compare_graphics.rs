@@ -22,8 +22,8 @@ pub struct CompareGraphics {
     displays: Option<Arc<(StudioDisplay, StudioDisplay)>>,
     task: Option<Task<()>>,
     cache: noshape_scene::builder::GpuCache,
-    /// The blend and selected feature row last drawn (None: not comparing).
-    seen: Option<(f32, Option<noshape_model::reference::FeatureId>)>,
+    /// The blend, selected feature row and compared documents (by pointer) last drawn (None: not comparing).
+    seen: Option<(f32, Option<noshape_model::reference::FeatureId>, (usize, usize))>,
 }
 
 /// A side's display: its Part Studio regenerated in that side's document, with its Variable Studio variables, other
@@ -92,16 +92,23 @@ impl CompareGraphics {
         Some(scene)
     }
 
-    /// Whether the compare state changed since the last call (start, stop,
-    /// a slider move, a feature row selected): the owner then builds its scene again.
+    /// Whether the compare state changed since the last call (start, stop, a slider move, a feature row selected,
+    /// Reverse compare: qa HIST-REVERSE-COMPARE-BAND): the owner then builds its scene again.
     pub fn changed(&mut self, doc: &Entity<DocModel>, cx: &App) -> bool {
-        let now = crate::part_studio_hooks::compare_blend(doc, cx).map(|b| (b, crate::part_studio_hooks::compare_selected(doc, cx)));
+        let sides = crate::part_studio_hooks::compare_documents(doc, cx).map_or((0, 0), |(b, _, t, _)| (Arc::as_ptr(&b) as usize, Arc::as_ptr(&t) as usize));
+        let now = crate::part_studio_hooks::compare_blend(doc, cx).map(|b| (b, crate::part_studio_hooks::compare_selected(doc, cx), sides));
         std::mem::replace(&mut self.seen, now) != now
     }
 
     /// Compare is open (as last seen by [`Self::changed`]).
     pub fn comparing(&self) -> bool {
         self.seen.is_some()
+    }
+
+    /// The compared documents (by pointer: base, target) the displays are for.
+    #[cfg(test)]
+    pub(crate) fn sides(&self) -> Option<(usize, usize)> {
+        self.key.map(|(b, t, _)| (b, t))
     }
 
     /// Not comparing (any more): forget the displays.
