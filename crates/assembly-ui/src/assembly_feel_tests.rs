@@ -842,6 +842,24 @@ fn frame_pixels(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<
     (img.as_bytes(0).map(|b| b.to_vec()).unwrap_or_default(), w)
 }
 
+/// The frame presented once the view has been still a while, no frame asked for (a software rasteriser's settled
+/// full-sample frame, render worker.rs `Settle`).
+fn settled_pixels(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) -> (Vec<u8>, usize) {
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
+    let t = std::time::Instant::now();
+    while t.elapsed() < std::time::Duration::from_millis(600) {
+        std::thread::sleep(std::time::Duration::from_millis(30));
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        draw(cx, window);
+    }
+    let img = cx.update(|cx| vp.read(cx).recorded_frames()).last().cloned();
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(false)));
+    let Some(img) = img else { return frame_pixels(cx, window, view) };
+    let w = img.size(0).width.0 as usize;
+    (img.as_bytes(0).map(|b| b.to_vec()).unwrap_or_default(), w)
+}
+
 /// Live2 asm-dialogs-1119 hz: with the mate dialog open, a hovered face's corner dots are filled white (the disc lost
 /// to the face's depth: hollow rings); after the first pick the connector's instance is outlined and its face selected.
 #[gpui::test]
@@ -1111,10 +1129,18 @@ fn a_hovered_cylinder_side_is_outlined_round_its_image(cx: &mut TestAppContext) 
     };
     let hover = |c: &[u8; 3]| c[0] >= 200 && (150..=215).contains(&c[1]) && i16::from(c[0]) - i16::from(c[2]) >= 50;
     let out = (silhouette - side).normalize();
-    let across: Vec<[u8; 3]> = (-4..=4).map(|k| rgb(silhouette + out * f64::from(k))).collect();
+    // Every device pixel across (the band is 2 of them: whole logical steps can skip it).
+    let across: Vec<[u8; 3]> = (-8..=8).map(|k| rgb(silhouette + out * (f64::from(k) / scale))).collect();
     assert!(across.iter().any(hover), "the silhouette in the hover colour: {across:?}");
     let rim: Vec<[u8; 3]> = (-3..=3).map(|k| rgb(top_front + DVec2::new(0.0, f64::from(k)))).collect();
     assert!(!rim.iter().any(hover), "the top rim's front arc not lit: {rim:?}");
+    let (px, w) = settled_pixels(cx, window, &view);
+    let rgb = |p: DVec2| {
+        let i = ((p.y * scale).round() as usize * w + (p.x * scale).round() as usize) * 4;
+        [px[i + 2], px[i + 1], px[i]]
+    };
+    let across: Vec<[u8; 3]> = (-8..=8).map(|k| rgb(silhouette + out * (f64::from(k) / scale))).collect();
+    assert!(across.iter().any(hover), "settled, the silhouette in the hover colour: {across:?}");
 }
 
 /// The faces a mate dialog's picks fill yellow.
