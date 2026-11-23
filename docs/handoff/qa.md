@@ -16,6 +16,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   asm d7991ecb (move ring 20 px: FEEL-ASM-MOVE-RING-RIMS, hover matrix asm cells), skasm 24ca4c6e stack (Offset box, sketch-tools-1123,
   fillet/chamfer: sk23.sh), studios stack (drw-dims-1123, drawing tool hover, Use copies, Note anchors, history legend 656a4061). Rescore each
   once its label shows. Bg wait byd0ye9vv exits on any new line there / rr-1de9 DONE / w538.
+- blend 08:5x (lead's call): 930cad75 (queued) makes c2-rings-loft Chamfer 1 build again ("Overlapping chamfers." was OCCT noise; our ring
+  differs from live's before the chamfer = the sketch gap, skasm 24ca4c6e). NOT a regression to flag; blend rechecks after 24ca4c6e.
 - INSERT-GRAPH-RESIDUALS (asm) VERIFIED 08:3x (7bfcc65ec; kit vibe2 ~/tmp/qa/walk2: mk.py docs, run.sh/x.sh on :491; Rel opens via the 6th row
   (333,538) only when it is named Others, then the version toggle (528,182); local shots qa-scratch/walk2/n1123).
 - Lead told (qa-alerts 07:3x): IMP-* + rings rechecks were already done. vibe2 leftover IMP wait loops killed (own, args checked).
