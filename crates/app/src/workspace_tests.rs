@@ -458,6 +458,40 @@ fn a_tab_drags_from_6_px_leaving_a_gap_its_width_and_a_100_px_ghost(cx: &mut Tes
     draw(cx, w);
 }
 
+/// Live document/1227 (behaviours 6586 qa5 tab management): a tab dragged over a folder tab's middle lights the
+/// folder (its drop blue under a faded ghost); near the folder's end it reorders instead, nothing lit.
+#[gpui::test]
+fn a_tab_dragged_over_a_folders_middle_lights_it(cx: &mut TestAppContext) {
+    let (w, ws, [_, a, ..]) = workspace(cx, "tab-over-folder");
+    let folder = ws.update(cx, |ws, cx| {
+        ws.doc.update(cx, |d, cx| {
+            let mut id = None;
+            d.edit_document("New folder", cx, |doc| id = Some(doc.add_folder("F", None)));
+            id.expect("the folder")
+        })
+    });
+    draw(cx, w);
+    let f = tab_bounds(cx, w, folder);
+    let at = tab_bounds(cx, w, a).center();
+    let none = Modifiers::none();
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_mouse_move(at, None, none);
+    vcx.simulate_mouse_down(at, MouseButton::Left, none);
+    vcx.simulate_mouse_move(at + gpui_kit::point(px(10.), px(0.)), Some(MouseButton::Left), none);
+    draw(cx, w);
+    assert!(cx.update(|cx| cx.has_active_drag()), "dragging A");
+    let into = |cx: &mut TestAppContext| ws.read_with(cx, |ws, _| ws.tab_drop_folder());
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(f.center(), Some(MouseButton::Left), none);
+    draw(cx, w);
+    assert_eq!(into(cx), Some(folder), "over the folder's middle: it lights");
+    let end = gpui_kit::point(f.right() - px(3.), f.center().y);
+    VisualTestContext::from_window(w, cx).simulate_mouse_move(end, Some(MouseButton::Left), none);
+    draw(cx, w);
+    assert_eq!(into(cx), None, "near its end: a reorder, the folder not lit");
+    VisualTestContext::from_window(w, cx).simulate_mouse_up(end, MouseButton::Left, none);
+    draw(cx, w);
+}
+
 /// Live2 11-13 and 2279 (b): a double-click on a tab activates it and does nothing more (no rename: Rename is in its
 /// menu).
 #[gpui::test]

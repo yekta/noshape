@@ -507,6 +507,7 @@ fn the_branch_filter_shows_with_a_second_workspace_and_narrows_the_rows(cx: &mut
     let pick = |cx: &mut TestAppContext, item: &'static str| {
         let at = bounds(cx, window, "hist-branch-filter").center();
         click(cx, window, at, 1);
+        assert!(view.read_with(cx, |v, _| v.branch_button_look().0), "its menu open: the blue outline");
         let row = bounds(cx, window, item);
         assert!(row.top() > button.bottom() && (f32::from(row.right()) - f32::from(button.right())).abs() <= 2., "the menu hangs right-aligned under the button (rows inside its border): {row:?} {button:?}");
         click(cx, window, row.center(), 1);
@@ -515,6 +516,7 @@ fn the_branch_filter_shows_with_a_second_workspace_and_narrows_the_rows(cx: &mut
     };
     pick(cx, "hist-branch-item Show current branch");
     assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show current branch");
+    assert_eq!(view.read_with(cx, |v, _| v.branch_button_look()), (false, true), "a filter on, the menu closed: filled blue, no outline");
     for row in ["hist-row B1", "hist-row V3", "hist-branched-from Branched from V1 on Main"] {
         assert!(drawn(cx, row), "{row} shown");
     }
@@ -524,6 +526,7 @@ fn the_branch_filter_shows_with_a_second_workspace_and_narrows_the_rows(cx: &mut
     let link = bounds(cx, window, "hist-branch-history").center();
     click(cx, window, link, 1);
     assert_eq!(view.read_with(cx, |v, _| v.ui_branch_filter()), "Show all branches");
+    assert_eq!(view.read_with(cx, |v, _| v.branch_button_look()), (false, false), "back on all branches: grey");
     assert!(drawn(cx, "hist-row Main") && drawn(cx, "hist-row V1") && !drawn(cx, "hist-branched-from Branched from V1 on Main"));
     pick(cx, "hist-branch-item Show current branch with parent branches");
     for row in ["hist-row B1", "hist-row V3", "hist-row Main", "hist-row V2", "hist-row V1", "hist-row Start"] {

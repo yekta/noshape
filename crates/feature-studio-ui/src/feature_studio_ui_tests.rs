@@ -298,6 +298,26 @@ fn the_completion_list_shows_230_ms_after_the_key(cx: &mut TestAppContext) {
     assert!(!open(cx), "not 210 ms after");
     pause(cx, window, 40);
     assert!(open(cx), "by 250 ms (live fsvs-feel-1118: 232 ms median)");
+    // Live fs-editor-feel-1122: the pointer over the open list doesn't move its highlight; the wheel there leaves it open.
+    {
+        use gpui_kit::{Modifiers, ScrollDelta, ScrollWheelEvent, VisualTestContext, point};
+        let row = || gpui_kit::component::input::COMPLETION_SELECTED_ROW.load(std::sync::atomic::Ordering::Relaxed);
+        let caret = cx.update(|cx| {
+            let ed = view.read(cx).editor.read(cx);
+            let c = ed.cursor();
+            ed.range_to_bounds(&(c - 1..c))
+        }).expect("laid out");
+        let before = row();
+        let over = point(caret.left() + px(40.), caret.bottom() + px(100.));
+        VisualTestContext::from_window(window, cx).simulate_mouse_move(over, None, Modifiers::default());
+        pause(cx, window, 100);
+        assert!(open(cx), "the pointer over the list: still open");
+        assert_eq!(row(), before, "the hovered row isn't highlighted");
+        VisualTestContext::from_window(window, cx).simulate_event(ScrollWheelEvent { position: over, delta: ScrollDelta::Lines(point(0., -3.)), wheel_ticks: Some(point(0., -1.)), ..Default::default() });
+        pause(cx, window, 100);
+        assert!(open(cx), "a wheel notch over the list: still open");
+        assert_eq!(row(), before, "the wheel doesn't move the highlight");
+    }
     // Live vs-fs-feel-1117: Tab doesn't accept (the list closes, a tab goes in); Esc closes it and keeps the text.
     let value = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).editor.read(cx).value().to_string());
     let bare = |s: &str| s.split_whitespace().collect::<String>();
@@ -717,6 +737,27 @@ fn an_errors_tooltip_shows_under_its_line_only_over_the_underline(cx: &mut TestA
     draw(cx, window);
     let mut v = VisualTestContext::from_window(window, cx);
     assert!(v.debug_bounds("fs-squiggle-tip").is_none(), "nothing one character past the underline");
+    // Live drw-matrix-1121 fsm-1: the tooltip shows over the underline while a text selection exists too.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.editor.update(cx, |e, cx| {
+        e.focus(w, cx);
+        e.set_selected_range(0..12, cx);
+    }))).unwrap();
+    draw(cx, window);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(span.center(), None, Modifiers::default());
+    draw(cx, window);
+    let mut v = VisualTestContext::from_window(window, cx);
+    assert!(v.debug_bounds("fs-squiggle-tip").is_some(), "with a selection: the tooltip still");
+    assert_eq!(cx.update(|cx| view.read(cx).editor.read(cx).selected_range()), 0..12, "the hover keeps the selection");
+    // A right-click on a word inside it: the selection stays; Copy / Paste / Cut at the pointer (fsm-1).
+    let word = cx.update(|cx| view.read(cx).editor.read(cx).range_to_bounds(&(2..3))).expect("laid out").center();
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Right, position: word, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    v.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Right, position: word, modifiers: Modifiers::default(), click_count: 1 });
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).editor.read(cx).selected_range()), 0..12, "the right-click keeps the selection");
+    let rows = cx.update(|cx| crate::os_menu::ui_state(cx)).map(|s| s["rows"].as_array().cloned().unwrap_or_default().iter().take(3).filter_map(|r| r.as_str().map(str::to_string)).collect::<Vec<_>>());
+    assert_eq!(rows, Some(vec!["Copy".to_string(), "Paste".into(), "Cut".into()]), "Copy / Paste / Cut first");
     let _ = std::fs::remove_dir_all(&dir);
 }
 

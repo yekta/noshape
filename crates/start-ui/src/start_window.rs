@@ -4471,7 +4471,7 @@ impl StartView {
                     .when(selected, |r| r.bg(pal.accent_soft))
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
                     // Dragged: faded in place (live docs-f2-onto-document-row).
-                    .when(self.dragging.contains(&d.path), |r| r.opacity(0.55))
+                    .when(self.dragging.contains(&d.path), |r| r.opacity(DRAGGED_ROW_OPACITY))
                     .when(d.trashed, |r| r.tooltip(crate::ui::tooltip("This document is in the trash and cannot be opened.")))
                     .child(Pins::room(pins.left_w))
                     .child(
@@ -4946,6 +4946,9 @@ fn trashed_toast(n: usize) -> String {
 /// How far a row moves before it drags (live: 4 px or less is a click, 5 a drag).
 const DOCS_DRAG_PX: f32 = 4.;
 
+/// A dragged row fades to half: selected, rgb(216,238,250) with grey text (live docs-page-gaps-1122).
+const DRAGGED_ROW_OPACITY: f32 = 0.5;
+
 /// The drag ghost's icons (ag-grid's move arrows and not-allowed).
 const GLYPH_DRAG_MOVE: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2.5v15M2.5 10h15M7.8 4.7 10 2.5l2.2 2.2M7.8 15.3l2.2 2.2 2.2-2.2M4.7 7.8 2.5 10l2.2 2.2M15.3 7.8l2.2 2.2-2.2 2.2"/></svg>"#;
 const GLYPH_DRAG_NO: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="10" cy="10" r="7"/><path d="m5.1 5.1 9.8 9.8"/></svg>"#;
@@ -4983,6 +4986,10 @@ fn start_docs_drag(view: WeakEntity<StartView>) -> impl Fn(&DocsDrag, Point<Pixe
     move |d, offset, _, cx| {
         let rows: Vec<PathBuf> = d.items.iter().map(|i| i.0.clone()).collect();
         let _ = view.update(cx, |v, cx| {
+            // The grabbed row is selected as it drags (live docs-page-gaps-1122: the selected blue, faded).
+            if let Some(row) = rows.first() {
+                v.context_select(row);
+            }
             v.dragging = rows;
             cx.notify();
         });

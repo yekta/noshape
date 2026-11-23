@@ -544,12 +544,16 @@ impl HistoryPanel {
         crate::ui_script::note_list(None);
     }
 
+    /// The Filter branches button's look: (a blue outline: its menu open, the funnel and ▾ filled blue: a filter on).
+    pub(crate) fn branch_button_look(&self) -> (bool, bool) {
+        (self.branch_menu_open, self.branch_filter != BranchFilter::All)
+    }
+
     /// The Filter branches button (live hist-filter-1122): 43 x 28, a funnel and a ▾, grey; filled blue while a filter
     /// other than Show all branches is on; a blue outline while its menu is open, which hangs right-aligned under it.
     fn render_branch_button(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let open = self.branch_menu_open;
-        let on = self.branch_filter != BranchFilter::All;
+        let (open, on) = self.branch_button_look();
         let ink = if on { pal.accent } else { pal.text_muted };
         div()
             .id("hist-branch-filter")

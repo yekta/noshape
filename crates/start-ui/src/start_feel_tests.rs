@@ -308,6 +308,7 @@ fn a_row_drags_from_5_px_under_a_pill_up_and_left_of_the_pointer(cx: &mut TestAp
     let near = |a: Pixels, b: Pixels| (f32::from(a) - f32::from(b)).abs() < 0.5;
     assert!(near(pill.size.height, px(48.)) && near(pill.left(), to.x - px(10.)) && near(pill.top(), to.y - px(8.)), "{pill:?} at {to:?}");
     assert_eq!(view.read_with(cx, |v, _| v.dragging.iter().map(|p| p.file_stem().unwrap().to_string_lossy().to_string()).collect::<Vec<_>>()), ["C"], "the row fades");
+    assert_eq!(selected(cx, &view), ["C"], "the dragged row is the selection (drawn faded selected)");
     VisualTestContext::from_window(w, cx).simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
     draw(cx, w);
 }
@@ -351,6 +352,16 @@ fn a_click_on_a_documents_name_opens_it(cx: &mut TestAppContext) {
 fn rows_light_and_select_in_lives_blues() {
     let pal = noshape_app_core::theme::PALETTE;
     assert_eq!((pal.row_hover, pal.accent_soft), (noshape_app_core::theme::rgb_const(0xdef1fb), noshape_app_core::theme::rgb_const(0xb2ddf6)));
+}
+
+/// Live docs-page-gaps-1122: a dragged row is its selected blue faded to rgb(216,238,250).
+#[test]
+fn a_dragged_row_fades_to_lives_light_blue() {
+    let blue = noshape_app_core::theme::PALETTE.accent_soft;
+    let a = super::DRAGGED_ROW_OPACITY;
+    let over_white = |c: f32| (255. * (c * a + (1. - a))).round();
+    let got = [over_white(blue.r), over_white(blue.g), over_white(blue.b)];
+    assert!(got.iter().zip([216., 238., 250.]).all(|(g, w)| (g - w).abs() <= 1.5), "{got:?} vs rgb(216,238,250)");
 }
 
 /// Live2 feel/documents.json `trashForN`: the question and the toast for one or several rows.

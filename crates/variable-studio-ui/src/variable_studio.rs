@@ -397,7 +397,7 @@ impl VariableStudioView {
     }
 
     /// The grid's keys (live2 studios.json variableStudioGrid) on a selected cell: arrows move (↑ / ↓ wrap), Enter
-    /// edits, Backspace clears into an edit (Delete does nothing). Tab: `grid_tab_action`.
+    /// or Space edits, Backspace clears into an edit (Delete does nothing). Tab: `grid_tab_action`.
     fn grid_key(&mut self, e: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) -> bool {
         // Esc while a row is dragged: the ghost and the drop line go, the release does nothing (live vs-rowdrag-1122).
         if e.keystroke.key == "escape" && cx.has_active_drag() {
@@ -421,7 +421,8 @@ impl VariableStudioView {
             "down" => grid_step(&from, 1, 0, n, true),
             "left" => grid_step(&from, 0, -1, n, false),
             "right" => grid_step(&from, 0, 1, n, false),
-            "enter" | "backspace" if !from.starts_with('t') => {
+            // Space edits as Enter does (live shortcuts-1123 vsfoc).
+            "enter" | "space" | "backspace" if !from.starts_with('t') => {
                 self.start_cell_edit(&from, (key == "backspace").then(String::new), window, cx);
                 return true;
             }
@@ -464,6 +465,10 @@ impl VariableStudioView {
             cx.propagate();
             return;
         };
+        // An edited cell commits as it hands the keyboard on (live fv-1121: Tab commits and moves right).
+        if let Some((st, _)) = self.cell_editing.clone().and_then(|k| self.inputs.get(&k).cloned()) {
+            st.update(cx, |_, cx| cx.emit(InputEvent::Blur));
+        }
         self.select_cell(&to, window, cx);
     }
 

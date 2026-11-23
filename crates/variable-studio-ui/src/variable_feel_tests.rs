@@ -385,3 +385,35 @@ fn a_row_drags_from_6_px_as_a_named_pill_and_esc_cancels(cx: &mut TestAppContext
     drag(&mut vcx, false);
     assert_eq!(names(cx, &view), ["d", "w"], "dropped over the first row's top");
 }
+
+/// Live drw-matrix-1121 vsm-1, shortcuts-1123, fv-1121: a click selects one cell; a Shift- or Ctrl-click on another
+/// moves the selection there (no range, no multi-select); Esc keeps it; Space starts its edit as Enter does; Tab
+/// commits and moves right, Shift+Tab left.
+#[gpui::test]
+fn a_cell_selection_moves_on_shift_or_ctrl_click_and_space_edits(cx: &mut TestAppContext) {
+    let (window, view) = studio(cx, "cell-select-keys");
+    cx.update(super::bind_keys);
+    keys(cx, window, &["d", "enter"]);
+    assert_eq!(names(cx, &view), ["w", "d"]);
+    let selected = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).cell_selected.clone());
+    let editing = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).cell_editing.clone());
+    let cell = |cx: &mut TestAppContext, i: usize| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("vs-val-{i}").into_boxed_str())).expect("the value cell").center();
+    let (v0, v1) = (cell(cx, 0), cell(cx, 1));
+    click_at(cx, window, v0, 1);
+    assert_eq!(selected(cx), Some("e0".into()), "a click selects w's value");
+    for m in [gpui_kit::Modifiers::shift(), gpui_kit::Modifiers::secondary_key()] {
+        let to = if selected(cx).as_deref() == Some("e0") { v1 } else { v0 };
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(to, m);
+        draw(cx, window);
+        assert_eq!(selected(cx), Some(if to == v1 { "e1".into() } else { "e0".into() }), "{m:?}-click moves the selection");
+    }
+    assert_eq!(selected(cx), Some("e0".into()));
+    keys(cx, window, &["escape"]);
+    assert_eq!((selected(cx), editing(cx)), (Some("e0".into()), None), "Esc keeps the selected cell");
+    keys(cx, window, &["space"]);
+    assert_eq!(editing(cx), Some("e0".into()), "Space edits it");
+    keys(cx, window, &["tab"]);
+    assert_eq!((editing(cx), selected(cx)), (None, Some("d0".into())), "Tab commits and moves right");
+    keys(cx, window, &["shift-tab"]);
+    assert_eq!(selected(cx), Some("e0".into()), "Shift+Tab moves left");
+}

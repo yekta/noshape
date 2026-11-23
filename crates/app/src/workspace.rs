@@ -2118,6 +2118,7 @@ impl Workspace {
                 .gap(px(3.))
                 .rounded_b(px(5.))
                 .bg(gpui_kit::rgb(0xeaeaea))
+                .when(g.into.is_some(), |d| d.opacity(GHOST_OVER_FOLDER_OPACITY))
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_size(px(14.))
                 .text_color(pal.text)
@@ -3090,6 +3091,7 @@ impl Workspace {
     fn folder_tab(&self, id: TabId, name: String, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
         tab_chip(SharedString::from(format!("folder-{id}")), false)
+            .debug_selector(move || format!("doc-tab-{id}"))
             .map(|d| noshape_app_core::ui_script::mark(d, || format!("doc_tab:{name}")))
             .min_w(px(60.))
             .max_w(px(200.))
@@ -3098,7 +3100,7 @@ impl Workspace {
             .child(self.folder_label(id, &name))
             .drag_threshold(TAB_DRAG_PX)
             .on_drag(TabDrag { id, name: name.clone(), icon: None, width: px(0.) }, start_tab_drag(cx.entity().downgrade()))
-            .when(self.tab_gap.as_ref().is_some_and(|g| g.into == Some(id)), |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+            .when(self.tab_gap.as_ref().is_some_and(|g| g.into == Some(id)), |d| d.bg(gpui_kit::rgb(FOLDER_DROP_BG)))
             .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| {
                 if this.tab_gap.as_ref().is_some_and(|g| g.into == Some(id)) {
                     this.drop_into(drag.id, Some(id), cx);
@@ -3467,6 +3469,11 @@ impl Workspace {
     pub(crate) fn tab_drag_and_rename(&self) -> (Option<TabId>, Option<TabId>) {
         (self.tab_gap.as_ref().map(|g| g.dragged), self.renaming_tab.as_ref().map(|r| r.0))
     }
+
+    /// The folder a dragged tab would drop into (drawn in the folder's drop blue, the ghost faded).
+    pub(crate) fn tab_drop_folder(&self) -> Option<TabId> {
+        self.tab_gap.as_ref().and_then(|g| g.into)
+    }
 }
 
 /// A tab or folder dragged on the tab bar (also its drag preview).
@@ -3511,6 +3518,13 @@ struct TabGap {
 
 /// A tab released at `frac` (0 to 1) across a folder tab goes into it in its middle 20–80 %; nearer its ends it
 /// reorders (live2 11-13).
+/// A folder tab with a dragged tab over its middle: the selected blue (live document/1227 hovered-group).
+const FOLDER_DROP_BG: u32 = 0xb2ddf6;
+
+/// The tab ghost over a folder it would drop into: faded to a quarter (live document/1227 hovering-group:
+/// rgb(192,225,243) over the folder's blue).
+const GHOST_OVER_FOLDER_OPACITY: f32 = 0.25;
+
 fn drops_into_folder(frac: f32) -> bool {
     (0.2..=0.8).contains(&frac)
 }
@@ -3722,6 +3736,19 @@ mod tab_autoscroll_tests {
     #[test]
     fn a_tab_goes_into_a_folder_released_over_its_middle() {
         assert_eq!([0.1, 0.19, 0.2, 0.5, 0.8, 0.81, 0.95].map(super::drops_into_folder), [false, false, true, true, true, false, false]);
+    }
+
+    /// Live document/1227: the folder under a dragged tab rgb(178,221,246); the #eaeaea ghost over it faded to
+    /// rgb(192,225,243).
+    #[test]
+    fn a_folder_under_a_dragged_tab_turns_blue_under_a_faded_ghost() {
+        let a = super::GHOST_OVER_FOLDER_OPACITY;
+        let c = super::FOLDER_DROP_BG;
+        let (r, g, b) = ((c >> 16) as f32, ((c >> 8) & 0xff) as f32, (c & 0xff) as f32);
+        assert_eq!((r, g, b), (178., 221., 246.));
+        let over = |under: f32| (234. * a + under * (1. - a)).round();
+        let got = [over(r), over(g), over(b)];
+        assert!(got.iter().zip([192., 225., 243.]).all(|(x, w)| (x - w).abs() <= 3.), "{got:?} vs rgb(192,225,243)");
     }
 
     /// Live2 (feel/documents.json tabBar.autoScroll): a tab dragged near an end of the strip scrolls it that way,
