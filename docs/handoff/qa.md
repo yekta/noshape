@@ -18,7 +18,7 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   :495, scratch feel1122/appear). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
 - **Units (logs qa-scratch/tmp/<name>.log)**: qa-wf23c (waits for psui 3cfb09978 + skasm 35c533220 in green, then wf23 01-03/06/07 ->
   hm2/out-wf23c: PICKED-EDGE-DASHED, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SM, SM-TAB-MERGE-PICK, CORNER-BREAK, CONFIG-FILTER-HELP
-  if 975844f0d is in); qa-ver6 (full matrix b* + [ips]* on psui b8a17535's green, after rr-b8a1/wf23c -> hmr5-b/hmr5-ips; replaced ver3); qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
+  if 975844f0d is in); qa-ver6 (full matrix b* + [ips]* on psui b8a17535's green, after rr-b8a1/wf23c -> hmr5-b/hmr5-ips; replaced ver3); qa-rr-2782 (dx 2782ce84 -> wf23 17 -> out-wf23e: SPEED-FILE-TAB-IMPORT-MENU s2, ours 192 ms vs live 58); qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
   MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM, FIXED-GLYPH-AA); qa-ver5 (after rr-c6ec: matrix '*-mc-*' -> hmr4-mc, navy rim + notch);
   qa-wait-imp (bool impeller -> IMP-DONE: expect no invalid part, close IMPELLER-SHELL-INVALID); qa-wait-sp (bool e7c98cc5a ->
   ~13.6 s + Part 1 129/385/258, close COMPAT-SURFACE-PATTERN-SLOWER). Hold each in a background task.
