@@ -247,9 +247,9 @@ impl DrawingEditor {
         let has_flags = sheet.annotations.iter().any(|a| matches!(&a.kind, AnnotationKind::Note { style, .. } if !style.flags.is_empty()));
         let has_cut_list = self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::CutList { .. }));
         // A property button: icon + caret, a list of tokens.
-        let prop = |id: &'static str, icon: &'static str, tip: &'static str, enabled: bool, items: Vec<(&'static str, String)>| {
+        let prop = |id: &'static str, icon: AnyElement, tip: &'static str, enabled: bool, items: Vec<(&'static str, String)>| {
             let ed = ed.clone();
-            let btn = Button::new(id).ghost().xsmall().w(px(45.)).h(px(30.)).dropdown_caret(true).child(crate::ui::glyph(icon, 18., ink)).tooltip(tip);
+            let btn = Button::new(id).ghost().xsmall().w(px(45.)).h(px(30.)).dropdown_caret(true).child(icon).tooltip(tip);
             let btn = btn.when(!enabled, |b| b.opacity(0.4));
             if !enabled {
                 return btn.into_any_element();
@@ -356,11 +356,11 @@ impl DrawingEditor {
                         .child(
                             h_flex()
                                 .gap(px(2.))
-                                .child(prop("callout-part", "part", "Part property", true, part_props))
-                                .child(prop("callout-bom", "bom", "BOM table property", true, bom_props))
-                                .child(prop("callout-inst", "instance", "Instance property", true, inst_props))
-                                .child(prop("callout-flag", "note", "Flag note", has_flags, vec![]))
-                                .child(prop("callout-cut", "cut-list", "Cut list table property", has_cut_list, tokens_of("Cut list"))),
+                                .child(prop("callout-part", crate::assets::icon("callout-part", 18., cx), "Part property", true, part_props))
+                                .child(prop("callout-bom", crate::assets::icon("callout-bom", 18., cx), "BOM table property", true, bom_props))
+                                .child(prop("callout-inst", crate::assets::icon("callout-instance", 18., cx), "Instance property", true, inst_props))
+                                .child(prop("callout-flag", crate::ui::glyph("note", 18., ink).into_any_element(), "Flag note", has_flags, vec![]))
+                                .child(prop("callout-cut", crate::ui::glyph("cut-list", 18., ink).into_any_element(), "Cut list table property", has_cut_list, tokens_of("Cut list"))),
                         )
                         .child(boxed(ABOVE, 356., 26., cx))
                         .child(h_flex().gap(px(10.)).child(boxed(LEFT, 83., 66., cx)).child(boxed(CENTRE, 170., 66., cx)).child(boxed(RIGHT, 83., 66., cx)))
