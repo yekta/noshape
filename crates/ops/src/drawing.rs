@@ -639,8 +639,8 @@ impl ViewPropValues {
             sketch_appearances: v.sketch_appearances,
             model_annotations: v.model_annotations,
             simplification: v.simplification,
-            name: v.name.clone().unwrap_or_else(|| noshape_scene::drawing_tools::view_edit::default_view_name(d, s, v)),
-            view_label: v.view_label_shown(),
+            name: v.name.clone().unwrap_or_else(|| noshape_scene::drawing_tools::view_edit::props_view_name(d, s, v)),
+            view_label: noshape_scene::drawing_tools::view_edit::props_view_label(v),
             label: match &v.kind {
                 ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
                 _ => v.label.clone().unwrap_or_default(),
@@ -655,9 +655,9 @@ impl ViewPropValues {
 /// View properties ✓ on one view (the sheet move is the caller's).
 pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewId, p: &ViewPropValues) {
     use noshape_model::drawing::{DisplayChoice, ViewKind};
-    use noshape_scene::drawing_tools::view_edit::{default_view_name, set_standard_orientation};
+    use noshape_scene::drawing_tools::view_edit::set_standard_orientation;
     let Some(old) = d.sheets.get(sheet).and_then(|s| s.view(id)).cloned() else { return };
-    let default_name = default_view_name(d, &d.sheets[sheet], &old);
+    let default_name = noshape_scene::drawing_tools::view_edit::props_view_name(d, &d.sheets[sheet], &old);
     let default_prefix = default_label_prefix(d, &old.kind);
     if let Some(r) = p.rotation_deg {
         noshape_scene::drawing_tools::view_edit::set_view_rotation(&mut d.sheets[sheet], id, r.to_radians());
@@ -696,7 +696,7 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     let label = p.label.trim().to_string();
     // ☐ View label hides a section / detail / auxiliary label.
     let auto = old.auto_label();
-    if auto {
+    if auto && p.view_label != noshape_scene::drawing_tools::view_edit::props_view_label(&old) {
         v.hide_label = !p.view_label;
     }
     // Prefix / Suffix: the drawing's prefix is kept as "not set".

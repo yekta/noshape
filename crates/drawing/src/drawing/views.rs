@@ -3530,16 +3530,25 @@ fn project_bodies(id: ViewId, bodies: &[ProjBody], frame: &ViewFrame, exact: boo
             g.edges.push(ViewEdge { points, visible, class: EdgeClass::Sharp, model: None, sketch: SketchEdge::None, profile: false, mesh: true, freeform: false });
         }
     }
-    // Snap points: vertices (on the kept side of a section) and centers of
-    // face-on circles.
+    // Snap points: visible vertices (on the kept side of a section), a point of a visible edge: a hidden one projected
+    // onto a visible edge's middle is no point there (live hole-plate-drawing: the Right view's top edge, over a hole's
+    // seam end, takes the edge); and centers of face-on circles.
+    let cell = size * 1e-5;
+    let key = |p: [f64; 2]| ((p[0] / cell).round() as i64, (p[1] / cell).round() as i64);
+    let shown: std::collections::HashSet<(i64, i64)> = g.edges.iter().filter(|e| e.visible).flat_map(|e| e.points.iter()).map(|p| key(*p)).collect();
+    let seen = |p: [f64; 2]| {
+        let (x, y) = key(p);
+        (-1..=1).any(|dx| (-1..=1).any(|dy| shown.contains(&(x + dx, y + dy))))
+    };
     for (bi, pb) in bodies.iter().enumerate() {
         let b = pb.body;
         for (i, v) in b.shape.vertices().iter().enumerate() {
             let Ok(p) = v.vertex_point() else { continue };
-            if !keep(bi, p) {
+            let q = frame.project(p);
+            if !keep(bi, p) || !seen(q) {
                 continue;
             }
-            g.snaps.push(Snap { p: frame.project(p), kind: SnapKind::Vertex, point: Some(PointRef::Vertex { body: b.id.clone(), name: (*b.vertices[i]).clone() }) });
+            g.snaps.push(Snap { p: q, kind: SnapKind::Vertex, point: Some(PointRef::Vertex { body: b.id.clone(), name: (*b.vertices[i]).clone() }) });
         }
     }
     let centers: Vec<Snap> = g

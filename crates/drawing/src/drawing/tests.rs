@@ -1,7 +1,7 @@
 //! Integration tests: views of the demo plate and sheet export.
 
 use super::build::{PickTarget, render_sheet};
-use super::views::{ViewCache, compute_view, regenerate_sources};
+use super::views::{SnapKind, ViewCache, compute_view, regenerate_sources};
 use super::*;
 use crate::document::TabContent;
 use noshape_kernel::EdgeClass;
@@ -1235,8 +1235,13 @@ fn broken_out_section_exposes_interior() {
             "hole wall at x = {x} visible"
         );
     }
-    // Snap points removed with the material are gone; edges keep their names.
-    assert!(g.snaps.len() <= before.snaps.len());
+    // Snap points removed with the material are gone (a vertex snaps only on a visible edge's points: the cut exposes
+    // the hole's walls, so their ends now snap); edges keep their names.
+    let ends: Vec<[f64; 2]> = g.edges.iter().filter(|e| e.visible).flat_map(|e| e.points.iter().copied()).collect();
+    for sn in g.snaps.iter().filter(|s| s.kind == SnapKind::Vertex && s.point.is_some()) {
+        assert!(ends.iter().any(|q| (q[0] - sn.p[0]).hypot(q[1] - sn.p[1]) < 1e-5), "vertex snap {:?} on a visible edge", sn.p);
+    }
+    assert!(g.snaps.len() != before.snaps.len(), "the cut changes the snaps");
     assert!(g.edges.iter().any(|e| e.model.is_some()));
     let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     let vp = pick_of(&built, PickTarget::View(ViewId(1)));

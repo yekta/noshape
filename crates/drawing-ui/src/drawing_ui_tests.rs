@@ -841,6 +841,40 @@ fn a_bom_border_drag_moves_only_that_border() {
     assert_eq!(divider_widths(&w, 4, 10.0, true, true), [20.0, 30.0, 40.0, 60.0], "a BOM's outer border as before");
 }
 
+/// qa DRW-DIM-HIDDEN-VERTEX-SNAP (live hole-plate-drawing): a vertex hidden behind a face is no snap. The hole's seam
+/// end projected onto the Right view's top edge made its middle a point, so the Dimension tool took a point there
+/// where live takes the edge: no vertex snap lies along a visible edge unless a visible edge ends at it.
+#[gpui::test]
+fn hidden_vertices_are_no_snaps(cx: &mut TestAppContext) {
+    use noshape_model::drawing::views::SnapKind;
+    START.set(Some("hole-plate-drawing"));
+    let (window, editor) = drawing(cx, "hidden-vertex-snaps");
+    real_sheet(cx, window, &editor);
+    let (vertices, stray) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let (mut vertices, mut stray) = (0, Vec::new());
+        for (id, g) in e.geoms.iter() {
+            let visible: Vec<&Vec<[f64; 2]>> = g.edges.iter().filter(|e| e.visible).map(|e| &e.points).collect();
+            let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-6;
+            for s in g.snaps.iter().filter(|s| s.kind == SnapKind::Vertex) {
+                vertices += 1;
+                let ends_here = visible.iter().any(|p| p.first().is_some_and(|q| near(*q, s.p)) || p.last().is_some_and(|q| near(*q, s.p)));
+                let on_one = visible.iter().any(|p| p.windows(2).any(|w| {
+                    let (d, t) = ([w[1][0] - w[0][0], w[1][1] - w[0][1]], [s.p[0] - w[0][0], s.p[1] - w[0][1]]);
+                    let l = d[0].hypot(d[1]);
+                    l > 1e-9 && (d[0] * t[1] - d[1] * t[0]).abs() / l < 1e-6 && (0.0..=l * l).contains(&(d[0] * t[0] + d[1] * t[1]))
+                }));
+                if on_one && !ends_here {
+                    stray.push((*id, s.p));
+                }
+            }
+        }
+        (vertices, stray)
+    });
+    assert!(vertices > 0, "the views have vertex snaps");
+    assert!(stray.is_empty(), "vertex snaps partway along a visible edge: {stray:?}");
+}
+
 /// ui-parity drw-centermark: Centermark, then a click on the hole's circle (at 45°, through the mouse) makes a
 /// centermark there.
 #[gpui::test]
@@ -2683,4 +2717,47 @@ fn the_sheet_border_line_drags(cx: &mut TestAppContext) {
         assert!((off[0] - 50.0).abs() < 0.5 && off[1].abs() < 0.5, "{off:?}");
     }))
     .unwrap();
+}
+
+/// qa DRW-CALLOUT-MENU-REMOVE-LEADERS (live workflows-1123 10 s22): two callouts selected, the menu has Remove leaders
+/// after Add leader, and it frees both.
+#[gpui::test]
+fn two_callouts_menu_removes_both_leaders(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    use noshape_scene::drawing_tools::Sel;
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let edges: Vec<Value> = g["views"][0]["edges"].as_array().cloned().unwrap_or_default().into_iter().filter(|e| e["type"] == "line").take(2).collect();
+        for (k, e) in edges.iter().enumerate() {
+            let mid = [(num(&e["a"][0]) + num(&e["b"][0])) / 2.0, (num(&e["a"][1]) + num(&e["b"][1])) / 2.0];
+            call(ctx, "drawing_callout", json!({ "drawing": dw, "anchor": mid, "position": [mid[0] + 25.0, mid[1] + 25.0 + 12.0 * k as f64], "text": (k + 1).to_string() }));
+        }
+    }));
+    let (window, editor) = drawing(cx, "two-callouts-remove-leaders");
+    real_sheet(cx, window, &editor);
+    let callouts = |cx: &mut TestAppContext| cx.update(|cx| {
+        editor.read(cx).current_sheet().annotations.iter().filter_map(|a| match &a.kind {
+            AnnotationKind::Balloon { callout, .. } => Some((a.id, callout.free, callout.leaders.len())),
+            _ => None,
+        }).collect::<Vec<_>>()
+    });
+    let before = callouts(cx);
+    assert_eq!(before.len(), 2, "two callouts: {before:?}");
+    assert!(before.iter().all(|(_, free, _)| !free), "both on an edge: {before:?}");
+    let rows = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.selection = before.iter().map(|(id, ..)| Sel::Annotation(*id)).collect();
+        e.multi_selection_entries(cx)
+    }));
+    let labels: Vec<String> = rows.iter().filter_map(|m| if let MenuEntry::Item { label, .. } = m { Some(label.to_string()) } else { None }).collect();
+    let add = labels.iter().position(|l| l == "Add leader").expect("Add leader");
+    assert_eq!(labels.get(add + 1).map(String::as_str), Some("Remove leaders"), "{labels:?}");
+    let act = rows.iter().find_map(|m| match m {
+        MenuEntry::Item { label, act, .. } if label.as_ref() == "Remove leaders" => Some(act.clone()),
+        _ => None,
+    }).expect("Remove leaders");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| act(e, w, cx))).unwrap();
+    let after = callouts(cx);
+    assert!(after.iter().all(|(_, free, n)| *free && *n == 0), "both stand free: {after:?}");
 }

@@ -10,6 +10,7 @@
 
 use crate::drawing_view::*;
 use gpui_kit::*;
+use noshape_model::drawing::build::{BuiltSheet, PickTarget};
 use noshape_model::drawing::sheet::LeaderPath;
 use noshape_model::drawing::{Annotation, AnnotationKind, Leader, LeaderStart};
 use noshape_scene::drawing_tools::annotation_edit as ae;
@@ -154,10 +155,14 @@ impl DrawingEditor {
     }
 
     /// The anchor follows the pointer: onto a snap point or edge of a view
-    /// it attaches there, elsewhere it stays on the sheet.
+    /// it attaches there (the edge lit orange, live drw-drag-feel-1122 L),
+    /// elsewhere it stays on the sheet.
     pub fn leader_end_move(&mut self, drag: &Drag, cx: &mut Context<Self>) {
         let Drag::LeaderEnd { id, leader, orig } = drag else { return };
         let c = self.cursor;
+        let tol = self.tol_mm(noshape_scene::drawing_tools::PICKBOX_PX);
+        let edge_at = |b: &BuiltSheet| b.hit_where(c, tol, &|t: &PickTarget| matches!(t, PickTarget::Edge { .. }));
+        self.hover = self.built.as_deref().and_then(edge_at);
         let (view, point, r) = match self.snap_at(c).or_else(|| self.any_point(c)) {
             Some(p) => (Some(p.view), p.p, p.r),
             None => (None, c, None),
@@ -168,6 +173,8 @@ impl DrawingEditor {
             ae::move_leader_end(a, *leader, view, point, r);
         }
         self.set_preview(Some(dr), cx);
+        // After the rebuild: the preview renumbers the picks.
+        self.hover = self.built.as_deref().and_then(edge_at);
     }
 
     /// The bend follows the pointer horizontally only (live (2)); the leader

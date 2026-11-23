@@ -17,7 +17,7 @@ use noshape_model::drawing::views;
 use noshape_model::drawing::build::PickTarget;
 use noshape_model::drawing::*;
 
-pub use noshape_scene::drawing_tools::view_edit::{ORIENTATIONS, TangentMode, default_view_name, orientation_name, set_standard_orientation};
+pub use noshape_scene::drawing_tools::view_edit::{ORIENTATIONS, TangentMode, default_view_name, orientation_name, props_view_name, set_standard_orientation};
 
 impl DrawingEditor {
     /// Right-click on a section's cutting line, its arrows or letters (live
@@ -126,6 +126,13 @@ pub struct ViewProps {
     /// Tangent edges / View simplification chosen in the panel.
     tangent_pick: bool,
     simp_pick: bool,
+}
+
+impl ViewProps {
+    /// The Scale field when the dialog opens on it: a section's or detail's (no View orientation row).
+    pub(crate) fn scale_first(&self) -> Option<Entity<InputState>> {
+        (self.orientation.is_none() && self.affixes.is_some() && self.multi.is_none()).then(|| self.scale_input.clone())
+    }
 }
 
 /// Several views' values as the panel opened (None: they differ).
@@ -578,7 +585,7 @@ impl DrawingEditor {
             Some(s) => noshape_model::drawing::sheet::scale_text(s, v.scale_text.as_deref()),
             None => format!("{} ({inherit})", views::view_scale_text(self.current_sheet(), id)),
         };
-        let name = v.name.clone().unwrap_or_else(|| default_view_name(&self.drawing, self.current_sheet(), &v));
+        let name = v.name.clone().unwrap_or_else(|| props_view_name(&self.drawing, self.current_sheet(), &v));
         let auto_label = matches!(v.kind, ViewKind::Section { .. } | ViewKind::Detail { .. } | ViewKind::AlignedSection { .. });
         let label = match &v.kind {
             ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } | ViewKind::Detail { label, .. } => label.clone(),
@@ -617,7 +624,7 @@ impl DrawingEditor {
             display: if matches!(v.kind, ViewKind::Base { .. }) { Some(v.display_state.clone().map_or(DisplayChoice::ShowAll, DisplayChoice::State)) } else { v.own_display.clone() },
             sheet: self.sheet,
             name: input(name, window, cx),
-            view_label: v.view_label_shown(),
+            view_label: noshape_scene::drawing_tools::view_edit::props_view_label(&v),
             label: input(label, window, cx),
             affixes: auto_label.then(|| {
                 let prefix = v.label_prefix.clone().or_else(|| noshape_ops::drawing::default_label_prefix(&self.drawing, &v.kind)).unwrap_or_default();
@@ -694,7 +701,7 @@ impl DrawingEditor {
         let simplification = p.simplification.map(|k| crate::drawing_insert::parse_simplification(k, &p.simp_value.read(cx).value(), self.drawing.units_mm).unwrap_or(k));
         let mut d = self.drawing.clone();
         for id in &ids {
-            let default_name = self.current_sheet().view(*id).map(|v| default_view_name(&self.drawing, self.current_sheet(), v)).unwrap_or_default();
+            let default_name = self.current_sheet().view(*id).map(|v| props_view_name(&self.drawing, self.current_sheet(), v)).unwrap_or_default();
             let Some(v) = d.sheets[self.sheet].view_mut(*id) else { continue };
             if let Some(s) = scale {
                 v.scale = s;
@@ -885,7 +892,8 @@ impl DrawingEditor {
         };
         let field = |input: &Entity<InputState>| h_flex().h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(div().flex_1().child(Input::new(input).appearance(false).xsmall().text_size(px(13.33)))).into_any_element();
         // Multi-line (Enter starts a new line): a view label's Prefix / Suffix.
-        let area_field = |input: &Entity<TextareaState>| div().min_h(px(25.)).border_b_1().border_color(line).text_color(field_ink).child(Textarea::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
+        // Prefix / Suffix: a boxed field three lines high (live workflows-1123 08 s16).
+        let area_field = |input: &Entity<TextareaState>| div().min_h(px(50.)).px(px(3.)).border_1().rounded(px(2.)).border_color(line).text_color(field_ink).child(Textarea::new(input).appearance(false).xsmall().text_size(px(13.33))).into_any_element();
         // Reference block.
         let reference = h_flex()
             .gap(px(3.))
@@ -949,7 +957,8 @@ impl DrawingEditor {
             let label = cur_named.unwrap_or_else(|| orientation_name(cur).into());
             let orient = select("vp-orient", label, items, true);
             rows.push(row("View orientation", div().track_focus(&self.first_field).child(orient).into_any_element()));
-        } else if multi.is_none() {
+        } else if multi.is_none() && !v.auto_label() {
+            // (A section or detail view has no orientation row: live workflows-1123 08 s16, 09 s11.)
             rows.push(row("View orientation", value(default_view_name(&self.drawing, sheet, &v))));
         }
         // Assemblies: Explode/Position and Display state (live drawing/1110,
@@ -1225,13 +1234,13 @@ impl DrawingEditor {
                 if let Some(n) = &v.named_view {
                     t.texts(["Named view".to_string(), n.clone()]);
                 }
-                t.text("View orientation");
                 // (A child view's orientation is a fixed value, not read by recorders since 2026-11-17.3: live2
                 // drw-view-properties-synchronize-breaks s9.)
-                match props.orientation {
-                    Some(_) => t.options(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
-                    None => t.options([default_view_name(&self.drawing, sheet, &v)]),
-                };
+                if props.orientation.is_some() {
+                    t.text("View orientation").options(ORIENTATIONS.iter().map(|(_, n)| n.to_string()));
+                } else if !v.auto_label() {
+                    t.text("View orientation").options([default_view_name(&self.drawing, sheet, &v)]);
+                }
                 // Assemblies: the two selects (live2 drw-view-properties-simplification-absolute s2).
                 if is_asm && source_tab.is_some() {
                     t.texts(["Explode/Position", "Display state"]);

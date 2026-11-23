@@ -63,7 +63,7 @@ impl Render for MaterialLibrariesView {
                 .text_size(px(12.))
                 .text_color(gpui_kit::rgb_static(0xffffff))
                 .cursor_pointer()
-                .hover(|d| d.bg(rgb(0x2b65c4)))
+                .hover(|d| d.bg(p().accent_hover))
                 .child("Remove")
                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                     f();

@@ -78,6 +78,22 @@ pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> S
     }
 }
 
+/// View properties › Name as the dialog opens: a section or detail view is "Section" / "Detail" (live workflows-1123
+/// 08 s16, 09 s11), the others their default name.
+pub fn props_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {
+    match &v.kind {
+        ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => "Section".into(),
+        ViewKind::Detail { .. } => "Detail".into(),
+        _ => default_view_name(drawing, sheet, v),
+    }
+}
+
+/// View properties › View label as the dialog opens: a Connected detail draws no label of its own (its line names it),
+/// so the box is clear (live workflows-1123 09 s11: only "SCALE 2:1" drawn, View label unticked).
+pub fn props_view_label(v: &DrawingView) -> bool {
+    v.view_label_shown() && !(matches!(v.kind, ViewKind::Detail { .. }) && v.detail_style == 1)
+}
+
 /// Order ▸ Bring to front / Send to back (the view list is the layer stack).
 pub fn order_view(s: &mut Sheet, id: ViewId, front: bool) {
     if let Some(i) = s.views.iter().position(|v| v.id == id) {

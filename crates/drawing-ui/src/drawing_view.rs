@@ -1788,6 +1788,8 @@ impl DrawingEditor {
             if let Some(h) = hover {
                 let single = self.tool_picks_edges();
                 match self.sel_of_pick(h) {
+                    // The edge a dragged leader end lands on lights orange (live drw-drag-feel-1122 L).
+                    Some(Sel::Edge(..)) if matches!(self.drag, Drag::LeaderEnd { .. }) => scene.add_flag(h, state::SELECTED),
                     // Onshape (drawing/14): a hovered annotation turns tan with
                     // a tan label box and its grips, drawn on top below.
                     Some(s @ Sel::Annotation(_)) if !single => self.push_annotation_look(&mut scene, b, &self.picks_of(s), DRAWING_HOVER),
@@ -2065,7 +2067,8 @@ impl DrawingEditor {
     /// The views framed now and the frame's colour: the hovered one tan, the other selected ones orange.
     pub(crate) fn view_frames(&self) -> Vec<(ViewId, u32)> {
         // (The Hatch region dialog frames no view: live2 drw-tools-1119 hc.png.)
-        let select = matches!(self.tool, Tool::Select) && self.hatch_dlg.is_none();
+        // (Nor does a dragged leader end's edge: live drw-drag-feel-1122 L.)
+        let select = matches!(self.tool, Tool::Select) && self.hatch_dlg.is_none() && !matches!(self.drag, Drag::LeaderEnd { .. });
         // Placing projected views: the view under the pointer framed as hovered, the parent (and a picked one) as
         // selected (live workflow 09 s05, s06).
         let projecting = matches!(self.tool, Tool::Projected { parent: Some(_) });
@@ -2268,7 +2271,11 @@ impl DrawingEditor {
             }
             m.indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
         };
-        for t in g.texts.iter().filter(|t| picks.contains(&t.pick)) {
+        // A hovered note with a leader keeps its text plain: only the leader lights (live drw-drag-feel-1122 N).
+        let sheet = self.current_sheet();
+        let led = |s: Sel| matches!(s, Sel::Annotation(id) if sheet.annotations.iter().any(|a| a.id == id && matches!(&a.kind, AnnotationKind::Note { style, .. } if !style.leaders.is_empty())));
+        let plain_text = colour == DRAWING_HOVER && picks.first().and_then(|p| self.sel_of_pick(*p)).is_some_and(led);
+        for t in g.texts.iter().filter(|t| !plain_text && picks.contains(&t.pick)) {
             quad(&mut boxes, hover_box(t), -0.5);
         }
         let mut points = PointData::default();
@@ -2526,7 +2533,13 @@ impl DrawingEditor {
             window.focus(&self.focus, cx);
         }
         if std::mem::take(&mut self.first_due) {
-            window.focus(&self.first_field, cx);
+            // A section's or detail's View properties open on Scale, its text selected (live workflows-1123 08 s16).
+            if let Some(s) = self.view_props.as_ref().and_then(|p| p.scale_first()) {
+                window.focus(&s.read(cx).focus_handle(cx), cx);
+                s.update(cx, |s, cx| s.select_all(window, cx));
+            } else {
+                window.focus(&self.first_field, cx);
+            }
         }
         self.first_lit = self.first_field.is_focused(window);
         self.sync_section_dlg(window, cx);

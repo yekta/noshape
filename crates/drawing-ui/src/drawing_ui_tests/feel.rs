@@ -4090,3 +4090,126 @@ fn a_view_moved_off_its_parents_sheet_is_apart_from_it(cx: &mut TestAppContext) 
     let moved = moved.expect("moved and selected");
     assert!(cx.update(|cx| editor.read(cx).apart_from_parent(moved)), "on another sheet: apart");
 }
+
+/// Live drw-drag-feel-1122 N and L: a hovered note with a leader keeps its text plain (no tan box); its leader's end
+/// dragged over another view edge lights that edge orange (no view frame, the old edge not lit blue), and released on
+/// the empty sheet leaves the note selected.
+#[gpui::test]
+fn a_dragged_leader_end_lights_the_edge_it_lands_on(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let mut corner = [f64::MAX, f64::MAX];
+        for v in g["views"].as_array().cloned().unwrap_or_default() {
+            for e in v["edges"].as_array().cloned().unwrap_or_default().iter().filter(|e| e["type"] == "line") {
+                for k in ["a", "b"] {
+                    let p = [num(&e[k][0]), num(&e[k][1])];
+                    if p[0] + p[1] < corner[0] + corner[1] {
+                        corner = p;
+                    }
+                }
+            }
+        }
+        let at = [(corner[0] - 40.0).max(25.0), (corner[1] - 40.0).max(25.0)];
+        call(ctx, "drawing_note", json!({ "drawing": dw, "text": "NOTE A", "position": at, "leader": corner }));
+    }));
+    let (window, editor) = drawing(cx, "feel-leader-end-drag");
+    real_sheet(cx, window, &editor);
+    let (id, text, end, target) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).expect("the note");
+        let (b, picks) = (e.built.clone().expect("built"), e.picks_of(Sel::Annotation(a.id)));
+        let t = b.geometry.texts.iter().find(|t| picks.contains(&t.pick)).expect("its text");
+        let q = noshape_model::drawing::font::text_box(t);
+        let text = [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0];
+        let (_, path) = e.leader_paths_of(a).into_iter().next().expect("its leader");
+        let end = *path.points.last().expect("the leader's end");
+        // The middle of the view edge farthest from the leader's end.
+        let mid = |l: &noshape_model::drawing::sheet::Polyline2| [(l.points[0][0] + l.points[1][0]) * 0.5, (l.points[0][1] + l.points[1][1]) * 0.5];
+        let edge = b.geometry.lines.iter().filter(|l| l.points.len() == 2 && matches!(b.picks.get(l.pick as usize), Some(PickTarget::Edge { .. })) && (l.points[0][0] - l.points[1][0]).hypot(l.points[0][1] - l.points[1][1]) > 10.0);
+        let target = edge.map(mid).max_by(|p, q| (p[0] - end[0]).hypot(p[1] - end[1]).total_cmp(&(q[0] - end[0]).hypot(q[1] - end[1]))).expect("a view edge");
+        (a.id, text, end, target)
+    });
+    // N: the hovered note's text has no tan box behind it.
+    assert_eq!(lit_at(cx, window, &editor, text), Some(Sel::Annotation(id)), "the text lights its note");
+    let tan_box = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).build_scene().instances.iter().any(|i| i.layer == -4 && i.color == crate::theme::lin(0xccb292)));
+    assert!(!tan_box(cx), "a hovered note with a leader: no tan box behind its text");
+    assert_eq!(click_at(cx, window, &editor, text, Modifiers::default()), vec![Sel::Annotation(id)], "a click selects it");
+    // L: its leader's end dragged onto another edge.
+    let (p, q) = (at_window(cx, &editor, end), at_window(cx, &editor, target));
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(p, None, Modifiers::default());
+    v.simulate_mouse_down(p, MouseButton::Left, Modifiers::default());
+    v.simulate_mouse_move(p + Point::new(px(20.), px(20.)), Some(MouseButton::Left), Modifiers::default());
+    v.simulate_mouse_move(q, Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    let (dragging, lit, orange, frames) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let scene = e.build_scene();
+        let lit = e.hover.and_then(|h| e.sel_of_pick(h));
+        let orange = e.hover.is_some_and(|h| scene.states.get(h as usize).is_some_and(|s| s & noshape_render::state::SELECTED != 0));
+        (matches!(e.drag, noshape_scene::drawing_tools::Drag::LeaderEnd { .. }), lit, orange, e.view_frames())
+    });
+    assert!(dragging, "the press on the leader's end drags it");
+    assert!(matches!(lit, Some(Sel::Edge(..))), "the edge under the pointer is the target: {lit:?}");
+    assert!(orange, "the target edge lit orange");
+    assert!(frames.is_empty(), "no view frame while dragging: {frames:?}");
+    // Released on the empty sheet: the note stays selected.
+    let free = at_window(cx, &editor, [text[0], text[1] + 12.0]);
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(free, Some(MouseButton::Left), Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).hover), None, "over the empty sheet nothing lit");
+    let mut v = VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_up(free, MouseButton::Left, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::Annotation(id)], "the note stays selected");
+}
+
+/// qa DRW-SECTION-DETAIL-VIEW-PROPS-ROWS (live workflows-1123 08 s16, 09 s11): a section's View properties open on
+/// Scale with "1:1 (Parent)" selected, Name "Section"; a Connected detail's Name "Detail" with View label clear (only
+/// its scale is drawn); neither has a View orientation row.
+#[gpui::test]
+fn section_and_detail_view_properties_open_as_live(cx: &mut TestAppContext) {
+    use noshape_model::drawing::ViewKind;
+    use noshape_scene::drawing_tools::view_edit::{props_view_label, props_view_name};
+    SUGGESTED.set(true);
+    SETUP.set(Some(|ctx, dw| {
+        let g = call(ctx, "drawing_get", json!({ "drawing": dw }));
+        let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let front = g["views"].as_array().and_then(|v| v.iter().find(|v| v["orientation"] == "front").cloned()).expect("Front");
+        let (lo, hi) = (&front["bounds"]["min"], &front["bounds"]["max"]);
+        let c = [(num(&lo[0]) + num(&hi[0])) / 2.0, (num(&lo[1]) + num(&hi[1])) / 2.0];
+        call(ctx, "drawing_section_view", json!({ "drawing": dw, "parent": front["id"], "point": c, "position": [num(&hi[0]) + 60.0, c[1]] }));
+        call(ctx, "drawing_detail_view", json!({ "drawing": dw, "parent": front["id"], "center": [0, 0], "radius": 8, "position": [300, 200], "style": "connected" }));
+    }));
+    let (window, editor) = drawing(cx, "feel-section-detail-props");
+    let (section, detail) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let id = |f: &dyn Fn(&ViewKind) -> bool| e.current_sheet().views.iter().find(|v| f(&v.kind)).map(|v| v.id);
+        (id(&|k| matches!(k, ViewKind::Section { .. })).expect("the section"), id(&|k| matches!(k, ViewKind::Detail { .. })).expect("the detail"))
+    });
+    let named = |cx: &mut TestAppContext, v| cx.update(|cx| {
+        let e = editor.read(cx);
+        let x = e.current_sheet().view(v).expect("the view");
+        (props_view_name(&e.drawing, e.current_sheet(), x), props_view_label(x))
+    });
+    assert_eq!(named(cx, section), ("Section".to_string(), true));
+    assert_eq!(named(cx, detail), ("Detail".to_string(), false), "a Connected detail draws no label of its own");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_view_props(section, w, cx))).unwrap();
+    draw(cx, window);
+    draw(cx, window);
+    let (focused, value, selected, first) = cx
+        .update_window(window, |_, w, cx| {
+            let e = editor.read(cx);
+            let s = e.view_props.as_ref().and_then(|p| p.scale_first()).expect("the dialog opens on Scale");
+            let st = s.read(cx);
+            (st.focus_handle(cx).is_focused(w), st.value().to_string(), st.selected_value().to_string(), e.first_field.is_focused(w))
+        })
+        .unwrap();
+    assert!(focused && !first, "Scale focused, not the first select");
+    assert!(value.ends_with("(Parent)"), "the parent's scale: {value}");
+    assert_eq!(selected, value, "its text selected");
+}

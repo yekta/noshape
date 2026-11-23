@@ -422,7 +422,7 @@ pub fn render_bar(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
                     .text_size(px(13.))
                     .text_color(gpui_kit::rgb_static(0xffffff))
                     .cursor_pointer()
-                    .hover(|d| d.bg(rgb(0x2b65c4)))
+                    .hover(|d| d.bg(p().accent_hover))
                     .child("Reverse compare")
                     .on_click(move |_, _, cx| reverse(&d, cx)),
             )

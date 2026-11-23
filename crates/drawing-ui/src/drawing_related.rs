@@ -290,7 +290,11 @@ impl DrawingEditor {
             let up = self.gpu.uploader();
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
         }
-        let dragged = self.dragging_annotation_id();
+        // A note whose leader end is dragged lights no edge (live drw-drag-feel-1122 L).
+        let dragged = self.dragging_annotation_id().or(match &self.drag {
+            Drag::LeaderEnd { id, .. } => Some(*id),
+            _ => None,
+        });
         let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).filter(|a| Some(*a) != dragged).collect();
         // A dimension just placed with the tool still on: no blue, and no dots on an edge's ends (qa workflow 09 s10; a
         // 2 point one keeps its points' discs, dim_kept_points).

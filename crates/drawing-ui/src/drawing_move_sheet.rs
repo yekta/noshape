@@ -90,7 +90,7 @@ impl DrawingEditor {
 
     /// Notes and callouts selected together (live A21, request 1590, qa
     /// DWG-GROUP-ANNOTATION-RULE): Paste · Copy · Paste as table · Add leader
-    /// · Group annotation (only with a callout among them) · Move to ▸;
+    /// · Remove leaders (any with one) · Group annotation (only with a callout among them) · Move to ▸;
     /// grouped ones Remove from grouped annotation and no Move to | Clear
     /// selection · Zoom to fit · Delete.
     fn multi_note_entries(&self, anns: &[&noshape_model::drawing::Annotation], _cx: &App) -> Vec<MenuEntry> {
@@ -110,6 +110,26 @@ impl DrawingEditor {
                 MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id: fid }, cx))
             },
         ];
+        // Remove leaders after Add leader when any of them has one (live workflows-1123 10 s22: two callouts).
+        let led = |a: &&noshape_model::drawing::Annotation| match &a.kind {
+            AnnotationKind::Note { style, .. } => !style.leaders.is_empty(),
+            AnnotationKind::Balloon { callout, .. } => !callout.leaders.is_empty() || !callout.free,
+            AnnotationKind::Gdt { leaders, .. } | AnnotationKind::SurfaceFinish { leaders, .. } => !leaders.is_empty(),
+            _ => false,
+        };
+        if anns.iter().any(led) {
+            let ids = ids.clone();
+            out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
+                t.edit_sheet("Remove leaders", cx, |s| {
+                    for id in &ids {
+                        noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, *id);
+                        if let Some(AnnotationKind::Balloon { callout, .. }) = s.annotations.iter_mut().find(|a| a.id == *id).map(|a| &mut a.kind) {
+                            callout.free = true;
+                        }
+                    }
+                })
+            }));
+        }
         if anns.iter().any(|a| a.ann_group.is_some()) {
             out.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| group_annotations(s, &ids, false))));
         } else {
