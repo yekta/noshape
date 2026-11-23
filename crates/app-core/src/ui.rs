@@ -472,13 +472,13 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
 
 /// A text box's help (live workflows-1123 06 s2-s4, the Configurations panel's "Filter inputs"): the title beside the
 /// box, then after [`TOOLTIP_EXPAND_DELAY`] the expanded tooltip under it, centred, `body` under the title band.
-/// `text` is the body's words, for the parity recorder.
-pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString>, body: impl Fn() -> AnyElement + 'static, anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+/// `text` is the body's words, for the parity recorder. The view shown is kept in `held` for [`held_help`].
+pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString>, body: impl Fn() -> AnyElement + 'static, anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>, held: HeldHelp) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let (title, text): (SharedString, SharedString) = (title.into(), text.into());
     let body: std::rc::Rc<dyn Fn() -> AnyElement> = std::rc::Rc::new(body);
     move |_, cx| {
         let (anchor, body) = (anchor.get(), body.clone());
-        cx.new(|cx| {
+        let tip = cx.new(|cx| {
             cx.spawn(async move |this: WeakEntity<RichTooltip>, cx| {
                 cx.background_executor().timer(TOOLTIP_EXPAND_DELAY).await;
                 let _ = this.update(cx, |t, cx| {
@@ -488,9 +488,21 @@ pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString
             })
             .detach();
             RichTooltip { title: title.clone(), description: text.clone(), expanded: false, anchor, width: Default::default(), beside: true, body: Some(body) }
-        })
-        .into()
+        });
+        *held.borrow_mut() = Some(tip.clone());
+        tip.into()
     }
+}
+
+/// A [`help_tooltip`]'s view, kept by its owner: gpui hides a tooltip once a key is pressed, live keeps this help
+/// while the pointer rests on the box and the user types (workflows-1123 06 s3-s4: a new input's name typed, Enter).
+pub type HeldHelp = std::rc::Rc<std::cell::RefCell<Option<Entity<RichTooltip>>>>;
+
+/// The held help to draw while the last input was a key and the pointer is still on `anchor` (none once gpui shows
+/// its own again). The owner empties `held` when the pointer leaves or presses the box.
+pub fn held_help(held: &HeldHelp, anchor: Bounds<Pixels>, window: &Window) -> Option<AnyElement> {
+    let tip = held.borrow().clone()?;
+    (window.last_input_was_keyboard() && anchor.contains(&window.mouse_position())).then(|| deferred(tip).with_priority(1).into_any_element())
 }
 
 /// A measured number (Measure panel, the bottom-right readout, mass

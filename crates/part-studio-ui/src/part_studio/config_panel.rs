@@ -1152,6 +1152,7 @@ impl PartStudioView {
         // border, its top 2 px under the panel's tab strip.
         let main = div()
             .id("cfg-configure")
+            .debug_selector(|| "cfg-configure".into())
             .h(px(32.))
             .px(px(10.))
             .flex()
@@ -1357,7 +1358,17 @@ impl PartStudioView {
                             let a = self.ui.cfg_filter_anchor.clone();
                             move |b, _, _| a.set(b)
                         }, |_, _, _, _| {}).absolute().top(px(-1.)).left(px(-1.)).right(px(-1.)).bottom(px(-1.)))
-                        .tooltip(crate::ui::help_tooltip("Filter inputs", config_filter_help_text(), config_filter_help, self.ui.cfg_filter_anchor.clone())),
+                        // (gpui reports no hover after a key too: only a pointer leaving drops the held help.)
+                        .on_hover(cx.listener(|this, hovered: &bool, window, cx| {
+                            if !*hovered && !window.last_input_was_keyboard() && this.ui.cfg_filter_help.borrow_mut().take().is_some() {
+                                cx.notify();
+                            }
+                        }))
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| {
+                            this.ui.cfg_filter_help.borrow_mut().take();
+                        }))
+                        .tooltip(crate::ui::help_tooltip("Filter inputs", config_filter_help_text(), config_filter_help, self.ui.cfg_filter_anchor.clone(), self.ui.cfg_filter_help.clone()))
+                        .children(crate::ui::held_help(&self.ui.cfg_filter_help, self.ui.cfg_filter_anchor.get(), window)),
                 )
                 .child(toggles)
                 .child({

@@ -7320,6 +7320,40 @@ fn the_config_filter_box_shows_its_help_under_a_still_pointer(cx: &mut TestAppCo
     assert_eq!(row, (true, true, true, true, true, true), "(short beside the box, centred on it; long 400 px, centred, 3 px under, tall) box {b:?}, short {short:?}, long {long:?}");
 }
 
+/// Qa CONFIG-FILTER-HELP-STILL-POINTER (live workflows-1123 06 s2-s4): Configure Part Studio clicked, the pointer left
+/// where it was (now on the filter box): the supported filters show and stay while the new input's name is typed and
+/// Enter pressed.
+#[gpui::test]
+fn the_config_filter_help_stays_while_the_new_inputs_name_is_typed(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-filter-help-typing", &[("width", "30 mm")]);
+    view.update(cx, |v, cx| {
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+        cx.notify();
+    });
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel);
+    let step = |cx: &mut TestAppContext, ms: u64| {
+        for _ in 0..ms / 10 {
+            cx.executor().advance_clock(std::time::Duration::from_millis(10));
+            draw(cx, window);
+        }
+    };
+    let button = at(cx, "cfg-configure").expect("Configure Part Studio").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(button, None, gpui_kit::Modifiers::default());
+    step(cx, 300);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(button, gpui_kit::Modifiers::default());
+    step(cx, 2700);
+    let shown = |cx: &mut TestAppContext| at(cx, "rich-tooltip").map(|b| f32::from(b.size.width));
+    let after_click = shown(cx);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_input("Large");
+    step(cx, 500);
+    let typed = shown(cx);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("enter");
+    step(cx, 500);
+    let entered = shown(cx);
+    assert_eq!((after_click, typed, entered), (Some(400.), Some(400.), Some(400.)), "the supported filters after the click, while typing, after Enter");
+}
+
 /// Live2 config.json (tableKeys): in the Configurations table, Enter on an edited value commits it and moves the
 /// selection down one row (the cell below framed).
 #[gpui::test]
