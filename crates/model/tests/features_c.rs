@@ -4383,6 +4383,38 @@ fn ring_rims_round_one_face_each_where_they_meet_at_the_bottom() {
     assert!(chamfers.len() == 4 && chamfers.iter().all(|a| (a - 9.797).abs() < 0.01), "chamfers {chamfers:?} (live 9.797)");
 }
 
+/// c2-rings-loft's Chamfer 1 after the "Extruded ring" Ø20.5 -> 21.32 edit (live bool rings-shell-edit-1123): Fillet 1's
+/// rounds now cross the strips of side beside the notch arcs, so each arc is two pieces with a round's edge between,
+/// and the 1 mm chamfers of the pieces overlap there: live fails "Overlapping chamfers." and the ring stays as it was
+/// (13 faces), which is all Shell 1 then gets.
+#[test]
+fn notch_arc_chamfers_that_overlap_fail_as_live() {
+    let brep = include_str!("data/rings-loft-ring-21_32.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let before = volume(&r, 0);
+    let arcs: Vec<Reference> = b
+        .shape
+        .edges()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| matches!(e.edge_info().unwrap().curve, noshape_kernel::Curve::Ellipse { minor_radius, .. } if near(minor_radius, mm(3.070296), 1e-6)))
+        .map(|(i, _)| Reference::Edge((*b.edges[i]).clone()))
+        .collect();
+    assert_eq!((b.shape.faces().len(), arcs.len()), (13, 8));
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(arcs));
+        p.set("width", expr("1 mm"));
+    });
+    let (status, message) = s.last_status();
+    assert_eq!((status, message.as_str()), (FeatureStatus::Error, "Overlapping chamfers."));
+    let r = s.regen();
+    assert_eq!(r.context.bodies[0].shape.faces().len(), 13);
+    assert!((volume(&r, 0) - before).abs() < 1e-15, "{} mm³, before {}", volume(&r, 0) * 1e9, before * 1e9);
+}
+
 /// A helical sweep cut into a cylinder: (the rod, the groove's helix over `turns` from the rod's base circle, the
 /// regenerated result). The groove starts below the base (it opens there) and ends inside the rod.
 fn helical_cut(outer: f64, inner: Option<f64>, profile: &[(f64, f64)], turns: &str, height: &str) -> (Studio, RegenResult) {

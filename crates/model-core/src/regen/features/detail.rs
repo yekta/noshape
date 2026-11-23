@@ -250,6 +250,73 @@ fn meeting_strips_overlap(shape: &Shape, edges: &[usize], d: f64) -> bool {
     })
 }
 
+/// Live's "Overlapping chamfers." (c2-rings-loft's Chamfer 1 after the Ø20.5 -> 21.32 edit, live bool rings-shell-edit-1123:
+/// Fillet 1's rounds cut each notch arc in two): two chains of the edges that don't touch but share a face, whose chamfers
+/// built together take material neither takes alone. (At Ø20.5 they share a sliver, at Extrude 1 9.6 mm neither: both
+/// build.) Rims of a plane and a cylinder and straight edges between planes have live's own rules (`rims`,
+/// [`round_overrun`]). `together`: the body's volume chamfered at all of them.
+fn chains_overlap(shape: &Shape, edges: &[usize], shapes: &[Shape], spec: k::ChamferSpec, together: f64) -> FResult<bool> {
+    if edges.len() < 2 || shapes.len() != edges.len() {
+        return Ok(false);
+    }
+    let (ef, ve) = (shape.edge_faces()?, shape.vertex_edges()?);
+    // Chains: the edges that meet at vertices.
+    let mut chain: Vec<usize> = (0..edges.len()).collect();
+    let root = |chain: &mut Vec<usize>, mut i: usize| {
+        while chain[i] != i {
+            i = chain[i];
+        }
+        i
+    };
+    for es in &ve {
+        let here: Vec<usize> = es.iter().filter_map(|&e| edges.iter().position(|&x| x == e as usize)).collect();
+        for w in here.windows(2) {
+            let (a, b) = (root(&mut chain, w[0]), root(&mut chain, w[1]));
+            chain[a] = b;
+        }
+    }
+    let mut chains: Vec<Vec<usize>> = Vec::new();
+    let mut of = BTreeMap::new();
+    for i in 0..edges.len() {
+        let r = root(&mut chain, i);
+        let k = *of.entry(r).or_insert_with(|| {
+            chains.push(Vec::new());
+            chains.len() - 1
+        });
+        chains[k].push(i);
+    }
+    if chains.len() < 2 {
+        return Ok(false);
+    }
+    let faces = shape.faces();
+    let planar = |f: u32| matches!(faces.get(f as usize).map(|f| f.face_surface()), Some(Ok(k::Surface::Plane(_))));
+    let straight = |c: &[usize]| c.iter().all(|&i| matches!(shapes[i].edge_info().map(|x| x.curve), Ok(k::Curve::Line { .. })) && ef.get(edges[i]).is_some_and(|f| f.iter().all(|&g| planar(g))));
+    let ruled = |c: &[usize]| straight(c) || super::blend_section::rims(shape, &c.iter().map(|&i| edges[i]).collect::<Vec<_>>()).is_some();
+    let on = |c: &[usize]| -> BTreeSet<u32> { c.iter().flat_map(|&i| ef.get(edges[i]).cloned().unwrap_or_default()).collect() };
+    let v0 = shape.volume()?;
+    let removed = |picked: &[usize]| -> Option<f64> {
+        let s: Vec<Shape> = picked.iter().map(|&i| shapes[i].clone()).collect();
+        k::chamfer_checked(shape, &s, spec, &[]).ok().and_then(|r| r.shape.volume().ok()).map(|v| v0 - v)
+    };
+    let mut alone: Vec<Option<Option<f64>>> = vec![None; chains.len()];
+    for a in 0..chains.len() {
+        for b in a + 1..chains.len() {
+            if (ruled(&chains[a]) && ruled(&chains[b])) || on(&chains[a]).is_disjoint(&on(&chains[b])) {
+                continue;
+            }
+            let ra = *alone[a].get_or_insert_with(|| removed(&chains[a]));
+            let rb = *alone[b].get_or_insert_with(|| removed(&chains[b]));
+            let (Some(ra), Some(rb)) = (ra, rb) else { continue };
+            let both = if chains.len() == 2 { Some(v0 - together) } else { removed(&[chains[a].clone(), chains[b].clone()].concat()) };
+            let Some(both) = both else { continue };
+            if both - (ra + rb) > (1e-3 * ra.min(rb)).max(1e-12) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
 /// Live's rule for rounds and chamfers of two or more edges (behaviours
 /// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds",
 /// request 1516 / 1587): a selected straight edge between planar faces that
@@ -1376,6 +1443,9 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         };
+        if matches!(spec, k::ChamferSpec::Equal(_)) && chains_overlap(&body.shape, &edges, &shapes, spec, res.shape.volume()?)? {
+            return err("Overlapping chamfers.");
+        }
         // OCCT's chamfer of straight concave edges taking material off (asm-isaac-ball's a2e4a2 Chamfer 2, 568 mm³ where
         // live adds 40.31): the corners filled as live's.
         // (Its own failures leave OCCT's: cli-draft-hang's Chamfer 4, faces it can't orient.)
