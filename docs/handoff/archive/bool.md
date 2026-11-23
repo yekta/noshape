@@ -5304,3 +5304,17 @@ cf-snap-hook 866 / 274 (suite run 18:5x); c2-bottle-split Split 1 ~12 ms in rele
   round waits (set `changed`); move_seams_off_holes: a loop, faces tried once unless changed, ef once a pass.
   T1 boolean_groups::stacked_pins_unify_as_one_piece_pins. A/B: wc-ab.sh in bool-hat (PROBE_NO_BATCH=1
   PROBE_NO_TRIED=1 = old). Left: 26 seam moves each a whole-part Apply (~0.6 s vibe2): batch them per pass next.
+
+## Moved from NEXT 11-23 06:00 (items 4-6)
+4. GAMMA B2 correctness, PARKED (lead told 17:48): live's pairs A..K (live/bool/gamma-b2-pairs) equal ours except
+   G (Chassis leg-left x Induction SSB-Front, live 0.078 mm3 less) and C (Chassis 2 x SKIN 3): live fills a 5 um gap
+   at z 18.386 (306 faces, overlap -0.25 mm3, area removed 2101.9; ours = OCCT 312 faces, +0.055, 1981.0). The STEP's
+   uncertainty is 5.E-6 m, but both parts at 5 um tolerance over-fill in OCCT (-52 mm3, 304 faces; probe
+   PROBE_PAIR2=2,3 PROBE_TOL=5e-6, gm-p2t.sh in bool-stages): live's rule is narrower. ~2 mm3 of the full union's
+   2.39 is in no pair (live's union removes 2 less than its pairs' sum; ours equals ours). 889 faces vs live 884.
+5. STANDOFFS Revolve 2 is ours (Boolean 185 + unify 198 ms); sections-ahead isn't the lever (st-brep9.out).
+6. Decision b: NO local check after the second group merge.
+   Probe tree bool-stages: uncommitted timers (groups.*, bands.*, unify.bands.*), PROBE_BANDS / PROBE_USDL /
+   PROBE_USD_SPLIT / PROBE_JOINS / PROBE_JOIN_FIRST switches, the local USD; shell.rs PROBE_SHELLS / EACH / GAPS. Never
+   commit them.
+
