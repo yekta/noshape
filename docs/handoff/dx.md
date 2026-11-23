@@ -33,7 +33,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   IMP-NO-FEEDBACK: live answered (live/dx/import-undo-1123): "Insert tab(s) : <file>.step" at +1.5 s, then one
   "Import document" entry at +7.7 s; Undo disabled in both tabs (ours: tab-bar edits aren't undoable either).
   Fixed (queued after 79b0abcb): the app adds the kept file first ("Insert tab(s) : <file>"), the tabs after. Open:
-  live's second entry reads "Import document", ours "Import <file>". No T1 test for the styled-face merge rule yet.
+  second entry now "Import document" as live (UNCOMMITTED, dx-scratch/hd-run1.log; upload-only's entry unrecorded in live). No T1 test for the styled-face merge rule yet.
 
 ## Committed: hose x_t END rings (core 11-23 03:0x: "please take the END rings")
 - xt.cpp: Chart + chart_of (19 exact points + closing, damped Newton), intersection_curve (CHART, LIMIT H,
@@ -53,17 +53,26 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
   xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
 
+## STATE 07:14
+- Committed, not landed (stacked on 538aa4b0, CHECKING since 06:44; never run land.sh while it's queued):
+  1362592de ordinate fan-out, 6778c1914 part_appearances `imported` rows, dcd70e18e import history entry
+  "Import document" (green hd-run1: clippy ops+app, ops e2e 301, app import 5). Land all three with land.sh once
+  538aa4b0 is through (the lead reports lands; no polling).
+- Then tell qa: IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK once landed.
+- Blocked on live (PAUSED until 11-24 07:00): REQUESTS "dx 11-23 06:57" (a) composite colour, (b) panel rows +
+  live STEP face colours.
+
 ## qa 06:5x import recheck (TICKETS e6e1ad1f3): 6 verified; new P1s
-- IMP-FACE-APPEARANCE-ROWS (COMMITTED 07:1x, green fa-run3: clippy, e2e, coverage): part_appearances lists the import's face
+- IMP-FACE-APPEARANCE-ROWS (COMMITTED 07:0x, green fa-run3: clippy, e2e, coverage): part_appearances lists the import's face
   appearances (ctx.face_appearance) under `imported` (face, part, colour, source feature), apart from the indexed
   `appearances`; e2e an_imports_own_face_colours_are_listed_as_its_face_appearances (live g48 face-colour.step); AGENT_API regenerated. The
   Appearances panel rows: live capture asked (REQUESTS "dx 11-23 06:57" (b)).
 - IMP-COMPOSITE-GENERATED-COLOUR: ours = ctx.alloc_color() (rotation by bodies made; usbc 34 -> idx 2 = live by
-  chance); live Mac mini #7f7f7f (idx 6). Mac mini STEP not on any host now. Capture asked (REQUESTS (a)): composite
+  chance); live Mac mini #7f7f7f (idx 6). Mac mini STEP not on any host now. Capture asked (REQUESTS "dx 11-23 06:57" (a); live PAUSED until 11-24 07:00): composite
   colour on clamp / train-joe / c2-duct / o-ring. Then fix.
 - IMP-NO-FEEDBACK: qa rechecks once 538aa4b0 is green.
-- FOUND: our STEP export writes no face colours (kernel ExportShape has the part colour only; ops export.rs
-  step_shape); live writes them (kernel/tests/data/step/face-colour.step = live g48, one face red). Next export item.
+- Our STEP export writes no face colours (kernel ExportShape: part colour only; ops export.rs step_shape). Whether
+  live writes them is unrecorded (face-colour.step's red face looks hand-appended): asked in REQUESTS (b).
 
 ## NEXT: drw-dims-1123 export checks (live/drw-dims-1123/INDEX.md, hole-table.md, iso-format.md, ordinate-*.md)
 - Tapped hole SIZE: DROPPED (06:40). drw-dims' M8 hole was made by API without a tap type (kit/build.mjs:65), so live
@@ -79,7 +88,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   source). Tie order among equal values unknown (live e,c,d,b,a; ours a..e). Land after 538aa4b0 (CHECKING
   since 06:09, batch since 06:44).
 - Ordinate "a group reaches the export only when its tool closes": tool flow, studios'.
-- Then: tell studios which tool-flow rows (Esc never closes a tool, chaining, silent invalid picks) are theirs.
+- Studios told (07:06) which drw-dims tool-flow rows are theirs.
 
 ## Parked: rings-loft STEP refit (branch dx-wip-step-refit, patch /root/dx-scratch/step-refit-wip.patch)
 - refit_loose_edges(shape, over, pcurves) after STEP read at 1e-4 mm: revolved ring 1449.9415 vs x_t 1449.9431
