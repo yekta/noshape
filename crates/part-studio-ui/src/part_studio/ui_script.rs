@@ -843,6 +843,6 @@ fn sketch_geometry(sk: &noshape_sketch::Sketch, owned: &std::collections::HashSe
             (g.to_string(), g)
         })
         .collect();
-    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.sort_by_cached_key(|(key, _)| key.clone());
     out.into_iter().map(|(_, g)| g).collect()
 }

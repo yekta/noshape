@@ -33,12 +33,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (07:14 UTC 11-23, after compaction 5): QUEUED cc8570b3 (batch 1de902059 + Mac mini e2e 654001243 +
-TICKETS rebuild; supersedes FAILED b8a17535). Lead told (07:14): report sent incl. qa re-score asks (qa at 186k, routed
-via lead), joint-edge-through-wall question, decision needed UIS-STATE-GEOMETRY, ERR-MATE-HOVER-GLYPH -> asm.
-Verified before the land: t103 hover_matrix 101/101; t104 17/17; t106+t107; t108 ops coverage:: + Mac mini e2e green.
-Open next: ERR-TOOL-BODY-COLOUR (extrude needs darker, revolve redder: pixel study), FEEL-EDIT-BODY-SHADE region tint
-(180,179,154) vs (185,186,164), LIST-TOOLTIP-CHROME unticked rows + root glyph, ERR-MISSING-SELECTION (core flag).
+## RESUME HERE (08:56 UTC 11-23): QUEUED cc8570b3 (batch incl. 1de902059: mate flyout unticked rows + root ⬇ badge
++ 400 px wrap). Committed, not landed: 825f6603f UIS-STATE-GEOMETRY (live recorder side in live/REQUESTS 07:17).
+UNCOMMITTED, t114 green apart from the triad bound (fixed since), t115 = the two tests + clippy:
+- ERR-TOOL-BODY-COLOUR: failing tool matte (preview_body_ids), alpha 0.8, TOOL_PREVIEW_FAIL 0x9b3d40 (scene palette):
+  extrude (129,60,63) vs live (130,62,67), revolve (129,63,66) vs (135,63,69). Test a_failing_tool_body_is_lives_matte_dark_red.
+- FEEL-TRANSFORM-TRIAD-LOOK drag: ghost_outline_only(.., &selection) marks a selected part's ghost faces; renderer.rs
+  draw_lists body_mask also draws lists.transparent. Dragged orange 944 (live 1384), ghost #C2CDD5 1771 (live 2418).
+- FEEL-ROLLBACK-CLAMP-HOVER pills/dot (list matrix green); clippy sort fixes; TICKETS notes for all + ERR-LIST-TOOLTIP-CHROME.
+- FEEL-EDIT-BODY-SHADE region: studied (print_edit_body_shade T2); only the region through the right face is off by
+  (4,7,10): the preview light's right face; left open in TICKETS.
+Then: commit, land.sh (825f6603f + these), report lead <=5 lines.
+Not mine now: ERR-SM-BAD-SELECTION-RED joint edge (skasm 11-23, lead's ok); dx adds an app-core toast stack (touches
+mod.rs DocEvent::Info/Error + render_viewport_overlay toast).
+Open next: ERR-MISSING-SELECTION (core flag), FEEL-MC-LOOK navy px (left: llvmpipe), P2 queue below.
 Older notes (t101):
 script /root/psui-scratch/run-t102.sh). t101: clippy clean, PS 37/39, HIST ok. Since t101: div.rs gate REVERTED (the
 row tip "Extrude 1 <- Sketch 1" still showed after a quick double-click), list-matrix row re-gapped, TICKETS

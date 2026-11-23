@@ -2118,3 +2118,175 @@ fn a_flange_on_a_joint_edge_draws_red_pixels(cx: &mut TestAppContext) {
     let after = red(cx);
     assert!(after >= before + 20, "red px: {before} closed, {after} with the dialog open");
 }
+
+/// FEEL-EDIT-BODY-SHADE study: Extrude 1 edited, the frame's main colours (live manip-feel-1122 extrude-released: top
+/// (132,144,156), front (168,196,212), the region through the front (184,184,164), through the left (164,160,132))
+/// (cargo test -p noshape-part-studio-ui --lib print_edit_body_shade -- --ignored --nocapture).
+#[gpui::test]
+#[ignore = "T2: prints an edited Extrude's colours"]
+fn print_edit_body_shade(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "edit-body-shade-study");
+    let id = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").map(|f| f.id)).expect("Extrude 1");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let (w, _, px) = m.frame(cx);
+    for (name, p) in [("top", [20., 15., 20.]), ("front", [20., 0., 10.]), ("front low", [20., 0., 2.]), ("right low", [40., 15., 2.]), ("bottom centre", [20., 15., 0.])] {
+        let q = m.screen(cx, p);
+        println!("== {name} {:?}", px[(q.y as u32 * w + q.x as u32) as usize]);
+    }
+    let mut count: std::collections::HashMap<[u8; 3], usize> = std::collections::HashMap::new();
+    for p in px.iter().filter(|p| !(p[0] > 225 && p[1] > 225 && p[2] > 225)) {
+        *count.entry([p[0] / 4 * 4, p[1] / 4 * 4, p[2] / 4 * 4]).or_default() += 1;
+    }
+    let mut top: Vec<_> = count.into_iter().collect();
+    top.sort_by_key(|t| std::cmp::Reverse(t.1));
+    for (c, n) in top.into_iter().take(12) {
+        println!("  [{c:?}] {n}");
+    }
+}
+
+/// ERR-TOOL-BODY-COLOUR: a failing tool body is matte dark red, no grey highlight (live errors-1123: an extrude
+/// missing the parts, its sides (130,62,67); a revolve's ring (135,63,69)); its main colour within 10.
+#[gpui::test]
+fn a_failing_tool_body_is_lives_matte_dark_red(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let base = serde_json::json!([
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+    ]);
+    let cases = [
+        ("extrude add-miss", 0x823e43, serde_json::json!([
+            { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[70, 15], [78, 15]] }] },
+            { "type": "extrude", "name": "Tool", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "ADD", "defaultScope": false, "booleanScope": [] } }
+        ])),
+        ("revolve remove-miss", 0x873f45, serde_json::json!([
+            { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "corner_rectangle": [[60, 5], [70, 15]] }] },
+            { "type": "newSketch", "name": "Sketch 4", "plane": "Top", "shapes": [{ "line": [[50, -5], [50, 25]] }] },
+            { "type": "revolve", "name": "Tool", "params": { "entities": ["Sketch 2 region 0"], "axis": ["Sketch 4 edges"], "operationType": "REMOVE", "defaultScope": false, "booleanScope": [] } }
+        ])),
+    ];
+    for (name, live, extra) in cases {
+        let mut features = base.as_array().unwrap().clone();
+        features.extend(extra.as_array().unwrap().iter().cloned());
+        let m = matrix_studio_from(cx, "failed-tool-study", serde_json::json!({ "units": "mm", "features": features }));
+        let id = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Tool").map(|f| f.id)).expect("the tool feature");
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+        wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+        m.park(cx);
+        let failed = cx.update(|cx| m.view.read(cx).tool_failed());
+        let (_, _, px) = m.frame(cx);
+        let mut count: std::collections::HashMap<[u8; 3], usize> = std::collections::HashMap::new();
+        for p in px.iter().filter(|p| p[0] as i32 - p[1] as i32 > 12 && p[0] < 215 && p[0] as i32 - p[2] as i32 > 8) {
+            *count.entry([p[0] / 3 * 3, p[1] / 3 * 3, p[2] / 3 * 3]).or_default() += 1;
+        }
+        let mut top: Vec<_> = count.into_iter().collect();
+        top.sort_by_key(|t| std::cmp::Reverse(t.1));
+        let main = top.first().map(|t| t.0).unwrap_or_default();
+        assert!(failed && close(main, live, 10), "{name}: failed {failed}, its main colour {main:?}, live #{live:06x} ({:?})", &top[..top.len().min(6)]);
+    }
+}
+
+/// FEEL-TRANSFORM-TRIAD-LOOK (qa manipnav r6): Translate by XYZ's hovered X arrow is one solid blue stroke over the part
+/// (live), not broken every ~3 px by the part's edges.
+#[gpui::test]
+fn a_hovered_triad_arrow_is_solid_blue_over_the_part(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "triad-solid");
+    let part = cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone()))).expect("the block");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("transform", w, cx))).unwrap();
+    draw(cx, m.window);
+    cx.update(|cx| m.view.update(cx, |v, cx| {
+        if let Some(e) = &v.edit {
+            e.dialog.update(cx, |d, _| {
+                d.feature.params.set("transformType", noshape_model::params::ParamValue::Enum("TRANSLATION_3D".into()));
+                d.feature.params.set("entities", noshape_model::params::ParamValue::Query(vec![part.clone()]));
+            });
+        }
+    }));
+    draw(cx, m.window);
+    // Looking from the top-front edge's side at the block's centre: the X shaft (from the centre) lies along that
+    // edge on screen, the edge in front of it (qa manipnav r6).
+    cx.update(|cx| {
+        let vp = m.view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            vp.camera.rotation = noshape_render::Camera::look_rotation(DVec3::new(0., 15., -10.).normalize(), DVec3::Z);
+            vp.camera.target = DVec3::new(0.02, 0.015, 0.01);
+            vp.request_frame(cx);
+        });
+    });
+    draw(cx, m.window);
+    let (a, b) = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let t = v.current_triad(cx).expect("the triad");
+        let s = v.triad_hit_segments(&t, cx)[0];
+        (s.0, s.1)
+    });
+    let at = |cx: &mut TestAppContext, p: DVec3| m.exact(cx, [p.x * 1000.0, p.y * 1000.0, p.z * 1000.0]);
+    let (sa, sb) = (at(cx, a), at(cx, b));
+    m.pointer.move_to(cx, &m.view, sa.lerp(sb, 0.4).round());
+    assert_eq!(cx.update(|cx| m.view.read(cx).ui.triad_hover), Some(0), "the X arrow hovered");
+    let (w, _, px) = m.frame(cx);
+    // On the stroke's centre line: blue (the outline or the core), never the part's dark edge.
+    let samples: Vec<[u8; 3]> = (0..24).map(|k| sa.lerp(sb, 0.1 + 0.4 * k as f64 / 23.0).round()).map(|q| px[(q.y as u32 * w + q.x as u32) as usize]).collect();
+    let blue = samples.iter().filter(|c| c[2] as i32 - c[0] as i32 > 40).count();
+    assert!(blue == samples.len(), "{blue}/{} samples blue along the shaft: {samples:?}", samples.len());
+}
+
+/// FEEL-TRANSFORM-TRIAD-LOOK (qa manipnav r6, live manip-feel-1122): while Translate by XYZ's X arrow is dragged, live
+/// keeps the part's orange outline at its first place (the light grey ghost, #C2CDD5) and draws the moved part opaque,
+/// its top #99C0D7 (live transform-x-drag: 7821 top px, 2418 ghost, 1384 orange); ours drew no outline (the outline mask
+/// skipped see-through parts).
+#[gpui::test]
+fn a_dragged_triad_keeps_the_outline_and_an_opaque_part(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "triad-drag-look");
+    let part = cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone()))).expect("the block");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("transform", w, cx))).unwrap();
+    draw(cx, m.window);
+    cx.update(|cx| m.view.update(cx, |v, cx| {
+        if let Some(e) = &v.edit {
+            e.dialog.update(cx, |d, _| {
+                d.feature.params.set("transformType", noshape_model::params::ParamValue::Enum("TRANSLATION_3D".into()));
+                d.feature.params.set("entities", noshape_model::params::ParamValue::Query(vec![part.clone()]));
+            });
+        }
+    }));
+    draw(cx, m.window);
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    let (a, b) = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let t = v.current_triad(cx).expect("the triad");
+        let s = v.triad_hit_segments(&t, cx)[0];
+        (s.0, s.1)
+    });
+    let at = |cx: &mut TestAppContext, p: DVec3| m.exact(cx, [p.x * 1000.0, p.y * 1000.0, p.z * 1000.0]);
+    let (sa, sb) = (at(cx, a), at(cx, b));
+    let grab = sa.lerp(sb, 0.4).round();
+    m.pointer.move_to(cx, &m.view, grab);
+    let count = |px: &[[u8; 3]]| {
+        let near = |c: u32, t: i32| px.iter().filter(|p| close(**p, c, t)).count();
+        let orange = px.iter().filter(|p| p[0] > 220 && (120..200).contains(&p[1]) && p[2] < 90).count();
+        (near(0x99c0d7, 12), near(0xc2cdd5, 8), orange)
+    };
+    let rest = count(&m.frame(cx).2);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(m.window, cx);
+    let dir = (sb - sa).normalize();
+    let p0 = m.pointer.window_point(&mut vcx, grab);
+    vcx.simulate_mouse_down(p0, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+    for k in 1..=6 {
+        let p = m.pointer.window_point(&mut vcx, grab + dir * (10.0 * k as f64));
+        vcx.simulate_mouse_move(p, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+        m.pointer.frames(cx, &m.view);
+    }
+    for _ in 0..20 {
+        m.pointer.frames(cx, &m.view);
+    }
+    let dragged = count(&m.frame(cx).2);
+    println!("triad drag (live top #99C0D7 px, ghost #C2CDD5 px, orange px): at rest {rest:?}, dragged {dragged:?}");
+    assert!(dragged.0 > 3000 && dragged.1 > 300 && dragged.2 * 2 > rest.2, "dragged: the moved top opaque, the ghost, its outline kept (live (7821, 2418, 1384)): {dragged:?} (at rest {rest:?})");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(m.window, cx);
+    let end = m.pointer.window_point(&mut vcx, grab + dir * 60.0);
+    vcx.simulate_mouse_up(end, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+}

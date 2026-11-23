@@ -56,9 +56,10 @@ pub mod viewport {
     /// part-studio/230 reads `#8494a0` on the top over white.
     pub const FEATURE_PREVIEW: u32 = 0x678495;
     /// A Remove / Intersect tool body: cutting (dark gray) or missing the
-    /// parts (dark red; live `#803f43` shaded).
+    /// parts (dark red; live `#803f43` shaded; failing, at 0.8 under the matte preview light: live errors-1123 sides
+    /// (130,62,67), revolve ring (135,63,69)).
     pub const TOOL_PREVIEW: u32 = 0x3a3d40;
-    pub const TOOL_PREVIEW_FAIL: u32 = 0x8a3a3f;
+    pub const TOOL_PREVIEW_FAIL: u32 = 0x9b3d40;
     /// "Highlight boundary edges" (help: open edges in red).
     pub const BOUNDARY_EDGE: u32 = 0xe00000;
     /// Errors (`ERROR_HIGHLIGHT_COLOR1`).

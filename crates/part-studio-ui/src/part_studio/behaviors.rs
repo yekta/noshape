@@ -3096,7 +3096,8 @@ impl PartStudioView {
         let (Some(_), Some(before)) = (&self.edit, &self.ui.preview_before) else { return Vec::new() };
         let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
         if let Some((tool, _)) = &self.ui.preview_tool {
-            if !self.preview_tool_blended() {
+            // A failing tool is matte as well (live errors-1123: no highlight; at 0.9 its sides (123,66,70), live (130,62,67)).
+            if !self.preview_tool_blended() && !self.tool_failed() {
                 return Vec::new();
             }
             return tool.bodies.iter().filter(|b| !old.contains(&b.id)).map(|b| b.id.clone()).collect();
@@ -3109,16 +3110,18 @@ impl PartStudioView {
 
     /// A Transform's ghost (its old place) shows its selection only as the part's orange band, no amber tint (live
     /// manip-feel-1118 m6).
-    pub(super) fn ghost_outline_only(&self, scene: &mut noshape_render::Scene, built: &crate::scene_builder::BuiltScene) {
+    pub(super) fn ghost_outline_only(&self, scene: &mut noshape_render::Scene, built: &crate::scene_builder::BuiltScene, selection: &[Reference]) {
         use noshape_render::scene::state;
         let Some(before) = &self.ui.preview_before else { return };
         let mut any = false;
-        // (The moved copy is display-only: a face's pick ids are the ghost's.)
+        // (The moved copy is display-only: a face's pick ids are the ghost's. A selected part marks the moved copy's
+        // id, not the ghost's: its faces are outlined here, qa FEEL-TRANSFORM-TRIAD-LOOK.)
         for b in before.bodies.iter().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
+            let whole = selection.contains(&Reference::Body(b.id.clone()));
             for f in &b.face_refs {
                 for &id in built.picks.ids_for(f) {
                     let st = scene.states.get(id as usize).copied().unwrap_or(0);
-                    if st & state::SELECTED != 0 {
+                    if whole || st & state::SELECTED != 0 {
                         scene.set_state(id, (st & !(state::SELECTED | state::BODY | state::TINT)) | state::OUTLINE | state::BAND);
                         any = true;
                     }
@@ -3183,7 +3186,7 @@ impl PartStudioView {
             }
             for b in tool.bodies.iter().filter(|b| !old.contains(&b.id)) {
                 let mut b = b.clone();
-                b.color = [c[0], c[1], c[2], if blended { 1.0 } else if failed { 0.9 } else { 0.6 }];
+                b.color = [c[0], c[1], c[2], if blended { 1.0 } else if failed { 0.8 } else { 0.6 }];
                 if !blended {
                     b.mesh = Arc::new(noshape_model::display::MeshBuffers { edges: Vec::new(), vertices: Vec::new(), ..(*b.mesh).clone() });
                 }

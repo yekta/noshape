@@ -1662,7 +1662,7 @@ impl PartStudioView {
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
-        self.ghost_outline_only(&mut scene, built);
+        self.ghost_outline_only(&mut scene, built, &selection);
         // A face hovered under a preview lights its edges of the model before the feature: the edges the preview made
         // (a Fillet's tangent lines) stay plain (live hover-matrix-recheck-1123 cell 4: the dark tangent line 3 px over
         // the picked strip, no #FFC685 along it; the face's other edges lit).
@@ -4347,8 +4347,11 @@ impl PartStudioView {
                         // The rollback bar released over Origin, a plane or the header lands at the top (live2 rb-followup
                         // 11-18, expanded or collapsed).
                         .children(dg_rows)
+                        .group("dg-rows")
                         .drag_over::<RollbackDrag>(|s, _, _, _| s.border_b_2().border_color(p().accent))
                         .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(Some(0), cx)))
+                        // The clamped line keeps the hollow dot at its left end (qa FEEL-ROLLBACK-CLAMP-HOVER, live x~47).
+                        .when(cx.has_active_drag(), |d| d.child(rollback_drop_dot(pal.accent).bottom(px(-2.5)).group_drag_over::<RollbackDrag>("dg-rows", |s| s.visible())))
                         // Live: the line ends in a 9 px tick; drawn over the rows.
                         .child(div().absolute().left(px(9.)).top(px(2.)).bottom(px(1.)).w(px(1.)).bg(pal.border))
                         .child(div().absolute().left(px(5.)).bottom(px(1.)).w(px(9.)).h(px(1.)).bg(pal.border))
@@ -6267,19 +6270,7 @@ impl PartStudioView {
             // Rollback drop line (live part-studio/30): a small hollow blue
             // circle at its left end, shown while the bar is dragged over
             // (only built during a drag: its start redraws every row).
-            .when(cx.has_active_drag(), |d| d.child(
-                div()
-                    .absolute()
-                    .left(px(0.))
-                    .top(px(-2.5))
-                    .size(px(7.))
-                    .rounded_full()
-                    .border_2()
-                    .border_color(pal.accent)
-                    .bg(gpui_kit::rgb(0xffffff))
-                    .invisible()
-                    .group_drag_over::<RollbackDrag>("feature-row", |s| s.visible()),
-            ))
+            .when(cx.has_active_drag(), |d| d.child(rollback_drop_dot(pal.accent).top(px(-2.5)).group_drag_over::<RollbackDrag>("feature-row", |s| s.visible())))
             // The same dot on a feature drag's line, top or bottom edge (F33).
             .when(cx.has_active_drag(), |d| {
                 let after = self.ui.feature_drop.get() == Some((i, true));
@@ -7178,6 +7169,11 @@ impl Render for SeparatorDrag {
     }
 }
 
+/// The rollback drop line's hollow dot at its left end (live part-studio/30), hidden until its row is dragged over.
+fn rollback_drop_dot(accent: gpui_kit::Rgba) -> gpui_kit::Div {
+    div().absolute().left(px(0.)).size(px(7.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xffffff)).invisible()
+}
+
 #[derive(Clone)]
 struct RollbackDrag;
 
@@ -7187,13 +7183,13 @@ struct RollbackDragPill(Point<Pixels>);
 
 impl Render for RollbackDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        // Onshape (live, part-studio/30): a dark-blue pill "Rollback bar" just
-        // right of the pointer, level with it.
+        // Onshape (live, part-studio/30): a dark-blue pill "Rollback bar", its corner 10 px right of and 5 px below
+        // the pointer (live reorder drag (+10, +5); qa FEEL-ROLLBACK-CLAMP-HOVER: 18 px lower than ours, level with it).
         // (Margins on a drag preview's root are ignored; offset a child.)
         div().child(div()
             .relative()
-            .left(self.0.x + px(12.))
-            .top(self.0.y - px(12.))
+            .left(self.0.x + px(10.))
+            .top(self.0.y + px(5.))
             .px(px(10.))
             .py(px(3.))
             .rounded_full()
@@ -7220,10 +7216,11 @@ struct FeatureDragPill(Point<Pixels>, SharedString);
 
 impl Render for FeatureDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        // (At the pointer + (10, 5), as the rollback bar's.)
         div().child(div()
             .relative()
-            .left(self.0.x + px(12.))
-            .top(self.0.y - px(12.))
+            .left(self.0.x + px(10.))
+            .top(self.0.y + px(5.))
             .px(px(10.))
             .py(px(3.))
             .rounded_full()

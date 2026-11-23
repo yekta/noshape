@@ -1478,6 +1478,8 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
     }
     if body_mask {
         draw(pass, &lists.opaque, &pipelines.mesh_body_mask);
+        // A see-through part outlined (a Transform's ghost at the old place, live manip-feel-1122 transform-x-drag).
+        draw(pass, &lists.transparent, &pipelines.mesh_body_mask);
         draw(pass, &lists.opaque, &pipelines.mesh_body_face);
         return;
     }
