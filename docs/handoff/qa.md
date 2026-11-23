@@ -14,12 +14,12 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   PS-SELECTED-FRONT-FILL). workflows-1123 rescored on 24f1566de (out-wf23b): 3 verified, 4 partly, 21 new rows (block 01:1x),
   P1 ASM-FIXES-NOT-IN-FLOW; duplicate union rows of the 21:4x/22:0x blocks dropped.
 - **Subagent running**: import fidelity (live/dx/import-fidelity-1123, 8 STEPs) vs ours, brief qa-scratch/brief-imp.md,
-  vibe2 :496, scratch qa-scratch/imp; file per owner (dx, psui, asm). IMPELLER-SHELL-INVALID verified 01:5x.
+  vibe2 :496, scratch qa-scratch/imp; file per owner (dx, psui, asm). IMPELLER-SHELL-INVALID verified 01:5x. workflows-1123 01-12 rescored 02:1x on ed11f7c48 (out-wf23g 01-05, out-wf23f 06-12): 8 verified, owners told.
 - **Done**: error catalogue live/errors-1123 vs ours, brief
   qa-scratch/brief-err.md, all filed (a 01:5x 12 rows, b 01:2x 10, c 01:4x 15), owners told, vibe2, scratch qa-scratch/err/<set>; appearance-1123 filed 01:5x (12 rows, core/psui told). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
 - **Units (logs qa-scratch/tmp/<name>.log)**: qa-wf23c (waits for psui 3cfb09978 + skasm 35c533220 in green, then wf23 01-03/06/07 ->
   hm2/out-wf23c: PICKED-EDGE-DASHED, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SM, SM-TAB-MERGE-PICK, CORNER-BREAK, CONFIG-FILTER-HELP
-  if 975844f0d is in); qa-ver6 (full matrix b* + [ips]* on psui b8a17535's green, after rr-b8a1/wf23c -> hmr5-b/hmr5-ips; replaced ver3); qa-wf23f (wf23 04-12 on the current green -> out-wf23f: out-wf23b's 01-12 ran on 7fe68797a, recheck those rows' 01:1x verdicts); qa-rr-2782 (dx 2782ce84 -> wf23 17 -> out-wf23e: SPEED-FILE-TAB-IMPORT-MENU s2, ours 192 ms vs live 58); qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
+  if 975844f0d is in); qa-ver6 (full matrix b* + [ips]* on psui b8a17535's green, after rr-b8a1/wf23c -> hmr5-b/hmr5-ips; replaced ver3); qa-rr-2782 (dx 2782ce84 -> wf23 17 -> out-wf23e: SPEED-FILE-TAB-IMPORT-MENU s2, ours 192 ms vs live 58); qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
   MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM, FIXED-GLYPH-AA); qa-ver5 (after rr-c6ec: matrix '*-mc-*' -> hmr4-mc, navy rim + notch);
   qa-wait-imp (bool impeller -> IMP-DONE: expect no invalid part, close IMPELLER-SHELL-INVALID); qa-wait-sp (bool e7c98cc5a ->
   ~13.6 s + Part 1 129/385/258, close COMPAT-SURFACE-PATTERN-SLOWER). Hold each in a background task.
