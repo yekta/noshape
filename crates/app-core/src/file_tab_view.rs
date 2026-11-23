@@ -399,13 +399,17 @@ pub fn download(doc: &Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mu
     let ext = static_ext(&f.ext());
     let doc = doc.clone();
     crate::file_dialogs::request_save_path("Download", f.file_name.clone(), ext, window, cx, move |path, cx| {
-        let r = f.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| std::fs::write(&path, b).map_err(|e| e.to_string()));
-        let msg = match r {
-            Ok(()) => format!("Downloaded {}", path.display()),
-            Err(e) => format!("Download failed: {e}"),
-        };
-        doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(msg)));
+        if let Some(e) = download_to(&f, &path) {
+            doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(e)));
+        }
     });
+}
+
+/// The file written to `path`: the error to show when it isn't. A download that worked shows nothing (live
+/// doc-file-tab-download: no dialog, no toast; it showed "Downloaded <path>" as a red error, user 11-23).
+fn download_to(f: &FileTab, path: &std::path::Path) -> Option<String> {
+    let r = f.bytes().ok_or_else(|| "the file data is damaged".to_string()).and_then(|b| std::fs::write(path, b).map_err(|e| e.to_string()));
+    r.err().map(|e| format!("Download failed: {e}"))
 }
 
 /// Update…: replace the file with another one (the tab keeps its name).
@@ -855,6 +859,20 @@ fn pick(doc: Entity<DocModel>, spec: PickSpec, window: &mut Window, cx: &mut App
 
 #[cfg(test)]
 mod tests {
+    /// A file tab's Download that worked shows nothing (live doc-file-tab-download); one that fails says why, red.
+    #[test]
+    fn a_download_that_works_shows_no_toast() {
+        let dir = std::env::temp_dir().join(format!("noshape-file-tab-download-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = noshape_model::file_tab::FileTab::new("Mac-mini-2024.step", b"ISO-10303-21;", 0);
+        let path = dir.join("Mac-mini-2024.step");
+        assert_eq!(super::download_to(&f, &path), None);
+        assert_eq!(std::fs::read(&path).unwrap(), b"ISO-10303-21;");
+        let failed = super::download_to(&f, &dir.join("no such folder").join("a.step"));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(failed.is_some_and(|e| e.starts_with("Download failed: ")));
+    }
+
     #[test]
     fn csv_rows_follow_rfc_4180() {
         let rows = super::csv_rows("a,b,c\r\n1,\"x, y\",\"say \"\"hi\"\"\"\n2,\"two\nlines\",\n");
