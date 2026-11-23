@@ -623,6 +623,17 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ previews
 
+    /// Where a Note tool click anchors its leader: a snap point or a view edge (in the view), else a centerline or the
+    /// sheet's frame line (a sheet point); with its sheet position.
+    fn note_line_leader(&self, c: [f64; 2]) -> Option<(Leader, [f64; 2])> {
+        let pk = self.pk();
+        if let Some(p) = pk.snap_or_edge_point(c) {
+            let at = self.pick_sheet(&p)?;
+            return Some((Leader { view: Some(p.view), point: p.p, ..Default::default() }, at));
+        }
+        pk.note_line_anchor(c).map(|q| (Leader { view: None, point: q, ..Default::default() }, q))
+    }
+
     pub fn pick_sheet(&self, p: &PickedPoint) -> Option<[f64; 2]> {
         self.pk().pick_sheet(p)
     }
@@ -801,6 +812,11 @@ impl DrawingEditor {
                 _ => crate::drawing_scene::SnapMark::Disc,
             };
             overlay.marks.push((p, mark, self.tol_mm(15.0)));
+        } else if matches!(self.tool, Tool::Note)
+            && self.note_leader.is_none()
+            && let Some((_, p)) = self.note_line_leader(c)
+        {
+            overlay.marks.push((p, crate::drawing_scene::SnapMark::Hourglass, self.tol_mm(15.0)));
         }
         self.section_edit_overlay(&mut overlay);
         self.table_tool_overlay(&mut overlay, cx);
@@ -1379,10 +1395,10 @@ impl DrawingEditor {
                 }
             }
             Tool::Note => {
-                // A click on a snap point or an edge anchors a leader; the
-                // next click places the text.
-                match (self.note_leader.is_some(), self.pk().snap_or_edge_point(c)) {
-                    (false, Some(p)) => self.note_leader = Some(Leader { view: Some(p.view), point: p.p, nodes: Vec::new(), ..Default::default() }),
+                // A click on a snap point, an edge, a centerline or the sheet's frame anchors a leader; the next click
+                // places the text.
+                match (self.note_leader.is_some(), self.note_line_leader(c)) {
+                    (false, Some((l, _))) => self.note_leader = Some(l),
                     _ => self.open_note_panel(None, c, window, cx),
                 }
             }

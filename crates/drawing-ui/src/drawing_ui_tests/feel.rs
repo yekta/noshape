@@ -3369,6 +3369,44 @@ fn the_note_tool_frames_a_vertex_in_a_15_px_square(cx: &mut TestAppContext) {
     assert_eq!(mark(cx, dim).map(|m| m.0), Some(SnapMark::Disc), "the Dimension tool's disc");
 }
 
+/// Live drw-hover-1122 tN-edge / tN-border: the Note tool marks where a click would hang its leader on a line, a view
+/// edge or the sheet's frame (7 px in), with a ~15 px hourglass; the click there anchors the leader (on the frame, a
+/// sheet point).
+#[gpui::test]
+fn the_note_tool_marks_a_leader_anchor_on_an_edge_or_the_frame_with_an_hourglass(cx: &mut TestAppContext) {
+    use crate::drawing_scene::SnapMark;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-note-hourglass");
+    real_sheet(cx, window, &editor);
+    let (a, b, _) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Note, cx)));
+    draw(cx, window);
+    let hourglass = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            e.overlay.marks.iter().find(|m| m.1 == SnapMark::Hourglass).map(|m| (m.0, m.2 / e.tol_mm(1.0)))
+        })
+    };
+    let on_edge = [a[0] + (b[0] - a[0]) / 3.0, a[1]];
+    lit_at(cx, window, &editor, on_edge);
+    let (p, size_px) = hourglass(cx).expect("an hourglass on the edge");
+    assert!((p[0] - on_edge[0]).hypot(p[1] - on_edge[1]) < 1e-6, "at the hotspot: {p:?} vs {on_edge:?}");
+    assert!((size_px - 15.0).abs() < 1e-6, "about 15 px: {size_px}");
+    let ([fx0, fy0, _, fy1], zoom) = cx.update(|cx| (editor.read(cx).current_sheet().size.frame_rect(), editor.read(cx).zoom));
+    let y = (fy0 + fy1) / 2.0 + 10.0;
+    lit_at(cx, window, &editor, [fx0 + 8.0 / zoom, y]);
+    assert_eq!(hourglass(cx), None, "8 px inside the frame: nothing");
+    lit_at(cx, window, &editor, [fx0 + 6.0 / zoom, y]);
+    let (p, _) = hourglass(cx).expect("an hourglass on the frame 6 px in");
+    assert!((p[0] - fx0).abs() < 1e-9 && (p[1] - y).abs() < 0.01, "on the frame line: {p:?}");
+    click_at(cx, window, &editor, [fx0 + 6.0 / zoom, y], Modifiers::default());
+    let leader = cx.update(|cx| editor.read(cx).note_leader.clone()).expect("the click anchors a leader");
+    assert_eq!(leader.view, None, "a sheet point");
+    assert!((leader.point[0] - fx0).abs() < 1e-9, "{:?}", leader.point);
+    lit_at(cx, window, &editor, [fx0 + 5.0 / zoom, y]);
+    assert_eq!(hourglass(cx), None, "no hourglass once the leader is anchored");
+}
+
 /// Help D22: the Dimension tool snaps to an edge's midpoint only after Shift+Q (its status says so); a new tool starts
 /// without them.
 #[gpui::test]

@@ -1,6 +1,6 @@
 {
  "name": "drw-centerline-circle-3-point-hole-centres",
- "about": "3 point circle centerline through three hole centres in Top, (10, 10), (50, 10) and (50, 30): a bolt circle centred (30, 20), r 22.36, and whether live adds marks at the picked centres",
+ "about": "3 point circle centerline through three hole centres in Top, (10, 10), (50, 10) and (50, 30): a bolt circle centred (30, 20), r 22.36, and whether live adds marks at the picked centres. Live refuses the Ø8 centre (50, 30); ours takes it by design (lead 11-23: live's failure, not a target)",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "coverage (lead 11-20: drawing types with 0-1 uses)",

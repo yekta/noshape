@@ -33,6 +33,9 @@ pub enum SnapMark {
     VividDisc,
     /// The Note tool's frame round a point (live C11 (a): hollow, ~15 px, rgb(255,130,63)).
     Box,
+    /// The Note tool's leader anchor on a line (a view edge, a centerline, the sheet's frame): an hourglass ⧗, ~15 px,
+    /// rgb(255,89,0) (live drw-hover-1122 tN-edge / tN-centerline / tN-border).
+    Hourglass,
     Square,
     Triangle,
     Diamond,
@@ -45,6 +48,7 @@ pub const VIVID_DISC_RGB: [u8; 4] = [255, 110, 32, 255];
 pub const VIVID_RIM_RGB: [u8; 4] = [255, 234, 223, 255];
 pub const SNAP_DISC_RGB: [u8; 4] = [216, 165, 102, 255];
 const NOTE_BOX_RGB: [u8; 4] = [255, 130, 63, 255];
+const HOURGLASS_RGB: [u8; 4] = [255, 89, 0, 255];
 
 impl Overlay {
     pub fn is_empty(&self) -> bool {
@@ -109,6 +113,13 @@ impl Overlay {
                 }
                 SnapMark::VividDisc => {
                     vivid.push(c);
+                    continue;
+                }
+                SnapMark::Hourglass => {
+                    let g = [[c[0] - h, c[1] + h], [c[0] + h, c[1] + h], [c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] - h, c[1] + h]];
+                    for w in g.windows(2) {
+                        l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: HOURGLASS_RGB, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+                    }
                     continue;
                 }
                 SnapMark::Box => {

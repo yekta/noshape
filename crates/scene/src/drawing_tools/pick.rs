@@ -745,6 +745,25 @@ impl<'a> SheetPick<'a> {
         self.snap_or_edge_point(s)
     }
 
+    /// The Note tool's leader anchor on a centerline (within 8 px) or the sheet's inner frame line (7 px), sheet mm: the
+    /// nearest point on it (live drw-hover-1122 tN-centerline / tN-border and its reach table).
+    pub fn note_line_anchor(&self, s: [f64; 2]) -> Option<[f64; 2]> {
+        let b = self.built?;
+        let nearest = |a: [f64; 2], e: [f64; 2]| {
+            let d = sub(e, a);
+            let l2 = d[0] * d[0] + d[1] * d[1];
+            let t = if l2 > 0.0 { (((s[0] - a[0]) * d[0] + (s[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0) } else { 0.0 };
+            let q = [a[0] + d[0] * t, a[1] + d[1] * t];
+            (q, len(sub(q, s)))
+        };
+        let centerlines = b.geometry.lines.iter().filter(|l| l.pick != 0 && b.picks.get(l.pick as usize).is_some_and(|t| self.is_centerline(t)));
+        let on_centerline = centerlines.flat_map(|l| l.points.windows(2).map(|w| nearest(w[0], w[1])).collect::<Vec<_>>()).filter(|(_, d)| *d < self.tol_mm(8.0));
+        let [x0, y0, x1, y1] = self.current_sheet().size.frame_rect();
+        let frame = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]];
+        let on_frame = frame.windows(2).map(|w| nearest(w[0], w[1])).filter(|(_, d)| *d < self.tol_mm(7.0)).collect::<Vec<_>>();
+        on_centerline.chain(on_frame).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(q, _)| q)
+    }
+
     pub fn snap_or_edge_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);

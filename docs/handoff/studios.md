@@ -30,6 +30,11 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   cylinder silhouette (now lit: pick.rs silhouette_line_of + smart.rs silhouette_axis_offset), tapped hole table cell
   dropped ISO's thread line (now ANSI only, drawing test covers both). x281 green: ops e2e 300, scene, clippy. 28462984f-ish
   tip (with USE-AGAIN) queued on top of the stack.
+- 07:58 (lead 07:5x): centerline on an exact hole centre = live's failure, ours takes it (behaviours, parity A52, the
+  take's about). The 3 P1s (MOVED-VIEW-PROPS, DETAIL-PREVIEW-LOOK, SECTION-PREVIEW-IN-PARENT) were done in the queued
+  stack. live drw-hover-matrix-1123 (r23n) paused after its setup probe (no hover samples); audited drw-hover-1122's
+  matrix instead: FEEL-DRW-NOTE-HOURGLASS done (x282 drawing-ui 180, clippy), FEEL-DRW-DIM-FRAME-LINE open (REQUESTS
+  studios 11-23 07:58). Rest of the 1122 matrix already in feel tests (reach, colours, table, centerline).
 - FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 on main). live import-into-doc-1123: ours matches; rest is dx's.
 - Mac check: watcher bd5jb96zs polls v0.4.68's mac asset (not published at 06:28); then bin/mac-copycheck.sh 0.4.68
   (idle >= 600 s only), report <= 3 lines to the lead. Background runs/watchers die at session end: re-arm.
@@ -57,8 +62,6 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
     app-core start_library a_finder_copy_is_named_after_its_file_and_leftover_side_files_go; app quit_tests (2).
   - File association / open-file events are dx's (open_requests.rs); dx keys "already open" on canonical(path) and its
     second start never opens the store. Not yet verified on the Mac's release build.
-- drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre; ours takes it. Decision needed
-  from the lead (copy or record as live's failure).
 
 
 ## Next, in order
