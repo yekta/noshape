@@ -3,34 +3,33 @@
 Updated 2026-11-23 05:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (06:11 UTC 11-23) — read first
-- P0 Offset box (user): ef72904e6 QUEUED alone (CHECKING since 06:09 in a batch of 4); lead cherry-picks it into
-  release/v0.4.68. Cause: the box copied the on-the-fly box style (transparent, blue line); the "black block" was a typed
-  Tab drawn as a missing glyph. Fix: white box + #ccc border + blue line, red on non-distance text; one-line fields drop
-  control-char text (vendor/gpui-base state.rs). Test the_offset_value_box_is_an_opaque_white_box_with_a_thin_caret.
-- BATCH COMMITTED, NOT QUEUED: 905844ae3-amended HEAD "skasm: sketch tools while drawing as live (sketch-tools-1123)..."
-  on top of ef72904e6 (backup branch skasm-wip2 = pre-squash). Tested (tm14): clippy 0 scene/psui, scene 222 ok, psui
-  matrix/text/offset/sm-flange serial ok; tm12 full psui 519/521 (the 2 = fillet-drag row, fixed since: oblique test
-  view made 28 px a too-big radius; and an sm GPU pixel test flaky in parallel). NEXT: once ef72904e6 LANDED (lead says),
-  `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh < /dev/null` (rebase drops the landed patch); diff --stat first.
-  If ef72904e6 FAILS: fix forward on it first.
-- qa SKT P0s (TICKETS top; evidence /root/qa-scratch/tickets/SKT-*-1123.png; qa ran on main, without this batch):
-  in the batch: FILLET-DRAG, FILLET-PENDING-SET (2nd corner preview, Esc drops all), ENDINGS-COMMIT (Offset tool off,
-  slot Esc, CA double-click at start), DASHDOT (30/6/4/6 px, CA circle), TEXT-KEYS (one Esc closes + tool off, canvas
-  click refocuses). OPEN: TEXT Enter = new line (needs TextareaState for "text.text" + multi-line text geometry);
-  CHAMFER-BOX-B (open_next_value_box exists; verify after land + stored structure: live point + 2 construction lines +
-  chamfer line); two-line fillet pick amber; then the P1 SKT rows (INFER-STORED, VB-PLACE-LENGTH, MENU-HEAD,
-  PATTERN-DESELECT, MIRROR-AGAIN, TANGENT-ARC-DOT).
-- P1 rings (lead, from blend): c2-rings-loft "Extruded ring" Ø20.5→21.32. CAUSE FOUND: arcs wZIh/MirrorCS (R3.137) are
-  under-defined (ends on the trimmed ellipse + mirror only). Ours: r 3.0703, c (-6.0062,14.0286), s (-7.7781,11.5212),
-  e (-2.9445,14.2577) → 980.743. Live: r 3.1374 kept, c (-6.0539,14.2168), s (-7.731,11.5653), e (-2.9169,14.2652) →
-  989.99 (area check by /tmp script reproduces both). Tried metrics, none = live: radius-kept min point movement (979.19),
-  centre+angles, centre+ellipse params. Our arc = centre + 2 points (no radius param), min-norm weighted step. Next: ask
-  live for a simple capture (one free arc with ends on a resized circle/ellipse) to learn DCM's rule; then a radius aux
-  param + weights in crates/sketch/src/solver.rs. Probe test: /root/skasm-scratch/rings-edit-probe.patch (ops parity T2;
-  run: tmrings.sh on vibex6). Report this to lead (not yet sent).
-- Skipped (report): Tab mid-draw = browser focus artefact. DECISION NEEDED (lead): duplicate Use / Mirror copies.
-- Later: bend-twice naming, ERR-SM-FILTER-FACE, FEEL-MC-PS-MARKER-REACH (asm), c2-constrained-surface pair.
+## NOW (06:30 UTC 11-23) — read first
+- QUEUED 7d729d65 (06:2x): 0cae2e75e SKT batch on top of ef72904e6 (Offset box P0; lead has it on release/v0.4.68). Lead
+  reports land results; never poll.
+- UNCOMMITTED in worktree (tm16 running on vibex6, log /root/skasm-scratch/tm16-run.log; script ~/tmp/skasm/tm16.sh =
+  clippy sketch/scene/psui/ops + sketch all, scene all, ops e2e::sketch, psui chamfer/fillet/text/offset serial). If green:
+  commit "skasm: two picked lines fillet / chamfer as live, chamfer box B keeps the keys, chamfers stored as live, Text
+  Enter is a new line", diff --stat, TICKETS dup check, land.sh. Changes:
+  - sketch tools.rs: Sketch::fillet_picked / chamfer_picked / cut_at_crossing (crossing lines cut at the crossing keeping
+    the picked sides; fillet drops the visualSharp), EditResult::absorb; chamfer() now adds 2 construction legs
+    sharp->end with LENGTH (live distanceAId/B) instead of 2 Distance dims. Tests tools.rs picked_crossing_lines_*,
+    onshape_ux chamfer test updated; ops e2e sketch_fillet_chamfer_offset expects 3 lines (2 construction).
+  - scene sketch_mode.rs: chamfer_dim_ends (Distance or construction Length) used by chamfer_dims/frame/labels/places;
+    corner_click two-line picks use *_picked, both lines selected (first pick too), commit/Esc clear them; test
+    two_picked_lines_fillet_on_enter.
+  - psui sketch.rs: commit_dimension Ok path refocuses canvas only if no box open (box B bug); Text field is a
+    TextareaState (SketchUi.text_area, text_area(), set_sketch_text); option_input/option_text/set_option/OptKind/
+    apply_pattern removed (unused). Tests a_chamfers_second_box_takes_the_keys_after_the_first, text dialog test +Enter.
+  - TICKETS rows FILLET-PENDING-SET / CHAMFER-BOX-B / TEXT-KEYS annotated (06:3x).
+- REQUESTS (live) filed 06:16: rings arcs capture (Extruded ring geometry before/after Ø21.32 + minimal free-arc cases);
+  multi-line Text layout in its box. Rings P1 cause: arcs wZIh/MirrorCS under-defined; ours r3.0703 (980.743), live keeps
+  r3.1374 (989.99); next = solver rule from the capture (radius aux param + weights, crates/sketch/src/solver.rs); probe
+  /root/skasm-scratch/rings-edit-probe.patch (tmrings.sh on vibex6).
+- Decision (lead, DECISIONS 07264069e): Use of a used edge and Mirror of a mirrored entity make duplicates as live
+  (SKT-MIRROR-AGAIN P1: implement).
+- Remaining SKT: two-line chamfer preview look unknown (we draw it); P1s INFER-STORED, VB-PLACE-LENGTH, MENU-HEAD,
+  PATTERN-DESELECT, MIRROR-AGAIN, TANGENT-ARC-DOT. psui owns POSTCOMMIT-HOVER, USE-HOVER.
+- Later: bend-twice naming, ERR-SM-FILTER-FACE, FEEL-MC-PS-MARKER-REACH, c2-constrained-surface pair.
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
   Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =

@@ -532,6 +532,15 @@ pub(crate) struct LineLayoutIndex {
 impl LineLayoutIndex {
     /// NOSHAPE PATCH (agent psui): see `PrepaintStateIndex::moved`.
     pub(crate) fn moved(&self, from: &Self, to: &Self) -> Self {
+        // A font loaded mid-frame cleared the caches: the indices no longer line up, and a stale generation makes
+        // `reuse_layouts` skip them.
+        let behind = self.lines_index < from.lines_index
+            || self.wrapped_lines_index < from.wrapped_lines_index
+            || self.lines_by_hash_index < from.lines_by_hash_index
+            || self.wrapped_lines_by_hash_index < from.wrapped_lines_by_hash_index;
+        if behind || self.font_generation != from.font_generation || from.font_generation != to.font_generation {
+            return Self { font_generation: usize::MAX, ..*self };
+        }
         Self {
             font_generation: self.font_generation,
             lines_index: self.lines_index - from.lines_index + to.lines_index,

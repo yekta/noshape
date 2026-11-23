@@ -8864,7 +8864,8 @@ fn f1_in_a_sketch_opens_help_on_the_current_or_last_tool(cx: &mut TestAppContext
 }
 
 /// Live sketch-tools-1123 text.md: with a new text's dialog open a canvas click starts and commits nothing (the
-/// dialog stays, its field focused again); one Esc closes the dialog, the tool off, nothing kept.
+/// dialog stays, its field focused again); Enter types a new line; one Esc closes the dialog, the tool off, nothing
+/// kept.
 #[gpui::test]
 fn the_text_dialog_closes_with_one_esc_and_survives_a_canvas_click(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "text-keys", Tool::Text);
@@ -8874,9 +8875,35 @@ fn the_text_dialog_closes_with_one_esc_and_survives_a_canvas_click(cx: &mut Test
     assert_eq!(state(cx), Some((true, Tool::Text)), "the dialog open");
     click(cx, window, &view, (300., 200.));
     assert_eq!(state(cx), Some((true, Tool::Text)), "a canvas click keeps it");
-    let focused = cx.update_window(window, |_, w, cx| view.read(cx).ui_ref().and_then(|u| u.opts.get("text.text").cloned()).is_some_and(|st| st.read(cx).focus_handle(cx).is_focused(w))).unwrap();
+    let focused = cx.update_window(window, |_, w, cx| view.read(cx).ui_ref().and_then(|u| u.text_area.as_ref().map(|t| t.0.clone())).is_some_and(|st| st.read(cx).focus_handle(cx).is_focused(w))).unwrap();
     assert!(focused, "the field focused again");
+    keys(cx, window, &["a", "b", "enter", "c"]);
+    assert_eq!(state(cx), Some((true, Tool::Text)), "Enter doesn't commit");
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| ed.text_string.clone())).as_deref(), Some("ab\nc"), "Enter types a new line");
     keys(cx, window, &["escape"]);
     assert_eq!(state(cx), Some((false, Tool::Select)), "one Esc: closed, the tool off");
     assert!(cx.update(|cx| view.read(cx).sketch_data(cx).is_some_and(|d| d.texts.is_empty())), "nothing kept");
+}
+
+/// Live sketch-tools-1123 chamfer.md (qa SKT-CHAMFER-BOX-B): Enter on the first distance's box opens the second,
+/// focused, so the next keys type its value (4, then 6).
+#[gpui::test]
+fn a_chamfers_second_box_takes_the_keys_after_the_first(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "chamfer-box-b", Tool::Line);
+    click(cx, window, &view, (400., 300.));
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (500., 400.));
+    keys(cx, window, &["escape", "escape"]);
+    let (window, view) = sketch_in_tool(cx, window, view, Tool::Chamfer);
+    click(cx, window, &view, (500., 300.));
+    keys(cx, window, &["enter", "4", "enter"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_some()), "the second distance's box open");
+    keys(cx, window, &["6", "enter"]);
+    let mut values: Vec<i64> = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.constraints().filter(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Length { curve, .. } if d.sketch.entity(curve).is_some_and(|e| e.construction))).filter_map(|c| c.kind.value()).map(|x| (x * 1e6).round() as i64).collect()
+    });
+    values.sort();
+    assert_eq!(values, vec![4000, 6000], "the chamfer's distances (µm)");
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Enter closes the box");
 }

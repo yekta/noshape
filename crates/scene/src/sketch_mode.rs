@@ -1822,7 +1822,7 @@ impl SketchEditor {
         }
         if !self.clicks.is_empty() || !self.picks.is_empty() || self.chain_end.is_some() || self.mirror_axis.is_some() || self.tangent_mode {
             // Live 2270: a constraint tool's picks (Midpoint started on two points) go with it.
-            if matches!(self.tool, Tool::Constraint(_)) {
+            if matches!(self.tool, Tool::Constraint(_) | Tool::Fillet | Tool::Chamfer) {
                 let picks: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
                 self.selection.retain(|e| !picks.contains(e));
             }
@@ -3143,15 +3143,18 @@ impl SketchEditor {
         // Another corner replaces a red preview.
         self.invalid_corner = None;
         // The corner point, or the two curves.
+        let mut first_at = p;
         let target = if let Some(pid) = corner {
             self.picks.clear();
             (pid, None)
         } else if let Some(c) = hovered {
-            if let Some(&(first, _)) = self.picks.first().filter(|(f, _)| *f != c) {
+            if let Some(&(first, at)) = self.picks.first().filter(|(f, _)| *f != c) {
                 self.picks.clear();
+                first_at = at;
                 (first, Some(c))
             } else {
                 self.picks = vec![(c, p)];
+                self.selection = vec![c];
                 return EditOutcome::redraw();
             }
         } else {
@@ -3163,8 +3166,8 @@ impl SketchEditor {
         let made = match (target, chamfer) {
             ((pid, None), true) => sk.chamfer_corner(pid, da, db),
             ((pid, None), false) => sk.fillet_corner(pid, r),
-            ((a, Some(b)), true) => sk.chamfer(a, b, da, db),
-            ((a, Some(b)), false) => sk.fillet(a, b, r),
+            ((a, Some(b)), true) => sk.chamfer_picked((a, first_at), (b, p), da, db),
+            ((a, Some(b)), false) => sk.fillet_picked((a, first_at), (b, p), r),
         };
         match made {
             Ok(res) => {
@@ -3174,9 +3177,8 @@ impl SketchEditor {
                 self.pending_corners = self.pending_corner_pid.into_iter().collect();
                 // Live (ui-parity sketch-fillet-corner): the clicked corner
                 // stays selected until the fillet is confirmed.
-                if target.1.is_none() {
-                    self.selection = vec![target.0];
-                }
+                // Two picked curves both stay selected (live sketch-tools-1123: amber).
+                self.selection = std::iter::once(target.0).chain(target.1).collect();
                 // Live shows no prompt for it (ui-parity sketch-fillet-corner).
                 self.message = None;
                 EditOutcome::redraw()
@@ -3243,7 +3245,8 @@ impl SketchEditor {
         let Some((preview, result)) = self.pending_corner.take() else { return EditOutcome::none() };
         self.pending_corner_pid = None;
         let corners = std::mem::take(&mut self.pending_corners);
-        self.selection.retain(|e| !corners.contains(e));
+        // (Two picked curves: their selection goes too.)
+        self.selection.retain(|e| !corners.contains(e) && !corners.is_empty());
         *data = preview;
         self.finish_create(data, &result.created);
         if self.tool == Tool::Chamfer {
@@ -3308,7 +3311,7 @@ impl SketchEditor {
         }
         let (data, result) = self.pending_corner.as_ref()?;
         let dims = chamfer_dims(&data.sketch, result);
-        let Some(ConstraintKind::Distance { a, b, .. }) = data.sketch.constraint(*dims.first()?).map(|c| c.kind.clone()) else { return None };
+        let (a, b) = chamfer_dim_ends(&data.sketch, *dims.first()?)?;
         let (sharp, end) = (data.sketch.point(a)?, data.sketch.point(b)?);
         Some((sharp, (end - sharp).try_normalize()?, end, dims))
     }
@@ -8675,14 +8678,24 @@ fn angle_arc(out: &mut Vec<[DVec2; 2]>, c: DVec2, s1: DVec2, s2: DVec2, r: f64, 
 
 /// A sketch chamfer's two distance dimensions (virtual sharp → chamfer end).
 fn chamfer_dims(sk: &Sketch, r: &noshape_sketch::EditResult) -> Vec<ConstraintId> {
-    r.constraints_added.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Distance { .. }))).collect()
+    r.constraints_added.iter().copied().filter(|c| chamfer_dim_ends(sk, *c).is_some()).collect()
+}
+
+/// A chamfer distance's (virtual sharp, chamfer end): its construction line's ends (live `distanceAId`), or the two
+/// points of an older chamfer's distance dimension.
+fn chamfer_dim_ends(sk: &Sketch, cid: ConstraintId) -> Option<(EntityId, EntityId)> {
+    match sk.constraint(cid)?.kind {
+        ConstraintKind::Distance { a, b, .. } => Some((a, b)),
+        ConstraintKind::Length { curve, .. } if sk.entity(curve)?.construction => sk.endpoints(curve),
+        _ => None,
+    }
 }
 
 /// Where a committed chamfer's distance boxes open (live sketch-tools-1123 at 3.9 px/mm): distance A's 15 mm off its
 /// edge and 7.5 mm past its middle toward its end, distance B's level with the corner, beside its edge.
 fn chamfer_box_places(sk: &Sketch, dims: &[ConstraintId], px: f64) -> Vec<(ConstraintId, DVec2)> {
     let place = |i: usize, cid: ConstraintId, label: DVec2| -> Option<(ConstraintId, DVec2)> {
-        let ConstraintKind::Distance { a, b, .. } = sk.constraint(cid)?.kind else { return None };
+        let (a, b) = chamfer_dim_ends(sk, cid)?;
         let (sharp, end) = (sk.point(a)?, sk.point(b)?);
         let mid = (sharp + end) * 0.5;
         let (n, u) = ((label - mid).try_normalize()?, (end - sharp).try_normalize()?);
@@ -8696,9 +8709,9 @@ fn chamfer_box_places(sk: &Sketch, dims: &[ConstraintId], px: f64) -> Vec<(Const
 fn chamfer_dim_labels(sk: &Sketch, dims: &[ConstraintId], px: f64) -> Vec<(ConstraintId, DVec2)> {
     let ends: Vec<(ConstraintId, DVec2, DVec2)> = dims
         .iter()
-        .filter_map(|cid| match sk.constraint(*cid)?.kind {
-            ConstraintKind::Distance { a, b, .. } => Some((*cid, sk.point(a)?, sk.point(b)?)),
-            _ => None,
+        .filter_map(|cid| {
+            let (a, b) = chamfer_dim_ends(sk, *cid)?;
+            Some((*cid, sk.point(a)?, sk.point(b)?))
         })
         .collect();
     ends.iter()
@@ -11864,6 +11877,23 @@ mod tests {
         (ed, d)
     }
 
+    /// Live sketch-tools-1123 fillet.md: two crossing lines picked one after the other each turn selected (amber),
+    /// nothing previews, and Enter makes the fillet in the picks' quadrant with its radius box.
+    #[test]
+    fn two_picked_lines_fillet_on_enter() {
+        let (mut ed, mut d) = editor(Tool::Fillet);
+        let h = d.sketch.add_line(v(-0.110, -0.025), v(-0.075, -0.025));
+        let w = d.sketch.add_line(v(-0.092, -0.010), v(-0.092, -0.045));
+        click(&mut ed, &mut d, v(-0.100, -0.025));
+        assert_eq!(ed.selection, vec![h], "the first line picked");
+        click(&mut ed, &mut d, v(-0.092, -0.035));
+        assert_eq!((ed.selection.clone(), count(&d, EntityKind::Arc)), (vec![h, w], 0), "both picked, nothing made yet");
+        assert!(ed.fillet_arrow(&d.sketch).is_none() && ed.fillet_value_label(&d.sketch).is_none(), "no preview");
+        assert!(ed.commit_corner(&mut d).changed, "{:?}", ed.message);
+        assert_eq!((count(&d, EntityKind::Arc), ed.selection.len()), (1, 0), "(arcs, selected) after Enter");
+        assert!(ed.dim_edit.is_some(), "the radius box");
+    }
+
     /// Live sketch-tools-1123 fillet.md: a second corner while one previews adds its own preview (both selected,
     /// nothing made); the same corner again (a double-click) keeps it pending; Enter makes both.
     #[test]
@@ -11900,9 +11930,9 @@ mod tests {
         assert!(ed.commit_corner(&mut d).changed);
         let first = ed.dim_edit.as_ref().expect("distance A's box").constraint;
         let second = ed.value_box_next.expect("distance B's box queued");
-        let geo = |cid: ConstraintId| match d.sketch.constraint(cid).map(|c| c.kind.clone()) {
-            Some(ConstraintKind::Distance { a, b, .. }) => (d.sketch.point(a).unwrap_or_default(), d.sketch.point(b).unwrap_or_default(), d.dimension_labels.get(&cid.0).map_or(DVec2::ZERO, |l| v(l[0], l[1]))),
-            _ => (DVec2::ZERO, DVec2::ZERO, DVec2::ZERO),
+        let geo = |cid: ConstraintId| match chamfer_dim_ends(&d.sketch, cid) {
+            Some((a, b)) => (d.sketch.point(a).unwrap_or_default(), d.sketch.point(b).unwrap_or_default(), d.dimension_labels.get(&cid.0).map_or(DVec2::ZERO, |l| v(l[0], l[1]))),
+            None => (DVec2::ZERO, DVec2::ZERO, DVec2::ZERO),
         };
         let (sharp, end, at) = geo(first);
         let u = (end - sharp).normalize();
@@ -11926,7 +11956,7 @@ mod tests {
         }
         click(&mut ed, &mut d, v(0.01, 0.01));
         assert!(ed.commit_corner(&mut d).changed, "{:?}", ed.message);
-        let mut values: Vec<i64> = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Distance { .. })).filter_map(|c| c.kind.value()).map(|x| (x * 1e6).round() as i64).collect();
+        let mut values: Vec<i64> = d.sketch.constraints().filter(|c| chamfer_dim_ends(&d.sketch, c.id).is_some()).filter_map(|c| c.kind.value()).map(|x| (x * 1e6).round() as i64).collect();
         values.sort();
         assert_eq!(values, vec![4000, 4000, 6000, 6000], "both chamfers' distances (µm)");
     }

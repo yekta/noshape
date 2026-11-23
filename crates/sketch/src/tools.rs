@@ -73,6 +73,16 @@ struct Cut {
 }
 
 impl EditResult {
+    /// Adds what a following operation changed.
+    pub fn absorb(&mut self, other: EditResult) {
+        self.created.extend(other.created);
+        self.removed.extend(other.removed);
+        self.modified.extend(other.modified);
+        self.constraints_added.extend(other.constraints_added);
+        self.constraints_removed.extend(other.constraints_removed);
+        self.created.retain(|c| !self.removed.contains(c));
+    }
+
     fn merge_removed(&mut self, ids: Vec<EntityId>) {
         for id in ids {
             if !self.removed.contains(&id) {
@@ -603,8 +613,8 @@ impl Sketch {
 
     /// Sketch chamfer between two lines sharing a corner: both lines are cut
     /// back by `d1` / `d2` from the corner and joined by a new line. The
-    /// corner stays as a construction "virtual sharp" carrying the two
-    /// distance dimensions.
+    /// corner stays as a construction "virtual sharp", joined to the chamfer's
+    /// ends by two construction lines carrying the distances.
     pub fn chamfer(&mut self, a: EntityId, b: EntityId, d1: f64, d2: f64) -> Result<EditResult> {
         if d1 <= 0.0 || d2 <= 0.0 {
             return Err(SketchError::OperationFailed("chamfer distances must be positive".into()));
@@ -645,9 +655,83 @@ impl Sketch {
             self.add_c(&mut res, ConstraintKind::Coincident { a: corner, b });
             res.modified.push(corner);
         }
-        self.add_c(&mut res, ConstraintKind::Distance { a: corner, b: pa, value: d1, mode: crate::constraints::DistanceMode::Center });
-        self.add_c(&mut res, ConstraintKind::Distance { a: corner, b: pb, value: d2, mode: crate::constraints::DistanceMode::Center });
+        // Live (behaviours "qa5 sketch tools" (4)): `distanceAId` / `distanceBId`, construction lines from the virtual
+        // sharp to the chamfer's ends, each with its LENGTH.
+        for (end, d) in [(pa, d1), (pb, d2)] {
+            let leg = self.add_line_between(corner, end)?;
+            let _ = self.set_construction(leg, true);
+            res.created.push(leg);
+            self.add_c(&mut res, ConstraintKind::Length { curve: leg, value: d });
+        }
         Ok(res)
+    }
+
+    /// Fillet of two picked curves. Lines that cross or fall short of each other are first cut (or extended) at
+    /// their crossing, each keeping the side of its pick point (live sketch-tools-1123: the fillet goes in the
+    /// quadrant of the picks, no visualSharp point).
+    pub fn fillet_picked(&mut self, a: (EntityId, DVec2), b: (EntityId, DVec2), radius: f64) -> Result<EditResult> {
+        let before = self.clone();
+        let made = self.cut_at_crossing(a, b).and_then(|(mut res, corner)| {
+            let mut r = self.fillet(a.0, b.0, radius)?;
+            if let Some(c) = corner.filter(|c| self.entity(*c).is_some()) {
+                let on = self.constraints_on(c);
+                r.constraints_added.retain(|x| !on.contains(x));
+                r.modified.retain(|x| *x != c);
+                self.remove_entities(&[c]);
+                res.created.retain(|x| *x != c);
+            }
+            res.absorb(r);
+            Ok(res)
+        });
+        if made.is_err() {
+            *self = before;
+        }
+        made
+    }
+
+    /// Chamfer of two picked lines, cut or extended at their crossing like [`Sketch::fillet_picked`].
+    pub fn chamfer_picked(&mut self, a: (EntityId, DVec2), b: (EntityId, DVec2), d1: f64, d2: f64) -> Result<EditResult> {
+        let before = self.clone();
+        let made = self.cut_at_crossing(a, b).and_then(|(mut res, _)| {
+            res.absorb(self.chamfer(a.0, b.0, d1, d2)?);
+            Ok(res)
+        });
+        if made.is_err() {
+            *self = before;
+        }
+        made
+    }
+
+    /// Two lines that share no end: each loses its end on the far side of their crossing from its pick point and
+    /// both meet at a new point there (returned). Curves that already meet, or aren't two lines, are left alone.
+    fn cut_at_crossing(&mut self, (a, pick_a): (EntityId, DVec2), (b, pick_b): (EntityId, DVec2)) -> Result<(EditResult, Option<EntityId>)> {
+        let mut res = EditResult::default();
+        let (Some((sa, ea)), Some((sb, eb))) = (self.endpoints(a), self.endpoints(b)) else { return Ok((res, None)) };
+        let tol = 4.0 * self.tool_tol();
+        let pos = |sk: &Sketch, p: EntityId| sk.point(p).unwrap_or_default();
+        let meet = [sa, ea].iter().any(|p| [sb, eb].iter().any(|q| p == q || (pos(self, *p) - pos(self, *q)).length() <= tol));
+        if meet || self.kind(a) != Some(EntityKind::Line) || self.kind(b) != Some(EntityKind::Line) {
+            return Ok((res, None));
+        }
+        let (a0, b0) = (pos(self, sa), pos(self, sb));
+        let (da, db) = (pos(self, ea) - a0, pos(self, eb) - b0);
+        let den = da.perp_dot(db);
+        if den.abs() <= 1e-12 * da.length() * db.length() {
+            return Err(SketchError::OperationFailed("the lines are parallel".into()));
+        }
+        let x = a0 + da * ((b0 - a0).perp_dot(db) / den);
+        let corner = self.add_point(x);
+        res.created.push(corner);
+        for (id, s, e, d, pick) in [(a, sa, ea, da, pick_a), (b, sb, eb, db, pick_b)] {
+            let s0 = pos(self, s);
+            let drop = if (pick - s0).dot(d) < (x - s0).dot(d) { e } else { s };
+            if let Some(ent) = self.entity_mut(id) {
+                ent.replace_point(drop, corner);
+            }
+            res.modified.push(id);
+            self.remove_orphans(&[drop], &mut res);
+        }
+        Ok((res, Some(corner)))
     }
 
     /// Chamfer at a corner point shared by exactly two lines.

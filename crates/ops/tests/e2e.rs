@@ -743,7 +743,9 @@ fn sketch_fillet_chamfer_offset() {
     assert_eq!(radius[0]["expression"], "4 mm");
     assert!(!cons.iter().any(|c| c["type"] == "Equal"));
     let ch = call(&mut ctx, "sketch_chamfer", json!({ "sketch": sk, "entities": [c3], "distance": 3 }));
-    assert_eq!(created(&ch, "line").len(), 1, "{ch}");
+    // The chamfer line and the two construction lines carrying its distances (live: chamferPolyline, distanceAId / B).
+    let lines = created(&ch, "line");
+    assert_eq!((lines.len(), lines.iter().filter(|l| l["construction"] == true).count()), (3, 2), "{ch}");
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
     let area = num(&st["regions"][0]["area"]);
     let expect = 800.0 - 2.0 * (16.0 - 4.0 * std::f64::consts::PI) - 4.5;

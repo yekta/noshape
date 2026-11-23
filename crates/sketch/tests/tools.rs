@@ -728,3 +728,46 @@ fn distance_set_to_zero_collapses_the_sides() {
     let side = sk.curve(r.curves[1]).unwrap();
     assert!((side.end_point() - side.start_point()).length() < 1e-9, "{side:?}");
 }
+
+/// Live sketch-tools-1123 fillet.md / chamfer.md: two crossing lines picked left of and below their crossing: each is
+/// cut there keeping the picked side, the fillet (no visualSharp point) or chamfer joins them in that quadrant.
+#[test]
+fn picked_crossing_lines_fillet_and_chamfer_in_the_picks_quadrant() {
+    let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+    let lines = |sk: &mut Sketch| (sk.add_line(mm(-110.0, -25.0), mm(-75.0, -25.0)), sk.add_line(mm(-92.0, -10.0), mm(-92.0, -45.0)));
+    let ends = |sk: &Sketch, id: EntityId| {
+        let c = sk.curve(id).unwrap();
+        (c.start_point() * 1e3, c.end_point() * 1e3)
+    };
+    let near = |p: DVec2, x: f64, y: f64| (p - v(x, y)).length() < 1e-6;
+
+    let mut sk = Sketch::new();
+    let (h, w) = lines(&mut sk);
+    let r = sk.fillet_picked((h, mm(-100.0, -25.0)), (w, mm(-92.0, -35.0)), 3e-3).unwrap();
+    assert!(sk.solve().is_solved());
+    let (hs, he) = ends(&sk, h);
+    let (ws, we) = ends(&sk, w);
+    assert!(near(hs, -110.0, -25.0) && near(he, -95.0, -25.0), "horizontal {hs} {he}");
+    assert!(near(ws, -92.0, -28.0) && near(we, -92.0, -45.0), "vertical {ws} {we}");
+    let arc = r.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Arc)).expect("the fillet arc");
+    let Some(Curve2::Arc { center, radius, .. }) = sk.curve(arc) else { panic!("an arc") };
+    assert!(near(center * 1e3, -95.0, -28.0) && close(radius, 3e-3, 1e-12), "arc {center} r {radius}");
+    let lone = sk.entities().filter(|e| e.kind() == EntityKind::Point && sk.users_of_point(e.id).is_empty()).count();
+    assert_eq!(lone, 0, "no visualSharp point");
+
+    let mut sk = Sketch::new();
+    let (h, w) = lines(&mut sk);
+    sk.chamfer_picked((h, mm(-100.0, -25.0)), (w, mm(-92.0, -35.0)), 4e-3, 6e-3).unwrap();
+    assert!(sk.solve().is_solved());
+    let (hs, he) = ends(&sk, h);
+    let (ws, we) = ends(&sk, w);
+    assert!(near(hs, -110.0, -25.0) && near(he, -96.0, -25.0), "horizontal {hs} {he}");
+    assert!(near(ws, -92.0, -31.0) && near(we, -92.0, -45.0), "vertical {ws} {we}");
+
+    let mut sk = Sketch::new();
+    let a = sk.add_line(mm(0.0, 0.0), mm(10.0, 0.0));
+    let b = sk.add_line(mm(0.0, 5.0), mm(10.0, 5.0));
+    let n = sk.entities().count();
+    assert!(sk.fillet_picked((a, mm(5.0, 0.0)), (b, mm(5.0, 5.0)), 1e-3).is_err(), "parallel lines");
+    assert_eq!(sk.entities().count(), n, "left as it was");
+}

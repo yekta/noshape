@@ -339,6 +339,7 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
             ed.fillet_radius = *m;
         } else {
             ed.chamfer_distance = *m;
+            ed.chamfer_distance_b = *m;
         }
     }
     let mut changed = false;

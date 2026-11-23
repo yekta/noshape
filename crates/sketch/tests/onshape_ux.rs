@@ -18,20 +18,26 @@ fn chamfer_corner_cuts_both_lines_and_keeps_virtual_sharp() {
     let l2 = sk.add_line_between(b, c).unwrap();
     let r = sk.chamfer_corner(b, 2.0, 3.0).unwrap();
     assert!(sk.solve().is_solved());
-    let new_line = r.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Line)).unwrap();
+    let new_line = r.created.iter().copied().find(|e| sk.kind(*e) == Some(EntityKind::Line) && !sk.entity(*e).unwrap().construction).unwrap();
     let (p, q) = sk.endpoints(new_line).unwrap();
     assert!((sk.point(p).unwrap() - v(8.0, 0.0)).length() < 1e-9);
     assert!((sk.point(q).unwrap() - v(10.0, 3.0)).length() < 1e-9);
     // the original lines now end at the chamfer
     assert!((sk.curve(l1).unwrap().end_point() - v(8.0, 0.0)).length() < 1e-9);
     assert!((sk.curve(l2).unwrap().start_point() - v(10.0, 3.0)).length() < 1e-9);
-    // the corner survives as a construction point with two distance dimensions
+    // the corner survives as a construction point, joined to the chamfer's ends by two construction lines with their
+    // lengths (live: visualSharp, distanceAId / distanceBId)
     assert!(sk.entity(b).unwrap().construction);
-    let dims: Vec<f64> = sk.constraints().filter_map(|c| match c.kind {
-        ConstraintKind::Distance { value, .. } => Some(value),
+    let legs: Vec<(DVec2, DVec2, f64)> = sk.constraints().filter_map(|c| match c.kind {
+        ConstraintKind::Length { curve, value } if sk.entity(curve)?.construction => {
+            let cv = sk.curve(curve)?;
+            Some((cv.start_point(), cv.end_point(), value))
+        }
         _ => None,
     }).collect();
-    assert_eq!(dims.len(), 2);
+    assert_eq!(legs.len(), 2, "{legs:?}");
+    assert!(legs.iter().all(|(s, _, _)| (*s - v(10.0, 0.0)).length() < 1e-9), "from the sharp: {legs:?}");
+    assert!((legs[0].1 - v(8.0, 0.0)).length() < 1e-9 && legs[0].2 == 2.0 && (legs[1].1 - v(10.0, 3.0)).length() < 1e-9 && legs[1].2 == 3.0, "{legs:?}");
     assert!(sk.chamfer_corner(c, 1.0, 1.0).is_err());
 }
 

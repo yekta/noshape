@@ -13,7 +13,7 @@ use crate::theme::{p, with_alpha};
 use crate::viewport::{Viewport, ViewportEvent};
 use glam::{DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Disableable as _, Icon, WindowExt as _, Selectable as _, Sizable as _, h_flex, v_flex};
@@ -106,6 +106,8 @@ pub(super) struct SketchUi {
     otf_invalid: bool,
     opts: HashMap<&'static str, Entity<InputState>>,
     opt_subs: Vec<Subscription>,
+    /// The Text dialog's field: a textarea, Enter types a new line (live sketch-tools-1123 text.md).
+    text_area: Option<(Entity<TextareaState>, Subscription)>,
     text_dialog_focused: bool,
     /// Constraint manager panel state (`None`: closed).
     cm: Option<ConstraintManager>,
@@ -297,12 +299,6 @@ enum TextStyle {
     Italic,
     FlipHorizontal,
     FlipVertical,
-}
-
-/// Kind of value an option field holds.
-#[derive(Clone, Copy, PartialEq)]
-enum OptKind {
-    Text,
 }
 
 /// Unit of an on-canvas pattern / transform value (`None`: an instance count).
@@ -2083,12 +2079,6 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn apply_pattern(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(out) = self.with_sketch(cx, |ed, data| ed.apply_pattern(data)) {
-            self.apply_outcome(out, window, cx);
-        }
-    }
-
     /// Accept the sketch and return references to all its regions.
     pub(super) fn finish_sketch(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<Reference> {
         let Some(id) = self.sketch.as_ref().map(|s| s.feature) else { return Vec::new() };
@@ -2309,7 +2299,10 @@ impl PartStudioView {
                 if self.message.as_ref().is_some_and(|(_, m)| m == crate::sketch_mode::SKETCH_NOT_SOLVED) {
                     self.message = None;
                 }
-                window.focus(&self.focus, cx);
+                // A chamfer's second box keeps the focus (live sketch-tools-1123).
+                if self.dim_input.is_none() {
+                    window.focus(&self.focus, cx);
+                }
             }
             Some(Err(e)) if e == crate::sketch_mode::SKETCH_NOT_SOLVED => {
                 // Live (qa5 dim conflict, SK1): the value is taken and the box
@@ -2672,54 +2665,28 @@ impl PartStudioView {
 
     // ------------------------------------------------------------ tool option fields
 
-    fn option_text(&self, key: &str) -> String {
-        let Some(ed) = &self.sketch else { return String::new() };
-        match key {
-            "text.text" => ed.text_string.clone(),
-            _ => String::new(),
-        }
-    }
-
-    fn option_input(&mut self, key: &'static str, kind: OptKind, window: &mut Window, cx: &mut Context<Self>) -> Option<Entity<InputState>> {
-        if let Some(st) = self.ui_ref().and_then(|u| u.opts.get(key).cloned()) {
-            return Some(st);
-        }
-        let text = self.option_text(key);
-        // (The Text dialog's field: one Esc closes the dialog, live sketch-tools-1123 text.md.)
-        let state = cx.new(|cx| InputState::new(window, cx).default_value(text).revert_on_escape(key != "text.text"));
-        let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
-            InputEvent::Change => {
-                let t = st.read(cx).value().to_string();
-                this.set_option(key, kind, &t, cx);
-            }
-            InputEvent::PressEnter { .. } => {
-                // Leave the field first so the post-apply refresh updates it.
-                window.focus(&this.focus, cx);
-                if key == "text.text" && this.sketch.as_ref().is_some_and(|e| e.text_dialog_open()) {
-                    this.accept_sketch_text(window, cx);
-                    return;
-                }
-                let tool = this.sketch.as_ref().map(|s| s.tool);
-                if tool.is_some_and(|t| t.is_pattern()) {
-                    this.apply_pattern(window, cx);
-                }
-            }
-            _ => {}
-        });
-        let ui = self.ui_mut()?;
-        ui.opts.insert(key, state.clone());
-        ui.opt_subs.push(sub);
-        Some(state)
-    }
-
-    fn set_option(&mut self, key: &str, _kind: OptKind, text: &str, cx: &mut Context<Self>) {
+    fn set_sketch_text(&mut self, text: &str, cx: &mut Context<Self>) {
         let Some(ed) = &mut self.sketch else { return };
-        if key != "text.text" {
-            return;
-        }
         ed.text_string = text.to_string();
         self.refresh_scene(false, cx);
         cx.notify();
+    }
+
+    /// The Text dialog's textarea (one Esc closes the dialog: no revert on Esc).
+    fn text_area(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<Entity<TextareaState>> {
+        if let Some((st, _)) = self.ui_ref().and_then(|u| u.text_area.as_ref()) {
+            return Some(st.clone());
+        }
+        let text = self.sketch.as_ref()?.text_string.clone();
+        let state = cx.new(|cx| TextareaState::new(window, cx).default_value(text));
+        let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+            if let InputEvent::Change = ev {
+                let t = st.read(cx).value().to_string();
+                this.set_sketch_text(&t, cx);
+            }
+        });
+        self.ui_mut()?.text_area = Some((state.clone(), sub));
+        Some(state)
     }
 
     // ------------------------------------------------------------ sketch text
@@ -2759,7 +2726,7 @@ impl PartStudioView {
         }
         fields.push(toggle("Flip horizontal", ed.text_flip_horizontal));
         fields.push(toggle("Flip vertical", ed.text_flip_vertical));
-        let text = self.ui_ref().and_then(|u| u.opts.get("text.text")).map_or_else(|| ed.text_string.clone(), |i| i.read(cx).value().to_string());
+        let text = self.ui_ref().and_then(|u| u.text_area.as_ref()).map_or_else(|| ed.text_string.clone(), |(i, _)| i.read(cx).value().to_string());
         fields.push(json!({ "label": "Text", "kind": "input", "value": text }));
         Some(json!({ "kind": "sketch-text", "title": "Text", "fields": fields, "count": format!("{}/250 characters", ed.text_string.chars().count()) }))
     }
@@ -2781,7 +2748,7 @@ impl PartStudioView {
                     let Some(f) = SKETCH_FONTS.get(i) else { return };
                     view.update(cx, |this, cx| {
                         this.set_text_style(TextStyle::Font(f.name), cx);
-                        if let Some(text) = this.ui_ref().and_then(|u| u.opts.get("text.text").cloned()) {
+                        if let Some(text) = this.ui_ref().and_then(|u| u.text_area.as_ref().map(|t| t.0.clone())) {
                             text.update(cx, |s, cx| s.focus(window, cx));
                         }
                     });
@@ -3330,7 +3297,7 @@ impl PartStudioView {
             if let Some(ui) = self.ui_mut() { ui.text_dialog_focused = false; }
             return None;
         }
-        let input = self.option_input("text.text", OptKind::Text, window, cx)?;
+        let input = self.text_area(window, cx)?;
         if self.ui_ref().is_some_and(|u| !u.text_dialog_focused) {
             let text = self.sketch.as_ref().map(|e| e.text_string.clone()).unwrap_or_default();
             input.update(cx, |s, cx| {
@@ -3440,7 +3407,7 @@ impl PartStudioView {
                                 .when(italic, |d| d.italic())
                                 .flex()
                                 .flex_col()
-                                .child(Input::new(&input).appearance(false).text_size(px(18.67)).px(px(2.)))
+                                .child(Textarea::new(&input).appearance(false).text_size(px(18.67)).px(px(2.)))
                                 // Live (sketch-text-font-typed-ok, a textarea): a click under the text puts the caret at its end.
                                 .child(div().flex_1().cursor_text().on_mouse_down(MouseButton::Left, {
                                     let input = input.clone();
