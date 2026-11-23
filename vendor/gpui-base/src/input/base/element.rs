@@ -710,7 +710,8 @@ impl<M: InputModeKind> TextElement<M> {
                         cursor_x,
                         bounds.top() + cursor_pos.y + ((line_height - cursor_height) / 2.),
                     ),
-                    size(CURSOR_WIDTH, cursor_height),
+                    // A code editor's caret is Ace's 2 px bar.
+                    size(if state.is_code_editor() { px(2.) } else { CURSOR_WIDTH }, cursor_height),
                 ),
                 is_active,
             });

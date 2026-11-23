@@ -760,3 +760,43 @@ fn the_commit_caret_is_18_px_and_the_right_group_ends_at_the_edge(cx: &mut TestA
     assert!(monitor.left() > caret.right() + px(300.), "a gap before Monitor: {monitor:?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live's Feature Studio editor (Ace) draws its caret as a 2 px bar.
+#[gpui::test]
+fn the_editors_caret_is_2_px_wide(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    let dir = std::env::temp_dir().join(format!("noshape-ui-fs-caret-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("ui.noshape");
+    let _ = std::fs::remove_file(&path);
+    {
+        use serde_json::json;
+        let mut ctx = noshape_ops::Ctx::new();
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| noshape_ops::registry::run(ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value;
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "tab_create", json!({ "kind": "featurestudio" }));
+    }
+    let session = crate::session::Session::open(&path).unwrap();
+    let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))).unwrap().id;
+    let (window, view) = cx.update(|cx| {
+        let doc = cx.new(|_| DocModel::new(session));
+        let bounds = Bounds { origin: Point::default(), size: size(px(1600.), px(900.)) };
+        let mut view = None;
+        let (w, _) = gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |window, cx| {
+            let v = cx.new(|cx| FeatureStudioView::new(doc, tab, window, cx));
+            view = Some(v.clone());
+            cx.new(|_| Workspace(v))
+        })
+        .unwrap();
+        (w, view.unwrap())
+    });
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.editor.update(cx, |e, cx| {
+        e.focus(w, cx);
+        e.set_selected_range(3..3, cx);
+    }))).unwrap();
+    draw(cx, window);
+    let caret = cx.update(|cx| view.read(cx).editor.read(cx).prepaint_caret_geometry()).expect("a caret");
+    assert_eq!(caret.cursor_bounds().size.width, px(2.));
+    let _ = std::fs::remove_dir_all(&dir);
+}

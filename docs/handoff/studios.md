@@ -60,15 +60,16 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   Local handoff commit on top (not queued; goes with the next land). Background watcher b13igqtld polls for
   v0.4.68's macOS asset (none at 05:30); then run bin/mac-copycheck.sh 0.4.68 on the Mac (idle >= 600 s only) and
   report <= 3 lines to the lead. DRW-SECTION-LABEL-GAP data: live 08 s4 section view at y 125.3, label 113.6.
-- Open studios rows left: FEEL-VS-CHIP-ON-CLICK (needs live's recording: our chip only while editing),
-  DRW-SECTION-LABEL-GAP P3 (needs both view boxes; gap 1.3 mm at 1:1, 0.6 at 2:1), DRW-CALLOUT-DIALOG-ICONS P3
-  (two-tone icons to draw), FS caret 2 px.
+- 06:05 local (after 3407a70e): e88304220 DRW-CALLOUT-DIALOG-ICONS (callout-part/bom/instance.svg, #287cbf accents,
+  assets::icon); FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 was on main). FS caret: gpui-base element.rs paints a code
+  editor's caret 2 px (Ace), test the_editors_caret_is_2_px_wide; run x269 (vibex7). DRW-SECTION-LABEL-GAP left open:
+  DXF capture asked in live REQUESTS (studios 11-23). live import-into-doc-1123: ours already matches (tabs after the
+  active tab, toast per file, "(1)", Split); the rest is dx's.
 - Shortcuts (live shortcuts-1123, lead's ask 04:2x): Drawing context: Mac ⌃Z/⌃Y NoAction, ⌘Y redo; elsewhere
   Ctrl+Shift+Z redo (app-core actions.rs, test drawing_key_tests). FS: Commit/CommitAll ⌘ only on a Mac; ⇧⌘F search
   also in the editor (input's own was Replace); Mac ⌃B/⌃P/⌃H/⌃D/⌃O (SplitLine, fs_lines::split_line). FS Mac keys
   untested on Linux (cfg!(macos) in bind_keys: refactor to fs_bindings(mac) + test). VS: a typed key opens the value
   list at once (value_completion; test a_letter_in_a_focused_value_cell_opens_the_list). Run x264 (vibex7).
-- FS caret: the FS editor is not a code_editor input; Ace's caret is 2 px; skipped for now.
 - Lead's extra: after v0.4.68 (05:00 release) is published, on the Mac (idle >= 10 min only): Finder-copy a scratch
   .noshape in ~/noshape-host/studios-keep, rename the copy, open it with the release app: new name, not a copy.
   Report <= 3 lines.
