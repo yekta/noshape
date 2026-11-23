@@ -39,7 +39,7 @@ regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls
   the first past it; there the ball interpolated between those two and the section's sides run along the faces to
   the edge point (fn bend_section). With that: ball loft VALID, 154 mm3 (live removes 167). The direct build then
   declined: the loft's sides strayed up to 1 mm off the tightly curved wall between sections (ZZ_LIES prints
-  lies_on's failing sample) -> now 4 sections per station around each zone (+-2 stations), running at 00:50.
+  lies_on's failing sample) -> now 4 sections per station around each zone (+-2 stations), run at 00:50 -> logs/kh-f1balls6.out.
   If the sides still stray: relax lies_on to the samples near the touch curve, or build those stretches as their
   own tools (live's own split: band / 2 transitions / top). Input kept at vibex7 ~/agents/blend-keep/kh-f1-input.brep
   (make it a test input).
