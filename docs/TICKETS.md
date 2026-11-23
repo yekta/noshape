@@ -833,6 +833,9 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   above the click** (Part 1's row menu ends just over the row; the drawing view's menu ends above the pointer); ours slides it up
   just enough to fit, so it covers the tab bar (Part 1 row) or lands **under the pointer** with the hovered row's submenu open
   (drawing view: View orientation's Top/Left/…/Isometric list shown at once) (tickets/wf40-part-row-menu.png, wf40-drw-view-menu.png).
+  lead 01:2x: stays open, two points for psui: (1) the flip boundary (ours flips against the window bottom and runs over the tab
+  bar; live most likely uses the area above the tab bar); (2) the drawing view menu opens AT the pointer with View orientation
+  hovered and its submenu open (psui: ours opens at pointer + (0,2); placement against wf40 step 57's pointer).
   qa recheck 00:4x, green 7fe68797a (hm2/out-wf-v/40-*/cmp-08.png, cmp-57.png): STILL OPEN. Part 1 row menu: live's bottom edge
   sits at y 370, just above the row (374); ours starts at the row (375) and runs to 530, over the tab bar. Drawing view menu: live
   opens above the pointer (y 111-327); ours opens at the pointer (top 330) with View orientation hovered and its submenu open.
