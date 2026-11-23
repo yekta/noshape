@@ -49,20 +49,20 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   HIST-MERGE-DIALOG-LOOK (body min_h 432, a version source plain bold, select borderless); HIST-GRAPH-LOOK (lanes 12 px
   apart, open lane 4 px / others 2 px, merge line source -> Merge node; version dot size not changed);
   CUSTOM-TABLE-INFO-CELL (ⓘ 11 px at the right edge, section … #333).
-- STATE 04:41: rebased on origin/main (clean); HEAD 35040b107 = set 2 + shortcuts + TICKETS rows (11 marked done,
-  DRW-SHEETS-EMPTY-CHEVRON open duplicate dropped), on top of ed2946eac (callout / linked notice; its test now passes).
-  key_tests fixed 04:50 (explicit imports instead of `use super::*`; `use gpui_kit::*` pulls gpui's `test`): x265
-  (fs-ui lib + clippy, vibex7) waiting for a build slot at 05:05. Green before: drawing-ui 191, history-ui 17, vs-ui 15,
-  app-core actions 6, part-studio feedback 2, clippy app-core/fs-ui/vs-ui/history/part-studio/drawing.
-- Uncommitted on top (x266: drawing-ui lib + clippy drawing-ui/ops, vibex7, queued 05:06): DRW-BOM-DIALOG-INSERT-ROW
-  (chooser.bom "Select a BOM", Assemblies only, Import = BOM data; pick_bom / pick_bom_tab; the dialog's Insert a
-  button, source select focused; Other documents… modal + link row removed; test the_bom_dialogs_insert_opens_select_a_bom)
-  and DRW-MOVED-VIEW-PROPS (a linked projected view's View orientation is a dropdown; ops apply_view_props makes it a
-  Base view on another orientation + sync_links; test extends a_view_moved_off_its_parents_sheet_is_apart_from_it).
-  TICKETS: both marked done; 3 "STILL OPEN qa 02:5x" rows dropped (fixes queued in 52b9cfb9 / HEAD, done rows exist).
-  Then: amend/commit, land.sh. 52b9cfb9 (+14f567d6, 58eda2cb) CHECKING since 04:20.
-- FEEL-VS-CHIP-ON-CLICK skipped: our chip shows only while editing; can't tell live's click state without w9's
-  recording (not found in workflows-1122/15). Ask qa for the recording path if it stays open.
+- STATE 05:30: QUEUED 3407a70e (8 commits: 8f66ab565 .. dac3f08e4, carries 52b9cfb9 / 14f567d6 / 58eda2cb's
+  content). Green before land: drawing-ui 192, fs-ui 31 (key_tests), history-ui 17, vs-ui 15, app-core actions 6,
+  part-studio feedback 2; land.sh clippy precheck passed on 14 crates. dac3f08e4: DRW-BOM-DIALOG-INSERT-ROW
+  (chooser.bom "Select a BOM", Assemblies only, Import = BOM data; the Other documents… modal + link row removed),
+  DRW-MOVED-VIEW-PROPS (linked projected view's orientation dropdown; ops apply_view_props makes it a Base view +
+  sync_links), DRW-MOVE-TO-SHEET-PLACE (open_move_sheet_at), UIP-ANNOTATION-STALE-POS (locator presses the drawn
+  text), DRW-DETAIL-PREVIEW-LOOK closed (live ink over empty sheet 160-175 = ours 164), HIST-TOAST-DROPPED-ON-RCLICK
+  closed (29331de49). After it lands: tell dx (roster.md id) featurescript raise_noted notices are Info now.
+  Local handoff commit on top (not queued; goes with the next land). Background watcher b13igqtld polls for
+  v0.4.68's macOS asset (none at 05:30); then run bin/mac-copycheck.sh 0.4.68 on the Mac (idle >= 600 s only) and
+  report <= 3 lines to the lead. DRW-SECTION-LABEL-GAP data: live 08 s4 section view at y 125.3, label 113.6.
+- Open studios rows left: FEEL-VS-CHIP-ON-CLICK (needs live's recording: our chip only while editing),
+  DRW-SECTION-LABEL-GAP P3 (needs both view boxes; gap 1.3 mm at 1:1, 0.6 at 2:1), DRW-CALLOUT-DIALOG-ICONS P3
+  (two-tone icons to draw), FS caret 2 px.
 - Shortcuts (live shortcuts-1123, lead's ask 04:2x): Drawing context: Mac ⌃Z/⌃Y NoAction, ⌘Y redo; elsewhere
   Ctrl+Shift+Z redo (app-core actions.rs, test drawing_key_tests). FS: Commit/CommitAll ⌘ only on a Mac; ⇧⌘F search
   also in the editor (input's own was Replace); Mac ⌃B/⌃P/⌃H/⌃D/⌃O (SplitLine, fs_lines::split_line). FS Mac keys
