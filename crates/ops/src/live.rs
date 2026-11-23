@@ -112,7 +112,11 @@ fn error_from_json(e: &Value) -> OpError {
 /// listens); only a file whose app is gone is skipped ([`stale`]): on a busy
 /// machine a slow connect is not a dead server.
 pub fn server_for(path: &Path) -> Option<(u16, String)> {
-    let info: Value = serde_json::from_slice(&std::fs::read(info_path(path)).ok()?).ok()?;
+    server_at(&info_path(path))
+}
+
+fn server_at(info: &Path) -> Option<(u16, String)> {
+    let info: Value = serde_json::from_slice(&std::fs::read(info).ok()?).ok()?;
     let port = info.get("port")?.as_u64()? as u16;
     let token = info.get("token")?.as_str()?.to_string();
     let pid = info.get("pid")?.as_u64()? as u32;
@@ -252,12 +256,15 @@ fn clean_stale() {
 /// Serve document `path`: each call arrives on `requests` (to run on the
 /// app's thread) and is answered with [`Request::answer`].
 pub fn serve(path: &Path, requests: impl Fn(Request) + Send + 'static) -> std::io::Result<Server> {
+    serve_at(info_path(path), path, requests)
+}
+
+fn serve_at(info: PathBuf, path: &Path, requests: impl Fn(Request) + Send + 'static) -> std::io::Result<Server> {
     clean_stale();
     let listener = TcpListener::bind(("127.0.0.1", 0))?;
     let port = listener.local_addr()?.port();
     let tok = token();
     std::fs::create_dir_all(dir())?;
-    let info = info_path(path);
     // Written beside and renamed into place: a reader (another process's
     // clean_stale, a CLI) sees the whole file or none.
     let tmp = dir().join(format!("{}-{}.tmp", std::process::id(), &token()[..12]));
@@ -291,6 +298,31 @@ pub fn serve(path: &Path, requests: impl Fn(Request) + Send + 'static) -> std::i
         }
     })?;
     Ok(Server { info, port, stop })
+}
+
+// ------------------------------------------------------------ the app
+
+/// The call the app's own server takes: open document `{"path"}` (or bring its window forward when it is open).
+pub const APP_OPEN: &str = "app_open_document";
+
+/// The running app's own discovery file, one per user (the temp folder is shared on Linux).
+pub fn app_info_path() -> PathBuf {
+    let user = std::env::var("USER").or_else(|_| std::env::var("USERNAME")).unwrap_or_default();
+    dir().join(format!("app-{}.json", key(Path::new(&format!("noshape app of {user}")))))
+}
+
+/// Serve the app itself at discovery file `info` ([`app_info_path`]): a second start with a document hands it the
+/// path ([`open_in_app`]) instead of opening it in a process of its own (a file opened from Explorer or a Linux file
+/// manager starts the program again).
+pub fn serve_app(info: PathBuf, requests: impl Fn(Request) + Send + 'static) -> std::io::Result<Server> {
+    serve_at(info, Path::new(""), requests)
+}
+
+/// Hand document `path` to the app serving at `info`, if one runs: whether it took it (then this start ends).
+pub fn open_in_app(info: &Path, path: &Path) -> bool {
+    let Some((port, token)) = server_at(info) else { return false };
+    let path = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+    call(port, &token, APP_OPEN, &json!({ "path": path })).is_ok()
 }
 
 // ------------------------------------------------------------ forwarding

@@ -29,24 +29,25 @@ else
   bin="$HOME/.local/bin" share="${XDG_DATA_HOME:-$HOME/.local/share}"
   sudo=""
 fi
-apps="$share/applications" icons="$share/icons/hicolor"
+apps="$share/applications" icons="$share/icons/hicolor" mime="$share/mime"
 # Agents are the user's: under `sudo ./install.sh`, their configuration is the invoking user's, not root's.
 as_user() { if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then sudo -u "$SUDO_USER" -H "$@"; else "$@"; fi; }
 
 refresh() {
+  command -v update-mime-database >/dev/null 2>&1 && $sudo update-mime-database "$mime" 2>/dev/null || true
   command -v update-desktop-database >/dev/null 2>&1 && $sudo update-desktop-database -q "$apps" 2>/dev/null || true
   command -v gtk-update-icon-cache >/dev/null 2>&1 && $sudo gtk-update-icon-cache -q -t "$icons" 2>/dev/null || true
 }
 
 if [ $uninstall = 1 ]; then
   [ -x "$bin/noshape" ] && [ "$agents" != no ] && as_user "$bin/noshape" agents disconnect --command "$bin/noshape" >/dev/null 2>&1 || true
-  $sudo rm -f "$bin/noshape" "$apps/noshape.desktop" "$icons/512x512/apps/noshape.png" "$icons/256x256/apps/noshape.png" "$icons/scalable/apps/noshape.svg"
+  $sudo rm -f "$bin/noshape" "$apps/noshape.desktop" "$icons/512x512/apps/noshape.png" "$icons/256x256/apps/noshape.png" "$icons/scalable/apps/noshape.svg" "$mime/packages/noshape.xml"
   refresh
   echo "noshape removed from $bin and $share"
   exit 0
 fi
 
-$sudo mkdir -p "$bin" "$apps" "$icons/512x512/apps" "$icons/scalable/apps"
+$sudo mkdir -p "$bin" "$apps" "$icons/512x512/apps" "$icons/scalable/apps" "$mime/packages"
 $sudo install -m 755 "$here/noshape" "$bin/noshape"
 # The menu entry starts the installed binary by its full path (a session's PATH may not have ~/.local/bin).
 sed "s|^Exec=noshape|Exec=$bin/noshape|" "$here/noshape.desktop" > "${TMPDIR:-/tmp}/noshape.desktop.$$"
@@ -54,7 +55,10 @@ $sudo install -m 644 "${TMPDIR:-/tmp}/noshape.desktop.$$" "$apps/noshape.desktop
 rm -f "${TMPDIR:-/tmp}/noshape.desktop.$$"
 $sudo install -m 644 "$here/noshape.png" "$icons/512x512/apps/noshape.png"
 $sudo install -m 644 "$here/noshape.svg" "$icons/scalable/apps/noshape.svg"
+# .noshape files: their type, opened with Noshape (noshape.desktop's MimeType).
+$sudo install -m 644 "$here/noshape-mime.xml" "$mime/packages/noshape.xml"
 refresh
+[ $system = 1 ] || { command -v xdg-mime >/dev/null 2>&1 && xdg-mime default noshape.desktop application/x-noshape 2>/dev/null || true; }
 # The app links the desktop's libraries (X11/Wayland keyboard, fonts, Vulkan): say which are missing.
 if ! version=$("$bin/noshape" --version 2>/dev/null); then
   echo "noshape is installed to $bin/noshape but can't start: these libraries are missing:" >&2

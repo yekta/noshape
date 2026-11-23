@@ -42,6 +42,8 @@ WizardStyle=modern
 ; for the files to be free.
 CloseApplications=no
 SetupLogging=yes
+; .noshape files open in Noshape (Explorer told of the new association).
+ChangesAssociations=yes
 
 [Files]
 Source: "{#Source}\noshape.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -55,6 +57,14 @@ Source: "prepare.ps1"; Flags: dontcopy
 Name: "{autoprograms}\Noshape"; Filename: "{app}\noshape.exe"
 
 [Registry]
+; .noshape documents open in Noshape (with its icon): Explorer starts noshape.exe with the file, which hands it to a
+; Noshape already running (crates/app/src/open_requests.rs).
+Root: HKA; Subkey: "Software\Classes\.noshape"; ValueType: string; ValueName: ""; ValueData: "Noshape.Document"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.noshape"; ValueType: string; ValueName: "Content Type"; ValueData: "application/x-noshape"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.noshape\OpenWithProgids"; ValueType: string; ValueName: "Noshape.Document"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\Noshape.Document"; ValueType: string; ValueName: ""; ValueData: "Noshape document"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Noshape.Document\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\noshape.exe,0"
+Root: HKA; Subkey: "Software\Classes\Noshape.Document\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\noshape.exe"" ""%1"""
 ; The install folder on the user's PATH: `noshape` and `noshape mcp` in any new terminal or MCP client.
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}'))
 
