@@ -29,15 +29,12 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   DIALOG-STATE (suppressed title left black per mates.md), TANGENT-WORDS (bar ✓ pale on reopened "not consistent"), CREATING-LIST);
   qa-wait-sp (bool ed272c73, same subject as e7c98cc5a -> compat: expect ~13.6 s + Part 1 129/385/258 (live 131/387/258), close
   COMPAT-SURFACE-PATTERN-SLOWER, tell bool). qa-rr-c6ec / qa-ver5 / qa-ver3 stopped (replaced).
-- psui p04 hover_matrix test failed dx's land 02:13 (psui told).
 - Kit: hm2/crop2.sh, score-a087/bin/sbs.sh, hm2/wf/wfcrop.py (WF_SET/WF_OUT), manipnav fm.sh (+fm992.sh), cells m15v-tr-xy-*.
   Runners take QA_HOST; wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT + glob arg.
 - Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
 
 ## Running units
-**Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
-after v0.4.57 was out). Scripts that call gh also `export HOME=${HOME:-/root}` themselves since 20:45.
-Local units are transient (`systemctl list-units 'qa-*'`); restart one with the `systemd-run` line in its description if it's gone.
+**Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails).
 - **qa-compat-loop**: bin/compat-loop.sh <baseline>, now **0.4.57** (moved by qa-pub-0457 11-17 21:44). On every watcher green, bin/compat-check.sh runs userdocs.py
   on vibex7 (hats, dock, 47 ticket docs, 16 authored docs from ~/agents/qa-keep/compat-v0443) with the baseline's CLI against the green.
   A feature that gets worse writes compat/ALERT-<sha> and one line per feature to /tmp/lead/qa-alerts. Move the baseline by
