@@ -384,7 +384,7 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
             let mut first = None;
             doc.update(cx, |doc, cx| {
                 if !inputs.is_empty() {
-                    let description = imp::description(&inputs.label);
+                    let description = imp::description();
                     let mut failed = Vec::new();
                     doc.edit_document(&description, cx, |d| (first, failed) = imp::apply(d, inputs, &choice, after, &units));
                     errors.extend(failed);

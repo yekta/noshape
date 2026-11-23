@@ -259,7 +259,7 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     draw(cx, w);
     // Live import-undo-1123: the kept file in its own history entry first, the translated tab in a second.
     let newest = doc.read_with(cx, |d, _| d.session.store.history(d.session.branch).unwrap().iter().take(2).map(|m| m.description.clone()).collect::<Vec<_>>());
-    assert_eq!(newest, ["Import block.step", "Insert tab(s) : block.step"]);
+    assert_eq!(newest, ["Import document", "Insert tab(s) : block.step"]);
     let after = tabs(cx);
     let at = after.iter().position(|n| n == "C").unwrap();
     assert_eq!(after.get(at + 1).map(String::as_str), Some("block"), "the Part Studio right after the active tab: {after:?}");

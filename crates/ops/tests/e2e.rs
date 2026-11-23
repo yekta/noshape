@@ -2881,7 +2881,7 @@ fn import_step_round_trip() {
     let v1 = num(&call(&mut ctx, "query_parts", json!({ "tab": "block" }))["parts"][0]["volume"]);
     assert!((v1 - v0).abs() < 1.0, "imported volume {v1} vs {v0}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
-    assert_eq!(hist["history"][0]["description"], "Import block.step");
+    assert_eq!(hist["history"][0]["description"], "Import document");
     // Errors name the file.
     let e = try_call(&mut ctx, "import_files", json!({ "files": ["/tmp/nope.xyz"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("files[0]"));

@@ -99,7 +99,7 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("files", &errors.join("; ")));
     }
     let before: Vec<noshape_model::document::TabId> = od.doc().tabs.iter().map(|t| t.id).collect();
-    let desc = import::description(&inputs.label);
+    let desc = import::description();
     let t1 = std::time::Instant::now();
     let (first, apply_errors) = od.session.edit_document(&desc, |d| import::apply(d, inputs, &c, after, &units))?;
     stage("apply + save", t1);

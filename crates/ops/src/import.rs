@@ -689,8 +689,6 @@ pub struct ImportInputs {
     files: Vec<FileTab>,
     /// Upload only: the files as file tabs, after the import's tab (live upload-only-1118).
     uploads: Vec<FileTab>,
-    /// "a.step, b.zip": the history entry is "Import <label>".
-    pub label: String,
 }
 
 impl ImportInputs {
@@ -712,8 +710,7 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
                 Err(e) => errors.push(format!("Import failed: {}: {e}", path.display())),
             }
         }
-        let label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
-        return (ImportInputs { read: Vec::new(), pvz: Vec::new(), assemblies: Vec::new(), files: Vec::new(), uploads, label }, errors);
+        return (ImportInputs { read: Vec::new(), pvz: Vec::new(), assemblies: Vec::new(), files: Vec::new(), uploads }, errors);
     }
     let mut read = Vec::new();
     // Native assemblies (a zip named like the root assembly; live G38).
@@ -786,12 +783,8 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
             Err(_) => errors.push(failed_to_translate(&import_names(path).1)),
         }
     }
-    let mut label = read.iter().map(|r| r.1.clone()).chain(pvz.iter().map(|p| p.file.clone())).chain(assemblies.iter().map(|a| format!("{}.zip", a.zip))).collect::<Vec<_>>().join(", ");
-    if label.is_empty() {
-        label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
-    }
     let files = if keep_files { file_tabs(paths) } else { Vec::new() };
-    (ImportInputs { read, pvz, assemblies, files, uploads: Vec::new(), label }, errors)
+    (ImportInputs { read, pvz, assemblies, files, uploads: Vec::new() }, errors)
 }
 
 /// The files as they are, as file tabs (an import keeps them).
@@ -909,9 +902,10 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
     (first, errors)
 }
 
-/// "Import <label>".
-pub fn description(label: &str) -> String {
-    format!("Import {label}")
+/// The history entry of an import's translated tabs (live import-undo-1123: "Import document", after the kept file's
+/// "Insert tab(s) : <file>").
+pub fn description() -> String {
+    "Import document".into()
 }
 
 #[cfg(test)]
