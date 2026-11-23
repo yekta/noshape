@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 06:28 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 06:37 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -168,19 +168,17 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    basic.rs boolean: SUBTRACTION non-offset tools named helpers_a::rebrand (Face{boolean, Generated(n)}), so the tool's
    face/feature appearances stop reaching the cut faces. T1 engine::subtract_cut_faces_are_the_booleans (both flags;
    a legacy flag only counts on a fresh Regenerator: set before the first regen, as on load).
-0. SPLIT RENUMBERING: no live capture with default names (ours numbers by list order, as live's Union); asked live
-   (REQUESTS "core 11-23 APPEAR-SPLIT default names"); act on its answer.
-0. HOSE JOINTS IN TEST (core-rf UNCOMMITTED: custom host mod.rs SweepRecipe + CtxState.sweeps (by body SHAPE: ids
-   change when the op ends); ops.rs op_sweep records (profile, path, options incl. the frame sweep_any_frame took, now
-   returning (OpResult, SweepMode)); op_shell Inside, both caps of a round sweep -> ring_sweep (ring = circle..r-t swept
-   with the same options; names: outer walls kept, inner Offset(wall), ends Offset(rim edge), under the shell op).
-   STATE: the ring path runs (8 faces, valid) but its outer wall lies 3.6e-6 off the disc sweep's (MakePipe of a face
-   with a hole approximates otherwise), so the name match (<1e-7) bails to the old shell. NEXT: try sweeping the inner
-   circle alone and cutting it from the original sweep (outer walls stay the original faces), or loosen the match to
-   1e-5. Remove the RINGDBG eprintln in ring_sweep before landing. T1 custom_features::
-   a_shelled_round_sweep_meets_exactly_at_its_joints (edges within 1e-8 of faces; drop its trivial circle-count assert:
-   sweep edges are not Circle curves). Run: .hose.sh on vibex8 -> remote ~/tmp/core/hose.out (rb.sh log empty if the
-   session ends: read the remote file). Then ask dx to rerun the hose x_t. Old probes ~/core-keep/probes2.patch.
+0. SPLIT NAMES: live split-default-names-1123 answered: names = "Part <list position>", renamed parts count; ours
+   already does (T1 features_a::split_pieces_take_the_default_names_after_the_parts_before_them, landing with hose).
+   OPEN: piece order. Live listed the x 30..40 piece (smaller, behind the x = 30 face's outward normal) first; ours
+   (split.rs sort: front side first) the x 0..30 one. Plane splits so far had equal halves, front first. Asked live
+   (REQUESTS "core 11-23 06:32 Split › Part: which piece is listed first?"): then fix the sort + add the order assert.
+0. HOSE JOINTS: landing with the Split test (f69e26acf): op_sweep records (profile, path, options + the frame
+   sweep_any_frame took) in CtxState.sweeps keyed by body SHAPE; op_shell Inside with both caps of a round sweep ->
+   ring_sweep = the sweep cut by the sweep of the circle r-t (a ring face's sweep lay 3.6e-6 off the disc's walls);
+   names: outer walls kept, inner Offset(wall) (|d-t| < 1e-5), ends Offset(rim edge). T1 custom_features::
+   a_shelled_round_sweep_meets_exactly_at_its_joints (edges within 1e-8). After landing: ask dx to rerun the hose x_t.
+   Offset-dumps probe saved as /root/core-scratch/probe-offset-dumps.diff (git apply for the scissor work).
 0. P1 SPEED-ASM-OPEN-SCISSOR (asm 11-23 06:3x; row in asm's queued TICKETS): scissor-lift's ~30 s open (live ~10 s) waits
    on a Derived chain. Doc vibex7 ~/agents/core-keep/sc/scissor.noshape (PRIVATE: mode-600 copies in ~/tmp/core/sc
    only: scfl.py feature_list of 2d82a0/9cbb0e with the 0.4.67 CLI; kp.err NOSHAPE_KERNEL_PROFILE). Move face 4 1.17 s =
