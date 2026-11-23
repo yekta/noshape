@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-23 06:2x)
+# QA handoff (agent qa; current state only, updated 2026-11-23 08:4x)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -12,6 +12,12 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   (done 06:55) listed speed x1.3-5.0 (rings, surface-pattern, impeller, loft-paths-guides, parting-line, drive-train, fill-pattern) but predates
   bool a092a991d / c353816d6: check the 07264069e worse.txt; also scenarios drw-table-cells-insert-row (live re-recorded 883e2fe05),
   drw-title-block-dblclick, mate-connector-shift-lock-inference match -> differs: confirm on that run, ticket if they stay.
+- **qa-wsubj** (tmp/wsubj.sh + wsubj.txt label|subject regex -> tmp/wsubj.log "IN-GREEN <label> <sha>"; lead 08:2x): queued on vibe2 land:
+  asm d7991ecb (move ring 20 px: FEEL-ASM-MOVE-RING-RIMS, hover matrix asm cells), skasm 24ca4c6e stack (Offset box, sketch-tools-1123,
+  fillet/chamfer: sk23.sh), studios stack (drw-dims-1123, drawing tool hover, Use copies, Note anchors, history legend 656a4061). Rescore each
+  once its label shows. Bg wait byd0ye9vv exits on any new line there / rr-1de9 DONE / w538.
+- INSERT-GRAPH-RESIDUALS (asm) VERIFIED 08:3x (7bfcc65ec; kit vibe2 ~/tmp/qa/walk2: mk.py docs, run.sh/x.sh on :491; Rel opens via the 6th row
+  (333,538) only when it is named Others, then the version toggle (528,182); local shots qa-scratch/walk2/n1123).
 - Lead told (qa-alerts 07:3x): IMP-* + rings rechecks were already done. vibe2 leftover IMP wait loops killed (own, args checked).
 - **qa-rr-1de9** (tmp/rr-1de9.sh -> tmp/rr-1de9.log, lead 07:2x): psui 1de902059 (QUEUED cc8570b3; subject "psui: ✓ greyed for a value out of
   range, hover cells") in green -> matrix hmr8-b + hmr8-ips, manipnav r10, sk23 out/r1de9, err/ver/out (old run saved err/ver/out-b6d5).
