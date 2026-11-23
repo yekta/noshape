@@ -189,7 +189,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    face); face history AddModified. Results: #7 698 -> 72 ms, #21 1008 ms (OCCT result garbage, volume -6.6e12) ->
    ~100 ms exact, #19/#22 (OCCT fails) valid; #8 (concave moved pair) falls back. BUG: dump #14 (1 plane +4 mm,
    neighbours CPCCP, a fuse) returns a NULL shape (probe panics at r.shape.volume()); a SLABDBG fprintf in the WIP
-   prints the result type: read the remote ~/tmp/core/sc/od.out (grep SLABDBG/NULL; run started 07:1x). Fix, drop SLABDBG + probe, then a T1 kernel test
+   prints the result type: 07:25 result: #14 never succeeded in the slab path (no SLABDBG) yet the OCCT fallback came back null: likely UnifySameDomain edits edges shared with the input solid (features.cpp ~6863 note) -> unify a BRepBuilderAPI_Copy (map history through it) or only after all guards; results are COMPOUNDs (fine). Fix, drop SLABDBG + probe, then a T1 kernel test
    (block with a pocket/boss: move a top face -/+; a hole wall), model/custom/ops suites, land; then Delete face 2
    (op_defeature 1.15 s). Many fillets/chamfers/Move face 2 there are Error in ours: maybe OCCT's broken offsets.
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
