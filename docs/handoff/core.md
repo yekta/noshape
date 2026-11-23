@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 06:37 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -168,26 +168,30 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    basic.rs boolean: SUBTRACTION non-offset tools named helpers_a::rebrand (Face{boolean, Generated(n)}), so the tool's
    face/feature appearances stop reaching the cut faces. T1 engine::subtract_cut_faces_are_the_booleans (both flags;
    a legacy flag only counts on a fresh Regenerator: set before the first regen, as on load).
-0. SPLIT NAMES: live split-default-names-1123 answered: names = "Part <list position>", renamed parts count; ours
-   already does (T1 features_a::split_pieces_take_the_default_names_after_the_parts_before_them, landing with hose).
-   OPEN: piece order. Live listed the x 30..40 piece (smaller, behind the x = 30 face's outward normal) first; ours
-   (split.rs sort: front side first) the x 0..30 one. Plane splits so far had equal halves, front first. Asked live
-   (REQUESTS "core 11-23 06:32 Split › Part: which piece is listed first?"): then fix the sort + add the order assert.
-0. HOSE JOINTS: landing with the Split test (f69e26acf): op_sweep records (profile, path, options + the frame
+0. SPLIT NAMES + ORDER: landing (14ada4d50 + f69e26acf/d82ae7d31 in queue f30c88bf). Names = "Part <list position>",
+   renamed parts count (ours already). Order (live split-order-1123): first piece = the one keeping the target's first
+   face in creation order (model-data naming::extrude_face_order, moved from custom query.rs creation_order) not every
+   piece keeps; only for one-Extrude bodies (else the old side sort). T1 features_a::split_pieces_take_… and
+   the_first_split_piece_keeps_…; kernel/model/custom suites green with it.
+0. HOSE JOINTS: QUEUED f30c88bf (f69e26acf): op_sweep records (profile, path, options + the frame
    sweep_any_frame took) in CtxState.sweeps keyed by body SHAPE; op_shell Inside with both caps of a round sweep ->
    ring_sweep = the sweep cut by the sweep of the circle r-t (a ring face's sweep lay 3.6e-6 off the disc's walls);
    names: outer walls kept, inner Offset(wall) (|d-t| < 1e-5), ends Offset(rim edge). T1 custom_features::
    a_shelled_round_sweep_meets_exactly_at_its_joints (edges within 1e-8). After landing: ask dx to rerun the hose x_t.
-   Offset-dumps probe saved as /root/core-scratch/probe-offset-dumps.diff (git apply for the scissor work).
-0. P1 SPEED-ASM-OPEN-SCISSOR (asm 11-23 06:3x; row in asm's queued TICKETS): scissor-lift's ~30 s open (live ~10 s) waits
-   on a Derived chain. Doc vibex7 ~/agents/core-keep/sc/scissor.noshape (PRIVATE: mode-600 copies in ~/tmp/core/sc
-   only: scfl.py feature_list of 2d82a0/9cbb0e with the 0.4.67 CLI; kp.err NOSHAPE_KERNEL_PROFILE). Move face 4 1.17 s =
-   op_offset_faces 1.05 s, Move face 5 2.07 s = 3x op_offset_faces 1.85 s (OCCT MakeOffset over the whole part), Delete
-   face 2 1.15 s = op_defeature. Dumps d/offsetfaces-N (NOSHAPE_DUMP_OPS); probe core.rs probe_offset_dumps (NOT for
-   git; .od.sh on vibex7 -> remote ~/tmp/core/sc/od.out): slow only #7 (148 faces, 2 cylinders -0.1 mm, 997 ms) and #21
-   (185 faces, 4 planes -0.15 mm, planar neighbours, 1211 ms); #19/#22 FAIL. Idea: planar faces whose neighbours run
-   along the normal -> fuse/cut the face's prism (cylinders: an annular one) before MakeOffset. Many fillets/chamfers/
-   Move face 2 there are Error: a parity issue of its own.
+0. P1 SPEED-ASM-OPEN-SCISSOR IN TEST (WIP parked: /root/core-scratch/slabs-wip.diff = features.cpp
+   offset_by_slabs + call in op_offset_faces + kernel/tests/core.rs probe; git apply it). Scissor doc vibex7
+   ~/agents/core-keep/sc/scissor.noshape PRIVATE (mode-600 copies ~/tmp/core/sc only); dumps ~/tmp/core/sc/d
+   (offsetfaces-N, NOSHAPE_DUMP_OPS) on vibex7 only; .od.sh (probe_offset_dumps, release) -> remote ~/tmp/core/sc/od.out.
+   offset_by_slabs: moved planes whose unmoved neighbours run along the normal (planes square, cylinders parallel;
+   moved neighbours: same offset, plane, edge convex for a cut / concave for a fuse) -> prism slab; whole cylinders
+   between 2 square end planes -> ring slab; Cut (d<0) / Fuse (d>0) + UnifySameDomain; guards: |dV| = fused slabs'
+   volume (slab wholly in/out), 1 valid solid, every result face one original face's image (moved face -> slab's far
+   face); face history AddModified. Results: #7 698 -> 72 ms, #21 1008 ms (OCCT result garbage, volume -6.6e12) ->
+   ~100 ms exact, #19/#22 (OCCT fails) valid; #8 (concave moved pair) falls back. BUG: dump #14 (1 plane +4 mm,
+   neighbours CPCCP, a fuse) returns a NULL shape (probe panics at r.shape.volume()); a SLABDBG fprintf in the WIP
+   prints the result type: was running (vibex7 task) at 07:1x. Fix, drop SLABDBG + probe, then a T1 kernel test
+   (block with a pocket/boss: move a top face -/+; a hole wall), model/custom/ops suites, land; then Delete face 2
+   (op_defeature 1.15 s). Many fillets/chamfers/Move face 2 there are Error in ours: maybe OCCT's broken offsets.
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
