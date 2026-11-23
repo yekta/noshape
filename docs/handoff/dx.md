@@ -53,14 +53,16 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
   xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
 
-## STATE 07:14
-- Committed, not landed (stacked on 538aa4b0, CHECKING since 06:44; never run land.sh while it's queued):
-  1362592de ordinate fan-out, 6778c1914 part_appearances `imported` rows, the styled-face merge T1, dcd70e18e import history entry
-  "Import document" (green hd-run1: clippy ops+app, ops e2e 301, app import 5). Land all three with land.sh once
-  538aa4b0 is through (the lead reports lands; no polling).
-- Queue otherwise empty (07:15): the rest waits on live (11-24 07:00), on other agents, or is parked by the lead.
-  Lead was at 320k at 07:15 (not messaged): tell it "queue empty, next task?" once it is under 200k.
-- Then tell qa: IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK once landed.
+## STATE 07:3x
+- QUEUED 7781b07e (07:28, lead: land now): the 8-commit stack (764f763a7 import file tab first, 538aa4b0 hose end
+  rings, ordinate fan-out, part_appearances `imported`, "Import document", styled-face merge T1, handoffs).
+- 538aa4b0's batch FAILED 07:18 on kernel planar_mesh::a_notched_plate_at_a_tiny_chord_keeps_the_planar_triangulation
+  (1 face to BRepMesh; mine, 43b024a8a). The batch only changed xt.cpp's writer. Not reproduced: on vibe2 it passes 3x
+  alone and in the full kernel run (591, dx-scratch/pm-run1.log); main's watcher is green. If 7781b07e fails on it again:
+  print the face (tessellate_export's fallback) on the land host's build; suspect a non-deterministic parallel Cut.
+- Lead was at 320-340k (not messaged): tell it about the flake + "queue empty, next task?" once it is under 200k.
+- After landing: tell qa IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK; tell core the hose
+  end rings are whole and the 4 tangent joints are their sweep's.
 - Blocked on live (PAUSED until 11-24 07:00): REQUESTS "dx 11-23 06:57" (a) composite colour, (b) panel rows +
   live STEP face colours.
 
