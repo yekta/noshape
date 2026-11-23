@@ -13,6 +13,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   15 judged (FILLET-DRAG-FOCUS, DRAG-DECIMALS, PLANE-HANDLE verified after reruns r7/r8; new P0 PS-SELECTED-EDGE-DARK-CORE, P1
   PS-SELECTED-FRONT-FILL). workflows-1123 rescored on 24f1566de (out-wf23b): 3 verified, 4 partly, 21 new rows (block 01:1x),
   P1 ASM-FIXES-NOT-IN-FLOW; duplicate union rows of the 21:4x/22:0x blocks dropped.
+- **Subagent running**: import fidelity (live/dx/import-fidelity-1123, 8 STEPs) vs ours, brief qa-scratch/brief-imp.md,
+  vibe2 :496, scratch qa-scratch/imp; file per owner (dx, psui, asm). IMPELLER-SHELL-INVALID verified 01:5x.
 - **Done**: error catalogue live/errors-1123 vs ours, brief
   qa-scratch/brief-err.md, all filed (a 01:5x 12 rows, b 01:2x 10, c 01:4x 15), owners told, vibe2, scratch qa-scratch/err/<set>; appearance-1123 filed 01:5x (12 rows, core/psui told). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
 - **Units (logs qa-scratch/tmp/<name>.log)**: qa-wf23c (waits for psui 3cfb09978 + skasm 35c533220 in green, then wf23 01-03/06/07 ->
