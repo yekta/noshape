@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 04:00 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 05:11 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -165,6 +165,17 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    (part pattern Add with NO_GEOMETRY_CHANGE -> error_shapes = the instances; regen tessellates them on Info; mod.rs
    draws an Info feature's error_mesh while open; T1 an_add_pattern_changing_nothing_draws_its_instances_red).
    Probes out of git: ~/core-keep/probes2.patch.
+0. IN TEST (core-rf, UNCOMMITTED; run .er2.sh on vibex8 -> /root/core-scratch/er2.log, task b72jr4rw2; then rerun it for
+   kernel_robustness/engine edits made during the run, already touched): ERR-SEL-RED-ALL-INPUTS: FeatureState/EvalCtx
+   `error_refs` (the inputs an error blames); set by extrude "Failed to extrude selections" (entities), thicken "Failed to
+   thicken all selections." (entities), chamfer "Failed to chamfer selections." (entities); scene Highlighting
+   `errors: &[Reference]` (was `error: bool`): only those red, other inputs orange; mod.rs passes failed_state.error_refs.
+   ERR-HOLE-DESTROYS-SILENT: hole.rs keeps the tool shapes as error_shapes on "The hole destroyed…" (engine.rs test checks
+   the mesh x -10..50 mm). ERR-LOFT-GUIDES-EMPTY: feature_dialog.rs an array entry without its pick reads "No selections"
+   (no UI test yet); the row tip order (live "Sketch 3, Sketch 2") not changed: live's other loft lists profile order.
+   T1s: features_c failed_extrude_reads_onshape_text (+depth0 red, upnext not), a_cylinder_thickened_past_its_axis_fails
+   (+error_refs), kernel_robustness oversize_chamfers_like_onshape (+edges blamed), scene edge_looks (errors slice).
+   Green -> commit, touch -c, land. qa 05:05 rescore: the other open core rows are in queued 318c67d5/96180a1c.
 0. HOSE-RINGS (dx 11-23; live exact everywhere, 144 edges no tolerance): the model's walls are accurate (sweep 1e-14,
    smooth Shell by_smooth shell.cpp ~3025 inner edges 1e-7, edge tol 2.8e-7); dx's xt writer restores the offset
    (offsets_restored) and cuts closed edges > 1e-8 off it: 6 rings a hose. Why: (a) END rings: the true offset meets the
@@ -176,12 +187,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    SetTolerance features.cpp ~2105: 3D size*1e-6, angular 1e-2); tol 1e-10/ang 1e-12 -> kink 3.7e-8 but the smooth Shell
    then splits a face (tol 3.2e-5) and x_t still 14->18 edges. Idea: shell of a round pipe = outer minus inner-circle sweep
    (exact joints), or fix by_smooth with tight sweeps. Refit experiment: /root/core-scratch/hose-refit-exp.patch.
-0. qa ERR rows: ERR-THICKEN-CYL-TOO-THICK queued: features.cpp thicken() refuses a side reaching
-   a quadric/torus face's centre of curvature; T1 features_c::a_cylinder_thickened_past_its_axis_fails. Guided surface
-   loft: every profile miss LOFT_FAILED (live loft-guide-past-end-1123 L/M/N; loft_guided.cpp ~2087; T1 kernel
-   core::a_guided_loft_refuses_a_guide_off_a_profile_as_live). ERR-MOVEFACE-STATUS + NEG-RADIUS queued. Next
-   ERR-SEL-RED-ALL-INPUTS (set a look row) (LOFT-TITLE-SUFFIX = psui's TITLE-SUFFIX, done by psui). Set a behaviour rows
-   REVOLVE-ANGLE0 / INTERSECT-NONE / LOFT-GUIDES-EMPTY / TARGETS-EMPTY are in the queued lands.
+0. qa ERR rows left after the above: LOFT-TITLE-SUFFIX is psui's (done); then the errors-1123 rest, then Fill 1.
 0. ERR-MISSING-SELECTION flag (promised psui ~05:00): regen counts a filter-rejected pick as missing (FeatureState.missing
    and the dialog's missing(r)).
 0. qa APPEAR P0s (TICKETS 01:5x): SUBTRACT-CUT-FACES (cut faces take the target's colour, not the tool feature's
