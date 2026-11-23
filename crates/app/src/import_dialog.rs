@@ -359,9 +359,24 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
     let choice = c.ops();
     let (doc, paths) = (doc.downgrade(), paths.to_vec());
     cx.spawn(async move |cx| {
+        // Live (import-undo-1123): the kept files come first, in their own history entry ("Insert tab(s) : <file>",
+        // +1.5 s), while the translation runs; its tabs come in a second.
+        if keep_files && !choice.upload_only {
+            let files = {
+                let paths = paths.clone();
+                cx.background_spawn(async move { imp::file_tabs(&paths) }).await
+            };
+            let names = files.iter().map(|f| f.file_name.clone()).collect::<Vec<_>>().join(", ");
+            cx.update(|cx| {
+                let Some(doc) = doc.upgrade() else { return };
+                if !files.is_empty() {
+                    doc.update(cx, |doc, cx| doc.edit_document(&format!("Insert tab(s) : {names}"), cx, |d| imp::add_kept_files(d, files)));
+                }
+            });
+        }
         let read = {
             let paths = paths.clone();
-            cx.background_spawn(async move { imp::read_inputs(&paths, &choice, keep_files, &units) }).await
+            cx.background_spawn(async move { imp::read_inputs(&paths, &choice, false, &units) }).await
         };
         cx.update(|cx| {
             let Some(doc) = doc.upgrade() else { return };

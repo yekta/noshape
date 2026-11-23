@@ -29,16 +29,20 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   appearances = live; Mac mini Main 152/258, Fan 14/529 face colours = live), P0 IMP-NEMA-SCREWS-SURFACE
   (io.cpp solids_from_closed_shells second pass after the pcurve fixes sews a part's open shells together at 1e-4 mm,
   same face order: 4 screws 1 solid / 250 faces; OCCT may read a broken MANIFOLD_SOLID_BREP as one shell per face; T1 a_step_shell_whose_faces_meet_without_sharing_edges_reads_as_a_solid).
-- Open: NEMA assembly part order (ours file order, live reverse: check the app's). IMP-NO-FEEDBACK waits for live
-  (REQUESTS dx 02:4x: one history step or two?). No T1 test for the styled-face merge rule yet.
+- QUEUED 79b0abcb (11-23 03:5x). Open: NEMA assembly part order (ours file order, live reverse: check the app's).
+  IMP-NO-FEEDBACK: live answered (live/dx/import-undo-1123): "Insert tab(s) : <file>.step" at +1.5 s, then one
+  "Import document" entry at +7.7 s; Undo disabled in both tabs (ours: tab-bar edits aren't undoable either).
+  Fixed (queued after 79b0abcb): the app adds the kept file first ("Insert tab(s) : <file>"), the tabs after. Open:
+  live's second entry reads "Import document", ours "Import <file>". No T1 test for the styled-face merge rule yet.
 
-## NEXT: hose x_t END rings in our writer (core 11-23 03:0x: "please take the END rings")
-- WIP patch /root/dx-scratch/hose-rings-wip.patch (xt.cpp only; not in tree): Chart + chart_of (19 exact points +
-  closing, damped Newton on_both_damped), intersection_curve (CHART, LIMIT H, INTERSECTION, INTERSECTION_DATA from
-  30.0 via Writer::schema), prepared() keeps a charted ring whole, edge pass charts closed off-face edges before refit.
-  Test a_hoses_walls_write_whole then wants (12, 22, 12) + max tol <= 1e-7: got (12, 26, 16): the 2 outer rings
-  chart, the 4 inner (offset wall, 2e-7..5e-7 tol) fail: Newton stalls ~1e-9 m at t=0 (one lands 1.7 um off the edge).
-  Look at the offset surface past v=1 (live's rings at v = 1 - 3e-12). Never shipped untested: live translation needed.
+## In flight: hose x_t END rings (core 11-23 03:0x: "please take the END rings"), patch /root/dx-scratch/hose-rings-v2.patch (xt.cpp + export.rs)
+- xt.cpp: Chart + chart_of (19 exact points + closing, damped Newton), intersection_curve (CHART, LIMIT H,
+  INTERSECTION, INTERSECTION_DATA from 30.0 via Writer::schema), prepared() keeps a charted ring whole, edge pass
+  charts closed off-face edges before refit. Debug stripped. a_hoses_walls_write_whole now (12, 26, 16): the 2 end
+  rings (offset wall x cap plane) whole; the 4 rings left cut are TANGENT joints between two offset walls (angle
+  ~1e-6: ill-posed, Newton stalls ~1e-9 m) = core's sweep, not mine. exa1 hose1: ours reads ours back 7/7.
+- Waiting: live import of live/dx/hose-rings-1123/ours-hose.x_t (REQUESTS "dx 04:1x"), then land + tell core.
+  Kernel/ops export/clippy run: dx-scratch/hr-run1.log.
 - Live (python3 dx-scratch/bin/xtdumpfull.py /root/parity/exchange/cf-hose-routing/live.x_t 40,41,204): ring edge
   curve = INTERSECTION(surface=[OFFSET_SURF, PLANE], chart, start=end=LIMIT type H at the first chart point),
   edge tolerance None, fins curve 0, no vertex. CHART: Base_parameter 0, Base_scale 1, Chart_count 20 (closed: last

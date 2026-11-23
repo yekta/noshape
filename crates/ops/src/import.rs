@@ -790,8 +790,24 @@ pub fn read_inputs(paths: &[PathBuf], c: &ImportChoice, keep_files: bool, units:
     if label.is_empty() {
         label = paths.iter().map(|p| import_names(p).1).collect::<Vec<_>>().join(", ");
     }
-    let files = if keep_files { paths.iter().filter_map(|p| Some(FileTab::new(&import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect() } else { Vec::new() };
+    let files = if keep_files { file_tabs(paths) } else { Vec::new() };
     (ImportInputs { read, pvz, assemblies, files, uploads: Vec::new(), label }, errors)
+}
+
+/// The files as they are, as file tabs (an import keeps them).
+pub fn file_tabs(paths: &[PathBuf]) -> Vec<FileTab> {
+    paths.iter().filter_map(|p| Some(FileTab::new(&import_names(p).1, &std::fs::read(p).ok()?, noshape_model::file_tab::now()))).collect()
+}
+
+/// An import's files added to the "CAD Imports" folder (Onshape keeps them there).
+pub fn add_kept_files(d: &mut Document, files: Vec<FileTab>) {
+    if files.is_empty() {
+        return;
+    }
+    let folder = cad_imports_folder(d);
+    for f in files {
+        add_file_tab(d, f, Some(folder), None);
+    }
 }
 
 /// The import's tabs added to `d` after `after`: returns the first new tab
@@ -806,13 +822,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         first.get_or_insert(id);
         at = Some(id);
     }
-    // Onshape keeps the imported files in a "CAD Imports" folder.
-    if !inputs.files.is_empty() {
-        let folder = cad_imports_folder(d);
-        for f in inputs.files {
-            add_file_tab(d, f, Some(folder), None);
-        }
-    }
+    add_kept_files(d, inputs.files);
     for a in &inputs.assemblies {
         // Combine: one Part Studio, no Assembly (live G41 (5)).
         if c.combine {
