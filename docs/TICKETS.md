@@ -470,6 +470,33 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
 
+## qa, 2026-11-23 02:3x (live dx/import-fidelity-1123 vs ours: 8 STEPs via + › Import… and ops import_files; greens ed11f7c48 / 6110b8c41, vibe2; qa-scratch/imp, evidence qa-scratch/tickets/IMP-*-1123.png)
+Same as live: the dialog (cards, 4 boxes and defaults, Combine hides composite), tab placement, the toast, Rule 1 on clamp/c2/o-ring/hose/USB-C,
+NEMA's Rule 2 tabs and order, part names/order/colours on the 4 corpus files. Ours is faster everywhere (to the tab ≤7.5 s vs live 6.3-154 s). Not
+checked: NEMA BOM elements, the toast's duration, the dialog's focus (state says "other"; live focuses Import, drawn pale, ours solid blue).
+- [ ] P0 **IMP-NEMA-SCREWS-SURFACE (dx)**: live imports NEMA 17's 4 M2.5 screws as solids inside "Screw" (16 occurrences); ours makes 4 surfaces
+  (250 faces each), so Screw is empty and Combine lists Parts (6) + Surfaces (4). live raw/nema17-{default,combine}.json; IMP-NEMA17-TREE/COMBINE-1123.png
+- [ ] P0 **IMP-FACE-OVERRIDE-READ (dx)**: live keeps the face colours KiCad's USB-C and the Mac mini put on single faces (USB-C #4c4c4c body,
+  #262525, gold #dbbc7e pins; Mac mini black logo, 152+14 face appearances); ours draws every face in the solid's colour (USB-C all #cccccc) with
+  0 face appearances (train-joe's are read). See IMPORT-SOLID-COLOUR-ON-EVERY-FACE. raw/{usbc,macmini}-default.json; IMP-USBC-COLOUR, IMP-MACMINI-COLOUR-1123.png
+- [ ] P1 **IMP-MULTISOLID-PRODUCT (dx)**: a STEP product holding several solids: live names the parts after the solids (Main, Fan) or Part 1..34
+  and makes each solid's colour its part appearance; ours names every part after the product ("root" ×2, "USB_C_Receptacle_GCT_USB4085" ×34) with
+  palette colours. IMP-USBC-NAMES-1123.png
+- [ ] P1 **IMP-UNIFORM-FACE-TO-PART (dx)**: train-joe: a colour on every face of a solid becomes the part appearance (#ba401b/#83bc68/#1651b0/#e8922a),
+  0 face appearances; ours draws the faces right but the parts keep the solid styles (#9dcfed/#a5a5a5/#3b61b4). IMP-TRAINJOE-COLOUR-1123.png
+- [ ] P1 **IMP-NOAPP-KEEP-PART (dx)**: Import appearances off: live keeps the part colours (Mac mini #ececec/#4a4848); ours drops them and draws
+  palette blue #8CB9D4. raw/macmini-noapp.json; IMP-MACMINI-NOAPP-1123.png
+- [ ] P1 **IMP-COMPOSITE (dx)**: "Create a composite part" makes one composite named after the file, a generated colour (#3b61b4 / #7f7f7f), drawn
+  in it, under "Composite parts (1)"; ours ignores the option for solids (createComposite never read). IMP-USBC/MACMINI-COMPOSITE-1123.png
+- [ ] P1 **IMP-NO-FEEDBACK (dx)**: live shows the CAD Imports tab ~1.6-2.7 s after Import; ours shows nothing until the tabs come (Mac mini 2.5-5.7 s,
+  NEMA 5.8-7.5 s): against "feedback within a frame". IMP-NEMA17-FEEDBACK-1123.png
+- [ ] P1 **IMP-FEATURE-PARAMS (dx)**: live's Import 1 has compositeName=<file>, maxAssembliesToCreate=0, flatten=true with Combine,
+  dependsOnBlob=true; ours "", 10, false, false. imp/cli/cmp-6110.txt
+- [ ] P1 **IMP-CLI-TAB-ORDER (dx)**: the app (as live) puts the new tabs after the active tab; ops import_files without `after` appends them at the end.
+- [ ] P1 **IMP-ASM-ROW-ICON (asm)**: NEMA's assembly tree: live's imported instance rows have no icon; ours draws a triad icon after each
+  sub-assembly row that cuts the names ("Aluminum front…"). live shots/nema17-default-open.png; IMP-NEMA17-TREE-1123.png
+- P3 note: c2-duct opens smaller than live's framing (other files framed alike). IMP-CORPUS-OPEN-1123.png
+
 ## qa, 2026-11-23 00:5x (ours on the Mac vs live timing-1123: 10 docs x 6 actions, 3 runs each, 0.4.67, load-gated; table qa-scratch/t23/table.txt)
 - Ours at or below live on every timed action except the two sketch dimension edits above (SPEED-RINGS-SHELL, SPEED-IMPELLER, raised
   to P0) and two under the bar: isaac suppress 1443 vs 1318 ms (1.09x), knifehandle dimension 2760 vs 1821 ms (1.52x). Assembly open
