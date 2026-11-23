@@ -9,49 +9,46 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-22 22:58 UTC.
+Updated 2026-11-23 00:29 UTC.
 
 ## In flight
 
 Worktree /root/projects/noshape-wt/studios, branch studios-0811a. Land: `NOSHAPE_RB_HOST=vibex7
 NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh`; read `git diff --stat origin/main...HEAD` first. Builds and crate
-tests on vibex7 (rb-hosts 6a36d3b1f; off it 02:00-04:00 UTC, qa's quiet window: vibex8 then). Scenarios on vibex8 via
-~/bin/slot (<=3 apps): build on vibex7, `scp -3 vibex7:tmp/studios/noshape-uip vibex8:tmp/studios/noshape-uip`, sync
-vibex8 with `rb.sh bash -c true`, then `ssh vibex8 "bash -s" < script` (x184b.sh: all drw doc ver vs fs rel scenarios,
-score line "score: N/978"; x184d.sh: drw only + the three hover matrices). Never vibe2. Every run under `timeout`;
-`touch -c` edited files before rb.sh; two rb.sh runs on one host share a target dir (one waits). Full ops e2e before a
-crates/drawing land (drawing-ui alone: not needed).
-- LANDED 155f85da as f4dda516 (11-22 13:07): the drawing P0 stack (hover/select, click_still, balloon leader, Change to
-  version, Esc rework, qa walk 9, workflow 09 / 26 batches).
-- LANDED d1452c9a as d425fa05 (14:40): palette halo, FS-DRAG-SELECT-BAND, view box rule, insert-row selection clear.
-- LANDED cd7b7401 as 634aa1f1 (15:21): Select line reach 8 px (lit at 7, not 8), SELECT_FORMAT_REACH_PX 9 (sheet border
-  lit at 8, not 9). vibex8 drw run on it (uip1122k): 371/374, same 3 diffs; hover matrices 3/3.
-- LANDED dd49dc0f as 1a9112ed (15:47): TICKETS stale rows.
-- QUEUED 323f69d3 (11-22 22:20; 12 commits): VS chip / row drag, FS tooltip, Restore ignores Enter, documents page,
-  title-block fix, drag marks + dim text inference, Esc mid view drag (`on_mouse_up_out`), dragged view's dims orange,
-  radius value dropped inside, folder list-row drop look, Esc ends a row drag, table Insert ▸ fix, TICKETS dup row.
-  3806ff953 (dx's hover cells) DROPPED in the rebase: dx landed its own (52cfbc549). Not in dx's: the Note tool's leader
-  on a centerline (live drw-hover-1122): recheck on main.
-- QUEUED 442cec4e (22:52; 16 commits incl. 323f69d3's stack, which was CHECKING) = 5a7f5a640, tested (x230-x237 green: drawing_ui_tests 158, scene drawing_tools, feature-studio-ui lib, clippy):
-  every qa workflows-1123 P0 (both blocks): SELECTED-VIEW-LABEL, PICK-EDGE-STAYS-LIT, BOM-HOVER-FILL, CALLOUT-SELECTED-LOOK,
-  FS-COMMIT-DISABLED-HOVER, RELATED-MARKS-BLUE (cut_line_looks CutLook::Related + push_related_marks; detail circle blue
-  unless `circle_pick`; callout lights its edge; selection_handles dots removed), SECTION-EDIT-MARKS (frame, filled dots,
-  overlay cleared on close, `hidden_texts` hides the cutting letters), CALLOUT-PLACED-HOVER (`placed_callout` +
-  `placed_callout_guides`); P1 DRW-SELECTION-AFTER-ACTION. TICKETS marked [x]. tested in x237 (159 green):
-  DRW-MOVED-VIEW-PROPS (`apart_from_parent`: Suppress ticked+greyed, rotation editable; orientation dropdown left).
+tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~/bin/slot (<=3 apps): build on vibex7,
+`scp -3 vibex7:tmp/studios/noshape-uip vibex8:tmp/studios/noshape-uip`, sync vibex8 with `rb.sh bash -c true`, then
+`ssh vibex8 "bash -s" < script` (x184b.sh all, x184d.sh drw + hover matrices). Never vibe2. Every run under `timeout`;
+`touch -c` edited files before rb.sh. Full ops e2e before a crates/drawing or store land. Read logs with tail/grep only.
+- LANDED 323f69d3 as 3077f315 (11-22 23:26). 1ca45c77 / 442cec4e FAILED on a handoff rebase conflict: rebased
+  (handoff-only commits dropped) and re-queued with the stack below.
+- STACK (tested): qa workflows-1123 drawing P0s (452aec56f: SELECTED-VIEW-LABEL, PICK-EDGE-STAYS-LIT, BOM-HOVER-FILL,
+  CALLOUT-SELECTED-LOOK, FS-COMMIT-DISABLED-HOVER, RELATED-MARKS-BLUE, SECTION-EDIT-MARKS, CALLOUT-PLACED-HOVER,
+  DRW-SELECTION-AFTER-ACTION, DRW-MOVED-VIEW-PROPS part); HIST-COMPARE-FEATURE-ICONS; HIST-COMPARE-FEATURE-HIGHLIGHT
+  + HIST-COMPARE-PARAMS-PANEL (x240); DRW-DETAIL-CONNECTED-OPTIONS + preview scale label (x241 ops e2e 296, x242).
+- USER P0 (lead 11-22 23:45, macOS ~/Documents/noshape): DOC-COPY-IDENTITY + DOC-SIDE-FILES:
+  - No per-document id exists: windows (OpenDocs, canonical path), recents, last-viewed are keyed by path, so a Finder
+    copy is already its own document; only its name was the original's. store `Document::meta().name` =
+    `shown_name(path, stored, name_file)`: the stored name while the file is the one it was set in (`set_name` records
+    meta `name_file`; the navbar rename keeps the file) or named after it ("Name" / "Name 2"), else the file stem.
+    Legacy docs renamed in the navbar before this (no name_file) show their file name.
+  - Quit: `DocModel::close_on_quit` (files::build_workspace, versions_page, and on the first deferred edit) flushes
+    and `store.suspend()`s, since quit ends via kernel exit_now without dropping documents -> no -wal/-shm left.
+  - `noshape_store::fold_log(path)`: a closed doc's leftover -wal/-shm folded in via Document::open (foreign logs
+    moved aside); skipped for docs this process has open (WRITERS registry). The documents page calls it on read.
+  - Finder copy of an open doc: the idle checkpointer (1 s) keeps the .noshape whole; a copy within 1 s of an edit
+    misses it (store test an_idle_open_document_is_whole_in_its_file). Leftover logs from old quits are now folded.
+  - Tests: store a_document_copied_or_renamed_outside_is_named_after_its_file, a_leftover_log_is_folded_into_its_document;
+    app-core start_library a_finder_copy_is_named_after_its_file_and_leftover_side_files_go; app quit_tests (2).
+  - File association / open-file events are dx's (open_requests.rs); dx keys "already open" on canonical(path) and its
+    second start never opens the store. Not yet verified on the Mac's release build.
 - DRW-VIEWPROPS-ENTER-APPLIES held: conflicts with live2 drw-view-properties-scale-typed; REQUESTS studios 22:43 asks live.
-- QUEUED (stacked on 442cec4e) HIST-COMPARE-FEATURE-ICONS (compare_mode.rs: rows use crate::assets::icon (colour) not svg
-  mask; marks 22 px, measured 11 px ">" in wf23-18-compare.png). x238 green (history-ui lib 17 + clippy).
-- HIST-COMPARE-FEATURE-HIGHLIGHT (next): compare_graphics.rs `scene` builds both sides greyed; the selected row
-  (compare_mode state `selected`, via a part_studio_hooks getter) must light that feature's bodies orange see-through:
-  needs a feature -> bodies map from each side's StudioDisplay.
-- qa P1/P2 left: HIST-COMPARE-PARAMS-PANEL (the dialog's own layout in each column),
-  DRW-SECTION-DETAIL-VIEW-PROPS-ROWS, DRW-DETAIL-CONNECTED-OPTIONS, DRW-DETAIL-PREVIEW-LOOK, DRW-SECTION-PREVIEW-IN-PARENT,
-  the 22:0x P2s.
-- drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box) not checked.
-- drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre, Ø5 centres take; ours takes
-  it. Decision needed from the lead (copy or record as live's failure); not changed.
-- QUEUE: DRW-DIM-HIDDEN-VERTEX-SNAP fix; the drag gaps above; FS / VS / history pages: everything else matches.
+- DRW-DETAIL-PREVIEW-LOOK open: ink dark vs light (live2 164 vs qa shot), the dashed radius line in the parent circle.
+- qa P1/P2 left: DRW-SECTION-DETAIL-VIEW-PROPS-ROWS, DRW-SECTION-PREVIEW-IN-PARENT, the 22:0x P2s.
+- drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box).
+- drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre; ours takes it. Decision needed
+  from the lead (copy or record as live's failure).
+- QUEUE: DRW-DIM-HIDDEN-VERTEX-SNAP fix; the drag gaps above; the Compare highlight not yet looked at in the app.
+
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
    panel's nested reading counted; its Border size gained Tight fit and 5 Characters). Every panel
