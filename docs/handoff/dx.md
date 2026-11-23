@@ -53,15 +53,16 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
   xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
 
-## STATE 07:3x
-- QUEUED 7781b07e (07:28, lead: land now): the 8-commit stack (764f763a7 import file tab first, 538aa4b0 hose end
+## STATE 07:37
+- QUEUED 0ea77f1c (07:37, carries 7781b07e of 07:28; lead: land now): the stack + the mesh counter fix (764f763a7 import file tab first, 538aa4b0 hose end
   rings, ordinate fan-out, part_appearances `imported`, "Import document", styled-face merge T1, handoffs).
 - 538aa4b0's batch FAILED 07:18 on kernel planar_mesh::a_notched_plate_at_a_tiny_chord_keeps_the_planar_triangulation
   (1 face to BRepMesh; mine, 43b024a8a). The batch only changed xt.cpp's writer. Not reproduced: on vibe2 it passes 3x
-  alone and in the full kernel run (591, dx-scratch/pm-run1.log); main's watcher is green. If 7781b07e fails on it again:
+  alone and in the full kernel run (591, dx-scratch/pm-run1.log); main's watcher is green.
   FIXED: the fallback count was one process-wide counter read as a before/after difference (another test meshing
   at once added its fallbacks); now counted per meshing (mesh.cpp FallbackCount), green kernel 591 (pm2-run1.log).
-- Lead was at 320-340k (not messaged): tell it about the flake + "queue empty, next task?" once it is under 200k.
+- Lead at 341k at 07:37 (not messaged): tell it "538aa4b0 failed on a shared mesh counter, fixed, requeued as 0ea77f1c;
+  queue empty, next task?" once it is under 200k.
 - After landing: tell qa IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK; tell core the hose
   end rings are whole and the 4 tangent joints are their sweep's.
 - Blocked on live (PAUSED until 11-24 07:00): REQUESTS "dx 11-23 06:57" (a) composite colour, (b) panel rows +
