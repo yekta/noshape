@@ -1993,6 +1993,55 @@ fn step_face_colour_reads_from_the_parts_sub_shapes() {
     assert!(parts.iter().all(|s| s.color.is_some()));
 }
 
+/// The import merges a part's faces on one plane but keeps a face with its own colour apart (live import-fidelity-1123:
+/// the Mac mini's Main keeps its 152 coloured faces): two boxes fused end to end (top, bottom, front and back each two
+/// faces) read back as six faces, and as seven with the colour still on its face when one of the halves is red.
+#[test]
+fn a_coloured_face_is_not_merged_into_its_neighbour_on_the_plane() {
+    let dir = std::env::temp_dir().join(format!("noshape-step-styled-merge-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("pair.step");
+    let a = make_box_corners(DVec3::ZERO, DVec3::new(0.02, 0.02, 0.01)).unwrap();
+    let b = make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.04, 0.02, 0.01)).unwrap();
+    let pair = fuse(&a, &b).unwrap().shape;
+    assert_eq!(pair.count(ShapeType::Face), 10);
+    write_step(&path, &[ExportShape { shape: pair, name: Some("Pair".into()), color: Some([0.5, 0.5, 0.5]) }], LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let (head, tail) = text.split_once("ENDSEC;\nEND-ISO").unwrap();
+    let entities: Vec<(usize, String)> = head.split(';').filter_map(|e| {
+        let (id, body) = e.trim().strip_prefix('#')?.split_once('=')?;
+        Some((id.trim().parse().ok()?, body.split_whitespace().collect::<String>()))
+    }).collect();
+    let faces: Vec<usize> = entities.iter().filter(|(_, b)| b.starts_with("ADVANCED_FACE(")).map(|(id, _)| *id).collect();
+    assert_eq!(faces.len(), 10);
+    // The part's own style names its representation context: the face's style is presented in the same one.
+    let context = entities.iter().find_map(|(_, b)| b.strip_prefix("MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION(")).and_then(|b| b.rsplit_once(",#")).map(|(_, c)| c.trim_end_matches(')').to_string()).unwrap();
+    let next = entities.iter().map(|(id, _)| id).max().unwrap() + 1;
+    let read = |text: &str| {
+        std::fs::write(&path, text).unwrap();
+        let parts = read_step(&path, LengthUnit::Meter).unwrap();
+        assert_eq!(parts.len(), 1);
+        (parts[0].shape.count(ShapeType::Face), parts[0].face_colors.clone())
+    };
+    assert_eq!(read(&text), (6, vec![]));
+    let mut kept = Vec::new();
+    for f in faces {
+        let n = next;
+        let style = format!(
+            "#{n}=COLOUR_RGB('',1.,0.,0.);\n#{}=FILL_AREA_STYLE_COLOUR('',#{n});\n#{}=FILL_AREA_STYLE('',(#{}));\n#{}=SURFACE_STYLE_FILL_AREA(#{});\n#{}=SURFACE_SIDE_STYLE('',(#{}));\n#{}=SURFACE_STYLE_USAGE(.BOTH.,#{});\n#{}=PRESENTATION_STYLE_ASSIGNMENT((#{}));\n#{}=STYLED_ITEM('',(#{}),#{f});\n#{}=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',(#{}),#{context});\n",
+            n + 1, n + 2, n + 1, n + 3, n + 2, n + 4, n + 3, n + 5, n + 4, n + 6, n + 5, n + 7, n + 6, n + 8, n + 7
+        );
+        let (faces, colours) = read(&format!("{head}{style}ENDSEC;\nEND-ISO{tail}"));
+        assert_eq!(colours.len(), 1, "face #{f}");
+        assert_eq!(colours[0].1, [1.0, 0.0, 0.0]);
+        kept.push(faces);
+    }
+    kept.sort();
+    // The two ends are whole faces (six faces either way); each of the eight halves stays apart from its neighbour.
+    assert_eq!(kept, [6, 6, 7, 7, 7, 7, 7, 7, 7, 7]);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
 /// Live's IGES of a part named "Long bracket part name 1": the 186 label
 /// holds "Long bra", a 406 Name property the whole name; live imports it as
 /// "Long bra" (request 1818), and so do we.

@@ -20,7 +20,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - Hose x_t rings: live.x_t exact everywhere; joints = core's sweep (G1); end rings: offered INTERSECTION in our writer
   if core's change doesn't make them exact. Tools dx-scratch/bin/xtdump.py, xtedges.py.
 
-## Import fidelity (qa TICKETS "qa, 2026-11-23 02:3x", live import-fidelity-1123): committing + land.sh 11-23 03:4x
+## Import fidelity (qa TICKETS "qa, 2026-11-23 02:3x", live import-fidelity-1123): landed cf9f959a
 - Green on vibe2: kernel all, model import, ops import, ops e2e:: (earlier run), coverage (AGENT_API regenerated), clippy.
 - IMP-MULTISOLID-PRODUCT (io.rs "Part N"), IMP-UNIFORM-FACE-TO-PART (uniform_faces_colored), IMP-NOAPP-KEEP-PART
   (apply_look), IMP-FEATURE-PARAMS (compositeName stem, maxAssembliesToCreate 0, dependsOnBlob, flatten=combine),
@@ -29,11 +29,11 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   appearances = live; Mac mini Main 152/258, Fan 14/529 face colours = live), P0 IMP-NEMA-SCREWS-SURFACE
   (io.cpp solids_from_closed_shells second pass after the pcurve fixes sews a part's open shells together at 1e-4 mm,
   same face order: 4 screws 1 solid / 250 faces; OCCT may read a broken MANIFOLD_SOLID_BREP as one shell per face; T1 a_step_shell_whose_faces_meet_without_sharing_edges_reads_as_a_solid).
-- QUEUED 79b0abcb (11-23 03:5x). Open: NEMA assembly part order (ours file order, live reverse: check the app's).
-  IMP-NO-FEEDBACK: live answered (live/dx/import-undo-1123): "Insert tab(s) : <file>.step" at +1.5 s, then one
-  "Import document" entry at +7.7 s; Undo disabled in both tabs (ours: tab-bar edits aren't undoable either).
-  Fixed (queued after 79b0abcb): the app adds the kept file first ("Insert tab(s) : <file>"), the tabs after. Open:
-  second entry now "Import document" as live (UNCOMMITTED, dx-scratch/hd-run1.log; upload-only's entry unrecorded in live). No T1 test for the styled-face merge rule yet.
+- LANDED as cf9f959a (05:04). NEMA assembly part order = live (qa cmp-green.txt: parts, root and sub-assembly
+  instance order SAME). IMP-NO-FEEDBACK (live/dx/import-undo-1123: "Insert tab(s) : <file>.step" +1.5 s, then one
+  "Import document" +7.7 s): kept file first in 538aa4b0's batch, "Import document" in dcd70e18e. Upload-only's
+  entry unrecorded in live. Styled-face merge rule: T1 export::a_coloured_face_is_not_merged_into_its_neighbour_on_the_plane
+  (committed, green: clippy kernel, export::step_ 7).
 
 ## Committed: hose x_t END rings (core 11-23 03:0x: "please take the END rings")
 - xt.cpp: Chart + chart_of (19 exact points + closing, damped Newton), intersection_curve (CHART, LIMIT H,
@@ -55,7 +55,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 
 ## STATE 07:14
 - Committed, not landed (stacked on 538aa4b0, CHECKING since 06:44; never run land.sh while it's queued):
-  1362592de ordinate fan-out, 6778c1914 part_appearances `imported` rows, dcd70e18e import history entry
+  1362592de ordinate fan-out, 6778c1914 part_appearances `imported` rows, the styled-face merge T1, dcd70e18e import history entry
   "Import document" (green hd-run1: clippy ops+app, ops e2e 301, app import 5). Land all three with land.sh once
   538aa4b0 is through (the lead reports lands; no polling).
 - Then tell qa: IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK once landed.
