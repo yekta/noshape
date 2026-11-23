@@ -11,6 +11,7 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   CLICK-EMPTY-SELECTS-PLANE, LINE-STORES-PERPENDICULAR, FIELD-RANGE-TIP-ENTER, MC-PS-MARKER-REACH; SPEED-IMPELLER split (bool/blend).
 - DONE 02:3x: import fidelity (8 STEPs) filed TICKETS "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm), told. Not checked: NEMA BOMs, toast duration,
   dialog focus. Xvfb :496 on vibe2 left running by the subagent (not ours to kill by pid). Data qa-scratch/imp.
+- **Subagent 03:4x**: sketch tools vs live/sketch-tools-1123 (brief qa-scratch/brief-sk23.md, vibe2 :498, scratch qa-scratch/sk23) -> file SKT-* (skasm), tell skasm. dx 3b6086ed + psui 0c1d80e6/7e017ac17 on main 03:39, waiting for green.
   If its notification never comes, read qa-scratch/imp and rerun from the brief.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
