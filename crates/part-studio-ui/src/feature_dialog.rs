@@ -2431,9 +2431,9 @@ impl FeatureDialog {
     }
 
     /// Whether ✓ is disabled (live `canSubmit`): until the dialog is dirty (an edit, or a regeneration without an
-    /// error), and while an applied value doesn't evaluate.
+    /// error), and while an applied value doesn't evaluate or is out of its range (live errors-1123 shell-zero-n-dlg).
     pub(crate) fn ok_blocked(&self) -> bool {
-        self.applied_value_error().is_some() || !self.dirty || self.number_field_failed()
+        self.applied_value_error().is_some() || self.range_error().is_some() || !self.dirty || self.number_field_failed()
     }
 
     /// A number field the regeneration's error names (live hem-type-tear-drop: Total length too short, ✓ off; every
@@ -3592,7 +3592,8 @@ impl FeatureDialog {
                                     let a2 = anchor.clone();
                                     d.child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()).tooltip(crate::ui::rich_tooltip(s.label, s.description, anchor))
                                 }
-                                (Some(m), _) => crate::ui::with_dialog_field_tooltip(d, m.clone(), px(3.)),
+                                // (Live err-tip-placement-1123: 2 px right of the box, level with it.)
+                                (Some(m), _) => crate::ui::with_dialog_field_tooltip(d, m.clone(), px(-1.)),
                                 (None, true) => d.tooltip(crate::ui::tooltip(s.label.to_string())),
                             })
                             .cursor_pointer()
@@ -4704,7 +4705,7 @@ impl Render for FeatureDialog {
                                 Some((st, _)) => d.child(div().debug_selector(|| "dialog-title-edit".into()).child(Input::new(st).small())),
                                 None => d.child(crate::ui::user_text(name)),
                             })
-                            .when_some(error_tip, |d, m| d.tooltip(crate::ui::tooltip(m)))
+                            .when_some(error_tip, crate::ui::with_dialog_title_tooltip)
                             // Live (behaviours 2388): the title isn't editable; features are renamed in the list.
                     )
                     // Live (psb 10-21 g): a dialog in configure mode has only ✕.

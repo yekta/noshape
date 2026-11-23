@@ -918,12 +918,17 @@ fn b3_field_face_hovered_edge_picked(cx: &mut TestAppContext) {
     dump("cell-b3_field_face_hovered_edge_picked", &c);
     let edge = m.screen(cx, EDGE) - m.screen(cx, FACE) + DVec2::new(40.0, 40.0);
     let picked = (edge.y as usize - 2..=edge.y as usize + 2).any(|y| close(c[y * 80 + edge.x as usize], 0xffa90a, 24));
-    // (#b28a5d: the muted boundary gave ~80; the preview's tangent line beside the band blends to a few, live 9.)
-    assert!(picked && count(&c, 0xffc685) > 150 && count(&c, 0xb28a5d) < 50, "{} #ffc685, {} #b28a5d", count(&c, 0xffc685), count(&c, 0xb28a5d));
+    // (#b28a5d: the muted boundary gave ~80; the preview's tangent line beside the band blends to a few, live 9.
+    // #ffc685: the face's own boundary only, 125 since the preview-made edges stay plain.)
+    assert!(picked && count(&c, 0xffc685) > 100 && count(&c, 0xb28a5d) < 50, "{} #ffc685, {} #b28a5d", count(&c, 0xffc685), count(&c, 0xb28a5d));
     // The band over the hovered face's boundary line beside it: its core #ffaf25, 78 % over #ffc685 (qa
     // FEEL-FILLET-FACE-OVER-PICKED: ours the core #dd9f26 over the face with the 1 px line over the band).
     let column: Vec<[u8; 3]> = (edge.y as usize - 4..=edge.y as usize + 4).map(|y| c[y * 80 + edge.x as usize]).collect();
     assert!(column.iter().any(|p| close(*p, 0xffaf25, 10)) && !column.iter().any(|p| close(*p, 0xdd9f26, 10)), "across the band {column:02x?}");
+    // No #ffc685 along the picked edge: the preview's tangent line 3 px over the band stays dark (live
+    // hover-matrix-recheck-1123 cell 4: 0 changed px within ±7 px; the face's other edges lit).
+    let near: Vec<[u8; 3]> = (edge.y as usize - 7..=edge.y as usize + 7).flat_map(|y| (edge.x as usize - 6..=edge.x as usize + 6).map(move |x| (x, y))).map(|(x, y)| c[y * 80 + x]).collect();
+    assert_eq!(near.iter().filter(|p| close(**p, 0xffc685, 12)).count(), 0, "#ffc685 within 7 px of the picked edge");
 }
 
 // Select other on the top face (live uip/select-other-row-click-1..4, qa FEEL-SELECT-OTHER-LOOK): no point is drawn where
@@ -2024,8 +2029,8 @@ fn nothing_lights_under_the_still_pointer_after_enter(cx: &mut TestAppContext) {
 }
 
 // Extrude 1 edited (live manip-feel-1122 edit-body-shade, qa FEEL-EDIT-BODY-SHADE): the top under the end cap reads live's
-// (132,146,155) within 9 (ours (131,140,147) and (138,148,154): the cap's grey once over the preview mix; drawn with the
-// frame too, it read (118,127,133)).
+// flat (132,147,155) within 9 (the cap's blue grey once over the preview mix; #595959 read (131,140,147) and
+// (138,148,154); drawn with the frame too, (118,127,133)).
 #[gpui::test]
 fn an_edited_extrudes_end_cap_greys_its_top_once(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -2038,4 +2043,78 @@ fn an_edited_extrudes_end_cap_greys_its_top_once(cx: &mut TestAppContext) {
     let (w, _, px) = m.frame(cx);
     let at: Vec<[u8; 3]> = tops.iter().map(|p| px[(p.y as u32 * w + p.x as u32) as usize]).collect();
     assert!(at.iter().all(|c| close(*c, 0x84929b, 9)), "the top under the end cap {at:?}, live (132,146,155)");
+}
+
+/// A selected edge of a selected face is one solid #ffa90a band (live sel-gestures-1122 ps-box-crossing-result: the
+/// face's boundary covers the band's core); alone it keeps its darker core (live hover-matrix-1121 edge-selected
+/// (207,141,18)).
+#[gpui::test]
+fn a_selected_edge_of_a_selected_face_is_solid(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "hover-matrix-solid-band");
+    let (edge, face) = (m.screen(cx, EDGE), m.screen(cx, FACE));
+    let core = |c: &[[u8; 3]]| near_centre(c, 1.0).map(|p| p[0]).min().unwrap_or(0);
+    m.pointer.move_to(cx, &m.view, edge);
+    m.pointer.click(cx, &m.view, edge);
+    m.park(cx);
+    let alone = m.crop(cx, edge);
+    assert!(core(&alone) < 225, "alone: its darker core ({:?})", near_centre(&alone, 1.0).collect::<Vec<_>>());
+    m.pointer.move_to(cx, &m.view, face);
+    m.pointer.click(cx, &m.view, face);
+    m.park(cx);
+    assert_eq!(cx.update(|cx| m.view.read(cx).selection.len()), 2, "the edge and its face selected");
+    let both = m.crop(cx, edge);
+    dump("edge-of-selected-face", &both);
+    assert!(near_centre(&both, 1.5).all(|p| close(p, 0xffa90a, 16)), "one solid band ({:?})", near_centre(&both, 1.5).collect::<Vec<_>>());
+}
+
+/// Selected faces keep one hue on every side (live sel-gestures-1122 ps-box-crossing-result): the front (184,136,45),
+/// the top (228,170,56).
+#[gpui::test]
+fn a_selected_front_face_is_the_tops_hue_darker(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "hover-matrix-front-fill");
+    let (front, top) = (m.screen(cx, [20., 0., 10.]), m.screen(cx, FACE));
+    for p in [front, top] {
+        m.pointer.move_to(cx, &m.view, p);
+        m.pointer.click(cx, &m.view, p);
+    }
+    m.park(cx);
+    let (w, _, px) = m.frame(cx);
+    let at = |p: DVec2| px[(p.y as u32 * w + p.x as u32) as usize];
+    let (f, t) = (at(front), at(top));
+    assert!(close(f, 0xb8882d, 6) && close(t, 0xe4aa38, 6), "front {f:?} (live (184,136,45)), top {t:?} (live (228,170,56))");
+}
+
+/// qa ERR-SM-BAD-SELECTION-RED (live errors-1123 sheet-metal fl-joint2): with a Flange on a joint edge of Flange 1's
+/// bend open, the joint edge is drawn red on the part (#bd3039), not only flagged.
+#[gpui::test]
+fn a_flange_on_a_joint_edge_draws_red_pixels(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [20, 0, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 2", "params": { "edges": ["edge through [60, 25, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 3", "params": { "edges": ["edge through [29, 2, 2]"] } },
+    ] });
+    let m = matrix_studio_from(cx, "sm-flange-joint-red-px", start);
+    // From above: from the matrix's front view Flange 1's wall hides the joint edge.
+    cx.update(|cx| {
+        let vp = m.view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            vp.camera.rotation = noshape_render::Camera::look_rotation(DVec3::new(0., 0., -1.), DVec3::Y);
+            vp.camera.target = DVec3::new(0.03, 0.02, 0.0);
+            vp.request_frame(cx);
+        });
+    });
+    m.park(cx);
+    let red = |cx: &mut TestAppContext| m.frame(cx).2.iter().filter(|c| close(**c, 0xbd3039, 40)).count();
+    let before = red(cx);
+    let flange = cx.update(|cx| m.view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Flange 3").map(|f| f.id))).expect("Flange 3");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(flange, w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy() && m.view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).status.is_some()));
+    m.park(cx);
+    let after = red(cx);
+    assert!(after >= before + 20, "red px: {before} closed, {after} with the dialog open");
 }

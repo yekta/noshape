@@ -312,7 +312,7 @@ impl FeatureDialog {
             }
         }
         // Errors show as the red title (its tooltip says why); the dialog has no message text of its own.
-        let red = self.applied_value_error().is_some() || self.status.as_ref().is_some_and(super::status_reads_red);
+        let red = self.applied_value_error().is_some() || self.title_status().as_ref().is_some_and(super::status_reads_red);
         let kind = if self.feature.type_id == "sketch" { "sketch" } else { "feature" };
         // ✓ (none in configure mode or a nested dialog).
         let ok = (!self.configure_mode && !self.nested).then(|| if self.ok_blocked() { "disabled" } else { "enabled" });

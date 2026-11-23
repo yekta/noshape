@@ -1105,6 +1105,9 @@ impl PartStudioView {
         self.hover = None;
         if let Some(ed) = &mut self.sketch {
             ed.hover = None;
+            if !ed.mid_draw() {
+                ed.inference = None;
+            }
         }
     }
 
@@ -1200,6 +1203,13 @@ impl PartStudioView {
         // The GPU hover result arrives after PointerMove. Refresh Use
         // here as well, so stopping on an edge still previews it.
         if self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Use) {
+            // A model vertex (the sketch origin's too) offers the edge under the pointer (live sketch-tools-1123
+            // use-convert: on the origin vertex the bottom edge lit; qa SKT-USE-HOVER).
+            if matches!(r, Some(Reference::Vertex(_) | Reference::Origin))
+                && let Some(e) = self.model_edge_at(vp.read(cx).pointer_position(), cx)
+            {
+                r = Some(e);
+            }
             self.hover = r;
             self.update_use_preview();
             self.refresh_scene(false, cx);
@@ -1548,8 +1558,13 @@ impl PartStudioView {
                 }
                 let (shift, dbl) = (modifiers.shift || modifiers.control, *click_count >= 2);
                 let mirrors = self.sketch.as_ref().is_some_and(|ed| ed.tool == Tool::Mirror && ed.has_mirror_axis());
+                let draws = self.sketch.as_ref().is_some_and(|ed| ed.tool.draws());
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_down(data, p, hovered, shift, dbl)) {
-                    if mirrors && out.changed {
+                    // A click that commits a shape (not a Line chain's next point): the new curve under the still pointer
+                    // drawn plain, no snap square (live sketch-tools-1123, qa SKT-POSTCOMMIT-HOVER: 3 point arc, tangent
+                    // arc, ellipse).
+                    let committed = draws && out.changed && self.sketch.as_ref().is_some_and(|ed| !ed.mid_draw());
+                    if (mirrors || committed) && out.changed {
                         self.hold_sketch_hover(*position);
                     }
                     self.apply_outcome(out, window, cx);
@@ -1666,6 +1681,10 @@ impl PartStudioView {
         }
         if !points.points.is_empty() {
             out.push(Instance::new(Drawable::Points(up.upload_points(&points))).per_primitive_color().unpickable().ignore_clip().layer(31));
+        }
+        let under = ed.end_dot_under_target(&data);
+        if !under.points.is_empty() {
+            out.push(Instance::new(Drawable::Points(up.upload_points(&under))).per_primitive_color().unpickable().ignore_clip().layer(noshape_scene::builder::HIGHLIGHT_LINES_LAYER - 1));
         }
         out.extend(self.preview_length_in_plane(ed, &data, &units, cx));
         out.extend(self.otf_box_in_plane(ed, &data, &units, cx));

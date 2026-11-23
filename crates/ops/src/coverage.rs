@@ -592,7 +592,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Release all configurations…", Op("release_create")),
     ("partStudio:Where used…", Op("part_where_used")),
     ("partStudio:Open in new browser tab", Op("document_open")),
-    ("partStudio:Remove appearance", Op("part_remove_appearance")),
     ("partStudio:Rename", Op("feature_rename")),
     ("partStudio:Rename…", Op("part_rename")),
     ("partStudio:Revision history…", Op("release_revision_history")),

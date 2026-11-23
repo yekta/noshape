@@ -5315,7 +5315,8 @@ impl AssemblyView {
             .when(all_selected, |d| d.bg(pal.accent_soft))
             .hover(|d| d.bg(pal.panel_hover))
             // Live (request 1559, cf-6): the error badge (the red ⬇ disc) sits
-            // on the icon's lower right; its tooltip (E15) "Assembly contains error".
+            // on the icon's lower right, 12 px from 7 px into it (errors-1123
+            // mates); its tooltip (E15) "Assembly contains error".
             .child(
                 div()
                     .w(px(16.))
@@ -5324,7 +5325,7 @@ impl AssemblyView {
                     .justify_center()
                     .relative()
                     .child(crate::assets::icon(&icon_path("assembly"), 16., cx))
-                    .when(has_error, |d| d.child(div().id("asm-error").absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("regen-error"), 11., cx)).tooltip(crate::ui::tooltip(error_tip)))),
+                    .when(has_error, |d| d.child(div().id("asm-error").absolute().right(px(-3.)).bottom(px(-3.)).child(crate::assets::icon(&icon_path("regen-error"), 12., cx)).tooltip(crate::ui::tooltip(error_tip)))),
             )
             .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN), cx) {
                 Some(field) => field,
@@ -5412,7 +5413,7 @@ impl AssemblyView {
     }
 
     /// A mate's flyout (live2 asm-feel (1)): its tooltip's head, then its parameters read-only, only the type while they
-    /// are all at their defaults (Revolute: "Revolute"; with Limits ticked: the type, Offset, Limits, each limit or "No
+    /// are all at their defaults and the mate regenerates (Revolute: "Revolute"; with Limits ticked: the type, Offset, Limits, each limit or "No
     /// minimum" / "No maximum"; Simulation is left out).
     fn mate_flyout(&self, m: &Mate) -> (String, Vec<crate::assembly_flyout::FlyRow>) {
         use crate::assembly_flyout::FlyRow;
@@ -5421,8 +5422,10 @@ impl AssemblyView {
         let mut rows = vec![FlyRow::Text(t.name().to_string())];
         let set = |e: &Option<ExprValue>| e.as_ref().is_some_and(|e| !e.text.trim().is_empty());
         let offset = set(&m.offset_x) || set(&m.offset_y) || set(&m.offset_z) || set(&m.rotation);
-        // (A Fastened lists its two at their defaults too: live errors-1118 tips, 10-24 "Fastened 1 (Hidden)".)
-        if !(offset || !m.limits.is_empty() || t == MateType::Fastened) {
+        // (A Fastened lists its two at their defaults too: live errors-1118 tips, 10-24 "Fastened 1 (Hidden)"; so does a
+        // failing or inactive mate, every row unticked: live errors-1123 mates.)
+        let flagged = self.result.mates.iter().any(|s| s.id == m.id && s.message.is_some());
+        if !(offset || !m.limits.is_empty() || t == MateType::Fastened || flagged) {
             return (head, rows);
         }
         let (ox, oy, oz, orot) = noshape_model::assembly::eval::offset_axes(t);

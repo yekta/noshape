@@ -969,6 +969,31 @@ fn enter_on_a_value_out_of_range_commits_nothing(cx: &mut TestAppContext) {
     assert_eq!(tips.0, "Enter a value between 0.0100 and 500000.  Current value is 0.", "the field's tip");
     assert!(tips.1.ends_with("Current value is 1000000000."), "the value whole: {}", tips.1);
     assert!(status.as_ref().is_some_and(|s| s.0 == noshape_model::display::FeatureStatus::Error && s.1.ends_with(" A parameter value is not valid.")), "{status:?}");
+    // ✓ greyed and the state's title red (live errors-1123 shell-zero-n-dlg).
+    let state = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap();
+    assert_eq!((state["ok"].as_str(), state["titleState"].as_str()), (Some("disabled"), Some("error")), "✓ and title with radius 0");
+    // The row's tip while open: one space after "properly:" (live errors-1123 lp-count0).
+    let row = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("feature:Fillet 1").expect("the Fillet 1 row");
+    crate::ui_script::clear_tooltip();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(row.origin.x + px(40.), row.center().y), None, Modifiers::default());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Fillet 1 did not regenerate properly: A parameter value is not valid."), "the open row's tip");
+    // The field's range tip 2 px right of the field, top-aligned, not under the pointer (live err-tip-placement-1123:
+    // a box's tip 2 px right of it; errors-1123 fillet 0 at x 412, the field 56 px short of the dialog's edge).
+    let (field, dlg) = {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        (vcx.debug_bounds("numf-radius").expect("the radius field"), vcx.debug_bounds("feature-dialog").expect("the dialog"))
+    };
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(field.origin.x + px(10.), field.center().y), None, Modifiers::default());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    let tip = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").expect("the range tip, placed");
+    assert!((tip.origin.x - field.right() - px(2.)).abs() <= px(1.) && (tip.origin.y - field.origin.y).abs() <= px(2.), "tip {tip:?}, field {field:?}, dialog right {:?}", dlg.right());
     keys(cx, window, &["escape"]);
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let depth = cx.update(|cx| view.read(cx).studio(cx).unwrap().feature(id).unwrap().params.expr("radius").map(|e| e.text.clone()));
@@ -1136,6 +1161,35 @@ fn a_blamed_empty_field_is_not_red_once_picked(cx: &mut TestAppContext) {
 
 /// Live2 feature-dialogs-1119 (rv.png): Revolve with its face picked and no axis yet fails asking for the axis, and the
 /// face stays drawn as picked, not in the failing red.
+/// qa ERR-SM-BAD-SELECTION-RED (live errors-1123 sheet-metal fl-joint2): a Flange on a joint edge of Flange 1's bend
+/// fails "Cannot create flange on an edge that is a joint…"; with its dialog open the joint edge is drawn red.
+#[gpui::test]
+fn a_flange_on_a_joint_edge_draws_the_edge_red(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [20, 0, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 2", "params": { "edges": ["edge through [60, 25, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 3", "params": { "edges": ["edge through [29, 2, 2]"] } },
+    ] });
+    let (window, view) = part_studio_from(cx, "sm-flange-joint-red", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let flange = cx.update(|cx| view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Flange 3").map(|f| f.id))).expect("Flange 3");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(flange, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).status.is_some()));
+    draw(cx, window);
+    let (status, missing, invalid, edges, red) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.edit.as_ref().expect("the Flange dialog").dialog.read(cx);
+        let edges: Vec<Reference> = d.feature.params.query("edges").to_vec();
+        let states = &v.viewport.read(cx).scene().states;
+        let red = edges.iter().all(|r| v.built.as_ref().is_some_and(|b| { let ids = b.picks.ids_for(r); !ids.is_empty() && ids.iter().all(|&id| states.get(id as usize).is_some_and(|s| s & noshape_render::scene::state::ERROR != 0)) }));
+        (d.status.clone(), d.only_missing_input(), d.invalid_input, edges.len(), red)
+    });
+    assert!(status.as_ref().is_some_and(|(s, m)| *s == noshape_model::display::FeatureStatus::Error && m.contains("is a joint")), "{status:?}");
+    assert!(edges == 1 && red, "the joint edge red: edges {edges}, red {red}, only missing {missing}, invalid input {invalid}");
+}
+
 #[gpui::test]
 fn a_dialog_only_missing_an_input_draws_its_picks_unred(cx: &mut TestAppContext) {
     let (window, view, top, _) = block_part(cx, "missing-input-not-red");
@@ -3119,6 +3173,10 @@ fn a_features_appearance_opens_as_live(cx: &mut TestAppContext) {
     keys(cx, window, &["escape"]);
     assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Esc cancelled the face appearance");
     assert_eq!(open(cx, EditTarget::Feature(FeatureId(9001), None)), ("Appearance".into(), None, [0x99, 0x99, 0x99], true));
+    keys(cx, window, &["escape"]);
+    // The panel's Add face appearance on no faces: black, ✓ off (live appearance-1123 q1-panel-add-face-appearance-click).
+    let (rgb, ok) = (open(cx, EditTarget::Faces(Vec::new(), None)).2, cx.update(|cx| view.read(cx).ui.appearance_edit.as_ref().map(|e| e.acceptable())));
+    assert_eq!((rgb, ok), ([0, 0, 0], Some(false)), "(colour, ✓ on) with no faces");
 }
 
 /// workflow-keyboard-mouse "p" (live request 1673): p sets the default planes' own visibility: with Top shown and
@@ -4380,10 +4438,58 @@ fn two_parts_faces_give_the_two_parts_menu(cx: &mut TestAppContext) {
         rows.push(format!("Add appearance to {faces} faces…"));
         rows
     };
-    assert_eq!(menu(cx, top1), live(2), "on Part 1's selected top");
-    assert_eq!(menu(cx, top2), live(2), "on Part 2's selected top");
+    assert_eq!(menu(cx, top1.clone()), live(2), "on Part 1's selected top");
+    assert_eq!(menu(cx, top2.clone()), live(2), "on Part 2's selected top");
     assert_eq!(menu(cx, front1), live(3), "on Part 1's unselected front");
     assert_eq!(cx.update(|cx| view.read(cx).selection.len()), 2, "the selection stays at the two tops");
+    // Part 1's row and Part 2's top (live appearance-1123 q3-part-plus-face-menu): the two parts' menu too.
+    let part1 = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.face_refs.contains(&top1)).map(|b| b.id.clone()).expect("Part 1"));
+    view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Body(part1), top2.clone()];
+        v.refresh_scene(false, cx);
+    });
+    let rows = menu(cx, top2);
+    let wanted = ["Hide 2 parts", "Copy 2 items", "Delete 2 parts…", "Edit appearance for 2 parts…"];
+    assert!(wanted.iter().all(|w| rows.iter().any(|r| r == w)), "a part row and a face: {rows:?}");
+}
+
+/// Live appearance-1123 (qa FEEL-APPEAR-PANEL-FA-ROWS): each face appearance sits under its part in the Appearances
+/// panel, a feature's named "Face appearance N" too, with its "N selections" count.
+#[gpui::test]
+fn face_appearances_sit_under_their_parts(cx: &mut TestAppContext) {
+    use noshape_model::partstudio::{AppearanceTarget, FaceAppearance};
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "corner_rectangle": [[60, 0], [80, 20]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "fa-rows", Some(start));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2);
+    let (face1, extrude2) = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.studio(cx).unwrap();
+        let e1 = s.features.iter().find(|f| f.name == "Extrude 1").unwrap().id;
+        let face = v.display.bodies.iter().flat_map(|b| b.face_refs.iter()).find(|r| r.depends_on() == Some(e1)).cloned().unwrap();
+        (face, s.features.iter().find(|f| f.name == "Extrude 2").unwrap().id)
+    });
+    view.update(cx, |v, cx| {
+        let tab = v.tab;
+        v.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Add appearances", cx, |ps| {
+                // Part 2's first, so the panel's order isn't the list's.
+                ps.appearances.push(FaceAppearance::new(AppearanceTarget::Feature(extrude2), [0.0, 1.0, 0.0, 1.0]));
+                ps.appearances.push(FaceAppearance::new(AppearanceTarget::Faces(vec![face1]), [0.0, 0.0, 1.0, 1.0]));
+            })
+        });
+        v.right_panel = Some(super::super::config_panel::RightPanel::Appearance);
+        cx.notify();
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let top = |cx: &mut TestAppContext, label: &str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("ap-row:{label}").into_boxed_str())).map(|b| f32::from(b.top()));
+    let order: Vec<Option<f32>> = ["Part 1", "Face appearance 2", "Part 2", "Face appearance 1"].iter().map(|l| top(cx, l)).collect();
+    assert!(order.iter().all(Option::is_some) && order.windows(2).all(|w| w[0] < w[1]), "Part 1, its face appearance, Part 2, Extrude 2's: {order:?}");
 }
 
 /// Live2 nav-feel-1119: "Where used for Part 1…" carries its icon (a part with a ?) in the face, edge and vertex menus.
@@ -7443,6 +7549,7 @@ fn remove_extrude_result(cx: &mut TestAppContext, name: &str, settle: bool, pick
     }
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).can_submit()));
     let flipped = cx.update(|cx| view.read(cx).edit.as_ref().expect("editing").dialog.read(cx).feature.params.bool("oppositeDirection"));
+    let failed = cx.update(|cx| view.read(cx).tool_failed());
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
     let faces = cx.update(|cx| view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the block").face_refs.len());
@@ -7451,6 +7558,8 @@ fn remove_extrude_result(cx: &mut TestAppContext, name: &str, settle: bool, pick
         let last = v.studio(cx).unwrap().features.last().map(|f| f.id)?;
         v.display.feature_state(last).map(|s| (s.status, s.message.clone()))
     });
+    let missed = matches!(state, Some((noshape_model::display::FeatureStatus::Info | noshape_model::display::FeatureStatus::Error, _)));
+    assert_eq!(failed, missed, "the preview draws its regions by their outline alone exactly when the tool fails: {state:?}");
     (flipped, faces, state)
 }
 

@@ -1456,6 +1456,12 @@ pub struct Highlighting {
     /// Selected parts drawn by their outline alone, in their own colour (an open part appearance editor: live
     /// tools-1119 a1-appearance, a2-red).
     pub untinted_parts: bool,
+    /// Selected faces drawn by their boundary alone, in their own colour (an open face or feature appearance editor:
+    /// live appearance-1123 q1-face-appearance-dialog, q1-feature-appearance-dialog).
+    pub untinted_faces: bool,
+    /// Picked regions drawn by their outline alone: a preview whose tool fails or misses every part (live errors-1123
+    /// extrude remove-miss, add-miss: the region outline orange, no fill).
+    pub regions_outlined: bool,
     /// A sketch's row hovered: its curves take the hover band, as hovered in the graphics (live hover-list-1122 p02, p27).
     pub curves_hovered: bool,
     /// A Sheet metal table row or a flat view bend hovered: its faces lit as hovered in the graphics, the pale orange
@@ -1465,7 +1471,7 @@ pub struct Highlighting {
 
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
-    let Highlighting { error, dialog, untinted_parts, curves_hovered, faces_hovered } = mode;
+    let Highlighting { error, dialog, untinted_parts, untinted_faces, regions_outlined, curves_hovered, faces_hovered } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, body_outline_rgb: None, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
@@ -1514,7 +1520,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                     overlay_pts.points.push(PointSprite { position: flat(p), color: [155, 155, 155, 255], pick_id: 0, size: 3.5, style: LineSegment::ON_TOP, _pad: 0 });
                 }
             }
-            if !hovered {
+            if !hovered && !regions_outlined {
                 let n: [f32; 3] = sk.frame.normal.as_vec3().into();
                 let fill = if error {
                     [c[0], c[1], c[2], 0.3]
@@ -1544,9 +1550,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             }
             let border = if flag == state::HOVER { hov_color } else { sel_color };
             for i in 0..4 {
-                // Lifted: at the same depth the plane's own blue border won
-                // over it; parts in front still hide it.
-                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(border), pick_id: 0, width: 3.0, style: LineSegment::LIFTED });
+                // Over the parts in front of it, hovered or selected (live box-drag-plane-border-1123; at rest the
+                // plain border and the selected fill stay hidden by them).
+                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(border), pick_id: 0, width: 3.0, style: LineSegment::ON_TOP });
             }
         }
         for &id in built.picks.ids_for(r) {
@@ -1554,7 +1560,8 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             // An erroring input face shows only its red outline; a lit
             // plane its overlay above; a hovered sketch region only its
             // boundary (live sketch/25: the fill doesn't change).
-            if !(flag == state::ERROR && t.is_some_and(|t| t.kind == PickKind::Face)) && !plane_lit && !(flag == state::HOVER && t.is_some_and(|t| t.kind == PickKind::SketchRegion)) {
+            let face = t.is_some_and(|t| t.kind == PickKind::Face);
+            if !((flag == state::ERROR || (untinted_faces && flag == state::SELECTED)) && face) && !plane_lit && !(flag == state::HOVER && t.is_some_and(|t| t.kind == PickKind::SketchRegion)) {
                 scene.add_flag(id, flag);
             }
             let Some(t) = t else { continue };
@@ -1741,8 +1748,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         }
     }
     for (id, flag) in boundary {
-        let own = scene.states.get(id as usize).is_some_and(|s| s & (state::HOVER | state::SELECTED | state::ERROR) != 0);
-        scene.add_flag(id, if own { flag } else { flag | state::OUTLINE });
+        let own = scene.states.get(id as usize).copied().unwrap_or(0);
+        let lined = if own & flag & state::SELECTED != 0 { state::LINED } else { 0 };
+        scene.add_flag(id, if own & (state::HOVER | state::SELECTED | state::ERROR) != 0 { flag | lined } else { flag | state::OUTLINE });
     }
     for id in silhouette {
         scene.add_flag(id, state::OUTLINE);
@@ -2171,7 +2179,8 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
                 out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&pick_disc(o, x, y, z, ro, pick)))).pick_only().ignore_clip().on_top().layer(30));
             }
             // Outline: outer circle, the inner circle outside the wedge, the
-            // wedge's two sides.
+            // wedge's two sides up to the inner circle (through the ring they drew a navy square at its front; live
+            // hover-matrix-recheck-1123 cells 5, 9: the front rows dark / lit / dark).
             let fade = |[r, g, b, a]: [u8; 4]| [r, g, b, (f32::from(a) * self.opacity).round() as u8];
             let rim = fade(MC_RIM);
             let mut l = LineData::default();
@@ -2179,8 +2188,8 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
             let inner: Vec<[f32; 3]> = (n / 4..=n).map(|k| f(at(ri, ang(k)))).collect();
             l.push_polyline(&outer, rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
             l.push_polyline(&inner, rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
-            l.push_polyline(&[f(o), f(at(ro, 0.0))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
-            l.push_polyline(&[f(o), f(at(ro, std::f64::consts::FRAC_PI_2))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
+            l.push_polyline(&[f(o), f(at(ri, 0.0))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
+            l.push_polyline(&[f(o), f(at(ri, std::f64::consts::FRAC_PI_2))], rim, 0, MC_RIM_PX, LineSegment::ON_TOP);
             out.push(Instance::new(Drawable::Lines(up.upload_lines(&l))).per_primitive_color().unpickable().ignore_clip().layer(31));
             // Axes: Z up from the centre, X / Y ticks outside the ring; over a lit owner vertex's disc, which covers the
             // rim's centre (live b3/ps-mc-hover: the blue axis whole down to the centre).

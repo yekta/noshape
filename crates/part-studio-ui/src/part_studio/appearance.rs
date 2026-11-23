@@ -86,8 +86,10 @@ pub struct AppearanceEdit {
 
 impl AppearanceEdit {
     /// ✓ is on: something changed, or it adds a face appearance.
-    fn acceptable(&self) -> bool {
-        self.adds || self.initial != (self.rgb, self.transparency, self.tessellation)
+    /// ✓ on: something changed or added; never a face appearance on no faces (live appearance-1123 q1: ✓ off).
+    pub(super) fn acceptable(&self) -> bool {
+        let no_faces = matches!(&self.target, EditTarget::Faces(f, None) if f.is_empty());
+        !no_faces && (self.adds || self.initial != (self.rgb, self.transparency, self.tessellation))
     }
 }
 
@@ -267,10 +269,11 @@ impl PartStudioView {
                 let cell = noshape_model::configured_properties::table(s, b).and_then(|t| t.rows.get(*row)).and_then(|r| r.values.get("Appearance")).and_then(|v| noshape_model::configured_properties::parse_color(v));
                 (cell.or_else(|| self.display.body(b).map(|d| d.color)).unwrap_or([0.7, 0.7, 0.7, 1.0]), TessQuality::Auto)
             }
-            // A new face appearance starts from the face's colour: its part's (live appearance-face-row-remove: R 157).
+            // A new face appearance starts from the face's colour: its part's (live appearance-face-row-remove: R 157); on no
+            // face, black (live appearance-1123 q1-panel-add-face-appearance-click: 000000).
             (EditTarget::Faces(faces, None), _) => {
                 let body = faces.iter().find_map(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r)));
-                (body.map(|b| b.color).unwrap_or([0.831, 0.44, 0.007, 1.0]), TessQuality::Auto)
+                (body.map(|b| b.color).unwrap_or([0.0, 0.0, 0.0, 1.0]), TessQuality::Auto)
             }
             _ => ([0.831, 0.44, 0.007, 1.0], TessQuality::Auto),
         };
@@ -597,19 +600,6 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn reset_part_appearance(&mut self, b: BodyId, cx: &mut Context<Self>) {
-        self.edit_part_appearance(&b, cx, |p| {
-            p.appearance = None;
-            p.tessellation = None;
-        });
-    }
-
-    fn edit_part_appearance(&mut self, b: &BodyId, cx: &mut Context<Self>, f: impl FnOnce(&mut noshape_model::partstudio::PartProperties)) {
-        let b = b.clone();
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Edit appearance", cx, |ps| f(ps.part_properties.entry(b).or_default()));
-        });
-    }
 
     /// Faces of the selection (for "Add appearance").
     pub(super) fn selected_faces(&self) -> Vec<Reference> {
@@ -860,13 +850,15 @@ impl PartStudioView {
                 // (dom/cursor-rows.json: from the part menu, x 241 y 647).
                 // A face or feature appearance is a feature-style dialog in the feature dialogs' place, 401 px tall (live
                 // parts-list-1118 e2: 220 x 401 at (246, 79)).
+                // (Live appearance-1123 q1: (972, 79) beside the panel, (241, 560) from the list: 5 px over the list's
+                // edge, 2 px up from the bottom.)
                 .map(|d| match (self.right_panel.is_some(), faces.is_some()) {
-                    (true, _) => d.top(px(3.)).right(px(4.)),
+                    (true, _) => d.top(px(3.)).right(px(9.)),
                     (false, true) => {
                         let at = super::behaviors::feature_dialog_pos();
                         d.left(at.x).top(at.y)
                     }
-                    (false, false) => d.left_0().bottom_0(),
+                    (false, false) => d.left(px(-5.)).bottom(px(2.)),
                 })
                 .w(px(220.))
                 .h(px(if faces.is_some() { 401. } else { 400. }))
@@ -894,7 +886,7 @@ impl PartStudioView {
                                 .items_center()
                                 .justify_center()
                                 .cursor(CursorStyle::Arrow)
-                                .child(crate::assets::icon("dialog-cancel", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-cancel", 24., cx).into_any_element(), || "button:cancel".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_appearance(cx))),
                         ),
                 )
@@ -1030,11 +1022,12 @@ impl PartStudioView {
                     }),
                 )
         };
-        let row = |id: SharedString, color: [f32; 4], label: String, indent: bool, selected: bool, off: bool| {
-            let target = format!("panel_row:{label}");
+        let row = |id: SharedString, color: [f32; 4], label: String, selected: bool, off: bool| {
+            let (target, sel) = (format!("panel_row:{label}"), format!("ap-row:{label}"));
             h_flex()
                 .id(id)
                 .map(|d| crate::ui_script::mark(d, move || target.clone()))
+                .debug_selector(move || sel.clone())
                 .w_full()
                 .cursor_pointer()
                 .when(selected, |d| d.border_2().border_color(rgb_u32(0x1651b0)))
@@ -1044,18 +1037,66 @@ impl PartStudioView {
                         .h(px(if selected { 25. } else { 29. }))
                         .flex()
                         .items_center()
-                        .pl(px(if indent { 18. } else { 4. }) - px(if selected { 2. } else { 0. }))
+                        .pl(px(if selected { 2. } else { 4. }))
                         .bg(rgb_u32(if selected { 0xdef1fb } else { 0xeaeaea }))
                         .map(|d| if selected { d.border_r_1() } else { d.border_1() })
                         .border_color(grid)
                         .text_size(px(14.))
-                        .when(!indent, |d| d.font_weight(FontWeight::BOLD))
+                        .font_weight(FontWeight::BOLD)
                         .text_color(pal.text)
                         .when(off, |d| d.line_through().text_color(pal.text_faint))
                         .truncate()
                         .child(label),
                 )
                 .child(swatch(color, selected, off))
+        };
+        // A face appearance under its part (live appearance-1123 q1-appearances-panel): a white 34 px row, the name, a
+        // 228 px "N selections" box and a 111 x 27 swatch; suppressed, both struck through and the swatch pale, crossed.
+        let face_row = |id: SharedString, color: [f32; 4], label: String, count: usize, off: bool| {
+            let (target, sel) = (format!("panel_row:{label}"), format!("ap-row:{label}"));
+            let c = gpui_kit::Rgba { r: lin_to_srgb(color[0]) as f32 / 255.0, g: lin_to_srgb(color[1]) as f32 / 255.0, b: lin_to_srgb(color[2]) as f32 / 255.0, a: color[3].clamp(0.0, 1.0) };
+            let struck = |d: Div| d.when(off, |d| d.italic().line_through().text_color(pal.text_faint));
+            h_flex()
+                .id(id)
+                .map(|d| crate::ui_script::mark(d, move || target.clone()))
+                .debug_selector(move || sel.clone())
+                .w_full()
+                .h(px(34.))
+                .cursor_pointer()
+                .bg(rgb_u32(0xffffff))
+                .text_size(px(14.))
+                .text_color(pal.text)
+                .child(struck(div().flex_1().h_full().flex().items_center().pl(px(4.)).border_l_1().border_r_1().border_b_1().border_color(grid).truncate()).child(label))
+                .child(
+                    h_flex()
+                        .flex_1()
+                        .h_full()
+                        .pl(px(4.))
+                        .gap(px(5.))
+                        .border_r_1()
+                        .border_b_1()
+                        .border_color(grid)
+                        .child(struck(div().w(px(228.)).h(px(27.)).flex().items_center().pl(px(4.)).border_1().border_color(rgb_u32(0xd7d7d7)).text_size(px(13.33))).when(off, |d| d.opacity(0.5)).child(if count == 1 { "1 selection".to_string() } else { format!("{count} selections") }))
+                        .child(
+                            div().w(px(111.)).h(px(27.)).rounded(px(4.)).border_1().border_color(grid).bg(rgb_u32(0xffffff)).when(off, |d| d.opacity(0.5)).child(div().size_full().rounded(px(3.)).bg(c)).when(off, |d| {
+                                d.relative().child(
+                                    canvas(
+                                        |_, _, _| {},
+                                        |b, _, window, _| {
+                                            let mut path = gpui_kit::PathBuilder::stroke(px(1.5));
+                                            path.move_to(b.origin);
+                                            path.line_to(b.bottom_right());
+                                            if let Ok(p) = path.build() {
+                                                window.paint_path(p, rgb_u32(0x333333));
+                                            }
+                                        },
+                                    )
+                                    .absolute()
+                                    .size_full(),
+                                )
+                            }),
+                        ),
+                )
         };
         let mut rows: Vec<AnyElement> = Vec::new();
         // Configured properties exist once the studio has an input.
@@ -1066,47 +1107,10 @@ impl PartStudioView {
             _ => None,
         };
         let mut rename_popup = if rename_part.is_some() { self.name_prompt(cx) } else { None };
-        if !sketches_tab {
-            for body in self.display.bodies.iter().filter(|b| b.kind != noshape_model::display::BodyKind::Wire) {
-                let props = studio.part_properties.get(&body.id);
-                let color = props.and_then(|p| p.appearance).map(|a| a.color).unwrap_or(body.color);
-                let (b1, b2) = (body.id.clone(), body.id.clone());
-                let custom = props.is_some_and(|p| p.appearance.is_some());
-                let view = cx.entity();
-                let rename_popup = if rename_part.as_ref() == Some(&body.id) { rename_popup.take() } else { None };
-                rows.push(
-                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false, self.selection.contains(&Reference::Body(body.id.clone())), false)
-                        // Live: a click selects the part (row and part
-                        // highlighted), a double click edits its appearance.
-                        .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
-                            if ev.click_count() >= 2 {
-                                this.edit_appearance(EditTarget::Parts(vec![b1.clone()]), w, cx);
-                            } else {
-                                this.pick_body(b1.clone(), cx);
-                            }
-                        }))
-                        // Live 1712 / 1717: Rename… (the small "Rename"
-                        // popup) · Edit appearance… · Configure appearance
-                        // (with configuration inputs).
-                        .os_context_menu(move |m, _, _| {
-                            let item = |label: &str, f: super::ViewAction| {
-                                let v = view.clone();
-                                crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
-                            };
-                            let (r, e, c, d) = (b2.clone(), b2.clone(), b2.clone(), b2.clone());
-                            m.item(item("Rename…", Box::new(move |this, w, cx| this.open_folder_prompt_for(super::FolderTarget::Part(r.clone()), w, cx))))
-                                .item(item("Edit appearance…", Box::new(move |this, w, cx| this.edit_appearance(EditTarget::Parts(vec![e.clone()]), w, cx))))
-                                .when(configurable, |m| m.item(item("Configure appearance", Box::new(move |this, _, cx| this.configure_appearance(c.clone(), cx)))))
-                                .when(custom, |m| m.separator().item(item("Remove appearance", Box::new(move |this, _, cx| this.reset_part_appearance(d.clone(), cx)))))
-                        })
-                        // The popup beside the row, left of the panel.
-                        .when_some(rename_popup, |d, popup| d.relative().child(div().absolute().top_0().left_0().size_0().child(deferred(anchored().anchor(Anchor::TopRight).snap_to_window().child(popup)).with_priority(5))))
-                        .into_any_element(),
-                );
-            }
-        }
         // Face appearances are numbered in order, as their editor's title (live batch 15: "Face appearance 1").
+        // A feature's is one too ("6 selections"); each goes under the part its first face is on (live appearance-1123).
         let mut face_n = 0;
+        let mut face_rows: Vec<(Option<BodyId>, AnyElement)> = Vec::new();
         for (i, a) in studio.appearances.iter().enumerate() {
             let is_sketch = matches!(&a.target, AppearanceTarget::Feature(f) if self.display.sketches.iter().any(|s| s.feature == *f));
             if !is_sketch {
@@ -1117,18 +1121,24 @@ impl PartStudioView {
             }
             let (label, target) = match &a.target {
                 AppearanceTarget::Faces(f) => (a.name.clone().unwrap_or_else(|| format!("Face appearance {face_n}")), EditTarget::Faces(f.clone(), Some(i))),
-                AppearanceTarget::Feature(f) => (a.name.clone().unwrap_or_else(|| names(&Reference::Feature(*f))), EditTarget::Feature(*f, Some(i))),
+                AppearanceTarget::Feature(f) if is_sketch => (a.name.clone().unwrap_or_else(|| names(&Reference::Feature(*f))), EditTarget::Feature(*f, Some(i))),
+                AppearanceTarget::Feature(f) => (a.name.clone().unwrap_or_else(|| format!("Face appearance {face_n}")), EditTarget::Feature(*f, Some(i))),
             };
             let suppressed = a.suppressed;
             let faces = match &a.target {
                 AppearanceTarget::Faces(f) => f.clone(),
+                AppearanceTarget::Feature(f) if !is_sketch => self.feature_geometry(*f).into_iter().filter(|r| matches!(r, Reference::Face(_))).collect(),
                 AppearanceTarget::Feature(_) => Vec::new(),
             };
+            let owner = faces.iter().find_map(|r| self.owning_body(r));
+            let count = faces.len();
             let view = cx.entity();
             let edit_target = target.clone();
             let rename_popup_here = if matches!(&self.folder_prompt, Some((_, super::FolderTarget::Appearance(k), _)) if *k == i) { self.name_prompt(cx) } else { None };
-            rows.push(
-                row(SharedString::from(format!("ap-face-{i}")), a.color, label, !is_sketch, false, suppressed)
+            let shown = if is_sketch { row(SharedString::from(format!("ap-face-{i}")), a.color, label, false, suppressed) } else { face_row(SharedString::from(format!("ap-face-{i}")), a.color, label, count, suppressed) };
+            face_rows.push((
+                owner,
+                shown
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         // Hovering a face appearance highlights its faces.
                         this.ui.appearance_hover = if *h { faces.clone() } else { Vec::new() };
@@ -1157,8 +1167,49 @@ impl PartStudioView {
                     })
                     .when_some(rename_popup_here, |d, popup| d.relative().child(div().absolute().top_0().left_0().size_0().child(deferred(anchored().anchor(Anchor::TopRight).snap_to_window().child(popup)).with_priority(5))))
                     .into_any_element(),
-            );
+            ));
         }
+        if !sketches_tab {
+            for body in self.display.bodies.iter().filter(|b| b.kind != noshape_model::display::BodyKind::Wire) {
+                let props = studio.part_properties.get(&body.id);
+                let color = props.and_then(|p| p.appearance).map(|a| a.color).unwrap_or(body.color);
+                let (b1, b2) = (body.id.clone(), body.id.clone());
+                let view = cx.entity();
+                let rename_popup = if rename_part.as_ref() == Some(&body.id) { rename_popup.take() } else { None };
+                rows.push(
+                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), self.selection.contains(&Reference::Body(body.id.clone())), false)
+                        // Live: a click selects the part (row and part
+                        // highlighted), a double click edits its appearance.
+                        .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
+                            if ev.click_count() >= 2 {
+                                this.edit_appearance(EditTarget::Parts(vec![b1.clone()]), w, cx);
+                            } else {
+                                this.pick_body(b1.clone(), cx);
+                            }
+                        }))
+                        // Live 1712 / 1717: Rename… (the small "Rename"
+                        // popup) · Edit appearance… · Configure appearance
+                        // (with configuration inputs); no reset (live appearance-1123: only Undo).
+                        .os_context_menu(move |m, _, _| {
+                            let item = |label: &str, f: super::ViewAction| {
+                                let v = view.clone();
+                                crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+                            };
+                            let (r, e, c) = (b2.clone(), b2.clone(), b2.clone());
+                            m.item(item("Rename…", Box::new(move |this, w, cx| this.open_folder_prompt_for(super::FolderTarget::Part(r.clone()), w, cx))))
+                                .item(item("Edit appearance…", Box::new(move |this, w, cx| this.edit_appearance(EditTarget::Parts(vec![e.clone()]), w, cx))))
+                                .when(configurable, |m| m.item(item("Configure appearance", Box::new(move |this, _, cx| this.configure_appearance(c.clone(), cx)))))
+                        })
+                        // The popup beside the row, left of the panel.
+                        .when_some(rename_popup, |d, popup| d.relative().child(div().absolute().top_0().left_0().size_0().child(deferred(anchored().anchor(Anchor::TopRight).snap_to_window().child(popup)).with_priority(5))))
+                        .into_any_element(),
+                );
+                let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut face_rows).into_iter().partition(|(o, _)| o.as_ref() == Some(&body.id));
+                face_rows = rest;
+                rows.extend(mine.into_iter().map(|(_, e)| e));
+            }
+        }
+        rows.extend(face_rows.into_iter().map(|(_, e)| e));
         if sketches_tab {
             // Sketches without their own appearance, in the inactive sketch color.
             let with_own: Vec<FeatureId> = studio.appearances.iter().filter_map(|a| if let AppearanceTarget::Feature(f) = a.target { Some(f) } else { None }).collect();
@@ -1166,7 +1217,7 @@ impl PartStudioView {
                 let f = sk.feature;
                 let color = sk.color.unwrap_or_else(|| crate::theme::lin(crate::theme::viewport::INACTIVE));
                 rows.push(
-                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false, false, false)
+                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false, false)
                         .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
                             if ev.click_count() >= 2 {
                                 this.edit_appearance(EditTarget::Feature(f, None), w, cx);
@@ -1220,6 +1271,7 @@ impl PartStudioView {
     pub(super) fn render_add_face_appearance(&mut self, cx: &mut Context<Self>) -> AnyElement {
         div()
             .id("ap-add-face")
+            .map(|d| crate::ui_script::mark(d, || "button:Add face appearance".into()))
             .size(px(26.))
             .flex()
             .items_center()

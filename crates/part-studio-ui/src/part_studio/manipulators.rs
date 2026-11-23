@@ -68,6 +68,8 @@ pub(super) struct ArcHandle {
     pub secondary: bool,
     /// The largest angle the drag sets (std's maxValue: a turn, Draft's 89.9°).
     pub max: f64,
+    /// Transform's: idle, its radius lines and arc grey, only the head white (live manip-feel-1122 rotate-axis-edge-picked).
+    pub grey: bool,
 }
 
 impl ArcHandle {
@@ -193,7 +195,7 @@ impl PartStudioView {
             return None;
         }
         let symmetric = p.bool("symmetric");
-        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })
+        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: false })
     }
 
     /// Revolve's handles (std addRevolveManipulator, live psb 10-24 rev-*):
@@ -252,7 +254,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         let axis = if p.bool("pullDirection") { -axis } else { axis };
-        Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians() })
+        Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians(), grey: false })
     }
 
     /// Plane's Line angle (std cplane.fs addAngleManipulator): about the
@@ -284,7 +286,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         let axis = if p.bool("oppositeDirection") { -axis } else { axis };
-        Some(ArcHandle { origin: o, axis, radial: radial * size / 4.0, angle, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })
+        Some(ArcHandle { origin: o, axis, radial: radial * size / 4.0, angle, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: false })
     }
 
     /// Transform's Rotate angle and Translate by distance arrow (std
@@ -307,7 +309,7 @@ impl PartStudioView {
                 return None;
             }
             let axis = if opposite { -axis } else { axis };
-            return Manip::of([Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU })]);
+            return Manip::of([Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: true })]);
         }
         if !p.is("transformType", "TRANSLATION_DISTANCE") {
             return None;
@@ -460,7 +462,9 @@ impl PartStudioView {
         if mesh.indices.is_empty() {
             return None;
         }
-        let grey = crate::theme::lin(0x595959);
+        // A blue grey: over the preview mix the top reads live's flat (132,147,155) (qa FEEL-EDIT-BODY-SHADE: #595959 read
+        // (138,148,154)).
+        let grey = crate::theme::lin(0x4c575b);
         let mut cap = noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.46]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
         // Once, over the mix (qa FEEL-EDIT-BODY-SHADE: drawn with the frame too, the top read (118,127,133), live (132,146,155)).
         cap.compare = noshape_render::scene::compare::POST_ONLY;
@@ -1202,7 +1206,7 @@ fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Optio
             if radial.length() < 1e-12 {
                 return None;
             }
-            Handle::StdArc(ArcHandle { origin: *axis_origin + *axis_direction * axis_direction.dot(rel), axis: *axis_direction, radial, angle: *angle, param: "", flip: None, secondary: *secondary, max: max.abs().max(min.abs()) }, i)
+            Handle::StdArc(ArcHandle { origin: *axis_origin + *axis_direction * axis_direction.dot(rel), axis: *axis_direction, radial, angle: *angle, param: "", flip: None, secondary: *secondary, max: max.abs().max(min.abs()), grey: false }, i)
         }
         M::Points { .. } | M::Triad { .. } => return None,
     })
@@ -1428,13 +1432,17 @@ fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::
     let heads = head_polylines(head_base, tangent, side, ARC_HEAD_PX * wpp, ARC_HEAD_PX * wpp, h.secondary);
     let n = ((h.angle.abs().to_degrees() / 4.0).ceil() as usize).clamp(2, 90);
     let arc: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point(h.angle * i as f64 / n as f64))).collect();
+    // Transform's idle arc #89A3B4 and radius lines #A8B2B8 (live #A4AEB4..#ACB5BB; qa hm7-rot-radius: ours white).
+    let plain = h.grey && !hover && !dragging;
+    let (arc_core, radius_core) = if plain { (crate::theme::rgb8(0x89a3b4), crate::theme::rgb8(0xa8b2b8)) } else { (core, core) };
     let mut back_lines = LineData::default();
     let mut front = LineData::default();
-    for (data, color, w) in [(&mut back_lines, outline, outline_px), (&mut front, core, core_px)] {
-        data.push_polyline(&arc, color, 0, w, LineSegment::ON_TOP);
-        data.push_polyline(&[f(end), f(head_base)], color, 0, w, LineSegment::ON_TOP);
-        data.push_polyline(&[f(h.origin), f(h.point(0.0))], color, 0, w * 0.75, LineSegment::ON_TOP);
-        data.push_polyline(&[f(h.origin), f(end)], color, 0, w * 0.75, LineSegment::ON_TOP);
+    for (data, front_side, color, w) in [(&mut back_lines, false, outline, outline_px), (&mut front, true, core, core_px)] {
+        let (arc_color, radius_color) = if front_side { (arc_core, radius_core) } else { (color, color) };
+        data.push_polyline(&arc, arc_color, 0, w, LineSegment::ON_TOP);
+        data.push_polyline(&[f(end), f(head_base)], arc_color, 0, w, LineSegment::ON_TOP);
+        data.push_polyline(&[f(h.origin), f(h.point(0.0))], radius_color, 0, w * 0.75, LineSegment::ON_TOP);
+        data.push_polyline(&[f(h.origin), f(end)], radius_color, 0, w * 0.75, LineSegment::ON_TOP);
         for p in &heads {
             data.push_polyline(&p.iter().map(|v| f(*v)).collect::<Vec<_>>(), color, 0, w, LineSegment::ON_TOP);
         }

@@ -467,6 +467,47 @@ fn a_mirrored_entity_is_plain_until_the_pointer_moves(cx: &mut TestAppContext) {
     assert!(hovered(cx).is_some(), "lit again once the pointer moves");
 }
 
+/// Qa SKT-POSTCOMMIT-HOVER (live sketch-tools-1123): the click that commits a 3 point arc or an ellipse leaves the new
+/// curve under the still pointer plain, with no snap square (ours lit it orange with the square); it lights once the
+/// pointer moves.
+#[gpui::test]
+fn a_committed_shape_is_plain_under_the_still_pointer(cx: &mut TestAppContext) {
+    for (tool, pts) in [(Tool::Arc3, [(400., 300.), (600., 300.), (500., 230.)]), (Tool::Ellipse, [(500., 300.), (600., 300.), (500., 250.)])] {
+        let (window, view) = sketch_with(cx, &format!("st-postcommit-{tool:?}"), tool);
+        let send = |cx: &mut TestAppContext, at: (f64, f64), press: bool| {
+            let at = DVec2::new(at.0, at.1);
+            cx.update_window(window, |_, w, cx| {
+                view.update(cx, |v, cx| {
+                    let vp = v.viewport.clone();
+                    vp.update(cx, |vp, _| vp.place_pointer(at));
+                    let m = Modifiers::default();
+                    let mut evs = vec![ViewportEvent::PointerMove { position: at, modifiers: m }, ViewportEvent::Hover(None)];
+                    if press {
+                        evs.extend([ViewportEvent::ToolDown { position: at, modifiers: m, click_count: 1 }, ViewportEvent::ToolUp { position: at, modifiers: m }, ViewportEvent::Hover(None)]);
+                    }
+                    for ev in &evs {
+                        v.on_viewport_event(&vp, ev, w, cx);
+                    }
+                })
+            })
+            .unwrap();
+            cx.run_until_parked();
+        };
+        let count = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().count()));
+        let before = count(cx);
+        for p in pts {
+            send(cx, p, true);
+        }
+        let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| (ed.hover.is_some(), ed.inference.is_some())));
+        assert!(count(cx) > before, "{tool:?}: committed");
+        send(cx, pts[2], false);
+        assert_eq!(lit(cx), Some((false, false)), "{tool:?}: plain under the still pointer, no snap");
+        assert!(cx.update(|cx| view.read(cx).hover.is_none()), "{tool:?}");
+        send(cx, (pts[2].0 + 1.5, pts[2].1 + 1.5), false);
+        assert_eq!(lit(cx).map(|l| l.0 || l.1), Some(true), "{tool:?}: lit again once the pointer moves");
+    }
+}
+
 /// Live workflows-1122 22 s11: Esc after a line's second click ends the chain; the end point under the still pointer
 /// stays plain (ours lit it) until the pointer moves.
 #[gpui::test]

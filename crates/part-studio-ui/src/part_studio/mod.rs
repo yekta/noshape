@@ -1042,6 +1042,15 @@ impl PartStudioView {
         listed_name(f, &self.computed_values(f.id, cx), &self.doc.read(cx).session.doc.settings.units, &self.display.variables)
     }
 
+    /// A row's text as the parity suite reads it: a custom feature's initials box first (live 2361: "uF uip Feature 1").
+    pub(super) fn script_feature_name(&self, f: &Feature, cx: &App) -> String {
+        let shown = self.shown_feature_name(f, cx);
+        match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
+            Some(t) => format!("{} {shown}", crate::ui::feature_initials(t.name)),
+            None => shown,
+        }
+    }
+
     pub(super) fn computed_values(&self, id: FeatureId, cx: &App) -> Vec<(String, String)> {
         let units = self.doc.read(cx).session.doc.settings.units;
         let Some(st) = self.display.feature_state(id) else { return Vec::new() };
@@ -1649,11 +1658,29 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none() && !attempt, dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)), faces_hovered: !sm_lit.is_empty() }, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none() && !attempt, dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), untinted_faces: self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Faces(..) | appearance::EditTarget::Feature(..) | appearance::EditTarget::Features(_))), regions_outlined: self.tool_failed(), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)), faces_hovered: !sm_lit.is_empty() }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
         self.ghost_outline_only(&mut scene, built);
+        // A face hovered under a preview lights its edges of the model before the feature: the edges the preview made
+        // (a Fillet's tangent lines) stay plain (live hover-matrix-recheck-1123 cell 4: the dark tangent line 3 px over
+        // the picked strip, no #FFC685 along it; the face's other edges lit).
+        if self.edit.is_some()
+            && matches!(single_hover, Some(Reference::Face(_)))
+            && let Some(before) = &self.ui.preview_before
+        {
+            use noshape_render::state::{HOVER, OUTLINE, SELECTED};
+            for (id, st) in scene.states.iter_mut().enumerate() {
+                if *st & OUTLINE == 0 || *st & SELECTED != 0 {
+                    continue;
+                }
+                let Some(t) = built.picks.get(id as u32).filter(|t| t.kind == PickKind::Edge) else { continue };
+                if !before.bodies.iter().any(|b| b.edge_refs.contains(&t.reference)) {
+                    *st &= !(HOVER | OUTLINE);
+                }
+            }
+        }
         // The curves a sketch tool's snap relates to light as hovered (live hover-matrix-1121 sk/inference-on-line-at).
         if let Some(ed) = &self.sketch
             && let Some(data) = self.sketch_data(cx)
@@ -4817,9 +4844,13 @@ impl PartStudioView {
         if !crate::ui_script::active() {
             return row;
         }
-        // The parity suite clicks a row by its name or by what it shows ("#w = 2 mm").
-        let shown = self.shown_feature_name(&f, cx);
-        crate::ui_script::wrap(crate::ui_script::wrap(row, || format!("feature:{}", f.name)), || format!("feature:{shown}"))
+        // The parity suite clicks a row by its name or by what it shows ("#w = 2 mm", "uF uip Feature 1").
+        let (shown, listed) = (self.shown_feature_name(&f, cx), self.script_feature_name(&f, cx));
+        let row = crate::ui_script::wrap(crate::ui_script::wrap(row, || format!("feature:{}", f.name)), || format!("feature:{shown}"));
+        if listed == shown {
+            return row;
+        }
+        crate::ui_script::wrap(row, || format!("feature:{listed}"))
     }
 
     /// A row of the parts list: click selects (or feeds a dialog's part
@@ -4898,7 +4929,7 @@ impl PartStudioView {
                 e
             }
         };
-        row.cached(StyleRefinement::default().w_full().h(px(24.)).flex_none()).into_any_element()
+        row.cached(StyleRefinement::default().w_full().h(px(26.)).flex_none()).into_any_element()
     }
 
     /// What a part row shows, as a number; `None` while it is renamed, dragged over or marked for the ui-parity driver.
@@ -4954,7 +4985,8 @@ impl PartStudioView {
         // Its eye hidden while its menu is open (live2 nav-feel-1119).
         let menu_open = self.ui.part_menu.as_ref() == Some(&b.id);
         // Live (selection/09, part-studio/450): the band spans the list with
-        // the content indented 18 px, 24 px tall, 5 px short of the edge.
+        // the content indented 18 px, 24 px tall, 5 px short of the edge; the rows 26 px apart (live DOM, qa wf23b 17
+        // s11). The clicked row keeps its tooltip (qa wf23b 17 s11).
         // While renaming the row is white with no hover fill: `tree_row` gets
         // `selected` so it sets no hover style (a second `.hover` panics, CRASH1).
         // The name's tooltip right of the row, centred on it, as a feature row's (live list-1119 4; it showed under
@@ -4965,6 +4997,11 @@ impl PartStudioView {
         };
         crate::ui::with_list_row_tooltip(crate::ui::tree_row(SharedString::from(format!("part-{}", b.id)), selected || renaming), tip)
             .h(px(24.))
+            .my(px(1.))
+            .debug_selector({
+                let name = b.name.clone();
+                move || format!("part-band:{name}")
+            })
             .pl(px(23.))
             .mr(crate::ui::LIST_ROW_INSET)
             .group("part-row")
@@ -5984,7 +6021,11 @@ impl PartStudioView {
             .bg(pal.accent_soft)
             .font_weight(FontWeight::SEMIBOLD)
             .when(self.edit_invalid(cx), |d| d.text_color(pal.text_invalid))
-            .child(crate::ui::tree_icon(&icon, false, cx))
+            // A custom feature's new row shows its initials box, red while it fails (live wf23 12 s3, 13 s10/11).
+            .child(match self.edit.as_ref().filter(|e| noshape_model::custom::is_custom(&e.dialog.read(cx).feature.type_id)).map(|_| type_name) {
+                Some(t) => crate::ui::initials_row_icon(t, self.edit_invalid(cx), true).debug_selector(|| "feature-new-initials".into()).into_any_element(),
+                None => crate::ui::tree_icon(&icon, false, cx).into_any_element(),
+            })
             .child(div().flex_1().truncate().child(crate::ui::user_text(name)));
         crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |cx| {
             match dialog.as_ref().and_then(|d| d.read(cx).title_status()) {
@@ -6125,7 +6166,8 @@ impl PartStudioView {
                 if needs_type_tag(name, type_name) { format!("{name} [{type_name}]") } else { name.to_string() }
             }
             let head = format!("{}{}", typed(&name, f.feature_type().map(|t| t.name).unwrap_or("")), if f.hidden { " (Hidden)" } else { "" });
-            // While its dialog is open, the dialog's error (live errors-1123 count 0: the message, not the bare name).
+            // While its dialog is open, the dialog's error (live errors-1123 count 0: the message, not the bare name, one
+            // space after "properly:" where the title's has two).
             let dialog_msg = self.edit.as_ref().filter(|_| editing).and_then(|e| e.dialog.read(cx).title_status()).filter(|s| s.0 == FeatureStatus::Error);
             let regen_msg = state.and_then(|s| {
                 let m = s.message.clone()?;
@@ -6146,7 +6188,7 @@ impl PartStudioView {
                     _ => Some(m),
                 }
             });
-            let msg = dialog_msg.map(|(_, m)| format!("{head} did not regenerate properly: {m}")).or(regen_msg);
+            let msg = dialog_msg.map(|(_, m)| format!("{head} did not regenerate properly: {}", m.trim_start())).or(regen_msg);
             // A sketch lists no inputs; an under-defined one says so.
             let sketch_tip = (f.type_id == "sketch").then(|| format!("{head}{}", if underdefined { " is not fully defined" } else { "" }));
             // Live (qa4 r5 s8 (3), ui 10-25 c): a suppressed row reads "Extrude 1
@@ -6278,9 +6320,9 @@ impl PartStudioView {
                 div()
                     .relative()
                     .flex_none()
-                    // A custom feature's row shows its initials box (live qa5 FS4).
+                    // A custom feature's row shows its initials box (live qa5 FS4, custom-feature-row-icon-1123).
                     .child(match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
-                        Some(t) => crate::ui::initials_icon_status(t.name, status == FeatureStatus::Error && !rolled_back).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
+                        Some(t) => crate::ui::initials_row_icon(t.name, status == FeatureStatus::Error && !rolled_back, selected || editing).when(rolled_back || suppressed || hidden, |d| d.opacity(0.5)),
                         None => crate::ui::tree_icon(&feature_icon(&f.type_id), rolled_back || suppressed || hidden, cx),
                     })
                     // Onshape list badges: under-defined sketch (12 px blue circle,
@@ -8156,8 +8198,9 @@ impl Render for PartStudioView {
                             .when(!self.ui.list_collapsed, |d| d.child(crate::ui::left_splitter()))
                             .child(slices.underlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
                             .children(self.render_dialog_layer())
-                            // Text fields stay out of the cached slices (qa4).
-                            .children(appearance_editor)
+                            // Text fields stay out of the cached slices (qa4). Over the view cube and the right strip
+                            // (live appearance-1123 q1-panel-swatch-dblclick-dialog), under any popup.
+                            .children(appearance_editor.map(|e| deferred(e).with_priority(0)))
                             .child(slices.overlay.clone().cached(StyleRefinement::default().absolute().top_0().left_0().size_full()))
                             // Slow regeneration: the working overlay (pending.rs).
                             // Opening: the loading state alone (live shows no working spinner under it).

@@ -125,6 +125,38 @@ fn profiles(dpr: f32, before: u32, after: u32) -> Option<Vec<Profile>> {
     Some(out)
 }
 
+/// Prints a failed tool body's top, front and side colours over the background (cargo test -p noshape-scene --test all
+/// edge_looks::print_failed_tool -- --ignored --nocapture).
+#[test]
+#[ignore = "T2: prints the failed tool look"]
+fn print_failed_tool() {
+    let Ok(mut r) = Renderer::new() else { return };
+    let mut display = block();
+    let c = noshape_scene::palette::lin(noshape_scene::palette::viewport::TOOL_PREVIEW_FAIL);
+    for alpha in [0.9f32, 1.0] {
+        let b = &mut display.bodies[0];
+        b.color = [c[0], c[1], c[2], alpha];
+        b.mesh = std::sync::Arc::new(noshape_model::display::MeshBuffers { edges: Vec::new(), vertices: Vec::new(), ..(*b.mesh).clone() });
+        let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+        let up = r.uploader();
+        let (w, h) = (800u32, 600u32);
+        let mut cache = GpuCache::default();
+        let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
+        let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap();
+        let mut cam = noshape_render::Camera { rotation: noshape_render::Camera::look_rotation(glam::DVec3::new(-1.0, 1.0, -1.0).normalize(), glam::DVec3::new(-1.0, 1.0, 2.0).normalize()), ..Default::default() };
+        cam.fit_box(lo, hi, w as f64 / h as f64);
+        let scene = builder::with_highlights(&built, &display, &[], None, &[], Vec::new(), Default::default(), &up);
+        let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+        let at = |p: glam::DVec3| {
+            let q = cam.project(p, glam::DVec2::new(w as f64, h as f64), 1.0).unwrap();
+            let o = ((q.y as u32 * w + q.x as u32) * 4) as usize;
+            hex([f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]])
+        };
+        let t = THICK as f64;
+        println!("alpha {alpha}: top {} front {} side {} background {}", at(glam::DVec3::new(0.15, 0.1, t)), at(glam::DVec3::new(0.15, 0.0, t / 2.0)), at(glam::DVec3::new(0.3, 0.1, t / 2.0)), hex([f.bgra[(10 * w as usize + 10) * 4 + 2], f.bgra[(10 * w as usize + 10) * 4 + 1], f.bgra[(10 * w as usize + 10) * 4]]));
+    }
+}
+
 /// Prints the profiles (cargo test -p noshape-scene --test all edge_looks:: -- --ignored --nocapture).
 #[test]
 #[ignore]
@@ -286,6 +318,34 @@ fn a_hovered_table_rows_faces_take_the_hover_look() {
     let (row, other) = (flags(true), flags(false));
     assert!(!row.is_empty() && row.iter().all(|f| f & state::HOVER != 0 && f & state::ACCENT == 0), "a row's face: {row:?}");
     assert!(other.iter().all(|f| f & state::ACCENT != 0 && f & state::HOVER == 0), "other accents keep theirs: {other:?}");
+}
+
+/// qa FEEL-APPEAR-FACE-SELECT-FILL (live appearance-1123 q1-face-appearance-dialog): with a face appearance editor open
+/// its faces keep their own colour (no selected fill), their boundary the selection's 2 px line; selected otherwise, filled.
+#[test]
+fn an_appearance_editors_faces_are_outlined_not_filled() {
+    let r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    use noshape_render::scene::state;
+    let display = block();
+    let (edge, top) = top_front(&display);
+    let up = r.uploader();
+    let mut cache = GpuCache::default();
+    let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
+    let flags = |untinted_faces: bool| {
+        let scene = builder::with_highlights(&built, &display, std::slice::from_ref(&top), None, &[], Vec::new(), builder::Highlighting { untinted_faces, ..Default::default() }, &up);
+        let of = |r: &Reference| built.picks.ids_for(r).iter().map(|&id| scene.states[id as usize]).collect::<Vec<u32>>();
+        (of(&top), of(&edge))
+    };
+    let ((face, boundary), (plain, _)) = (flags(true), flags(false));
+    assert!(!face.is_empty() && face.iter().all(|f| f & state::SELECTED == 0), "the editor's face unfilled: {face:?}");
+    assert!(boundary.iter().all(|f| f & (state::SELECTED | state::OUTLINE) == state::SELECTED | state::OUTLINE), "its boundary outlined: {boundary:?}");
+    assert!(plain.iter().all(|f| f & state::SELECTED != 0), "selected otherwise: {plain:?}");
 }
 
 /// A rebuild reuses each unchanged body's pick targets (the cache keyed by its mesh): the same ids for the same

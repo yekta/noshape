@@ -351,6 +351,21 @@ fn rows() -> Vec<Row> {
             l.double_click(cx, "feature:Extrude 1");
             expect(l.editing(cx), Some("Extrude 1".to_string()), "editing")
         } },
+        Row { id: "double-click / a quick one shows no row tooltip, a shown one stays", live: "Sheet metal model 1 double-clicked at once: no tooltip at 1.35 s (qa wf23 01 s17); Extrude 1's name shown before the double-click stays (wf10); live row-tip-dblclick-1123: none after a double-click in 12 trials (0 / 50 / 300 ms leads), a shown one stays through both clicks", gap: true, check: |l, cx| {
+            crate::ui_script::clear_tooltip();
+            l.double_click(cx, "feature:Extrude 1");
+            l.wait(cx, 1350);
+            let shown = crate::ui_script::shown_tooltip();
+            let quick = shown.is_some();
+            l.keys(cx, "escape");
+            l.wait(cx, 450);
+            crate::ui_script::clear_tooltip();
+            l.hover(cx, "feature:Extrude 1", 1200);
+            l.double_click(cx, "feature:Extrude 1");
+            let kept = crate::ui_script::shown_tooltip().is_some();
+            l.keys(cx, "escape");
+            expect((quick, kept), (false, true), &format!("(a tooltip 1.35 s after a quick double-click {shown:?}, one shown before kept)"))
+        } },
         Row { id: "double-click / a feature's blank right side", live: "its dialog too", gap: false, check: |l, cx| {
             let b = l.bounds(cx, "feature:Extrude 1").ok_or("no row")?;
             l.double_click_at(cx, point(b.origin.x + b.size.width - px(40.), b.center().y));
@@ -439,6 +454,15 @@ fn rows() -> Vec<Row> {
             let (b, row) = (l.bounds(cx, "rename-box").ok_or("no rename box")?, l.bounds(cx, "feature:Extrude 1").ok_or("no row")?);
             l.keys(cx, "escape");
             expect((f32::from(b.size.height), f32::from(b.right() - row.right())), (24., 0.), "(height, right edge - the list's)")
+        } },
+        Row { id: "parts / rows 26 px apart, the clicked row keeps its tooltip", live: "Part 1 and Part 2 26 px apart (24 px band); a click on Part 1 leaves its 'Part 1' tooltip shown (qa wf23b 17 s11)", gap: false, check: |l, cx| {
+            let (a, b) = (l.bounds(cx, "part-band:Part 1").ok_or("no Part 1")?, l.bounds(cx, "part-band:Part 2").ok_or("no Part 2")?);
+            l.hover(cx, "part:Part 1", 450);
+            l.click(cx, "part:Part 1", NONE);
+            l.wait(cx, 450);
+            let tip = crate::ui_script::shown_tooltip();
+            crate::ui_script::clear_tooltip();
+            expect((f32::from(b.top() - a.top()), f32::from(a.size.height), tip), (26., 24., Some("Part 1".to_string())), "(pitch, band, tooltip after the click)")
         } },
         Row { id: "dialog / Final", live: "a 49 x 22 button right of the slider; pressed, Final is on (walk8 9a-9c)", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Extrude 1");
@@ -1180,6 +1204,13 @@ fn rows() -> Vec<Row> {
             l.hover(cx, "feature:Extrude 1", 450);
             expect(crate::ui_script::shown_tooltip(), Some("Extrude 1 <- Sketch 1".to_string()), "tooltip")
         } },
+        Row { id: "hover / a feature row's tooltip 3 px right of the row, level with it", live: "live err-tip-placement-1123: the row 40, 352, 200 × 26, its tip 243, 352, 26 high; it stays there as the pointer moves (qa ERR-CHROME-TIP-PLACEMENT: ours ~5 px right, 7 px lower)", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 450);
+            let row = l.bounds(cx, "feature:Extrude 1").ok_or("no Extrude 1 row")?;
+            let tip = l.bounds(cx, "placed-tooltip").ok_or("no tooltip box")?;
+            let (dx, dy) = (f32::from(tip.left() - row.right()), f32::from(tip.top() - row.top()));
+            expect(((dx - 3.).abs() <= 1., dy.abs() <= 1.), (true, true), &format!("(3 px right, level: ours {dx} right, {dy} lower; row {row:?})"))
+        } },
         Row { id: "hover / a Parts row's tooltip right of the row", live: "'Part 1' beside the list, right of the row and centred on it, as a feature row's (live list-1119 4; ours showed under the pointer)", gap: false, check: |l, cx| {
             l.hover(cx, "part:Part 1", 450);
             let row = l.bounds(cx, "part:Part 1").ok_or("no Part 1 row")?;
@@ -1584,6 +1615,23 @@ fn several_parts_share_one_properties_dialog(cx: &mut TestAppContext) {
     assert_eq!(rows, [("Part 1".to_string(), true), ("Part 2".to_string(), false)], "the list still shows both");
     cx.update_window(l.window, |_, w, cx| form.update(cx, |f, cx| f.press_row(1, Modifiers::secondary_key(), w, cx))).unwrap();
     assert_eq!(cx.update(|cx| form.read(cx).header()), "2 selected");
+}
+
+/// The part Properties modal is live's 1173×687 with nothing stored, centred, 15 px from the top
+/// (live psui/properties-dialog-1123 at 1920×1080: buttons 5.25 px apart, Close x 1474.1 w 57.9, y 653 h 33.5).
+#[gpui::test]
+fn the_properties_modal_has_lives_size(cx: &mut TestAppContext) {
+    let l = studio(cx, "props-size", 1.0);
+    assert_eq!(crate::properties_dialog::props_size(), (1173., 687.), "nothing stored");
+    l.right_click(cx, "part:Part 1");
+    let at = l.bounds(cx, "menu:Properties…").expect("Properties… in the menu").center();
+    l.press(cx, at, MouseButton::Left, NONE, 1);
+    let mid = cx.update_window(l.window, |_, w, _| f32::from(w.viewport_size().width) / 2.).unwrap();
+    let [apply, save, close] = ["meta-apply", "meta-save", "meta-close"].map(|id| l.bounds(cx, id).expect(id));
+    // (The buttons' widths follow the font, so Apply's left is checked through the 5.25 px gaps.)
+    let got = [f32::from(save.left() - apply.right()), f32::from(close.left() - save.right()), f32::from(close.right()) - mid, f32::from(close.top()), f32::from(close.bottom())];
+    let live = [5.25, 5.25, 1474.1 + 57.9 - 960., 653., 686.5];
+    assert!(got.iter().zip(live).all(|(g, l)| (g - l).abs() <= 1.), "gaps, Close right (from the centre), Close top/bottom: ours {got:?}, live {live:?}");
 }
 
 /// A part's Properties: Reset all goes by the saved values, so a Part number only typed stays (live

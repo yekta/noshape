@@ -137,7 +137,7 @@ pub fn invalid_field(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool) -> gp
 /// ([`eval_message`]).
 pub fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, tip: String) -> gpui_kit::Stateful<gpui_kit::Div> {
     use gpui_kit::prelude::FluentBuilder as _;
-    use gpui_kit::{ParentElement as _, StatefulInteractiveElement as _, Styled as _, div, px};
+    use gpui_kit::{ParentElement as _, Styled as _, div, px};
     if !invalid {
         return el;
     }
@@ -147,8 +147,9 @@ pub fn invalid_field_tip(el: gpui_kit::Stateful<gpui_kit::Div>, invalid: bool, t
         .border_b_1()
         .border_color(pal.error)
         .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.error))
-        // An empty tip: no tooltip (live 1722: a length or real out of range).
-        .when(!tip.is_empty(), |d| d.tooltip(crate::ui::tooltip(tip)))
+        // An empty tip: no tooltip (live 1722). Beside the dialog, as a selection box's (live errors-1123 fillet 0: the
+        // range tip right of the dialog, not under the pointer).
+        .map(|d| if tip.is_empty() { d } else { crate::ui::with_dialog_field_tooltip(d, tip, px(-1.)) })
 }
 
 /// Live's hover text for a value that doesn't evaluate as `expected` (ui

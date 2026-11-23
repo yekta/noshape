@@ -1622,6 +1622,29 @@ fn a_failed_mate_between_fixed_parts_is_marked(cx: &mut TestAppContext) {
     }
 }
 
+/// qa ERR-LIST-TOOLTIP-CHROME (live errors-1123 mates): a failing mate's row flyout lists every row of its dialog,
+/// unticked, under its "has error" title, not the type alone.
+#[gpui::test]
+fn a_failed_mates_flyout_lists_every_row(cx: &mut TestAppContext) {
+    use crate::assembly_flyout::FlyRow;
+    let path = document(cx, "mate-failed-flyout", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": true }));
+        call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (_window, view) = open_from_top_when(cx, &path, |v| v.result.mates.first().is_some_and(|s| !s.ok));
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let m = v.assembly(cx).unwrap().mates[0].clone();
+        let (head, rows) = v.mate_flyout(&m);
+        assert!(head.starts_with("Revolute 1 has error: "), "{head}");
+        assert_eq!(rows, vec![FlyRow::Text("Revolute".into()), FlyRow::Check("Offset".into(), false), FlyRow::Check("Limits".into(), false)]);
+    });
+}
+
 /// Interaction-feel "Graphics → list (2)": a part hovered in the graphics area lights nothing in the instance list
 /// (no hovered or related row) and opens no flyout.
 #[gpui::test]

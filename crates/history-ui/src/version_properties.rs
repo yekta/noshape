@@ -8,7 +8,7 @@
 //! has form undo / redo and Apply, Save (disabled until edited), Close.
 
 use crate::doc_model::{DocEvent, DocModel};
-use crate::properties_dialog::{PROPS_MIN, bootstrap_modal, footer_button, gray_box, label, modal_header, props_size, resizable_props};
+use crate::properties_dialog::{bootstrap_modal, footer_button, gray_box, label, modal_header, props_size, resizable_props};
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
@@ -443,7 +443,7 @@ impl Render for ItemProperties {
                 .tooltip(crate::ui::tooltip(tip))
                 .child(svg().path(crate::assets::icon_path(icon)).size(px(20.)).text_color(rgb(0x333333)))
         };
-        let body_h = 421. + props_size().1 - PROPS_MIN.1;
+        let body_h = props_size().1 - 121.;
         v_flex()
             .w_full()
             .text_color(pal.text)

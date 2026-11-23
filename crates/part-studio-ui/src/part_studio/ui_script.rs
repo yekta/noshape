@@ -186,11 +186,7 @@ impl PartStudioView {
                                     _ => "ok",
                                 }
                             };
-                            // A custom feature's row reads with its initials box first (live 2361: "uF uip Feature 1").
-                            let name = match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
-                                Some(t) => format!("{} {}", crate::ui::feature_initials(t.name), self.shown_feature_name(f, cx)),
-                                None => self.shown_feature_name(f, cx),
-                            };
+                            let name = self.script_feature_name(f, cx);
                             rows.push(json!({ "name": name, "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id) || picked_rows.contains(&f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && state != "rolled-back" && !(editing == Some(f.id) || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx)) }));
                         }
                         // A new feature's row while its dialog is open (red while it fails, as drawn).

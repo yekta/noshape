@@ -1344,7 +1344,7 @@ impl Render for MetaForm {
             // The item's name under the title, over a #ccc rule (several parts: over the form, beside their list).
             .when(self.multi.is_none(), |d| d.child(header))
             .child({
-                let scroll = div().id("meta-scroll").h(px(381. + props_size().1 - PROPS_MIN.1)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form);
+                let scroll = div().id("meta-scroll").h(px(props_size().1 - 163.5)).overflow_y_scroll().track_scroll(&self.scroll).p(px(15.)).child(form);
                 match (&self.multi, &self.card) {
                     (Some(m), _) => v_flex()
                         .w_full()
@@ -1378,7 +1378,7 @@ impl Render for MetaForm {
                         h_flex()
                             .w_full()
                             .items_start()
-                            .child(div().w(px(300.)).h(px(381. + props_size().1 - PROPS_MIN.1)).flex_none().bg(rgb(0xf5f5f5)).border_r_1().border_color(rgb(0xcccccc)).child(row))
+                            .child(div().w(px(300.)).h(px(props_size().1 - 163.5)).flex_none().bg(rgb(0xf5f5f5)).border_r_1().border_color(rgb(0xcccccc)).child(row))
                             .child(div().flex_1().min_w_0().child(scroll))
                             .into_any_element()
                     }
@@ -1419,8 +1419,8 @@ impl Render for MetaForm {
                     .child(div().flex_1())
                     .child(
                         h_flex()
-                            .gap(px(5.))
-                            .pr(px(4.))
+                            .gap(px(5.25))
+                            .pr(px(1.))
                             .child(footer_button("meta-apply", "Apply", true, dirty).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.save(false, window, cx))))
                             .map(|d| match self.embedded.clone() {
                                 Some(back) => d.child(footer_button("meta-go-back", "Go back", false, true).on_click(move |_, window, cx| back(window, cx))),
@@ -1437,7 +1437,7 @@ impl Render for MetaForm {
 /// italics; the form's rows highlighted.
 fn parts_list(m: &Multi, dirty: bool, form: impl IntoElement, cx: &mut Context<MetaForm>) -> AnyElement {
     // The form's height and its 41 px header.
-    let h = px(381. + props_size().1 - PROPS_MIN.1 + 41.);
+    let h = px(props_size().1 - 122.5);
     let rows = m.names.iter().enumerate().map(|(i, name)| {
         let picture = match m.thumbs.get(i).cloned().flatten() {
             Some(image) => img(ImageSource::Render(image)).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
@@ -1795,10 +1795,11 @@ pub fn open_instance_properties(instance: String, designator: String, on_save: i
     window.defer(cx, move |window, cx| focus.update(cx, |s, cx| s.focus(window, cx)));
 }
 
-/// The Properties modal's least (and default) size; live `resizableModal`
-/// (`metadata-dialog`, resizeX + resizeY), kept across sessions as Onshape
-/// keeps it in localStorage.
-pub const PROPS_MIN: (f32, f32) = (800., 542.);
+/// The Properties modal's least (and default) size, border included (live
+/// `resizableModal` `metadata-dialog`, 1173×687 with nothing stored, at
+/// 1920×1080 and 1600×900), kept across sessions as Onshape keeps it in
+/// localStorage.
+pub const PROPS_MIN: (f32, f32) = (1173., 687.);
 
 thread_local! {
     static PROPS_SIZE: std::cell::Cell<(f32, f32)> = std::cell::Cell::new(

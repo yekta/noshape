@@ -766,7 +766,8 @@ pub mod state {
     pub const INSTANCE: u32 = 8192;
     /// On faces whose boundary is drawn as its own line (a mate dialog's picked face, the face hovered while picking):
     /// the band (BAND, PICKED instances) leaves that boundary to the line (live workflows-1122 08 s07 / s08: the 4 px
-    /// #ffc685 or #FFC20E line over the instance's amber).
+    /// #ffc685 or #FFC20E line over the instance's amber). On a selected edge: it bounds a selected face, whose
+    /// boundary line covers its band's core (one solid band).
     pub const LINED: u32 = 16384;
 }
 

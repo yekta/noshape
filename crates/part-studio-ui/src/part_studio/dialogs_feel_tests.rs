@@ -855,7 +855,7 @@ fn rows() -> Vec<Row> {
             cx.update_window(window, |_, w, cx| w.close_dialog(cx)).unwrap();
             expect(order, vec!["Description", "Part number", "Revision", "Vendor", "Project", "Product line", "Title 1", "Title 2", "Title 3", "Not revision managed", "Exclude from all BOMs"], "the field after each Tab from Name")
         } },
-        Row { id: "Appearance / its panel on opening", live: "220 × 400 at the graphics area's bottom left; the hex field focused, its text selected, uppercase without '#'; A with two decimals (1.00)", gap: false, check: |cx| {
+        Row { id: "Appearance / its panel on opening", live: "220 × 400 at the graphics area's bottom left, 5 px over the list's edge, 2 px up (appearance-1123 q1: (241, 560)); the hex field focused, its text selected, uppercase without '#'; A with two decimals (1.00)", gap: false, check: |cx| {
             let (window, view) = block(cx, "dlg-appearance");
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
                 let b = v.display.bodies.first().map(|b| b.id.clone()).unwrap();
@@ -877,7 +877,7 @@ fn rows() -> Vec<Row> {
             let size = (f32::from(panel.size.width).round(), f32::from(panel.size.height).round());
             expect(
                 (size, (left, bottom), hex.len() == 6 && hex == hex.to_uppercase() && !hex.starts_with('#'), alpha.as_str(), focused, selected),
-                ((220., 400.), (0., 0.), true, "1.00", true, true),
+                ((220., 400.), (-5., 2.), true, "1.00", true, true),
                 "size, (left, bottom) in the graphics, hex uppercase without #, A, hex focused, its text selected",
             )
         } },
@@ -1378,6 +1378,13 @@ fn a_hole_without_points_says_only_that(cx: &mut TestAppContext) {
     }
     let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
     assert!(tip.ends_with("did not regenerate properly: No hole points selected."), "the title's tooltip: {tip:?}");
+    // Where live puts it, wherever the pointer is on the title (live err-tip-placement-1123: the title 246, 79, 164 wide,
+    // its tip 385, 80; qa ERR-CHROME-TIP-PLACEMENT: ours under the pointer).
+    let placed = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").map(|b| (f32::from(b.left() - title.right()), f32::from(b.top() - title.top())));
+    let first = placed(cx);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(title.origin.x + px(80.), title.center().y), None, Modifiers::default());
+    draw(cx, window);
+    assert!(first.is_some_and(|(dx, dy)| (dx + 25.).abs() <= 1. && (dy - 1.).abs() <= 1.) && placed(cx) == first, "the tip from the title's right / top: {first:?}, after a move {:?} (live -25, 1)", placed(cx));
 }
 
 /// Routing curve's Point edit type Multiple (std routingCurve.fs addMultiPointsManipulator / multiTriadManipulator,

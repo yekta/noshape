@@ -309,6 +309,13 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         if let Some(b) = name.strip_prefix("tool:").and_then(|d| noshape_app_core::ui_script::bounds_of(&format!("button:{d}"))) {
             return Ok(b.center());
         }
+        // A list popup's row live's runner names as a list row that ours marks as a menu row (qa UIS-LIST-ROW-MENU-ROWS,
+        // workflows-1123 03 s24 "Butt joint - Direction 1", 06 s24 "Large").
+        if let Some(row) = name.strip_prefix("list_row:").map(|r| format!("menu:{r}"))
+            && let Some(b) = noshape_app_core::ui_script::bounds_of(&row)
+        {
+            return Ok(visible_center(b, noshape_app_core::ui_script::clip_of(&row)));
+        }
         // A list row by the start of its text, as live's runner falls back to ("Assembly" for "Assembly 2 <1>"), when only
         // one row starts with it and a space.
         for kind in ["instance:", "feature:"] {

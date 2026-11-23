@@ -15,6 +15,9 @@ const WIDTH: f32 = 228.;
 const HEAD_H: f32 = 26.;
 const ROW_H: f32 = 26.;
 const PAD: f32 = 4.;
+/// The flyout's widest (live errors-1123 mates: a longer title wraps, its bar 400 px wide and 44 px high on two lines).
+const MAX_W: f32 = 400.;
+const HEAD_LINE: f32 = 18.;
 /// The body's left edge and a read-only field's width (live2 errors-1119 lo: "Revolute" 11 px in, its line 212 px).
 const BODY_X: f32 = 11.;
 const FIELD_W: f32 = 212.;
@@ -36,14 +39,14 @@ pub struct MateFlyout {
 }
 
 impl MateFlyout {
-    /// The flyout's height: the header and the body's rows.
-    fn height(&self) -> f32 {
-        HEAD_H + if self.rows.is_empty() { 0. } else { self.rows.len() as f32 * ROW_H + 2. * PAD }
+    /// The flyout's height: the header (`head_lines` lines) and the body's rows.
+    fn height(&self, head_lines: usize) -> f32 {
+        HEAD_H + HEAD_LINE * head_lines.saturating_sub(1) as f32 + if self.rows.is_empty() { 0. } else { self.rows.len() as f32 * ROW_H + 2. * PAD }
     }
 }
 
 impl Render for MateFlyout {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !crate::os_menu::is_open(cx) {
             crate::ui_script::note_tooltip(&self.note);
         }
@@ -73,15 +76,18 @@ impl Render for MateFlyout {
         let content = div()
             .font_family(cx.theme().font_family.clone())
             .when(!self.rows.is_empty(), |d| d.min_w(px(WIDTH)))
+            .max_w(px(MAX_W))
             .whitespace_nowrap()
             .text_size(px(12.))
             .text_color(ink)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(2.), spread_radius: px(0.), inset: false }])
-            .child(div().h(px(HEAD_H)).px(px(PAD)).flex().items_center().bg(gpui_kit::rgb(0xd0dbe5)).font_weight(FontWeight::BOLD).line_height(px(18.)).child(crate::ui::user_text(self.head.clone())))
+            .child(div().min_h(px(HEAD_H)).py(px((HEAD_H - HEAD_LINE) / 2.)).px(px(PAD)).flex().items_center().whitespace_normal().bg(gpui_kit::rgb(0xd0dbe5)).font_weight(FontWeight::BOLD).line_height(px(HEAD_LINE)).child(crate::ui::user_text(self.head.clone())))
             .children(body)
             .with_animation("mate-flyout-fade", Animation::new(FADE), |c, t| c.opacity(t));
+        // (Bold runs ~6 % wider than the regular face text_width measures.)
+        let head_lines = (crate::ui::text_width(window, &self.head, 12.) * 1.06 / (MAX_W - 2. * PAD)).ceil().max(1.) as usize;
         let a = self.anchor;
-        let at = point(a.right() + px(3.), a.center().y - px(self.height() / 2.));
+        let at = point(a.right() + px(3.), a.center().y - px(self.height(head_lines) / 2.));
         div().child(anchored().position(at).snap_to_window().child(content))
     }
 }

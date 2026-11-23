@@ -139,7 +139,22 @@ pub fn text_width(window: &Window, text: &str, size: f32) -> f32 {
 
 pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let text: SharedString = text.into();
-    move |window, cx| styled_tooltip(Tooltip::new(text.clone()), text.clone(), window, cx)
+    move |window, cx| styled_tooltip(Tooltip::new(html_spaces(&text)), text.clone(), window, cx)
+}
+
+/// A tip's text as live's HTML draws it: a run of spaces as one ("…properly:  A parameter…", "…500000.  Current…";
+/// qa ERR-TIP-DOUBLE-SPACE-RENDER). The text itself keeps them.
+fn html_spaces(text: &SharedString) -> SharedString {
+    if !text.contains("  ") {
+        return text.clone();
+    }
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        if !(c == ' ' && out.ends_with(' ')) {
+            out.push(c);
+        }
+    }
+    out.into()
 }
 
 /// [`tooltip`] with some words bold (byte ranges of `text`), as live's "**Submit** requires **Approvers**".
@@ -179,6 +194,8 @@ fn styled_tooltip(tip: Tooltip, text: SharedString, window: &mut Window, cx: &mu
             .pb(px(3.))
             .text_size(px(12.))
             .font_weight(FontWeight::MEDIUM)
+            // Live `.tooltip-inner`: at most 400 px wide, a longer text wraps (errors-1123 mate slider-limits: 2 lines).
+            .max_w(px(RICH_TOOLTIP_W))
             .build(window, cx);
         cx.new(|_| MenuAwareTip(tip, text)).into()
     }
@@ -571,7 +588,7 @@ impl Render for PlacedTooltip {
             .line_height(px(18.))
             .flex_none()
             .bg(pal.tooltip)
-            .map(|d| if self.user { d.child(user_text(self.text.clone())) } else { d.child(self.text.clone()) });
+            .map(|d| if self.user { d.child(user_text(self.text.clone())) } else { d.child(html_spaces(&self.text)) });
         // Live `.tooltip-expand`: the expanded fill, 4 px padding, at most
         // 400 px wide, under the title.
         let extra = self.expanded.as_ref().filter(|(_, shown)| *shown).map(|(text, _)| div().max_w(px(RICH_TOOLTIP_W)).p(px(4.)).line_height(px(18.)).bg(gpui_kit::rgb(0xffffff)).when(!self.upright, |d| d.italic()).child(text.clone()));
@@ -646,6 +663,20 @@ pub fn with_user_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: Tip
 /// the dialog's right edge).
 pub fn with_dialog_field_tooltip(el: Stateful<Div>, text: impl Into<SharedString>, inset: Pixels) -> Stateful<Div> {
     tip_with(el, text.into(), TipSide::Right, false, inset, false)
+}
+
+/// A feature dialog's red title's tooltip, fixed where live puts it whatever the pointer does (live
+/// err-tip-placement-1123: the title at 246, 79, 164 wide, its tip at 385, 80: 25 px in from the title's right, 1 px down).
+pub fn with_dialog_title_tooltip(el: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
+    let text: SharedString = text.into();
+    let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+    let a2 = anchor.clone();
+    el.relative()
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top(px(1.)).left_0().right(px(28.)).h(px(26.)))
+        .tooltip(move |_, cx| {
+            let (text, anchor) = (text.clone(), anchor.get());
+            cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: false, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: false }).into()
+        })
 }
 
 /// A list row's tooltip, beside the row (live part-studio/16, 95), showing
@@ -1621,21 +1652,9 @@ pub fn feature_initials(name: &str) -> String {
     out
 }
 
-/// Onshape's custom-feature icon (`.tool-initials-icon`, live
-/// part-studio/1252): the initials in a 20 px box with a 1 px `#999`
-/// border, in the custom features dropdown and the feature list.
+/// Onshape's custom-feature icon (`div.tool-initials-icon`, live part-studio/1252, custom-feature-row-icon-1123): the
+/// initials 11 px in a 20 px box, 1 px `#999` border, radius 3, in the custom features dropdown.
 pub fn initials_icon(name: &str) -> Div {
-    initials_icon_status(name, false)
-}
-
-/// The initials box's border: `#999`, or the error red while the feature
-/// fails to regenerate (live qa5 featurescript (7): "Qc" outlined red).
-pub fn initials_border(failing: bool) -> u32 {
-    if failing { 0xbd3039 } else { 0x999999 }
-}
-
-/// [`initials_icon`] for a feature-list row, red-outlined when it fails.
-pub fn initials_icon_status(name: &str, failing: bool) -> Div {
     div()
         .flex_none()
         .size(px(20.))
@@ -1643,12 +1662,34 @@ pub fn initials_icon_status(name: &str, failing: bool) -> Div {
         .items_center()
         .justify_center()
         .border_1()
-        .border_color(gpui_kit::rgb(initials_border(failing)))
-        .rounded(px(2.))
+        .border_color(gpui_kit::rgb(0x999999))
+        .rounded(px(3.))
         .bg(gpui_kit::rgb(0xffffff))
-        .text_size(px(12.))
-        .text_color(p().text)
+        .text_size(px(11.))
+        .text_color(gpui_kit::rgb(0x333333))
         .child(feature_initials(name))
+}
+
+/// A custom feature's feature-list row icon (`span.os-tool-initials-icon`, live custom-feature-row-icon-1123): 17 × 15
+/// centred in the 20 px icon slot, 1 px `#999` border (never red), radius 2, see-through; the initials 10 px `#333`,
+/// the row's red `#AA252D` while it fails, semibold while the row is selected.
+pub fn initials_row_icon(name: &str, failing: bool, selected: bool) -> Div {
+    div().flex_none().size(px(20.)).flex().items_center().justify_center().child(
+        div()
+            .w(px(17.))
+            .h(px(15.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .border_1()
+            .border_color(gpui_kit::rgb(0x999999))
+            .rounded(px(2.))
+            .text_size(px(10.))
+            .line_height(px(15.))
+            .font_weight(if selected { FontWeight::SEMIBOLD } else { FontWeight::NORMAL })
+            .text_color(gpui_kit::rgb(if failing { 0xaa252d } else { 0x333333 }))
+            .child(feature_initials(name)),
+    )
 }
 
 /// A regeneration time as Onshape shows it: "617ms", "1.02s" from 1 s on
@@ -1694,8 +1735,6 @@ mod tests {
     fn failing_custom_feature_icon_is_outlined_red() {
         // Live (qa5 featurescript (7)): a failing custom feature's "Qc" box
         // is outlined red; otherwise #999.
-        assert_eq!(initials_border(true), 0xbd3039);
-        assert_eq!(initials_border(false), 0x999999);
         assert_eq!(feature_initials("QA cube"), "Qc");
     }
 

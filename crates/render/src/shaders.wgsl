@@ -268,6 +268,16 @@ fn light_fragment(world: vec3<f32>, n: vec3<f32>, base: vec3<f32>, ambient: f32,
     return srgb_to_linear(clamp(lit, vec3(0.0), vec3(1.0)));
 }
 
+// A selected face turned from the light keeps its hue but darker: live's front (184,136,45) under a top (228,170,56) and
+// right (217,162,53) at n·l 0.06, 0.75, 0.58 (live sel-gestures-1122 ps-box-crossing-result); lit faces as before.
+fn face_selected_dim(normal_in: vec3<f32>, front: bool) -> f32 {
+    var n = normalize(normal_in);
+    if (!front) { n = -n; }
+    let right = normalize(cross(g.camera_fwd.xyz, g.camera_up.xyz));
+    let light = normalize(right + g.camera_up.xyz - g.camera_fwd.xyz);
+    return mix(0.92, 1.0, smoothstep(0.05, 0.5, dot(n, light)));
+}
+
 // Feature previews (instance params.y bit 4): no part lighting. Onshape's
 // preview of a box in the default view has the top and front faces alike and
 // the right side lighter (live part-studio/230): flat ambient plus one light
@@ -405,6 +415,7 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
             // A whole part keeps more of its shading (live "psui (10-27, interaction 5.x)": top (243,183,72), front (192,144,57), right (224,169,66)).
             let body = (st & BODY) != 0u;
             c = mix(sel * select(0.97, 1.0, body), shade(i.world, i.normal, front, sel), select(0.45, 0.6, body));
+            if ((st & (BODY | PICKED)) == 0u) { c = srgb_to_linear(linear_to_srgb(c) * face_selected_dim(i.normal, front)); }
         } else if ((inst.params.y & 16u) != 0u) {
             c = shade_preview(i.normal, front, c);
         } else {
@@ -1153,8 +1164,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     o.world = mix(wa, wb, t);
     o.style = l.style;
     o.across = side * half;
-    // A part edge's own highlight band (fs_line).
-    o.core = select(0.0, 1.0, own_edge);
+    // A part edge's own highlight band (fs_line); 2: its core opaque, a selected edge of a selected face (LINED: the
+    // face's 2 px boundary over it, live sel-gestures-1122 ps-box-crossing-result).
+    o.core = select(0.0, select(1.0, 2.0, (st & LINED) != 0u), own_edge);
     o.under = base;
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
@@ -1202,7 +1214,7 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let half = 2.5 * dpr;
         let col = linear_to_srgb(i.color.rgb);
         let rim = max(1.0, 0.6 * dpr);
-        if (a > half - rim) { return vec4(col, i.color.a); }
+        if (a > half - rim || i.core > 1.5) { return vec4(col, i.color.a); }
         // The plain line (1 CSS px, antialiased) under the core; none under a BAND line (style 1024).
         // Over a hovered face's boundary line (style 4096, LineSegment::OVER_LIT_FACE): the core at 78 % over that line's
         // #ffc685, uniform #ffaf25 (live b3/dlg-face-otherhover13).
@@ -1223,7 +1235,7 @@ fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
         let a = abs(i.across);
         let col = linear_to_srgb(i.color.rgb);
         let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
-        if (a > 2.5 * dpr - max(1.0, 0.6 * dpr)) { return vec4(col, i.color.a); }
+        if (a > 2.5 * dpr - max(1.0, 0.6 * dpr) || i.core > 1.5) { return vec4(col, i.color.a); }
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / (0.78 + edge), (0.78 + edge) * i.color.a);
     }
     return enc(i.color);

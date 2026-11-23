@@ -3051,6 +3051,12 @@ impl PartStudioView {
         }));
     }
 
+    /// The previewed tool fails: it misses every part, or its feature fails (drawn dark red, its region outlined).
+    pub(super) fn tool_failed(&self) -> bool {
+        let Some((_, fid)) = &self.ui.preview_tool else { return false };
+        self.tool_missed() || self.display.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error)
+    }
+
     /// A Remove / Intersect whose tool reaches no part: every part comes out
     /// of the feature exactly as it went in, and the feature didn't fail (an
     /// empty merge scope is "No merge scope selected.", no bubble: qa
@@ -3153,9 +3159,9 @@ impl PartStudioView {
         // tool body (the preview blend's model with the feature): an Add's in
         // the preview tone with its edges, a Remove's / Intersect's gray, red
         // while it reaches no part or fails (part-studio/234-237), no edges.
-        if let (Some(_), Some((tool, fid)), Some(before)) = (&self.edit, &self.ui.preview_tool, &self.ui.preview_before) {
+        if let (Some(_), Some((tool, _)), Some(before)) = (&self.edit, &self.ui.preview_tool, &self.ui.preview_before) {
             let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
-            let failed = self.tool_missed() || self.display.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error);
+            let failed = self.tool_failed();
             let adds = self.ui.preview_tool_adds;
             let c = crate::theme::lin(if failed { crate::theme::viewport::TOOL_PREVIEW_FAIL } else if adds { crate::theme::viewport::FEATURE_PREVIEW } else { crate::theme::viewport::TOOL_PREVIEW });
             let mut d = (*self.display).clone();

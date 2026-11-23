@@ -141,15 +141,19 @@ impl PartStudioView {
             faces.push(r.clone());
         }
         // Live multi-part-menu-1122: faces, edges or vertices of two or more parts selected (the right-clicked entity's
-        // part joins them) give the menu for those parts.
+        // part joins them) give the menu for those parts; a selected part row counts too (live appearance-1123
+        // q3-part-plus-face-menu: Part 1's row and a face of Part 2: Hide 2 parts).
         let mut several: Vec<BodyId> = Vec::new();
         let mut several_features: Vec<(FeatureId, String)> = Vec::new();
         if !in_sketch && !editing && matches!(kind, Some(PickKind::Face | PickKind::Edge | PickKind::Vertex)) {
-            for r in self.selection.iter().filter(|r| matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))).chain(target_ref.iter()) {
+            for r in self.selection.iter().filter(|r| matches!(r, Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_) | Reference::Body(_))).chain(target_ref.iter()) {
                 if let Some(b) = self.owning_body(r)
                     && !several.contains(&b)
                 {
                     several.push(b);
+                }
+                if matches!(r, Reference::Body(_)) {
+                    continue;
                 }
                 if let Some(id) = self.creating_feature(r, cx)
                     && !several_features.iter().any(|f| f.0 == id)
