@@ -3057,7 +3057,9 @@ impl PartStudioView {
     /// BOOL4B-BUBBLE, live 1592).
     pub(super) fn tool_missed(&self) -> bool {
         let (Some((preview, fid)), Some(before)) = (&self.ui.preview_tool, &self.ui.preview_before) else { return false };
-        if preview.features.iter().any(|f| f.id == *fid && f.status == noshape_model::display::FeatureStatus::Error) {
+        // The preview runs the feature as New, so the feature's own error is the studio's (live errors-1123 remove-miss).
+        let failed = |d: &StudioDisplay| d.feature_state(*fid).is_some_and(|s| s.status == FeatureStatus::Error);
+        if failed(preview) || failed(&self.display) {
             return false;
         }
         !before.bodies.is_empty()

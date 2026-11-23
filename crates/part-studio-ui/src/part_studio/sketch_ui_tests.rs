@@ -7493,6 +7493,47 @@ fn a_flipped_remove_extrude_missing_the_block_is_an_info(cx: &mut TestAppContext
     }
 }
 
+/// Live errors-1123 extrude remove-miss: a Remove beside the block shows the blue "do not intersect" bubble with Merge
+/// with all on, and with an empty merge scope only its error ("No merge scope selected."), no bubble.
+#[gpui::test]
+fn a_remove_missing_with_no_merge_scope_shows_only_its_error(cx: &mut TestAppContext) {
+    use noshape_model::display::FeatureStatus;
+    use noshape_model::params::ParamValue;
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm", "oppositeDirection": true } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[80, 15], [83, 15]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "rm-miss-noscope", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.iter().find(|s| s.regions.len() == 1 && v.studio(cx).unwrap().feature(s.feature).is_some_and(|f| f.name == "Sketch 2")).expect("Sketch 2");
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions[0].key.clone() }];
+            v.start_feature("extrude", w, cx);
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("editing").dialog.clone());
+    let bubble = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).message.as_ref().map(|(_, m)| m.clone()));
+    let state = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let fid = v.edit.as_ref()?.dialog.read(cx).feature.id;
+            v.display.feature_state(fid).map(|s| (s.status, s.message.clone().unwrap_or_default()))
+        })
+    };
+    dialog.update(cx, |d, cx| d.set_value("operationType", ParamValue::Enum("REMOVE".into()), cx));
+    dialog.update(cx, |d, cx| d.set_value("defaultScope", ParamValue::Bool(true), cx));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).message.is_some());
+    assert_eq!(bubble(cx).as_deref(), Some("Selected tools and targets do not intersect."), "Merge with all on: the info bubble");
+    dialog.update(cx, |d, cx| d.set_value("defaultScope", ParamValue::Bool(false), cx));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).message.is_none());
+    assert_eq!(state(cx), Some((FeatureStatus::Error, "No merge scope selected.".to_string())));
+    assert_eq!(bubble(cx), None, "an empty merge scope: the error only");
+}
+
 /// Live2 feedback.json (documentLoad): an opening studio shows "Loading studio data…" until a result is in and
 /// "Loading graphics…" while its scene builds; nothing in the first moment of a quick open, nor once it is drawn.
 #[gpui::test]
