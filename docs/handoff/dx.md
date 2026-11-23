@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-23 00:14 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-23 01:31 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,26 +13,18 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## USER P0s (lead 11-22 23:0x-23:4x) -- STATE 11-23 00:14: 4 commits green, NOT landed, waiting for the lead
-Lead: when built + green TELL THE LEAD BEFORE land.sh (release.yml changed: lead's workflow_dispatch dry run first).
-studios keeps only the copy identity and -wal cleanup; the open path is ours. Hose x_t end rings are core's now.
-Commits on dx-open4 (after b25d8b219, d6a37defd, which re-land with them):
-- 318315fe9 open-file: Info.plist CFBundleDocumentTypes + exported UTI app.noshape.document (icon noshape);
-  noshape.iss association; packaging/linux/noshape-mime.xml (install.sh, .deb, release.yml verify steps);
-  ops live.rs serve_app/open_in_app/APP_OPEN/app_info_path (test ops tests/live.rs
-  a_second_start_hands_its_document_to_the_running_app); app open_requests.rs (on_open_urls at launch + running,
-  second start hands over, open = focus if open). TODO after landing: verify on the Mac's release build (does
-  openURLs at launch arrive before run()? start window flash?).
-- 185a83a46 Download: no toast on success (live shows none), error only on failure. Test
-  a_download_that_works_shows_no_toast. Noted, not fixed: drawing status bubble guesses red by text (drawing_ui.rs ~33).
-- 61a29a3c2 pickers: file_dialogs picker_filter/filtered: no filter for "*" (macOS greyed every file), named filters
-  in both cases. Import takes any file (non-CAD -> file tab, as live).
-- 70edeb41d STEP: io.cpp sub_colors: solid/shell styles -> solidColors (part colour), faces only from face styles;
-  split_connected_pieces names a body's several solids after them (live: Main/Fan), split solid "<part>__<solid>".
-  T1 export::step_solid_colours_are_part_colours_and_face_styles_stay_on_their_face. Mac mini: Main #ececec 258 f /
-  152 face colours, Fan #4a4848 529 f / 14, as live. Private copy on vibe2 deleted.
-Green (vibe2): kernel all 586, ops live:: + import, app-core file_, noshape open_requests, clippy kernel/app-core/
-ops/noshape --all-targets. Scripts /root/dx-scratch/p0-remote.sh, p0-remote2.sh.
+## QUEUED 2782ce84 (11-23 01:3x, 7 commits): the 4 user P0s + SAT edges re-land + qa P1 file-tab Import speed
+- Lead dry run 45087596193 (dryrun/dx-open4 at ae489fe) all green. Mac check on its dmg (/root/dx-scratch/mac-assoc.sh,
+  Mac ~/noshape-host/dx-keep/assoc/): UTI + icon, LaunchServices handler, open at launch / while running, same file
+  only focuses, CLI second start hands over: all pass; test copy unregistered + removed. Import .step listing: rfd
+  source checked only (no screen capture over ssh).
+- P0s: open-file 3 OSes (ops live.rs serve_app/open_in_app; app open_requests.rs), Download no toast, pickers with no
+  filter for all files, STEP solid colours + solid names (Mac mini Main/Fan as live).
+- qa SPEED-FILE-TAB-IMPORT-MENU: workspace.rs translate_file -> import_dialog::open_written (copy written in
+  background, Import waits). Test workspace_tests::a_file_tabs_import_opens_its_dialog_before_the_file_is_written.
+  qa asked to replay workflows-1123 17 s2 after landing.
+- Noted, not fixed: drawing status bubble guesses red by text (drawing_ui.rs ~33).
+- Hose x_t end rings: core's (repro sent 11-23 01:0x).
 
 ## Parked: rings-loft STEP refit (branch dx-wip-step-refit, patch /root/dx-scratch/step-refit-wip.patch)
 - refit_loose_edges(shape, over, pcurves) after STEP read at 1e-4 mm: revolved ring 1449.9415 vs x_t 1449.9431
