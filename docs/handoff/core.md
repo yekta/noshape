@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 01:40 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 02:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -50,8 +50,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **REGEN-SPEED isaac:** isaac-ball open is level with live (TICKETS SPEED-ASM-OPEN: 13.9 s vs 8.3-13.1). Extrude 27's
   unify.reordered is 1.1 s of 76 s serial kernel time: not worth a change. Kernel totals over the open: op_boolean
   12.9 s (bool), op_fillet 11.9 s (blend), op_unify 7.0, volume_change 3.8, min_distance 2.4.
-- **Hosts:** vibex8 still under qa's ~/.slot-quiet (cargo rc 75 "held"); told lead 04:5x. vibex7 load 9-12.
-- **SURF-INTRO-OFFSET-END:** live (behaviours "core (11-21 20:33) surf-intro", dom/core-surfintro-loft1.txt): Loft 1 pairs
   its profiles BY PARAMETER (as ours), ruled 3x1, 120x2 CPs, knots doubled at 1/64. So our 1 mm2 gap is the profiles'
   own parametrisation (live's projected curves: 64 spans, doubled knots); compare ours with the dump next.
   Ours: Loft 1 12748.85 vs live 12749.86 mm2 (car body, derived b7635b82); scripts vibex7 ~/agents/core-keep/sib (ar.py
@@ -162,30 +160,37 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. HOSE-RINGS (dx 11-23): cf-hose-routing (hoseRouting FS: opSweep (Discrete) of a circle along fitSplines, then
-   opShell of the 2 plane caps, 1 mm in): end ring edges 1.2e-4 m off the outer BSplineSurface in the model (dx's
-   probe, branch dx-wip-step-refit, NOSHAPE_XT_DEBUG=1); live exact. FOUND: the sweeps are exact (every edge within
-   1e-14 m of its faces, re-run and as fed to the Shell: dumps vibex7 ~/tmp/core/hose/{sweep,shell}-N.brep/.txt via
-   NOSHAPE_DUMP_OPS). k::shell (OCCT MakeThickSolid, shell.cpp op_shell_solid_unbudgeted ~10770) FAILS on that input,
-   so the model takes a fallback (likely the inner offset solid cut out, ~10750): the cut re-intersects the cap planes
-   with the B-spline wall -> approximated rings, tol 1e-4. Next: find the path FS opShell takes (custom host ops.rs
-   opShell -> model-core shell), keep the outer wall's own ring edges (they are exact) in the fallback. Probe (UNCOMMITTED,
-   never commit): kernel core::probe_hose_sweep (edge devs via max_deviation), scripts .hd.sh / .hp2.sh.
-0. qa ERR rows (TICKETS "qa, 2026-11-23 01:2x"): ERR-HOLE-DESTROYS-SILENT (QUEUED with revolve 0° + loft guides info, see
-   land.sh --status), ERR-MOVEFACE-STATUS
-   (side-through: ours a 0-volume part, live "Could not offset selected faces as requested."; cyl-r0/neg: live OK, the
-   boss gone, ours errors / leaves r2: direct.rs 440-470 offset -> offset_by_booleans; P1 NEG-RADIUS),
-   ERR-THICKEN-CYL-TOO-THICK (r4 cylinder 6 mm in: live "Failed to thicken all selections.", ours builds),
-   ERR-FACE-PATTERN-FAILED-PREVIEW (failed instances drawn dark red), ERR-ADD-PATTERN-PREVIEW-TINT (lp-dist0 Add preview
-   red), ERR-FEATPATTERN-TITLE-SUFFIX (psui's feature_dialog.rs ~4553: a Bool field (std flags fullFeaturePattern,
-   patternUtils.fs 391) must not append "A parameter value is not valid."; psui took it 11-23).
-0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md, 78/96 match). LANDING
-   2245e27a: Boolean subtract Targets field, intersect apart w/o Keep tools removes both silently. Never add errors
-   for live's "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
-0000. DONE 8631c5717 (stale) STD-3132: bundled std 3112 -> 3132 (live/std-3132 +
-   live/std-3132-vs-3112.diff, 14 files / 181 lines: SM pattern keeps collapsed walls V3128, hole error preview on a start
-   plane, 7/8"-14 UNF tap drill 0.8125 in, thin extrude's new builtin @setThinWallOneSided: no-op unless annotations need
-   it). Gate: model suite none worse + skasm's 25 SM docs; tell skasm when landed.
+0. IN FLIGHT 02:26 (core-rf, UNCOMMITTED): kernel thicken() curvature refusal (features.cpp top of thicken), guided
+   surface loft miss = LOFT_FAILED (loft_guided.cpp + kernel test), T1 features_c::a_cylinder_thickened_past_its_axis_fails
+   (first run said Ok: stale rb.sh sync, files touched, rerun .th2.sh -> task output / rerun it). Also in features_c an
+   #[ignore = "probe"] probe_move_face_boss_block: NEVER commit (delete before commit), its PROBE lines give ours for
+   live's move-face cases. Commit Thicken + loft once green (not core.rs's probe_hose_sweep hunk: git apply --cached).
+0. 01:33 batch failure (part-studio-ui a_chip_made_by_a_later_feature) is NOT 2245e27a: passes on core-rf (told lead).
+0. HOSE-RINGS (dx 11-23; live exact everywhere, 144 edges no tolerance): the model's walls are accurate (sweep 1e-14,
+   smooth Shell by_smooth shell.cpp ~3025 inner edges 1e-7, edge tol 2.8e-7); dx's xt writer restores the offset
+   (offsets_restored) and cuts closed edges > 1e-8 off it: 6 rings a hose. Why: (a) END rings: the true offset meets the
+   cap plane 2.5e-8 off the iso-line (live: INTERSECTION offset x plane; dx can write that); (b) JOINTS: our sweep's 5
+   wall B-surfaces meet with normals 4.7e-5 rad apart, so the inner offsets are 4.7e-8 apart. Live: straight runs are
+   CYLINDERs (outer and inner), bends OFFSET_SURF(B_SURFACE), joints exact CIRCLEs / SP_CURVEs. NEXT (mine): the sweep
+   (opSweep Discrete, path = opFitSpline segments) makes straight path runs cylinders and its segments G1. Refit
+   experiment (1e-9 on one face, not enough): /root/core-scratch/hose-refit-exp.patch. Probe (UNCOMMITTED, never
+   commit): kernel core::probe_hose_sweep (x_t round trip of shell-10; dumps vibex7 ~/tmp/core/hose), .hp3.sh.
+0. qa ERR rows: ERR-THICKEN-CYL-TOO-THICK DONE in core-rf (uncommitted): features.cpp thicken() refuses a side reaching
+   a quadric/torus face's centre of curvature; T1 features_c::a_cylinder_thickened_past_its_axis_fails. Guided surface
+   loft: every profile miss LOFT_FAILED (live loft-guide-past-end-1123 L/M/N; loft_guided.cpp ~2087; T1 kernel
+   core::a_guided_loft_refuses_a_guide_off_a_profile_as_live). Then ERR-MOVEFACE-STATUS (side-through: ours 0-volume
+   part, live "Could not offset selected faces as requested."; cyl-r0/neg: live OK, boss gone: direct.rs 440-470; P1
+   NEG-RADIUS), ERR-FACE-PATTERN-FAILED-PREVIEW, ERR-ADD-PATTERN-PREVIEW-TINT; set a look rows ERR-SEL-RED-ALL-INPUTS,
+   ERR-BUBBLE-ON-ERROR, ERR-SWEEP-FAIL-BODY (LOFT-TITLE-SUFFIX = psui's TITLE-SUFFIX, done by psui). Set a behaviour rows
+   REVOLVE-ANGLE0 / INTERSECT-NONE / LOFT-GUIDES-EMPTY / TARGETS-EMPTY are in the queued lands.
+0. ERR-MISSING-SELECTION flag (promised psui ~05:00): regen counts a filter-rejected pick as missing (FeatureState.missing
+   and the dialog's missing(r)).
+0. qa APPEAR P0s (TICKETS 01:5x): SUBTRACT-CUT-FACES (cut faces take the target's colour, not the tool feature's
+   appearance: part-studio-ui appearance.rs face_colors Feature target hits r.depends_on()==f), SPLIT-LOSES-COLOURS
+   (halves keep name "Red block", colour, face appearances; other parts' default names unchanged), PATTERN-COPY-COLOURS
+   (pattern/mirror copies keep colours and face appearances).
+0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
+   "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
