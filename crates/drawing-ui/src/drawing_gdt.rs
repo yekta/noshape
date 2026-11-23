@@ -253,11 +253,13 @@ impl DrawingEditor {
             cx.notify();
             return true;
         }
-        // On an edge: no leader, moves with the view (live2 gtol-1119).
-        if let Some(view) = self.pk().hovered_edge().map(|(v, _)| v) {
-            let mut a = noshape_scene::drawing_tools::gdt(id, c, frame, extra);
-            a.view_group = Some(view);
-            self.edit_sheet("Geometric tolerance", cx, |s| s.annotations.push(a));
+        // On an edge: a leader from the point clicked, the next click places the frame (live drw-dims-1123 gdt.md; gtol-1119
+        // had recorded a frame on the edge with no leader).
+        if self.pk().hovered_edge().is_some()
+            && let Some(p) = self.pk().snap_or_edge_point(c)
+        {
+            self.note_leader = Some(noshape_model::drawing::Leader { view: Some(p.view), point: p.p, ..Default::default() });
+            self.leader_ref = p.r.clone();
             cx.notify();
             return true;
         }

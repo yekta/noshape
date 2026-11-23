@@ -2407,10 +2407,10 @@ fn the_surface_finish_symbol_follows_the_pointer_before_and_after_a_click(cx: &m
     assert_eq!(shown(cx, free).map(|s| s.0), Some(free), "the next symbol at the pointer");
 }
 
-/// Live2 gtol-1119 (as the 11-07 take; ann-1118's leader didn't reproduce): a click on the lit edge places a ⌖ frame
-/// right there, no leader, moving with the view; the next click places a second frame; both stay.
+/// Live drw-dims-1123 gdt.md (gtol-1119 had recorded no leader): a click on the lit edge anchors a leader there, the
+/// next click places the ⌖ frame with it at once, and the tool goes on.
 #[gpui::test]
-fn a_geometric_tolerance_clicked_on_an_edge_is_placed_there_and_the_next_click_places_another(cx: &mut TestAppContext) {
+fn a_geometric_tolerance_clicked_on_an_edge_starts_a_leader_and_the_next_click_places_it(cx: &mut TestAppContext) {
     use noshape_model::drawing::AnnotationKind;
     SUGGESTED.set(true);
     let (window, editor) = drawing(cx, "feel-gdt-edge");
@@ -2423,13 +2423,13 @@ fn a_geometric_tolerance_clicked_on_an_edge_is_placed_there_and_the_next_click_p
     let gdts = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Gdt { .. })).cloned().collect::<Vec<_>>());
     let mid = [(a[0] + b[0]) / 2.0, a[1]];
     click_sheet(cx, window, &editor, mid);
-    let placed = gdts(cx);
-    assert!(matches!(placed.as_slice(), [g] if matches!(&g.kind, AnnotationKind::Gdt { leaders, .. } if leaders.is_empty()) && g.view_group.is_some()), "one frame on the edge, no leader, with its view: {placed:?}");
-    assert!((placed[0].position[0] - mid[0]).hypot(placed[0].position[1] - mid[1]) < 0.05, "at the click: {:?} for {mid:?}", placed[0].position);
-    assert!(cx.update(|cx| editor.read(cx).note_leader.is_none()), "no leader anchored");
+    assert!(gdts(cx).is_empty(), "the edge click places nothing yet");
+    assert!(cx.update(|cx| editor.read(cx).note_leader.is_some()), "a leader is anchored");
     let above = [mid[0], a[1] + out * 8.0];
     click_sheet(cx, window, &editor, above);
-    assert_eq!(gdts(cx).len(), 2, "the second click places a second frame");
+    let placed = gdts(cx);
+    assert!(matches!(placed.as_slice(), [g] if matches!(&g.kind, AnnotationKind::Gdt { leaders, .. } if leaders.len() == 1)), "one frame with its leader: {placed:?}");
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Gdt) && editor.read(cx).note_leader.is_none()), "the tool goes on, the leader used");
 }
 
 /// Live2 errors-1118: a view whose part no longer resolves goes blank (no "No parts to show" box) and the sheet shows
@@ -4844,4 +4844,63 @@ fn the_same_pick_twice_stays_picked(cx: &mut TestAppContext) {
         })
     });
     assert_eq!(picks, 1, "the line stays picked");
+}
+
+/// Live drw-dims-1123 INDEX "Hover colours": Dimension (d), Diameter, Hole callout and GD&T light an edge orange;
+/// Line to line angular, Point to line, Line to line and Radial tan, as Select does.
+#[gpui::test]
+fn edge_hover_colour_follows_the_tool(cx: &mut TestAppContext) {
+    use crate::drawing_view::{DRAWING_HOVER, DRAWING_SELECTED};
+    use noshape_scene::drawing_tools::DimTool;
+    let (_window, editor) = drawing(cx, "feel-dims-hover-colour");
+    let colour = |cx: &mut TestAppContext, tool: Tool| cx.update(|cx| editor.update(cx, |e, _| {
+        e.tool = tool;
+        e.edge_hover_colour()
+    }));
+    let dim = |kind| Tool::Dimension { kind, picks: vec![] };
+    for kind in [DimTool::Linear, DimTool::Diameter, DimTool::Point2, DimTool::Angle3] {
+        assert_eq!(colour(cx, dim(kind)), DRAWING_SELECTED, "{kind:?} orange");
+    }
+    for kind in [DimTool::Angle, DimTool::PointLine, DimTool::LineLine, DimTool::Radius] {
+        assert_eq!(colour(cx, dim(kind)), DRAWING_HOVER, "{kind:?} tan");
+    }
+    assert_eq!(colour(cx, Tool::HoleCallout { circle: None }), DRAWING_SELECTED, "Hole callout orange");
+    assert_eq!(colour(cx, Tool::Gdt), DRAWING_SELECTED, "GD&T orange");
+    assert_eq!(colour(cx, Tool::Select), DRAWING_HOVER, "Select tan");
+}
+
+/// Live drw-dims-1123 centerline.md: a 2 point circle centerline's click on a hole's circle takes the circle's top
+/// quadrant (ModeQuad), not the point clicked.
+#[gpui::test]
+fn a_circle_centerline_click_takes_the_circles_top_quadrant(cx: &mut TestAppContext) {
+    use noshape_model::drawing::PointRef;
+    use noshape_model::drawing::views::EdgeGeom;
+    START.set(Some("holes-plate-drawing"));
+    let (window, editor) = drawing(cx, "feel-cl-quadrant");
+    real_sheet(cx, window, &editor);
+    let (at, top) = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let (view, center, radius, mid) = e.built.as_ref()?.placements.iter().find_map(|pl| {
+                let g = e.geoms.get(&pl.id)?;
+                g.model_edges.iter().find_map(|m| match m.geom {
+                    EdgeGeom::Circle { center, radius, face_on: true, bore: true, .. } => {
+                        let k = std::f64::consts::FRAC_1_SQRT_2 * radius;
+                        Some((pl.id, center, radius, [center[0] + k, center[1] + k]))
+                    }
+                    _ => None,
+                })
+            })?;
+            let pl = e.placement(view)?;
+            Some((pl.to_sheet(mid), [center[0], center[1] + radius]))
+        })
+    }).expect("a hole's circle");
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::CircleCenterline { three: false, points: vec![] }, cx)));
+    draw(cx, window);
+    click_sheet(cx, window, &editor, at);
+    let first = cx.update(|cx| match &editor.read(cx).tool {
+        Tool::CircleCenterline { points, .. } => points.first().cloned(),
+        _ => None,
+    }).expect("the click is taken");
+    assert!((first.p[0] - top[0]).abs() < 1e-9 && (first.p[1] - top[1]).abs() < 1e-9, "the top quadrant {top:?}: {:?}", first.p);
+    assert!(matches!(first.r, Some(PointRef::Quadrant { k: 1, .. })), "kept as the quadrant: {:?}", first.r);
 }

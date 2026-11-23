@@ -713,6 +713,25 @@ impl<'a> SheetPick<'a> {
 
     /// A snap point, else the point on the hovered edge nearest the click (a
     /// note's leader attaches to an edge, live behaviours "Note leader").
+    /// A circle centerline's click on a face-on circle: its top quadrant, unless the click is on its centre (live
+    /// drw-dims-1123 centerline.md: ModeQuad points, the centre needs an exact click).
+    pub fn circle_click_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
+        let snap = self.snap_at(s);
+        if snap.as_ref().is_some_and(|p| matches!(p.r, Some(PointRef::Center { .. }))) {
+            return snap;
+        }
+        if let Some((view, me)) = self.hovered_edge()
+            && let EdgeGeom::Circle { center, radius, face_on: true, .. } = me.geom
+        {
+            let r = match me.center_ref() {
+                Some(PointRef::Center { body, name }) => Some(PointRef::Quadrant { body, name, k: 1 }),
+                _ => None,
+            };
+            return Some(PickedPoint { view, p: [center[0], center[1] + radius], r });
+        }
+        self.snap_or_edge_point(s)
+    }
+
     pub fn snap_or_edge_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
         if let Some(p) = self.snap_at(s) {
             return Some(p);

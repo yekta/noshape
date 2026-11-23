@@ -1857,7 +1857,7 @@ impl DrawingEditor {
         style.background_bottom = bg;
         // Drawings use their own (behaviours 1480, asb/u-906/907): hover #CCB292, selected #CC925C; a tool's hovered
         // edge orange too (live drw/dact-aa-d3); highlighted lines 2 px solid, antialiased (live dh0, dsel3, d-sel-view).
-        style.hover_color = crate::theme::lin(if self.tool_picks_edges() { DRAWING_SELECTED } else { DRAWING_HOVER });
+        style.hover_color = crate::theme::lin(self.edge_hover_colour());
         style.select_color = crate::theme::lin(DRAWING_SELECTED);
         style.lit_line_px = LIT_LINE_PX;
         // Other members of a hovered / selected annotation group (live
@@ -1869,6 +1869,18 @@ impl DrawingEditor {
 
     /// Tools that pick edges highlight the hovered edge alone, not its view (qa DWG-E2E-SILHOUETTE: Edge to edge
     /// centerline tinted the view), in orange (behaviours "drawing Dimension tool", live drw/dact-aa-d3).
+    /// A lit edge's colour: orange in the tools that pick edges, tan in Select and in Line to line angular, Point to
+    /// line, Line to line and Radial (live drw-dims-1123 INDEX "Hover colours").
+    pub(crate) fn edge_hover_colour(&self) -> u32 {
+        use noshape_scene::drawing_tools::DimTool;
+        match self.tool {
+            Tool::Dimension { kind: DimTool::Angle | DimTool::PointLine | DimTool::LineLine | DimTool::Radius, .. } => DRAWING_HOVER,
+            Tool::HoleCallout { .. } | Tool::Gdt => DRAWING_SELECTED,
+            _ if self.tool_picks_edges() => DRAWING_SELECTED,
+            _ => DRAWING_HOVER,
+        }
+    }
+
     fn tool_picks_edges(&self) -> bool {
         matches!(
             self.tool,

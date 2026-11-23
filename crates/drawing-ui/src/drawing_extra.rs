@@ -1284,7 +1284,7 @@ impl DrawingEditor {
                 self.placed_table = (kind == TableTool::Hole).then_some(id);
             }
             // On empty sheet nothing is placed (live drw-dims-1123 datum.md).
-            Tool::Datum { anchor: None } if self.datum_attach_at(c).is_none() && self.any_point(c).is_none() => {}
+            Tool::Datum { anchor: None } if self.datum_attach_at(c).is_none() && self.pk().snap_or_edge_point(c).is_none() => {}
             Tool::Datum { anchor: None } => {
                 // On a GD&T frame edge or a dimension's lines (the red
                 // crosshair), else on the geometry.

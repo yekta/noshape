@@ -795,7 +795,11 @@ impl DrawingEditor {
         if let Some(p) = self.hover_snap {
             // The Note tool and the 2 point centerline frame the point (live C11 (a), live2 ann-1118); the dimension tools
             // and others put the disc on it (D21).
-            let mark = if matches!(self.tool, Tool::Note | Tool::Centerline { .. }) { crate::drawing_scene::SnapMark::Box } else { crate::drawing_scene::SnapMark::Disc };
+            let mark = match self.tool {
+                Tool::Note | Tool::Centerline { .. } => crate::drawing_scene::SnapMark::Box,
+                Tool::Dimension { kind: DimTool::Point2 | DimTool::PointLine | DimTool::Angle3, .. } => crate::drawing_scene::SnapMark::VividDisc,
+                _ => crate::drawing_scene::SnapMark::Disc,
+            };
             overlay.marks.push((p, mark, self.tol_mm(15.0)));
         }
         self.section_edit_overlay(&mut overlay);
@@ -1333,8 +1337,9 @@ impl DrawingEditor {
                 }
             }
             Tool::CircleCenterline { three, mut points } => {
-                // A snap point, else the point on the edge under the pointer (live drw-centerline-circle-3-point).
-                if let Some(p) = self.pk().snap_or_edge_point(c).filter(|p| points.first().is_none_or(|f| f.view == p.view)) {
+                // A circle's top quadrant, a snap point, else the point on the edge under the pointer (live
+                // drw-centerline-circle-3-point, drw-dims-1123).
+                if let Some(p) = self.pk().circle_click_point(c).filter(|p| points.first().is_none_or(|f| f.view == p.view)) {
                     points.push(p);
                 }
                 let need = if three { 3 } else { 2 };

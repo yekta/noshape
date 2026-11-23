@@ -28,6 +28,9 @@ pub struct Overlay {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapMark {
     Disc,
+    /// The point tools' vertex (2 point linear, Point to line, 3 point angular: live drw-dims-1123 INDEX): a saturated
+    /// disc rgb(255,110,32) in a light rim rgb(255,234,223).
+    VividDisc,
     /// The Note tool's frame round a point (live C11 (a): hollow, ~15 px, rgb(255,130,63)).
     Box,
     Square,
@@ -38,6 +41,8 @@ pub enum SnapMark {
 
 /// A snap point's disc (live D21).
 pub const SNAP_DISC_PX: f32 = 10.0;
+pub const VIVID_DISC_RGB: [u8; 4] = [255, 110, 32, 255];
+pub const VIVID_RIM_RGB: [u8; 4] = [255, 234, 223, 255];
 pub const SNAP_DISC_RGB: [u8; 4] = [216, 165, 102, 255];
 const NOTE_BOX_RGB: [u8; 4] = [255, 130, 63, 255];
 
@@ -94,11 +99,16 @@ impl Overlay {
         }
         const ORANGE: [u8; 4] = [255, 140, 0, 255];
         let mut discs = Vec::new();
+        let mut vivid = Vec::new();
         for &(c, kind, s) in &self.marks {
             let h = s * 0.5;
             let pts: Vec<[f64; 2]> = match kind {
                 SnapMark::Disc => {
                     discs.push(c);
+                    continue;
+                }
+                SnapMark::VividDisc => {
+                    vivid.push(c);
                     continue;
                 }
                 SnapMark::Box => {
@@ -124,6 +134,10 @@ impl Overlay {
         for c in discs {
             p.points.push(PointSprite { position: [c[0] as f32, c[1] as f32, 0.5], color: SNAP_DISC_RGB, pick_id: 0, size: SNAP_DISC_PX, style: 2, _pad: 0 });
         }
+        for c in vivid {
+            p.points.push(PointSprite { position: [c[0] as f32, c[1] as f32, 0.5], color: VIVID_RIM_RGB, pick_id: 0, size: SNAP_DISC_PX + 4.0, style: 2, _pad: 0 });
+            p.points.push(PointSprite { position: [c[0] as f32, c[1] as f32, 0.5], color: VIVID_DISC_RGB, pick_id: 0, size: SNAP_DISC_PX, style: 2, _pad: 0 });
+        }
         for q in &self.points {
             p.points.push(PointSprite { position: [q[0] as f32, q[1] as f32, 0.5], color: [255, 140, 0, 255], pick_id: 0, size: 9.0, style: 2, _pad: 0 });
         }
@@ -131,5 +145,20 @@ impl Overlay {
             p.points.push(PointSprite { position: [q[0] as f32, q[1] as f32, 0.5], color: *color, pick_id: 0, size: 9.0, style: 2, _pad: 0 });
         }
         (l, p)
+    }
+}
+
+#[cfg(test)]
+mod vivid_tests {
+    use super::*;
+
+    /// Live drw-dims-1123 INDEX: the point tools' vertex is a saturated disc in a light rim, other tools' the D21 disc.
+    #[test]
+    fn a_vivid_disc_is_saturated_in_a_light_rim() {
+        let o = Overlay { marks: vec![([1.0, 2.0], SnapMark::VividDisc, 0.0), ([3.0, 4.0], SnapMark::Disc, 0.0)], ..Default::default() };
+        let (_, p) = o.to_render([0, 0, 0, 255]);
+        let colours: Vec<([u8; 4], f32)> = p.points.iter().map(|q| (q.color, q.size)).collect();
+        assert!(colours.contains(&(SNAP_DISC_RGB, SNAP_DISC_PX)), "{colours:?}");
+        assert!(colours.contains(&(VIVID_DISC_RGB, SNAP_DISC_PX)) && colours.iter().any(|(c, s)| *c == VIVID_RIM_RGB && *s > SNAP_DISC_PX), "{colours:?}");
     }
 }

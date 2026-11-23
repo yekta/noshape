@@ -82,6 +82,17 @@ pub fn edge_pair_centerline(a1: [f64; 2], b1: [f64; 2], a: [f64; 2], b: [f64; 2]
     let dir = norm(sub(b1, a1));
     let (a2, b2) = if dot(sub(b, a), dir) >= 0.0 { (a, b) } else { (b, a) };
     let mid = |p: [f64; 2], q: [f64; 2]| [(p[0] + q[0]) * 0.5, (p[1] + q[1]) * 0.5];
+    // Non-parallel edges (a chamfer and an edge): their bisector, from the corner across both edges' extent (live
+    // drw-dims-1123 centerline.md).
+    let dir2 = norm(sub(b2, a2));
+    if (dir[0] * dir2[1] - dir[1] * dir2[0]).abs() > 1e-6
+        && let Some(x) = AnnotationKind::line_intersection(a1, b1, a2, b2)
+    {
+        let d = norm([dir[0] + dir2[0], dir[1] + dir2[1]]);
+        let ts = [a1, b1, a2, b2].map(|p| dot(sub(p, x), d));
+        let (lo, hi) = (ts.iter().copied().fold(f64::INFINITY, f64::min), ts.iter().copied().fold(f64::NEG_INFINITY, f64::max));
+        return ([x[0] + d[0] * lo, x[1] + d[1] * lo], [x[0] + d[0] * hi, x[1] + d[1] * hi]);
+    }
     (mid(a1, a2), mid(b1, b2))
 }
 
@@ -1382,5 +1393,22 @@ mod title_field_tests {
         // Delete (the note gone): the field is empty.
         d.sheets[0].annotations.clear();
         assert_eq!(d.sheets[0].title_field("Title"), Some(""));
+    }
+}
+
+#[cfg(test)]
+mod edge_pair_tests {
+    use super::*;
+
+    /// Live drw-dims-1123 centerline.md: edge to edge on non-parallel edges gives their bisector; parallel edges the
+    /// middle line.
+    #[test]
+    fn edge_to_edge_centerline_bisects_non_parallel_edges() {
+        let (p, q) = edge_pair_centerline([0., 0.], [10., 0.], [0., 0.], [0., 10.]);
+        let d = norm(sub(q, p));
+        assert!((d[0] - d[1]).abs() < 1e-9 && d[0] > 0.0, "45° bisector: {p:?} {q:?}");
+        assert!(p[0].abs() < 1e-9 && p[1].abs() < 1e-9, "from the corner: {p:?}");
+        let (p, q) = edge_pair_centerline([0., 0.], [10., 0.], [10., 4.], [0., 4.]);
+        assert!((p[1] - 2.0).abs() < 1e-9 && (q[1] - 2.0).abs() < 1e-9 && (q[0] - p[0]).abs() > 9.0, "the middle line: {p:?} {q:?}");
     }
 }
