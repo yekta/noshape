@@ -1329,9 +1329,10 @@ fn the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus(cx: &mut Tes
         let grabs = cx.update(|cx| view.read(cx).viewport.read(cx).manipulator_at(p));
         assert!(h == Some(5) && grabs, "point {k} of the square: handle {h:?} (the XY square is 5), the viewport grabs it: {grabs}");
     }
+    // (Through the viewport's event path, which moves the focus on other presses: qa FEEL-TRIAD-RELEASE-FOCUS.)
     let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
-        let t = cx.update(|cx| view.read(cx).current_triad(cx)).expect("the triad");
-        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.triad_event(t, &ev, w, cx))).unwrap();
+        let vp = cx.update(|cx| view.read(cx).viewport.clone());
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.on_viewport_event(&vp, &ev, w, cx))).unwrap();
         draw(cx, window);
     };
     // The drag: live's capture is in Isometric (Shift+7), where screen right runs along X + Y.
@@ -1355,7 +1356,7 @@ fn the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus(cx: &mut Tes
     let mm = |cx: &mut TestAppContext, id: &str| cx.update(|cx| dialog.read(cx).feature.params.expr(id).and_then(|x| x.text.trim().trim_end_matches("mm").trim().parse::<f64>().ok())).unwrap_or(0.0);
     let (dx, dy, dz) = (mm(cx, "dx"), mm(cx, "dy"), mm(cx, "dz"));
     let focus_after = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
-    assert!(dx > 1.0 && (dx - dy).abs() < 0.2 && dz == 0.0 && focus_after == focus_before, "+40 px right: X {dx}, Y {dy}, Z {dz} mm (live 8.3 / 8.3 / 0); the focus {focus_before:?} -> {focus_after:?}");
+    assert!(dx > 1.0 && (dx - dy).abs() < 0.2 && dz == 0.0 && focus_before.is_some() && focus_after == focus_before, "+40 px right: X {dx}, Y {dy}, Z {dz} mm (live 8.3 / 8.3 / 0); the focus {focus_before:?} -> {focus_after:?}");
 }
 
 /// Live2 pattern-hole-1118 y (qa): Hole with no point: the title's tooltip ends "[Hole] did not regenerate properly: No

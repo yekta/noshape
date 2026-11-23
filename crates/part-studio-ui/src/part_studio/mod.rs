@@ -2117,7 +2117,10 @@ impl PartStudioView {
         // Onshape. An open feature dialog takes it (Enter, Esc, Tab stay its
         // own, as the assembly's mate dialog). Sketch mode does this itself
         // (pressed dimension labels keep their field).
-        let press = matches!(ev, ViewportEvent::Click { .. } | ViewportEvent::ContextMenu { .. } | ViewportEvent::ToolDown { .. } | ViewportEvent::BoxSelect { .. });
+        // (Not a press on Transform's triad: the focus stays where it was, live's dropdown keeps its blue underline,
+        // manip-feel-1122 tr-release-focus; qa FEEL-TRIAD-RELEASE-FOCUS.)
+        let on_triad = matches!(ev, ViewportEvent::ToolDown { position, .. } if self.current_triad(cx).is_some_and(|t| self.triad_handle_at(&t, *position, cx).is_some()));
+        let press = !on_triad && matches!(ev, ViewportEvent::Click { .. } | ViewportEvent::ContextMenu { .. } | ViewportEvent::ToolDown { .. } | ViewportEvent::BoxSelect { .. });
         let target = match &self.edit {
             Some(e) => e.dialog.read(cx).focus_handle(cx),
             None => self.focus.clone(),
