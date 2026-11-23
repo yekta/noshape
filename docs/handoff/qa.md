@@ -8,6 +8,11 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 ## IN FLIGHT 06:5x
 - **Waiting**: unit qa-w538 (tmp/w538.sh -> tmp/w538.log "IN-GREEN"): dx's IMP-NO-FEEDBACK commit (subject has IMP-NO-FEEDBACK or CAD Imports)
   in green -> rerun the IMP app cells (qa-scratch/imp/ui, brief-impver.md; Mac mini copies mode 700, deleted after) for the CAD Imports tab timing.
+- **qa-rr-1de9** (tmp/rr-1de9.sh -> tmp/rr-1de9.log, lead 07:2x): psui 1de902059 (QUEUED cc8570b3; subject "psui: ✓ greyed for a value out of
+  range, hover cells") in green -> matrix hmr8-b + hmr8-ips, manipnav r10, sk23 out/r1de9, err/ver/out (old run saved err/ver/out-b6d5).
+  Then rescore psui's "fixed, to verify" rows: hover cells, FEEL-SKETCH-INF-END-DOT, plane border, rotate radius lines, SKT-POSTCOMMIT-HOVER,
+  SKT-USE-HOVER, ERR-* incl. ERR-OK-ENABLED-OUT-OF-RANGE / TIP spaces / TIP places / 400 px wrap, FEEL-EDIT-BODY-SHADE (edit-cap).
+  ERR-MATE-HOVER-GLYPH is asm's (owner fixed in TICKETS). Live PAUSED until 11-24 ~07:00: live questions go in live/REQUESTS.md.
   Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
 - **DONE 11-23 (all filed, owners told, lead via qa-alerts)**: cut v0.4.68 GO (green 31f1866d8). sk23 sketch tools (cd5c34163). Hover matrix
   114/125 (8433b44fe). psui b8a1 (200ca055e). errors-1123 recheck (e7de64235: core BUBBLE + TINT verified; P0 ERR-OK-ENABLED-OUT-OF-RANGE
