@@ -20,6 +20,8 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Branch lane colors (Onshape `--os-version-graph-branch-0..5`).
+/// A version's dot in the graph: ~11 px across on its 4 px lane (live workflows-1123 19 s06).
+pub(crate) const VERSION_DOT_R: f32 = 5.5;
 const LANES: [u32; 6] = [0x1651b0, 0xfab601, 0x3ad4a7, 0xb689be, 0x3e94ff, 0xb88a00];
 
 /// A workspace lane's colour (graph lines and workspace chips).
@@ -1649,7 +1651,7 @@ impl Render for HistoryPanel {
                         }
                         RowKind::Version | RowKind::Change | RowKind::Merge | RowKind::Merged => {
                             let mut f = PathBuilder::fill();
-                            f.add_polygon(&circle(c, if kind == RowKind::Version { 4.5 } else { 3. }), true);
+                            f.add_polygon(&circle(c, if kind == RowKind::Version { VERSION_DOT_R } else { 3. }), true);
                             if let Ok(path) = f.build() {
                                 window.paint_path(path, color(l));
                             }
@@ -2417,7 +2419,7 @@ impl Render for HistoryPanel {
                                             .gap(px(10.))
                                             .pb(px(20.))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-workspace", 20., cx), "Workspace", false)).child(legend_item(crate::assets::icon("legend-version", 20., cx), "Version", false)).child(legend_item(crate::assets::icon("legend-change", 20., cx), "Change", true)))
-                                            .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release", 20., cx), "Release", false)))
+                                            .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-release-candidate-pin", 20., cx), "Release candidate", false)).child(legend_item(crate::assets::icon("legend-release-pin", 20., cx), "Release", false)))
                                             .child(h_flex().gap(px(30.)).child(legend_item(crate::assets::icon("legend-obsoletion", 20., cx), "Contains obsoletion", false)).child(legend_item(crate::assets::icon("hide-auto-versions", 20., cx), "Automatic version", false))),
                                     ))
                             ),

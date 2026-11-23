@@ -35,6 +35,8 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   stack. live drw-hover-matrix-1123 (r23n) paused after its setup probe (no hover samples); audited drw-hover-1122's
   matrix instead: FEEL-DRW-NOTE-HOURGLASS done (x282 drawing-ui 180, clippy), FEEL-DRW-DIM-FRAME-LINE open (REQUESTS
   studios 11-23 07:58). Rest of the 1122 matrix already in feel tests (reach, colours, table, centerline).
+- 08:1x (lead: my open P2s): all on main's list are fixed in the queued stack (qa's "STILL OPEN" 02:5x reads predate
+  it). Leftovers done: HIST-LEGEND pin glyphs + Change glyph, HIST-GRAPH version dot r 5.5 (VERSION_DOT_R).
 - FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 on main). live import-into-doc-1123: ours matches; rest is dx's.
 - Mac check: watcher bd5jb96zs polls v0.4.68's mac asset (not published at 06:28); then bin/mac-copycheck.sh 0.4.68
   (idle >= 600 s only), report <= 3 lines to the lead. Background runs/watchers die at session end: re-arm.
