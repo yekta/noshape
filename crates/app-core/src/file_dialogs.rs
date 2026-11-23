@@ -143,6 +143,29 @@ pub fn remember_choice_in(store: &Path, purpose: DialogPurpose, chosen: &Path) {
     }
 }
 
+/// The extensions a native picker filters on: none for "all files" (`*`, or none given; rfd hands macOS's panel `*`
+/// as a file type, which greys every file out, and GTK `*.*`, which hides files without a dot), else each in lower and
+/// upper case (GTK's patterns are case-sensitive: "PART.STEP").
+pub fn picker_filter(exts: &[&str]) -> Option<Vec<String>> {
+    if exts.is_empty() || exts.iter().any(|e| e.is_empty() || *e == "*") {
+        return None;
+    }
+    let mut out: Vec<String> = Vec::new();
+    for e in exts.iter().flat_map(|e| [e.to_lowercase(), e.to_uppercase()]) {
+        if !out.contains(&e) {
+            out.push(e);
+        }
+    }
+    Some(out)
+}
+
+pub fn filtered(dialog: rfd::AsyncFileDialog, name: &str, exts: &[&str]) -> rfd::AsyncFileDialog {
+    match picker_filter(exts) {
+        Some(exts) => dialog.add_filter(name, &exts),
+        None => dialog,
+    }
+}
+
 /// Ask for a save location, then call `then` with the chosen path.
 /// Uses the native dialog when available, otherwise an in-app prompt.
 pub fn request_save_path(title: &'static str, default_name: String, ext: &'static str, window: &mut Window, cx: &mut App, then: impl FnOnce(PathBuf, &mut App) + 'static) {
@@ -157,11 +180,7 @@ pub fn request_save_path(title: &'static str, default_name: String, ext: &'stati
     if native_dialogs_available() {
         let name = default_name.clone();
         cx.spawn(async move |cx| {
-            let picked = rfd::AsyncFileDialog::new()
-                .set_title(title)
-                .set_directory(start_dir(DialogPurpose::Save))
-                .set_file_name(&name)
-                .add_filter(ext.to_uppercase(), &[ext])
+            let picked = filtered(rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(DialogPurpose::Save)).set_file_name(&name), &ext.to_uppercase(), &[ext])
                 .save_file()
                 .await
                 .map(|f| f.path().to_path_buf());
@@ -200,7 +219,7 @@ pub fn request_open_path_for(purpose: DialogPurpose, title: &'static str, filter
     }
     if native_dialogs_available() {
         cx.spawn(async move |cx| {
-            let picked = rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(purpose)).add_filter(filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
+            let picked = filtered(rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(purpose)), filter_name, exts).pick_file().await.map(|f| f.path().to_path_buf());
             if let Some(p) = picked {
                 remember_choice(purpose, &p);
                 cx.update(|cx| then(p, cx));
@@ -226,7 +245,7 @@ pub fn request_open_paths(title: &'static str, filter_name: &'static str, exts: 
     }
     if native_dialogs_available() {
         cx.spawn(async move |cx| {
-            let picked: Vec<PathBuf> = rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(DialogPurpose::Open)).add_filter(filter_name, exts).pick_files().await.map(|v| v.iter().map(|f| f.path().to_path_buf()).collect()).unwrap_or_default();
+            let picked: Vec<PathBuf> = filtered(rfd::AsyncFileDialog::new().set_title(title).set_directory(start_dir(DialogPurpose::Open)), filter_name, exts).pick_files().await.map(|v| v.iter().map(|f| f.path().to_path_buf()).collect()).unwrap_or_default();
             if let Some(first) = picked.first() {
                 remember_choice(DialogPurpose::Open, first);
                 cx.update(|cx| then(picked, cx));
@@ -303,7 +322,7 @@ fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: Path
 
 #[cfg(test)]
 mod tests {
-    use super::{DialogPurpose, PathStyle, display_path_in, os_path_in, remember_choice_in, start_dir_in};
+    use super::{DialogPurpose, PathStyle, display_path_in, os_path_in, picker_filter, remember_choice_in, start_dir_in};
 
     /// User 11-12: an export's dialog starts where the last export went (each purpose its own), and a folder deleted
     /// since falls back to the documents folder.
@@ -351,5 +370,14 @@ mod tests {
         assert_eq!(display_path_in("/home/anna/Documents", Some("/home/ann"), PathStyle::Unix), "/home/anna/Documents");
         assert_eq!(display_path_in("/srv/cad/noshape", Some("/home/ann"), PathStyle::Unix), "/srv/cad/noshape");
         assert_eq!(display_path_in("/srv/cad/noshape", None, PathStyle::Unix), "/srv/cad/noshape");
+    }
+
+    /// Import's "all files" picker hands the OS no filter: macOS greyed out Mac-mini-2024.step under `*` (user 11-23).
+    #[test]
+    fn all_files_pickers_have_no_filter_and_named_ones_both_cases() {
+        assert_eq!(picker_filter(&["*"]), None);
+        assert_eq!(picker_filter(&[]), None);
+        assert_eq!(picker_filter(&[""]), None);
+        assert_eq!(picker_filter(&["step", "STP"]), Some(vec!["step".into(), "STEP".into(), "stp".into(), "STP".into()]));
     }
 }
