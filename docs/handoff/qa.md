@@ -8,8 +8,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 ## IN FLIGHT 04:5x (new thread 04:1x, first)
 - **DONE 01:2x-03:0x** (TICKETS, owners told): errors-1123 a/b/c (37 rows), appearance (12), wf-1123 01-12 (02:1x) and 13-20 (03:0x),
   import fidelity "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm; data qa-scratch/imp; Xvfb :496 on vibe2 is the subagent's, left running).
-- **sk23**: replay done 04:39 on green 975bab060 (37 cells, sk23/out/all); a subagent analyses it (brief qa-scratch/brief-sk23.md) -> file SKT-* (skasm), tell skasm.
-- **CUT v0.4.68 DONE 04:5x: GO posted (0c1d80e6c build, all SAME, 3 docs valid; lead decides on red asm)**. Was: main RED at 45dc53023 04:34 (asm tests: assembly_feel a_hovered_cylinder_side…, ops ui_parity an_assembly_start_builds;
+- **sk23 DONE 04:5x**: TICKETS "qa 11-23 04:5x" (9 P0 + 8 P1, + user P0 SKT-OFFSET-BOX-LOOK); kit fixes sk23/an/ana2.py (window offset 562,350), gen_fix.py (chamfer cells). Verify on skasm/psui lands.
+- **CUT v0.4.68: GO posted 04:5x; lead holds it until asm names the red cause; may ask a recheck of a release branch with a revert.** Was: main RED at 45dc53023 04:34 (asm tests: assembly_feel a_hovered_cylinder_side…, ops ui_parity an_assembly_start_builds;
   likely dff49b598) -> fallback: 0c1d80e6c CLI (qa-bisect, built 04:30 on vibex7, unit qa-cand0468b) + COMPAT_BIN compat-check -> cut-verdict.sh
   -> qa-alerts (unit qa-cut0468, log tmp/cut0468.log "CUT-DONE"). Add rings-loft/impeller/surface-pattern lines; decision to lead: cut on red asm?
   Timers qa-cut-0415/0450 restarted 05:02 by qa-timers-back. dx 79b0abcb (not on main 04:4x) -> qa-wimp "IN-GREEN" -> subagent brief-impver.md.

@@ -5,6 +5,26 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-23 04:5x: sketch tools while drawing vs live sketch-tools-1123 (green 975bab060, vibe2; kit qa-scratch/sk23, evidence tickets/SKT-<X>-1123.png live | ours, state out/{all,fix}/<cell>/state.json)
+- [ ] P0 **SKT-OFFSET-BOX-LOOK (skasm)** (user P0 11-23, via lead): the sketch Offset value box draws with no background and a black block caret; live's value box look (white box, thin caret) as the other sketch value boxes.
+- [ ] P0 **SKT-FILLET-PENDING-SET (skasm)**: fillet and chamfer: live adds a 2nd preview on a 2nd corner and one Esc drops all pending, a two-line pick (each turns amber) + Enter commits R3 + box; ours commits the 1st on the 2nd click, Esc only closes the box, two lines pick nothing. FILLET-2ND-CORNER, FILLET-2LINE
+- [ ] P0 **SKT-FILLET-DRAG (skasm)**: live's drag sets r/d (fillet preview red at 162 px, release makes nothing; chamfer d 4.0119 + its box); ours ignores the drag and commits the default R5 / 5x5. FILLET-DRAG, out/fix/fix-ch
+- [ ] P0 **SKT-CHAMFER-BOX-B (skasm)**: live Enter on box A (4) opens box B, distances stay 4/6 for the next chamfer; ours Enter closes the box, B stays 5, next chamfer 5/5. Stored: live point + 2 construction lines + chamfer line, ours chamfer line + point. CHAMFER-BOX2
+- [ ] P0 **SKT-DASHDOT-GUIDES (skasm; psui if the stroke is shared)**: center point arc circle dash-dot (49 % inked, 24 dashes; ours solid); polygon construction circle dash ~25/gap 6 px (ours 41/1.5); text box 30/6/4/6 (ours 10/1/3/2). DASHDOT-GUIDES
+- [ ] P0 **SKT-ENDINGS-COMMIT (skasm)**: live Offset Enter turns the tool off (ours stays on); arc-slot Esc discards (ours commits +4 entities +15 constraints; SKETCH-SLOT-ON-ARC's "Esc keeps" verification 11-20 was wrong); center point arc double-click after the centre creates nothing (ours an arc). OFFSET-ENTER, SLOT-ESC, CA-DBL
+- [ ] P0 **SKT-TEXT-KEYS (skasm)**: Enter in the Text textarea is a new line (ours commits, then "c" starts Circle); one Esc closes the dialog, tool off, nothing kept (ours 4 Escs, dialog stays); canvas click keeps the dialog but focus should return to the textarea. TEXT-ENTER-ESC
+- [ ] P0 **SKT-POSTCOMMIT-HOVER (psui)**: live draws no hover on the just-committed curve under the pointer; ours hover-orange + snap square (3 point arc 392 px, tangent arc 641, ellipse 1015). POSTCOMMIT-HOVER
+- [ ] P0 **SKT-USE-HOVER (psui)**: Use: face hover live light-orange loop (ours light blue); vertex at the origin offers its edge (orange 334 px, ours 45); edge live 20 px light blue (ours 314). USE-HOVER
+- = SKETCH-MIRROR-LINE-LOOK (l.831) still PARTLY: live picked line 5 px (242,255,128)/(215,226,150), ours 2 px (189,199,100). MIRROR-LINE
+- [ ] P1 **SKT-INFER-STORED (skasm)**: 3 point arc: live L0 orange at the tangent bend + TANGENT(midSnap0), ours neither (A3-TANGENT); Text: live adds VERTICAL(secondSnap0); conic: ours adds a HORIZONTAL beside COINCIDENT x2 + RHO (CONIC-H).
+- [ ] P1 **SKT-VB-PLACE-LENGTH (skasm)**: center point arc box on the axis through the centre opposite the start (ca5: live y -30.5, ours -18); tangent arc box 5 mm left of live (VB-PLACE); Line mid-chain digit + Enter: live keeps the chain end and moves the start, ours shrinks about the middle (LINE-LENGTH).
+- [ ] P1 **SKT-MENU-HEAD (skasm)**: right-click header live "Escape arc / fillet / chamfer / use", ours "Escape 3 point arc / sketch fillet / sketch chamfer / use / project edges". MENU-HEAD
+- [ ] P1 **SKT-PATTERN-DESELECT (skasm)**: ending a pattern by its button or right-click+Esc leaves the seed normal blue; ours keeps it amber with snap squares. PATTERN-BTN
+- [ ] P1 **SKT-MIRROR-AGAIN (skasm)**: mirroring an already mirrored entity makes a coincident 2nd copy; ours does nothing. MIRROR-AGAIN
+- [ ] P1 **SKT-TANGENT-ARC-DOT (skasm)**: no pointer dot in tangent arc before an end; ours a 21 px dot (sk23/an/ana2-all.txt ta-3).
+- [ ] P1 **UIS-STATE-GEOMETRY (psui)**: ui-script state lists sketch entities by kind only: add points/derivatives and used/projected (Use) entities (spline handles, Line LENGTH ends, Use results unreplayable).
+- = 3 point arc endings, tangent arc constraints, center point arc constraints, value box opening (17/17 stages), spline, line slot, polygon endings, ellipse, conic Rho box, fillet box/Enter/double-click, chamfer Esc/l/button/double-click, mirror commits + Enter, linear/circular pattern endings, Text ✓/Cancel.
+
 ## psui, 2026-11-22 23:5x (user P0: Mac mini M6, imported STEP appearance and union; live behaviours "psui P0: STEP import colours…", live/psui/step-colours-1122)
 Live: the STEP import makes part appearances (Main #ececec, Fan #4a4848) and face appearances only for faces with their own
 colour (Main 152/258, Fan 14/529). A part appearance set later turns only the uncoloured faces (Main's 106) and keeps
