@@ -5,31 +5,27 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 00:4x (after the compaction, first)
-- **DONE since 22:1x**: matrix 113/125 on green 5e634b35e (psui b6812aae: manipulator ring over a selected edge, 4 cells =; PS cells
-  pixel-identical; psui told). Re-verify pushed: skasm wf-1122 + walk 4 on 172785c95 (8 verified, 5 partly, new P0 DIM-PICKED-SIDE-BLACK,
-  SPLINE-PLACED-POINTS, CLICK-EMPTY-SELECTS-PLANE (live asked), P1 LINE-STORES-PERPENDICULAR, P2 MIRROR-SYMMETRIC-COUNT); MC + sketch
-  gestures on 02cea338f (6 verified, 7 partly, asm 3 still open; new P0 SK-LONGPRESS-SELECTS, MC-ASM-CYL-SIDE-OUTLINE, MC-ASM-SHIFT-RELEASE,
-  P1 MC-PS-ORIGIN-CORNER-MARKER; live asked for a MARKER-REACH fine sweep). SM-TABLE-PANE-SPLIT closed (live default 50 %), P2
-  SM-TABLE-SPLIT-KEPT. PS-RAIL-STOPWATCH-WARNING closed (llvmpipe badge). skasm, asm, psui told. Briefs: qa-scratch/brief-ver.md, brief-t23.md.
-- **Subagents running (results come as notifications; if lost after compaction, rerun from the brief)**: (a) Mac timing vs live
-  timing-1123 (brief-t23.md, raw in qa-scratch/t23/, gate: load < 6 + mem >= 25 % before EVERY Mac call, GUI also idle >= 600 s; lead
-  00:0x: discard timings under load). (b) psui manip/nav + sel-gestures rows (brief-ver.md set "psui"; shots feel1122/manipnav/r6 on
-  7fe68797a, fieldsel/r5 on 5e634b35e) -> mark rows like the skasm ones, tell psui.
-- **Units (logs qa-scratch/tmp/<name>.log)**: qa-ver2 (workflows-1123 replay on vibex8 -> hm2/out-wf23b, log ver2-wf.log; then score per
-  step vs out-wf23 and TICKETS blocks 21:4x/22:0x: mark fixed rows, file new); qa-ver3 (wf-1122 40 for CTX-MENU-FLIP-UP -> out-wf-v, then
-  psui f5ebb8b3 'subj:a picked edge solid and bright under the preview' -> matrix hmr3-b/hmr3-ips: AXIS-UNDER-DISC, FILLET-FACE-OVER-PICKED
-  #ffaf25, PICKED-EDGE-DASHED-UNDER-PREVIEW, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SHEET-METAL, Corner break vertex disc);
-  qa-ver4 (can't-tell reruns: xv-search-unfold + wf12/27 with WF_KEEP_WORLD=1 -> out-wfv2 (EXTRA-UNFOLD-REFOLD, UIS-WORLD-TARGET), walk3
-  s3-sk-fillet -> out-wkv2 (SKFILLET-FLOW)); qa-rr-c6ec (asm c6ec3d1c subj "asm: tickets: notes folded into qa's rewritten rows" ->
-  mcinfer r7 asm cells + asmfeel out-af-c6ec dr-BaseR: MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM, FIXED-GLYPH-AA); qa-ver5 (psui to-verify
-  FEEL-QUERY-PART-PICK-FILL wf-1122 19 + FEEL-DIM-SELECTED-REF-LINE-YELLOW 32v -> out-wfv3; then after c6ec matrix '*-mc-*' -> hmr4-mc:
-  navy rim (psui: llvmpipe 1x, c6ec draws 4x settled) + asm's white notch in the ring); qa-wait-imp (bool 448c038e impeller ->
-  wait-imp.log IMP-DONE: expect no invalid part, close IMPELLER-SHELL-INVALID, tell bool); qa-wait-sp (bool e7c98cc5a surface pattern ->
-  wait-sp.log: expect ~13.6 s + Part 1 129/385/258, close COMPAT-SURFACE-PATTERN-SLOWER, tell bool). Hold each in a background task.
-- Matrix scoring kit: hm2/crop2.sh <run> <cmpdir>; diff vs hm2/score-5e63/cmp-{b,ips}; score-a087/bin/sbs.sh for live|old|new.
-- Runners take QA_HOST (fs.sh, mi.sh, fm.sh, asmfeel.sh; default vibex8); wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT.
-- Next from owners: asm Shift-release / cyl-side / rehover sha; psui rotate axis edge + Extrude top cap. Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
+## IN FLIGHT 01:1x (after a compaction, first)
+- **DONE 00:4x-01:1x** (all in TICKETS, owners told): CTX-MENU-FLIP-UP still open (px). EXTRA-UNFOLD-REFOLD, SKFILLET-FLOW,
+  UIS-WORLD-TARGET verified; P2 UIS-FIELD-NOT-SHOWN. Mac timing vs timing-1123 (qa-scratch/t23/table.txt): SPEED-RINGS-SHELL +
+  SPEED-IMPELLER raised to P0 (bool), rest <= live; P2 UIS-DIM-LABEL-TARGET (skasm). QUERY-PART-PICK-FILL verified, DIM-SELECTED-
+  REF-LINE-YELLOW partly. asm SHIFT-RELEASE + PICKED-REHOVER still open on 24f1566de (mcinfer r8). psui manip/nav + sel rows: all
+  15 judged (FILLET-DRAG-FOCUS, DRAG-DECIMALS, PLANE-HANDLE verified after reruns r7/r8; new P0 PS-SELECTED-EDGE-DARK-CORE, P1
+  PS-SELECTED-FRONT-FILL). workflows-1123 rescored on 24f1566de (out-wf23b): 3 verified, 4 partly, 21 new rows (block 01:1x),
+  P1 ASM-FIXES-NOT-IN-FLOW; duplicate union rows of the 21:4x/22:0x blocks dropped.
+- **Subagents running (notifications; if lost, rerun from the brief)**: error catalogue live/errors-1123 vs ours, brief
+  qa-scratch/brief-err.md, sets a (extrude..boolean + fillet/chamfer, :492), b (patterns, mirror, hole, thicken, split, move face,
+  :493), c (sheet metal + mates, :494), vibe2, scratch qa-scratch/err/<set>; appearance-1123 vs ours (brief-feel-1122.md rules,
+  :495, scratch feel1122/appear). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
+- **Units (logs qa-scratch/tmp/<name>.log)**: qa-wf23c (waits for psui 3cfb09978 + skasm 35c533220 in green, then wf23 01-03/06/07 ->
+  hm2/out-wf23c: PICKED-EDGE-DASHED, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SM, SM-TAB-MERGE-PICK, CORNER-BREAK, CONFIG-FILTER-HELP
+  if 975844f0d is in); qa-ver3 (after psui f5ebb8b3 -> matrix hmr3-b/hmr3-ips); qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
+  MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM, FIXED-GLYPH-AA); qa-ver5 (after rr-c6ec: matrix '*-mc-*' -> hmr4-mc, navy rim + notch);
+  qa-wait-imp (bool impeller -> IMP-DONE: expect no invalid part, close IMPELLER-SHELL-INVALID); qa-wait-sp (bool e7c98cc5a ->
+  ~13.6 s + Part 1 129/385/258, close COMPAT-SURFACE-PATTERN-SLOWER). Hold each in a background task.
+- Kit: hm2/crop2.sh, score-a087/bin/sbs.sh, hm2/wf/wfcrop.py (WF_SET/WF_OUT), manipnav fm.sh (+fm992.sh), cells m15v-tr-xy-*.
+  Runners take QA_HOST; wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT + glob arg.
+- Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
