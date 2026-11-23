@@ -1321,3 +1321,70 @@ fn an_older_file_takes_a_second_workspace_of_the_same_name() {
     assert_eq!(doc.list_branches().unwrap().iter().filter(|b| b.name == "Main").count(), 2);
     assert_ne!(doc.branch_by_name("Main").unwrap().unwrap().id, twin);
 }
+
+/// A document file copied or renamed in Finder or Explorer is named after its file; one renamed in Noshape keeps the
+/// characters its file name can't hold (lead P0 11-22: "Mac mini M6 Fan Hat - Copy" showed the original's name).
+#[test]
+fn a_document_copied_or_renamed_outside_is_named_after_its_file() {
+    let dir = TempDir::new();
+    let path = dir.file("Fan Hat.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    d.set_name("Fan Hat").unwrap();
+    drop(d);
+    let copy = dir.file("Fan Hat - Copy.noshape");
+    std::fs::copy(&path, &copy).unwrap();
+    assert_eq!(Document::open_read_only(&copy).unwrap().meta().unwrap().name, "Fan Hat - Copy");
+    assert_eq!(Document::open_read_only(&path).unwrap().meta().unwrap().name, "Fan Hat");
+    let renamed = dir.file("Fan Hat v2.noshape");
+    std::fs::rename(&copy, &renamed).unwrap();
+    assert_eq!(Document::open(&renamed).unwrap().meta().unwrap().name, "Fan Hat v2");
+    // Noshape's own copy beside another "Fan Hat" keeps its name, as live's documents can share one.
+    let second = dir.file("Fan Hat 2.noshape");
+    std::fs::copy(&path, &second).unwrap();
+    assert_eq!(Document::open_read_only(&second).unwrap().meta().unwrap().name, "Fan Hat");
+    let mut d = Document::open(&path).unwrap();
+    d.set_name("Fan: Hat").unwrap();
+    drop(d);
+    let colon = dir.file("Fan- Hat.noshape");
+    std::fs::rename(&path, &colon).unwrap();
+    assert_eq!(Document::open_read_only(&colon).unwrap().meta().unwrap().name, "Fan: Hat");
+    // Renamed in Noshape (the navbar: the file keeps its name), then copied in Finder: the copy is its file's.
+    let mut d = Document::open(&colon).unwrap();
+    d.set_name("Brim").unwrap();
+    assert_eq!(d.meta().unwrap().name, "Brim");
+    drop(d);
+    let brim_copy = dir.file("Fan- Hat copy.noshape");
+    std::fs::copy(&colon, &brim_copy).unwrap();
+    assert_eq!(Document::open_read_only(&brim_copy).unwrap().meta().unwrap().name, "Fan- Hat copy");
+    assert_eq!(Document::open_read_only(&colon).unwrap().meta().unwrap().name, "Brim");
+    for f in [&renamed, &colon, &second, &brim_copy] {
+        assert!(!side(f, "-wal").exists() && !side(f, "-shm").exists(), "{} left side files", f.display());
+    }
+}
+
+/// A document left with its log (a crash, a quit that didn't close it): `fold_log` puts the log's edits into the
+/// file and removes the -wal and -shm, so a Finder copy of the file alone has them; an open document is left alone.
+#[test]
+fn a_leftover_log_is_folded_into_its_document() {
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    d.keep_log();
+    let main = d.default_branch().unwrap();
+    d.commit(main, &[("tab/a", Some(b"in the log".as_slice()))], "edit").unwrap();
+    assert!(std::fs::metadata(side(&path, "-wal")).is_ok_and(|m| m.len() > 0), "the edit is in the log");
+    // The files as a crash leaves them, under a name nothing has open.
+    let left = dir.file("left.noshape");
+    for s in ["", "-wal", "-shm"] {
+        std::fs::copy(side(&path, s), side(&left, s)).unwrap();
+    }
+    fold_log(&path).unwrap();
+    assert!(std::fs::metadata(side(&path, "-wal")).is_ok_and(|m| m.len() > 0), "open: left alone");
+    drop(d);
+    fold_log(&left).unwrap();
+    assert!(!side(&left, "-wal").exists() && !side(&left, "-shm").exists(), "the side files are gone");
+    let copy = dir.file("copy.noshape");
+    std::fs::copy(&left, &copy).unwrap();
+    let alone = Document::open_read_only(&copy).unwrap();
+    assert_eq!(alone.read_all(alone.head(main).unwrap()).unwrap()["tab/a"], b"in the log");
+}

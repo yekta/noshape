@@ -252,7 +252,11 @@ pub fn rename_open_document(path: PathBuf, name: String, cx: &mut App) {
 
 pub fn versions_page(path: PathBuf, name: String, window: &mut Window, cx: &mut App) -> anyhow::Result<AnyView> {
     let session = session::Session::open(&path)?;
-    let doc = cx.new(|_| doc_model::DocModel::new(session));
+    let doc = cx.new(|cx| {
+        let mut d = doc_model::DocModel::new(session);
+        d.close_on_quit(cx);
+        d
+    });
     let open: noshape_history_ui::history_panel::PageOpen = std::rc::Rc::new(move |target, window, cx| {
         let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
         let opened = match target {
@@ -346,6 +350,7 @@ fn build_workspace(session: session::Session, gpu: Gpu, window: &mut Window, cx:
     let doc = cx.new(|cx| {
         let mut d = doc_model::DocModel::new(session);
         d.watch_external(cx);
+        d.close_on_quit(cx);
         d
     });
     noshape_render::perf::milestone("window: document model");

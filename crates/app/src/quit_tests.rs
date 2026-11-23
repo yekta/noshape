@@ -1,5 +1,5 @@
 //! Quitting commits every open document's pending edit (an assembly Insert session, the appearance editor's colour),
-//! also while something else still holds the document (logout and shutdown quit the app the same way).
+//! also while something else still holds the document (logout and shutdown quit the app the same way), and closes it.
 
 use crate::doc_model::DocModel;
 use gpui_kit::{AppContext as _, TestAppContext};
@@ -27,8 +27,37 @@ fn quitting_commits_a_pending_edit(cx: &mut TestAppContext) {
     let held = doc.clone();
     cx.quit();
     assert!(!held.read_with(cx, |d, _| d.has_pending()));
+    // The process ends without dropping the document: quitting closed it, so nothing is left beside the file (lead P0
+    // 11-22: -wal and -shm beside the user's documents).
+    for ext in ["-wal", "-shm"] {
+        assert!(!std::path::Path::new(&format!("{}{ext}", path.display())).exists(), "{ext} left beside the document");
+    }
     let reopened = crate::session::Session::open(&path).unwrap();
     assert!(matches!(&reopened.doc.tab(tab).unwrap().content, noshape_model::TabContent::PartStudio(ps) if ps.rollback == Some(0)));
     drop((held, doc));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A document open without an edit waiting closes on quit too: no -wal or -shm left beside it (lead P0 11-22).
+#[gpui::test]
+fn quitting_closes_an_open_document(cx: &mut TestAppContext) {
+    let dir = std::env::temp_dir().join(format!("noshape-quit-close-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("c.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    let session = crate::session::Session::create(&path, Document::new()).unwrap();
+    let doc = cx.new(|cx| {
+        let mut d = DocModel::new(session);
+        d.close_on_quit(cx);
+        d
+    });
+    assert!(std::path::Path::new(&format!("{}-wal", path.display())).exists(), "open: the log is beside it");
+    cx.quit();
+    for ext in ["-wal", "-shm"] {
+        assert!(!std::path::Path::new(&format!("{}{ext}", path.display())).exists(), "{ext} left beside the document");
+    }
+    drop(doc);
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -300,12 +300,7 @@ impl DocModel {
         if let Err(e) = self.pending.note(&mut self.session, tab, || format!("{tab_name} :: {description}")) {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
         }
-        if self.quit_commit.is_none() {
-            self.quit_commit = Some(cx.on_app_quit(|this, cx| {
-                this.flush_pending(cx);
-                async {}
-            }));
-        }
+        self.close_on_quit(cx);
         cx.emit(DocEvent::TabChanged(tab));
         cx.notify();
         Some(r)
@@ -317,6 +312,19 @@ impl DocModel {
         let r = self.edit_tab_deferred(tab, description, cx, f);
         self.pending_preview = preview;
         r
+    }
+
+    /// Quitting commits the pending edit and closes the file: the process ends without dropping the document, and only
+    /// the close lets SQLite fold the write-ahead log in and remove the -wal and -shm beside it.
+    pub fn close_on_quit(&mut self, cx: &mut Context<Self>) {
+        if self.quit_commit.is_some() {
+            return;
+        }
+        self.quit_commit = Some(cx.on_app_quit(|this, cx| {
+            this.flush_pending(cx);
+            this.session.store.suspend();
+            async {}
+        }));
     }
 
     /// Commit the pending edit (if any) as one microversion.

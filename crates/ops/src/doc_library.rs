@@ -30,8 +30,7 @@ pub fn sidecars(p: &Path) -> [PathBuf; 2] {
 
 /// File-name-safe version of a document name.
 pub fn sanitize_name(name: &str) -> String {
-    let s: String = name.trim().chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '-' } else { c }).collect();
-    s.trim_matches('.').trim().to_string()
+    noshape_store::file_name_for(name)
 }
 
 /// A path in `dir` for `name` that does not exist yet ("name", "name 2", ...).

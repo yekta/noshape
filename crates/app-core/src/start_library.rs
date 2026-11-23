@@ -181,8 +181,14 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
         let doc = noshape_store::Document::open_read_only(path)?;
         let (meta, (owner, modified_by)) = (doc.meta()?, doc.owner_and_last_author()?);
         let workspace = doc.list_branches()?.into_iter().next().map(|b| b.name).unwrap_or_default();
-        return Ok(MetaRead { name: meta.name, description: meta.description, workspace, modified: meta.modified, created: doc.created()?, owner, modified_by, thumbnail: meta.thumbnail });
+        let read = MetaRead { name: meta.name, description: meta.description, workspace, modified: meta.modified, created: doc.created()?, owner, modified_by, thumbnail: meta.thumbnail };
+        // A document left with its log by a crash or an old quit: folded in (nothing while it is open).
+        drop(doc);
+        let _ = noshape_store::fold_log(path);
+        return Ok(read);
     }
+    // A -shm left alone beside a closed document goes too.
+    let _ = noshape_store::fold_log(path);
     use rusqlite::{Connection, OpenFlags, OptionalExtension as _};
     let mut uri = url_escape(&path.to_string_lossy());
     uri.insert_str(0, "file:");
@@ -196,7 +202,7 @@ fn read_meta(path: &Path) -> anyhow::Result<MetaRead> {
     let text = |v: Option<Vec<u8>>| v.map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
     let (owner, modified_by) = noshape_store::owner_and_last_author(&conn)?;
     let workspace: String = conn.query_row("SELECT name FROM branches WHERE is_default = 1 LIMIT 1", [], |r| r.get(0)).optional()?.unwrap_or_default();
-    Ok(MetaRead { name: text(get("name")?), description: text(get("description")?), workspace, modified: text(get("modified")?).parse().unwrap_or(0), created: noshape_store::document_created(&conn)?, owner, modified_by, thumbnail: get("thumbnail")? })
+    Ok(MetaRead { name: noshape_store::shown_name(path, text(get("name")?), &text(get("name_file")?)), description: text(get("description")?), workspace, modified: text(get("modified")?).parse().unwrap_or(0), created: noshape_store::document_created(&conn)?, owner, modified_by, thumbnail: get("thumbnail")? })
 }
 
 /// A document file's thumbnail (Reference manager rows).
@@ -222,7 +228,7 @@ fn read_entry(path: &Path, stamp: (Option<SystemTime>, Option<SystemTime>, u64),
     match read_meta(path) {
         Ok(meta) => Cached {
             stamp,
-            name: if meta.name.trim().is_empty() { stem } else { meta.name },
+            name: meta.name,
             modified: if meta.modified > 0 { meta.modified } else { fallback_ms },
             created: meta.created,
             modified_by: meta.modified_by,
@@ -281,5 +287,29 @@ mod tests {
         assert_eq!(onshape_time(midnight, true, false), "12:00 AM Nov 7, 2020");
         assert_eq!(onshape_time(midnight, false, true), "Nov 7, 2020");
         assert!(format_onshape_time(now - 400 * 86_400_000).contains(", "));
+    }
+
+    /// The documents page (lead P0 11-22): a Finder copy is listed under its own file name, and a closed document's
+    /// leftover -wal and -shm are folded into it when it is read.
+    #[test]
+    fn a_finder_copy_is_named_after_its_file_and_leftover_side_files_go() {
+        let dir = std::env::temp_dir().join(format!("noshape-library-copy-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("Fan Hat.noshape");
+        let mut d = noshape_store::Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+        d.keep_log();
+        let main = d.default_branch().unwrap();
+        d.commit(main, &[("tab/a", Some(b"two".as_slice()))], "edit").unwrap();
+        let copy = dir.join("Fan Hat - Copy.noshape");
+        for ext in ["", "-wal", "-shm"] {
+            std::fs::copy(format!("{}{ext}", path.display()), format!("{}{ext}", copy.display())).unwrap();
+        }
+        drop(d);
+        assert_eq!(read_meta(&copy).unwrap().name, "Fan Hat - Copy");
+        for ext in ["-wal", "-shm"] {
+            assert!(!std::path::Path::new(&format!("{}{ext}", copy.display())).exists(), "{ext} left beside the copy");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

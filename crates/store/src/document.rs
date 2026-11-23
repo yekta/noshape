@@ -318,6 +318,23 @@ impl Drop for Document {
         // The checkpointer's connection first, so the document's is the last to close.
         drop(self._idle_checkpoint.take());
         self.close_connection();
+        if !self.read_only {
+            note_writer(&self.path, false);
+        }
+    }
+}
+
+/// The documents this process has open for writing: their -wal and -shm are in use, not left over.
+static WRITERS: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+fn note_writer(path: &Path, open: bool) {
+    let Ok(mut w) = WRITERS.lock() else { return };
+    match w.iter().position(|p| p == path) {
+        _ if open => w.push(path.to_path_buf()),
+        Some(i) => {
+            w.swap_remove(i);
+        }
+        None => {}
     }
 }
 
@@ -592,6 +609,7 @@ impl Document {
             )?;
         }
         tx.commit()?;
+        note_writer(path, true);
         Ok(Document {
             db: Some(conn),
             path: path.to_path_buf(),
@@ -647,6 +665,9 @@ impl Document {
             e => e,
         })?;
         schema::check_and_migrate(&mut conn, !read_only)?;
+        if !read_only {
+            note_writer(path, true);
+        }
         Ok(Document {
             db: Some(conn),
             path: path.to_path_buf(),
@@ -1443,10 +1464,11 @@ impl Document {
             .unwrap_or_default())
     }
 
-    /// Document metadata.
+    /// Document metadata. Its name is the file's once the file was renamed or copied outside Noshape (Finder,
+    /// Explorer): the stored one only while the file is still named after it.
     pub fn meta(&self) -> Result<DocumentMeta> {
         Ok(DocumentMeta {
-            name: self.meta_string("name")?,
+            name: shown_name(&self.path, self.meta_string("name")?, &self.meta_string("name_file")?),
             description: self.meta_string("description")?,
             default_units: self.meta_string("default_units")?,
             created: self.meta_string("created")?.parse().unwrap_or(0),
@@ -1465,8 +1487,10 @@ impl Document {
         Ok(document_created(self.conn()?)?)
     }
 
+    /// Also notes the file it is named in: a copy or rename outside Noshape is then named after its own file.
     pub fn set_name(&mut self, name: &str) -> Result<()> {
-        self.set_meta("name", Some(name.as_bytes()))
+        self.set_meta("name", Some(name.as_bytes()))?;
+        self.set_meta("name_file", Some(file_stem(&self.path).as_bytes()))
     }
 
     pub fn set_description(&mut self, description: &str) -> Result<()> {
@@ -1534,6 +1558,40 @@ pub fn document_created(conn: &Connection) -> rusqlite::Result<Timestamp> {
 }
 
 /// SQLite's write-ahead log and shared-memory index next to `path`.
+/// Folds a closed document's leftover write-ahead log (a crash, a quit that didn't close it) into the file: closing
+/// the last connection makes SQLite remove the -wal and -shm (a log of another file is moved aside, as on open).
+/// While another connection has the file open (this process's or another's) it changes nothing.
+pub fn fold_log(path: &Path) -> Result<()> {
+    if WRITERS.lock().is_ok_and(|w| w.iter().any(|p| p == path)) {
+        return Ok(());
+    }
+    if side_files(path).iter().any(|p| p.exists()) {
+        drop(Document::open(path)?);
+    }
+    Ok(())
+}
+
+/// A document name as a file name: the characters file systems refuse become '-', no leading or trailing dots.
+pub fn file_name_for(name: &str) -> String {
+    let s: String = name.trim().chars().map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '-' } else { c }).collect();
+    s.trim_matches('.').trim().to_string()
+}
+
+/// The stored name while the file is the one it was given for (`named_file`, a rename in Noshape keeps the file) or
+/// is named after it ("Name", or "Name 2" beside another "Name"); else the file's own name.
+pub fn shown_name(path: &Path, stored: String, named_file: &str) -> String {
+    let stem = file_stem(path);
+    let clean = file_name_for(&stored);
+    let numbered = |n: &str| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit());
+    let after_it = !clean.is_empty() && stem.strip_prefix(clean.as_str()).is_some_and(|rest| rest.is_empty() || rest.strip_prefix(' ').is_some_and(numbered));
+    let given_here = !stored.trim().is_empty() && !named_file.is_empty() && stem == named_file;
+    if stem.is_empty() || after_it || given_here { stored } else { stem }
+}
+
+fn file_stem(path: &Path) -> String {
+    path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default()
+}
+
 fn side_files(path: &Path) -> [std::path::PathBuf; 2] {
     ["-wal", "-shm"].map(|suffix| {
         let mut p = path.as_os_str().to_owned();
