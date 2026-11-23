@@ -801,6 +801,9 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   above the click** (Part 1's row menu ends just over the row; the drawing view's menu ends above the pointer); ours slides it up
   just enough to fit, so it covers the tab bar (Part 1 row) or lands **under the pointer** with the hovered row's submenu open
   (drawing view: View orientation's Top/Left/…/Isometric list shown at once) (tickets/wf40-part-row-menu.png, wf40-drw-view-menu.png).
+  qa recheck 00:4x, green 7fe68797a (hm2/out-wf-v/40-*/cmp-08.png, cmp-57.png): STILL OPEN. Part 1 row menu: live's bottom edge
+  sits at y 370, just above the row (374); ours starts at the row (375) and runs to 530, over the tab bar. Drawing view menu: live
+  opens above the pointer (y 111-327); ours opens at the pointer (top 330) with View orientation hovered and its submenu open.
 - [x] qa verified 15:0x, green 3871292da (asm 1420a57e), workflow replay hm2/out-wf: wf40 step 46: Open linked document and Where used for Part 1… after Replace Part 1 <1>…. Fixed (asm 11-22 06:4x: a linked document's part: Open linked document and Where used for Part 1… (where-used icon) after Replace Part 1 <1>…; test another_documents_part_pins_its_reference) P1 **ASM-FACE-MENU-ROWS (asm)** (workflow 40 step 46): right-click a face of Part 1 <1> in Assembly 1: live's menu has
   **Open linked document** (after Replace Part 1 <1>…) and **Where used for Part 1…**; ours lacks both, the rest in live's order
   (tickets/wf40-asm-face-menu.png).
