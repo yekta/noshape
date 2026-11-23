@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 02:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 02:56 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -160,27 +160,28 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. IN FLIGHT 02:26 (core-rf, UNCOMMITTED): kernel thicken() curvature refusal (features.cpp top of thicken), guided
-   surface loft miss = LOFT_FAILED (loft_guided.cpp + kernel test), T1 features_c::a_cylinder_thickened_past_its_axis_fails
-   (first run said Ok: stale rb.sh sync, files touched, rerun .th2.sh -> task output / rerun it). Also in features_c an
-   #[ignore = "probe"] probe_move_face_boss_block: NEVER commit (delete before commit), its PROBE lines give ours for
-   live's move-face cases. Commit Thicken + loft once green (not core.rs's probe_hose_sweep hunk: git apply --cached).
+0. QUEUED ba3d71cf (02:35, carries 2245e27a/6d3caf84/e686d40c/f9bfa75fc): 62069e2d7 Thicken refuses a side reaching a
+   quadric/torus face's centre of curvature (features.cpp thicken; T1 features_c::a_cylinder_thickened_past_its_axis_fails);
+   guided surface loft: every profile miss LOFT_FAILED (loft_guided.cpp ~2087). TO LAND: 47768962c Move face (direct.rs:
+   a part offset to nothing fails; offset_past_axis -> booleans, boss removed; T1 features_c::move_face_on_the_boss_block_as_live).
+   Probes kept OUT of git: ~/core-keep/probes2.patch (kernel probe_hose_sweep + probe_hose_lines; git apply to rerun, .hl.sh).
 0. 01:33 batch failure (part-studio-ui a_chip_made_by_a_later_feature) is NOT 2245e27a: passes on core-rf (told lead).
 0. HOSE-RINGS (dx 11-23; live exact everywhere, 144 edges no tolerance): the model's walls are accurate (sweep 1e-14,
    smooth Shell by_smooth shell.cpp ~3025 inner edges 1e-7, edge tol 2.8e-7); dx's xt writer restores the offset
    (offsets_restored) and cuts closed edges > 1e-8 off it: 6 rings a hose. Why: (a) END rings: the true offset meets the
    cap plane 2.5e-8 off the iso-line (live: INTERSECTION offset x plane; dx can write that); (b) JOINTS: our sweep's 5
    wall B-surfaces meet with normals 4.7e-5 rad apart, so the inner offsets are 4.7e-8 apart. Live: straight runs are
-   CYLINDERs (outer and inner), bends OFFSET_SURF(B_SURFACE), joints exact CIRCLEs / SP_CURVEs. NEXT (mine): the sweep
-   (opSweep Discrete, path = opFitSpline segments) makes straight path runs cylinders and its segments G1. Refit
-   experiment (1e-9 on one face, not enough): /root/core-scratch/hose-refit-exp.patch. Probe (UNCOMMITTED, never
-   commit): kernel core::probe_hose_sweep (x_t round trip of shell-10; dumps vibex7 ~/tmp/core/hose), .hp3.sh.
+   CYLINDERs (outer and inner), bends OFFSET_SURF(B_SURFACE), joints exact CIRCLEs / SP_CURVEs. dx TOOK the END rings
+   (writer INTERSECTION, 02:50). JOINTS mine. Probe probe_hose_lines (line-bend-line, Discrete): straight runs as LINES
+   give cylinders (OCCT KPart; as Bezier splines: SurfaceOfLinearExtrusion), but joint kink 1.2e-5 rad either way (pipe
+   SetTolerance features.cpp ~2105: 3D size*1e-6, angular 1e-2); tol 1e-10/ang 1e-12 -> kink 3.7e-8 but the smooth Shell
+   then splits a face (tol 3.2e-5) and x_t still 14->18 edges. Idea: shell of a round pipe = outer minus inner-circle sweep
+   (exact joints), or fix by_smooth with tight sweeps. Refit experiment: /root/core-scratch/hose-refit-exp.patch.
 0. qa ERR rows: ERR-THICKEN-CYL-TOO-THICK DONE in core-rf (uncommitted): features.cpp thicken() refuses a side reaching
    a quadric/torus face's centre of curvature; T1 features_c::a_cylinder_thickened_past_its_axis_fails. Guided surface
    loft: every profile miss LOFT_FAILED (live loft-guide-past-end-1123 L/M/N; loft_guided.cpp ~2087; T1 kernel
-   core::a_guided_loft_refuses_a_guide_off_a_profile_as_live). Then ERR-MOVEFACE-STATUS (side-through: ours 0-volume
-   part, live "Could not offset selected faces as requested."; cyl-r0/neg: live OK, boss gone: direct.rs 440-470; P1
-   NEG-RADIUS), ERR-FACE-PATTERN-FAILED-PREVIEW, ERR-ADD-PATTERN-PREVIEW-TINT; set a look rows ERR-SEL-RED-ALL-INPUTS,
+   core::a_guided_loft_refuses_a_guide_off_a_profile_as_live). ERR-MOVEFACE-STATUS + NEG-RADIUS done (47768962c). Next
+   ERR-FACE-PATTERN-FAILED-PREVIEW, ERR-ADD-PATTERN-PREVIEW-TINT; set a look rows ERR-SEL-RED-ALL-INPUTS,
    ERR-BUBBLE-ON-ERROR, ERR-SWEEP-FAIL-BODY (LOFT-TITLE-SUFFIX = psui's TITLE-SUFFIX, done by psui). Set a behaviour rows
    REVOLVE-ANGLE0 / INTERSECT-NONE / LOFT-GUIDES-EMPTY / TARGETS-EMPTY are in the queued lands.
 0. ERR-MISSING-SELECTION flag (promised psui ~05:00): regen counts a filter-rejected pick as missing (FeatureState.missing
