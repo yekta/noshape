@@ -164,11 +164,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    -> body red, empty loft guide row "No selections", drop_filtered_picks (a pick its field refuses = missing).
    318c67d5 / 0c582c74 (failed 05:04 on handoff conflicts) are already on main as 26657ac62 / 6f2f75e18.
    After both land: tell qa (agent_status first, roster ids) to rescore errors-1123 core rows + APPEAR-SPLIT/PATTERN.
-0. IN TEST SUBTRACT-CUT-FACES (core-rf uncommitted; .cut.sh on vibex8 -> /root/core-scratch/cut.log: model, model-data,
-   ops): ScopeRule 20 + PartStudio.legacy_cut_face_names (set on load when < 20 and any booleanBodies) -> Context;
+0. QUEUED SUBTRACT-CUT-FACES (11-23 06:4x; model, model-data, ops green): ScopeRule 20 + PartStudio.legacy_cut_face_names (set on load when < 20 and any booleanBodies) -> Context;
    basic.rs boolean: SUBTRACTION non-offset tools named helpers_a::rebrand (Face{boolean, Generated(n)}), so the tool's
-   face/feature appearances stop reaching the cut faces. T1 engine::subtract_cut_faces_are_the_booleans (both flags).
-   Green -> commit, touch -c, land.
+   face/feature appearances stop reaching the cut faces. T1 engine::subtract_cut_faces_are_the_booleans (both flags;
+   a legacy flag only counts on a fresh Regenerator: set before the first regen, as on load).
 0. SPLIT RENUMBERING: no live capture with DEFAULT names (live q5 only had custom names; live lists the untouched part
    first, then the pieces, so order-numbering would give it "Part 1" as ours does). Asked live (REQUESTS.md "core
    11-23 APPEAR-SPLIT default names"). Act when it answers. Then HOSE joints (lead order).
@@ -178,6 +177,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    .hl.sh): straight runs as LINES give cylinders, joint kink 1.2e-5 rad (pipe SetTolerance features.cpp ~2105); tight
    tol -> kink 3.7e-8 but the smooth Shell splits a face. Idea: a round pipe's shell = outer minus the inner-circle sweep
    (exact joints), or by_smooth with tight sweeps. Refit experiment /root/core-scratch/hose-refit-exp.patch.
+0. P1 SPEED-ASM-OPEN-SCISSOR (asm 11-23 06:3x; row in asm's queued TICKETS): scissor-lift's ~30 s open (live ~10 s) waits
+   on a Derived chain. Mine: Studio 2d82a0 moveFace 4.4 s/9 (Move face 5 2.4 s); Studio 9cbb0e moveFace 3.4 s/8 +
+   deleteFace 1.1 s/2 (Move face 4 1.2 s, Delete face 2 1.1 s). Doc: vibex7 ~/agents/core-keep/sc/scissor.noshape
+   (PRIVATE: a mode-600 copy in ~/tmp/core only). Profile: CLI feature_list regen_ms. After HOSE joints.
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
