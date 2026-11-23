@@ -13,8 +13,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   15 judged (FILLET-DRAG-FOCUS, DRAG-DECIMALS, PLANE-HANDLE verified after reruns r7/r8; new P0 PS-SELECTED-EDGE-DARK-CORE, P1
   PS-SELECTED-FRONT-FILL). workflows-1123 rescored on 24f1566de (out-wf23b): 3 verified, 4 partly, 21 new rows (block 01:1x),
   P1 ASM-FIXES-NOT-IN-FLOW; duplicate union rows of the 21:4x/22:0x blocks dropped.
-- **Subagents running (notifications; if lost, rerun from the brief)**: error catalogue live/errors-1123 vs ours, brief
-  qa-scratch/brief-err.md, set a (extrude..boolean + fillet/chamfer, :492) still running; b filed 01:2x (10 rows), c filed 01:4x (15 rows), owners told, vibe2, scratch qa-scratch/err/<set>; appearance-1123 filed 01:5x (12 rows, core/psui told). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
+- **Done**: error catalogue live/errors-1123 vs ours, brief
+  qa-scratch/brief-err.md, all filed (a 01:5x 12 rows, b 01:2x 10, c 01:4x 15), owners told, vibe2, scratch qa-scratch/err/<set>; appearance-1123 filed 01:5x (12 rows, core/psui told). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
 - **Units (logs qa-scratch/tmp/<name>.log)**: qa-wf23c (waits for psui 3cfb09978 + skasm 35c533220 in green, then wf23 01-03/06/07 ->
   hm2/out-wf23c: PICKED-EDGE-DASHED, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SM, SM-TAB-MERGE-PICK, CORNER-BREAK, CONFIG-FILTER-HELP
   if 975844f0d is in); qa-ver6 (full matrix b* + [ips]* on psui b8a17535's green, after rr-b8a1/wf23c -> hmr5-b/hmr5-ips; replaced ver3); qa-wf23f (wf23 04-12 on the current green -> out-wf23f: out-wf23b's 01-12 ran on 7fe68797a, recheck those rows' 01:1x verdicts); qa-rr-2782 (dx 2782ce84 -> wf23 17 -> out-wf23e: SPEED-FILE-TAB-IMPORT-MENU s2, ours 192 ms vs live 58); qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
