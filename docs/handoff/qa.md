@@ -8,6 +8,11 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 ## IN FLIGHT 06:5x
 - **Waiting**: unit qa-w538 (tmp/w538.sh -> tmp/w538.log "IN-GREEN"): dx's IMP-NO-FEEDBACK commit (subject has IMP-NO-FEEDBACK or CAD Imports)
   in green -> rerun the IMP app cells (qa-scratch/imp/ui, brief-impver.md; Mac mini copies mode 700, deleted after) for the CAD Imports tab timing.
+- **Suites**: run 1123-0656-07264069 (green 07264069e, has the rings / surface-pattern fixes) in progress (loop.log "run done"). The b37201ea run
+  (done 06:55) listed speed x1.3-5.0 (rings, surface-pattern, impeller, loft-paths-guides, parting-line, drive-train, fill-pattern) but predates
+  bool a092a991d / c353816d6: check the 07264069e worse.txt; also scenarios drw-table-cells-insert-row (live re-recorded 883e2fe05),
+  drw-title-block-dblclick, mate-connector-shift-lock-inference match -> differs: confirm on that run, ticket if they stay.
+- Lead told (qa-alerts 07:3x): IMP-* + rings rechecks were already done. vibe2 leftover IMP wait loops killed (own, args checked).
 - **qa-rr-1de9** (tmp/rr-1de9.sh -> tmp/rr-1de9.log, lead 07:2x): psui 1de902059 (QUEUED cc8570b3; subject "psui: ✓ greyed for a value out of
   range, hover cells") in green -> matrix hmr8-b + hmr8-ips, manipnav r10, sk23 out/r1de9, err/ver/out (old run saved err/ver/out-b6d5).
   Then rescore psui's "fixed, to verify" rows: hover cells, FEEL-SKETCH-INF-END-DOT, plane border, rotate radius lines, SKT-POSTCOMMIT-HOVER,
