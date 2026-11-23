@@ -1,41 +1,48 @@
 # Blends (agent "blend"): current state
 
-Updated 11-22 22:41 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-23 00:53 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-22 22:41 UTC)
+## Now (11-23 00:53 UTC)
 
 - ORDER: knifehandle Fillet 1 (below; a fold-handling build, large) -> c2-surfaces-lofts-projected's Face blend 2 (core
   11-22: feature 9 ERROR "Failed to blend faces", live OK, 8 -> 9/45 after core's Loft 1 fix e3e73b362) -> Suspension's
   cusp end -> scissor 2d82a0 F13. Speed follow-up: knifehandle Fillet 2 ~6 s (below).
 - Impeller bisect (qa, Part 3 invalid since 0.4.65): NOT blend's (qa's bisect-imp.log: my 11-21 trio valid).
-- NOT YET LANDED (blend10 branch blend-khtip, 6ee607290 on 02cea338f, squashed): knifehandle Chamfer 1 (7/15/10) + Fillet 2 (11/27/18). Chamfer: a chamfer's section tangent
-  follows the walk (a reversed edge's bevel probed inward for its run-on, stopped short, the cut left the part
-  unchanged). Fillet 2: tip caps < sewing tol dropped; run-on over free-form faces cut by the tip faces' whole surfaces
-  (the face's own part never cut it: 4 s saved); ball builds fork the supports of the edges at their ends (two
-  parallel builds shared one support's last foot: the tip run-on stopped a step short in 1 regeneration in 5).
-  Gate: features 408/0, g13 OK; pair (bin/kh-gate.sh, base blend-rgate detached at 02cea338f) was running at 22:41:
-  read logs/kh-gate.out (suite-khf2.cmp); if clean, `git diff --stat origin/main...HEAD` (4 files) and land.sh from
-  blend10 (rebase first; rebuild nothing unless it conflicts). Docs worktree blend-doc (this handoff) can go after.
+- NOT YET LANDED (blend10 branch blend-khtip, 6ee607290 on 02cea338f, squashed): knifehandle Chamfer 1 (7/15/10) +
+  Fillet 2 (11/27/18): chamfer section tangent along the walk; Fillet 2 tip caps < sewing tol dropped, run-on over
+  free-form faces cut by the tip faces' whole surfaces, ball builds fork their supports. Gate: features 408/0, g13 OK;
+  the PAIR never got a vibex7 slot (queue 6 deep 22:31-00:10); restarted 00:10 11-23 as systemd unit blend-khpair
+  (bin/kh-pair.sh -> logs/kh-pair.out, "== done" at the end, cmp in suite-khf2.cmp). If clean: `git diff --stat
+  origin/main...HEAD` in blend10 (4 files), land.sh from blend10.
+- LIVE ERRORS (live/errors-1123/fillet.md, chamfer.md): our messages match. To test (T1, a 40x30x10 block's top front
+  edge): Chamfer TWO_DISTANCES 5/40, 12/45 (both ways), 35/35 BUILD in live (a flat cut kept while part of the block
+  is left); Equal 45 fails. Fillet R20 on the top face fails; an L part's concave corner R12 fails, R9 builds.
 - FILLET 2 SPEED: ~6 s on the doc's input (live time unrecorded; main errored in 0.4 s). 3.7 s is two splits of each
   236 mm round's whole tool by the tip bevel faces' surfaces (the bevels run the blade's length beside the round, so
   OCCT intersects along all of it). Ideas: split only the tool's tip end (pieces per tool are a Vec already) or cut the
   two tools in parallel.
-- KNIFEHANDLE FILLET 1 (live: Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767, a 4.5 mm CONIC rho 0.5 round of the
-  closed 140.75 mm edge, ~200 ms). Ours (input 2/3/2 205688.296 mm3): "the rolling balls jump along the edge", then a
-  64-section closed loft whose cut is INVALID (6 s). CAUSE: across the cap's top (|y| < ~9 mm, z > ~10) the edge bends
-  tighter than the round: radius 4.57 mm at y -8.85 and less toward the top (probe zz_f1_on, ZZK lines). The ball
-  centres / cap contacts fold back there (swallowtail). Live trims the fold: the cap loses everything above z 6.78
-  (1483 -> 1121 mm2) and the round is 4 faces: main band 487.8 mm2, a top face 118.4 (|y| <= 8.22, z 6.13-11.41), two
-  transitions 16.3 (y +-6.25..9.99). Tried: the closed edge as 2/3/4/6/8 open lofts at 64/128 sections, cut together:
-  each loft valid, every cut invalid or 0/2 solids (tangent tool faces on the free-form handle, not only the fold).
-  Next: the ball path must handle the fold itself (find the fold's two cusps on the centre curve, trim the round where
-  its two sheets cross, cover the top) in the direct build, not a loft cut. Input s-sb3.brep (below), make it a test.
-  Live data: vibex8 ~/parity/models/c2-surf-workshop-knifehandle/live.jsonl.
+- KNIFEHANDLE FILLET 1 (live: Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767, removes 167 mm3; a 4.5 mm CONIC rho
+  0.5 round of the closed 140.75 mm cap edge). Live faces (live.jsonl line 32 bodies JnD): band 487.8, top 118.4 (y
+  +-8.22, z 6.13-11.41), two transitions 16.3, cap 1121.2 (z <= 6.781), wall 22061.8; edges band-wall 117.7, band-cap
+  105.6, top-cap 17.0, top-wall 13.2, band-trans 6.06 x2, trans-top 7.75 x2, trans-wall 4.0 x2.
+  FOUND (blend12, probe bin/kh-f1balls.sh, ZZ_BALLS prints each station): (1) the edge's parameter runs ~20x faster in
+  one stretch: stations even in parameter looked like a jump -> stations now even in arc length (`at` by a 256-span
+  length table) and the jump checks compare a centre's step with the edge point's step; (2) a closed edge's first
+  ball found the handle's far side from a stale projection seed -> Support::reseed before the first guess; (3) the
+  cap's top has two humps (z 11.76 at y +-6.7, dip z 10.54 at y 0) bending tighter than the round: the ball centres
+  run forward, back, forward (stations ~ k14-16 and k23-25 of 76) -> "zones" from the last ball before the turn to
+  the first past it; there the ball interpolated between those two and the section's sides run along the faces to
+  the edge point (fn bend_section). With that: ball loft VALID, 154 mm3 (live removes 167). The direct build then
+  declined: the loft's sides strayed up to 1 mm off the tightly curved wall between sections (ZZ_LIES prints
+  lies_on's failing sample) -> now 4 sections per station around each zone (+-2 stations), running at 00:50.
+  If the sides still stray: relax lies_on to the samples near the touch curve, or build those stretches as their
+  own tools (live's own split: band / 2 transitions / top). Input kept at vibex7 ~/agents/blend-keep/kh-f1-input.brep
+  (make it a test input).
 - Probe worktree blend12 (branch blend-khf1 on 0322a568e, never land): ZZ_SBDUMP (each section_blend call's body +
   edges, ZZSB timing), ZZSPLIT (run-on split timings), ZZ_MAXSTEP, ZZ_SPLITN / ZZ_N (pieces / sections), tests
   zz_khchain (ZZ_BREP), zz_f2_on (ZZ_F2IN), zz_f1_on (ZZ_F1IN: edges, faces, curvature, fillet result). Scripts:
