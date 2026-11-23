@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 03:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 03:23 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -155,14 +155,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. QUEUED 0c582c74 (02:56; carries ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED, Move face
-   (a part offset to nothing fails; boss offset to its axis removed). 2245e27a/6d3caf84/e686d40c LANDED 02:53.
-   IN TEST (core-rf, UNCOMMITTED, run .fp2.sh on vibex8 -> /root/core-scratch/fp2.log; vibex7 held for qa's 03:00 speed
-   run): ERR-FACE-PATTERN-FAILED-PREVIEW + ERR-SWEEP-FAIL-BODY: pattern.rs apply_tools strict -> error_shapes = off
-   copies; run_pattern_paths FACE failure -> failed_instances copies; hole.rs missed_tools -> error_shapes on "None of
-   the holes intersected a part."; solid_a.rs tight bend -> error_shapes = the invalid sweep. T1: features_c
-   a_face_mirror_off_the_part_draws_its_copies_red, a_hole_off_its_part_draws_its_body_red (new boss_block() /
-   face_nearest() helpers), kernel_robustness a_sweep_round_too_tight_a_bend_draws_its_body_red. Green -> commit, land.
+0. QUEUED 318c67d5 (03:23; carries 0c582c74 + ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED,
+   Move face (part offset to nothing fails; boss offset to its axis removed), and ERR-FACE-PATTERN-FAILED-PREVIEW +
+   ERR-SWEEP-FAIL-BODY: failed face patterns/mirrors (off copies), holes off their part (tool at its Depth from the
+   point) and too-tight sweeps fill error_shapes, drawn dark red. T1s features_c boss_block()/face_nearest() helpers,
+   kernel_robustness a_sweep_round_too_tight_a_bend_draws_its_body_red; hole/pattern/sweep tests 90/90 on vibex8.
    ERR-BUBBLE-ON-ERROR: regen pushes no info on that error; the bubble is part-studio-ui mod.rs ~1256 dialog state:
    reproduce in the app (qa err/b remove-miss) before touching. Probes out of git: ~/core-keep/probes2.patch.
 0. HOSE-RINGS (dx 11-23; live exact everywhere, 144 edges no tolerance): the model's walls are accurate (sweep 1e-14,
@@ -176,12 +173,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    SetTolerance features.cpp ~2105: 3D size*1e-6, angular 1e-2); tol 1e-10/ang 1e-12 -> kink 3.7e-8 but the smooth Shell
    then splits a face (tol 3.2e-5) and x_t still 14->18 edges. Idea: shell of a round pipe = outer minus inner-circle sweep
    (exact joints), or fix by_smooth with tight sweeps. Refit experiment: /root/core-scratch/hose-refit-exp.patch.
-0. qa ERR rows: ERR-THICKEN-CYL-TOO-THICK DONE in core-rf (uncommitted): features.cpp thicken() refuses a side reaching
+0. qa ERR rows: ERR-THICKEN-CYL-TOO-THICK queued: features.cpp thicken() refuses a side reaching
    a quadric/torus face's centre of curvature; T1 features_c::a_cylinder_thickened_past_its_axis_fails. Guided surface
    loft: every profile miss LOFT_FAILED (live loft-guide-past-end-1123 L/M/N; loft_guided.cpp ~2087; T1 kernel
-   core::a_guided_loft_refuses_a_guide_off_a_profile_as_live). ERR-MOVEFACE-STATUS + NEG-RADIUS done (47768962c). Next
-   ERR-FACE-PATTERN-FAILED-PREVIEW, ERR-ADD-PATTERN-PREVIEW-TINT; set a look rows ERR-SEL-RED-ALL-INPUTS,
-   ERR-BUBBLE-ON-ERROR, ERR-SWEEP-FAIL-BODY (LOFT-TITLE-SUFFIX = psui's TITLE-SUFFIX, done by psui). Set a behaviour rows
+   core::a_guided_loft_refuses_a_guide_off_a_profile_as_live). ERR-MOVEFACE-STATUS + NEG-RADIUS queued. Next
+   ERR-ADD-PATTERN-PREVIEW-TINT; set a look rows ERR-SEL-RED-ALL-INPUTS,
+   ERR-BUBBLE-ON-ERROR (LOFT-TITLE-SUFFIX = psui's TITLE-SUFFIX, done by psui). Set a behaviour rows
    REVOLVE-ANGLE0 / INTERSECT-NONE / LOFT-GUIDES-EMPTY / TARGETS-EMPTY are in the queued lands.
 0. ERR-MISSING-SELECTION flag (promised psui ~05:00): regen counts a filter-rejected pick as missing (FeatureState.missing
    and the dialog's missing(r)).
