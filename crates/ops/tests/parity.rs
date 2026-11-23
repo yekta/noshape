@@ -6400,3 +6400,49 @@ fn a_plane_through_an_in_context_point_builds() {
     let s = t.step(0);
     assert!(s.ours.is_some() && s.problems.is_empty() && s.status.as_deref() == Some("Ok"), "{:?} {:?} {:?}", s.status, s.message, s.problems);
 }
+
+/// Live (bool/rings-shell-edit-1123 chain-2132): c2-rings-loft's "Extruded ring" diameter 20.5 → 21.32 mm. Its two
+/// R3.137 arcs are held only by their ends on the trimmed ellipse and a mirror; live keeps their radius (3.1374) and
+/// Extrude 1 is 989.9879 mm³.
+#[test]
+#[ignore = "T2: live's corpus from /root/parity/models (other people's work, never in the repo)"]
+fn rings_extruded_ring_diameter_edit_solves_as_live() {
+    let dir = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into())).join("c2-rings-loft");
+    let Some((features, live, refs)) = read_model(&dir) else { return };
+    let mut all = live_refs(&live, &refs);
+    add_sketch_refs(&mut all, &features["sketchBodies"], features["features"].as_array().map(Vec::as_slice).unwrap_or_default());
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("rings-edit.noshape"), &features, all).expect("opened");
+    for k in 0..3 {
+        t.step(k);
+    }
+    let sketch = t.ours("FpcvM1Dv9WD6z1p_0").expect("Extruded ring").to_string();
+    let g = t.call("sketch_get", json!({ "sketch": sketch })).expect("sketch_get");
+    let text = g.to_string();
+    let mut dims = Vec::new();
+    fn walk(v: &Value, out: &mut Vec<Value>) {
+        match v {
+            Value::Object(m) => {
+                if m.get("id").and_then(Value::as_str).is_some_and(|i| i.starts_with("dim:")) {
+                    out.push(v.clone());
+                }
+                m.values().for_each(|x| walk(x, out));
+            }
+            Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            _ => {}
+        }
+    }
+    walk(&g, &mut dims);
+    let dia = dims.iter().find(|d| d.to_string().contains("20.5")).unwrap_or_else(|| panic!("the Ø20.5 dimension in {dims:?}"));
+    let id = dia["id"].as_str().unwrap().to_string();
+    t.call("sketch_set_dimension", json!({ "sketch": sketch, "dimension": id, "value": "21.32 mm" })).expect("set");
+    let after = t.call("sketch_get", json!({ "sketch": sketch })).expect("sketch_get");
+    let arcs: Vec<&Value> = after["entities"].as_array().into_iter().flatten().filter(|e| e["type"] == "arc").collect();
+    let near = |v: &Value, x: f64, y: f64| (v[0].as_f64().unwrap_or(f64::NAN) - x).hypot(v[1].as_f64().unwrap_or(f64::NAN) - y) < 1e-5;
+    let kept = arcs.iter().any(|a| near(&a["center"], -6.054333, 14.216775) && near(&a["start"], -7.730992, 11.564972) && near(&a["end"], -2.917313, 14.265185));
+    assert!(kept, "the free arc (live centre (-6.054333, 14.216775), r 3.137394) in {arcs:#?}\nbefore: {}", text.chars().take(2000).collect::<String>());
+    // Live's evVolume is ~3e-5 below the exact profile x 8 mm at both diameters (989.9879 / 1094.4938); ours is exact.
+    let mass = t.call("query_mass_properties", json!({})).expect("mass");
+    let v = mass["volume"].as_f64().unwrap_or(f64::NAN);
+    assert!((v / 989.9879 - 1.0).abs() < 1e-4, "Extrude 1's volume (live 989.9879 mm³): {mass}");
+}

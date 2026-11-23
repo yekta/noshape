@@ -117,6 +117,16 @@ fn rows() -> Vec<Row> {
             let first: Vec<&str> = labels.iter().filter(|l| *l != "———").take(2).map(|s| s.as_str()).collect();
             expect((first, tool(cx, &view)), (vec!["Escape line", "Confirm Sketch 1"], Some(Tool::Line)), "first rows, tool")
         } },
+        Row { id: "arc / fillet / chamfer / use: the menu's head", live: "'Escape arc', 'Escape fillet', 'Escape chamfer', 'Escape use' (sketch-tools-1123)", gap: false, check: |cx| {
+            let heads: Vec<String> = [Tool::Arc3, Tool::Fillet, Tool::Chamfer, Tool::Use].into_iter().map(|t| {
+                let (window, view) = sketch_with(cx, "st-menu-head", t);
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), None, w, cx))).unwrap();
+                draw(cx, window);
+                let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+                labels.into_iter().find(|l| l != "———").unwrap_or_default()
+            }).collect();
+            expect(heads, ["Escape arc", "Escape fillet", "Escape chamfer", "Escape use"].map(String::from).to_vec(), "heads")
+        } },
         Row { id: "line / Enter mid-chain dimensions the segment just drawn", live: "the on-canvas length box becomes a driving dimension on it; the chain continues", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-enter", Tool::Line);
             click(cx, window, &view, (400., 300.));

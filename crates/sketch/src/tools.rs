@@ -839,17 +839,16 @@ impl Sketch {
     /// source by a mirror (symmetric) constraint of its own (a line, an arc, a circle, a spline) and a segment's ends
     /// by one each (Onshape's `.begCons` / `.endCons`; a circle's or an arc's centre, a spline's inner points only
     /// through its curve's); a point by one; an ellipse by its points and EQUAL. A point on the axis is copied too, tied by
-    /// its own (live workflows-1122 22 s35: a line ending on the axis, 3 SYMMETRIC); an entity whose mirror image is
-    /// already there makes nothing.
+    /// its own (live workflows-1122 22 s35: a line ending on the axis, 3 SYMMETRIC); an entity mirrored before makes
+    /// a second, coincident copy (live sketch-tools-1123, DECISIONS 11-23).
     pub fn mirror(&mut self, ids: &[EntityId], axis: EntityId) -> Result<EditResult> {
         let (a, b) = self.line_pts(axis).ok_or_else(|| SketchError::OperationFailed("mirror axis must be a line".into()))?;
-        let tol = self.tool_tol();
         let d = (b - a).normalize_or_zero();
         if d == DVec2::ZERO {
             return Err(SketchError::OperationFailed("degenerate mirror axis".into()));
         }
         let f = move |p: DVec2| reflect(p, a, b);
-        let ids: Vec<EntityId> = ids.iter().copied().filter(|i| *i != axis && !self.has_image(*i, &f, tol)).collect();
+        let ids: Vec<EntityId> = ids.iter().copied().filter(|i| *i != axis).collect();
         let mut res = EditResult::default();
         let vf = move |v: DVec2| d * (2.0 * v.dot(d)) - v;
         let (pmap, emap) = self.copy_entities(&ids, &f, &vf, true, &|_| false, &mut res)?;
@@ -889,34 +888,6 @@ impl Sketch {
             }
         }
         Ok(res)
-    }
-
-    /// Whether entity `id`'s image under `f` is already in the sketch (a point, a line, an arc or a circle of the same
-    /// kind there, within `tol`).
-    fn has_image(&self, id: EntityId, f: &dyn Fn(DVec2) -> DVec2, tol: f64) -> bool {
-        let Some(kind) = self.kind(id) else { return false };
-        let near = |p: DVec2, q: DVec2| (p - q).length() <= tol;
-        let ends = |e: EntityId| self.endpoints(e).and_then(|(s, t)| Some((self.point(s)?, self.point(t)?)));
-        let circle = |e: EntityId| Some((self.center_pos(e)?, self.radius_of(e)?));
-        let same = |other: EntityId| -> bool {
-            if other == id || self.kind(other) != Some(kind) {
-                return false;
-            }
-            match kind {
-                EntityKind::Point => self.point(id).zip(self.point(other)).is_some_and(|(p, q)| near(f(p), q)),
-                EntityKind::Line | EntityKind::Arc => {
-                    let ((s, t), (u, v)) = match (ends(id), ends(other)) {
-                        (Some(x), Some(y)) => (x, y),
-                        _ => return false,
-                    };
-                    let ends_match = (near(f(s), u) && near(f(t), v)) || (near(f(s), v) && near(f(t), u));
-                    ends_match && (kind == EntityKind::Line || circle(id).zip(circle(other)).is_some_and(|((c, r), (k, q))| near(f(c), k) && (r - q).abs() <= tol))
-                }
-                EntityKind::Circle => circle(id).zip(circle(other)).is_some_and(|((c, r), (k, q))| near(f(c), k) && (r - q).abs() <= tol),
-                _ => false,
-            }
-        };
-        matches!(kind, EntityKind::Point | EntityKind::Line | EntityKind::Arc | EntityKind::Circle) && self.entities().any(|e| same(e.id))
     }
 
     /// Linear pattern: `count - 1` copies, each offset by `step`.

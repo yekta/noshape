@@ -203,3 +203,16 @@ fn a_text_box_is_the_fonts_ascent_as_onshapes() {
     let width = run.width * h + 40.0 / 2048.0 * em;
     assert!((width - 105.95).abs() < 0.05, "the run {width} mm");
 }
+
+/// SKT-TEXT-KEYS: a line break leaves the box as the first line's; later lines hang below it at the same left x,
+/// 1.8889 ascents apart, unscaled (live text-two-lines-1123: "HH⏎HH⏎HH" baselines 0 / -18.889 / -37.778 at ascent 10).
+#[test]
+fn a_sketch_texts_later_lines_hang_below_its_box() {
+    let lay = |t: &str| noshape_sketch::text::layout_sketch_text(t, noshape_sketch::text::SKETCH_DEFAULT_FONT, false, false);
+    let low = |t: &str| lay(t).polylines(8).iter().flatten().map(|p| p.y).fold(f64::MAX, f64::min) * 10.0;
+    let (one, three) = (lay("HH"), lay("HH\nHH\nHH"));
+    assert_eq!((three.lines, three.width), (3, one.width));
+    assert_eq!(three.contours[..one.contours.len()], one.contours[..]);
+    assert!(low("HH").abs() < 0.01 && (low("HH\nHH\nHH") + 37.778).abs() < 0.01, "{}", low("HH\nHH\nHH"));
+    assert!((low("Ab\nc") + 19.026).abs() < 0.05, "c reaches {}", low("Ab\nc"));
+}

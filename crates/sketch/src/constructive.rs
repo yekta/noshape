@@ -27,6 +27,10 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 /// Components larger than this keep the weighted minimum norm.
 const MAX_UNITS: usize = 60;
 
+
+/// A free arc's start and end carriers and the points joined to its ends (0 start, 1 end).
+type FreeArcCarriers = (crate::geom::Curve2, crate::geom::Curve2, Vec<(usize, EntityId)>);
+
 impl Sketch {
     /// Places the entities of every component whose constraints don't hold
     /// (see the module docs). Returns the entities of the components that
@@ -222,6 +226,7 @@ impl Sketch {
             }
             let own: Vec<EntityId> = comp.iter().flat_map(|u| std::iter::once(*u).chain(self.entity(*u).map(|e| e.point_refs()).unwrap_or_default())).collect();
             let was: Vec<(EntityId, Geometry)> = own.iter().filter_map(|e| self.entity(*e).map(|x| (*e, x.geometry.clone()))).collect();
+            let before: HashMap<EntityId, Geometry> = was.iter().cloned().collect();
             if !self.place_component(&comp, &comp_cons, &unit_of) {
                 for (e, g) in was {
                     if let Some(x) = self.entity_mut_silent(e) {
@@ -230,8 +235,13 @@ impl Sketch {
                 }
                 if !self.hold_the_base(&comp, &comp_cons) {
                     left.extend(own);
+                    continue;
                 }
             }
+            self.refit_free_arcs(&comp, &|p| match before.get(&p) {
+                Some(Geometry::Point { pos }) => Some(*pos),
+                _ => None,
+            });
         }
         left
     }
@@ -1636,6 +1646,90 @@ impl Sketch {
 
     /// Holds `u`'s size in `sub` (a line's length, a circle's or arc's
     /// radius) as a constraint at its current value; false for a point.
+    /// A free arc (no dimension, no tangency; its ends only on circles / ellipses or their arcs' ends, its points only
+    /// mirrored) keeps its radius when those curves change: each end goes to its nearest point on its curve and the
+    /// centre follows on its side of the chord (live, behaviours "skasm free arc re-solve on a resized curve"). Those of
+    /// `arcs` whose ends moved from where `was` puts them are refitted; whether any was.
+    pub(crate) fn refit_free_arcs(&mut self, arcs: &[EntityId], was: &dyn Fn(EntityId) -> Option<DVec2>) -> bool {
+        let mut any = false;
+        for &u in arcs {
+            let Some(Geometry::Arc { center, start, end }) = self.entity(u).map(|e| e.geometry.clone()) else { continue };
+            let (Some(c0), Some(s0), Some(e0)) = (was(center), was(start), was(end)) else { continue };
+            let r = (s0 - c0).length();
+            let moved = |p: EntityId, q: DVec2| self.point(p).is_some_and(|now| (now - q).length() > 1e-12);
+            if !moved(start, s0) && !moved(end, e0) {
+                continue;
+            }
+            let Some((cs, ce, joined)) = self.free_arc_carriers(u, [center, start, end]) else { continue };
+            let (s1, e1) = (cs.closest(s0).1, ce.closest(e0).1);
+            let half = (e1 - s1).length() * 0.5;
+            if half < 1e-12 || half >= r {
+                continue;
+            }
+            let side = (c0 - (s0 + e0) * 0.5).dot((e0 - s0).perp()).signum();
+            let c1 = (s1 + e1) * 0.5 + (e1 - s1).perp().normalize() * side * (r * r - half * half).sqrt();
+            let _ = self.set_point(center, c1);
+            let _ = self.set_point(start, s1);
+            let _ = self.set_point(end, e1);
+            for (i, p) in joined {
+                let _ = self.set_point(p, if i == 0 { s1 } else { e1 });
+            }
+            any = true;
+        }
+        any
+    }
+
+    /// The curves free arc `u`'s start and end lie on (shared or Coincident), and the points joined to its ends; None
+    /// when anything else holds it.
+    fn free_arc_carriers(&self, u: EntityId, [center, start, end]: [EntityId; 3]) -> Option<FreeArcCarriers> {
+        let mut carriers: [Option<crate::geom::Curve2>; 2] = [None, None];
+        for (i, p) in [start, end].into_iter().enumerate() {
+            for e in self.entities().filter(|e| e.id != u && e.kind() != EntityKind::Point && e.point_refs().contains(&p)) {
+                if e.endpoints().is_none_or(|(s, f)| s != p && f != p) {
+                    return None;
+                }
+                carriers[i] = Some(self.round_carrier(e.id, u)?);
+            }
+        }
+        let mut joined = Vec::new();
+        let mine = [u, center, start, end];
+        for c in self.constraints().filter(|c| c.driving && c.kind.entities().iter().any(|e| mine.contains(e))) {
+            match c.kind {
+                ConstraintKind::Symmetric { .. } => {}
+                ConstraintKind::Coincident { a, b } => {
+                    let (i, other) = match (a, b) {
+                        (p, o) | (o, p) if p == start || p == end => (usize::from(p == end), o),
+                        _ => return None,
+                    };
+                    carriers[i] = Some(self.round_carrier(other, u)?);
+                    if self.kind(other) == Some(EntityKind::Point) {
+                        joined.push((i, other));
+                    }
+                }
+                _ => return None,
+            }
+        }
+        let [Some(cs), Some(ce)] = carriers else { return None };
+        Some((cs, ce, joined))
+    }
+
+    /// The whole circle or ellipse that `e` lies on: a circle / ellipse, an arc of one, or a point ending such an arc
+    /// (other than `not`).
+    fn round_carrier(&self, e: EntityId, not: EntityId) -> Option<crate::geom::Curve2> {
+        use crate::geom::Curve2;
+        let curve = if self.kind(e) == Some(EntityKind::Point) {
+            self.entities().find(|x| x.id != not && x.endpoints().is_some_and(|(s, f)| s == e || f == e)).and_then(|x| self.curve(x.id))?
+        } else {
+            self.curve(e)?
+        };
+        match curve {
+            Curve2::Circle { .. } | Curve2::Ellipse { .. } => Some(curve),
+            Curve2::Arc { center, radius, .. } => Some(Curve2::Circle { center, radius }),
+            Curve2::EllipticalArc { center, major, minor, .. } => Some(Curve2::Ellipse { center, major, minor }),
+            _ => None,
+        }
+    }
+
     fn hold_size(&self, sub: &mut Sketch, u: EntityId) -> bool {
         // An ellipse keeps both radii (live coincident.json: moved onto a fixed point, it translates).
         if let Some(Geometry::Ellipse { major, minor, .. }) = self.entity(u).map(|e| e.geometry.clone()) {

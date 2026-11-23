@@ -4,6 +4,7 @@
 mod bench;
 mod constraints_more;
 mod dwg;
+mod free_arc;
 mod fuzz;
 mod live_fuzz;
 mod misc;

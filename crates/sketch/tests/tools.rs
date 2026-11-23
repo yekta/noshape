@@ -328,7 +328,7 @@ fn a_centre_point_arc_swept_clockwise_is_stored_clockwise() {
 
 /// Live's sketch Mirror (live/feel/mirror.json): one mirror constraint per copy (a line's, an arc's, a circle's,
 /// a point's), a segment's ends one each, a circle's or an arc's centre none of its own; the source's own
-/// constraints not copied; mirroring onto an image already there makes nothing. The sketch solves.
+/// constraints not copied; mirroring again makes a second copy (sketch-tools-1123). The sketch solves.
 #[test]
 fn mirror_constrains_each_copy_as_live() {
     let mut sk = Sketch::new();
@@ -359,9 +359,10 @@ fn mirror_constrains_each_copy_as_live() {
     assert_eq!(sk.constraints().count() - before, 8);
     let rep = sk.solve();
     assert!(rep.is_solved(), "{rep:?}");
-    // Again: every image is there already.
+    // Again: a second, coincident copy of each with its own mirror constraints (live sketch-tools-1123).
     let again = sk.mirror(&[l, a, p, c], axis).unwrap();
-    assert!(again.created.is_empty() && again.constraints_added.is_empty(), "{again:?}");
+    assert_eq!((again.created.iter().filter(|e| sk.kind(**e) != Some(EntityKind::Point)).count(), again.constraints_added.len()), (3, 8), "{again:?}");
+    assert!(sk.solve().is_solved());
 }
 
 /// Live workflows-1122 22 s35: a line ending on the mirror line gets a copy with its own end there, three SYMMETRIC

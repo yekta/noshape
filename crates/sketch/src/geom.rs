@@ -426,13 +426,14 @@ impl Curve2 {
                 break;
             }
         }
-        let q = self.point(t);
-        let dist = (q - p).length();
-        if dist <= best.1 + 1e-12 {
+        // Against the curve at the best sample, not its chord: inside a convex curve the chords are nearer than the
+        // curve, and the refined point was dropped for the sample's (a free arc's end off its ellipse's nearest point).
+        let (q, s) = (self.point(t), self.point(best.0));
+        let (dist, sample) = ((q - p).length(), (s - p).length());
+        if dist <= sample + 1e-12 {
             (t, q, dist)
         } else {
-            let q = self.point(best.0);
-            (best.0, q, (q - p).length())
+            (best.0, s, sample)
         }
     }
 

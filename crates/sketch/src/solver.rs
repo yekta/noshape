@@ -1536,6 +1536,39 @@ impl Sketch {
         true
     }
 
+    /// Free arcs keep their radius on curves that changed (live, `Sketch::refit_free_arcs`): refitted from where they
+    /// were before this solve, kept when the sketch then solves without moving a point. Not what a drag holds.
+    fn keep_free_arcs(&mut self, before: &Sketch, opts: &SolveOptions) -> Option<SolveReport> {
+        let held = |e: EntityId| opts.light.contains(&e) || opts.still.contains(&e);
+        let was = |p: EntityId| before.point(p);
+        let arcs: Vec<EntityId> = self
+            .entities()
+            .filter(|e| e.kind() == EntityKind::Arc && !held(e.id))
+            .filter(|e| match e.geometry {
+                Geometry::Arc { center, start, end } => ![center, start, end].into_iter().any(held) && [start, end].into_iter().any(|p| was(p).zip(self.point(p)).is_some_and(|(a, b)| (a - b).length() > 1e-12)),
+                _ => false,
+            })
+            .map(|e| e.id)
+            .collect();
+        if arcs.is_empty() {
+            return None;
+        }
+        let mut trial = self.clone();
+        if !trial.refit_free_arcs(&arcs, &was) {
+            return None;
+        }
+        let at = trial.clone();
+        let rep = trial.solve_inner(opts);
+        let moved = trial.entities().any(|e| match (at.entity(e.id).map(|a| &a.geometry), &e.geometry) {
+            (Some(Geometry::Point { pos: p }), Geometry::Point { pos: q }) => (*p - *q).length() > 1e-9,
+            _ => false,
+        });
+        (rep.is_solved() && !moved).then(|| {
+            *self = trial;
+            rep
+        })
+    }
+
     /// Solves all driving constraints, warm-started from the current geometry.
     pub fn solve(&mut self) -> SolveReport {
         self.solve_with(&SolveOptions::default())
@@ -1571,6 +1604,7 @@ impl Sketch {
         // fails (live: c2-loft-guide-curves-wave-washer's Sketch 4 rectangles, a far corner 63.5 mm off a model
         // vertex, move over; ours diverged: the Minimum distance between two sides broke once the solve sheared them).
         let rep = if rep.is_solved() { rep } else { self.carried_onto_anchors(&snapshot, opts).unwrap_or(rep) };
+        let rep = if rep.is_solved() { self.keep_free_arcs(&snapshot, opts).unwrap_or(rep) } else { rep };
         let mut rep = rep;
         if let Some((_, a)) = analysis
             && rep.dof.is_none()

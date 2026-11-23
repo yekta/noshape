@@ -1663,7 +1663,10 @@ impl SketchEditor {
         }
         // Choosing a drawing tool or Dimension clears the selection (live: L with a line selected deselects it;
         // skasm/hm-sk-1122 c5a: D too, no dimension started).
-        if self.tool.draws() || self.tool == Tool::Dimension {
+        // Leaving a pattern tool leaves its seed unselected, drawn normal blue (live sketch-tools-1123 mp2: Esc, the
+        // tool's button, the menu's Escape).
+        let left_pattern = self.tool != previous && matches!(previous, Tool::LinearPattern | Tool::CircularPattern);
+        if self.tool.draws() || self.tool == Tool::Dimension || left_pattern {
             self.selection.clear();
             self.selected_constraints.clear();
         }
@@ -1991,6 +1994,15 @@ impl SketchEditor {
             && let Some(s) = semicircle_snap(self.clicks[0].pos, self.clicks[1].pos, p, self.world_per_px * 9.0)
         {
             best = Some(Inference { kind: InferenceKind::Midpoint, position: s, entity: None, reference: Some((self.clicks[0].pos + self.clicks[1].pos) * 0.5), constraints: Vec::new(), distance: (s - p).length(), priority: 1 });
+        }
+        // 3 point arc: the bend that makes the arc tangent to a line ending at its start or end lights that line and
+        // makes the arc TANGENT (live sketch-tools-1123 arcs.md: `TANGENT (midSnap0)`).
+        if self.tool == Tool::Arc3
+            && self.clicks.len() == 2
+            && best.as_ref().is_none_or(|i| i.priority > 1)
+            && let Some((line, q)) = tangent_bend(sk, &self.clicks, p, self.world_per_px * 9.0)
+        {
+            best = Some(Inference { kind: InferenceKind::Tangent, position: q, entity: Some(line), reference: None, constraints: vec![AutoConstraint::TangentTo(line)], distance: (q - p).length(), priority: 1 });
         }
         // The snap lit last holds out to its let-go reach unless a stronger one lights.
         if !self.exact_inference
@@ -4486,14 +4498,26 @@ impl SketchEditor {
                 self.pending_text = None;
                 // Live (sketch-text-font-typed-ok: COINCIDENT, HORIZONTAL): a corner placed on a point is Coincident with it.
                 let corners: Vec<EntityId> = data.texts.iter().find(|t| t.id == id).map(|t| t.box_points.iter().map(|p| EntityId(*p)).collect()).unwrap_or_default();
-                for c in std::mem::take(&mut self.text_clicks) {
-                    let Some(pt) = corners.iter().copied().find(|p| data.sketch.point(*p).is_some_and(|q| q.distance(c.pos) < 1e-9)) else { continue };
+                // The first click's corner is the box corner nearest it, the second click's the one across from it (the
+                // box is as wide as the text, so the second corner need not be under the click).
+                let nearest = |p: DVec2| (0..corners.len()).min_by(|&i, &j| {
+                    let d = |k: usize| data.sketch.point(corners[k]).map_or(f64::INFINITY, |q| q.distance(p));
+                    d(i).total_cmp(&d(j))
+                });
+                let first = self.text_clicks.first().and_then(|c| nearest(c.pos));
+                for (k, c) in std::mem::take(&mut self.text_clicks).into_iter().enumerate() {
+                    let Some(i) = first else { break };
+                    let pt = corners[if k == 0 { i } else { (i + 2) % corners.len() }];
+                    // An alignment the corner was inferred to is kept too (live sketch-tools-1123 text.md: `VERTICAL
+                    // (secondSnap0)`, the second corner vertical to a line's end).
                     for a in c.inference.iter().flat_map(|i| &i.constraints) {
-                        if let AutoConstraint::CoincidentPoint(q) = *a
-                            && q != pt
-                        {
-                            let _ = data.sketch.add_constraint(ConstraintKind::Coincident { a: pt, b: q });
-                        }
+                        let kind = match *a {
+                            AutoConstraint::CoincidentPoint(q) if q != pt => ConstraintKind::Coincident { a: pt, b: q },
+                            AutoConstraint::HorizontalWith(q) if q != pt => ConstraintKind::Horizontal { a: pt, b: Some(q) },
+                            AutoConstraint::VerticalWith(q) if q != pt => ConstraintKind::Vertical { a: pt, b: Some(q) },
+                            _ => continue,
+                        };
+                        let _ = data.sketch.add_constraint(kind);
                     }
                 }
                 self.set_tool(Tool::Select);
@@ -6095,8 +6119,19 @@ impl SketchEditor {
             data.dimension_exprs.insert(cid.0, ExprValue::new(text));
         }
         // Live 1785 / 2022: a sketch's first dimension scales it onto the new value; else a free line's start moves.
-        let scaled = data.sketch.scale_for_edit(cid);
-        let opts = (!scaled).then(|| data.sketch.free_line_edit_options(cid)).flatten().unwrap_or_else(|| data.sketch.dimension_edit_options(cid));
+        // Line mid-chain: the last segment's length keeps its end, the chain point, and moves its start (live
+        // sketch-tools-1123 arcs.md).
+        let chain_end = match data.sketch.constraint(cid).map(|c| c.kind.clone()) {
+            Some(ConstraintKind::Length { curve, .. }) if self.tool == Tool::Line => {
+                self.chain_end.filter(|p| data.sketch.endpoints(curve).is_some_and(|(_, e)| e == *p)).map(|p| (curve, p))
+            }
+            _ => None,
+        };
+        let scaled = chain_end.is_none() && data.sketch.scale_for_edit(cid);
+        let opts = match chain_end {
+            Some((curve, p)) => noshape_sketch::SolveOptions { light: vec![curve], still: vec![p], ..data.sketch.dimension_edit_options(cid) },
+            None => (!scaled).then(|| data.sketch.free_line_edit_options(cid)).flatten().unwrap_or_else(|| data.sketch.dimension_edit_options(cid)),
+        };
         let report = data.sketch.solve_with(&opts);
         // The next fillet defaults to the radius just typed (live, 568).
         if let Some(ConstraintKind::Radius { curve, value }) = data.sketch.constraint(cid).map(|c| c.kind.clone())
@@ -6962,7 +6997,9 @@ impl SketchEditor {
             // the lit curve, show alone, live sketch/54, qa walk 1 w4-vertex, w4-mid; qa FEEL-LINE-SNAP-MODEL-LOOK;
             // skasm/hm-sk-1122 c4a, c4d.)
             let on_point = self.clicks.is_empty() && self.inference.as_ref().is_some_and(|i| matches!(i.kind, InferenceKind::Endpoint | InferenceKind::Midpoint | InferenceKind::Center | InferenceKind::Quadrant | InferenceKind::OnCurve));
-            if self.tool.draws() && !on_point && !self.end_on_lit_target() && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
+            // (Tangent arc: none before its start end is picked, live sk23 ta-3.)
+            let no_start = self.tool == Tool::TangentArc && self.chain_end.is_none();
+            if self.tool.draws() && !on_point && !no_start && !self.end_on_lit_target() && !(self.tool == Tool::Circle && !self.clicks.is_empty()) {
                 points.points.push(PointSprite { position: w(c), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
             }
         }
@@ -8287,6 +8324,35 @@ fn square_corner(a: DVec2, c: DVec2) -> DVec2 {
 
 /// Third point of an exact semicircle over the chord `a`-`b` when the
 /// cursor's 3-point circle has its center within `tol` of the chord midpoint.
+/// The point nearest `p` (within `tol`) of the arc from `clicks[0]` to `clicks[1]` tangent to a line ending at either
+/// click's point, with that line.
+fn tangent_bend(sk: &Sketch, clicks: &[Click], p: DVec2, tol: f64) -> Option<(EntityId, DVec2)> {
+    let [a, b] = clicks else { return None };
+    let mut best: Option<(EntityId, DVec2, f64)> = None;
+    for (at, other) in [(a, b.pos), (b, a.pos)] {
+        let Some(AutoConstraint::CoincidentPoint(pt)) = at.inference.as_ref().and_then(|i| i.constraints.first()) else { continue };
+        for e in sk.entities().filter(|e| e.kind() == EntityKind::Line) {
+            let Some((s, f)) = sk.endpoints(e.id).filter(|(s, f)| s == pt || f == pt) else { continue };
+            let (Some(ps), Some(pf)) = (sk.point(s), sk.point(f)) else { continue };
+            let Some(n) = (pf - ps).perp().try_normalize() else { continue };
+            let chord = other - at.pos;
+            let across = n.dot(chord);
+            if across.abs() < 1e-12 {
+                continue;
+            }
+            let centre = at.pos + n * (chord.length_squared() / (2.0 * across));
+            let r = (centre - at.pos).length();
+            let Some(u) = (p - centre).try_normalize() else { continue };
+            let q = centre + u * r;
+            let off = (q - p).length();
+            if off <= tol && best.is_none_or(|(_, _, d)| off < d) {
+                best = Some((e.id, q, off));
+            }
+        }
+    }
+    best.map(|(l, q, _)| (l, q))
+}
+
 fn semicircle_snap(a: DVec2, b: DVec2, p: DVec2, tol: f64) -> Option<DVec2> {
     let m = (a + b) * 0.5;
     let (ctr, _) = noshape_sketch::shapes::circle_through(a, p, b)?;
@@ -10040,6 +10106,54 @@ mod tests {
         assert!(!ed.accept_otf(&mut d).unwrap(), "nothing left to accept");
     }
 
+    /// Live sketch-tools-1123 text.md (SKT-INFER-STORED): the second corner inferred vertical to a line's end keeps
+    /// `VERTICAL (secondSnap0)`.
+    #[test]
+    fn a_text_corner_inferred_vertical_to_a_point_stays_vertical() {
+        let (mut ed, mut d) = editor(Tool::Text);
+        let line = d.sketch.add_line(v(0.0, 0.05), v(0.03, 0.05));
+        let (_, end) = d.sketch.endpoints(line).unwrap();
+        ed.place(&mut d, Click { pos: v(0.01, 0.01), inference: None }, false);
+        let vertical = Inference { kind: InferenceKind::Vertical, position: v(0.03, 0.02), entity: None, reference: Some(v(0.03, 0.05)), constraints: vec![AutoConstraint::VerticalWith(end)], distance: 0.0, priority: 1 };
+        ed.place(&mut d, Click { pos: v(0.03, 0.02), inference: Some(vertical) }, false);
+        ed.text_string = "Ab".into();
+        assert!(ed.accept_text(&mut d).changed);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { b: Some(b), .. } if b == end)), "VERTICAL to the line's end");
+    }
+
+    /// Live sketch-tools-1123 arcs.md (SKT-INFER-STORED): a 3 point arc from a line's end, its bend where the arc is
+    /// tangent to the line: the line lights and the arc is made TANGENT to it.
+    #[test]
+    fn a_three_point_arc_bent_tangent_to_its_starts_line_is_tangent() {
+        let (mut ed, mut d) = editor(Tool::Arc3);
+        let l0 = d.sketch.add_line(v(-0.06, 0.03), v(-0.02, 0.03));
+        click(&mut ed, &mut d, v(-0.02, 0.03));
+        click(&mut ed, &mut d, v(0.0, 0.01));
+        // The tangent circle: centre (-0.02, 0.01), r 0.02; the pointer 2 px off its mid-sweep point.
+        let bend = v(-0.02, 0.01) + DVec2::new(1.0, 1.0).normalize() * (0.02 + 2.0 * PX);
+        ed.pointer_move(&mut d, bend, false, false);
+        assert_eq!(ed.inference.as_ref().map(|i| (i.kind, i.entity)), Some((InferenceKind::Tangent, Some(l0))), "the line lit");
+        click(&mut ed, &mut d, bend);
+        let arc = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).unwrap().id;
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Tangent { a, b } if (a, b) == (arc, l0) || (a, b) == (l0, arc))));
+        assert!(d.sketch.solve().is_solved());
+    }
+
+    /// Live sketch-tools-1123 (arcs.md, SKT-VB-PLACE-LENGTH): a length typed mid-chain keeps the segment's end, the
+    /// chain point, and moves its start.
+    #[test]
+    fn a_length_typed_mid_chain_keeps_the_chain_point() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.013));
+        click(&mut ed, &mut d, v(0.03, 0.017));
+        ed.commit_otf(&mut d, "7", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
+        let (s, e) = d.sketch.endpoints(line).unwrap();
+        let (ps, pe) = (d.sketch.point(s).unwrap(), d.sketch.point(e).unwrap());
+        assert!((pe - v(0.03, 0.017)).length() < 1e-9 && ((pe - ps).length() - 0.007).abs() < 1e-9, "{ps} {pe}");
+        assert_eq!((ed.tool, ed.chain_end), (Tool::Line, Some(e)));
+    }
+
     /// Live 2025 (b): an ellipse's boxes after its 3rd click, the major active; Enter dimensions the active box at
     /// its value and moves to the other; once a box is a dimension, Enter on the other, untouched one does nothing.
     #[test]
@@ -10183,6 +10297,20 @@ mod tests {
             assert!(d.sketch.entities().count() > before, "{tool:?}: the pattern added its instances");
             assert_eq!(ed.tool, Tool::Select, "{tool:?}: the tool ended");
             assert!(ed.selection.is_empty(), "{tool:?}: nothing selected");
+        }
+    }
+
+    /// Live sketch-tools-1123 mp2 (SKT-PATTERN-DESELECT): a pattern ended without its commit (the tool's button again,
+    /// Esc, the menu's Escape) keeps nothing and leaves its seed unselected.
+    #[test]
+    fn a_pattern_ended_without_commit_leaves_its_seed_unselected() {
+        for (tool, then) in [(Tool::LinearPattern, Tool::LinearPattern), (Tool::CircularPattern, Tool::Select)] {
+            let (mut ed, mut d) = editor(tool);
+            let line = d.sketch.add_line(v(0.01, 0.01), v(0.02, 0.01));
+            ed.selection.push(line);
+            let before = d.sketch.entities().count();
+            ed.set_tool(then);
+            assert_eq!((ed.tool, ed.selection.len(), d.sketch.entities().count()), (Tool::Select, 0, before), "{tool:?}");
         }
     }
 
@@ -13014,6 +13142,15 @@ mod tests {
         let (mut ed, mut d) = editor(Tool::Line);
         ed.pointer_move(&mut d, v(0.03, 0.017), false, false);
         assert_eq!(cursor_points(&ed, &d), 1, "the point at the pointer, no snap");
+    }
+
+    /// Live sk23 ta-3 (SKT-TANGENT-ARC-DOT): Tangent arc shows no point at the pointer before its start is picked.
+    #[test]
+    fn tangent_arc_shows_no_cursor_point_before_its_start() {
+        let units = UnitPrefs::default();
+        let (mut ed, mut d) = editor(Tool::TangentArc);
+        ed.pointer_move(&mut d, v(0.03, 0.017), false, false);
+        assert_eq!(ed.overlay(&d, &units).1.points.iter().filter(|p| p.size == 6.0).count(), 0);
     }
 
     /// qa 11-17 SKSNAP-ALIGN-WOKEN-POINT (live 11-17 sketch-snap-1117 row 2): another sketch's point rested on (an

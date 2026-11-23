@@ -558,13 +558,25 @@ pub const ASCENT_PER_EM: f64 = 0.72;
 
 /// [`layout_text`] for a sketch text box: in units where the box's height is 1, its `ascent` ([`ASCENT_PER_EM`]),
 /// not the font's ascender line.
+/// The box holds the first line only: later lines hang below it at the same left x, [`SKETCH_LINE_PITCH`] apart,
+/// and the box's width is the first line's (live text-two-lines-1123).
 pub fn layout_sketch_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
-    let layout = layout_text(text, font, bold, italic);
-    match ascender_per_em(font, bold, italic) {
-        Some(a) => layout.scaled(a / ASCENT_PER_EM),
-        None => layout,
+    let k = ascender_per_em(font, bold, italic).map_or(1.0, |a| a / ASCENT_PER_EM);
+    let mut out = TextLayout::default();
+    for (li, line) in text.chars().take(MAX_CHARS).collect::<String>().lines().enumerate() {
+        let one = layout_text(line, font, bold, italic).scaled(k);
+        let dy = SKETCH_LINE_PITCH * li as f64;
+        out.contours.extend(one.contours.iter().map(|c| map_contour(c, &|p| DVec2::new(p.x, p.y - dy))));
+        if li == 0 {
+            out.width = one.width;
+        }
+        out.lines = li + 1;
     }
+    out
 }
+
+/// Baseline to baseline of a sketch text's lines, in ascents (live: 18.889 mm at ascent 10).
+pub const SKETCH_LINE_PITCH: f64 = 1.8889;
 
 /// The ascender line (a text box's height) per font size of the face [`layout_text`] uses (Open Sans 2189 / 2048).
 pub fn ascender_per_em(font: &str, bold: bool, italic: bool) -> Option<f64> {

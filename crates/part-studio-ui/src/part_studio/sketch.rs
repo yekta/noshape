@@ -5685,7 +5685,14 @@ impl PartStudioView {
         let tool = ed.tool;
         let drawing_spline = matches!(tool, Tool::Spline | Tool::Bezier) && !ed.clicks_empty();
         let tool_active = tool != Tool::Select && !drawing_spline;
-        let tool_name = tool.label().split(" (").next().unwrap_or("tool").to_lowercase();
+        // Live's headers (sketch-tools-1123): "Escape arc", "Escape fillet", "Escape chamfer", "Escape use".
+        let tool_name = match tool {
+            Tool::Arc3 => "arc".to_string(),
+            Tool::Fillet => "fillet".to_string(),
+            Tool::Chamfer => "chamfer".to_string(),
+            Tool::Use => "use".to_string(),
+            _ => tool.label().split(" (").next().unwrap_or("tool").to_lowercase(),
+        };
         // A single selected line: Align view with vertical axis (tool menu).
         let (sel0, frame) = ((n == 1).then(|| ed.selection[0]), ed.frame);
         let single_line = sel0.zip(self.sketch_data(cx)).and_then(|(e, d)| match d.sketch.curve(e)? {
