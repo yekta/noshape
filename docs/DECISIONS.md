@@ -203,7 +203,8 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   on OCCT vs live's ~0.25 s document). Staged, each stage through the full Boolean gate (+0 -0 on every corpus).
 - 11-23 (lead) Subtract's cut faces take the target part's colour, as live's (core). They get Boolean-based names for
   that, gated by the Part Studio's feature version: older studios keep their current names so references don't break.
-- 11-23 (lead) Importing into an existing Part Studio is Onshape's route: Derived › the picker's Import… (the file becomes
-  its own tab, Derived brings its parts in, linked). No direct "import into this Part Studio" beyond what live offers.
+- 11-23 (lead) Importing into an existing Part Studio is Onshape's route: + › Import… (the file becomes its own tab), then a
+  Derived of that tab brings its parts in, linked (live import-into-doc-1123: Derived's picker has no Import…).
+  No direct "import into this Part Studio" beyond what live offers.
 - 11-23 (lead) Sketch Use of an already-used edge and Mirror of an already-mirrored entity make duplicates, as live's
   (skasm): this is behaviour, not a failure, so we match it rather than refuse.
