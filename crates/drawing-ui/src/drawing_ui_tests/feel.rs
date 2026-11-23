@@ -1216,6 +1216,14 @@ fn a_click_on_a_bom_cell_opens_the_cell_panel_and_a_double_click_adds_nothing(cx
     };
     let one = press(cx, 1..=1);
     assert_eq!(one, (Some((id, (1, 0), (1, 0))), vec![Sel::Table(id)], true, true), "one click: the cell, the table, the Cell panel, no editor");
+    // The pointer still on it: the table's tan hover frame with the blue cell (live cferr-bomclk-1118, drw-hover-1122
+    // sh-tablecell); Esc drops the cell and the hover frame stays (cferr-bomclk-1118 b7).
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).lit_tables().into_iter().map(|(t, _)| t).collect::<Vec<_>>());
+    assert_eq!(lit(cx), vec![id], "clicked, the pointer on it: the table's hover look");
+    cx.update(|cx| editor.update(cx, |e, cx| e.cancel(cx)));
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).cell_sel.map(|c| c.table)), None, "Esc drops the cell");
+    assert_eq!(lit(cx), vec![id], "after Esc, the pointer on it: the hover frame stays");
     cx.executor().advance_clock(std::time::Duration::from_millis(600));
     assert_eq!(press(cx, 1..=2), one, "a double-click: the same");
     // An empty click keeps the cell (live drwm-4b b7, drwm-6 c4c).
@@ -1631,6 +1639,20 @@ fn a_holes_centre_mark_lights_from_its_circle_and_a_press_there_drags_the_view(c
         e.picks_of(mark).iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| *s & (noshape_render::state::SELECTED | noshape_render::state::HOVER) != 0)).count()
     });
     assert_eq!(lit_arms, 0, "the view selected: its centre mark's arms as they are");
+    // The view selected and the centre mark hovered (live2 drw-centermark, last row): the circle stays the view's
+    // orange, the arms tan, its 4 grips and blue dot, the view's orange frame.
+    assert_eq!(lit_at(cx, window, &editor, on_arm), Some(mark), "the view selected: an arm still lights the centre mark");
+    let l = looks(cx);
+    assert!(!l.grips.is_empty() && l.circles.is_empty(), "hovered in the selected view: its grips, the circle the view's orange ({l:?})");
+    let hovered_arms = cx.update(|cx| {
+        let e = editor.read(cx);
+        let scene = e.build_scene();
+        e.picks_of(mark).iter().filter(|p| scene.states.get(**p as usize).is_some_and(|s| *s & noshape_render::state::HOVER != 0)).count()
+    });
+    assert!(hovered_arms > 0, "hovered in the selected view: the arms tan");
+    assert_eq!(frames(cx), vec![(view, crate::drawing_view::DRAWING_SELECTED)], "hovered in the selected view: the view's orange frame");
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::View(view)], "the view stays selected");
+    lit_at(cx, window, &editor, [5.0, 5.0]);
     cx.update(|cx| editor.update(cx, |e, _| e.selection.clear()));
     let position = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().view(view).map(|v| v.position).expect("the view"));
     let before = position(cx);
@@ -2819,6 +2841,15 @@ fn the_dimension_tool_marks_its_picks_as_live_and_keeps_the_placed_one_selected(
     assert_eq!(count(cx), before + 1, "one dimension placed");
     assert_eq!(sel, vec![Sel::Annotation(placed)], "placed: selected");
     assert!(bold(cx, Some(placed)), "placed: bold");
+    // The pointer moved off before Esc: black at once, no box, no tint (live dimsel-1121 (d)).
+    lit_at(cx, window, &editor, [5.0, 5.0]);
+    let tinted = cx.update(|cx| {
+        let e = editor.read(cx);
+        let scene = e.build_scene();
+        let boxed = scene.instances.iter().any(|i| i.layer == -4);
+        (boxed, e.picks_of(Sel::Annotation(placed)).iter().any(|p| scene.states.get(*p as usize).is_some_and(|s| *s & (noshape_render::state::SELECTED | noshape_render::state::HOVER) != 0)))
+    });
+    assert_eq!(tinted, (false, false), "placed, the pointer off it: black");
     // Placed, the tool on: both points keep their discs (live drw-dimension-point-to-point-vertical s4); Esc takes them.
     let discs = |cx: &mut TestAppContext| cx.update(|cx| [a, b].iter().filter(|p| editor.read(cx).overlay.marks.iter().any(|(m, k, _)| *k == SnapMark::Disc && (m[0] - p[0]).hypot(m[1] - p[1]) < 1e-6)).count());
     assert_eq!(discs(cx), 2, "placed: both discs kept");
@@ -4942,3 +4973,5 @@ fn a_circle_centerline_click_takes_the_circles_top_quadrant(cx: &mut TestAppCont
     assert!((first.p[0] - top[0]).abs() < 1e-9 && (first.p[1] - top[1]).abs() < 1e-9, "the top quadrant {top:?}: {:?}", first.p);
     assert!(matches!(first.r, Some(PointRef::Quadrant { k: 1, .. })), "kept as the quadrant: {:?}", first.r);
 }
+
+mod states;

@@ -249,6 +249,27 @@ impl DrawingEditor {
         }
     }
 
+    /// The annotations whose referenced geometry lights light blue: the selected and the hovered alike (live
+    /// drawing 1392: identical either way).
+    pub(crate) fn related_annotations(&self) -> Vec<u64> {
+        // A note whose leader end is dragged lights no edge (live drw-drag-feel-1122 L).
+        let dragged = self.dragging_annotation_id().or(match &self.drag {
+            Drag::LeaderEnd { id, .. } => Some(*id),
+            _ => None,
+        });
+        let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).filter(|a| Some(*a) != dragged).collect();
+        // A dimension just placed with the tool still on: no blue, and no dots on an edge's ends (qa workflow 09 s10; a
+        // 2 point one keeps its points' discs, dim_kept_points).
+        if matches!(self.tool, Tool::Dimension { .. }) {
+            anns.clear();
+        }
+        if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| dragged.is_none_or(|d| *s != Sel::Annotation(d))) {
+            anns.push(a);
+        }
+        anns.extend(self.placed_callout_lit());
+        anns
+    }
+
     pub fn push_related_highlights(&self, scene: &mut Scene) {
         let Some(b) = &self.built else { return };
         // The selected hatch regions: a yellow outline with a pale halo (live request 1682, "the yellow surround"); the
@@ -290,21 +311,7 @@ impl DrawingEditor {
             let up = self.gpu.uploader();
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
         }
-        // A note whose leader end is dragged lights no edge (live drw-drag-feel-1122 L).
-        let dragged = self.dragging_annotation_id().or(match &self.drag {
-            Drag::LeaderEnd { id, .. } => Some(*id),
-            _ => None,
-        });
-        let mut anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(a) = s { Some(*a) } else { None }).filter(|a| Some(*a) != dragged).collect();
-        // A dimension just placed with the tool still on: no blue, and no dots on an edge's ends (qa workflow 09 s10; a
-        // 2 point one keeps its points' discs, dim_kept_points).
-        if matches!(self.tool, Tool::Dimension { .. }) {
-            anns.clear();
-        }
-        if let Some(Sel::Annotation(a)) = self.hover.and_then(|h| self.sel_of_pick(h)).filter(|s| dragged.is_none_or(|d| *s != Sel::Annotation(d))) {
-            anns.push(a);
-        }
-        anns.extend(self.placed_callout_lit());
+        let anns = self.related_annotations();
         let (row_callouts, row_geometry) = self.table_row_highlight();
         if anns.is_empty() && row_callouts.is_empty() && row_geometry.is_empty() {
             return;

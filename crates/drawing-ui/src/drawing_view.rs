@@ -213,7 +213,7 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                 // original, live drw-custom-table-split s13.)
                 // (Add node / Remove node keep the note: live2 drw-leader-add-node s11, drw-leader-remove-node s14; Group
                 // annotation its callouts: qa workflows-1123 10 s23.)
-                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Group annotation" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten" | "Split Hole table below" | "Split custom table below" | "Add node" | "Remove node");
+                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Group annotation" | "Remove from group" | "Hide auto centermarks" | "Show all" | "Remove foreshorten" | "Split Hole table below" | "Split custom table below" | "Add node" | "Remove node" | "Border frame" | "Border zones" | "Title block");
                 let paste = label.as_ref() == "Paste";
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
@@ -231,6 +231,12 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                         if !keeps && matches!(t.tool, Tool::Select) && !t.dialog_or_mode_open() && !t.selection.is_empty() {
                             t.selection.clear();
                             t.redraw(cx);
+                        }
+                        // What the menu closed over lights at once (live dx q2489 step 8: the view under the row).
+                        if matches!(t.tool, Tool::Select) && !t.dialog_or_mode_open() {
+                            t.cursor = at;
+                            t.pointer_off = false;
+                            t.update_hover(cx);
                         }
                     });
                     hover_after_menu(window);
@@ -1767,11 +1773,12 @@ impl DrawingEditor {
                     scene.add_flag(p, state::SELECTED);
                 }
             }
-            // A dragged view's dimensions and notes go orange with it (live drw-drag-feel-1122 V).
-            if let Drag::MoveViews { view, .. } = self.drag
-                && self.preview.is_some()
-                && !self.view_drag_cancelled
-            {
+            // A dragged view goes orange, with its dimensions and notes (live drw-drag-feel-1122 V, feel/cov-1120).
+            if let Some(view) = self.dragged_view() {
+                let label = |p: &u32| matches!(b.picks.get(*p as usize), Some(PickTarget::ViewLabel(_)));
+                for p in self.picks_of(Sel::View(view)).into_iter().filter(|p| !label(p)) {
+                    scene.add_flag(p, state::SELECTED);
+                }
                 for a in cur.annotations.iter().filter(|a| a.kind.view() == Some(view) || a.moves_with_view() == Some(view)) {
                     for p in self.picks_of(Sel::Annotation(a.id)) {
                         scene.add_flag(p, state::SELECTED);
@@ -1811,6 +1818,15 @@ impl DrawingEditor {
                     }
                 }
             }
+            // The circle a radial's grip is dragged onto lights orange (live drawing/regrip rg-2).
+            if let Drag::Reattach { orig, .. } = &self.drag
+                && matches!(orig.kind, AnnotationKind::RadialDimension { .. })
+                && let Some(Pick::Circle { view, center, .. }) = self.pk().circle_pick(self.cursor)
+            {
+                for p in self.pk().centermark_circle_picks(view, noshape_model::drawing::build::centermark_key(center)) {
+                    scene.add_flag(p, state::SELECTED);
+                }
+            }
             // Its palette open, a dimension keeps the tan hover look wherever the pointer is (live drwm-5 p0, q1a, q2).
             let palette_dim = self.palette.as_ref().filter(|p| !p.hole).map(|p| Sel::Annotation(p.id));
             for d in dims.iter().filter(|d| hovered_dim != Some(**d) && palette_dim != Some(**d)) {
@@ -1838,6 +1854,14 @@ impl DrawingEditor {
             self.push_aux_states(&mut scene);
         }
         scene
+    }
+
+    /// The view a drag is moving (the preview shown, not cancelled with Esc).
+    pub(crate) fn dragged_view(&self) -> Option<ViewId> {
+        match self.drag {
+            Drag::MoveViews { view, .. } if self.preview.is_some() && !self.view_drag_cancelled => Some(view),
+            _ => None,
+        }
     }
 
     /// The annotation a drag is moving.
@@ -2116,7 +2140,10 @@ impl DrawingEditor {
         });
         // A hovered cutting line frames its section view light blue (live2 drw-tools-1119 sl.png).
         let colour = if select && self.hovered_cut_line().is_some() { 0x90cef1 } else { DRAWING_HOVER };
-        let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, colour)).into_iter().collect();
+        // A dragged view: the selected look's frame (live drw-drag-feel-1122 V).
+        let dragged = self.dragged_view();
+        let hovered = hovered.filter(|v| dragged != Some(*v));
+        let mut frames: Vec<(ViewId, u32)> = hovered.map(|v| (v, colour)).into_iter().chain(dragged.map(|v| (v, DRAWING_SELECTED))).collect();
         let boxed = self.box_preview.iter().filter(|_| matches!(self.drag, Drag::SelectBox { .. }));
         for s in self.selection.iter().chain(boxed).chain(lit.map(Sel::View).iter()) {
             if let Sel::View(v) = s

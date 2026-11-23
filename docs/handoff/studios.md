@@ -37,6 +37,21 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   studios 11-23 07:58). Rest of the 1122 matrix already in feel tests (reach, colours, table, centerline).
 - 08:1x (lead: my open P2s): all on main's list are fixed in the queued stack (qa's "STILL OPEN" 02:5x reads predate
   it). Leftovers done: HIST-LEGEND pin glyphs + Change glyph, HIST-GRAPH version dot r 5.5 (VERSION_DOT_R).
+- 08:2x lead: feel-spec audit of my 6 areas (behaviours.md specs without a test -> a feel test each, fix fails, hover x
+  selected/dragged/open-menu first; land ~5 per batch; report counts specs / covered before / after). Sweep lists:
+  /root/studios-scratch/audit/{drawing,studios}.tsv + *-uncovered.md (made by two read-only subagents).
+  Counts: 1081 specs (drawing 632, docs 118, VS 96, FS 96, history 79, release 60), 598 covered before (483 open, 28 P0).
+  08:4x batch 1 (P0s, 21 specs -> 619): drawing feel/states.rs (sel x hover = hover look for dim/note/centerline/
+  border; oh- keeps the view orange; dragged view orange frame + edges [fixed]; dragged dim plain, hover on release;
+  menu row click keeps the note + lights the view under it [fixed]; radial grip drag lights the target circle
+  [fixed]); feel.rs BOM cell + Esc, centre mark hovered in a selected view, placed dim black off the pointer; FS
+  completion hover/wheel + squiggle tip with a selection; docs dragged row = selected at 0.5 [fixed, was 0.55].
+  Tab bar 6586-3 too (folder rgb(178,221,246) under a 0.25 ghost) -> 620. Batch 2 (P1, +10 -> 630): diameter's
+  circle blue hovered = selected (related_annotations), view label hover/click, VS cell Shift/Ctrl-click/Esc/Space/
+  Tab (Space now edits as Enter), FS right-click keeps the selection + Copy/Paste/Cut, history filter look.
+  Open P0s: 46692-13 centerline grips (REQUESTS 08:37: tip squares + blue discs), 24268-4 angular regrip, VS 48068-1
+  (no hover state exists: nothing to assert), 4 tab-bar ones (crates/app workspace). Matrix "no change" for sh-note/
+  sh-border was wrong: crops show the hover look (behaviours note 08:29).
 - FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 on main). live import-into-doc-1123: ours matches; rest is dx's.
 - Mac check: watcher bd5jb96zs polls v0.4.68's mac asset (not published at 06:28); then bin/mac-copycheck.sh 0.4.68
   (idle >= 600 s only), report <= 3 lines to the lead. Background runs/watchers die at session end: re-arm.
