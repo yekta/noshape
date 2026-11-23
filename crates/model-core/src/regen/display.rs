@@ -501,11 +501,14 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             .map(|a| a.color)
             .or_else(|| ctx.part_appearance.get(&b.id).copied())
             .unwrap_or(PART_COLORS[b.color % PART_COLORS.len()]);
-        // Faces a feature colored (an import's face colours).
+        // Faces a feature colored (an import's face colours), kept on a part another was merged into (live psui
+        // step-colours-1122: a union keeps both parts' face appearances, split faces' pieces included).
         let face_colors: Vec<Option<[f32; 4]>> = if ctx.face_appearance.is_empty() {
             Vec::new()
         } else {
-            b.faces.iter().map(|n| ctx.face_appearance.iter().rev().find(|(id, f, _)| *id == b.id && n.descends_from(f)).map(|(_, _, c)| *c)).collect()
+            let alive: std::collections::HashSet<&crate::reference::BodyId> = ctx.bodies.iter().map(|o| &o.id).collect();
+            let ours = |id: &crate::reference::BodyId| *id == b.id || !alive.contains(id);
+            b.faces.iter().map(|n| ctx.face_appearance.iter().rev().find(|(id, f, _)| ours(id) && n.descends_from(f)).map(|(_, _, c)| *c)).collect()
         };
         let face_colors = if face_colors.iter().any(Option::is_some) { face_colors } else { Vec::new() };
         let bounds = mesh_bounds(&mesh).or_else(|| b.shape.bounding_box(false).ok().map(|x| (x.min, x.max)));

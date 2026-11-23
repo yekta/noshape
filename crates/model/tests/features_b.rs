@@ -1029,6 +1029,46 @@ fn import_foreign_names_and_colors() {
     assert!(r.display.bodies.iter().all(|d| d.face_colors.is_empty() && d.color != [0.0, 0.0, 1.0, 1.0]));
 }
 
+/// A union of imported parts is its first tool (live psui step-colours-1122): that part's name, id and colour, every
+/// face colour of both kept (split faces' pieces too), the other part's uncoloured faces in the result's colour.
+#[test]
+fn union_of_imported_parts_is_its_first_tool() {
+    use noshape_model::features::importing::ImportPartInfo;
+    let a = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.01, 0.01, 0.01).unwrap();
+    let b = noshape_kernel::make_box_corners(DVec3::splat(0.005), DVec3::splat(0.015)).unwrap();
+    let brep = String::from_utf8(noshape_kernel::Shape::compound(&[a, b]).to_brep_bytes().unwrap()).unwrap();
+    let info = vec![
+        ImportPartInfo { name: Some("Main".into()), color: Some([0.0, 1.0, 0.0]), opacity: None, faces: Vec::new() },
+        ImportPartInfo { name: Some("Fan".into()), color: Some([0.0, 0.0, 1.0]), opacity: None, faces: vec![(0, [1.0, 0.0, 0.0])] },
+    ];
+    let json = serde_json::to_string(&info).unwrap();
+    for (first, colour) in [("Main", [0.0, 1.0, 0.0, 1.0]), ("Fan", [0.0, 0.0, 1.0, 1.0])] {
+        let mut s = Studio::new();
+        let (b2, j2) = (brep.clone(), json.clone());
+        s.add("importForeign", move |p| {
+            p.set("blobData", ParamValue::Text(b2));
+            p.set("partInfo", ParamValue::Text(j2));
+        });
+        let r = s.ok();
+        let id = |name: &str| r.context.bodies.iter().find(|x| x.name == name).unwrap().id.clone();
+        let (main, fan) = (id("Main"), id("Fan"));
+        let tools = if first == "Main" { vec![main.clone(), fan] } else { vec![fan, main] };
+        let kept = tools[0].clone();
+        s.add("booleanBodies", move |p| {
+            p.set("operationType", ParamValue::Enum("UNION".into()));
+            p.set("tools", ParamValue::Query(tools.into_iter().map(Reference::Body).collect()));
+        });
+        let r = s.ok();
+        assert_eq!(r.context.bodies.len(), 1);
+        assert_eq!(r.context.bodies[0].id, kept);
+        let d = &r.display.bodies[0];
+        assert_eq!((d.name.as_str(), d.color), (first, colour));
+        assert!(d.face_colors.contains(&Some([1.0, 0.0, 0.0, 1.0])), "{first}: Fan's red face kept");
+        let others: Vec<_> = d.face_colors.iter().flatten().filter(|c| **c != [1.0, 0.0, 0.0, 1.0]).collect();
+        assert!(others.is_empty(), "{first}: no other face colour {others:?}");
+    }
+}
+
 /// Mesh imports (Onshape G22/G27): STL and PVZ parts are mesh parts (one
 /// face, no edges); a PVZ part whose mesh doesn't close (Onshape's loft
 /// sample) becomes a closed composite of its 2 open pieces.
