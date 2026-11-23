@@ -515,6 +515,27 @@ UIS-FEATURE-INITIALS (12 s13/14, 13 s18). No regressions vs out-wf23 except 03 s
 - [ ] P2 **HIST-LEGEND-LOOK (studios)**: workflow 19 s21: live's History legend ~50 px lower with pin glyphs; ours a dotted blue Change line and plain triangles. tickets/wf23b-19-s21-legend.png
 - [ ] P2 **PS-PARTS-ROW-TOOLTIP-PITCH (psui)**: workflow 17 s11: live shows a "Part 1" tooltip on the clicked row and a 26 px row pitch; ours no tooltip, 24 px. tickets/wf23b-17-s11.png
 
+## qa, 2026-11-23 01:5x (live errors-1123 set a vs ours: extrude, revolve, sweep, loft, shell, draft, boolean, fillet, chamfer; 48 cases; committed on 24f1566de, creating on 30d4affdd)
+9 =, 39 ≠. Row tooltips, title hover texts and committed messages are word for word (except the loft title); header mark, red row/title,
+pink box, row tooltip box (208,219,229) and info bubble colours =. "Succeeds in live" (Chamfer 5/40, 35/35, 12/45, 45/12; Draft 60°,
+80° flipped, 89°; Fillet R9) build in ours too, except Revolve 0° and Intersect with no overlap (rows below). Evidence
+qa-scratch/tickets/ERR-<F>-<CASE>[-N]-1123.png (-N = creating, live left). Not replayed: the Loft Profiles box hover (no script target);
+Enter on out-of-range values (✓ checked: disabled, as live).
+- [ ] P0 **ERR-CHROME-ACTIVE-BOX-TIP (psui)**: hovering an empty required box that is the active blue box: live shows the message ("Select face or sketch region to extrude."); ours the box label. 15 cases (every */empty, draft/nofaces, boolean no-tools/union-empty). ERR-EXTRUDE-EMPTY-1123.png
+- [ ] P0 **ERR-CHROME-TIP-PLACEMENT (psui)**: live puts field tooltips right of the dialog beside the box and the title tooltip right of the title; ours under the pointer; the row tooltip ~5 px right and 7 px lower. ERR-EXTRUDE-REMOVE-MISS-1123.png
+- [ ] P0 **ERR-TOOL-BODY-COLOUR (psui)**: the would-be tool body: live (113,76,79), ring (141,68,73), region with an orange outline only; ours paler (139,86,92)/(123,101,106), region filled orange. extrude/add-miss, remove-miss, revolve/remove-miss. ERR-EXTRUDE-ADD-MISS-1123.png
+- [ ] P0 **ERR-SEL-RED-ALL-INPUTS (core)**: on a failure live keeps the selections orange and the entries normal, only the entities the feature names go red (chamfer/fillet edge, shell face); ours makes every entry red and draws the inputs red or pale red; depth 0's region lacks live's red outline; up-to-face and sweep-nopath regions tan instead of orange. extrude depth0/upnext/uptoface-none, revolve axis-through, sweep nopath/tight-bend/in-plane, loft one-profile/coplanar/guide-miss, draft face-parallel/is-neutral/angle-90, shell zero, boolean subtract-no-targets, fillet too-big. ERR-DRAFT-FACE-PARALLEL-1123.png
+- [ ] P0 **ERR-BUBBLE-ON-ERROR (core)**: Extrude/Revolve Remove with an empty merge scope: ours shows the INFO "do not intersect" bubble next to the error; live the error only. ERR-EXTRUDE-REMOVE-MISS-1123.png
+- [ ] P0 **ERR-REVOLVE-ANGLE0 (core)**: Revolve 0°: live builds a full ring, row normal; ours "Revolve would create self-intersecting part.". ERR-REVOLVE-ANGLE0-1123.png
+- [ ] P0 **ERR-BOOLEAN-INTERSECT-NONE (core)**: Intersect with no overlap: live OK, no message, both parts consumed; ours INFO bubble, both parts kept. ERR-BOOLEAN-INTERSECT-NO-OVERLAP-1123.png
+- [ ] P0 **ERR-BOOLEAN-TARGETS-EMPTY (core)**: Subtract with no targets: ours doesn't name `targets` as the faulty parameter: box not pink, its hover "Targets" with no message. ERR-BOOLEAN-SUBTRACT-NO-TARGETS-1123.png
+- [ ] P0 **ERR-LOFT-GUIDES-EMPTY (core)**: Loft with an empty guide: live INFO bubble "Some selections could not be used as guides, check that selections are not construction entities.", the guide row "No selections"; ours OK, no bubble, a blank row, and the row tip lists "Sketch 2, Sketch 3" (live "Sketch 3, Sketch 2"). ERR-LOFT-GUIDES-EMPTY-1123.png
+- [ ] P0 **ERR-SWEEP-FAIL-BODY (core)**: sweep/tight-bend, profile-in-path-plane: live draws the failed sweep dark red, translucent, red edges; ours nothing. ERR-SWEEP-TIGHT-BEND-1123.png
+- [ ] P0 **ERR-FILLET-FAIL-PREVIEW (blend)**: fillet too big / concave corner: live draws the attempted fillet magenta (255,0,255), keeps the selection orange and shows the radius manipulator; ours red edges, no magenta, no manipulator. ERR-FILLET-TOO-BIG-1123.png
+- [ ] P0 **ERR-LOFT-TITLE-SUFFIX (core)**: Loft with no profiles: our title hover appends " A parameter value is not valid."; same root as ERR-FEATPATTERN-TITLE-SUFFIX (01:2x). ERR-LOFT-EMPTY-1123.png
+- Range tooltip ("Enter a value between 0.0100 and 500000. Current value is 0.", Draft "between 0 and 89.9…") missing on shell/fillet/chamfer zero and draft 90 too: see ERR-FIELD-RANGE-TIP-ENTER (01:4x, psui). ERR-SHELL-ZERO-N-1123.png
+- P3 shell/hollow-too-thick: ours draws an orange outline over the red edges. ERR-SHELL-HOLLOW-TOO-THICK-1123.png
+
 ## qa, 2026-11-23 01:5x (live psui/appearance-1123 Q1-Q5 vs ours, green 30d4affdd (+ ed11f7c48 for 7 cells), vibe2; qa-scratch/feel1122/appear/)
 Most of the dialog and part-colour flows =: dialog 220×400, ✓ off until a change, palette/# field/RGBA/tessellation, preview colours
 exact (223,44,46 / 143,44,46), ✓/✕, Undo/Redo, multi-part dialog, overlap rule, Union/Intersect/Subtract rules, assemblies (no instance
