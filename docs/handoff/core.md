@@ -1,14 +1,10 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 02:56 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 03:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-22 13:05 UTC)
-- **Queue:** c66e5963 rectangle test fixes (core-rf: 8e3ffc49's fix forward; ops e2e show_code/coincident, psui
-  model-edge drags (block_centre), snaps row (normalize_or_zero), glyph walk; lit-end was main's, psui f8b0a2d8);
-  3779e4f1 knifehandle Blade scatter (core-dock). LANDED 472eddd5 Loft 1 as c08ef29e (14:40; blend told to rerun
-  Fillet 1), f94fdf98 isaac speed (volume_change, merge_cylinder_patches copy only for merging pairs; 00f1d4 19.9 -> 12.5 s).
 - **QUEUED P0 BOOLEAN-UNION-FIRST-TOOL-IDENTITY (1e05327f, 11-23):** display.rs face_colors also takes face colours of
   a part merged away (keyed by its old BodyId), so a union keeps both parts' face colours. Already as live: the union
   keeps the first tool's id and name (T1 features_b::union_of_imported_parts_is_its_first_tool, both orders). The
@@ -80,7 +76,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   suite pair (lofts in many docs change edge kinds) + NOSHAPE_PARITY_VALIDITY=1 on surfaces-lofts-projected.
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
-
 
 ## In flight (11-20)
 - **LANDED 11-20:** singularities Sketch 2 P0 a2e7c966; fillet orientation d80c2c58 (then reverted, below); manualblend
@@ -160,12 +155,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. QUEUED ba3d71cf (02:35, carries 2245e27a/6d3caf84/e686d40c/f9bfa75fc): 62069e2d7 Thicken refuses a side reaching a
-   quadric/torus face's centre of curvature (features.cpp thicken; T1 features_c::a_cylinder_thickened_past_its_axis_fails);
-   guided surface loft: every profile miss LOFT_FAILED (loft_guided.cpp ~2087). TO LAND: 47768962c Move face (direct.rs:
-   a part offset to nothing fails; offset_past_axis -> booleans, boss removed; T1 features_c::move_face_on_the_boss_block_as_live).
-   Probes kept OUT of git: ~/core-keep/probes2.patch (kernel probe_hose_sweep + probe_hose_lines; git apply to rerun, .hl.sh).
-0. 01:33 batch failure (part-studio-ui a_chip_made_by_a_later_feature) is NOT 2245e27a: passes on core-rf (told lead).
+0. QUEUED 0c582c74 (02:56; carries ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED, Move face
+   (a part offset to nothing fails; boss offset to its axis removed). 2245e27a/6d3caf84/e686d40c LANDED 02:53.
+   IN TEST (core-rf, UNCOMMITTED, run .fp2.sh on vibex8 -> /root/core-scratch/fp2.log; vibex7 held for qa's 03:00 speed
+   run): ERR-FACE-PATTERN-FAILED-PREVIEW + ERR-SWEEP-FAIL-BODY: pattern.rs apply_tools strict -> error_shapes = off
+   copies; run_pattern_paths FACE failure -> failed_instances copies; hole.rs missed_tools -> error_shapes on "None of
+   the holes intersected a part."; solid_a.rs tight bend -> error_shapes = the invalid sweep. T1: features_c
+   a_face_mirror_off_the_part_draws_its_copies_red, a_hole_off_its_part_draws_its_body_red (new boss_block() /
+   face_nearest() helpers), kernel_robustness a_sweep_round_too_tight_a_bend_draws_its_body_red. Green -> commit, land.
+   ERR-BUBBLE-ON-ERROR: regen pushes no info on that error; the bubble is part-studio-ui mod.rs ~1256 dialog state:
+   reproduce in the app (qa err/b remove-miss) before touching. Probes out of git: ~/core-keep/probes2.patch.
 0. HOSE-RINGS (dx 11-23; live exact everywhere, 144 edges no tolerance): the model's walls are accurate (sweep 1e-14,
    smooth Shell by_smooth shell.cpp ~3025 inner edges 1e-7, edge tol 2.8e-7); dx's xt writer restores the offset
    (offsets_restored) and cuts closed edges > 1e-8 off it: 6 rings a hose. Why: (a) END rings: the true offset meets the
