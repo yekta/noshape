@@ -5813,3 +5813,62 @@ fn an_external_threads_chamfer_and_undercut_cut_the_rod() {
         }
     }
 }
+
+/// Live errors-1123 move-face on boss-block (block x -20..20, y -15..15, z 0..10, Ø8 boss at x 10 to z 20): the +x side
+/// offset 40 mm in leaves nothing and fails ("Could not offset selected faces as requested."); the top offset 10 or
+/// 15 mm in builds; the boss's cylinder offset 4 or 6 mm in builds with the boss gone.
+#[test]
+fn move_face_on_the_boss_block_as_live() {
+    let build = || {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(-20.0, -15.0), (20.0, -15.0), (20.0, 15.0), (-20.0, 15.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_circle(DVec2::new(mm(10.0), 0.0), mm(4.0));
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("20 mm"));
+            p.set("operationType", ParamValue::Enum("ADD".into()));
+            p.set("defaultScope", ParamValue::Bool(true));
+        });
+        s
+    };
+    let side = Some(DVec3::new(mm(20.0), 0.0, mm(5.0)));
+    let top = Some(DVec3::new(0.0, mm(10.0), mm(10.0)));
+    for (case, at, dist, ok, vol) in [("side-through", side, "40 mm", false, None), ("zero", top, "10 mm", true, None), ("collapse", top, "15 mm", true, None), ("cyl-r0", None, "4 mm", true, Some(12000.0)), ("cyl-neg", None, "6 mm", true, Some(12000.0))] {
+        let mut s = build();
+        let r = s.ok();
+        let face = match at {
+            Some(p) => {
+                let b = &r.context.bodies[0];
+                let off = |f: &noshape_kernel::Shape| f.project_point(p).unwrap().point.distance(p);
+                let i = b.shape.faces().iter().enumerate().min_by(|x, y| off(x.1).total_cmp(&off(y.1))).unwrap().0;
+                Reference::Face((*b.faces[i]).clone())
+            }
+            None => cylinder_face(&r, 0),
+        };
+        s.add("moveFace", move |p| {
+            p.set("moveFaces", ParamValue::Query(vec![face]));
+            p.set("offsetDistance", expr(dist));
+            p.set("oppositeDirection", ParamValue::Bool(true));
+        });
+        let st = s.last_status();
+        if !ok {
+            assert_eq!(st, (FeatureStatus::Error, "Could not offset selected faces as requested.".to_string()), "{case}");
+            continue;
+        }
+        assert_eq!(st.0, FeatureStatus::Ok, "{case}: {st:?}");
+        let Some(live) = vol else { continue };
+        let r = s.regen();
+        assert_eq!(r.context.bodies.len(), 1, "{case}");
+        assert!(near(volume(&r, 0) * 1e9, live, 1e-3), "{case}: {} mm³", volume(&r, 0) * 1e9);
+    }
+}

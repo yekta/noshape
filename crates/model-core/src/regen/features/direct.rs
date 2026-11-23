@@ -346,6 +346,7 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
     }
     // Onshape's texts: the kernel's reason isn't shown.
     let failed_msg = if ty == "OFFSET" { "Could not offset selected faces as requested." } else { "Could not transform selected faces as requested." };
+    let moved: Vec<usize> = groups.keys().copied().collect();
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
@@ -448,6 +449,11 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         if translate_dir.is_none() && (touches_freeform(&body.shape, &faces) || beside_its_own_surface(&body.shape, &faces)) && offset_by_booleans(ev, bi, &faces, dist).is_ok() {
             continue;
         }
+        // A cylinder offset to its axis goes whole: OCCT's offset turns it inside out (live mf-cyl-neg: no r 2 boss).
+        if translate_dir.is_none() && shapes.iter().any(|f| offset_past_axis(f, dist).unwrap_or(false)) {
+            offset_by_booleans(ev, bi, &faces, dist).map_err(|_| fe(failed_msg))?;
+            continue;
+        }
         let res = match translate_dir {
             None => match k::offset_faces(&body.shape, &shapes, dist) {
                 Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,
@@ -494,28 +500,38 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
         ev.replace_body(bi, res.shape, names);
     }
+    // A part moved to nothing (live mf-side-through: a side offset the part's length in) fails.
+    if moved.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.kind == BodyKind::Solid && b.shape.volume().is_ok_and(|v| v <= 1e-15))) {
+        return err(failed_msg);
+    }
     Ok(())
+}
+
+/// Whether a round cylinder face offset by `d` along its outward normal reaches its axis: a hole closing, a boss going
+/// (live mf-cyl-r0 / mf-cyl-neg: the r 4 boss offset 4 or 6 mm in is removed).
+fn offset_past_axis(f: &Shape, d: f64) -> FResult<bool> {
+    let k::Surface::Cylinder { origin, axis, radius, .. } = f.face_surface()? else { return Ok(false) };
+    // A point on the face (a full cylinder's centroid is on its axis).
+    let c = f.project_point(f.centroid()? + axis.any_orthonormal_vector() * radius)?.point;
+    let toward_axis = f.normal_at_point(c)?.dot((origin + axis * (c - origin).dot(axis)) - c) > 0.0;
+    let inward = if toward_axis { d } else { -d };
+    Ok(inward >= radius * (1.0 - 1e-9) && f.edges().iter().any(|e| e.is_closed().unwrap_or(false)))
 }
 
 /// The region a face sweeps when offset by `d` along its outward normal (d < 0:
 /// into the part). A cylinder face offset past its axis (a hole closing)
 /// sweeps the whole cylinder.
 fn face_slab(f: &Shape, d: f64) -> FResult<Shape> {
-    if let k::Surface::Cylinder { origin, axis, radius, .. } = f.face_surface()? {
-        // Offset toward the axis by at least the radius (outward normal pointing in).
-        // A point on the face (a full cylinder's centroid is on its axis).
-        let c = f.project_point(f.centroid()? + axis.any_orthonormal_vector() * radius)?.point;
-        let n = f.normal_at_point(c)?;
-        let toward_axis = n.dot((origin + axis * (c - origin).dot(axis)) - c) > 0.0;
-        if toward_axis && d >= radius * (1.0 - 1e-9) && f.edges().iter().any(|e| e.is_closed().unwrap_or(false)) {
-            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
-            for v in f.vertices() {
-                let t = (v.vertex_point()? - origin).dot(axis);
-                lo = lo.min(t);
-                hi = hi.max(t);
-            }
-            return Ok(k::make_cylinder(&k::Plane::from_normal(origin + axis * lo, axis), radius, hi - lo, std::f64::consts::TAU)?);
+    if let k::Surface::Cylinder { origin, axis, radius, .. } = f.face_surface()?
+        && offset_past_axis(f, d)?
+    {
+        let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+        for v in f.vertices() {
+            let t = (v.vertex_point()? - origin).dot(axis);
+            lo = lo.min(t);
+            hi = hi.max(t);
         }
+        return Ok(k::make_cylinder(&k::Plane::from_normal(origin + axis * lo, axis), radius, hi - lo, std::f64::consts::TAU)?);
     }
     // Thicken, then make sure the slab is on the requested side.
     let p = f.centroid()?;
