@@ -27,7 +27,7 @@ pub fn ops() -> Vec<Op> {
             opt("iges_postprocessing", json!({ "type": "boolean" }), "IGES postprocessing (IGES files): their straight edges read as lines."),
             opt("keep_files", json!({ "type": "boolean", "default": true }), "Keep the files as file tabs in \"CAD Imports\"."),
             opt("upload_only", json!({ "type": "boolean" }), "Upload only: every file kept as it is, as a file tab after the import's tab, nothing translated. A bare assembly file (.sldasm, .iam, .catproduct, .asm) needs it, as the dialog: Onshape needs a zip of the assembly and all of its references to translate it."),
-            opt("after", s(), "Tab to put the new tabs after (default: the end)."),
+            opt("after", s(), "Tab to put the new tabs after (default: the open tab, as the app)."),
         ],
         mutates: true,
         destructive: false,
@@ -46,7 +46,8 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let after = match a.opt_str("after")? {
         Some(t) => Some(doc::find_tab(od.doc(), t).map_err(|e| e.with_param("after"))?),
-        None => None,
+        // Live import-fidelity-1123: right after the open tab (a new document's first), never at the end.
+        None => od.window.active_tab.or(od.session.active_tab).filter(|t| od.doc().tab(*t).is_some()).or_else(|| od.doc().ordered_tabs().first().map(|t| t.id)),
     };
     // A bare assembly file: the dialog's Import stays disabled until Upload only is ticked (live upload-only-1118).
     let upload_only = a.bool_or("upload_only", false)?;
@@ -75,7 +76,8 @@ fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // As the dialog: only offered for Onshape's material density types.
     c.density = a.bool_or("density", false)? && import::offers_material_density(&paths);
     c.y_up = a.bool_or("y_up", false)?;
-    c.composite = a.bool_or("composite", false)?;
+    // Combine hides the composite box (live import-fidelity-1123).
+    c.composite = a.bool_or("composite", false)? && !c.combine;
     c.join = a.bool_or("join", false)?;
     // As the dialog: only offered for IGES files.
     c.iges_post = a.bool_or("iges_postprocessing", false)? && import::offers_iges_postprocessing(&paths);

@@ -2932,6 +2932,49 @@ fn import_iges_round_trip_keeps_names_and_colours() {
     assert_eq!(back["color"], "#e51919", "{back}");
 }
 
+/// Import appearances off keeps the part's colour and drops the faces' own (live import-fidelity-1123 macmini-noapp).
+#[test]
+fn import_appearances_off_keeps_the_part_colour() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import-noapp.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "parts": [part], "color": "#e51919" }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "faces": [top], "color": "#00ff00" }));
+    let step = scratch("noapp.step");
+    call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": step.to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()], "appearances": false }));
+    let back = &call(&mut ctx, "query_parts", json!({ "tab": "noapp" }))["parts"][0];
+    assert_eq!(back["color"], "#e51919", "{back}");
+    let a = call(&mut ctx, "part_appearances", json!({ "tab": "noapp" }));
+    assert!(a["appearances"].as_array().is_none_or(|l| l.is_empty()), "{a}");
+    // With no `after`, the new Part Studio comes right after the open tab, not at the end (live import-fidelity-1123).
+    let tabs: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let at = |n: &str| tabs.iter().position(|t| t == n).unwrap_or_else(|| panic!("{n}: {tabs:?}"));
+    assert_eq!(at("noapp"), at("Part Studio 1") + 1, "{tabs:?}");
+}
+
+/// Import's "Create a composite part" on a file of two solids: one closed composite named after the file, in a
+/// colour of its own (live import-fidelity-1123: usbc, Mac mini); with Combine the option is off, as its hidden box.
+#[test]
+fn import_composite_part_is_named_after_the_file() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "import-composite.noshape");
+    let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "tab": "Part Studio 1", "sketch": sk, "tool": "circle", "points": [[80, 0], [85, 0]] }));
+    let disc = call(&mut ctx, "sketch_get", json!({ "tab": "Part Studio 1", "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": "extrude", "params": { "entities": [disc], "depth": "10 mm", "operationType": "NEW" } }));
+    let step = scratch("pair_of_parts.step");
+    call(&mut ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STEP", "file": step.to_str().unwrap() }));
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()], "composite": true }));
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "pair_of_parts" }));
+    let list: Vec<(String, String)> = parts["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), p["kind"].as_str().unwrap().to_string())).collect();
+    assert_eq!(list, vec![("pair_of_parts".to_string(), "Composite".to_string())], "{parts}");
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()], "composite": true, "combine": true }));
+    let parts = call(&mut ctx, "query_parts", json!({ "tab": "pair_of_parts (1)" }));
+    assert!(parts["parts"].as_array().unwrap().iter().all(|p| p["kind"] == "Solid") && parts["parts"].as_array().unwrap().len() == 2, "{parts}");
+}
+
 #[test]
 fn materials_and_appearances() {
     let mut ctx = Ctx::new();
@@ -3749,6 +3792,13 @@ fn import_options_and_errors() {
     // The STL in millimeters has the block's size.
     let parts = call(&mut ctx, "query_parts", json!({ "tab": tabs[0]["name"].as_str().unwrap() }));
     assert!(parts["parts"].as_array().unwrap().iter().all(|p| { let b = &p["bounding_box"]; b.is_null() || (num(&b["max"][0]) - num(&b["min"][0]) - 80.0).abs() < 0.1 }), "{parts}");
+    // Live import-fidelity-1123: Import 1 names the composite after its file, flattens with Combine, makes no assemblies.
+    let tab = tabs[0]["name"].as_str().unwrap();
+    let import = call(&mut ctx, "feature_list", json!({ "tab": tab }))["features"].as_array().unwrap().iter().find(|f| f["name"] == "Import 1").unwrap()["id"].clone();
+    let g = call(&mut ctx, "feature_get", json!({ "tab": tab, "feature": import }));
+    let p = &g["params"];
+    assert_eq!((p["compositeName"].as_str(), p["flatten"].as_bool(), p["dependsOnBlob"].as_bool()), (Some("opts_block"), Some(true), Some(true)), "{g}");
+    assert!(["0", "\"0\"", "0.0"].contains(&p["maxAssembliesToCreate"].to_string().as_str()), "{g}");
     // A zip without a native root assembly, an unknown type, a missing file.
     // Two parts exported as individual files: a zip of STEP files, no native assembly.
     let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();

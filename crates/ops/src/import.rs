@@ -530,6 +530,11 @@ pub fn add_import_feature(ps: &mut PartStudio, file: &str, foreign: Foreign, uni
         // Live (documents/64-import-feature-dialog.png): the feature is
         // numbered like any other ("Import 1") and allows faulty parts.
         f.params.set("allowFaultyParts", ParamValue::Bool(true));
+        // Live import-fidelity-1123: the composite named after the file, no assemblies, the file's blob.
+        let stem = std::path::Path::new(file).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        f.params.set("compositeName", ParamValue::Text(stem));
+        f.params.set("maxAssembliesToCreate", ParamValue::Expr(noshape_units::ExprValue::new("0")));
+        f.params.set("dependsOnBlob", ParamValue::Bool(true));
         f.params.set("blobData", ParamValue::Text(foreign.brep));
         f.params.set("partInfo", ParamValue::Text(foreign.parts));
         f.params.set("foreignId", ParamValue::Text(file.to_string()));
@@ -881,6 +886,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
                 f.params.set("yAxisIsUp", ParamValue::Bool(c.y_up));
                 f.params.set("createComposite", ParamValue::Bool(c.composite));
                 f.params.set("joinAdjacentSurfaces", ParamValue::Bool(c.join));
+                f.params.set("flatten", ParamValue::Bool(c.combine));
             }
         }
         // A name already used: "<name> (1)", "(2)", … (live).

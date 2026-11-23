@@ -502,6 +502,9 @@ pub fn add_pvz_assembly(doc: &mut Document, pvz: &PvzImport, units: &UnitPrefs) 
     f.params.set("blobData", ParamValue::Text(brep));
     f.params.set("partInfo", ParamValue::Text(info));
     f.params.set("foreignId", ParamValue::Text(foreign_id.clone()));
+    f.params.set("compositeName", ParamValue::Text(stem.clone()));
+    f.params.set("maxAssembliesToCreate", ParamValue::Expr(noshape_units::ExprValue::new("0")));
+    f.params.set("dependsOnBlob", ParamValue::Bool(true));
     // The dialog's choices first: they decide which bodies the parts become.
     for (k, v) in options {
         f.params.set(k, ParamValue::Bool(*v));

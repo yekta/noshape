@@ -362,6 +362,7 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
     };
     // In the file's order: each wire before the tool that followed it.
     let mut wires = wires.into_iter().peekable();
+    let mut parts = Vec::new();
     for (ti, (p, look)) in tools.into_iter().zip(looks).enumerate() {
         while let Some((_, w, wl)) = wires.next_if(|(at, _, _)| *at <= ti) {
             let before = ev.ctx.bodies.len();
@@ -375,6 +376,15 @@ pub fn import_foreign(ev: &mut EvalCtx) -> FResult<()> {
         add(ev, p, kind)?;
         for bi in before..ev.ctx.bodies.len() {
             apply_look(ev, bi, &look, appearances);
+            parts.push(bi);
+        }
+    }
+    // "Create a composite part when importing multiple or non-solid bodies": one closed composite named after the file,
+    // in a colour of its own (live import-fidelity-1123: usbc's 34 parts, the Mac mini's 2).
+    if ev.bool("createComposite") && (parts.len() > 1 || parts.iter().any(|&i| ev.ctx.bodies[i].kind != BodyKind::Solid)) {
+        match ev.params.text("compositeName").to_string() {
+            n if n.is_empty() => super::refgeom::make_composite(ev, &parts, true, 40_000)?,
+            n => super::refgeom::make_named_composite(ev, &parts, true, 40_000, n)?,
         }
     }
     for (_, p, look) in wires {
@@ -428,8 +438,7 @@ fn linear(c: [f32; 3]) -> [f32; 4] {
 /// its own (live G35: STL "Part 1" rgb(248,135,1), isGenerated).
 const MESH_PART_COLOR: [f32; 3] = [248.0 / 255.0, 135.0 / 255.0, 1.0 / 255.0];
 
-/// Give an imported part the file's name, and with "Import appearances"
-/// its colours (the part's and its faces' own).
+/// Give an imported part the file's name and its colour, and with "Import appearances" its faces' own colours.
 fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
     if let Some(name) = look.name.as_ref().filter(|n| !n.trim().is_empty()) {
         ev.ctx.bodies[bi] = std::sync::Arc::new(ev.ctx.bodies[bi].renamed(name.clone()));
@@ -440,13 +449,15 @@ fn apply_look(ev: &mut EvalCtx, bi: usize, look: &Look, appearances: bool) {
     if !(appearances && look.color.is_some()) && body.shape.is_mesh() {
         ev.ctx.part_appearance.insert(body.id.clone(), linear(MESH_PART_COLOR));
     }
-    if !appearances {
-        return;
-    }
-    if let Some(c) = look.color {
+    // Import appearances off keeps the part colours and drops the face colours (live import-fidelity-1123
+    // macmini-noapp: Main #ececec, Fan #4a4848, 0 face appearances).
+    if let Some(c) = look.color.filter(|_| appearances || !body.shape.is_mesh()) {
         let mut c = linear(c);
         c[3] = look.opacity.unwrap_or(1.0);
         ev.ctx.part_appearance.insert(body.id.clone(), c);
+    }
+    if !appearances {
+        return;
     }
     for (face, c) in &look.faces {
         if let Some(fi) = body.shape.index_of(face, ShapeType::Face) {

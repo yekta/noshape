@@ -4,6 +4,8 @@
 // unit conversion is done by the Rust layer.
 #include "internal.hpp"
 #include <BRepBuilderAPI_Copy.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
+#include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_NurbsConvert.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <Geom_BSplineCurve.hxx>
@@ -92,6 +94,7 @@
 #include <TDF_Label.hxx>
 #include <TDataStd_Name.hxx>
 #include <TDocStd_Document.hxx>
+#include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <XCAFApp_Application.hxx>
 #include <XCAFDoc_ColorTool.hxx>
@@ -534,12 +537,74 @@ void refine_freeform_pcurves(const std::vector<TopoDS_Shape>& shapes)
   }
 }
 
+namespace
+{
+bool is_closed_shell(const TopoDS_Shell& sh)
+{
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+  TopExp::MapShapesAndAncestors(sh, TopAbs_EDGE, TopAbs_FACE, ef);
+  bool closed = ef.Extent() > 0;
+  for (int i = 1; i <= ef.Extent() && closed; ++i)
+  {
+    const TopoDS_Edge& ed = TopoDS::Edge(ef.FindKey(i));
+    const int          n  = ef(i).Extent();
+    closed = BRep_Tool::Degenerated(ed) || n == 2 || (n == 1 && BRep_Tool::IsClosed(ed, TopoDS::Face(ef(i).First())));
+  }
+  return closed;
+}
+
+// A part's open shells whose faces meet within 0.1 µm but don't share their edges (the NEMA 17 STEP's screws, a
+// MANIFOLD_SOLID_BREP read as one open shell of 250 faces, or as one shell per face; live reads solids), sewn shut
+// into one shell: the same faces in the same order (face colours go by index), or nothing when sewing leaves them
+// open, in several shells, or changes the face count.
+std::optional<TopoDS_Shell> sewn_shut(const TopoDS_Shape& open_shells)
+{
+  ShapeIMap faces;
+  TopExp::MapShapes(open_shells, TopAbs_FACE, faces);
+  BRepBuilderAPI_Sewing sew(1e-4); // mm (the reader's unit): 0.1 µm
+  for (int i = 1; i <= faces.Extent(); ++i)
+    sew.Add(faces(i));
+  sew.Perform();
+  TopoDS_Shell sewn;
+  int          shells = 0;
+  for (TopExp_Explorer e(sew.SewedShape(), TopAbs_SHELL); e.More(); e.Next(), ++shells)
+    sewn = TopoDS::Shell(e.Current());
+  ShapeIMap in_sewn;
+  if (shells == 1)
+    TopExp::MapShapes(sewn, TopAbs_FACE, in_sewn);
+  if (shells != 1 || !BRep_Tool::IsClosed(sewn) || in_sewn.Extent() != faces.Extent())
+    return std::nullopt;
+  std::vector<TopoDS_Shape> oriented(in_sewn.Extent() + 1);
+  for (TopExp_Explorer e(sewn, TopAbs_FACE); e.More(); e.Next())
+    oriented[in_sewn.FindIndex(e.Current())] = e.Current();
+  TopoDS_Shell out;
+  BRep_Builder b;
+  b.MakeShell(out);
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const int k = in_sewn.FindIndex(sew.IsModifiedSubShape(faces(i)) ? sew.ModifiedSubShape(faces(i)) : faces(i));
+    if (k == 0)
+      return std::nullopt;
+    b.Add(out, oriented[k]);
+  }
+  out.Closed(true);
+  BRepBuilderAPI_MakeSolid ms(out);
+  if (!ms.IsDone())
+    return std::nullopt;
+  TopoDS_Solid so = ms.Solid();
+  BRepLib::OrientClosedSolid(so);
+  if (!BRepCheck_Analyzer(so).IsValid())
+    return std::nullopt;
+  return out;
+}
+} // namespace
+
 // A surface model's closed shells as solids (a FreeCAD STEP: SHELL_BASED_SURFACE_MODEL of one CLOSED_SHELL, no
 // MANIFOLD_SOLID_BREP; live reads it as a solid part: asm-infento-subs' shaft, lever, halfClutch): each shell outside a
 // solid whose every edge bounds two of its faces (or is a seam or degenerate), made a solid facing out. Open shells
-// stay surfaces; the faces and their order (and colours) stay. A shape of mesh faces (a tessellated shell: Onshape's
+// stay surfaces unless they sew shut (`sew`: once their pcurves are fixed); the faces and their order (and colours) stay. A shape of mesh faces (a tessellated shell: Onshape's
 // STEP of a mesh part) is made a mesh body as the mesh import makes it.
-void solids_from_closed_shells(std::vector<TopoDS_Shape>& shapes)
+void solids_from_closed_shells(std::vector<TopoDS_Shape>& shapes, bool sew)
 {
   for (TopoDS_Shape& s : shapes)
   {
@@ -547,7 +612,8 @@ void solids_from_closed_shells(std::vector<TopoDS_Shape>& shapes)
       continue;
     if (has_mesh_faces(s))
     {
-      s = mesh_rebodied(s);
+      if (!sew)
+        s = mesh_rebodied(s);
       continue;
     }
     ShapeIMap in_solid;
@@ -555,30 +621,49 @@ void solids_from_closed_shells(std::vector<TopoDS_Shape>& shapes)
       TopExp::MapShapes(e.Current(), TopAbs_SHELL, in_solid);
     const occ::handle<BRepTools_ReShape> rs  = new BRepTools_ReShape;
     bool                                 any = false;
+    std::vector<TopoDS_Shell>            open;
     for (TopExp_Explorer e(s, TopAbs_SHELL); e.More(); e.Next())
     {
       const TopoDS_Shell sh = TopoDS::Shell(e.Current());
       if (in_solid.Contains(sh) || rs->IsRecorded(sh))
         continue;
-      NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
-      TopExp::MapShapesAndAncestors(sh, TopAbs_EDGE, TopAbs_FACE, ef);
-      bool closed = ef.Extent() > 0;
-      for (int i = 1; i <= ef.Extent() && closed; ++i)
-      {
-        const TopoDS_Edge& ed = TopoDS::Edge(ef.FindKey(i));
-        const int          n  = ef(i).Extent();
-        closed = BRep_Tool::Degenerated(ed) || n == 2 || (n == 1 && BRep_Tool::IsClosed(ed, TopoDS::Face(ef(i).First())));
-      }
-      if (!closed)
-        continue;
       try
       {
+        if (!is_closed_shell(sh))
+        {
+          open.push_back(sh);
+          continue;
+        }
         ShapeFix_Solid     fix;
         const TopoDS_Solid so = fix.SolidFromShell(sh);
         if (so.IsNull())
           continue;
         rs->Replace(sh, so);
         any = true;
+      }
+      catch (const Standard_Failure&)
+      {
+      }
+    }
+    if (sew && !open.empty())
+    {
+      try
+      {
+        TopoDS_Compound all;
+        BRep_Builder    b;
+        b.MakeCompound(all);
+        for (const TopoDS_Shell& sh : open)
+          b.Add(all, sh);
+        const std::optional<TopoDS_Shell> shut = sewn_shut(all);
+        ShapeFix_Solid                    fix;
+        const TopoDS_Solid                so = shut ? fix.SolidFromShell(*shut) : TopoDS_Solid();
+        if (!so.IsNull())
+        {
+          rs->Replace(open[0], so);
+          for (size_t i = 1; i < open.size(); ++i)
+            rs->Remove(open[i]);
+          any = true;
+        }
       }
       catch (const Standard_Failure&)
       {
@@ -920,9 +1005,10 @@ StepImport read_step(rust::Str path)
   }
   if (out.shapes->items.empty())
     fail_io("STEP file contains no shapes: " + p);
-  solids_from_closed_shells(out.shapes->items);
+  solids_from_closed_shells(out.shapes->items, false);
   fix_pole_pcurves(out.shapes->items);
   refine_freeform_pcurves(out.shapes->items);
+  solids_from_closed_shells(out.shapes->items, true);
   clock.lap("step pole pcurves");
   return out;
 }
@@ -1148,9 +1234,10 @@ StepTree read_step_tree(rust::Str path)
   clock.lap("step tree walk");
   app->Close(doc);
   clock.lap("step tree close");
-  solids_from_closed_shells(out.parts.shapes->items);
+  solids_from_closed_shells(out.parts.shapes->items, false);
   fix_pole_pcurves(out.parts.shapes->items);
   refine_freeform_pcurves(out.parts.shapes->items);
+  solids_from_closed_shells(out.parts.shapes->items, true);
   clock.lap("step tree pole pcurves");
   return out;
 }

@@ -86,7 +86,7 @@ pub fn import_foreign() -> FeatureType {
         ParamSpec::enum_("unit", "Unit", LENGTH_UNIT_NAMES).default_enum("Meter").visible(|v| v.bool("specifyUnits")),
         hidden(ParamSpec::enum_("originalUnit", "Original unit", LENGTH_UNIT_NAMES).default_enum("Meter")),
         hidden(ParamSpec::bool("flatten", "Flatten assembly", false)),
-        hidden(ParamSpec::num("maxAssembliesToCreate", "Maximum number of assemblies created", NumSpec::integer(10, 1, 100_000))),
+        hidden(ParamSpec::num("maxAssembliesToCreate", "Maximum number of assemblies created", NumSpec::integer(10, 0, 100_000))),
         hidden(ParamSpec::bool("isInContext", "Is in context", false)),
         ParamSpec::bool("createComposite", "Create composite", false),
         // Import modal › "Join adjacent surfaces": sew surfaces sharing edges.

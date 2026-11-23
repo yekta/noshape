@@ -74,18 +74,18 @@ pub struct ImportedShape {
 /// Imported parts with each solid, and each solid's pieces meeting at no edge, a part of its own, coloured as the part
 /// and named after it, a split solid's pieces "<part>__<solid>" (live2 q-step-twopiece: one STEP solid "Two pieces" of
 /// two separate blocks in "Part 2" imports as two solid parts "Part 2__Two pieces"), a body of several solids' parts
-/// after their solids (live: Mac-mini-2024.step's product "root" of solids "Main" and "Fan"); a part that can't be
-/// split stays whole.
+/// after their solids (live: Mac-mini-2024.step's product "root" of solids "Main" and "Fan"), or "Part 1"… when they
+/// have no names (live import-fidelity-1123: usbc); a part that can't be split stays whole.
 pub fn split_connected_pieces(parts: Vec<ImportedShape>) -> Vec<ImportedShape> {
     let mut out = Vec::with_capacity(parts.len());
     for p in parts {
         let Ok(r) = ffi::connected_pieces(p.shape.raw()) else {
-            out.push(one_solid_colored(p));
+            out.push(uniform_faces_colored(one_solid_colored(p)));
             continue;
         };
         let pieces = list_to_vec(&r.shapes);
         if pieces.len() < 2 {
-            out.push(one_solid_colored(p));
+            out.push(uniform_faces_colored(one_solid_colored(p)));
             continue;
         }
         let several_solids = r.piece_solid.iter().any(|s| Some(s) != r.piece_solid.first());
@@ -99,13 +99,24 @@ pub fn split_connected_pieces(parts: Vec<ImportedShape>) -> Vec<ImportedShape> {
             let name = match (named.map(|(.., n)| n), &p.name) {
                 (Some(s), Some(n)) if split => Some(format!("{n}__{s}")),
                 (Some(s), _) if split || several_solids => Some(s.clone()),
+                (None, n) if several_solids => solid.map(|s| format!("Part {}", s + 1)).or(n.clone()),
                 (_, n) => n.clone(),
             };
             let color = solid.and_then(|s| p.solid_colors.iter().find(|(i, _)| *i == s)).map(|(_, c)| *c).or(p.color);
-            out.push(ImportedShape { shape, name, color, face_colors, solid_names: Vec::new(), solid_colors: Vec::new(), ..p.clone() });
+            out.push(uniform_faces_colored(ImportedShape { shape, name, color, face_colors, solid_names: Vec::new(), solid_colors: Vec::new(), ..p.clone() }));
         }
     }
     out
+}
+
+/// A part whose every face has the same colour of its own: that is the part's colour, with no face colours (live
+/// import-fidelity-1123: train-joe's and usbc's solids, every face overridden).
+fn uniform_faces_colored(p: ImportedShape) -> ImportedShape {
+    let Some(&(_, c)) = p.face_colors.first() else { return p };
+    if p.face_colors.len() != p.shape.count(crate::ShapeType::Face) || p.face_colors.iter().any(|(_, f)| *f != c) {
+        return p;
+    }
+    ImportedShape { color: Some(c), face_colors: Vec::new(), ..p }
 }
 
 /// A part of one solid with a colour of its own: that is the part's colour.
@@ -278,7 +289,8 @@ fn sewn_closed(p: ImportedShape, unit: LengthUnit) -> ImportedShape {
 /// colours follow their faces.
 fn merged_faces(mut p: ImportedShape, periodic: bool) -> Result<ImportedShape> {
     let t0 = std::time::Instant::now();
-    let m = ck(ffi::merge_same_surface_faces(p.shape.raw(), periodic))?;
+    let styled: Vec<u32> = p.face_colors.iter().map(|&(f, _)| f as u32).collect();
+    let m = ck(ffi::merge_same_surface_faces(p.shape.raw(), periodic, &styled))?;
     p.face_colors = p.face_colors.iter().filter_map(|(f, c)| m.face_map.get(*f).filter(|&&k| k != u32::MAX).map(|&k| (k as usize, *c))).collect();
     p.shape = Shape::from_ptr(m.shape);
     if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {

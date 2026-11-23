@@ -1038,7 +1038,7 @@ void set_thread_cancel(size_t flag);
 OpOut op_unify(const OcShape& s);
 // An imported part's faces on one plane (and with `periodic` one cylinder, cone, sphere or torus) merged, no history; the
 // part as it is when no two neighbours share one.
-MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic);
+MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic, rust::Slice<const uint32_t> styled_faces);
 OpOut op_join_edges(const OcShape& s);
 OpOut op_unify_edges(const OcShape& s);
 OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double tol, double max_turn);

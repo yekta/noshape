@@ -1017,7 +1017,7 @@ fn import_foreign_names_and_colors() {
     let r = s.ok();
     let other = r.display.bodies.iter().find(|d| d.name != "Bracket").unwrap();
     assert!(other.face_colors.contains(&Some([1.0, 0.0, 0.0, 1.0])));
-    // Without "Import appearances": names only.
+    // Without "Import appearances": names and part colours, no face colours (live import-fidelity-1123, macmini-noapp).
     let mut s = Studio::new();
     s.add("importForeign", move |p| {
         p.set("blobData", ParamValue::Text(brep));
@@ -1026,7 +1026,8 @@ fn import_foreign_names_and_colors() {
     });
     let r = s.ok();
     assert!(r.display.bodies.iter().any(|d| d.name == "Bracket"));
-    assert!(r.display.bodies.iter().all(|d| d.face_colors.is_empty() && d.color != [0.0, 0.0, 1.0, 1.0]));
+    assert!(r.display.bodies.iter().all(|d| d.face_colors.iter().all(Option::is_none)), "no face colours");
+    assert!(r.display.bodies.iter().any(|d| d.color == [0.0, 0.0, 1.0, 1.0]), "the part keeps its colour");
 }
 
 /// A union of imported parts is its first tool (live psui step-colours-1122): that part's name, id and colour, every

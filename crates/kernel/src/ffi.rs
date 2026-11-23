@@ -829,7 +829,7 @@ pub(crate) mod ffi {
         fn op_unify(s: &OcShape) -> Result<OpOut>;
         /// An imported part's faces on one plane (with `periodic` also one cylinder, cone, sphere or torus) merged, no
         /// history; the part itself when no neighbours share one.
-        fn merge_same_surface_faces(s: &OcShape, periodic: bool) -> Result<MergedFaces>;
+        fn merge_same_surface_faces(s: &OcShape, periodic: bool, styled_faces: &[u32]) -> Result<MergedFaces>;
         fn op_join_edges(s: &OcShape) -> Result<OpOut>;
         fn op_unify_edges(s: &OcShape) -> Result<OpOut>;
         fn op_join_edges_at(s: &OcShape, pts: &[f64], tol: f64, max_turn: f64) -> Result<OpOut>;

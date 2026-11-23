@@ -12743,7 +12743,7 @@ bool closes_without_seams(const TopoDS_Shape& s)
   return true;
 }
 
-MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
+MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic, rust::Slice<const uint32_t> styled_faces)
 {
   require_non_null(s.shape, "shape");
   const ShapeIMap& fm = s.map(TopAbs_FACE);
@@ -12805,6 +12805,11 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
   };
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  // Faces with a colour of their own keep their edges (live import-fidelity-1123: the USB-C's 140 styled faces).
+  NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> styled;
+  for (const uint32_t k : styled_faces)
+    if ((int)k < fm.Extent())
+      styled.Add(converted_face(fm((int)k + 1)));
   // Only across edges between faces on one analytic surface: the others kept (a healed thread's B-spline faces merged
   // into one whose boundary doesn't close).
   bool                                                   any = false;
@@ -12812,7 +12817,7 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const auto& faces = ef(i);
-    const bool  merge = faces.Extent() == 2 && !faces.First().IsSame(faces.Last()) && same_surface(TopoDS::Face(faces.First()), TopoDS::Face(faces.Last()), periodic);
+    const bool  merge = faces.Extent() == 2 && !faces.First().IsSame(faces.Last()) && same_surface(TopoDS::Face(faces.First()), TopoDS::Face(faces.Last()), periodic) && !styled.Contains(faces.First()) && !styled.Contains(faces.Last());
     any               = any || merge;
     if (!merge)
       keep.Add(ef.FindKey(i));
@@ -12919,7 +12924,7 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
   }
   // A merged periodic face Parasolid couldn't bound: the part merged across planes only.
   if (periodic && !closes_without_seams(result) && closes_without_seams(s.shape))
-    return merge_same_surface_faces(s, false);
+    return merge_same_surface_faces(s, false, styled_faces);
   MergedFaces out;
   out.shape = wrap(result);
   ShapeIMap nm;

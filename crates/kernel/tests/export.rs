@@ -1578,8 +1578,68 @@ fn dump_step_pmi() {
 fn dump_step_colours() {
     let Some(p) = std::env::var_os("NOSHAPE_STEP_READ") else { return };
     for s in split_connected_pieces(read_step(std::path::Path::new(&p), LengthUnit::Meter).unwrap()) {
-        println!("part {:?} colour {:?} {} faces, {} face colours", s.name, s.color, s.shape.count(ShapeType::Face), s.face_colors.len());
+        println!("part {:?} colour {:?} {} solids {} faces, {} face colours", s.name, s.color, s.shape.count(ShapeType::Solid), s.shape.count(ShapeType::Face), s.face_colors.len());
     }
+}
+
+/// Debug aid: the parts `read_step_assembly` gives for `NOSHAPE_STEP_ASM`.
+#[test]
+#[ignore = "debug aid"]
+fn dump_step_assembly() {
+    let Some(p) = std::env::var_os("NOSHAPE_STEP_ASM") else { return };
+    let Some(((root, parts, instances), _)) = read_step_assembly_nested(std::path::Path::new(&p), LengthUnit::Meter).unwrap() else { return println!("no assembly") };
+    println!("root {root}, {} instances", instances.len());
+    for s in parts {
+        println!("part {:?} colour {:?} {} solids {} shells {} faces", s.name, s.color, s.shape.count(ShapeType::Solid), s.shape.count(ShapeType::Shell), s.shape.count(ShapeType::Face));
+        if s.shape.count(ShapeType::Solid) == 0 {
+            for tol in [1e-7, 1e-6, 1e-5, 1e-4] {
+                let r = sew(&s.shape.faces(), tol, true).map(|r| (r.shape.count(ShapeType::Solid), r.shape.count(ShapeType::Face), r.shape.is_valid()));
+                println!("  sewn at {tol}: {r:?}");
+            }
+        }
+    }
+}
+
+/// A STEP solid whose faces don't share their edges (the NEMA 17 motor's screws: a MANIFOLD_SOLID_BREP OCCT reads as
+/// one open shell of 250 faces; live reads solids) is sewn shut: a box written with each edge's second use given its
+/// own copy of the EDGE_CURVE reads back as one solid of six faces.
+#[test]
+fn a_step_shell_whose_faces_meet_without_sharing_edges_reads_as_a_solid() {
+    let dir = std::env::temp_dir().join(format!("noshape-step-sewn-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.step");
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(0.03, 0.02, 0.01)).unwrap();
+    write_step(&path, &[ExportShape { shape: b, name: Some("Box".into()), color: None }], LengthUnit::Meter).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let (head, tail) = text.split_once("ENDSEC;\nEND-ISO").unwrap();
+    let mut next = head.split('#').skip(1).filter_map(|r| r.split_once('=')).filter_map(|(id, _)| id.trim().parse::<usize>().ok()).max().unwrap() + 1;
+    let edge_body = |id: &str| head.split(';').map(str::trim).find_map(|e| e.strip_prefix(&format!("#{id} ")).or_else(|| e.strip_prefix(&format!("#{id}="))).map(|r| r.trim_start_matches(['=', ' ']).to_string())).unwrap();
+    let (mut seen, mut copies, mut out) = (std::collections::HashSet::new(), String::new(), String::new());
+    for (i, part) in head.split("ORIENTED_EDGE(").enumerate() {
+        if i == 0 {
+            out.push_str(part);
+            continue;
+        }
+        out.push_str("ORIENTED_EDGE(");
+        // ORIENTED_EDGE('',*,*,#E,.T.): the edge is the reference before the orientation.
+        let (args, rest) = part.split_once(')').unwrap();
+        let e = args.rsplit(',').nth(1).unwrap().trim().trim_start_matches('#').to_string();
+        if seen.insert(e.clone()) {
+            out.push_str(&format!("{args}){rest}"));
+            continue;
+        }
+        copies.push_str(&format!("#{next} = {};\n", edge_body(&e)));
+        out.push_str(&format!("{}){rest}", args.replacen(&format!("#{e}"), &format!("#{next}"), 1)));
+        next += 1;
+    }
+    assert_eq!(copies.lines().count(), 12, "a box's 12 edges each used twice");
+    std::fs::write(&path, format!("{out}{copies}ENDSEC;\nEND-ISO{tail}")).unwrap();
+    let parts = read_step(&path, LengthUnit::Meter).unwrap();
+    let s = &parts[0].shape;
+    assert_eq!((parts.len(), s.count(ShapeType::Solid), s.count(ShapeType::Face)), (1, 1, 6));
+    let v = volume_properties(s).unwrap().mass;
+    assert!((v - 6e-6).abs() < 1e-12, "{v}");
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 /// One STEP product of two solids, each styled its own colour, and one face of the first styled again (psui's Mac
@@ -1603,30 +1663,33 @@ fn step_solid_colours_are_part_colours_and_face_styles_stay_on_their_face() {
     let first_face = refs(&body_of(refs(&body_of(solids[0]))[0]))[0];
     assert!(body_of(first_face).starts_with("ADVANCED_FACE"));
     let context = entities.iter().find(|(_, b)| b.contains("GEOMETRIC_REPRESENTATION_CONTEXT(3)")).map(|(i, _)| *i).unwrap();
-    let mut next = entities.iter().map(|(i, _)| *i).max().unwrap() + 1;
-    let mut added = String::new();
-    let mut styled = Vec::new();
-    for (item, rgb) in [(solids[0], "1.,0.,0."), (solids[1], "0.,0.,1."), (first_face, "0.,1.,0.")] {
-        let n = next;
-        added += &format!("#{}=COLOUR_RGB('',{rgb});\n#{}=FILL_AREA_STYLE_COLOUR('',#{});\n#{}=FILL_AREA_STYLE('',(#{}));\n", n, n + 1, n, n + 2, n + 1);
-        added += &format!("#{}=SURFACE_STYLE_FILL_AREA(#{});\n#{}=SURFACE_SIDE_STYLE('',(#{}));\n", n + 3, n + 2, n + 4, n + 3);
-        added += &format!("#{}=SURFACE_STYLE_USAGE(.BOTH.,#{});\n#{}=PRESENTATION_STYLE_ASSIGNMENT((#{}));\n", n + 5, n + 4, n + 6, n + 5);
-        added += &format!("#{}=STYLED_ITEM('color',(#{}),#{item});\n", n + 7, n + 6);
-        styled.push(format!("#{}", n + 7));
-        next += 8;
-    }
-    added += &format!("#{next}=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',({}),#{context});\n", styled.join(","));
-    // The solids named as a CAD system does (one product, two named bodies).
-    let rename = |l: &str| {
-        let Some(name) = entity(l).and_then(|(id, _)| [(solids[0], "Cube"), (solids[1], "Block")].into_iter().find(|(s, _)| *s == id)).map(|(_, n)| n) else { return l.to_string() };
-        let open = l.find("MANIFOLD_SOLID_BREP('").unwrap() + "MANIFOLD_SOLID_BREP('".len();
-        let close = open + l[open..].find('\'').unwrap();
-        format!("{}{name}{}", &l[..open], &l[close..])
+    // The solids red and blue, `green` faces green again, the solids named `names` (one product, two bodies).
+    let styled_read = |names: [&str; 2], green: &[usize]| {
+        let mut next = entities.iter().map(|(i, _)| *i).max().unwrap() + 1;
+        let mut added = String::new();
+        let mut styled = Vec::new();
+        for (item, rgb) in [(solids[0], "1.,0.,0."), (solids[1], "0.,0.,1.")].into_iter().chain(green.iter().map(|&f| (f, "0.,1.,0."))) {
+            let n = next;
+            added += &format!("#{}=COLOUR_RGB('',{rgb});\n#{}=FILL_AREA_STYLE_COLOUR('',#{});\n#{}=FILL_AREA_STYLE('',(#{}));\n", n, n + 1, n, n + 2, n + 1);
+            added += &format!("#{}=SURFACE_STYLE_FILL_AREA(#{});\n#{}=SURFACE_SIDE_STYLE('',(#{}));\n", n + 3, n + 2, n + 4, n + 3);
+            added += &format!("#{}=SURFACE_STYLE_USAGE(.BOTH.,#{});\n#{}=PRESENTATION_STYLE_ASSIGNMENT((#{}));\n", n + 5, n + 4, n + 6, n + 5);
+            added += &format!("#{}=STYLED_ITEM('color',(#{}),#{item});\n", n + 7, n + 6);
+            styled.push(format!("#{}", n + 7));
+            next += 8;
+        }
+        added += &format!("#{next}=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',({}),#{context});\n", styled.join(","));
+        let rename = |l: &str| {
+            let Some(name) = entity(l).and_then(|(id, _)| [(solids[0], names[0]), (solids[1], names[1])].into_iter().find(|(s, _)| *s == id)).map(|(_, n)| n) else { return l.to_string() };
+            let open = l.find("MANIFOLD_SOLID_BREP('").unwrap() + "MANIFOLD_SOLID_BREP('".len();
+            let close = open + l[open..].find('\'').unwrap();
+            format!("{}{name}{}", &l[..open], &l[close..])
+        };
+        let text = text.lines().map(rename).collect::<Vec<_>>().join("\n");
+        let end = text.rfind("ENDSEC;").unwrap();
+        std::fs::write(&path, format!("{}{added}{}\n", &text[..end], &text[end..])).unwrap();
+        split_connected_pieces(read_step(&path, LengthUnit::Meter).unwrap())
     };
-    let text = text.lines().map(rename).collect::<Vec<_>>().join("\n");
-    let end = text.rfind("ENDSEC;").unwrap();
-    std::fs::write(&path, format!("{}{added}{}\n", &text[..end], &text[end..])).unwrap();
-    let parts = split_connected_pieces(read_step(&path, LengthUnit::Meter).unwrap());
+    let parts = styled_read(["Cube", "Block"], &[first_face]);
     assert_eq!(parts.len(), 2, "{:?}", parts.iter().map(|p| (&p.name, p.color, p.face_colors.len())).collect::<Vec<_>>());
     let near = |c: Option<[f32; 3]>, want: [f32; 3]| c.is_some_and(|c| c.iter().zip(want).all(|(x, y)| (x - y).abs() < 0.01));
     let red = parts.iter().find(|p| near(p.color, [1.0, 0.0, 0.0])).expect("the red solid's part");
@@ -1639,6 +1702,15 @@ fn step_solid_colours_are_part_colours_and_face_styles_stay_on_their_face() {
     // Each part is its solid: the cube of 10 mm and the block of 20 mm.
     assert!((volume_properties(&red.shape).unwrap().mass - 1e-6).abs() < 1e-9);
     assert!((volume_properties(&blue.shape).unwrap().mass - 8e-6).abs() < 1e-9);
+    // Live import-fidelity-1123: every face of a solid overridden in one colour makes that the part's colour, with no
+    // face colours (train-joe, usbc); a product's unnamed solids are "Part 1"… (usbc's 34).
+    let cube_faces = refs(&body_of(refs(&body_of(solids[0]))[0]));
+    assert_eq!(cube_faces.len(), 6);
+    let parts = styled_read(["", ""], &cube_faces);
+    let green = parts.iter().find(|p| near(p.color, [0.0, 1.0, 0.0])).expect("the cube's part in its faces' colour");
+    assert!(green.face_colors.is_empty(), "{:?}", green.face_colors);
+    let blue = parts.iter().find(|p| near(p.color, [0.0, 0.0, 1.0])).expect("the blue solid's part");
+    assert_eq!((green.name.as_deref(), blue.name.as_deref()), (Some("Part 1"), Some("Part 2")));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

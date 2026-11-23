@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-23 01:31 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-23 03:37 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,18 +13,41 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## QUEUED 2782ce84 (11-23 01:3x, 7 commits): the 4 user P0s + SAT edges re-land + qa P1 file-tab Import speed
-- Lead dry run 45087596193 (dryrun/dx-open4 at ae489fe) all green. Mac check on its dmg (/root/dx-scratch/mac-assoc.sh,
-  Mac ~/noshape-host/dx-keep/assoc/): UTI + icon, LaunchServices handler, open at launch / while running, same file
-  only focuses, CLI second start hands over: all pass; test copy unregistered + removed. Import .step listing: rfd
-  source checked only (no screen capture over ssh).
-- P0s: open-file 3 OSes (ops live.rs serve_app/open_in_app; app open_requests.rs), Download no toast, pickers with no
-  filter for all files, STEP solid colours + solid names (Mac mini Main/Fan as live).
-- qa SPEED-FILE-TAB-IMPORT-MENU: workspace.rs translate_file -> import_dialog::open_written (copy written in
-  background, Import waits). Test workspace_tests::a_file_tabs_import_opens_its_dialog_before_the_file_is_written.
-  qa asked to replay workflows-1123 17 s2 after landing.
-- Noted, not fixed: drawing status bubble guesses red by text (drawing_ui.rs ~33).
-- Hose x_t end rings: core's Shell fallback (MakeThickSolid fails, cap planes re-intersected = the 0.1 mm); writer not at fault (core 11-23).
+## LANDED 3b6086ed (11-23 03:39; was 834b5a0a): the user's 4 P0s + SAT edges + qa SPEED-FILE-TAB-IMPORT-MENU
+- Mac association verified on dry run 45087596193's dmg (dx-scratch/mac-assoc.sh): all pass, cleaned.
+- Noted, not fixed: drawing status bubble guesses red by text (drawing_ui.rs ~33); app workspace.rs import() reads
+  non-CAD files on the UI thread.
+- Hose x_t rings: live.x_t exact everywhere; joints = core's sweep (G1); end rings: offered INTERSECTION in our writer
+  if core's change doesn't make them exact. Tools dx-scratch/bin/xtdump.py, xtedges.py.
+
+## Import fidelity (qa TICKETS "qa, 2026-11-23 02:3x", live import-fidelity-1123): committing + land.sh 11-23 03:4x
+- Green on vibe2: kernel all, model import, ops import, ops e2e:: (earlier run), coverage (AGENT_API regenerated), clippy.
+- IMP-MULTISOLID-PRODUCT (io.rs "Part N"), IMP-UNIFORM-FACE-TO-PART (uniform_faces_colored), IMP-NOAPP-KEEP-PART
+  (apply_look), IMP-FEATURE-PARAMS (compositeName stem, maxAssembliesToCreate 0, dependsOnBlob, flatten=combine),
+  IMP-CLI-TAB-ORDER (`after` default = open tab), IMP-COMPOSITE (closed composite named after the file),
+  P0 IMP-FACE-OVERRIDE-READ (merge_same_surface_faces keeps styled faces: usbc Part 1 140 faces #4c4c4c, 0 face
+  appearances = live; Mac mini Main 152/258, Fan 14/529 face colours = live), P0 IMP-NEMA-SCREWS-SURFACE
+  (io.cpp solids_from_closed_shells second pass after the pcurve fixes sews a part's open shells together at 1e-4 mm,
+  same face order: 4 screws 1 solid / 250 faces; OCCT may read a broken MANIFOLD_SOLID_BREP as one shell per face; T1 a_step_shell_whose_faces_meet_without_sharing_edges_reads_as_a_solid).
+- Open: NEMA assembly part order (ours file order, live reverse: check the app's). IMP-NO-FEEDBACK waits for live
+  (REQUESTS dx 02:4x: one history step or two?). No T1 test for the styled-face merge rule yet.
+
+## NEXT: hose x_t END rings in our writer (core 11-23 03:0x: "please take the END rings")
+- WIP patch /root/dx-scratch/hose-rings-wip.patch (xt.cpp only; not in tree): Chart + chart_of (19 exact points +
+  closing, damped Newton on_both_damped), intersection_curve (CHART, LIMIT H, INTERSECTION, INTERSECTION_DATA from
+  30.0 via Writer::schema), prepared() keeps a charted ring whole, edge pass charts closed off-face edges before refit.
+  Test a_hoses_walls_write_whole then wants (12, 22, 12) + max tol <= 1e-7: got (12, 26, 16): the 2 outer rings
+  chart, the 4 inner (offset wall, 2e-7..5e-7 tol) fail: Newton stalls ~1e-9 m at t=0 (one lands 1.7 um off the edge).
+  Look at the offset surface past v=1 (live's rings at v = 1 - 3e-12). Never shipped untested: live translation needed.
+- Live (python3 dx-scratch/bin/xtdumpfull.py /root/parity/exchange/cf-hose-routing/live.x_t 40,41,204): ring edge
+  curve = INTERSECTION(surface=[OFFSET_SURF, PLANE], chart, start=end=LIMIT type H at the first chart point),
+  edge tolerance None, fins curve 0, no vertex. CHART: Base_parameter 0, Base_scale 1, Chart_count 20 (closed: last
+  point = first), Chordal_error 1.13e-4, Angular_error 0.337, Parameter_error [None,None]. INTERSECTION_DATA (v30+
+  only; our writer's v12 schema has none): uv_type 4, (u1,v1,u2,v2) per chart point.
+- Writer xt.cpp: edge pass ~1895 (deviation -> refit -> else edge_tol = tolerant SP_CURVE fins); add: a closed
+  tolerant edge between two faces -> exact chart points (march + refine on both surfaces), INTERSECTION node;
+  surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
+  xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
 
 ## Parked: rings-loft STEP refit (branch dx-wip-step-refit, patch /root/dx-scratch/step-refit-wip.patch)
 - refit_loose_edges(shape, over, pcurves) after STEP read at 1e-4 mm: revolved ring 1449.9415 vs x_t 1449.9431
@@ -36,7 +59,6 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - Hose x_t end rings (exa1 r1 XTDBG): model's ring edges are 1e-4 m off their B-surfaces (tolerant 1.8e-4..3.2e-4 m)
   and 1.1e-7 m off the offset inner wall: model geometry, not the writer; live writes exact SP_CURVE rings on the
   OFFSET_SURF. Report to the lead (core sweep) before writer work.
-- 4c8ee668 / d6a37def: both CHECKING at 23:3x (land.sh --status).
 - Also from live: psui P0 STEP colours answer in behaviours.md (see 4).
 
 ## In flight: data exchange (lead 08:0x)
