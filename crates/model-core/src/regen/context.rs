@@ -749,6 +749,9 @@ pub struct Context {
     /// The studio's revolved faces' axis connectors along the revolve's axis
     /// ([`crate::partstudio::PartStudio::legacy_revolve_axes`]).
     pub legacy_revolve_axes: bool,
+    /// The studio's Subtracts leave their tools' faces in the targets under the tools' names
+    /// ([`crate::partstudio::PartStudio::legacy_cut_face_names`]).
+    pub legacy_cut_face_names: bool,
     pub bodies: Bodies,
     pub sketches: Vec<Arc<SketchResult>>,
     /// Sketches a Derived feature brought in from its source: (the Derived
@@ -967,6 +970,7 @@ impl Context {
             legacy_remove_seeds,
             legacy_moved_face_frames,
             legacy_revolve_axes,
+            legacy_cut_face_names,
             bodies: _,
             sketches,
             derived_sketches,
@@ -1016,6 +1020,7 @@ impl Context {
             && *legacy_remove_seeds == o.legacy_remove_seeds
             && *legacy_moved_face_frames == o.legacy_moved_face_frames
             && *legacy_revolve_axes == o.legacy_revolve_axes
+            && *legacy_cut_face_names == o.legacy_cut_face_names
             && same_arcs(sketches, &o.sketches)
             && *derived_sketches == o.derived_sketches
             && *sketch_copies == o.sketch_copies

@@ -181,13 +181,14 @@ impl Feature {
 /// Add with a merge scope merges its seeds too ([`PartStudio::legacy_pattern_seeds`]); 17, a part pattern's Remove or
 /// Intersect uses its seeds up too ([`PartStudio::legacy_remove_seeds`]); 18, a sketch on a face of a part a Transform
 /// moved in the face's frame moved with it ([`PartStudio::legacy_moved_face_frames`]); 19, a revolved face's axis
-/// connectors against the revolve's axis as drawn ([`PartStudio::legacy_revolve_axes`]); 0, older studios.
+/// connectors against the revolve's axis as drawn ([`PartStudio::legacy_revolve_axes`]); 20, a Subtract's tool faces left
+/// in its targets named by the Boolean ([`PartStudio::legacy_cut_face_names`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(19)
+        ScopeRule(20)
     }
 }
 
@@ -465,6 +466,11 @@ pub struct PartStudio {
     /// along it): mates on them keep their frames.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_revolve_axes: bool,
+    /// Saved with a Boolean before a Subtract's tool faces left in its targets were named by the Boolean (ScopeRule < 20:
+    /// by the tool's features, so the tool's face and feature appearances coloured them; live gives them the target's
+    /// colour): they keep the tool's names, so later features find them as they did.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_cut_face_names: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -714,6 +720,9 @@ impl PartStudio {
         }
         if self.scope_rule.0 < 19 && !self.features.is_empty() {
             self.legacy_revolve_axes = true;
+        }
+        if self.scope_rule.0 < 20 && self.features.iter().any(|f| f.type_id == "booleanBodies") {
+            self.legacy_cut_face_names = true;
         }
         self.scope_rule = ScopeRule::default();
     }

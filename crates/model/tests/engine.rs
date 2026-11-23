@@ -1955,6 +1955,23 @@ fn boolean_results_and_names_as_live() {
     assert_ne!(color(&r, &new.0), c1, "with a new colour");
 }
 
+/// Live appearance-1123 Q5 Subtract: the tool's faces left in the target are the Boolean's (the target's colour, not
+/// the tool's face or feature appearances); a studio saved before (ScopeRule < 20) keeps the tool's names.
+#[test]
+fn subtract_cut_faces_are_the_booleans() {
+    for legacy in [false, true] {
+        let (mut t, [p1, p2, _]) = qa5_bool();
+        // (As on load: set before the studio's first regeneration, a cached context keeps the flag it was made with.)
+        (t.ps.legacy_cut_face_names, t.reg) = (legacy, Regenerator::new());
+        let s = t.add("booleanBodies", &[("operationType", en("SUBTRACTION")), ("tools", q(vec![Reference::Body(p2.clone())])), ("targets", q(vec![Reference::Body(p1.clone())]))]);
+        let r = t.ok();
+        let target = r.context.bodies.iter().find(|b| b.id == p1).expect("the target");
+        let creators: Vec<_> = target.faces.iter().filter_map(|n| n.creator()).collect();
+        assert_eq!(creators.contains(&s), !legacy, "{creators:?}");
+        assert_eq!(creators.contains(&p2.feature), legacy, "{creators:?}");
+    }
+}
+
 /// Live NAME2 / BOOL2 ("qa5 booleans"): a union keeps the first-picked
 /// part's id and colour (the pin picked first); Intersect with ☑ Keep tools
 /// keeps all three parts and adds the common volume as a new part, last.

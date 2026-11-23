@@ -129,10 +129,13 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 picks.iter().map(|(b, shapes)| offset_tool(b, shapes)).collect()
             };
             let mut tools: Vec<NamedShape> = Vec::with_capacity(tools_idx.len());
+            // A Subtract's tool faces left in its targets are the Boolean's: the target's colour, not the tool's face or
+            // feature appearances (live appearance-1123 q5 Subtract).
+            let rename = op == "SUBTRACTION" && !ev.ctx.legacy_cut_face_names;
             for ((b, _), res) in picks.iter().zip(offsets) {
                 let names = b.shape_names();
                 let Some(res) = res else {
-                    tools.push(NamedShape { shape: b.shape.clone(), names });
+                    tools.push(if rename { NamedShape::new(b.shape.clone(), super::helpers_a::rebrand(ev, names.faces)) } else { NamedShape { shape: b.shape.clone(), names } });
                     continue;
                 };
                 let role = |n: &crate::naming::Name| crate::reference::Role::Offset(n.clone());
