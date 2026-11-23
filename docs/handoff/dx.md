@@ -24,7 +24,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   background, Import waits). Test workspace_tests::a_file_tabs_import_opens_its_dialog_before_the_file_is_written.
   qa asked to replay workflows-1123 17 s2 after landing.
 - Noted, not fixed: drawing status bubble guesses red by text (drawing_ui.rs ~33).
-- Hose x_t end rings: core's (repro sent 11-23 01:0x).
+- Hose x_t end rings: core's Shell fallback (MakeThickSolid fails, cap planes re-intersected = the 0.1 mm); writer not at fault (core 11-23).
 
 ## Parked: rings-loft STEP refit (branch dx-wip-step-refit, patch /root/dx-scratch/step-refit-wip.patch)
 - refit_loose_edges(shape, over, pcurves) after STEP read at 1e-4 mm: revolved ring 1449.9415 vs x_t 1449.9431
