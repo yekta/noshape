@@ -1,28 +1,35 @@
-# QA handoff (agent qa; current state only, updated 2026-11-22 19:0x)
+# QA handoff (agent qa; current state only, updated 2026-11-23 02:3x)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 01:1x (after a compaction, first)
-- **DONE 00:4x-01:1x** (all in TICKETS, owners told): CTX-MENU-FLIP-UP still open (px). EXTRA-UNFOLD-REFOLD, SKFILLET-FLOW,
-  UIS-WORLD-TARGET verified; P2 UIS-FIELD-NOT-SHOWN. Mac timing vs timing-1123 (qa-scratch/t23/table.txt): SPEED-RINGS-SHELL +
-  SPEED-IMPELLER raised to P0 (bool), rest <= live; P2 UIS-DIM-LABEL-TARGET (skasm). QUERY-PART-PICK-FILL verified, DIM-SELECTED-
-  REF-LINE-YELLOW partly. asm SHIFT-RELEASE + PICKED-REHOVER still open on 24f1566de (mcinfer r8). psui manip/nav + sel rows: all
-  15 judged (FILLET-DRAG-FOCUS, DRAG-DECIMALS, PLANE-HANDLE verified after reruns r7/r8; new P0 PS-SELECTED-EDGE-DARK-CORE, P1
-  PS-SELECTED-FRONT-FILL). workflows-1123 rescored on 24f1566de (out-wf23b): 3 verified, 4 partly, 21 new rows (block 01:1x),
-  P1 ASM-FIXES-NOT-IN-FLOW; duplicate union rows of the 21:4x/22:0x blocks dropped.
-- **Subagent running**: import fidelity (live/dx/import-fidelity-1123, 8 STEPs) vs ours, brief qa-scratch/brief-imp.md,
-  vibe2 :496, scratch qa-scratch/imp; file per owner (dx, psui, asm). IMPELLER-SHELL-INVALID verified 01:5x. workflows-1123 01-12 rescored 02:1x on ed11f7c48 (out-wf23g 01-05, out-wf23f 06-12): 8 verified, owners told.
-- **Done**: error catalogue live/errors-1123 vs ours, brief
-  qa-scratch/brief-err.md, all filed (a 01:5x 12 rows, b 01:2x 10, c 01:4x 15), owners told, vibe2, scratch qa-scratch/err/<set>; appearance-1123 filed 01:5x (12 rows, core/psui told). File their drafts per owner (core, blend, skasm, asm, psui chrome), tell owners.
-- **Units (logs qa-scratch/tmp/<name>.log)**: qa-wf23c (waits for psui 3cfb09978 + skasm 35c533220 in green, then wf23 01-03/06/07 ->
-  hm2/out-wf23c: PICKED-EDGE-DASHED, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SM, SM-TAB-MERGE-PICK, CORNER-BREAK, CONFIG-FILTER-HELP
-  if 975844f0d is in); qa-ver6 (full matrix b* + [ips]* on psui b8a17535's green, after rr-b8a1/wf23c -> hmr5-b/hmr5-ips; replaced ver3); qa-rr-2782 (dx 2782ce84 failed tests 02:13, waits on the subject for the re-land -> wf23 17 -> out-wf23e: SPEED-FILE-TAB-IMPORT-MENU s2, ours 192 ms vs live 58); qa-rr-a936 (asm a936c3a6 = c6ec's fixes + SHIFT-RELEASE, CYL-SIDE-OUTLINE, PICKED-REHOVER glyph, PATTERN-PICK-LOOK origin -> mcinfer r9 asm cells, out-af-a936, wf23 04/05 out-wf23h, matrix hmr6-mc; THEN rerun errors-1123 set c mate cells with a subagent from qa-scratch/err/c, RE-MAKING the overdef .noshape files: the old ones saved the moved pin); old: qa-rr-c6ec (asm c6ec3d1c -> mcinfer r7 + out-af-c6ec:
-  MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM, FIXED-GLYPH-AA); qa-ver5 (after rr-c6ec: matrix '*-mc-*' -> hmr4-mc, navy rim + notch);
-  qa-wait-imp (bool impeller -> IMP-DONE: expect no invalid part, close IMPELLER-SHELL-INVALID); qa-wait-sp (bool e7c98cc5a ->
-  ~13.6 s + Part 1 129/385/258, close COMPAT-SURFACE-PATTERN-SLOWER). Hold each in a background task.
+## IN FLIGHT 02:3x (after a compaction, first)
+- **DONE 01:2x-02:3x** (all in TICKETS, owners told): errors-1123 sets a (01:5x, 12 rows), b (01:2x, 10), c (01:4x, 15);
+  appearance-1123 (01:5x, 12 rows); IMPELLER-SHELL-INVALID verified (ed11f7c48, 0 invalid); workflows-1123 01-12 rescored 02:1x on
+  ed11f7c48 (out-wf23g 01-05, out-wf23f 06-12; out-wf23b's 01-12 had run on 7fe68797a): 8 verified, 7 partly, UIS-MATE-PATTERN-ROW
+  reopened; ASM-FIXES-NOT-IN-FLOW verified; PICKED-REHOVER partly (markers gone, the re-hover glyph missing); live answers noted on
+  FEEL-CLICK-EMPTY-SELECTS-PLANE, SKETCH-LINE-STORES-PERPENDICULAR, ERR-FIELD-RANGE-TIP-ENTER (in-range 0 commits),
+  FEEL-MC-PS-MARKER-REACH (half-way rule: ours' 18 px right; corner approach + back midpoint still differ); SPEED-IMPELLER split
+  (bool ~1.1 s x2, the fillets are blend's). CTX-MENU-FLIP-UP open with psui.
+- **Subagent**: import fidelity (live/dx/import-fidelity-1123, 8 STEPs) vs ours, brief qa-scratch/brief-imp.md, vibe2 :496,
+  scratch qa-scratch/imp (resumed after a restart 02:15). On its result: file IMP-* rows per owner (dx, psui, asm), tell them.
+  If its notification never comes, read qa-scratch/imp and rerun from the brief.
+- **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
+  qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
+  wf-1122 12 out-wfv4: ROTATE-EDGE-SENSE, EDIT-BODY-SHADE, CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN);
+  qa-ver6 (after rr-b8a1: full matrix b* + [ips]* on b8a17535's green -> hm2/hmr5-b, hmr5-ips);
+  qa-rr-2782 (dx re-queued 834b5a0a, same subject "dx: a file tab's Import… opens its dialog at once" -> wf23 17 out-wf23e, step 2:
+  ours 192 ms vs live 58: SPEED-FILE-TAB-IMPORT-MENU);
+  qa-rr-a936 (asm a936c3a6 "asm: an over-defining mate moves nothing…" -> mcinfer r9 asm cells (MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM,
+  SHIFT-RELEASE, CYL-SIDE-OUTLINE, PICKED-REHOVER glyph), out-af-a936 dr-BaseR (FIXED-GLYPH-AA), wf23 04/05 out-wf23h
+  (PATTERN-PICK-LOOK origin), matrix hmr6-mc (rim/notch); THEN a subagent reruns errors-1123 set c mate cells from qa-scratch/err/c,
+  RE-MAKING the overdef .noshape files (old ones saved the moved pin): SOLVE-MOVES, OVERDEF-BOTH, LIMITS-COMMITTED, BALL-CONE,
+  DIALOG-STATE (suppressed title left black per mates.md), TANGENT-WORDS (bar ✓ pale on reopened "not consistent"), CREATING-LIST);
+  qa-wait-sp (bool ed272c73, same subject as e7c98cc5a -> compat: expect ~13.6 s + Part 1 129/385/258 (live 131/387/258), close
+  COMPAT-SURFACE-PATTERN-SLOWER, tell bool). qa-rr-c6ec / qa-ver5 / qa-ver3 stopped (replaced).
+- psui p04 hover_matrix test failed dx's land 02:13 (psui told).
 - Kit: hm2/crop2.sh, score-a087/bin/sbs.sh, hm2/wf/wfcrop.py (WF_SET/WF_OUT), manipnav fm.sh (+fm992.sh), cells m15v-tr-xy-*.
   Runners take QA_HOST; wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT + glob arg.
 - Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
