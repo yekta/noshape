@@ -44,6 +44,15 @@ pub struct AutoArm {
     pub ext: f64,
 }
 
+/// An ordinate group laid out on the sheet: measured axis `u`, leader direction `n`, the members `pts` and their value
+/// texts' positions along `u`.
+struct OrdinateTexts {
+    u: [f64; 2],
+    n: [f64; 2],
+    pts: Vec<[f64; 2]>,
+    at: Vec<f64>,
+}
+
 impl SheetPick<'_> {
     /// A linear dimension's geometry on the sheet (resolved positions).
     pub fn dimension_frame(&self, a: &Annotation) -> Option<LinearFrame> {
@@ -445,24 +454,27 @@ impl SheetPick<'_> {
         a
     }
 
-    /// The annotation `orig` (resolved) dragged from `start` to the cursor.
-    /// The ordinate group member whose value is at sheet point `s` (near
-    /// the group's level, `position`), with the measured axis on the sheet.
-    fn ordinate_member_at(&self, view: noshape_model::drawing::ViewId, points: &[[f64; 2]], horizontal: bool, shifts: &[f64], position: [f64; 2], s: [f64; 2]) -> Option<(usize, [f64; 2])> {
-        let pl = self.placement(view)?;
-        let rot = noshape_model::drawing::views::view_rotation(self.current_sheet(), view);
-        let u = noshape_model::drawing::views::rotate2(if horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);
-        let n = noshape_model::drawing::views::rotate2(if horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
+    /// Ordinate group `a` laid out on the sheet.
+    fn ordinate_texts(&self, a: &Annotation) -> Option<OrdinateTexts> {
+        let AnnotationKind::OrdinateGroup { view, origin, points, horizontal, shifts, .. } = &a.kind else { return None };
+        let pl = self.placement(*view)?;
+        let rot = noshape_model::drawing::views::view_rotation(self.current_sheet(), *view);
+        let u = noshape_model::drawing::views::rotate2(if *horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);
+        let n = noshape_model::drawing::views::rotate2(if *horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
+        let pts: Vec<[f64; 2]> = points.iter().map(|p| pl.to_sheet(*p)).collect();
+        let along: Vec<f64> = pts.iter().map(|p| dot(*p, u)).collect();
+        let at = noshape_model::drawing::sheet::ordinate_text_layout(&along, dot(pl.to_sheet(*origin), u), shifts, self.drawing.props.dim_text_height);
+        Some(OrdinateTexts { u, n, pts, at })
+    }
+
+    /// The ordinate group member of `a` whose value is at sheet point `s` (near the group's level), with the measured
+    /// axis on the sheet.
+    fn ordinate_member_at(&self, a: &Annotation, s: [f64; 2]) -> Option<(usize, [f64; 2])> {
+        let OrdinateTexts { u, n, at, .. } = self.ordinate_texts(a)?;
         let dh = self.drawing.props.dim_text_height;
-        if (dot(s, n) - dot(position, n)).abs() > 3.0 * dh {
+        if (dot(s, n) - dot(a.position, n)).abs() > 3.0 * dh {
             return None;
         }
-        let along: Vec<f64> = points.iter().map(|p| dot(pl.to_sheet(*p), u)).collect();
-        let mut at = noshape_model::drawing::sheet::ordinate_text_positions(&along, dh + 1.5);
-        for (t, sh) in at.iter_mut().zip(shifts.iter()) {
-            *t += sh;
-        }
-        noshape_model::drawing::sheet::ordinate_push_apart(&mut at, shifts, dh + 1.5);
         at.iter()
             .enumerate()
             .map(|(i, t)| (i, (t - dot(s, u)).abs()))
@@ -471,37 +483,25 @@ impl SheetPick<'_> {
             .map(|(i, _)| (i, u))
     }
 
-    /// A jogged ordinate value whose knee (round grip) is at sheet point
-    /// `s`: its index, the extension line's direction on the sheet and the
-    /// side the values sit on (live request 1662).
-    #[allow(clippy::too_many_arguments)]
-    fn ordinate_knee_at(&self, view: noshape_model::drawing::ViewId, points: &[[f64; 2]], horizontal: bool, shifts: &[f64], knees: &[f64], position: [f64; 2], s: [f64; 2]) -> Option<(usize, [f64; 2], f64)> {
-        use noshape_model::drawing::sheet::{ORDINATE_KNEE, ordinate_push_apart, ordinate_text_positions};
-        let pl = self.placement(view)?;
-        let rot = noshape_model::drawing::views::view_rotation(self.current_sheet(), view);
-        let u = noshape_model::drawing::views::rotate2(if horizontal { [1.0, 0.0] } else { [0.0, 1.0] }, rot);
-        let n = noshape_model::drawing::views::rotate2(if horizontal { [0.0, 1.0] } else { [1.0, 0.0] }, rot);
-        let dh = self.drawing.props.dim_text_height;
-        let pts: Vec<[f64; 2]> = points.iter().map(|p| pl.to_sheet(*p)).collect();
+    /// A jogged ordinate value of `a` whose knee (round grip) is at sheet point `s`: its index, the extension line's
+    /// direction on the sheet and the side the values sit on (live request 1662).
+    fn ordinate_knee_at(&self, a: &Annotation, s: [f64; 2]) -> Option<(usize, [f64; 2], f64)> {
+        let AnnotationKind::OrdinateGroup { knees, .. } = &a.kind else { return None };
+        let OrdinateTexts { u, n, pts, at } = self.ordinate_texts(a)?;
         if pts.is_empty() {
             return None;
         }
-        let level = dot(position, n);
+        let level = dot(a.position, n);
         let mean = pts.iter().map(|p| dot(*p, n)).sum::<f64>() / pts.len() as f64;
         let sg = if level >= mean { 1.0 } else { -1.0 };
-        let along: Vec<f64> = pts.iter().map(|p| dot(*p, u)).collect();
-        let mut at = ordinate_text_positions(&along, dh + 1.5);
-        for (t, sh) in at.iter_mut().zip(shifts.iter()) {
-            *t += sh;
-        }
-        ordinate_push_apart(&mut at, shifts, dh + 1.5);
         (0..pts.len())
-            .filter(|&i| (at[i] - along[i]).abs() >= 1e-6)
+            .filter(|&i| (at[i] - dot(pts[i], u)).abs() >= 1e-6)
             .map(|i| {
                 let l0 = dot(pts[i], n) + sg;
-                let k = level - sg * knees.get(i).copied().filter(|k| *k > 0.0).unwrap_or(ORDINATE_KNEE);
+                let k = level - sg * knees.get(i).copied().filter(|k| *k > 0.0).unwrap_or(noshape_model::drawing::sheet::ORDINATE_KNEE);
                 let k = if (k - l0) * sg < 0.0 { l0 } else { k };
-                let p = [u[0] * along[i] + n[0] * k, u[1] * along[i] + n[1] * k];
+                let along = dot(pts[i], u);
+                let p = [u[0] * along + n[0] * k, u[1] * along + n[1] * k];
                 (i, (p[0] - s[0]).hypot(p[1] - s[1]))
             })
             .filter(|(_, d)| *d < 1.5)
@@ -509,6 +509,7 @@ impl SheetPick<'_> {
             .map(|(i, _)| (i, n, sg))
     }
 
+    /// The annotation `orig` (resolved) dragged from `start` to the cursor.
     pub fn dragged_annotation(&self, orig: &Annotation, start: [f64; 2]) -> Annotation {
         let c = self.cursor;
         let d = sub(c, start);
@@ -600,8 +601,8 @@ impl SheetPick<'_> {
             // A jogged value's knee grip slides along its extension line
             // only: the bend height, the value staying put (live request
             // 1662).
-            AnnotationKind::OrdinateGroup { view, points, horizontal, shifts, knees, .. } if self.ordinate_knee_at(*view, points, *horizontal, shifts, knees, orig.position, start).is_some() => {
-                let (i, n, sg) = self.ordinate_knee_at(*view, points, *horizontal, shifts, knees, orig.position, start).expect("checked");
+            AnnotationKind::OrdinateGroup { points, knees, .. } if self.ordinate_knee_at(orig, start).is_some() => {
+                let (i, n, sg) = self.ordinate_knee_at(orig, start).expect("checked");
                 knees.resize(points.len(), 0.0);
                 let cur = if knees[i] > 0.0 { knees[i] } else { noshape_model::drawing::sheet::ORDINATE_KNEE };
                 knees[i] = (cur - sg * dot(d, n)).max(3.5);
@@ -609,8 +610,8 @@ impl SheetPick<'_> {
             // A value under the pointer moves sideways alone, its extension
             // line jogging over to it (live request 1603); elsewhere the
             // group moves.
-            AnnotationKind::OrdinateGroup { view, points, horizontal, shifts, .. } if self.ordinate_member_at(*view, points, *horizontal, shifts, orig.position, start).is_some() => {
-                let (i, u) = self.ordinate_member_at(*view, points, *horizontal, shifts, orig.position, start).expect("checked");
+            AnnotationKind::OrdinateGroup { points, shifts, .. } if self.ordinate_member_at(orig, start).is_some() => {
+                let (i, u) = self.ordinate_member_at(orig, start).expect("checked");
                 shifts.resize(points.len(), 0.0);
                 shifts[i] += dot(d, u);
             }

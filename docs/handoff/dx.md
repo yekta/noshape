@@ -53,6 +53,22 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
   xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
 
+## NEXT: drw-dims-1123 export checks (live/drw-dims-1123/INDEX.md, hole-table.md, iso-format.md, ordinate-*.md)
+- Tapped hole SIZE: DROPPED (06:40). drw-dims' M8 hole was made by API without a tap type (kit/build.mjs:65), so live
+  wrote no thread line; studios' UI-made M6 (behaviours l.46020) shows "Ø5 THRU / M6x1 THRU", as ours (ops e2e
+  studios_hole_plate_callouts_and_table_as_live). No change.
+- Checked, already as live: ours groups by spec in feature order (same result on this part: each feature a spec),
+  merged SIZE/QTY, X/Y LOC leading zero; ISO comma + no trailing zeros on lengths, angles keep 1 decimal.
+- ISO (ISO_A4 1:3): lengths drop trailing zeros ("105", "Ø10", "R10"), decimal comma ("Ø6,8", "135,0°"), callouts
+  "Ø10 THRU" / "3X Ø6 THRU" / cbore "⌴Ø14 ↧5", text 3.5 mm; ANSI 3 decimals, no leading zero (".787"), 0.12 in.
+- Ordinate fan-out (COMMITTED 06:52, green: drawing 187, scene 215, ops e2e 300, clippy clean): sheet::ordinate_text_layout (shared by sheet.rs and
+  scene jog.rs picks): going away from the zero, a value closer than 1.53 x text height to the previous moves on to it
+  (live oht-ht.dxf: 5 x 2.165 stacked 0.1836 in from the point, 2.756 above); was: runs centred on their mean (no live
+  source). Tie order among equal values unknown (live e,c,d,b,a; ours a..e). Land after 538aa4b0 (CHECKING
+  since 06:09, batch since 06:44).
+- Ordinate "a group reaches the export only when its tool closes": tool flow, studios'.
+- Then: tell studios which tool-flow rows (Esc never closes a tool, chaining, silent invalid picks) are theirs.
+
 ## Parked: rings-loft STEP refit (branch dx-wip-step-refit, patch /root/dx-scratch/step-refit-wip.patch)
 - refit_loose_edges(shape, over, pcurves) after STEP read at 1e-4 mm: revolved ring 1449.9415 vs x_t 1449.9431
   (was 1450.036), read 2.5 s vs 1.7 (cached ShapeAnalysis_Surface; on_both eps scaled by |x0|). T1

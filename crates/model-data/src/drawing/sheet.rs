@@ -2374,13 +2374,8 @@ impl SheetGeometry {
                     let mean = sheet_pts.iter().map(|p| dot(*p, n)).sum::<f64>() / sheet_pts.len() as f64;
                     let sg = if level >= mean { 1.0 } else { -1.0 };
                     let along: Vec<f64> = sheet_pts.iter().map(|p| dot(*p, u)).collect();
-                    let mut text_pos = ordinate_text_positions(&along, dh + 1.5);
-                    // A value dragged sideways pushes on the ones it reaches,
-                    // which jog away too (live request 1603).
-                    for (t, s) in text_pos.iter_mut().zip(shifts.iter()) {
-                        *t += s;
-                    }
-                    ordinate_push_apart(&mut text_pos, shifts, dh + 1.5);
+                    // A value dragged sideways pushes on the ones it reaches, which jog away too (live request 1603).
+                    let text_pos = ordinate_text_layout(&along, dot(env.to_sheet(*view, *origin), u), shifts, dh);
                     let mut ang = n[1].atan2(n[0]);
                     let mut halign = if sg > 0.0 { 0.0 } else { 1.0 };
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
@@ -3629,8 +3624,6 @@ fn crossing(a: [[f64; 2]; 2], b: [[f64; 2]; 2]) -> Option<[f64; 2]> {
     (t > eps && t < 1.0 - eps && u > eps && u < 1.0 - eps).then(|| [a[0][0] + r[0] * t, a[0][1] + r[1] * t])
 }
 
-/// Text positions (along the measured axis) of ordinate values at `along`,
-/// at least `gap` apart: overlapping runs are spread around their mean.
 /// How far before an ordinate group's value row a jogged extension line
 /// bends by default (sheet mm); the slant ends 3 mm before the row.
 pub const ORDINATE_KNEE: f64 = 6.0;
@@ -3663,37 +3656,38 @@ pub fn ordinate_push_apart(pos: &mut [f64], shifts: &[f64], gap: f64) {
     }
 }
 
-pub fn ordinate_text_positions(along: &[f64], gap: f64) -> Vec<f64> {
+/// Text positions (along the measured axis) of ordinate values at `along`, the group's zero at `zero`: going away
+/// from the zero, a value closer than `gap` to the one before it moves on to `gap` past it (live drw-dims-1123: five
+/// equal values stacked 0.1836 in apart outward from the one left at its own place).
+pub fn ordinate_text_positions(along: &[f64], zero: f64, gap: f64) -> Vec<f64> {
     let mut order: Vec<usize> = (0..along.len()).collect();
-    order.sort_by(|a, b| along[*a].total_cmp(&along[*b]));
-    // Clusters of (indices in order, positions).
-    let mut clusters: Vec<(Vec<usize>, f64)> = Vec::new();
-    for &i in &order {
-        clusters.push((vec![i], along[i]));
-        // Merge while the last two clusters overlap.
-        while clusters.len() >= 2 {
-            let n = clusters.len();
-            let (ref a, sa) = clusters[n - 2];
-            let (ref b, sb) = clusters[n - 1];
-            let end_a = sa + (a.len() as f64 - 1.0) * gap;
-            if sb >= end_a + gap - 1e-9 {
-                break;
-            }
-            let mut idx = a.clone();
-            idx.extend(b.iter().copied());
-            let mean = idx.iter().map(|k| along[*k]).sum::<f64>() / idx.len() as f64;
-            let start = mean - (idx.len() as f64 - 1.0) * gap / 2.0;
-            clusters.truncate(n - 2);
-            clusters.push((idx, start));
-        }
-    }
-    let mut out = vec![0.0; along.len()];
-    for (idx, start) in clusters {
-        for (j, i) in idx.into_iter().enumerate() {
-            out[i] = start + j as f64 * gap;
+    order.sort_by(|a, b| (along[*a] - zero).abs().total_cmp(&(along[*b] - zero).abs()));
+    let mut out = along.to_vec();
+    let at_zero = order.iter().map(|&i| along[i]).find(|p| p - zero >= 0.0).filter(|p| p - zero < gap);
+    for side in [1.0, -1.0] {
+        let mut last = if side < 0.0 { at_zero } else { None };
+        for &i in order.iter().filter(|&&i| (along[i] - zero >= 0.0) == (side > 0.0)) {
+            let p = match last {
+                Some(l) if (along[i] - l) * side < gap => l + side * gap,
+                _ => along[i],
+            };
+            out[i] = p;
+            last = Some(p);
         }
     }
     out
+}
+
+/// Where an ordinate group's value texts sit along the measured axis (sheet mm): stacked apart (live drw-dims-1123:
+/// 1.53 text heights, 0.1836 in at 0.12 in), then the ones dragged sideways (`shifts`) moved, pushing on the rest.
+pub fn ordinate_text_layout(along: &[f64], zero: f64, shifts: &[f64], text_height: f64) -> Vec<f64> {
+    let gap = 1.53 * text_height;
+    let mut at = ordinate_text_positions(along, zero, gap);
+    for (t, s) in at.iter_mut().zip(shifts) {
+        *t += s;
+    }
+    ordinate_push_apart(&mut at, shifts, gap);
+    at
 }
 
 /// Sheet rectangle [x0, y0, x1, y1] (mm) of a sheet's title block.

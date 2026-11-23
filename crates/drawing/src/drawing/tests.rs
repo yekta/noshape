@@ -1558,8 +1558,19 @@ fn spline_and_polygon_crops() {
 
 #[test]
 fn grouped_ordinate_dimensions() {
-    assert_eq!(sheet::ordinate_text_positions(&[0.0, 1.0, 2.0, 30.0], 5.0), vec![-4.0, 1.0, 6.0, 30.0]);
-    assert_eq!(sheet::ordinate_text_positions(&[10.0, 0.0], 5.0), vec![10.0, 0.0]);
+    // Live drw-dims-1123 (oht-ht.dxf, inches): the zero, .591, five 2.165 and a 2.756, at 0.12 in text: the first 2.165
+    // stays at its point, the rest stack 0.1836 in apart away from the zero, the 2.756 above them.
+    let inch = |v: &[f64]| v.iter().map(|x| x * 25.4).collect::<Vec<_>>();
+    let along = inch(&[5.6418, 5.9371, 6.7245, 6.7245, 6.7245, 7.0198, 6.7245, 6.7245]);
+    let mut got = sheet::ordinate_text_layout(&along, 5.6418 * 25.4, &[], 0.12 * 25.4);
+    got.iter_mut().for_each(|t| *t /= 25.4);
+    let mut stack: Vec<f64> = [2, 3, 4, 6, 7].map(|i| got[i]).to_vec();
+    stack.sort_by(f64::total_cmp);
+    let near = |a: &[f64], b: &[f64]| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() < 0.010);
+    assert!(near(&[got[0], got[1], got[5]], &[5.6418, 5.9371, 7.6425]), "{got:?}");
+    assert!(near(&stack, &[6.7245, 6.9081, 7.0917, 7.2753, 7.4589]), "{got:?}");
+    // Below the zero the stack goes the other way, starting from a value at the zero.
+    assert_eq!(sheet::ordinate_text_positions(&[0.0, -1.0, -1.0, 30.0], 0.0, 5.0), vec![0.0, -5.0, -10.0, 30.0]);
     let (doc, mut drawing) = demo();
     let sources = regenerate_sources(&doc, &drawing);
     let cache = ViewCache::new();
