@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 05:41 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 05:55 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -167,10 +167,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    (split pieces -> target, keeps name; part pattern/mirror/transform/copy-part/feature-pattern copies -> source) and
    regen/display.rs inherits part_properties appearance (and a split piece's name) along it; part-studio-ui
    appearance.rs lineage(): face and feature appearances follow Split parents and Role::Copy sources. T1 features_c
-   split_pieces_and_pattern_copies_keep_their_parts_appearance, psui unit copies_and_split_pieces_keep_their_faces_appearances.
-   Green -> commit, land. Left: SUBTRACT-CUT-FACES (cut faces take the target's colour even with a feature appearance
-   on the tool's feature: tool faces keep their names in a subtract, so face_colors can't tell; needs a mark on them),
-   "default names unchanged" part of SPLIT-LOSES-COLOURS (alloc_part_name for the pieces).
+   split_pieces_and_pattern_copies_keep_their_parts_appearance (er4: split half OK, pattern half failed only because the
+   test reused the 1st studio's part id: FIXED in the test, rerun .er4.sh), psui unit
+   copies_and_split_pieces_keep_their_faces_appearances (OK). Green -> commit, touch -c, land.
+0. LEAD ORDER (11-23 05:5x): land the part colours, then SPLIT renumbering (APPEAR-SPLIT-LOSES-COLOURS: "renumbers the
+   untouched Orange block's default name to Part 1"; live: other parts' default names unchanged; look at
+   alloc_part_name / default-name renumbering), then SUBTRACT-CUT-FACES (RULING: cut faces take the target's colour via
+   Boolean-based naming of the tool faces left in the target, gated by the studio's feature version: older studios keep
+   their names and references; then face/feature appearances on the tool no longer reach them), then HOSE joints.
+   After 7cc94a23 lands: tell qa (agent_status first, roster ids) to rescore the errors-1123 core rows: all fixes
+   (435354603, c276c745f, 26657ac62, 8417f0a85, 099bb7abc, 7cc94a23) postdate its 975bab060 rescore.
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
