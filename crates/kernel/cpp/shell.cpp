@@ -1536,11 +1536,14 @@ std::atomic<unsigned> projectors_gen{0};
 gp_Dir normal_at(const TopoDS_Face& f, const gp_Pnt& p)
 {
   using Projector = std::pair<occ::handle<Geom_Surface>, std::unique_ptr<GeomAPI_ProjectPointOnSurf>>;
+  using Bounds    = std::pair<occ::handle<TopoDS_TShape>, std::array<double, 4>>;
   thread_local std::vector<Projector> projectors;
+  thread_local std::vector<Bounds>    bounds;
   thread_local unsigned               gen = 0;
   if (gen != projectors_gen.load(std::memory_order_relaxed))
   {
     projectors.clear();
+    bounds.clear();
     gen = projectors_gen.load(std::memory_order_relaxed);
   }
   const occ::handle<Geom_Surface> S  = BRep_Tool::Surface(f);
@@ -1563,9 +1566,41 @@ gp_Dir normal_at(const TopoDS_Face& f, const gp_Pnt& p)
   double u = 0, v = 0;
   if (pr->NbPoints() > 0)
     pr->LowerDistanceParameters(u, v);
+  // (A foot on the face's bound moved a hair inside: on a knot where the surface is only C0 the normal is the face's
+  // side's, not whichever span the last bit of u picks.)
+  const std::array<double, 4>* b = nullptr;
+  for (const Bounds& q : bounds)
+    if (q.first == f.TShape())
+      b = &q.second;
+  if (b == nullptr)
+  {
+    if (bounds.size() >= 256)
+      bounds.clear();
+    std::array<double, 4> fb;
+    BRepTools::UVBounds(f, fb[0], fb[1], fb[2], fb[3]);
+    bounds.emplace_back(f.TShape(), fb);
+    b = &bounds.back().second;
+  }
+  auto inside = [](double& x, double lo, double hi) {
+    const double e = 1e-9 * (hi - lo);
+    if (std::abs(x - lo) < 1e3 * e)
+      x = lo + e;
+    else if (std::abs(x - hi) < 1e3 * e)
+      x = hi - e;
+  };
+  const double pu = u, pv = v;
+  inside(u, (*b)[0], (*b)[1]);
+  inside(v, (*b)[2], (*b)[3]);
   BRepAdaptor_Surface s(f);
-  BRepLProp_SLProps   lp(s, u, v, 1, 1e-9);
+  BRepLProp_SLProps   lp(s, pu, pv, 1, 1e-9);
   gp_Dir              n = lp.IsNormalDefined() ? lp.Normal() : gp_Dir(0, 0, 1);
+  if (pu != u || pv != v)
+  {
+    // Only a crease (the other span's normal) takes the inner one: on a smooth face the foot's own stays exact.
+    BRepLProp_SLProps in(s, u, v, 1, 1e-9);
+    if (in.IsNormalDefined() && (!lp.IsNormalDefined() || in.Normal().Angle(n) > 1e-6))
+      n = in.Normal();
+  }
   return f.Orientation() == TopAbs_REVERSED ? n.Reversed() : n;
 }
 
