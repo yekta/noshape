@@ -213,6 +213,34 @@ def same_position(path, k, a, b):
     return pa is None or pb is None or (len(pa) == len(pb) and all(abs(x - y) <= 2.0 for x, y in zip(pa, pb)))
 
 
+GEOMETRY_TOL_MM = 0.01
+
+
+def same_geometry(path, k, a, b):
+    """A sketch's entity geometry (UIS-STATE-GEOMETRY, sketch mm): each side's entities sorted by kind and points
+    (to 0.1 mm), then the same kinds in order, each number within GEOMETRY_TOL_MM; compared where both sides record it."""
+    if path != ".sketch" or k != "geometry" or not isinstance(a[k], list) or not isinstance(b[k], list):
+        return False
+
+    def key(g):
+        pts = g.get("points") if isinstance(g, dict) else None
+        return (str(g.get("kind")) if isinstance(g, dict) else "", [[round(c, 1) for c in p] for p in pts or []])
+
+    a[k].sort(key=key)
+    b[k].sort(key=key)
+
+    def near(x, y):
+        if isinstance(x, dict) and isinstance(y, dict):
+            return all(near(x[i], y[i]) for i in x if i in y) and x.get("kind") == y.get("kind")
+        if isinstance(x, list) and isinstance(y, list):
+            return len(x) == len(y) and all(near(i, j) for i, j in zip(x, y))
+        if isinstance(x, (int, float)) and isinstance(y, (int, float)) and not isinstance(x, bool):
+            return abs(x - y) <= GEOMETRY_TOL_MM
+        return x == y
+
+    return near(a[k], b[k])
+
+
 def first_difference(a, b, path=""):
     """The first key path where `a` (live) and `b` (ours) differ, with both values. Keys only one side records
     (a side's debugging aids) are not compared; the selection compares its count only until both record kind and owner."""
@@ -224,14 +252,14 @@ def first_difference(a, b, path=""):
             if path == ".dialog" and k == "fields" and a.get("title") == "Create Drawing: New drawing name" and a[k] == []:
                 continue
             # Live's recorder couldn't read the sketch (`"error": "sketch model not reached"`, before a plane is picked).
-            if path == ".sketch" and a.get("error") and k in ("entities", "constraints", "dimensions"):
+            if path == ".sketch" and a.get("error") and k in ("entities", "constraints", "dimensions", "geometry"):
                 continue
             if path == ".selection" and k == "items" and not all("owner" in i and i.get("kind") for i in (a[k] or [])):
                 continue
             # A flip button has no label of its own (live records its icon's name).
             if k == "label" and a.get("kind") == "toggle":
                 continue
-            if same_position(path, k, a, b):
+            if same_position(path, k, a, b) or same_geometry(path, k, a, b):
                 continue
             d = first_difference(a[k], b[k], f"{path}.{k}")
             if d:
@@ -257,7 +285,7 @@ def all_differences(a, b, path=""):
                 continue
             if k == "label" and a.get("kind") == "toggle":
                 continue
-            if same_position(path, k, a, b):
+            if same_position(path, k, a, b) or same_geometry(path, k, a, b):
                 continue
             out += all_differences(a[k], b[k], f"{path}.{k}")
         return out
@@ -459,7 +487,7 @@ def normalize_live(state):
     # ("not recorded", not empty) and aren't compared.
     sk = (state or {}).get("sketch")
     if isinstance(sk, dict):
-        for k in ("entities", "constraints", "dimensions"):
+        for k in ("entities", "constraints", "dimensions", "geometry"):
             if sk.get(k) is None:
                 sk.pop(k, None)
         sk.pop("error", None)

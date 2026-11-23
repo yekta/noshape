@@ -8614,3 +8614,48 @@ fn a_ui_script_world_target_is_a_model_point(cx: &mut TestAppContext) {
     let vertex = at(cx, serde_json::json!({ "vertex": [10, 0, 0] }));
     assert!(world.is_ok() && world == vertex, "world {world:?}, vertex {vertex:?}");
 }
+
+/// UIS-STATE-GEOMETRY: the parity state lists each sketch entity's points in sketch mm and a fit spline's end
+/// derivatives, so a step that moves a point or a handle compares as a difference, not as the same kinds.
+#[gpui::test]
+fn the_parity_state_lists_sketch_geometry(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "uip-geometry", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            let id = v.studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Spline", cx, |ps| {
+                    let f = ps.features.iter_mut().find(|f| f.id == id).unwrap();
+                    let Some(noshape_model::params::ParamValue::Sketch(mut arc)) = f.params.get("sketch").cloned() else { panic!("a sketch") };
+                    let d = std::sync::Arc::make_mut(&mut arc);
+                    d.sketch.add_fit_spline_with_handles(&[glam::DVec2::new(0.0, 0.05), glam::DVec2::new(0.02, 0.07), glam::DVec2::new(0.04, 0.05)]).unwrap();
+                    f.params.set("sketch", noshape_model::params::ParamValue::Sketch(arc));
+                })
+            });
+            id
+        })
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let geometry = state["sketch"]["geometry"].as_array().cloned().unwrap_or_default();
+    let ends = |g: &serde_json::Value| {
+        let mut p: Vec<(i64, i64)> = g["points"].as_array().unwrap().iter().map(|p| (p[0].as_f64().unwrap().round() as i64, p[1].as_f64().unwrap().round() as i64)).collect();
+        p.sort();
+        p
+    };
+    let mut lines: Vec<Vec<(i64, i64)>> = geometry.iter().filter(|g| g["kind"] == "line").map(ends).collect();
+    lines.sort();
+    assert_eq!(lines, [vec![(0, 0), (0, 30)], vec![(0, 0), (40, 0)], vec![(0, 30), (40, 30)], vec![(40, 0), (40, 30)]], "{geometry:?}");
+    let spline = geometry.iter().find(|g| g["kind"] == "spline").expect("the spline listed");
+    assert_eq!(spline["points"], serde_json::json!([[0.0, 50.0], [20.0, 70.0], [40.0, 50.0]]));
+    let d = spline["derivatives"].as_array().expect("its end derivatives");
+    assert!(d.len() == 2 && d.iter().all(|v| v.as_array().is_some_and(|v| v.len() == 2)), "{spline}");
+    assert!(!geometry.iter().any(|g| g["kind"] == "construction line"), "its handle arms go with the spline: {geometry:?}");
+}

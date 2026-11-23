@@ -33,19 +33,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (06:53 UTC 11-23): batch committed + land.sh (all but crates/ops/tests/e2e.rs; msg
-/root/psui-scratch/commit-batch.txt). Verified: t103 hover_matrix 101/101; t104 17/17; t106 all but 2, fixed in t107
-(3/3): range tip = field right + 2 (live err-tip-placement-1123: a box's tip 2 px right; live's field also 56 px short
-of the dialog edge), flange joint edge red px from above (from the matrix front view Flange 1's wall hides it).
-In the batch: ERR-OK-ENABLED-OUT-OF-RANGE (ok_blocked + range_error; ui_state titleState from title_status), open row
-tip one space, tips collapse spaces when drawn, plain tooltips max 400 px (LIST-TOOLTIP-CHROME), end cap #4c575b
-(FEEL-EDIT-BODY-SHADE: qa's flat (132,147,155); sRGB-space blend, target Bgra8Unorm), Transform rotate grey, plane
-border ON_TOP. NEXT: report lead; after the rebase mark in TICKETS (qa rows only on main): ERR-OK-ENABLED-OUT-OF-RANGE,
-ERR-TIP-DOUBLE-SPACE-RENDER, INVALID-VALUE-CHROME, CHROME-TIP-PLACEMENT, LIST-TOOLTIP-CHROME (wrap part),
-FEEL-EDIT-BODY-SHADE (top), SKT-POSTCOMMIT-HOVER, SKT-USE-HOVER "fixed, to verify". Then commit 2 (e2e.rs Mac mini +
-TICKETS ~23-25 fix, APPEARANCE-PART-UNDER-FACE-COLOURS [x]). Open: ERR-TOOL-BODY-COLOUR (extrude needs darker, revolve
-redder: one constant can't do both; pixel study), FEEL-EDIT-BODY-SHADE region tint (180,179,154) vs (185,186,164),
-SM-BAD-SELECTION-RED: ours red when in view; ask qa if live draws it through the wall.
+## RESUME HERE (07:14 UTC 11-23, after compaction 5): QUEUED cc8570b3 (batch 1de902059 + Mac mini e2e 654001243 +
+TICKETS rebuild; supersedes FAILED b8a17535). Lead told (07:14): report sent incl. qa re-score asks (qa at 186k, routed
+via lead), joint-edge-through-wall question, decision needed UIS-STATE-GEOMETRY, ERR-MATE-HOVER-GLYPH -> asm.
+Verified before the land: t103 hover_matrix 101/101; t104 17/17; t106+t107; t108 ops coverage:: + Mac mini e2e green.
+Open next: ERR-TOOL-BODY-COLOUR (extrude needs darker, revolve redder: pixel study), FEEL-EDIT-BODY-SHADE region tint
+(180,179,154) vs (185,186,164), LIST-TOOLTIP-CHROME unticked rows + root glyph, ERR-MISSING-SELECTION (core flag).
 Older notes (t101):
 script /root/psui-scratch/run-t102.sh). t101: clippy clean, PS 37/39, HIST ok. Since t101: div.rs gate REVERTED (the
 row tip "Extrude 1 <- Sketch 1" still showed after a quick double-click), list-matrix row re-gapped, TICKETS

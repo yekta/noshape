@@ -466,16 +466,7 @@ impl PartStudioView {
             // (A spline's tangent handles are part of it in live's model: not listed.)
             .filter(|e| !e.external && !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)) && !text_box.contains(&e.id))
             .map(|e| {
-                let kind = match e.kind() {
-                    EntityKind::Line => "line",
-                    EntityKind::Circle => "circle",
-                    EntityKind::Arc => "arc",
-                    EntityKind::Ellipse => "ellipse",
-                    EntityKind::EllipticalArc => "elliptical arc",
-                    EntityKind::BSpline | EntityKind::FitSpline => "spline",
-                    EntityKind::Conic => "conic",
-                    EntityKind::Point => "point",
-                };
+                let kind = entity_kind_name(e.kind());
                 if e.construction { format!("construction {kind}") } else { kind.to_string() }
             })
             .collect();
@@ -556,7 +547,8 @@ impl PartStudioView {
         dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
         let mut dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();
         dimensions.extend(driven.into_iter().map(|kind| json!({ "kind": kind, "expression": null })));
-        json!({ "tool": tool, "entities": entities, "constraints": constraints, "dimensions": dimensions })
+        let geometry = sketch_geometry(sk, &owned, &text_box);
+        json!({ "tool": tool, "entities": entities, "constraints": constraints, "dimensions": dimensions, "geometry": geometry })
     }
 
     /// A selected entity's kind and owner as the parity state names them (an inferred point: its entity's).
@@ -791,4 +783,66 @@ fn onshape_dimension_expression(text: &str, unit: &str) -> String {
         return format!("({t}) {unit}");
     }
     t.to_string()
+}
+
+/// An entity kind as live's sketch state names it.
+fn entity_kind_name(kind: noshape_sketch::EntityKind) -> &'static str {
+    use noshape_sketch::EntityKind;
+    match kind {
+        EntityKind::Line => "line",
+        EntityKind::Circle => "circle",
+        EntityKind::Arc => "arc",
+        EntityKind::Ellipse => "ellipse",
+        EntityKind::EllipticalArc => "elliptical arc",
+        EntityKind::BSpline | EntityKind::FitSpline => "spline",
+        EntityKind::Conic => "conic",
+        EntityKind::Point => "point",
+    }
+}
+
+/// The sketch's entities with their points in sketch mm (UIS-STATE-GEOMETRY): a curve's defining points in order
+/// (centre first), a circle's radius, a fit spline's end derivatives (its handle tips less its ends) and the Use
+/// results, `used`. Sorted, so the comparer matches them in order.
+fn sketch_geometry(sk: &noshape_sketch::Sketch, owned: &std::collections::HashSet<noshape_sketch::EntityId>, text_box: &std::collections::HashSet<noshape_sketch::EntityId>) -> Vec<Value> {
+    use noshape_sketch::{EntityKind, Geometry};
+    let mm = |p: DVec2| [(p.x * 1e7).round() / 1e4, (p.y * 1e7).round() / 1e4];
+    let at = |id: &noshape_sketch::EntityId| sk.point(*id).map(mm);
+    let mut out: Vec<(String, Value)> = sk
+        .entities()
+        .filter(|e| !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)) && !text_box.contains(&e.id))
+        .map(|e| {
+            let mut kind = entity_kind_name(e.kind()).to_string();
+            if e.construction {
+                kind = format!("construction {kind}");
+            }
+            let mut g = json!({ "kind": kind });
+            let points: Vec<[f64; 2]> = match &e.geometry {
+                Geometry::Point { pos } => vec![mm(*pos)],
+                Geometry::FitSpline { points, handles } => {
+                    if let Some((a, b)) = handles {
+                        let ends = (points.first().and_then(at), points.last().and_then(at));
+                        let d = |tip: &noshape_sketch::EntityId, end: Option<[f64; 2]>| at(tip).zip(end).map(|(t, e)| [((t[0] - e[0]) * 1e4).round() / 1e4, ((t[1] - e[1]) * 1e4).round() / 1e4]);
+                        g["derivatives"] = json!([d(a, ends.0), d(b, ends.1)]);
+                    }
+                    points.iter().filter_map(at).collect()
+                }
+                _ => e.point_refs().iter().filter_map(at).collect(),
+            };
+            g["points"] = json!(points);
+            match &e.geometry {
+                Geometry::Circle { radius, .. } => g["radius"] = json!((radius * 1e7).round() / 1e4),
+                Geometry::Ellipse { major, minor, .. } | Geometry::EllipticalArc { major, minor, .. } => {
+                    g["major"] = json!(mm(*major));
+                    g["minor"] = json!((minor * 1e7).round() / 1e4);
+                }
+                _ => {}
+            }
+            if e.external {
+                g["used"] = json!(true);
+            }
+            (g.to_string(), g)
+        })
+        .collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out.into_iter().map(|(_, g)| g).collect()
 }
