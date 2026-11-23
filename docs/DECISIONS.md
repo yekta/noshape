@@ -205,3 +205,5 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   that, gated by the Part Studio's feature version: older studios keep their current names so references don't break.
 - 11-23 (lead) Importing into an existing Part Studio is Onshape's route: Derived › the picker's Import… (the file becomes
   its own tab, Derived brings its parts in, linked). No direct "import into this Part Studio" beyond what live offers.
+- 11-23 (lead) Sketch Use of an already-used edge and Mirror of an already-mirrored entity make duplicates, as live's
+  (skasm): this is behaviour, not a failure, so we match it rather than refuse.
