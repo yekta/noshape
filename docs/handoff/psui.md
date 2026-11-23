@@ -33,8 +33,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (09:05 UTC 11-23): cc8570b3 batch LANDED. QUEUED 78be1090 = 825f6603f UIS-STATE-GEOMETRY + 7506baee8
-(below; t114/t115 green, clippy clean). Live recorder side of the geometry state: live/REQUESTS 07:17.
+## RESUME HERE (09:3x UTC 11-23): P0 from lead FIRST: re-land skasm's + studios' stacks (failed 09:01 on rebase vs cc8570b3).
+- skasm: worktree /root/projects/noshape-wt/psui-skrebase (branch psui-skrebase, from 1b23d327) rebased on main; one
+  conflict sketch_mode.rs ~6994 (kept main's !self.end_on_lit_target() AND skasm's no_start tangent arc); + 4f2720440
+  TICKETS 7 doubled rows dropped. Tests: /root/psui-scratch/run-sk1.sh (vibex8) -> sk1.out. Then land.sh from there.
+- studios: worktree psui-strebase (from 7a996f6c; 656a4061 is an older copy of b2403e40b) rebased clean; + 0862acea6
+  TICKETS 9 doubled rows. Tests run-st1.sh (vibex7) -> st1.out. Then land.sh from there. Tell lead each new sha.
+- Dedup tool: /root/psui-scratch/dedup.py <old tip> [--apply] (keeps the longest of rows a rebase doubled).
+- After: remove both worktrees (git worktree remove) and their ~/agents/psui-*rebase on vibex7/8.
+Own: e6f1b4395 CONFIG-FILTER-HELP-STILL-POINTER committed (test green t117b, clippy clean), not landed; stacked on 22fec2ce2
+(TICKETS dups) after QUEUED 78be1090. land.sh once the P0 lands are queued.
 In 7506baee8:
 - ERR-TOOL-BODY-COLOUR: failing tool matte (preview_body_ids), alpha 0.8, TOOL_PREVIEW_FAIL 0x9b3d40 (scene palette):
   extrude (129,60,63) vs live (130,62,67), revolve (129,63,66) vs (135,63,69). Test a_failing_tool_body_is_lives_matte_dark_red.
