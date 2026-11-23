@@ -807,6 +807,10 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         if let Err(e) = ev.boolean_into(&targets, tools, k::BooleanOp::Cut) {
             return Err(if ev.cancelled() { e } else { fe("Hole creates invalid geometry.") });
         }
+        // A hole that takes a whole part errors and keeps it (live errors-1123 ho-huge: Ø60 through a 40 x 30 block).
+        if ids.iter().any(|id| index_of_body(ev, id).is_none()) {
+            return Err(fe("The hole destroyed one or more parts."));
+        }
     }
     // hole.fs: the computed Depth reads "Multiple" for several locations.
     if let Some(h) = up_to_depth_found.filter(|_| end == "UP_TO_NEXT" || end == "UP_TO_ENTITY") {

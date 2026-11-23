@@ -50,7 +50,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     };
     let axis = if ev.bool("oppositeDirection") { -axis } else { axis };
     let profiles = if thin { super::thin::thin_profiles_sided(ev, refs, super::thin::WallSide::Along(&turning), true)? } else { ev.profiles(refs)? };
-    let full = ev.bool("fullRevolve");
+    let full = full_revolve(ev);
     let mut tools = Vec::new();
     for p in &profiles {
         if full {
@@ -96,7 +96,7 @@ fn surface(ev: &mut EvalCtx) -> FResult<()> {
             .collect();
         let key = edge_sources.first().cloned().unwrap_or(crate::reference::Source::Index(i as u32));
         let p = Profile { shape: w, frame, edge_sources, key, from_face: false };
-        if ev.bool("fullRevolve") {
+        if full_revolve(ev) {
             let res = k::revolve(&p.shape, origin, axis, TAU).map_err(revolve_failed)?;
             let names = sweep_names(ev, &p, &res, false, false);
             tools.push(NamedShape::new(res.shape, names));
@@ -321,6 +321,11 @@ fn side_names(ev: &EvalCtx, p: &Profile, res: &k::OpResult, far: &Role) -> Vec<c
     }
     let empty = ShapeNames::default();
     ev.name_result(&[&empty], &res.history, &res.shape, &roles, None)
+}
+
+/// Full revolve on, or a Blind revolve of 0° on one side (live errors-1123 revolve angle0: a full ring, no error).
+fn full_revolve(ev: &EvalCtx) -> bool {
+    ev.bool("fullRevolve") || (ev.is("endBound", "BLIND") && !ev.bool("symmetric") && !ev.bool("hasStartBound") && ev.angle("angle").is_ok_and(|a| a.abs() < 1e-12))
 }
 
 fn partial(ev: &EvalCtx, p: &Profile, origin: DVec3, axis: DVec3) -> FResult<NamedShape> {

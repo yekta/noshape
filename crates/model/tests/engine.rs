@@ -412,6 +412,26 @@ fn surface_loft_between_coplanar_open_curves() {
     assert!(near(area, 0.02 * 0.01, 1e-6), "{area}");
 }
 
+/// Live errors-1123 loft guides-empty: Guides on with no guide picked builds the loft, with an info.
+#[test]
+fn a_loft_with_guides_on_and_none_picked_builds_with_an_info() {
+    let mut t = T::new();
+    let mut item = |x: f64| {
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(x, 0.0), DVec2::new(x, 0.01)).0;
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let mut v = ParamValues::default();
+        v.set("wireProfileEntities", q(vec![Reference::SketchEntity { sketch: s, entity: l }]));
+        v
+    };
+    let (a, c) = (item(0.0), item(0.02));
+    let loft = t.add("loft", &[("bodyType", en("SURFACE")), ("wireProfilesArray", ParamValue::Array(vec![a, c])), ("addGuides", b(true))]);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|x| x.id == loft).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Info, Some("Some selections could not be used as guides, check that selections are not construction entities.")));
+    assert!(r.context.bodies.iter().any(|b| b.id.feature == loft));
+}
+
 /// qa SURFACE-LOFT-GUIDE-FAILS (live workflow 12): a surface Loft between two lines (Top, y -20, and Front, z 20, both x
 /// -10..50 mm) with a guide line on Right meeting each at x 0, mid-length: live builds the surface (here a flat strip,
 /// 60 x 20 sqrt 2 mm).
@@ -946,6 +966,18 @@ fn extrude_second_direction_flip_is_against_the_normal() {
     assert!((lo + 0.05).abs() < 1e-7 && (hi - 0.025).abs() < 1e-7 && near(v, 1e-4 * 0.075, 1e-6), "{lo} {hi} {v}");
 }
 
+/// Live errors-1123 revolve angle0: Full revolve off, Blind, 0° builds the full 360° ring, no error.
+#[test]
+fn a_blind_revolve_of_0_degrees_is_a_full_ring() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), rect(0.01, 0.0, 0.02, 0.01));
+    let r = t.regions(s)[0].clone();
+    t.add("revolve", &[("entities", q(vec![r])), ("axis", q(vec![Reference::Plane(DatumPlane::Top)])), ("fullRevolve", b(false)), ("angle", e("0 deg"))]);
+    let ring = PI * (0.02f64.powi(2) - 0.01f64.powi(2)) * 0.01;
+    let v = total_volume(&t.ok().context);
+    assert!(near(v, ring, 1e-6), "{v}");
+}
+
 #[test]
 fn revolve_up_to_vertex_face_and_next() {
     let quarter = 0.25 * PI * (0.02f64.powi(2) - 0.01f64.powi(2)) * 0.01;
@@ -1077,6 +1109,23 @@ fn query_variable_selection_types_as_std() {
 }
 
 // ------------------------------------------------------------------ hole table edit logic
+
+/// Live errors-1123 ho-huge: a Ø60 hole through all of a 40 x 30 x 10 block errors "The hole destroyed one or more
+/// parts." and the block stays.
+#[test]
+fn a_hole_that_takes_the_whole_part_errors_and_keeps_it() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+    let pl = t.top_plane("10 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(0.02, 0.015));
+    let s = t.sketch(Reference::FeaturePlane(pl), sk);
+    let h = t.add("hole", &[("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])), ("unitsSystem", en("METRIC")), ("endStyleV2", en("THROUGH")), ("holeDiameterV3", e("60 mm"))]);
+    let r = t.regen();
+    let st = r.display.features.iter().find(|x| x.id == h).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("The hole destroyed one or more parts.")));
+    assert!(near(total_volume(&r.context), 0.04 * 0.03 * 0.01, 1e-9), "the block stays");
+}
 
 #[test]
 fn hole_dialog_table_values_then_edits() {

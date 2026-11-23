@@ -1273,6 +1273,10 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let shapes: Vec<Shape> = sections.iter().map(|s| s.shape.clone()).collect();
     // loft.fs guides (live "psb (10-24 f)").
     let guide_refs: Vec<Reference> = if ev.bool("addGuides") { ev.params.array("guidesArray").iter().flat_map(|g| g.query("guideEntities").to_vec()).collect() } else { Vec::new() };
+    if ev.bool("addGuides") && guide_refs.is_empty() {
+        // Live errors-1123 loft guides-empty: the loft builds, with this info.
+        ev.infos.push("Some selections could not be used as guides, check that selections are not construction entities.".into());
+    }
     if !guide_refs.is_empty() {
         let guides = wires_from(&resolve_curves(ev, &guide_refs)?)?;
         guide_conditions(ev, &shapes)?;
