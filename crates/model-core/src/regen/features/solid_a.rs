@@ -751,7 +751,11 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         let res = if !valid || may_self_intersect(&p.shape, &path, &res.shape, opts.scale_end) && res.shape.self_intersects() {
             match pieces() {
                 Some(r) => r,
-                None => return err(tight_bend_message(&p.shape, &path)),
+                None => {
+                    // Live sweep tight-bend: the tube folding through itself drawn dark red.
+                    ev.error_shapes = vec![res.shape.clone()];
+                    return err(tight_bend_message(&p.shape, &path));
+                }
             }
         } else {
             res

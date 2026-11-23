@@ -467,6 +467,8 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
     let mut any_hit = false;
     // Locations that made no hole (hole.fs warns when only some miss).
     let mut missed = 0;
+    // The holes that reach no part, drawn dark red where they'd be (live ho-offpart).
+    let mut missed_tools: Vec<noshape_kernel::Shape> = Vec::new();
     // A fastener fit on a hole through fewer than two parts (live L51).
     let mut fit_unused = false;
     // A tapped depth deeper than a hole gets in its parts (hole.fs).
@@ -553,6 +555,13 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         let hit_bodies: Vec<(usize, f64, f64)> = rel.iter().filter_map(|(bi, iv)| Some((*bi, iv.first()?.0, iv.last()?.1))).collect();
         if hit_bodies.is_empty() {
             missed += 1;
+            // Live ho-offpart: drawn at its Depth from the point.
+            let (h, r) = (ev.length("holeDepthV3").unwrap_or(0.0), dims.diameter * 0.5);
+            if let Ok(pts) = hole_profile(dims.diameter, &dims, h, tip_len(tip_angle, r), 0.0)
+                && let Ok(tool) = k::revolve_profile_tool(&pts, &k::Plane::new(s, -dir, perp(dir)))
+            {
+                missed_tools.push(tool);
+            }
             continue;
         }
         let r_main = dims.diameter * 0.5;
@@ -698,6 +707,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         ordered.retain(|x| x.1 < h + tip);
         if ordered.is_empty() {
             missed += 1;
+            missed_tools.extend(make_tool(dims.diameter).ok().map(|t| t.shape));
             continue;
         }
         any_hit = true;
@@ -751,6 +761,7 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["scope"], "No target parts selected for hole.");
     }
     if !any_hit {
+        ev.error_shapes = missed_tools;
         return crate::regen::eval::err_at(&["scope"], "None of the holes intersected a part.");
     }
     // Live L53: a location that makes no hole fails the whole feature.

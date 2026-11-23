@@ -5814,45 +5814,50 @@ fn an_external_threads_chamfer_and_undercut_cut_the_rod() {
     }
 }
 
+/// Live errors-1123's boss-block: block x -20..20, y -15..15, z 0..10, an Ø8 boss at x 10 to z 20.
+fn boss_block() -> Studio {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(-20.0, -15.0), (20.0, -15.0), (20.0, 15.0), (-20.0, 15.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(mm(10.0), 0.0), mm(4.0));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("20 mm"));
+        p.set("operationType", ParamValue::Enum("ADD".into()));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    s
+}
+
+/// The face of part `bi` nearest `p`.
+fn face_nearest(r: &RegenResult, bi: usize, p: DVec3) -> Reference {
+    let b = &r.context.bodies[bi];
+    let off = |f: &noshape_kernel::Shape| f.project_point(p).unwrap().point.distance(p);
+    let i = b.shape.faces().iter().enumerate().min_by(|x, y| off(x.1).total_cmp(&off(y.1))).unwrap().0;
+    Reference::Face((*b.faces[i]).clone())
+}
+
 /// Live errors-1123 move-face on boss-block (block x -20..20, y -15..15, z 0..10, Ø8 boss at x 10 to z 20): the +x side
 /// offset 40 mm in leaves nothing and fails ("Could not offset selected faces as requested."); the top offset 10 or
 /// 15 mm in builds; the boss's cylinder offset 4 or 6 mm in builds with the boss gone.
 #[test]
 fn move_face_on_the_boss_block_as_live() {
-    let build = || {
-        let mut s = Studio::new();
-        let mut sk = noshape_sketch::Sketch::new();
-        polyline(&mut sk, &[(-20.0, -15.0), (20.0, -15.0), (20.0, 15.0), (-20.0, 15.0)], true);
-        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
-        let region = s.region(sid);
-        s.add("extrude", move |p| {
-            p.set("entities", q(region));
-            p.set("depth", expr("10 mm"));
-        });
-        let mut sk = noshape_sketch::Sketch::new();
-        sk.add_circle(DVec2::new(mm(10.0), 0.0), mm(4.0));
-        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
-        let region = s.region(sid);
-        s.add("extrude", move |p| {
-            p.set("entities", q(region));
-            p.set("depth", expr("20 mm"));
-            p.set("operationType", ParamValue::Enum("ADD".into()));
-            p.set("defaultScope", ParamValue::Bool(true));
-        });
-        s
-    };
     let side = Some(DVec3::new(mm(20.0), 0.0, mm(5.0)));
     let top = Some(DVec3::new(0.0, mm(10.0), mm(10.0)));
     for (case, at, dist, ok, vol) in [("side-through", side, "40 mm", false, None), ("zero", top, "10 mm", true, None), ("collapse", top, "15 mm", true, None), ("cyl-r0", None, "4 mm", true, Some(12000.0)), ("cyl-neg", None, "6 mm", true, Some(12000.0))] {
-        let mut s = build();
+        let mut s = boss_block();
         let r = s.ok();
         let face = match at {
-            Some(p) => {
-                let b = &r.context.bodies[0];
-                let off = |f: &noshape_kernel::Shape| f.project_point(p).unwrap().point.distance(p);
-                let i = b.shape.faces().iter().enumerate().min_by(|x, y| off(x.1).total_cmp(&off(y.1))).unwrap().0;
-                Reference::Face((*b.faces[i]).clone())
-            }
+            Some(p) => face_nearest(&r, 0, p),
             None => cylinder_face(&r, 0),
         };
         s.add("moveFace", move |p| {
@@ -5871,4 +5876,49 @@ fn move_face_on_the_boss_block_as_live() {
         assert_eq!(r.context.bodies.len(), 1, "{case}");
         assert!(near(volume(&r, 0) * 1e9, live, 1e-3), "{case}: {} mm³", volume(&r, 0) * 1e9);
     }
+}
+
+/// Live errors-1123 mirror mi-face-off: the boss's faces mirrored about the block's -x side land off the part ("Pattern
+/// could not be created on the same part."), the mirrored faces drawn dark red beside the block.
+#[test]
+fn a_face_mirror_off_the_part_draws_its_copies_red() {
+    let mut s = boss_block();
+    let r = s.ok();
+    let faces = vec![cylinder_face(&r, 0), face_nearest(&r, 0, DVec3::new(mm(10.0), 0.0, mm(20.0)))];
+    let plane = face_nearest(&r, 0, DVec3::new(mm(-20.0), 0.0, mm(5.0)));
+    s.add("mirror", move |p| {
+        p.set("patternType", en("FACE"));
+        p.set("faces", ParamValue::Query(faces));
+        p.set("mirrorPlane", ParamValue::Query(vec![plane]));
+    });
+    let res = s.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.clone().unwrap_or_default()), (FeatureStatus::Error, "Pattern could not be created on the same part.".to_string()));
+    let m = st.error_mesh.as_ref().expect("error geometry");
+    let (lo, hi) = m.positions.iter().map(|p| p[0] as f64).fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
+    // The boss (x 6..14) mirrored about x -20: x -54..-46.
+    assert!((lo - mm(-54.0)).abs() < 1e-6 && (hi - mm(-46.0)).abs() < 1e-6, "{lo} {hi}");
+}
+
+/// Live errors-1123 hole ho-offpart: a hole at a point 60 mm beside the block, scope the part, fails ("None of the holes
+/// intersected a part.") and draws its hole body dark red at the point.
+#[test]
+fn a_hole_off_its_part_draws_its_body_red() {
+    let mut s = boss_block();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = sk.add_point(DVec2::new(mm(80.0), 0.0));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let part = s.ok().context.bodies[0].id.clone();
+    s.add("hole", move |h| {
+        h.set("scope", q(Reference::Body(part)));
+        h.set("locations", ParamValue::Query(vec![Reference::SketchEntity { sketch: sid, entity: p.0 }]));
+        h.set("unitsSystem", en("METRIC"));
+        h.set("holeDiameterV3", expr("5 mm"));
+    });
+    let res = s.regen();
+    let st = res.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.clone().unwrap_or_default()), (FeatureStatus::Error, "None of the holes intersected a part.".to_string()));
+    let m = st.error_mesh.as_ref().expect("the hole body");
+    let (lo, hi) = m.positions.iter().map(|p| p[0] as f64).fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
+    assert!((lo - mm(77.5)).abs() < 1e-6 && (hi - mm(82.5)).abs() < 1e-6, "{lo} {hi}");
 }

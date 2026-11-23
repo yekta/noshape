@@ -598,14 +598,23 @@ fn run_pattern_paths(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> 
             // Onshape's PATTERN_FACE_FAILED / MIRROR_FACE_FAILED: the reason isn't shown.
             let failed = if verb(ev) == "mirror" { "Failed to create face mirror, check input." } else { "Failed to create pattern, check input." };
             for (id, fs) in groups {
-                pattern_faces(ev, &id, &fs, &instances, true).map_err(|e| {
-                    if e.message == "Cancelled" || e.message == NOT_ON_BODY {
-                        return e;
-                    }
-                    log::debug!("face pattern: {}", e.message);
-                    trace(ev, format!("face pattern failed: {}", e.message));
-                    fe(failed)
-                })?;
+                let Err(e) = pattern_faces(ev, &id, &fs, &instances, true) else { continue };
+                if e.message == "Cancelled" {
+                    return Err(e);
+                }
+                // The copies it couldn't make, drawn dark red (live cv-face-off: the face instance off the block).
+                if ev.error_shapes.is_empty()
+                    && let Some(bi) = index_of_body(ev, &id)
+                {
+                    let body = ev.ctx.bodies[bi].clone();
+                    ev.error_shapes = failed_instances(&[], &body, &fs, &instances);
+                }
+                if e.message == NOT_ON_BODY {
+                    return Err(e);
+                }
+                log::debug!("face pattern: {}", e.message);
+                trace(ev, format!("face pattern failed: {}", e.message));
+                return err(failed);
             }
             Ok(())
         }
@@ -963,6 +972,8 @@ fn apply_tools(ev: &mut EvalCtx, seed: &BodyId, tools: Vec<NamedShape>, add: boo
         // a Feature pattern skips one and fails when all are off, asking for
         // Reapply features (live "qa5 bracket" †; std patternUtils).
         if strict && tools.iter().any(off) {
+            // Live mi-face-off: the copies off the part drawn dark red where they'd be.
+            ev.error_shapes = tools.iter().filter(|t| off(t)).map(|t| t.shape.clone()).collect();
             return err(NOT_ON_BODY);
         }
         if !tools.is_empty() && tools.iter().all(off) {

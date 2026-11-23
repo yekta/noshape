@@ -615,6 +615,28 @@ fn sweep_round_tight_bend() {
     }
 }
 
+/// Live errors-1123 sweep tight-bend: a sweep refused round a bend tighter than its profile draws the body it couldn't
+/// make dark red (the tube folding through itself), as G1 SW's R2 bend.
+#[test]
+fn a_sweep_round_too_tight_a_bend_draws_its_body_red() {
+    let mut t = T::new();
+    let mut prof = noshape_sketch::Sketch::new();
+    prof.add_circle(DVec2::ZERO, 0.003);
+    let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: prof, ..Default::default() })))]);
+    let mut path = noshape_sketch::Sketch::new();
+    let l = path.add_line(DVec2::new(0.0, 0.0), DVec2::new(0.0, 0.03));
+    let a = path.add_arc(DVec2::new(0.002, 0.03), DVec2::new(0.002, 0.032), DVec2::new(0.0, 0.03));
+    let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: path, ..Default::default() })))]);
+    let r = t.regen();
+    let key = r.display.sketches.iter().find(|x| x.feature == pf).unwrap().regions[0].key.clone();
+    let sw = t.add("sweep", &[("profiles", q(vec![Reference::SketchRegion { sketch: pf, key }])), ("path", q(vec![Reference::SketchEntity { sketch: pp, entity: l.0 }, Reference::SketchEntity { sketch: pp, entity: a.0 }]))]);
+    let r = t.regen();
+    let s = r.display.features.iter().find(|s| s.id == sw).unwrap();
+    assert_eq!((s.status, s.message.as_deref()), (FeatureStatus::Error, Some("Could not create valid swept body, check input.")));
+    let m = s.error_mesh.as_ref().expect("the failed body");
+    assert!(!m.face_ranges.is_empty());
+}
+
 /// A spline's two handle tips are marked in its sketch's display (drawn as Onshape's handle: hollow at rest, a 14 px
 /// disc lit; render offscreen::a_handle_tip_is_drawn_as_lives_in_each_state), its other points aren't.
 #[test]
