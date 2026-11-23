@@ -4214,7 +4214,7 @@ fn a_plane_picked_in_a_dialog_is_lighter_than_a_selected_plane(cx: &mut TestAppC
         let built = v.built.as_ref().expect("a scene");
         let right = v.display.planes.iter().find(|p| p.name == "Right").expect("the Right plane").reference.clone();
         [false, true].map(|dialog| {
-            let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&right), None, &[], Vec::new(), crate::scene_builder::Highlighting { error: false, dialog, ..Default::default() }, v.gpu.uploader());
+            let scene = crate::scene_builder::with_highlights(built, &v.display, std::slice::from_ref(&right), None, &[], Vec::new(), crate::scene_builder::Highlighting { dialog, ..Default::default() }, v.gpu.uploader());
             scene.instances.iter().map(|i| i.color[3]).filter(|a| [crate::theme::viewport::PLANE_SELECTED_ALPHA, crate::theme::viewport::PLANE_PICKED_ALPHA].contains(a)).collect::<Vec<f32>>()
         })
     });

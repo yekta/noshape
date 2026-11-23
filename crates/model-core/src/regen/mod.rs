@@ -535,7 +535,7 @@ impl Regenerator {
                 keys.push((f.id, key));
             }
             if i >= upto {
-                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, missing_refs: Vec::new(), computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
+                states.push(FeatureState { id: f.id, status: FeatureStatus::RolledBack, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, missing_refs: Vec::new(), computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), error_refs: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() });
                 continue;
             }
             if let Some(versions) = self.entries.get_mut(&f.id)
@@ -606,7 +606,7 @@ impl Regenerator {
                 noshape_kernel::kernel_profile_mark("");
             }
             let ft = Instant::now();
-            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, missing_refs: Vec::new(), computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
+            let mut state = FeatureState { id: f.id, status: FeatureStatus::Ok, message: None, underdefined: false, time_ms: 0.0, faulty: Vec::new(), invalid_input: false, drawn_failed: false, missing: 0, missing_refs: Vec::new(), computed: Vec::new(), variable: None, touched: Vec::new(), error_mesh: None, error_parts: Vec::new(), error_refs: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new() };
             if let Some(msg) = expr_error.take() {
                 state.status = FeatureStatus::Error;
                 state.message = Some(msg);
@@ -638,8 +638,11 @@ impl Regenerator {
                         let own = |id: FeatureId| studio.features.iter().any(|g| g.id == id);
                         let (pruned, missing) = eval::drop_missing_regions(params, &base, &own);
                         let params = pruned.as_ref().unwrap_or(params);
-                        state.missing = missing.len();
-                        state.missing_refs = missing;
+                        let specs = f.feature_type().filter(|_| !crate::custom::is_custom(&f.type_id)).map(|t| t.params.as_slice()).unwrap_or(&[]);
+                        let (refused, dropped) = eval::drop_filtered_picks(params, specs, &base);
+                        let params = refused.as_ref().unwrap_or(params);
+                        state.missing = missing.len() + dropped.len();
+                        state.missing_refs = missing.into_iter().chain(dropped).collect();
                         // Geometry of Assembly contexts joins the feature's context only
                         // while it is evaluated (never merged, patterned or listed).
                         let uses_context = !studio.contexts.is_empty() && crate::in_context::params_use_context(params, None);
@@ -770,6 +773,7 @@ impl Regenerator {
                                     state.error_mesh = Some(display::tessellate_error(&noshape_kernel::Shape::compound(&ev.error_shapes), opts));
                                 }
                                 state.error_parts = std::mem::take(&mut ev.error_bodies);
+                                state.error_refs = std::mem::take(&mut ev.error_refs);
                             }
                             Err(_) => {
                                 state.status = FeatureStatus::Error;

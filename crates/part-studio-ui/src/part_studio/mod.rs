@@ -1574,6 +1574,8 @@ impl PartStudioView {
         }
         // Its parts of the result (a failed Shell's part) highlighted in place (live feedback-gaps 5).
         let error_parts = failed_state.map(|s| s.error_parts.clone()).unwrap_or_default();
+        // Only the inputs its error blames go red; the rest stay orange (live errors-1123).
+        let blamed: Vec<Reference> = failed_state.filter(|_| failing && !attempt).map(|s| s.error_refs.clone()).unwrap_or_default();
         for b in self.display.bodies.iter().filter(|b| !b.hidden && error_parts.contains(&b.id)) {
             extra.extend(scene_builder::error_geometry(&b.mesh, false, self.gpu.uploader()));
         }
@@ -1658,7 +1660,7 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none() && !attempt, dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), untinted_faces: self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Faces(..) | appearance::EditTarget::Feature(..) | appearance::EditTarget::Features(_))), regions_outlined: self.tool_failed(), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)), faces_hovered: !sm_lit.is_empty() }, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { errors: &blamed, dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), untinted_faces: self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Faces(..) | appearance::EditTarget::Feature(..) | appearance::EditTarget::Features(_))), regions_outlined: self.tool_failed(), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)), faces_hovered: !sm_lit.is_empty() }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }

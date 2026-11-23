@@ -1861,6 +1861,7 @@ fn a_cylinder_thickened_past_its_axis_fails() {
         });
         let r = s.ok();
         let side = cylinder_face(&r, 0);
+        let blamed = side.clone();
         s.add("thicken", move |p| {
             p.set("entities", ParamValue::Query(vec![side]));
             p.set("thickness1", expr(t1));
@@ -1872,6 +1873,8 @@ fn a_cylinder_thickened_past_its_axis_fails() {
             assert_eq!(st.0, FeatureStatus::Ok, "{t1} / {t2}: {st:?}");
         } else {
             assert_eq!(st, (FeatureStatus::Error, "Failed to thicken all selections.".to_string()), "{t1} / {t2}");
+            // Live errors-1123 th-cyl-in: the face drawn red.
+            assert_eq!(s.regen().display.features.last().unwrap().error_refs, vec![blamed], "{t1} / {t2}");
         }
     }
 }
@@ -2011,12 +2014,23 @@ fn failed_extrude_reads_onshape_text() {
     polyline(&mut sk, &[(120.0, 10.0), (130.0, 10.0), (130.0, 20.0), (120.0, 20.0)], true);
     let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
     let region = s.region(sid);
-    s.add("extrude", move |p| {
+    let blamed = region.clone();
+    let x = s.add("extrude", move |p| {
         p.set("entities", q(region));
         p.set("endBound", en("UP_TO_SURFACE"));
         p.set("endBoundEntityFace", q(side));
     });
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Failed to extrude selections, check input.".to_string()));
+    // Live errors-1123: its region drawn red (depth0 too); Up to next's failure leaves it orange (upnext).
+    let blames = |s: &mut Studio| s.regen().display.features.last().unwrap().error_refs.clone();
+    assert_eq!(blames(&mut s), vec![blamed.clone()], "up to a face it can't reach");
+    for (k, v, msg, red) in [("endBound", en("BLIND"), "Failed to extrude selections, check input.", true), ("endBound", en("UP_TO_NEXT"), "Up to next termination problem, consider switching it to up to part.", false)] {
+        let p = &mut s.ps.features.iter_mut().find(|f| f.id == x).unwrap().params;
+        p.set(k, v);
+        p.set("depth", expr("0 mm"));
+        assert_eq!(s.last_status(), (FeatureStatus::Error, msg.to_string()));
+        assert_eq!(blames(&mut s), if red { vec![blamed.clone()] } else { Vec::new() }, "{msg}");
+    }
 }
 
 /// Live's texts (err18, docs/parity/error-wording.md): Up to next with nothing ahead, a revolve whose axis crosses
@@ -6005,6 +6019,32 @@ fn an_add_pattern_changing_nothing_draws_its_instances_red() {
     let m = st.error_mesh.as_ref().expect("the instances");
     let (lo, hi) = m.positions.iter().map(|p| p[2] as f64).fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
     assert!((lo - 0.0).abs() < 1e-6 && (hi - mm(20.0)).abs() < 1e-6, "{lo} {hi}");
+}
+
+/// Live errors-1123 mi-cylplane / cv-path-face: a pick its field doesn't take (the boss's cylinder as Mirror plane, the
+/// block's top face as Curve pattern's path) is a missing selection: left out, the feature's own empty-input error and
+/// "1 missing selection".
+#[test]
+fn a_pick_its_field_refuses_is_missing() {
+    let mut s = boss_block();
+    let r = s.ok();
+    let part = r.context.bodies[0].id.clone();
+    let (cyl, top) = (cylinder_face(&r, 0), face_nearest(&r, 0, DVec3::new(mm(0.0), mm(-5.0), mm(10.0))));
+    let (p1, c1) = (part.clone(), cyl.clone());
+    let m = s.add("mirror", move |p| {
+        p.set("entities", q(Reference::Body(p1)));
+        p.set("mirrorPlane", ParamValue::Query(vec![c1]));
+    });
+    let (t1, p2) = (top.clone(), part);
+    let c = s.add("curvePattern", move |p| {
+        p.set("entities", q(Reference::Body(p2)));
+        p.set("edges", ParamValue::Query(vec![t1]));
+        p.set("instanceCount", expr("3"));
+    });
+    let res = s.regen();
+    let state = |id| res.display.feature_state(id).map(|st| (st.status, st.message.clone().unwrap_or_default(), st.missing, st.missing_refs.clone())).unwrap();
+    assert_eq!(state(m), (FeatureStatus::Error, "Select a mirror plane.".to_string(), 1, vec![cyl]));
+    assert_eq!(state(c), (FeatureStatus::Error, "Select a path to pattern along.".to_string(), 1, vec![top]));
 }
 
 /// Live errors-1123 mirror mi-face-off: the boss's faces mirrored about the block's -x side land off the part ("Pattern

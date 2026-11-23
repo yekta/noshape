@@ -1730,11 +1730,15 @@ pub fn thicken(ev: &mut EvalCtx) -> FResult<()> {
     let mut grouped: BTreeMap<usize, usize> = BTreeMap::new();
     for inp in &inputs {
         // Live's words alone (c2-surf-workshop-singularities' "Thicken failure"); the kernel's reason only in the log.
+        // Live errors-1123 th-cyl-in: the selection drawn red.
+        let blamed = ev.query("entities").to_vec();
         let res = k::thicken(&inp.shape, t1, t2).map_err(|e| {
+            ev.error_refs = blamed.clone();
             log::debug!("Failed to thicken all selections. ({e})");
             crate::regen::eval::FeatureError::new("Failed to thicken all selections.")
         })?;
         if res.shape.count(ShapeType::Solid) == 0 {
+            ev.error_refs = blamed;
             return err("Failed to thicken all selections.");
         }
         let shape = res.shape;

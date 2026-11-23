@@ -815,11 +815,14 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         // geometry." (live H5: a counterbore tangent to a side face; live
         // "qa4 round 5 v2 s1 follow-up": a hole tangent to a face, both
         // non-manifold).
+        let shapes: Vec<noshape_kernel::Shape> = tools.iter().map(|t| t.shape.clone()).collect();
         if let Err(e) = ev.boolean_into(&targets, tools, k::BooleanOp::Cut) {
             return Err(if ev.cancelled() { e } else { fe("Hole creates invalid geometry.") });
         }
-        // A hole that takes a whole part errors and keeps it (live errors-1123 ho-huge: Ø60 through a 40 x 30 block).
+        // A hole that takes a whole part errors and keeps it, its hole bodies drawn dark red (live errors-1123 ho-huge:
+        // Ø60 through a 40 x 30 block).
         if ids.iter().any(|id| index_of_body(ev, id).is_none()) {
+            ev.error_shapes = shapes;
             return Err(fe("The hole destroyed one or more parts."));
         }
     }

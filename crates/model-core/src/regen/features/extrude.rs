@@ -20,7 +20,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // "Contrast: a failed EXTRUDE", 10-22): the kernel's reason isn't shown.
     // Up to next that finds nothing to stop at: EXTRUDE_UPTO_NEXT_NO_DIVISION (live err18).
     let next = ev.is("endBound", "UP_TO_NEXT") || (ev.bool("hasSecondDirection") && ev.is("secondDirectionBound", "UP_TO_NEXT"));
-    eval_inner(ev).map_err(|e| {
+    let res = eval_inner(ev).map_err(|e| {
         // (A Boolean noshape's declined with NOSHAPE_BOOL_FALLBACK=0: its reason kept.)
         if e.message.starts_with(crate::regen::eval::KERNEL_FAILURE) && !e.message.contains("noshape's Boolean declined") {
             log::debug!("extrude: {}", e.message);
@@ -29,7 +29,12 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         } else {
             e
         }
-    })
+    });
+    // Live errors-1123 depth0: its region drawn red.
+    if res.as_ref().is_err_and(|e| e.message == "Failed to extrude selections, check input.") {
+        ev.error_refs = ev.query("entities").to_vec();
+    }
+    res
 }
 
 fn eval_inner(ev: &mut EvalCtx) -> FResult<()> {

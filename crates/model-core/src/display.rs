@@ -525,6 +525,10 @@ pub struct FeatureState {
     /// place (their own shading tinted error red, edges red), not as ghosts.
     #[serde(default)]
     pub error_parts: Vec<BodyId>,
+    /// The inputs a failed feature blames (std's error entities): drawn error red while its dialog is open, its other
+    /// selections orange (live errors-1123 extrude depth0, thicken th-cyl-in, chamfer too-big).
+    #[serde(default)]
+    pub error_refs: Vec<Reference>,
     /// Hole: parts behind its locations (against the hole direction), for
     /// the dialog's flip heuristic (hole.fs holeScopeFlipHeuristics).
     pub touched_behind: Vec<BodyId>,

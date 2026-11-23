@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 05:11 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 05:35 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -18,9 +18,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   kernel core::a_curve_on_a_cylinder_fills_with_that_cylinder). Next: check each edge got its p-curve (FindSurface
   wants the SAME handle and location on every edge, then Is2DClosed); else build the face on the cylinder directly
   (fill: all edges on one analytic face -> BRepBuilderAPI_MakeFace(surface, wire)).
-- LANDED c8555cc4 + c2f57b7b as b6eeab79 (11-23 00:11): gamma Move face 1 1391 -> 235 ms; loft-stations3 J/K LOFT_FAILED.
-- **VALID-SURFLOFTS-LOFT1 LANDED e3e73b362 (18:27):** loft's own straight edges as lines (straight_edges_as_lines, op_loft;
-  NOSHAPE_LOFT_SPLINE_EDGES=1 off). Suite 1984 -> 2015 features, none worse. Blend told: Face blend 2 next.
 - **KNIFEHANDLE LOFT 1 (open at +0.13 %, lead 11-22: parity is the target):** 472eddd5: each loop runs by its own
   parameter from guide 0, each guide by its own parameter (Pchip through (v_i, t_i)): 21504.09 mm2 vs live 21477.23
   (was 21517.64), P1-P4 width within 0.02 mm, P5-tip +0.38 mm. T1 kernel the_knifehandle_loft_through_six_profiles_has_lives_area.
@@ -183,8 +180,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    then splits a face (tol 3.2e-5) and x_t still 14->18 edges. Idea: shell of a round pipe = outer minus inner-circle sweep
    (exact joints), or fix by_smooth with tight sweeps. Refit experiment: /root/core-scratch/hose-refit-exp.patch.
 0. qa ERR rows left after the above: LOFT-TITLE-SUFFIX is psui's (done); then the errors-1123 rest, then Fill 1.
-0. ERR-MISSING-SELECTION flag (promised psui ~05:00): regen counts a filter-rejected pick as missing (FeatureState.missing
-   and the dialog's missing(r)).
+0. ERR-MISSING-SELECTION flag IN TEST (core-rf, uncommitted, after the set above): eval.rs drop_filtered_picks (a face
+   in a field without face bits, a non-planar face in a planar-only field, an edge in a field without edge/axis/point
+   bits; parts/feature fields skipped; built-in features only) -> mod.rs adds them to missing / missing_refs.
+   T1 features_c a_pick_its_field_refuses_is_missing. Then a full noshape-model run (it can drop picks in old tests).
+   FEATPATTERN-TITLE-SUFFIX: psui fixed it (0c1d80e6c), nothing for core.
 0. qa APPEAR P0s (TICKETS 01:5x): SUBTRACT-CUT-FACES (cut faces take the target's colour, not the tool feature's
    appearance: part-studio-ui appearance.rs face_colors Feature target hits r.depends_on()==f), SPLIT-LOSES-COLOURS
    (halves keep name "Red block", colour, face appearances; other parts' default names unchanged), PATTERN-COPY-COLOURS

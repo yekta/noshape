@@ -3743,7 +3743,8 @@ impl FeatureDialog {
                         let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
                         let label = match (s.item_template, values.array(arr_id).get(k)) {
                             (Some(t), Some(it)) => self.item_label(t, it, item_specs, arr_id, k),
-                            _ => r.as_ref().map(|r| (self.labeler)(r)).unwrap_or_default(),
+                            // Live errors-1123 loft guides-empty: an entry without its pick.
+                            _ => r.as_ref().map_or_else(|| "No selections".to_string(), |r| (self.labeler)(r)),
                         };
                         let item_key = format!("{arr_id}.{k}");
                         let open = if rows { !self.closed_items.contains(&item_key) } else { collapse && self.open_items.contains(&item_key) };

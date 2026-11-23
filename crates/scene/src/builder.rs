@@ -1441,17 +1441,15 @@ pub fn silhouette_edges(m: &noshape_model::display::MeshBuffers) -> SilhouetteDa
 
 /// Apply hover/selection state and rebuild highlight overlays for pick-only
 /// elements. Returns a new scene sharing all static GPU buffers.
-/// `error`: the edited feature fails. Live (behaviours "URGENT (10-22)",
-/// part-studio/2022, 2028): its inputs (`selection`) are drawn red instead of
-/// the orange selection: edges and face outlines red, sketch regions
-/// red-outlined with a light red fill, no face fill. `accent` (hovered parts
-/// and rows) keeps its colour.
+/// `errors`: the inputs a failing edited feature blames. Live (errors-1123 extrude depth0, chamfer too-big): drawn red
+/// instead of the orange selection: edges and face outlines red, sketch regions red-outlined with a light red fill, no
+/// face fill; its other inputs stay orange (upnext, draft, loft…). `accent` (hovered parts and rows) keeps its colour.
 /// How [`with_highlights`] lights the selection: in the error colour (a failed feature's picks), and as an open
 /// feature dialog's picks (`dialog`: a plane picked there takes the light dialog fill, live feel/mirror 33, not a
 /// selected plane's amber).
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Highlighting {
-    pub error: bool,
+pub struct Highlighting<'a> {
+    pub errors: &'a [Reference],
     pub dialog: bool,
     /// Selected parts drawn by their outline alone, in their own colour (an open part appearance editor: live
     /// tools-1119 a1-appearance, a2-red).
@@ -1471,14 +1469,15 @@ pub struct Highlighting {
 
 #[allow(clippy::too_many_arguments)]
 pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &[Reference], hover: Option<&Reference>, accent: &[Reference], extra: Vec<Instance>, mode: Highlighting, up: &Uploader) -> Scene {
-    let Highlighting { error, dialog, untinted_parts, untinted_faces, regions_outlined, curves_hovered, faces_hovered } = mode;
+    let Highlighting { errors, dialog, untinted_parts, untinted_faces, regions_outlined, curves_hovered, faces_hovered } = mode;
     let _t = noshape_render::perf::scope("s.with_highlights");
     let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, hover_outline_rgb: None, body_outline: false, body_outline_rgb: None, no_occlusion: built.scene.no_occlusion };
     let mut overlay_pts = PointData::default();
     let mut overlay_regions: Vec<(MeshData, [f32; 4], bool)> = Vec::new();
     let mut overlay_lines = LineData::default();
     let mut hidden_hover = LineData::default();
-    let sel_color = theme::lin(if error { theme::viewport::ERROR } else { theme::viewport::SELECTION });
+    let sel_color = theme::lin(theme::viewport::SELECTION);
+    let err_color = theme::lin(theme::viewport::ERROR);
     let hov_color = theme::lin(theme::viewport::PREHIGHLIGHT);
     // Onshape outlines hovered and selected faces (their boundary edges
     // light orange / amber) instead of tinting a hovered face.
@@ -1500,7 +1499,8 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             // its boundary in light orange; a selected one is filled
             // amber with an amber boundary.
             let hovered = flag == state::HOVER;
-            let c = if hovered { hov_color } else { sel_color };
+            let error = flag == state::ERROR;
+            let c = if hovered { hov_color } else if error { err_color } else { sel_color };
             // Region meshes sit 1 µm above the plane (regen
             // display.rs); the outline goes back onto the plane so
             // it doesn't count as hiding the sketch's own curves
@@ -1548,7 +1548,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 let k = theme::lin(fill);
                 overlay_regions.push((MeshData { positions: corners.to_vec(), normals: vec![n; 4], pick_ids: vec![0; 4], indices: vec![0, 1, 2, 0, 2, 3] }, [k[0], k[1], k[2], alpha], true));
             }
-            let border = if flag == state::HOVER { hov_color } else { sel_color };
+            let border = if flag == state::HOVER { hov_color } else if flag == state::ERROR { err_color } else { sel_color };
             for i in 0..4 {
                 // Over the parts in front of it, hovered or selected (live box-drag-plane-border-1123; at rest the
                 // plain border and the selected fill stay hidden by them).
@@ -1570,7 +1570,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                     if let Some(a) = t.anchor {
                         let p: [f32; 3] = a.as_vec3().into();
                         if flag == state::ERROR {
-                            overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(sel_color), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
+                            overlay_pts.points.push(PointSprite { position: p, color: lin_to_u8(err_color), pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
                         } else {
                             let c = if flag == state::HOVER { hov_color } else { sel_color };
                             overlay_pts.points.extend(vertex_disc(p, lin_to_u8(c)));
@@ -1609,6 +1609,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     // #f0b850, part-studio/09), not a selected face's. In a dialog its band, also while the feature fails (live
     // workflow 19 step 10: Subtract's Tools Part 2 with no Targets yet).
     for r in selection {
+        let error = errors.contains(r);
         if untinted_parts
             && let Reference::Body(b) = r
             && let Some(body) = display.body(b).filter(|b| !b.face_refs.is_empty())
@@ -1682,6 +1683,10 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
                 }
             }
         }
+    }
+    // Blamed inputs outside the selection (a failing chamfer's edge picked through its face).
+    for r in errors.iter().filter(|r| !selection.contains(r)) {
+        mark(r, state::ERROR, &mut scene);
     }
     // A decal on a selected face (or of a selected Decal feature) is tinted
     // (live: hovered it isn't).

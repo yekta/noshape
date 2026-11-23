@@ -1371,7 +1371,12 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
 }
 
 pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
-    in_onshape_words(chamfer_in(ev), "Failed to chamfer selections.")
+    let res = in_onshape_words(chamfer_in(ev), "Failed to chamfer selections.");
+    // Live errors-1123 too-big: its edges drawn red.
+    if res.as_ref().is_err_and(|e| e.message == "Failed to chamfer selections.") {
+        ev.error_refs = ev.query("entities").to_vec();
+    }
+    res
 }
 
 fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {

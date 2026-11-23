@@ -725,7 +725,7 @@ mod tests {
     use noshape_model::params::ParamValue;
 
     fn state(status: FeatureStatus, faulty: &[&str], touched: Vec<BodyId>) -> FeatureState {
-        FeatureState { id: FeatureId::new_random(), status, message: None, underdefined: false, time_ms: 0.0, faulty: faulty.iter().map(|s| s.to_string()).collect(), invalid_input: false, drawn_failed: false, computed: Vec::new(), variable: None, touched, error_mesh: None, error_parts: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new(), missing: 0, missing_refs: Vec::new() }
+        FeatureState { id: FeatureId::new_random(), status, message: None, underdefined: false, time_ms: 0.0, faulty: faulty.iter().map(|s| s.to_string()).collect(), invalid_input: false, drawn_failed: false, computed: Vec::new(), variable: None, touched, error_mesh: None, error_parts: Vec::new(), error_refs: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), manipulators: Vec::new(), missing: 0, missing_refs: Vec::new() }
     }
 
     /// An Extrude already Adding into Part 1 (a first preview touched it).

@@ -1125,6 +1125,10 @@ fn a_hole_that_takes_the_whole_part_errors_and_keeps_it() {
     let st = r.display.features.iter().find(|x| x.id == h).unwrap();
     assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("The hole destroyed one or more parts.")));
     assert!(near(total_volume(&r.context), 0.04 * 0.03 * 0.01, 1e-9), "the block stays");
+    // Its Ø60 hole body drawn dark red round the block.
+    let m = st.error_mesh.as_ref().expect("the hole body");
+    let (lo, hi) = m.positions.iter().map(|p| p[0] as f64).fold((f64::MAX, f64::MIN), |(a, b), x| (a.min(x), b.max(x)));
+    assert!((lo + 0.01).abs() < 1e-4 && (hi - 0.05).abs() < 1e-4, "{lo} {hi}");
 }
 
 #[test]

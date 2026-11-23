@@ -3134,7 +3134,8 @@ fn oversize_chamfers_like_onshape() {
         let faces = t.regen().context.bodies.first().map_or(0, |b| b.faces.len());
         let ok = match want {
             Ok((wv, wf)) => st == FeatureStatus::Ok && (v - wv).abs() < 5e-3 && faces == wf,
-            Err(m) => st == FeatureStatus::Error && msg.as_deref() == Some(m),
+            // Live errors-1123 too-big: "Failed to chamfer selections." draws its edges red.
+            Err(m) => st == FeatureStatus::Error && msg.as_deref() == Some(m) && (m != FAILED || t.regen().display.feature_state(f).is_some_and(|s| s.error_refs == *edges)),
         };
         if !ok {
             bad.push(format!("{what}: {st:?} {msg:?} {v:.4} mm³ {faces} faces, live {want:?}"));

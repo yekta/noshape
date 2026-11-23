@@ -186,6 +186,8 @@ pub struct EvalCtx<'a> {
     pub error_shapes: Vec<Shape>,
     /// Parts of the result the failure is about (a failed Shell's part): `FeatureState::error_parts`.
     pub error_bodies: Vec<BodyId>,
+    /// See `FeatureState::error_refs`.
+    pub error_refs: Vec<Reference>,
     /// See [`crate::display::FeatureState::touched_behind`].
     pub touched_behind: Vec<BodyId>,
     /// See [`crate::display::FeatureState::debug`].
@@ -350,6 +352,57 @@ pub fn drop_missing_regions(params: &ParamValues, ctx: &Context, own: &dyn Fn(Fe
     (out, missing)
 }
 
+/// Copy of `params` without the face and edge picks their field's filter refuses, and those picks: live counts them
+/// as missing ("Missing Face of Extrude 2", "1 missing selection"; errors-1123 mi-cylplane: a cylinder as Mirror plane,
+/// cv-path-face: a face as Curve pattern's path). Parts fields are left alone (a face picked there is its part).
+pub fn drop_filtered_picks(params: &ParamValues, specs: &[crate::params::ParamSpec], ctx: &Context) -> (Option<ParamValues>, Vec<Reference>) {
+    use crate::params::{ParamKind, QueryFilter as Q};
+    const FACES: Q = Q(Q::ANY_FACE.0 | Q::PLANE.0 | Q::MATE_CONNECTOR.0);
+    const EDGES: Q = Q(Q::EDGE.0 | Q::SOLID_EDGE.0 | Q::LINEAR_EDGE.0 | Q::CIRCULAR_EDGE.0 | Q::SKETCH_EDGE.0 | Q::AXIS.0 | Q::POINT_LIKE.0);
+    let planar = |r: &Reference| {
+        let found = ctx.bodies.find_untracked(LookupKind::Face, match r {
+            Reference::Face(n) => n,
+            _ => return true,
+        });
+        let Some(&(bi, fi)) = found.first() else { return true };
+        ctx.bodies.untracked()[bi].shape.sub_shape(ShapeType::Face, fi).ok().and_then(|f| f.face_plane().ok()).is_none_or(|p| p.is_some())
+    };
+    let refuses = |r: &Reference, f: Q| -> bool {
+        if f.0 == 0 || f.intersects(Q(Q::BODY.0 | Q::FEATURE.0)) {
+            return false;
+        }
+        match r {
+            Reference::Face(_) if !f.intersects(FACES) => true,
+            Reference::Face(_) if !f.intersects(Q(Q::FACE.0 | Q::CYLINDRICAL_FACE.0)) && f.intersects(Q::PLANAR_FACE) => !planar(r),
+            Reference::Edge(_) => !f.intersects(EDGES),
+            _ => false,
+        }
+    };
+    fn prune(v: &ParamValues, specs: &[crate::params::ParamSpec], refuses: &dyn Fn(&Reference, Q) -> bool, dropped: &mut Vec<Reference>) -> Option<ParamValues> {
+        let mut out: Option<ParamValues> = None;
+        for s in specs {
+            let new = match (&s.kind, v.0.get(s.id)) {
+                (ParamKind::Query { filter, .. }, Some(ParamValue::Query(q))) if q.iter().any(|r| refuses(r, *filter)) => {
+                    dropped.extend(q.iter().filter(|r| refuses(r, *filter)).cloned());
+                    Some(ParamValue::Query(q.iter().filter(|r| !refuses(r, *filter)).cloned().collect()))
+                }
+                (ParamKind::Array { item, .. }, Some(ParamValue::Array(items))) => {
+                    let pruned: Vec<Option<ParamValues>> = items.iter().map(|it| prune(it, item, refuses, dropped)).collect();
+                    pruned.iter().any(|x| x.is_some()).then(|| ParamValue::Array(items.iter().zip(pruned).map(|(it, x)| x.unwrap_or_else(|| it.clone())).collect()))
+                }
+                _ => None,
+            };
+            if let Some(new) = new {
+                out.get_or_insert_with(|| v.clone()).0.insert(s.id.into(), new);
+            }
+        }
+        out
+    }
+    let mut dropped = Vec::new();
+    let out = prune(params, specs, &refuses, &mut dropped);
+    (out, dropped)
+}
+
 /// Copy of `params` with every [`Reference::QueryVariable`] (also inside
 /// arrays) replaced by the variable's references from `ctx`; `None` when
 /// the parameters use no query variable. Unknown variables expand to
@@ -405,7 +458,7 @@ impl<'a> EvalCtx<'a> {
     /// A context for evaluating one feature (no feature list, no pattern
     /// transform, not editing a sketch).
     pub fn new(feature: FeatureId, name: &'a str, params: &'a ParamValues, units: &'a UnitPrefs, ctx: Context, outer_vars: &'a BTreeMap<String, Quantity>) -> Self {
-        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, seed_op: None, probe_touched: false }
+        EvalCtx { aliases: Default::default(), feature, name, params, units, ctx, outer_vars, warnings: Vec::new(), infos: Vec::new(), computed: Vec::new(), manipulators: Vec::new(), touched: Vec::new(), error_shapes: Vec::new(), error_bodies: Vec::new(), error_refs: Vec::new(), touched_behind: Vec::new(), debug: Default::default(), toggle_points: Vec::new(), editing_sketch: None, derived: None, features: Features::default(), xform: None, custom: None, custom_type: None, cancel: None, scratch: false, seed_op: None, probe_touched: false }
     }
 
     /// Puts the merged faces' other names noted while naming into the context's bodies (before the context is handed
