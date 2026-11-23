@@ -151,6 +151,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-20 | f689de1bb65a3ed2a2e8f9eacebb61bface4f9a4 (13:35 run; models release on vibex7, 99/157 documents on live's new index (was 96/126): geometry 84.9 -> 72.6 is coverage (1516/2087 features), not regressions; scenarios from 1120-0407, assemblies / exchange / export from 1119-1302) | 87.9 | 72.6 | 97.6 | 74.2 | 97.7 | 96.1 | 97.6 | 90.0 | 81.7 | 100.0 | 100.0 | 99.9 | 99.9 |
 | 2026-11-21 | 8feaade1 (09:35 run; models 108/174 documents; 1120-2308-8feaade1) | 90.6 | 75.3 | 97.7 | 97.6 | 98.0 | 94.7 | 100.0 | 97.7 | 79.6 | 100.0 | 100.0 | 100.0 | 98.6 |
 | 2026-11-22 | 17157c2f (16:23 run; models 130/188 documents; 1122-0657-17157c2f) | 89.5 | 75.3 | 96.6 | 96.4 | 97.3 | 93.0 | 96.4 | 96.9 | 86.1 | 77.3 | 98.6 | 100.0 | 99.7 |
+| 2026-11-23 | b37201ea (06:56 run; models 131/188 documents; 1122-1947-b37201ea) | 90.0 | 75.7 | 96.8 | 89.2 | 97.6 | 94.9 | 100.0 | 96.4 | 80.7 | 100.0 | 100.0 | 100.0 | 99.9 |
 
 ## Speed window (qa, 02:00–04:00 UTC; vibe7 from 2026-11-13, a new baseline; docs/parity/INDEX.md "Scoring changes")
 
