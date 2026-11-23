@@ -34,7 +34,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
 ## Now (01:15 UTC 11-23)
-Landing: this commit (TRANSFORM-ROTATE-EDGE-SENSE axis edge, FEEL-EDIT-BODY-SHADE top via render `compare::POST_ONLY`,
+Landing: b8a17535 QUEUED 01:2x (TRANSFORM-ROTATE-EDGE-SENSE axis edge, FEEL-EDIT-BODY-SHADE top via render `compare::POST_ONLY`,
 CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN mark, Mac mini rename e2e, TICKETS: CTX-MENU-FLIP-UP closed (lead (a)),
 6 union duplicates dropped). Earlier queue (f5ebb8b3, 02f48bdd, 975844f0) all on main. asm's c6ec3d1c (software settle):
 once landed, rebase, re-run render + hover_matrix (end cap test tol 9: (131,140,147)/(138,148,154) vs live (132,146,155)).
@@ -53,6 +53,48 @@ NEXT (qa 11-23, TICKETS rows have the evidence):
 - PARTLY rows (qa 11-22 notes in TICKETS): TRANSFORM-TRIAD-LOOK (dashed X arrow; orange outline at the original place
   while dragging), TRIAD-RELEASE-FOCUS (focus leaves the dropdown at drag start), PS-BOX-DRAG-HOVER (lit plane's edge
   hidden behind the part), ROLLBACK-CLAMP-HOVER (pill ~18 px, drop line has no dot).
+- qa wf-1123 on 24f1566de (before 3cfb09978; 01-03/06/07 replay on its first green): FEEL-CORNER-BREAK-VERTEX-PICK
+  (03 s16) no disc at all (live a saturated orange disc), arrow outline white dashed: recheck on b8a17535's green.
+  New P2 PS-PARTS-ROW-TOOLTIP-PITCH (17 s11): live "Part 1" tooltip on the clicked row and 26 px pitch; ours none, 24.
+- CTX-MENU-FLIP-UP: the flip is closed (lead (a)), but qa keeps the row open. The drawing view menu (wf40 s57) opened with
+  "View orientation" hovered and its submenu showing, so the pointer was over the menu. Check our place (drawing_view.rs
+  ~186: pointer + (0,2)) against step 57's pointer (qa hm2/out-wf-v/40-*/cmp-57.png, live 111-327 above it).
+- qa errors-1123 set b (TICKETS "qa, 2026-11-23 01:2x", evidence qa-scratch/tickets/ERR-*-1123.png), 3 psui P0s:
+  ERR-HOLE-INVALID-COMMIT (Hole depth 0: ours commits on the 2nd Enter, retitled "↧ 0 mm"; live's Enter does nothing),
+  ERR-MISSING-SELECTION (live "Missing Face of Extrude 1" red + yellow icon overlay + "1 missing selection" tip; ours
+  a plain entry; core owns the flag), ERR-INVALID-VALUE-CHROME (count 0: two spaces after "properly:", the row tip
+  carries the message, 2 px red underline without the blue focus line). Do these FIRST (P0), before the dark core.
+- ERR-FEATPATTERN-TITLE-SUFFIX (core hands it to psui): a faulty Bool field (std flags fullFeaturePattern on "Could
+  not create all instances…") must not add " A parameter value is not valid." to the title tip (feature_dialog.rs
+  ~4553, any non-Query faulty field today) nor draw the checkbox red; live shows neither.
+- qa errors-1123 set c (TICKETS block 01:4x), 4 psui P0s: ERR-FIELD-RANGE-TIP-ENTER (sheet metal out-of-range: no
+  "Enter a value between … Current value is …" tip, 2nd Enter commits; same root as ERR-HOLE-INVALID-COMMIT; skasm is
+  adding the tip behind Hints::RANGE_TIP: coordinate, psui owns the Enter-doesn't-commit rule), ERR-SM-BAD-SELECTION-RED
+  (failing entry grey, joint edge not red), ERR-MATE-HOVER-GLYPH (error mate row hover: live red glyph + orange edges;
+  ours tints parts; assembly: tell asm first), ERR-LIST-TOOLTIP-CHROME (row tip drops unticked rows, no 400 px wrap,
+  root red dot instead of the circled ⬇).
+- t85 (vibex8, ~/tmp/psui/t85.log, script /root/psui-scratch/run-t85.sh) checks the batch below: clippy app-core/app/
+  part-studio-ui/drawing-ui + dialog tests + chrome/feedback matrices + drawing menus. It started before the
+  "two spaces" edit: rerun once, then land. b8a17535's batch failed a_chip_made_by_a_later_feature; it passes alone
+  (t84), lead told. skasm dropped RANGE_TIP and re-adds their Flange test on top of mine. asm: mate hover/row tip
+  are free (their root-row tip hunk ~5299 lands first: the circled ⬇ waits for it).
+- qa 02:xx on green ed11f7c48: VERIFIED PARTS-ROW-OF-PICK-SHEET-METAL, PICKED-EDGE-DASHED-UNDER-PREVIEW,
+  HOVER-DISC-AFTER-COMMIT. PARTLY: CORNER-BREAK-VERTEX-PICK (disc 70 px vs 73; white 167 px arrow outline x1090-1147
+  y500-521, ~450 black px round the vertex vs live 18), CONFIG-FILTER-HELP (s3-4: the Supported filters popover 400x133
+  at 1312,147 missing). Open: FEEL-ROW-TIP-AFTER-DBLCLICK (01 s17), UIS-LIST-ROW-MENU-ROWS. tickets/<T>-ver-1123.png.
+- Landing (02:2x, error P0 batch + p04 flake fix; dx 2782ce84 waits on it): Enter refused on an out-of-range value (`range_error`, accept_edit), title keeps the last
+  valid value, `title_status()` (row tip while open, count 0 "properly:  A…"), invalid field no blue hover, general
+  range tip "Enter a value between 0.0100 and 500000.  Current value is 0." (two spaces, value whole; skasm: live/skasm/out-of-range-1123), Bool faulty no suffix, faulty query field's
+  entries red, active empty box tip = message beside the dialog, menus flip at the tab bar's top (os_menu
+  `set_menu_floor`, workspace canvas; anchored `flip_floor` patch), drawing canvas menu fit to that floor.
+  Still open: ERR-SM-BAD-SELECTION-RED's red joint edge in the viewport (repro qa-scratch/err/c/cells/sm-fl-joint2.json),
+  ERR-CHROME-TIP-PLACEMENT title + row tips (~5 px right, 7 low), ERR-TOOL-BODY-COLOUR (scene error_geometry: live tool
+  body (113,76,79), ring (141,68,73), region outline only), ERR-MATE-HOVER-GLYPH, ERR-LIST-TOOLTIP-CHROME.
+  ERR-MISSING-SELECTION: core's flag ~3-4 h after 02:00 (they message), then check.
+- qa appearance-1123 (TICKETS 01:5x): P0 FEEL-APPEAR-FACE-SELECT-FILL (face/feature appearance dialog fills picked faces
+  orange; live keeps their colour, orange outline only). P1 PANEL-FA-ROWS, PART-NO-RESET (drop "Remove appearance"),
+  PART-FACE-MENU-2-PARTS, EMPTY-FACE-DIALOG (✓ off, 000000), DIALOG-UNDER-OVERLAYS. P2 DIALOG-OFFSET (5 px), PS-PROPERTIES-
+  DIALOG-SIZE, UIS-APPEAR-TARGETS.
 - Appearance: live/psui/appearance-1123/index.md (41 shots; behaviours "psui the Appearance panel in full"): part
   dialog 220x400 Palette|Mixer, ✓ off until a change, no Reset; Face appearance rows only in the Appearances panel;
   Boolean/split/pattern colour rules. Compare ours after the Mac mini P0.

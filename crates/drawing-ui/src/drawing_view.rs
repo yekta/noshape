@@ -192,7 +192,8 @@ pub fn open_drawing_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::O
 /// has none (live2 11-15 takes: eight menus at the pointer with row 2 lit, three moved with none).
 pub fn open_canvas_menu(position: Point<Pixels>, menu: Entity<crate::os_menu::OsMenu>, window: &mut Window, cx: &mut App) {
     let at = position + point(px(1.), px(-35.));
-    let fits = f32::from(at.y) + menu.read(cx).content_height() <= f32::from(window.viewport_size().height);
+    // (Room down to the tab bar's top: live wf40 s57, a view's menu low in the sheet moved up, no row lit.)
+    let fits = f32::from(at.y) + menu.read(cx).content_height() <= f32::from(crate::os_menu::menu_floor(window, position.y, cx));
     if fits {
         menu.update(cx, |m, _| m.hover_at(px(35.)));
     }

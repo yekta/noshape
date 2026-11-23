@@ -1607,7 +1607,11 @@ fn the_list_viewport_matrix_matches_live(cx: &mut TestAppContext) {
         wrong.push(format!("p02 hidden Sketch 2's row: {circle} hover px on its circle (want ≥ 3; {wide} within 6 px / 60, at it {c:02x?}), {top} on Part 2's top outline (want 0)"));
     }
     set(cx, &|v| v.ui.list_hover = None);
-    // p04: the Top plane's row: its outline.
+    // p04: the Top plane's row: its outline. The pointer off the graphics, on the list's empty space, as over the row
+    // (left in the graphics, the viewport's own hover pick took the row's hover back: dx's land 11-23 02:13).
+    let below = cx.update_window(m.window, |_, w, _| w.viewport_size()).unwrap();
+    gpui_kit::VisualTestContext::from_window(m.window, cx).simulate_mouse_move(gpui_kit::point(px(60.), below.height - px(60.)), None, gpui_kit::Modifiers::default());
+    m.pointer.frames(cx, &m.view);
     set(cx, &|v| v.hover = Some(Reference::Plane(DatumPlane::Top)));
     // Points along its four edges on screen: the viewport's size (and so which edges parts hide) differs by platform.
     let (size, edge) = cx.update(|cx| {

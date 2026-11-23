@@ -3125,8 +3125,8 @@ impl PartStudioView {
 
     fn accept_edit(&mut self, repeat: bool, window: &mut Window, cx: &mut Context<Self>) {
         // Live (ui (10-26 c), VAR-INVALID): a value of the wrong type keeps
-        // the dialog open; nothing is created.
-        if self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).value_error(cx).is_some()) {
+        // the dialog open; nothing is created. Nor does one out of range (live errors-1123: Hole depth 0).
+        if self.edit.as_ref().is_some_and(|e| { let d = e.dialog.read(cx); d.value_error(cx).is_some() || d.range_error().is_some() }) {
             return;
         }
         // Live (EMPTY-COMMIT): nor does one that isn't dirty yet (a new Extrude with nothing picked).
@@ -5944,8 +5944,7 @@ impl PartStudioView {
 
     fn edit_invalid(&self, cx: &App) -> bool {
         self.edit.as_ref().is_some_and(|e| {
-            let d = e.dialog.read(cx);
-            matches!(d.status.as_ref().map(|s| s.0), Some(FeatureStatus::Error)) || d.has_invalid_value()
+            matches!(e.dialog.read(cx).title_status().map(|s| s.0), Some(FeatureStatus::Error))
         })
     }
 
@@ -5982,7 +5981,7 @@ impl PartStudioView {
             .child(crate::ui::tree_icon(&icon, false, cx))
             .child(div().flex_1().truncate().child(crate::ui::user_text(name)));
         crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |cx| {
-            match dialog.as_ref().and_then(|d| d.read(cx).status.clone()) {
+            match dialog.as_ref().and_then(|d| d.read(cx).title_status()) {
                 Some((FeatureStatus::Error | FeatureStatus::Warning, m)) => format!("{head} did not regenerate properly: {m}").into(),
                 _ => head.clone().into(),
             }
@@ -6120,7 +6119,9 @@ impl PartStudioView {
                 if needs_type_tag(name, type_name) { format!("{name} [{type_name}]") } else { name.to_string() }
             }
             let head = format!("{}{}", typed(&name, f.feature_type().map(|t| t.name).unwrap_or("")), if f.hidden { " (Hidden)" } else { "" });
-            let msg = state.and_then(|s| {
+            // While its dialog is open, the dialog's error (live errors-1123 count 0: the message, not the bare name).
+            let dialog_msg = self.edit.as_ref().filter(|_| editing).and_then(|e| e.dialog.read(cx).title_status()).filter(|s| s.0 == FeatureStatus::Error);
+            let regen_msg = state.and_then(|s| {
                 let m = s.message.clone()?;
                 match s.status {
                     // Live: unresolved selections add a second line ("1 missing selection").
@@ -6139,6 +6140,7 @@ impl PartStudioView {
                     _ => Some(m),
                 }
             });
+            let msg = dialog_msg.map(|(_, m)| format!("{head} did not regenerate properly: {m}")).or(regen_msg);
             // A sketch lists no inputs; an under-defined one says so.
             let sketch_tip = (f.type_id == "sketch").then(|| format!("{head}{}", if underdefined { " is not fully defined" } else { "" }));
             // Live (qa4 r5 s8 (3), ui 10-25 c): a suppressed row reads "Extrude 1

@@ -933,6 +933,48 @@ fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the next Enter 200 ms on accepts");
 }
 
+/// Live errors-1123 (Hole depth 0, a flange length 0, a fillet radius 0): Enter on a value out of range commits
+/// nothing, however often; the title keeps the last valid value and reads "…properly:  A parameter value is not
+/// valid.", the row's tip while the dialog is open too.
+#[gpui::test]
+fn enter_on_a_value_out_of_range_commits_nothing(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "enter-out-of-range", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Fillet 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["0", "enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    for _ in 0..2 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(200));
+        keys(cx, window, &["enter"]);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        assert!(cx.update(|cx| view.read(cx).edit.is_some()), "Enter on radius 0 keeps the dialog open");
+    }
+    let (radius, status) = cx.update(|cx| {
+        let d = dialog.read(cx);
+        (d.row_feature().params.expr("radius").map(|e| e.text.clone()), d.title_status())
+    });
+    assert_eq!(radius.as_deref(), Some("2 mm"), "the title keeps the last valid radius");
+    let tips = cx.update(|cx| (dialog.read(cx).range_message("radius", "0 mm"), dialog.read(cx).range_message("radius", "1000000 m")));
+    assert_eq!(tips.0, "Enter a value between 0.0100 and 500000.  Current value is 0.", "the field's tip");
+    assert!(tips.1.ends_with("Current value is 1000000000."), "the value whole: {}", tips.1);
+    assert!(status.as_ref().is_some_and(|s| s.0 == noshape_model::display::FeatureStatus::Error && s.1.ends_with(" A parameter value is not valid.")), "{status:?}");
+    keys(cx, window, &["escape"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let depth = cx.update(|cx| view.read(cx).studio(cx).unwrap().feature(id).unwrap().params.expr("radius").map(|e| e.text.clone()));
+    assert_eq!(depth.as_deref(), Some("2 mm"), "nothing committed");
+}
+
 /// Live (ui-parity extrude-ok-button, behaviours request 1849): a click on ✓ while Depth holds typed text only
 /// applies it ("20 mm"); the dialog stays and the next ✓ accepts.
 #[gpui::test]
@@ -7712,6 +7754,52 @@ fn a_custom_features_dialog_is_generated_and_fails_as_live(cx: &mut TestAppConte
 }
 
 /// Live workflow 13 step 10 (qa CUSTOM-FEATURE-DIALOG-HELP): a custom feature's dialog has no "?" help; a built-in's has.
+/// Live errors-1123 lp-feat-off: an error naming a checkbox (Reapply features off: "Could not create all instances…")
+/// reads as it is; one naming a value field appends " A parameter value is not valid.".
+#[gpui::test]
+fn an_error_naming_a_checkbox_adds_no_value_suffix(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "checkbox-error");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("linearPattern", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Linear pattern dialog").dialog.clone());
+    let msg = "Could not create all instances, some instances failed to regenerate.";
+    let title = |cx: &mut TestAppContext, field: &str| {
+        dialog.update(cx, |d, cx| {
+            d.set_status(Some((noshape_model::display::FeatureStatus::Error, msg.to_string())), cx);
+            d.set_faulty(vec![field.to_string()], false, cx);
+            d.title_status().map(|s| s.1)
+        })
+    };
+    assert_eq!(title(cx, "fullFeaturePattern").as_deref(), Some(msg), "a checkbox: the message alone");
+    assert_eq!(title(cx, "distance"), Some(format!("{msg} A parameter value is not valid.")), "a value field: the suffix");
+}
+
+/// Live errors-1123 fl-joint2: an error naming a selection field draws its entry red ("Edge of Flange 1"); one naming
+/// another field leaves it dark.
+#[gpui::test]
+fn an_error_naming_a_selection_field_draws_its_entry_red(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "faulty-entry", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let fillet = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Fillet 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(fillet, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    let red = |cx: &mut TestAppContext, field: &str| {
+        dialog.update(cx, |d, cx| {
+            d.set_status(Some((noshape_model::display::FeatureStatus::Error, "Failed to fillet.".to_string())), cx);
+            d.set_faulty(vec![field.to_string()], false, cx);
+            let edge = d.feature.params.query("entities")[0].clone();
+            d.entry_failing("entities", &edge)
+        })
+    };
+    assert_eq!((red(cx, "entities"), red(cx, "radius")), (true, false), "(the error names the edges, the radius)");
+}
+
 #[gpui::test]
 fn a_custom_features_dialog_has_no_help(cx: &mut TestAppContext) {
     let (window, _view) = probe_dialog(cx, "cf-probe-help");

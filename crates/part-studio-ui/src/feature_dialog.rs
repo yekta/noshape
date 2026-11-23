@@ -1577,9 +1577,11 @@ impl FeatureDialog {
     /// A field entry drawn as an error (live `ns-list-item-error`): its entity is gone, or the feature fails with an
     /// error naming no field, which draws its inputs red (live feel/feedback.json "failedPreview": Fillet 100 mm's
     /// "Edge of Extrude 1" entry red, the field itself not marked); not when the inputs were refused before any
-    /// operation (live L19: Thicken's two zero thicknesses keep the face's entry dark).
-    pub(crate) fn entry_failing(&self, r: &Reference) -> bool {
-        let failing = matches!(self.status, Some((FeatureStatus::Error, _))) && self.faulty.is_empty() && !self.invalid_input && self.feature.type_id != "sketch";
+    /// operation (live L19: Thicken's two zero thicknesses keep the face's entry dark). An error naming the entry's own
+    /// field draws it red too (live errors-1123 fl-joint2: Flange's "Edge of Flange 1").
+    pub(crate) fn entry_failing(&self, path: &str, r: &Reference) -> bool {
+        let error = matches!(self.status, Some((FeatureStatus::Error, _))) && !self.invalid_input && self.feature.type_id != "sketch";
+        let failing = error && (self.faulty.is_empty() || self.faulty.iter().any(|f| f == path));
         failing || self.ref_missing(r)
     }
 
@@ -2352,11 +2354,17 @@ impl FeatureDialog {
     }
 
     /// The hover text of a value out of its field's range. Live: a count reads "Enter an integer value between 1 and
-    /// 2500. Current value is 0."; other quantities have none (live 1722: Helix's Target revolutions or Height 0).
-    fn range_message(&self, path: &str, text: &str) -> String {
+    /// 2500. Current value is 0."; another quantity "Enter a value between 0.0100 and 500000.  Current value is 0." (two
+    /// spaces) in the field's units, only its bounds to 3 significant digits (errors-1123: flange, hem, shell, fillet,
+    /// chamfer 0, draft 90; live/skasm/out-of-range-1123: "… Current value is 1000000000.").
+    pub(crate) fn range_message(&self, path: &str, text: &str) -> String {
         let Some(ParamKind::Num(n)) = self.spec_for_path(path).map(|s| &s.kind) else { return crate::quantity_field::INVALID_TIP.to_string() };
         if n.kind != noshape_model::params::NumKind::Integer {
-            return String::new();
+            let dim = n.kind.dim();
+            let f = self.units.si_factor(dim);
+            let v = noshape_units::evaluate_as(text, dim, &self.units, &self.variables).map(|q| q.value / f).unwrap_or(0.0);
+            let sig3 = |b: f64| if b == 0.0 { "0".to_string() } else { format!("{:.*}", (2 - b.abs().log10().floor() as i32).max(0) as usize, b) };
+            return format!("Enter a value between {} and {}.  Current value is {}.", sig3(n.min / f), sig3(n.max / f), noshape_units::format_number(v, 6));
         }
         let v = noshape_units::evaluate_as(text, noshape_units::Dim::UNITLESS, &self.units, &self.variables).map(|q| q.value).unwrap_or(0.0);
         let shown = if v.fract() == 0.0 { format!("{}", v as i64) } else { noshape_units::format_number(v, 3) };
@@ -2368,6 +2376,36 @@ impl FeatureDialog {
     /// and ✓ follow it, never the text being typed.
     fn applied_text(&self, id: &str, typed: &str) -> String {
         if self.inputs.contains_key(id) { self.baselines.get(id).cloned().unwrap_or_else(|| typed.to_string()) } else { typed.to_string() }
+    }
+
+    /// A shown number field whose applied value is out of its range: Enter commits nothing (live errors-1123: Hole
+    /// depth 0, a flange length 0; the title keeps the last valid value).
+    pub fn range_error(&self) -> Option<&'static str> {
+        self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params) && matches!(s.kind, ParamKind::Num(_))).map(|s| s.id).find(|id| {
+            matches!(self.feature.params.get(id), Some(ParamValue::Expr(e)) if { let t = self.applied_text(id, &e.text); !t.trim().is_empty() && self.out_of_range(id, &t) })
+        })
+    }
+
+    /// The status the title (and the feature's row while the dialog is open) shows: the regeneration's, or "A
+    /// parameter value is not valid." for an applied value of the wrong type or out of range.
+    pub fn title_status(&self) -> Option<(FeatureStatus, String)> {
+        // A value out of range (live 1722, L55; errors-1123 count 0): the title appends " A parameter value is not
+        // valid." to its message ("…properly:  A parameter value is not valid." with none).
+        if self.range_error().is_some() {
+            let base = self.status.as_ref().map(|s| s.1.clone()).filter(|m| m != VALUE_NOT_VALID).unwrap_or_default();
+            return Some((FeatureStatus::Error, format!("{base} {VALUE_NOT_VALID}")));
+        }
+        if self.applied_value_error().is_some() {
+            return Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string()));
+        }
+        // An error naming value fields appends it too (live2 custom-feature-1118 b4: "…: Probe failure on purpose A
+        // parameter value is not valid."; Revolute limits, Linear pattern distance); one naming only selection
+        // fields doesn't (Hole's "No hole points selected.", live2 pattern-hole-1118 y), nor one naming a checkbox
+        // (live errors-1123 lp-feat-off: Reapply features, "Could not create all instances…").
+        if let Some((FeatureStatus::Error, msg)) = self.status.as_ref().filter(|s| self.faulty.iter().any(|f| !self.spec_for_path(f).is_some_and(|p| matches!(p.kind, ParamKind::Query { .. } | ParamKind::Bool { .. }))) && !s.1.ends_with(VALUE_NOT_VALID)) {
+            return Some((FeatureStatus::Error, format!("{msg} {VALUE_NOT_VALID}")));
+        }
+        self.status.clone()
     }
 
     /// An applied number of the wrong type: the title and the feature's row are red (live).
@@ -2425,7 +2463,7 @@ impl FeatureDialog {
         for s in self.ty.params.iter().filter(|s| matches!(s.kind, ParamKind::Num(_))) {
             let Some(ParamValue::Expr(e)) = self.feature.params.get(s.id) else { continue };
             let applied = self.applied_text(s.id, &e.text);
-            let text = if self.eval_errors(|_, _| applied.clone()).any(|(id, _)| id == s.id) { self.valid_texts.get(s.id).cloned().unwrap_or(applied) } else { applied };
+            let text = if self.out_of_range(s.id, &applied) || self.eval_errors(|_, _| applied.clone()).any(|(id, _)| id == s.id) { self.valid_texts.get(s.id).cloned().unwrap_or(applied) } else { applied };
             if text != e.text {
                 let mut e = e.clone();
                 e.text = text;
@@ -3346,7 +3384,7 @@ impl FeatureDialog {
                         let single = indices.len() == 1;
                         let label_for_drag = label.clone();
                         // Missing references (deleted/suppressed creators) show red.
-                        let missing = indices.iter().any(|i| self.entry_failing(&refs[*i]));
+                        let missing = indices.iter().any(|i| self.entry_failing(&path_s, &refs[*i]));
                         // Made by a later feature: its name in light grey italic (live 1990 5.15, 90h-missing-chip).
                         let later = !missing && indices.iter().any(|i| (self.later)(&refs[*i]));
                         let p2 = path_s.clone();
@@ -3491,6 +3529,9 @@ impl FeatureDialog {
                 // Live (dialogs/*-error): a field the error points at is
                 // pink with a red border; hovering it shows the message.
                 let error = if active || cs_open { None } else { self.field_error(s.id) };
+                // The active box stays blue, but its hover still says what is wrong (live errors-1123 */empty: "Select
+                // face or sketch region to extrude.").
+                let tip_error = if cs_open { None } else { self.field_error(s.id) };
                 let caption = div()
                     .px(px(6.))
                     // Live (dom/dialog-extrude-new): the empty field is 26 px
@@ -3545,13 +3586,14 @@ impl FeatureDialog {
                             // A parameter with a description shows Onshape's
                             // expanding tooltip (live Derived › Locations: the
                             // label, then "Select or create mate connectors…").
-                            .map(|d| match (&error, s.description.is_empty()) {
+                            .map(|d| match (&tip_error, s.description.is_empty()) {
                                 (None, false) => {
                                     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
                                     let a2 = anchor.clone();
                                     d.child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full()).tooltip(crate::ui::rich_tooltip(s.label, s.description, anchor))
                                 }
-                                _ => d.tooltip(crate::ui::tooltip(error.clone().unwrap_or_else(|| s.label.to_string()))),
+                                (Some(m), _) => crate::ui::with_dialog_field_tooltip(d, m.clone(), px(3.)),
+                                (None, true) => d.tooltip(crate::ui::tooltip(s.label.to_string())),
                             })
                             .cursor_pointer()
                             .flex()
@@ -4314,7 +4356,8 @@ impl FeatureDialog {
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
                         .map(|d| crate::quantity_field::invalid_field_tip(d, invalid, invalid_tip))
-                        .hover(|d| d.border_color(pal.accent))
+                        // (An invalid one stays 2 px red under the pointer: live errors-1123 count 0.)
+                        .when(!invalid, |d| d.hover(|d| d.border_color(pal.accent)))
                         // Live (dialogs/variable-01): the focused field has a 2 px blue underline.
                         // (A 1 px border plus a 1 px inset line above it, so
                         // the underline thickens upward like live's inset shadow.)
@@ -4522,7 +4565,6 @@ impl Render for FeatureDialog {
         rows.extend(extra_rows);
         // The Sketch dialog has no preview slider (live).
         let sketch = self.feature.type_id == "sketch";
-        let status = self.status.clone();
         // Onshape: the title turns red while the feature is invalid.
         // Live L27: a warning turns the title red too (has-regen-error).
         // Live (ui (10-26 c), VAR-INVALID): a value that doesn't evaluate as
@@ -4534,32 +4576,12 @@ impl Render for FeatureDialog {
                 && let ParamKind::Num(n) = &spec.kind
                 && let applied = self.applied_text(spec.id, &e.text)
                 && noshape_units::evaluate_as(&applied, n.kind.dim(), &self.units, &self.variables).is_ok()
+                && !self.out_of_range(spec.id, &applied)
             {
                 self.valid_texts.insert(spec.id, applied);
             }
         }
-        let value_invalid = self.applied_value_error().is_some();
-        // A length or real out of range (live 1722, L55): ✓ stays enabled; the
-        // title appends " A parameter value is not valid." to its message
-        // ("…properly:  A parameter value is not valid." with none).
-        let range_invalid = !value_invalid
-            && self.ty.params.iter().filter(|s| s.is_visible(&self.feature.params)).any(|s| {
-                matches!(&s.kind, ParamKind::Num(n) if n.kind != noshape_model::params::NumKind::Integer)
-                    && matches!(self.feature.params.get(s.id), Some(ParamValue::Expr(e)) if { let t = self.applied_text(s.id, &e.text); !t.trim().is_empty() && self.out_of_range(s.id, &t) })
-            });
-        let status = if value_invalid {
-            Some((FeatureStatus::Error, VALUE_NOT_VALID.to_string()))
-        } else if range_invalid {
-            let base = status.as_ref().map(|s| s.1.clone()).filter(|m| m != VALUE_NOT_VALID).unwrap_or_default();
-            Some((FeatureStatus::Error, format!("{base} {VALUE_NOT_VALID}")))
-        } else if let Some((FeatureStatus::Error, msg)) = status.as_ref().filter(|s| self.faulty.iter().any(|f| !self.spec_for_path(f).is_some_and(|p| matches!(p.kind, ParamKind::Query { .. }))) && !s.1.ends_with(VALUE_NOT_VALID)) {
-            // An error naming value fields appends it too (live2 custom-feature-1118 b4: "…: Probe failure on purpose A
-            // parameter value is not valid."; Revolute limits, Linear pattern distance); one naming only selection
-            // fields doesn't (Hole's "No hole points selected.", live2 pattern-hole-1118 y).
-            Some((FeatureStatus::Error, format!("{msg} {VALUE_NOT_VALID}")))
-        } else {
-            status
-        };
+        let status = self.title_status();
         let invalid = status.as_ref().is_some_and(status_reads_red);
         // Live (`canSubmit`, woolsthorpe): ✓ waits for the dialog to be
         // dirty (an edit, or a regeneration without an error) and for every

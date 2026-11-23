@@ -21,6 +21,7 @@ pub struct Anchored {
     position_mode: AnchoredPositionMode,
     offset: Option<Point<Pixels>>,
     flip_point: Option<Point<Pixels>>,
+    flip_floor: Option<Pixels>,
 }
 
 /// anchored gives you an element that will avoid overflowing the window bounds.
@@ -34,6 +35,7 @@ pub fn anchored() -> Anchored {
         position_mode: AnchoredPositionMode::Window,
         offset: None,
         flip_point: None,
+        flip_floor: None,
     }
 }
 
@@ -90,6 +92,13 @@ impl Anchored {
     /// flipped left ends 1 px left of the pointer, flipped up 4 px below it), not the anchor position.
     pub fn flip_point(mut self, point: Point<Pixels>) -> Self {
         self.flip_point = Some(point);
+        self
+    }
+
+    /// NOSHAPE PATCH: with [`Self::switch_anchor_or_snap`], a y an element placed above it doesn't cross: it goes to
+    /// the other side when it would (a web page's menu stays above its bottom tab bar).
+    pub fn flip_floor(mut self, y: Pixels) -> Self {
+        self.flip_floor = Some(y);
         self
     }
 }
@@ -185,7 +194,8 @@ impl Element for Anchored {
             }
             // Up and down: a menu that doesn't fit its side goes to the other, then snaps (live nav-feel-1119: the
             // face menu, 627 px under a pointer at y 520 of 1079, opens above it, its top at the window's top).
-            if desired.bottom() > limits.bottom() || desired.top() < limits.top() {
+            let floor = self.flip_floor.filter(|f| origin.y < *f).map_or(limits.bottom(), |f| f.min(limits.bottom()));
+            if desired.bottom() > floor || desired.top() < limits.top() {
                 let flip_at = self.flip_point.map_or(at, |f| point(at.x, f.y));
                 desired = Bounds::from_anchor_and_size(anchor.other_side_along(Axis::Vertical), flip_at, children_bounds.size);
             }

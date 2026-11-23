@@ -310,6 +310,17 @@ fn rows() -> Vec<Row> {
             let b = c.menu_of_rows_at(cx, rows, at, crate::os_menu::MENU_AT_POINTER).ok_or("no menu")?;
             expect((f32::from(b.top()) <= 3., b.bottom() > at.y, b.bottom() < size.height - px(20.)), (true, true, true), &format!("(top at the window's top, over the pointer, not down to the bottom): {b:?} at {at:?}"))
         } },
+        Row { id: "context menu / doesn't run over the tab bar: above the row", live: "qa wf40 s8: the Part 1 row's menu, too tall for the room above the tab bar, opens above the row (its bottom at y 370, the row at 374)", gap: false, check: |c, cx| {
+            let size = cx.update_window(c.tips, |_, w, _| w.viewport_size()).unwrap();
+            let floor = size.height - px(100.);
+            cx.update_window(c.tips, |_, w, cx| crate::os_menu::set_menu_floor(w, Some(floor), cx)).unwrap();
+            let at = point(px(200.), floor - px(60.));
+            let b = c.menu_of_rows_at(cx, 6, at, crate::os_menu::MENU_AT_ROW);
+            let under = c.menu_of_rows_at(cx, 1, point(px(200.), floor + px(5.)), crate::os_menu::MENU_AT_POINTER);
+            cx.update_window(c.tips, |_, w, cx| crate::os_menu::set_menu_floor(w, None, cx)).unwrap();
+            let (b, under) = (b.ok_or("no menu")?, under.ok_or("no menu on the tab bar")?);
+            expect((b.bottom() <= at.y + px(4.5), under.top() >= floor), (true, true), &format!("(above the row; one opened on the tab bar stays at the pointer): {b:?} {under:?} at {at:?}"))
+        } },
         Row { id: "context menu / a feature-list row's at + (10, 12)", live: "+ (10, 12) on feature-list rows", gap: false, check: |c, cx| {
             let b = c.menu_at(cx, point(px(300.), px(200.)), crate::os_menu::MENU_AT_ROW).ok_or("no menu")?;
             near(f32::from(b.left()), 310., "left")?;

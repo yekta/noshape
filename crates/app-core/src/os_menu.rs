@@ -1202,6 +1202,11 @@ fn render_host(window: &Window, cx: &App) -> Vec<AnyElement> {
     if let Some(f) = menu.read(cx).flip {
         placed = placed.flip_point(f);
     }
+    // Live (wf40 s8): a menu opened above the document's tab bar doesn't run over it (the Part 1 row's menu opens above
+    // the row).
+    if let Some(y) = cx.try_global::<MenuFloors>().and_then(|f| f.0.get(&window.window_handle().window_id())) {
+        placed = placed.flip_floor(*y);
+    }
     out.push(deferred(placed.child(menu.clone())).with_priority(POPUP_PRIORITY).into_any_element());
     out
 }
@@ -1219,6 +1224,31 @@ impl Render for MenuLayer {
 
 /// What every app window floats above its content, under its menus (the app's update card), set once at startup.
 static FLOATING: std::sync::OnceLock<fn(&Window, &App) -> Option<AnyElement>> = std::sync::OnceLock::new();
+
+/// Per window, the y its menus opened above don't cross (the top of a document window's tab bar).
+#[derive(Default)]
+struct MenuFloors(std::collections::HashMap<WindowId, Pixels>);
+
+impl Global for MenuFloors {}
+
+/// The lowest y a menu opened at `y` in `window` may reach: the window's floor when `y` is above it, else its bottom.
+pub fn menu_floor(window: &Window, y: Pixels, cx: &App) -> Pixels {
+    let bottom = window.viewport_size().height;
+    cx.try_global::<MenuFloors>().and_then(|f| f.0.get(&window.window_handle().window_id()).copied()).filter(|f| y < *f).map_or(bottom, |f| f.min(bottom))
+}
+
+/// Keep `window`'s menus opened above `y` from crossing it (none: only the window's bottom).
+pub fn set_menu_floor(window: &Window, y: Option<Pixels>, cx: &mut App) {
+    let id = window.window_handle().window_id();
+    if cx.try_global::<MenuFloors>().and_then(|f| f.0.get(&id).copied()) == y {
+        return;
+    }
+    let floors = &mut cx.default_global::<MenuFloors>().0;
+    match y {
+        Some(y) => floors.insert(id, y),
+        None => floors.remove(&id),
+    };
+}
 
 /// Draw `f`'s element above every app window's content (its own position inside the window), under the menus.
 pub fn set_floating(f: fn(&Window, &App) -> Option<AnyElement>) {

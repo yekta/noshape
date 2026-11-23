@@ -184,7 +184,7 @@ fn rows() -> Vec<Row> {
             let query = d["fields"].as_array().and_then(|f| f.iter().find(|f| f["kind"] == "query")).cloned().ok_or("no selection field")?;
             let entry_red = cx.update(|cx| {
                 let dlg = dialog.read(cx);
-                dlg.feature.params.query("entities").iter().all(|r| dlg.entry_failing(r))
+                dlg.feature.params.query("entities").iter().all(|r| dlg.entry_failing("entities", r))
             });
             let tip = hover_tooltip(cx, window, "dialog-title").unwrap_or_default();
             // (Live's recorder reads the field itself "ok": fillet-too-big; the entry is what turns red.)
@@ -236,7 +236,7 @@ fn rows() -> Vec<Row> {
             let (message, entry_red, picked) = cx.update(|cx| {
                 let dlg = dialog.read(cx);
                 let picked = dlg.feature.params.query("entities");
-                (dlg.status.as_ref().map(|s| s.1.clone()), picked.iter().any(|r| dlg.entry_failing(r)), picked.len())
+                (dlg.status.as_ref().map(|s| s.1.clone()), picked.iter().any(|r| dlg.entry_failing("entities", r)), picked.len())
             });
             let marked: Vec<String> = d["fields"].as_array().map(|f| f.iter().filter(|f| f["state"] != "ok").filter_map(|f| f["label"].as_str().map(str::to_string)).collect()).unwrap_or_default();
             expect((d["titleState"].as_str(), message.as_deref(), picked, entry_red, marked), (Some("error"), Some("Invalid input selections."), 1, false, Vec::<String>::new()), "(title, message, faces picked, an entry red, fields marked)")

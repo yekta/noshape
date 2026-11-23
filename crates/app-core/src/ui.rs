@@ -642,6 +642,12 @@ pub fn with_user_tip(el: Stateful<Div>, text: impl Into<SharedString>, side: Tip
     tip_with(el, text.into(), side, true, Pixels::ZERO, false)
 }
 
+/// A dialog field's tooltip right of the dialog, beside the field (live errors-1123: a selection box `inset` in from
+/// the dialog's right edge).
+pub fn with_dialog_field_tooltip(el: Stateful<Div>, text: impl Into<SharedString>, inset: Pixels) -> Stateful<Div> {
+    tip_with(el, text.into(), TipSide::Right, false, inset, false)
+}
+
 /// A list row's tooltip, beside the row (live part-studio/16, 95), showing
 /// its stored name (user text, never translated).
 pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {

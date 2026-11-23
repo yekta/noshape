@@ -2643,7 +2643,17 @@ impl Render for Workspace {
                                 // Onshape: at the feature dialog's place (below the toolbar, right of the list).
                                 .children(self.units_panel.as_ref().map(|(p, _)| div().absolute().top(px(39.)).left(px(self.active.map_or(crate::ui::LEFT_PANEL_W, crate::ui::left_panel_w))).child(p.clone()))),
                         )
-                        .child(div().w_full().flex_none().track_focus(&self.chrome_focus[1]).child(tabs))
+                        .child(
+                            div()
+                                .relative()
+                                .w_full()
+                                .flex_none()
+                                .track_focus(&self.chrome_focus[1])
+                                .child(tabs)
+                                // Live (wf40 s8): a menu opened above the tab bar doesn't run over it (the Part 1 row's opens
+                                // above the row).
+                                .child(canvas(|b, window, cx| crate::os_menu::set_menu_floor(window, Some(b.top()), cx), |_, _, _, _| {}).absolute().inset_0()),
+                        )
                         // Live document/75: the notices panel sits under the tab bar,
                         // right of the left rail (the rail runs the full height).
                         .children(self.fs_notices.as_ref().map(|(p, _)| p.clone())),
