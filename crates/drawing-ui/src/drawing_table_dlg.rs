@@ -45,7 +45,7 @@ pub struct TableDlg {
 impl DrawingEditor {
     /// Views of the current sheet whose source suits the table (assemblies
     /// for BOMs, Part Studios for cut lists), one per source, with names.
-    fn table_sources(&self, kind: TableTool) -> Vec<(ViewId, String)> {
+    pub(crate) fn table_sources(&self, kind: TableTool) -> Vec<(ViewId, String)> {
         let sheet = self.current_sheet();
         let mut seen: Vec<SourceKey> = Vec::new();
         let mut out = Vec::new();
@@ -116,7 +116,7 @@ impl DrawingEditor {
     }
 
     /// Editing a table: apply the dialog live.
-    fn apply_table_dlg(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn apply_table_dlg(&mut self, cx: &mut Context<Self>) {
         if let Some(d) = &self.table_dlg
             && let Some(id) = d.table
         {
@@ -135,7 +135,7 @@ impl DrawingEditor {
 
     /// BOM data…: a CSV file (this document's, another one's or imported)
     /// as the table's rows.
-    fn pick_bom_data(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn pick_bom_data(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let ed = cx.entity().downgrade();
         crate::drawing_hooks::pick_file(self.doc.clone(), "BOM data", &[noshape_model::file_tab::FileKind::Csv], &["csv"], window, cx, move |file, _, cx| {
             let text = file.bytes().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
@@ -150,109 +150,6 @@ impl DrawingEditor {
                 t.update_preview(cx);
                 cx.notify();
             });
-        });
-    }
-
-    /// Other documents…: an assembly of another document (its latest
-    /// version, else its workspace as it is now).
-    fn pick_other_assembly(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        use gpui_kit::component::WindowExt as _;
-        let here = self.doc.read(cx).session.path.clone();
-        // The library scan reads every document: off the UI thread.
-        let docs: Entity<Option<Vec<crate::library::DocEntry>>> = cx.new(|_| None);
-        let scan = docs.clone();
-        cx.spawn(async move |_, cx| {
-            let found = cx
-                .background_spawn(async move {
-                    // The window's path may be relative (opened from a shell).
-                    let canon = |p: &std::path::Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
-                    let here = canon(&here);
-                    crate::drawing_hooks::library_docs().into_iter().filter(|d| !d.broken && !d.trashed && canon(&d.path) != here).collect::<Vec<_>>()
-                })
-                .await;
-            scan.update(cx, |d, cx| {
-                *d = Some(found);
-                cx.notify();
-            });
-        })
-        .detach();
-        let opened: Entity<Option<OpenedDoc>> = cx.new(|_| None);
-        let search = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search documents"));
-        let ed = cx.entity().downgrade();
-        window.open_dialog(cx, move |dialog, _, cx| {
-            let pal = p();
-            let q = search.read(cx).value().to_lowercase();
-            let mut list = v_flex().id("bom-other-list").h(px(260.)).overflow_y_scroll().border_1().border_color(gpui_kit::rgb(0xd3d7d9));
-            let row = |id: SharedString| h_flex().id(id).h(px(30.)).px(px(8.)).gap(px(8.)).text_size(px(13.)).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)));
-            match opened.read(cx).clone() {
-                Some((name, items)) => {
-                    let (back, search) = (opened.clone(), search.clone());
-                    list = list.child(row("bom-other-back".into()).child("‹").child(div().font_weight(FontWeight::SEMIBOLD).child(name)).on_click(move |_, window, cx| {
-                        search.update(cx, |s, cx| s.set_value("", window, cx));
-                        back.update(cx, |o, cx| {
-                            *o = None;
-                            cx.notify();
-                        })
-                    }));
-                    if items.is_empty() {
-                        list = list.child(div().p(px(10.)).text_size(px(13.)).text_color(pal.text_muted).child("No assemblies in this document."));
-                    }
-                    for (i, (src, label)) in items.into_iter().filter(|(_, l)| l.to_lowercase().contains(&q)).enumerate() {
-                        let ed = ed.clone();
-                        list = list.child(row(SharedString::from(format!("bom-other-asm-{i}"))).child(crate::assets::icon("assembly", 16., cx)).child(label).on_click(move |_, window, cx| {
-                            window.close_dialog(cx);
-                            let src = src.clone();
-                            let _ = ed.update(cx, |t, cx| {
-                                if let Some(d) = &mut t.table_dlg {
-                                    d.bom_source = Some(src);
-                                    d.bom_data = None;
-                                }
-                                t.ensure_sources(false, cx);
-                                t.update_preview(cx);
-                                cx.notify();
-                            });
-                        }));
-                    }
-                }
-                None => {
-                    let docs = docs.read(cx).clone();
-                    if docs.is_none() {
-                        list = list.child(div().p(px(10.)).text_size(px(13.)).text_color(pal.text_muted).child("Loading documents…"));
-                    }
-                    for (i, doc) in docs.iter().flatten().filter(|d| d.name.to_lowercase().contains(&q)).enumerate() {
-                        let (open, doc, search) = (opened.clone(), doc.clone(), search.clone());
-                        list = list.child(row(SharedString::from(format!("bom-other-doc-{i}"))).child(crate::assets::icon("document", 16., cx)).child(div().flex_1().truncate().child(doc.name.clone())).on_click(move |_, window, cx| {
-                            search.update(cx, |s, cx| s.set_value("", window, cx));
-                            let items = (|| {
-                                let store = noshape_store::Document::open_read_only(&doc.path).ok()?;
-                                let graph = store.graph().ok()?;
-                                let (mv, vname) = match graph.versions.last() {
-                                    Some(v) => (v.microversion, v.name.clone()),
-                                    None => (store.head(store.default_branch().ok()?).ok()?, "Main".to_string()),
-                                };
-                                let snap = crate::derived::external_snapshot(&doc.path, mv).ok()?;
-                                Some(
-                                    snap.ordered_tabs()
-                                        .into_iter()
-                                        .filter(|t| matches!(t.content, noshape_model::document::TabContent::Assembly(_)))
-                                        .map(|t| {
-                                            let key = crate::derived::ExternalRef { path: doc.path.clone(), microversion: mv, tab: t.id.to_string() }.key();
-                                            let label = format!("{} ({} {vname})", t.name, doc.name);
-                                            (noshape_model::drawing::BomSource { tab: t.id, version: Some(key), label: label.clone() }, label)
-                                        })
-                                        .collect::<Vec<_>>(),
-                                )
-                            })()
-                            .unwrap_or_default();
-                            open.update(cx, |o, cx| {
-                                *o = Some((doc.name.clone(), items));
-                                cx.notify();
-                            });
-                        }));
-                    }
-                }
-            }
-            crate::os_ui::modal(dialog, "Other documents", 520.).child(crate::os_ui::modal_body().gap(px(8.)).child(gpui_kit::component::input::Input::new(&search).h(px(30.)).text_size(px(13.))).child(list)).footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("bom-other-cancel", "Cancel", cx))))
         });
     }
 
@@ -564,7 +461,8 @@ impl DrawingEditor {
             let as_select = id != "table-dlg-template";
             let shown = label.clone();
             // Properties open with their first select focused (live b-ok-panel, drw-cut-list-table-properties 10: a blue line).
-            let focused = editing && id == if bom { "table-dlg-template" } else { "table-dlg-order" };
+            // Inserting a BOM: its source (live workflows-1123 10 s1).
+            let focused = if editing { id == if bom { "table-dlg-template" } else { "table-dlg-order" } } else { bom && id == "table-dlg-source" };
             let value = div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(label.clone());
             Button::new(id).accessibility_label(label).child(value).ghost().small().w(px(w)).h(px(25.)).dropdown_caret(true).text_color(gpui_kit::rgb(0x333333)).rounded(px(0.)).map(|b| if focused { b.border_b_2().border_color(pal.accent) } else { b.border_b_1().border_color(gpui_kit::rgb(0xdddddd)) }).os_dropdown_menu(SharedString::from(format!("{id}-dd")), as_select, move |mut m, _, _| {
                 for (l, on, f) in &items {
@@ -801,28 +699,34 @@ impl DrawingEditor {
                         }),
                     )
                 })
+                // Live workflows-1123 10 s1: an Insert button (Select a BOM) and the source select.
                 .when(!editing && bom, |v| {
                     v.child(
                         h_flex()
                             .px(px(4.))
+                            .pt(px(2.))
                             .gap(px(4.))
-                            // Insert lists the drawing's suitable sources, like the select.
-                            .child(select("table-dlg-insert", "Insert".into(), 64., source_items.clone()))
+                            .child(
+                                h_flex()
+                                    .id("table-dlg-insert-bom")
+                                    .debug_selector(|| "table-dlg-insert-bom".into())
+                                    .flex_1()
+                                    .map(|d| crate::ui_script::mark(d, || "button:Insert".into()))
+                                    .h(px(26.))
+                                    .justify_center()
+                                    .gap(px(6.))
+                                    .border_1()
+                                    .border_color(gpui_kit::rgb(0xd7d7d7))
+                                    .rounded(px(2.))
+                                    .cursor_pointer()
+                                    .text_size(px(13.))
+                                    .hover(|d| d.bg(pal.row_hover))
+                                    .child(crate::assets::icon("insert", 14., cx))
+                                    .child("Insert")
+                                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_bom_chooser(cx))),
+                            )
                             .child(select("table-dlg-source", source_label.clone(), 120., source_items)),
                     )
-                    // Other documents' assemblies and BOM data files (help
-                    // bom_table; drawing.md TB14).
-                    .when(bom, |v| {
-                        let link = |id: &'static str, label: &'static str| div().id(id).text_size(px(12.)).text_color(gpui_kit::rgb(0x1651b0)).cursor_pointer().child(label);
-                        v.child(
-                            h_flex()
-                                .px(px(8.))
-                                .py(px(2.))
-                                .gap(px(12.))
-                                .child(link("table-dlg-other", "Other documents…").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.pick_other_assembly(window, cx))))
-                                .child(link("table-dlg-data", "BOM data…").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.pick_bom_data(window, cx)))),
-                        )
-                    })
                 })
                 .when_some(d.table.filter(|_| editing), |v, id| {
                     let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
@@ -858,7 +762,3 @@ impl DrawingEditor {
         )
     }
 }
-
-/// Other documents…: the opened document's name and its assemblies (with
-/// their labels).
-type OpenedDoc = (String, Vec<(noshape_model::drawing::BomSource, String)>);

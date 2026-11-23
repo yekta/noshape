@@ -90,6 +90,9 @@ pub struct ChooserState {
     pub other_doc: Option<OtherDoc>,
     /// The Cut list table's "Select a composite part" (live2 2278): composite parts only, a pick is the table's.
     pub composite: bool,
+    /// The BOM table dialog's Insert: "Select a BOM" (live behaviours 6168: Current document › Assemblies), a pick is
+    /// the table's source.
+    pub bom: bool,
     /// Custom table › Add's "Select a Part Studio" (live custom-tables 262, 279): Part Studios only, a pick is the
     /// custom table's.
     pub studio: bool,
@@ -235,6 +238,7 @@ impl DrawingEditor {
             self.chooser.search = None;
         }
         self.chooser.composite = true;
+        self.chooser.bom = false;
         self.chooser.other = false;
         self.insert.chooser = Some(0);
         self.ensure_sources(false, cx);
@@ -242,12 +246,57 @@ impl DrawingEditor {
     }
 
     pub fn close_composite_chooser(&mut self) {
-        if std::mem::take(&mut self.chooser.composite) {
+        if std::mem::take(&mut self.chooser.composite) | std::mem::take(&mut self.chooser.bom) {
             self.insert.chooser = None;
         }
     }
 
+    /// The BOM table dialog's Insert: Select a BOM, on its Assemblies.
+    pub fn open_bom_chooser(&mut self, cx: &mut Context<Self>) {
+        if self.insert.chooser.is_some() && !self.chooser.bom {
+            self.insert.chooser = None;
+            self.chooser.search = None;
+        }
+        (self.chooser.composite, self.chooser.studio, self.chooser.other) = (false, false, false);
+        self.chooser.bom = true;
+        self.insert.chooser = Some(1);
+        self.ensure_sources(false, cx);
+        cx.notify();
+    }
+
+    pub(crate) fn pick_bom_tab(&mut self, id: TabId, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        match self.chooser.other_doc.clone().filter(|_| self.chooser.other) {
+            Some(d) => {
+                let Some((key, doc)) = d.key(id) else { return };
+                self.pick_bom(id, format!("{name} ({doc})"), Some(key), window, cx);
+            }
+            None => self.pick_bom(id, name, None, window, cx),
+        }
+    }
+
+    /// An assembly picked in Select a BOM: the table's source (a view's own assembly: that view).
+    fn pick_bom(&mut self, id: TabId, label: String, version: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let view = version.is_none().then(|| self.table_dlg.as_ref().map(|d| d.kind)).flatten().and_then(|k| {
+            self.table_sources(k).into_iter().map(|(v, _)| v).find(|v| views::view_source(self.current_sheet(), *v).is_some_and(|(k, _)| k.tab == id))
+        });
+        if let Some(d) = &mut self.table_dlg {
+            d.bom_data = None;
+            d.bom_source = if view.is_some() { None } else { Some(noshape_model::drawing::BomSource { tab: id, version, label }) };
+            if view.is_some() {
+                d.view = view;
+            }
+        }
+        self.close_composite_chooser();
+        window.focus(&self.focus, cx);
+        self.ensure_sources(false, cx);
+        self.apply_table_dlg(cx);
+        cx.notify();
+    }
+
     fn chooser_title(&self) -> &'static str {
+        if self.chooser.bom {
+            return "Select a BOM";
+        }
         match (self.chooser.composite, self.chooser.studio) {
             (true, _) => "Select a composite part",
             (_, true) => "Select a Part Studio",
@@ -269,7 +318,7 @@ impl DrawingEditor {
             self.insert.chooser = None;
             self.chooser.search = None;
         }
-        self.chooser.composite = false;
+        (self.chooser.composite, self.chooser.bom) = (false, false);
         if !self.chooser.studio {
             self.chooser.studio_config.clear();
         }
@@ -1076,7 +1125,14 @@ impl DrawingEditor {
                 }
                 any = true;
                 read_rows.push(row_read(&name, false));
-                list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick_tree(id, None, cx))));
+                let label = name.clone();
+                list = list.child(row_base(SharedString::from(format!("dr-ch-asm-{id}")), 20.).child(div().truncate().child(crate::ui::user_text(name))).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    if this.chooser.bom {
+                        this.pick_bom_tab(id, label.clone(), window, cx);
+                    } else {
+                        this.pick_tree(id, None, cx);
+                    }
+                })));
                 continue;
             }
             // Part Studios on and nothing else: the studio rows themselves.
@@ -1276,7 +1332,7 @@ impl DrawingEditor {
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, _, _| this.chooser.keyboard_left = false))
             // Replace...'s chooser: Esc closes it, even from its search box (live2 drw-sheet-ref-replace).
             .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
-                if this.chooser.composite || this.chooser.studio {
+                if this.chooser.composite || this.chooser.studio || this.chooser.bom {
                     this.close_composite_chooser();
                     this.close_studio_chooser();
                     window.focus(&this.focus, cx);
@@ -1306,7 +1362,7 @@ impl DrawingEditor {
                     .border_color(gpui_kit::rgb(0xd3d7d9))
                     .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(self.chooser_title()))
                     .child(div().id("dr-chooser-close").debug_selector(|| "dr-chooser-close".into()).relative().top(px(1.)).left(px(-1.)).w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("panel-close", 24., gpui_kit::rgb(0x999999))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.chooser.composite = false;
+                        (this.chooser.composite, this.chooser.bom) = (false, false);
                         this.close_studio_chooser();
                         this.insert.chooser = None;
                         cx.notify();
@@ -1327,16 +1383,22 @@ impl DrawingEditor {
         let sub_tabs = h_flex()
             .border_b_1()
             .border_color(gpui_kit::rgb(0xeeeeee))
-            .child(tab_btn("dr-ch-ps", "Part Studios", tab == 0).debug_selector(|| "dr-ch-ps".into()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.insert.chooser = Some(0);
-                cx.notify();
-            })))
+            // (Select a BOM: assemblies only.)
+            .when(!self.chooser.bom, |h| {
+                h.child(tab_btn("dr-ch-ps", "Part Studios", tab == 0).debug_selector(|| "dr-ch-ps".into()).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.insert.chooser = Some(0);
+                    cx.notify();
+                })))
+            })
             .child(tab_btn("dr-ch-asm", "Assemblies", tab == 1).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.insert.chooser = Some(1);
                 cx.notify();
             })));
-        // Live 170: "⤒ Import..." under the list (both document tabs).
+        // Live 170: "⤒ Import..." under the list (both document tabs); Select a BOM's takes BOM data (help bom_table).
+        let bom_data = std::rc::Rc::new(cx.listener(|this, _: &ClickEvent, window, cx| this.pick_bom_data(window, cx)));
+        let bom = self.chooser.bom;
         let import_row = |cx: &App| {
+            let bom_data = bom_data.clone();
             h_flex()
                 .id("dr-ch-import")
                 .debug_selector(|| "dr-ch-import".into())
@@ -1350,7 +1412,7 @@ impl DrawingEditor {
                 .hover(|d| d.bg(pal.row_hover))
                 .child(crate::assets::icon("import", 14., cx))
                 .child("Import...")
-                .on_click(|_, window, cx| crate::drawing_hooks::import(window, cx))
+                .on_click(move |e, window, cx| if bom { bom_data(e, window, cx) } else { crate::drawing_hooks::import(window, cx) })
         };
         // (Select a composite part / Select a Part Studio: no kinds, filters or Import.)
         let composite = self.chooser.composite || self.chooser.studio;

@@ -339,7 +339,7 @@ impl DrawingEditor {
             out.push(MenuEntry::item(format!("Switch to {fs_name}"), move |_, w, cx| crate::actions::request_activate_tab(fs, w, cx)));
         }
         }
-        out.push(MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(crate::drawing_move_sheet::MoveTarget::Table(id), cx)));
+        out.push(MenuEntry::item("Move to sheet...", move |t, w, cx| t.open_move_sheet_at(w.mouse_position(), crate::drawing_move_sheet::MoveTarget::Table(id), cx)));
         out.push(MenuEntry::Separator);
         out.push(MenuEntry::item("Clear selection", |t, _, cx| {
             t.selection.clear();

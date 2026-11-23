@@ -662,6 +662,14 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
     if let Some(r) = p.rotation_deg {
         noshape_scene::drawing_tools::view_edit::set_view_rotation(&mut d.sheets[sheet], id, r.to_radians());
     }
+    // A view whose parent is on another sheet (Move to sheet) given another orientation: a base view of its own
+    // (live workflows-1123 11 s13: its View orientation is a dropdown).
+    let rebased_view = match (&old.kind, p.orientation) {
+        (ViewKind::Projected { .. }, Some(n)) if d.sheets[sheet].linked_parent(id).is_some() && views::standard_orientation(d, &d.sheets[sheet], id) != Some(n) => {
+            views::view_source(&d.sheets[sheet], id).map(|(key, part)| (key, part, n, views::view_scale(&d.sheets[sheet], id)))
+        }
+        _ => None,
+    };
     let Some(v) = d.sheets[sheet].view_mut(id) else { return };
     v.scale = p.scale;
     v.scale_text = p.scale.and(p.scale_text.clone());
@@ -731,6 +739,13 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
             set_standard_orientation(v, n);
         }
     }
+    let rebased = rebased_view.is_some();
+    if let Some((key, part, n, scale)) = rebased_view {
+        v.kind = ViewKind::Base { source: key.tab, config: key.config, orientation: n, part };
+        v.explode = key.explode;
+        v.custom_frame = None;
+        v.scale = v.scale.or(Some(scale));
+    }
     if rescaled && !toggled {
         let sh = &mut d.sheets[sheet];
         // The view and the views whose scale comes from it.
@@ -757,6 +772,9 @@ pub fn apply_view_props(doc: &Document, d: &mut Drawing, sheet: usize, id: ViewI
                 x.scale_label = Some(differs);
             }
         }
+    }
+    if rebased {
+        d.sync_links();
     }
 }
 

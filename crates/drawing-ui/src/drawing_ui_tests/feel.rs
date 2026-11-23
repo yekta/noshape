@@ -4223,6 +4223,22 @@ fn a_view_moved_off_its_parents_sheet_is_apart_from_it(cx: &mut TestAppContext) 
     }));
     let moved = moved.expect("moved and selected");
     assert!(cx.update(|cx| editor.read(cx).apart_from_parent(moved)), "on another sheet: apart");
+    // Its View orientation is a dropdown on its own orientation; another one makes it a base view.
+    let shown = cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.open_view_props(moved, w, cx);
+        e.view_props.as_ref().and_then(|p| p.orientation)
+    })).unwrap();
+    let shown = shown.expect("an orientation choice");
+    use noshape_model::drawing::ViewOrientation;
+    let other = if shown == ViewOrientation::Front { ViewOrientation::Top } else { ViewOrientation::Front };
+    let kind = cx.update(|cx| editor.update(cx, |e, cx| {
+        if let Some(p) = e.view_props.as_mut() {
+            p.orientation = Some(other);
+        }
+        e.apply_view_props(cx);
+        e.current_sheet().view(moved).map(|v| v.kind.clone())
+    }));
+    assert!(matches!(kind, Some(noshape_model::drawing::ViewKind::Base { orientation, .. }) if orientation == other), "{kind:?}");
 }
 
 /// Live drw-drag-feel-1122 N and L: a hovered note with a leader keeps its text plain (no tan box); its leader's end
@@ -4502,8 +4518,15 @@ fn move_to_sheet_shows_the_picked_sheet_before_ok(cx: &mut TestAppContext) {
     draw(cx, window);
     assert_eq!(state(cx), (0, 0, false, 1), "✕: back on Sheet1");
     assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::View(view)]);
+    // Opened from the menu: its top-left at the item's click (live workflows-1123 11 s7), not the right-click's.
+    let item = gpui_kit::point(gpui_kit::px(640.), gpui_kit::px(300.));
+    let (at, want) = cx.update(|cx| editor.update(cx, |e, cx| {
+        e.menu_at = [10.0, 10.0];
+        e.open_move_sheet_at(item, MoveTarget::View(view), cx);
+        (e.move_sheet.as_ref().map(|d| d.at), e.local(item))
+    }));
+    assert_eq!(at, Some(want));
     cx.update(|cx| editor.update(cx, |e, cx| {
-        e.open_move_sheet(MoveTarget::View(view), cx);
         e.pick_move_sheet(1, cx);
         e.accept_move_sheet(cx);
     }));
@@ -4521,4 +4544,41 @@ fn move_to_sheet_shows_the_picked_sheet_before_ok(cx: &mut TestAppContext) {
         let ids: Vec<_> = two.views.iter().map(|v| v.id).collect();
         assert_eq!(ids, vec![mirror, moved.id], "Sheet2 holds the moved view and its parent's undrawn mirror only");
     });
+}
+
+/// Live workflows-1123 10 s1 (DRW-BOM-DIALOG-INSERT-ROW): the BOM table dialog's Insert is a button that opens
+/// "Select a BOM" on the Assemblies (no Part Studios); an assembly picked there is the table's.
+#[gpui::test]
+fn the_bom_dialogs_insert_opens_select_a_bom(cx: &mut TestAppContext) {
+    START.set(Some("pin-block-asm-drawing"));
+    let (window, editor) = drawing(cx, "feel-bom-insert");
+    cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.tool = Tool::Table { kind: noshape_scene::drawing_tools::TableTool::Bom, view: None, origin: None };
+            e.sync_table_dlg();
+        })
+    });
+    draw(cx, window);
+    let insert = VisualTestContext::from_window(window, cx).debug_bounds("table-dlg-insert-bom").expect("an Insert button");
+    VisualTestContext::from_window(window, cx).simulate_click(insert.center(), Modifiers::default());
+    draw(cx, window);
+    let open = cx.update(|cx| {
+        let e = editor.read(cx);
+        (e.chooser.bom, e.insert.chooser)
+    });
+    assert_eq!(open, (true, Some(1)), "Select a BOM, on its Assemblies");
+    assert!(VisualTestContext::from_window(window, cx).debug_bounds("dr-ch-ps").is_none(), "no Part Studios tab");
+    let asm = cx.update(|cx| {
+        let e = editor.read(cx);
+        e.doc.read(cx).session.doc.ordered_tabs().into_iter().find(|t| matches!(t.content, noshape_model::document::TabContent::Assembly(_))).map(|t| (t.id, t.name.clone()))
+    });
+    let (id, name) = asm.expect("the start's assembly");
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.pick_bom_tab(id, name, w, cx))).unwrap();
+    let picked = cx.update(|cx| {
+        let e = editor.read(cx);
+        let d = e.table_dlg.as_ref().expect("the dialog stays");
+        let tab = d.bom_source.as_ref().map(|s| s.tab).or_else(|| d.view.and_then(|v| noshape_model::drawing::views::view_source(e.current_sheet(), v).map(|(k, _)| k.tab)));
+        (e.chooser.bom, e.insert.chooser, tab)
+    });
+    assert_eq!(picked, (false, None, Some(id)), "the chooser closes, the assembly is the table's");
 }

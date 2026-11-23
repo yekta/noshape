@@ -49,25 +49,26 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   HIST-MERGE-DIALOG-LOOK (body min_h 432, a version source plain bold, select borderless); HIST-GRAPH-LOOK (lanes 12 px
   apart, open lane 4 px / others 2 px, merge line source -> Merge node; version dot size not changed);
   CUSTOM-TABLE-INFO-CELL (ⓘ 11 px at the right edge, section … #333).
-- STATE 04:05: commit ed2946eac (callout dialog, linked-notice 35 s, move-to-sheet test) not landed yet. Its test
-  feedback::a_linked_notice_stays_while_the_user_works now passes (it had to wait for the studio's load: the overlay
-  timer never started); DBG lines removed. Uncommitted second set (FS rows, HIST rows, CUSTOM-TABLE-INFO-CELL,
-  DRW-SECTION-EDIT-DIALOG, TOAST-ABOVE-MODAL = toast priority 50 over gpui-base dialogs' 10+layer,
-  DRW-SECTION-PREVIEW-IN-PARENT = `section_in_parent`: placing view's lines + frame hidden, p0 dot; asserted in
-  feel.rs a_vertical_sections_cut…) in x262 (`bin/x262.sh`, log x262.log). Then commit, rebase, TICKETS rows against
-  main's text, land. Then x263-build.sh on vibex7 + x263-run.sh on vibex8 (workflows 08/12/14/18/19 replay), pixel
-  check by script. DRW-DETAIL-PREVIEW-LOOK: Connected connector hidden while placing (hidden_lines), test in feel.rs
-  a_detail_views_preview…; drawing-ui needs x262b (`bin/x262b.sh`) as it changed after x262 started.
+- STATE 04:41: rebased on origin/main (clean); HEAD 35040b107 = set 2 + shortcuts + TICKETS rows (11 marked done,
+  DRW-SHEETS-EMPTY-CHEVRON open duplicate dropped), on top of ed2946eac (callout / linked notice; its test now passes).
+  key_tests fixed 04:50 (explicit imports instead of `use super::*`; `use gpui_kit::*` pulls gpui's `test`): x265
+  (fs-ui lib + clippy, vibex7) waiting for a build slot at 05:05. Green before: drawing-ui 191, history-ui 17, vs-ui 15,
+  app-core actions 6, part-studio feedback 2, clippy app-core/fs-ui/vs-ui/history/part-studio/drawing.
+- Uncommitted on top (x266: drawing-ui lib + clippy drawing-ui/ops, vibex7, queued 05:06): DRW-BOM-DIALOG-INSERT-ROW
+  (chooser.bom "Select a BOM", Assemblies only, Import = BOM data; pick_bom / pick_bom_tab; the dialog's Insert a
+  button, source select focused; Other documents… modal + link row removed; test the_bom_dialogs_insert_opens_select_a_bom)
+  and DRW-MOVED-VIEW-PROPS (a linked projected view's View orientation is a dropdown; ops apply_view_props makes it a
+  Base view on another orientation + sync_links; test extends a_view_moved_off_its_parents_sheet_is_apart_from_it).
+  TICKETS: both marked done; 3 "STILL OPEN qa 02:5x" rows dropped (fixes queued in 52b9cfb9 / HEAD, done rows exist).
+  Then: amend/commit, land.sh. 52b9cfb9 (+14f567d6, 58eda2cb) CHECKING since 04:20.
+- FEEL-VS-CHIP-ON-CLICK skipped: our chip shows only while editing; can't tell live's click state without w9's
+  recording (not found in workflows-1122/15). Ask qa for the recording path if it stays open.
 - Shortcuts (live shortcuts-1123, lead's ask 04:2x): Drawing context: Mac ⌃Z/⌃Y NoAction, ⌘Y redo; elsewhere
   Ctrl+Shift+Z redo (app-core actions.rs, test drawing_key_tests). FS: Commit/CommitAll ⌘ only on a Mac; ⇧⌘F search
   also in the editor (input's own was Replace); Mac ⌃B/⌃P/⌃H/⌃D/⌃O (SplitLine, fs_lines::split_line). FS Mac keys
   untested on Linux (cfg!(macos) in bind_keys: refactor to fs_bindings(mac) + test). VS: a typed key opens the value
   list at once (value_completion; test a_letter_in_a_focused_value_cell_opens_the_list). Run x264 (vibex7).
-- NEXT after the land: DRW-BOM-DIALOG-INSERT-ROW needs a "Select a BOM" chooser mode (live behaviours 6168: Insert ›
-  Select a BOM › Current document › Assemblies): like `chooser.studio` / `composite` in drawing_chooser.rs (Assemblies
-  tab = tab 1), pick sets the table dialog's source; then drop the "Other documents… / BOM data…" link row and make
-  Insert a button with the insert icon (as the cut list's, drawing_table_dlg.rs ~765). FS caret: the FS editor is not
-  a code_editor input; Ace's caret is 2 px; skipped for now.
+- FS caret: the FS editor is not a code_editor input; Ace's caret is 2 px; skipped for now.
 - Lead's extra: after v0.4.68 (05:00 release) is published, on the Mac (idle >= 10 min only): Finder-copy a scratch
   .noshape in ~/noshape-host/studios-keep, rename the copy, open it with the release app: new name, not a copy.
   Report <= 3 lines.

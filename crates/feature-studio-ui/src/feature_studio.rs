@@ -2865,7 +2865,7 @@ mod bench;
 
 #[cfg(test)]
 mod key_tests {
-    use super::*;
+    use super::{Commit, CommitAll, RemoveLine, SearchStudios, SplitLine, fs_bindings};
     use gpui_kit::{Action as _, KeyContext, Keymap, Keystroke};
 
     /// Live shortcuts-1123 fsed / fsno: ⌘S / ⇧⌘S commit on a Mac (⌃S doesn't), Ctrl+S elsewhere; ⇧⌘F searches from

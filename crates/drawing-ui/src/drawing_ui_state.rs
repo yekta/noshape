@@ -106,7 +106,16 @@ impl DrawingEditor {
                 return Ok(self.sheet_to_window(x.pos));
             }
             let a = self.ui_annotations().into_iter().find(|(_, k, s)| s == text && kind.is_none_or(|x| x == *k)).ok_or_else(|| format!("no annotation {text}"))?;
-            self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position).ok_or("no annotation")?
+            // Its text where it is drawn (a dimension's dragged text is not at its `position`: UIP-ANNOTATION-STALE-POS).
+            let picks = self.picks_of(Sel::Annotation(a.0));
+            let drawn = self.built.as_ref().and_then(|b| b.geometry.texts.iter().find(|x| picks.contains(&x.pick))).map(|x| {
+                let q = noshape_model::drawing::font::text_box(x);
+                [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0]
+            });
+            match drawn {
+                Some(at) => at,
+                None => self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position).ok_or("no annotation")?,
+            }
         } else {
             return Err(format!("not a drawing target: {t}"));
         };

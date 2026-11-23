@@ -50,6 +50,15 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// The context menu's Move to sheet...: the panel's top-left at the item's click (live workflows-1123 11 s7).
+    pub fn open_move_sheet_at(&mut self, at: Point<Pixels>, target: MoveTarget, cx: &mut Context<Self>) {
+        self.open_move_sheet(target, cx);
+        let at = self.local(at);
+        if let Some(d) = &mut self.move_sheet {
+            d.at = at;
+        }
+    }
+
     /// A sheet picked: live shows that sheet at once, the object moved there and selected; ✓ keeps it (qa
     /// DRW-MOVE-TO-SHEET-PREVIEW, workflow 11 s9).
     pub(crate) fn pick_move_sheet(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -268,7 +277,7 @@ impl DrawingEditor {
             MenuEntry::Separator,
             MenuEntry::item("View properties...", move |t, w, cx| t.open_view_props_multi(props_ids.clone(), w, cx)),
             MenuEntry::Separator,
-            MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(MoveTarget::View(first), cx)),
+            MenuEntry::item("Move to sheet...", move |t, w, cx| t.open_move_sheet_at(w.mouse_position(), MoveTarget::View(first), cx)),
         ];
         out.extend(crate::drawing_props::paste_entry(cx));
         out.extend([

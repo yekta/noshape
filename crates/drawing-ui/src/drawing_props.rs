@@ -80,7 +80,7 @@ pub(crate) const FIRST_FIELD_LIT: u32 = 0x1b5faa;
 /// View properties dialog state.
 pub struct ViewProps {
     pub view: ViewId,
-    orientation: Option<ViewOrientation>,
+    pub(crate) orientation: Option<ViewOrientation>,
     /// View orientation › a named view of the source.
     named: Option<String>,
     /// None: parent (or sheet) scale.
@@ -395,7 +395,7 @@ impl DrawingEditor {
             out.push(MenuEntry::item(format!("Switch to {name}"), move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
         }
         // Live drawing/290: Move to sheet…, Copy, Paste as table (always).
-        out.push(MenuEntry::item("Move to sheet...", move |t, _, cx| t.open_move_sheet(crate::drawing_move_sheet::MoveTarget::View(id), cx)));
+        out.push(MenuEntry::item("Move to sheet...", move |t, w, cx| t.open_move_sheet_at(w.mouse_position(), crate::drawing_move_sheet::MoveTarget::View(id), cx)));
         // Suppress alignment with parent (derived views that align with it;
         // live drawing/447: after Move to sheet…).
         if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
@@ -613,6 +613,8 @@ impl DrawingEditor {
             view: id,
             orientation: match &v.kind {
                 ViewKind::Base { orientation, .. } => Some(*orientation),
+                // Its parent on another sheet (Move to sheet): its orientation is a choice too (live workflows-1123 11 s13).
+                ViewKind::Projected { .. } if self.current_sheet().linked_parent(id).is_some() => views::standard_orientation(&self.drawing, self.current_sheet(), id),
                 _ => None,
             },
             named: v.named_view.clone(),
