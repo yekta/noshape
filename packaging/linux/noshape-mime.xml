@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- .noshape documents (shared-mime-info): file managers show them as Noshape documents and open them with
+     noshape.desktop (MimeType=application/x-noshape). Installed as <share>/mime/packages/noshape.xml. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-noshape">
+    <comment>Noshape document</comment>
+    <icon name="noshape"/>
+    <glob pattern="*.noshape"/>
+  </mime-type>
+</mime-info>

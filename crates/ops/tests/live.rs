@@ -143,3 +143,31 @@ fn servers_starting_together_stay_discoverable_and_stale_files_go() {
     assert!(!stale_file.exists(), "the stale discovery file was cleaned up");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A second start with a document (a .noshape opened from Explorer or a Linux file manager starts the program again;
+/// `noshape <file>` in a terminal) hands the path, made absolute, to the running app and ends; with no app running it
+/// opens the document itself.
+#[test]
+fn a_second_start_hands_its_document_to_the_running_app() {
+    let dir = std::env::temp_dir().join(format!("noshape-app-open-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let info = dir.join("app.json");
+    let doc = dir.join("part.noshape");
+    assert!(!noshape_ops::live::open_in_app(&info, &doc), "no app running");
+    let (tx, rx) = std::sync::mpsc::channel::<(String, Value)>();
+    let tx = std::sync::Mutex::new(tx);
+    let server = noshape_ops::live::serve_app(info.clone(), move |r| {
+        let _ = tx.lock().unwrap().send((r.tool.clone(), r.args.clone()));
+        r.answer(Ok(registry::OpOutput { value: json!({}), images: Vec::new() }));
+    })
+    .unwrap();
+    let cwd = std::env::current_dir().unwrap();
+    let relative = std::path::PathBuf::from("some folder").join("part.noshape");
+    assert!(noshape_ops::live::open_in_app(&info, &relative));
+    let (tool, args) = rx.recv().unwrap();
+    assert_eq!(tool, noshape_ops::live::APP_OPEN);
+    assert_eq!(args["path"].as_str().map(std::path::PathBuf::from), Some(cwd.join(&relative)));
+    drop(server);
+    assert!(!noshape_ops::live::open_in_app(&info, &doc), "the app quit");
+    let _ = std::fs::remove_dir_all(&dir);
+}

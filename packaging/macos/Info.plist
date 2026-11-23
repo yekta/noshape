@@ -28,5 +28,47 @@
   <true/>
   <key>LSApplicationCategoryType</key>
   <string>public.app-category.graphics-design</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Noshape document</string>
+      <key>CFBundleTypeRole</key>
+      <string>Editor</string>
+      <key>LSHandlerRank</key>
+      <string>Owner</string>
+      <key>CFBundleTypeIconFile</key>
+      <string>noshape</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>app.noshape.document</string>
+      </array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>app.noshape.document</string>
+      <key>UTTypeDescription</key>
+      <string>Noshape document</string>
+      <key>UTTypeIconFile</key>
+      <string>noshape</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+        <string>public.content</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>noshape</string>
+        </array>
+        <key>public.mime-type</key>
+        <string>application/x-noshape</string>
+      </dict>
+    </dict>
+  </array>
 </dict>
 </plist>

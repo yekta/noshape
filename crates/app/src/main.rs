@@ -46,6 +46,7 @@ mod tab_manager_tests;
 mod workspace_tests;
 mod cli_mode;
 mod live_server;
+mod open_requests;
 mod doc_dialogs;
 mod shortcuts_page;
 mod import_dialog;
@@ -443,6 +444,10 @@ fn main() {
     if let Some(code) = cli_mode::run(&os_args) {
         std::process::exit(code);
     }
+    // A document for an app already running goes to it (its window comes forward), before a bundle or window starts.
+    if open_requests::hand_over(&std::env::args().skip(1).collect::<Vec<_>>()) {
+        return;
+    }
     if cfg!(target_os = "macos") && cli_mode::reopen_as_bundle(&os_args) {
         return;
     }
@@ -506,6 +511,15 @@ fn main() {
 
     let app = gpui_kit::application().with_assets(assets::AppAssets);
     noshape_render::perf::milestone("GPUI application created");
+    // Documents the OS asks to open (macOS: Finder, `open`; at launch they come before the app starts) and those a
+    // second start hands over.
+    let (open_tx, open_rx) = async_channel::unbounded::<PathBuf>();
+    let os_opens = open_tx.clone();
+    app.on_open_urls(move |urls| {
+        for p in urls.iter().filter_map(|u| open_requests::url_path(u)) {
+            let _ = os_opens.send_blocking(p);
+        }
+    });
     // macOS: clicking the dock icon with no windows open shows the start window.
     app.on_reopen(|cx| {
         if cx.windows().is_empty() {
@@ -514,6 +528,9 @@ fn main() {
     });
     app.run(move |cx| {
         noshape_render::perf::milestone("GPUI app started");
+        // Launched to open documents (macOS's open event, not an argument): the first as if given, the rest after it.
+        let mut launch_opens: Vec<PathBuf> = std::iter::from_fn(|| open_rx.try_recv().ok()).collect();
+        let path = path.clone().or_else(|| (!launch_opens.is_empty() && reopen.is_none()).then(|| launch_opens.remove(0)));
         gpui_kit::init(cx);
         noshape_render::perf::milestone("gpui-kit initialized");
         // Onshape's text (Chrome) is grayscale anti-aliased, without the
@@ -593,6 +610,18 @@ fn main() {
         } else {
             files::show_start_window(cx);
         }
+        for p in launch_opens.drain(..) {
+            open_requests::open(&p, gpu.clone(), cx);
+        }
+        let server = open_requests::serve(open_tx.clone());
+        let g = gpu.clone();
+        cx.spawn(async move |cx| {
+            let _server = server;
+            while let Ok(p) = open_rx.recv().await {
+                cx.update(|cx| open_requests::open(&p, g.clone(), cx));
+            }
+        })
+        .detach();
         // A page scenario (the documents page, Preferences) runs from the app, across its windows.
         if ui_script::enabled() && let Some(page) = ui_script::page_start() {
             if page == "preferences" {

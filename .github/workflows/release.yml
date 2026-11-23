@@ -251,16 +251,18 @@ jobs:
           mkdir -p "$d"
           cp target/release/noshape "$d/"
           strip "$d/noshape"
-          cp packaging/linux/noshape.desktop packaging/linux/install.sh README.md "$d/"
+          cp packaging/linux/noshape.desktop packaging/linux/noshape-mime.xml packaging/linux/install.sh README.md "$d/"
           cp packaging/icons/noshape-512.png "$d/noshape.png"
           cp packaging/icons/noshape.svg "$d/noshape.svg"
           tar czf "out/$d.tar.gz" "$d"
           # The .deb: /usr/bin/noshape, the menu entry and icons.
           pkg=deb/noshape
           mkdir -p "$pkg/DEBIAN" "$pkg/usr/bin" "$pkg/usr/share/applications" "$pkg/usr/share/icons/hicolor/512x512/apps" \
-            "$pkg/usr/share/icons/hicolor/scalable/apps" "$pkg/usr/share/doc/noshape"
+            "$pkg/usr/share/icons/hicolor/scalable/apps" "$pkg/usr/share/doc/noshape" "$pkg/usr/share/mime/packages"
           cp "$d/noshape" "$pkg/usr/bin/noshape"
           cp packaging/linux/noshape.desktop "$pkg/usr/share/applications/"
+          # .noshape's type (dpkg's shared-mime-info trigger updates the database).
+          cp packaging/linux/noshape-mime.xml "$pkg/usr/share/mime/packages/noshape.xml"
           cp "$d/noshape.png" "$pkg/usr/share/icons/hicolor/512x512/apps/noshape.png"
           cp "$d/noshape.svg" "$pkg/usr/share/icons/hicolor/scalable/apps/noshape.svg"
           cp README.md "$pkg/usr/share/doc/noshape/"
@@ -410,6 +412,8 @@ jobs:
           python3 $check /usr/bin/noshape
           test -f /usr/share/applications/noshape.desktop
           test -f /usr/share/icons/hicolor/512x512/apps/noshape.png
+          # .noshape files are Noshape documents (the mime database updated by dpkg's trigger).
+          grep -q '^[0-9]*:application/x-noshape:\*\.noshape' /usr/share/mime/globs2
           sudo apt-get remove -y noshape
           test ! -e /usr/bin/noshape
           # The tarball's install.sh (the libraries are there now, as on a desktop). A fake Claude Code on PATH:
@@ -423,6 +427,7 @@ jobs:
           grep -qx "mcp add --scope user noshape -- $HOME/.local/bin/noshape mcp" "$HOME/claude-calls"
           grep -q "^Exec=$HOME/.local/bin/noshape" "$HOME/.local/share/applications/noshape.desktop"
           test -f "$HOME/.local/share/icons/hicolor/512x512/apps/noshape.png"
+          test -f "$HOME/.local/share/mime/packages/noshape.xml"
           export PATH="$HOME/.local/bin:$PATH"
           test "$(command -v noshape)" = "$HOME/.local/bin/noshape"
           python3 $check noshape
