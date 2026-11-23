@@ -515,6 +515,24 @@ UIS-FEATURE-INITIALS (12 s13/14, 13 s18). No regressions vs out-wf23 except 03 s
 - [ ] P2 **HIST-LEGEND-LOOK (studios)**: workflow 19 s21: live's History legend ~50 px lower with pin glyphs; ours a dotted blue Change line and plain triangles. tickets/wf23b-19-s21-legend.png
 - [ ] P2 **PS-PARTS-ROW-TOOLTIP-PITCH (psui)**: workflow 17 s11: live shows a "Part 1" tooltip on the clicked row and a 26 px row pitch; ours no tooltip, 24 px. tickets/wf23b-17-s11.png
 
+## qa, 2026-11-23 01:5x (live psui/appearance-1123 Q1-Q5 vs ours, green 30d4affdd (+ ed11f7c48 for 7 cells), vibe2; qa-scratch/feel1122/appear/)
+Most of the dialog and part-colour flows =: dialog 220×400, ✓ off until a change, palette/# field/RGBA/tessellation, preview colours
+exact (223,44,46 / 143,44,46), ✓/✕, Undo/Redo, multi-part dialog, overlap rule, Union/Intersect/Subtract rules, assemblies (no instance
+appearance) all =. Evidence qa-scratch/tickets/{FEEL-,}APPEAR-*-1123.png (live left); live shots in live/psui/appearance-1123/.
+Not compared: the Mixer tab (no live shot).
+- [ ] P0 **APPEAR-SUBTRACT-CUT-FACES (core)**: Subtract with a feature appearance on the tool's feature: live's cut faces take the target's part colour; ours the tool feature's appearance (green). q5-subtract+FA.png; APPEAR-SUBTRACT-CUT-FACES-1123.png
+- [ ] P0 **APPEAR-SPLIT-LOSES-COLOURS (core)**: Split: live keeps "Red block", its colour and the blue top face on both halves; ours names them Part 2/Part 3 in default colours, drops the face appearance, and renumbers the untouched Orange block's default name to "Part 1". q5-split.png; APPEAR-SPLIT-LOSES-COLOURS-1123.png
+- [ ] P0 **APPEAR-PATTERN-COPY-COLOURS (core)**: part pattern, mirror, feature pattern (with/without a feature appearance): live copies keep the source colours and face appearances; ours are default-coloured with none. q5-partPattern.png, q5-mirror.png, q5-featPattern*.png; APPEAR-PATTERN-COPY-COLOURS-1123.png
+- [ ] P0 **FEEL-APPEAR-FACE-SELECT-FILL (psui)**: face/feature appearance dialog: live shows the picked faces in their colour with only the orange outline; ours fills them orange, hiding the swatch preview until ✓. q1-face-appearance-dialog.png, q1-feature-appearance-dialog.png; FEEL-APPEAR-FACE-SELECT-FILL-1123.png
+- [ ] P1 **FEEL-APPEAR-PANEL-FA-ROWS (psui)**: live nests face appearances under their part (white row, "1 selection"/"6 selections" box, 111 px swatch; a feature appearance is also "Face appearance N"; suppressed: italic struck-through name and box, pale crossed swatch); ours lists them after the parts, grey, indented, full-width swatch, no count, "Extrude 2", suppressed swatch full colour with one stray stroke. q1-appearances-panel.png, q2-face-appearance-suppressed.png; FEEL-APPEAR-PANEL-FA-ROWS-1123.png
+- [ ] P1 **APPEAR-PART-NO-RESET (psui)**: panel part-row menu: live Rename… · Edit appearance… only (only Undo restores the generated colour); ours adds "Remove appearance". q1-panel-part-row-menu.png; APPEAR-PART-NO-RESET-1123.png
+- [ ] P1 **APPEAR-PART-FACE-MENU-2-PARTS (psui)**: Part 1 row + a face of Part 2 selected: live's face menu covers both (Hide 2 parts, Copy 2 items, Delete 2 parts…, Edit appearance for 2 parts…); ours is Part 2's alone. q3-part-plus-face-menu.png; APPEAR-PART-FACE-MENU-2-PARTS-1123.png
+- [ ] P1 **APPEAR-EMPTY-FACE-DIALOG (psui)**: panel "Add face appearance" with nothing selected: live ✓ disabled, 000000; ours ✓ enabled (commits on no faces), EBB114. q1-panel-add-face-appearance-click.png; APPEAR-EMPTY-FACE-DIALOG-1123.png
+- [ ] P1 **FEEL-APPEAR-DIALOG-UNDER-OVERLAYS (psui)**: the Appearance dialog from the panel (972,79): live covers the view cube's ▾ and the right strip; ours draws them over the palette and the ? icon. q1-panel-swatch-dblclick-dialog.png; FEEL-APPEAR-DIALOG-UNDER-OVERLAYS-1123.png
+- [ ] P2 **FEEL-APPEAR-DIALOG-OFFSET (psui)**: live opens at (241,560) from the Parts list and (972,79) from the panel; ours 5 px right (and 2 px lower from the list). q1-part-appearance-dialog.png; FEEL-APPEAR-DIALOG-OFFSET-1123.png
+- [ ] P2 **PS-PROPERTIES-DIALOG-SIZE (psui)**: the part Properties dialog: ours 800×541, live about 1171×685 (seen in the appearance capture, not measured to the px). feel1122/appear/run1
+- [ ] P2 **UIS-APPEAR-TARGETS (psui)**: the ui_script has no target for the Appearance dialog's ✕ (`{"button":"cancel"}`) or the panel's "Add face appearance" icon (clicked by px).
+
 ## qa, 2026-11-23 01:4x (live errors-1123 set c vs ours: sheet metal 23 cells + mates 68 cells; greens 24f1566de / 30d4affdd)
 Sheet metal mostly =; mates differ. Evidence qa-scratch/tickets/ERR-{FLANGE,HEM,BEND,MATES}-*-1123.png (live left); live shots in
 live/errors-1123/shots/. Not replayed: committed oneconn/sameinst/Tangent one-entity/same-face (the ops refuse to build them; creating
