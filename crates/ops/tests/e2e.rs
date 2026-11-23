@@ -2954,6 +2954,24 @@ fn import_appearances_off_keeps_the_part_colour() {
     assert_eq!(at("noapp"), at("Part Studio 1") + 1, "{tabs:?}");
 }
 
+/// A face whose file colour differs from its part's is listed as a face appearance made by the import (live
+/// import-fidelity-1123: Mac mini Main 152 of 258 faces, source Import 1); the part's other faces have none.
+#[test]
+fn an_imports_own_face_colours_are_listed_as_its_face_appearances() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("import-faceapp.noshape").to_str().unwrap() }));
+    // Live's g48 export: three parts, one face made red.
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/face-colour.step");
+    call(&mut ctx, "import_files", json!({ "files": [file] }));
+    let a = call(&mut ctx, "part_appearances", json!({ "tab": "face-colour" }));
+    let imported = a["imported"].as_array().unwrap();
+    assert_eq!(imported.len(), 1, "{a}");
+    assert_eq!((&imported[0]["color"], &imported[0]["source"]), (&json!("#ff0000"), &json!("Import 1")), "{a}");
+    let parts: Vec<Value> = call(&mut ctx, "query_parts", json!({ "tab": "face-colour" }))["parts"].as_array().unwrap().iter().map(|p| p["id"].clone()).collect();
+    assert!(parts.contains(&imported[0]["part"]), "{a}");
+    assert!(a["appearances"].as_array().is_none_or(|l| l.is_empty()), "the panel's own rows stay apart: {a}");
+}
+
 /// Import's "Create a composite part" on a file of two solids: one closed composite named after the file, in a
 /// colour of its own (live import-fidelity-1123: usbc, Mac mini); with Combine the option is off, as its hidden box.
 #[test]

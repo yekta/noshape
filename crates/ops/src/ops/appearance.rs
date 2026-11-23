@@ -112,7 +112,7 @@ pub fn ops() -> Vec<Op> {
             group: "part",
             verb: "appearances",
             summary: "The Part Studio's custom appearances and materials (the Appearance panel)",
-            description: "Each part's material, density and own appearance, and the face / feature appearances with their index.",
+            description: "Each part's material, density and own appearance, the face / feature appearances with their index, and the face appearances an import made (`imported`: one per face whose file colour differs from its part's, with its `source` feature).",
             fields: vec![doc_field(), tab_field()],
             mutates: false,
             destructive: false,
@@ -365,5 +365,18 @@ fn appearances(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             j
         })
         .collect();
-    Ok(json!({ "parts": parts, "appearances": other }).into())
+    // An import's face colours that differ from the part's (live import-fidelity-1123: Mac mini 152 + 14, source Import 1).
+    let imported: Vec<Value> = r
+        .context
+        .face_appearance
+        .iter()
+        .map(|(body, face, c)| {
+            let mut j = color_json(*c);
+            j["face"] = json!(refs::to_id(&Reference::Face((**face).clone())));
+            j["part"] = json!(refs::body_id(body));
+            j["source"] = json!(ps.feature(body.feature).map(|f| f.name.clone()));
+            j
+        })
+        .collect();
+    Ok(json!({ "parts": parts, "appearances": other, "imported": imported }).into())
 }

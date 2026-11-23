@@ -53,6 +53,18 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
   xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
 
+## qa 06:5x import recheck (TICKETS e6e1ad1f3): 6 verified; new P1s
+- IMP-FACE-APPEARANCE-ROWS (COMMITTED 07:1x, green fa-run3: clippy, e2e, coverage): part_appearances lists the import's face
+  appearances (ctx.face_appearance) under `imported` (face, part, colour, source feature), apart from the indexed
+  `appearances`; e2e an_imports_own_face_colours_are_listed_as_its_face_appearances (live g48 face-colour.step); AGENT_API regenerated. The
+  Appearances panel rows: live capture asked (REQUESTS "dx 11-23 06:57" (b)).
+- IMP-COMPOSITE-GENERATED-COLOUR: ours = ctx.alloc_color() (rotation by bodies made; usbc 34 -> idx 2 = live by
+  chance); live Mac mini #7f7f7f (idx 6). Mac mini STEP not on any host now. Capture asked (REQUESTS (a)): composite
+  colour on clamp / train-joe / c2-duct / o-ring. Then fix.
+- IMP-NO-FEEDBACK: qa rechecks once 538aa4b0 is green.
+- FOUND: our STEP export writes no face colours (kernel ExportShape has the part colour only; ops export.rs
+  step_shape); live writes them (kernel/tests/data/step/face-colour.step = live g48, one face red). Next export item.
+
 ## NEXT: drw-dims-1123 export checks (live/drw-dims-1123/INDEX.md, hole-table.md, iso-format.md, ordinate-*.md)
 - Tapped hole SIZE: DROPPED (06:40). drw-dims' M8 hole was made by API without a tap type (kit/build.mjs:65), so live
   wrote no thread line; studios' UI-made M6 (behaviours l.46020) shows "Ø5 THRU / M6x1 THRU", as ours (ops e2e

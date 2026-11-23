@@ -6901,7 +6901,7 @@ Examples:
 
 The Part Studio's custom appearances and materials (the Appearance panel).
 
-Each part's material, density and own appearance, and the face / feature appearances with their index.
+Each part's material, density and own appearance, the face / feature appearances with their index, and the face appearances an import made (`imported`: one per face whose file colour differs from its part's, with its `source` feature).
 
 Examples:
 
