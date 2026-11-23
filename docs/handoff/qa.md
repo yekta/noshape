@@ -18,7 +18,7 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   qa-ver7 (replaces ver6; when psui b8a17535 AND c318cefa "psui: Enter commits no value out of range…" are in green, after
   rr-b8a1/wf23i: full matrix b* + [ips]* -> hm2/hmr7-b, hmr7-ips; "in green" line in ver7.log = start the subagent from
   qa-scratch/brief-errver.md: psui ERR-* rows + CTX-MENU-FLIP-UP re-verify);
-  qa-wf23i (workflows-1123 13-20 on 26abe20b8 -> hm2/out-wf23i; then re-verify the 13-20 rows like brief-ver23.md);
+  DONE 03:0x wf 13-20 rescored on 26abe20b8 (TICKETS, studios/psui told); qa-wf18 reruns 18 -> out-wf23j: s24 Compare shot was mid-zoom, check vs live;
   qa-rr-2782 (dx re-queued 834b5a0a, same subject "dx: a file tab's Import… opens its dialog at once" -> wf23 17 out-wf23e, step 2:
   ours 192 ms vs live 58: SPEED-FILE-TAB-IMPORT-MENU);
   qa-rr-a936 (asm a936c3a6 "asm: an over-defining mate moves nothing…" -> mcinfer r9 asm cells (MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM,
