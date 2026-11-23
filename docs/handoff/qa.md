@@ -9,10 +9,10 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 - **DONE 01:2x-03:0x** (TICKETS, owners told): errors-1123 a/b/c (37 rows), appearance (12), wf-1123 01-12 (02:1x) and 13-20 (03:0x),
   import fidelity "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm; data qa-scratch/imp; Xvfb :496 on vibe2 is the subagent's, left running).
 - **sk23 DONE 04:5x**: TICKETS "qa 11-23 04:5x" (9 P0 + 8 P1, + user P0 SKT-OFFSET-BOX-LOOK); kit fixes sk23/an/ana2.py (window offset 562,350), gen_fix.py (chamfer cells). Verify on skasm/psui lands.
-- **CUT v0.4.68: GO posted 04:5x; lead holds it until asm names the red cause; may ask a recheck of a release branch with a revert.** Was: main RED at 45dc53023 04:34 (asm tests: assembly_feel a_hovered_cylinder_side…, ops ui_parity an_assembly_start_builds;
-  likely dff49b598) -> fallback: 0c1d80e6c CLI (qa-bisect, built 04:30 on vibex7, unit qa-cand0468b) + COMPAT_BIN compat-check -> cut-verdict.sh
-  -> qa-alerts (unit qa-cut0468, log tmp/cut0468.log "CUT-DONE"). Add rings-loft/impeller/surface-pattern lines; decision to lead: cut on red asm?
-  Timers qa-cut-0415/0450 restarted 05:02 by qa-timers-back. dx 79b0abcb (not on main 04:4x) -> qa-wimp "IN-GREEN" -> subagent brief-impver.md.
+- **CUT v0.4.68 DONE**: GO on green 31f1866d8 05:38 (qa-alerts, + detail line; 45dc53023's asm red did not recur). Lead cuts.
+  dx cf9f959a (=79b0abcb, 8 IMP rows) on main -> qa-wimp "IN-GREEN" -> subagent brief-impver.md; dx 538aa4b0 IMP-NO-FEEDBACK queued: recheck when green.
+- **errors-1123 core rows** rescored on 975bab060 (b6d50d9d3; core told). Core landed 099bb7abc/8417f0a85 (Add-pattern tint, bubble): rescore when green.
+- **Units on green 31f1866d8 05:1x**: ver7 matrix (hmr7-b, hmr7-ips) running on vibe2; rr-2782, rr-a936 running; rr-b8a1 done 05:16 (review out-wf23d/out-wfv4).
 - **qa-wait-5191** (blend 51916f785, c2-rings-loft Chamfer 1 "Overlapping chamfers." after the Ø20.5 edit): in green + compat -> qa-alerts line,
   then the Ø20.5 edit (t23 cli_dim.py, +4/8/12 %) 0.4.67 vs green on vibex7 -> tmp/wait-5191.log "DIM-DONE". Close SPEED-RINGS-SHELL if
   ~live (5.1 s) and Chamfer 1 errors as live; tell blend the numbers.
