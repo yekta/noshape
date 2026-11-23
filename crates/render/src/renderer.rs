@@ -869,6 +869,8 @@ struct DrawLists {
     /// (the "with" layer), or the only ones drawn (its post pass).
     skip_post: bool,
     only_post: bool,
+    /// A feature preview's frame: [`crate::scene::compare::POST_ONLY`] left out (only its post pass draws them).
+    skip_post_only: bool,
     /// Color passes: the frame's detail, for the bodies drawn as their box
     /// ([`lod_boxes`]); pick passes always draw full detail.
     lod: Option<Detail>,
@@ -1171,8 +1173,8 @@ impl DrawLists {
             if self.skip_compare != 0 && inst.compare == self.skip_compare {
                 continue;
             }
-            let post = inst.compare == crate::scene::compare::POST;
-            if (post && self.skip_post) || (!post && self.only_post) {
+            let post = matches!(inst.compare, crate::scene::compare::POST | crate::scene::compare::POST_ONLY);
+            if (post && self.skip_post) || (!post && self.only_post) || (inst.compare == crate::scene::compare::POST_ONLY && self.skip_post_only) {
                 continue;
             }
             // A body's box instead of the body, never both; one level of
@@ -3449,6 +3451,7 @@ impl Renderer {
             None if req.scene.preview_mix.is_some() => crate::scene::compare::TARGET,
             None => 0,
         };
+        lists.skip_post_only = req.scene.compare.is_none() && req.scene.preview_mix.is_some();
         lists.lod = Some(req.style.detail);
         lists.mesh_error_px = req.style.detail.mesh_error_px;
         lists.coarsest = req.style.software;
@@ -3481,7 +3484,7 @@ impl Renderer {
             (over, bind_over, faces, bind_faces)
         });
         // A feature preview's highlights over the "with" layer (compare::POST).
-        let post_frame = (req.scene.compare.is_none() && req.scene.preview_mix.is_some() && req.scene.instances.iter().any(|i| i.compare == crate::scene::compare::POST)).then(|| {
+        let post_frame = (req.scene.compare.is_none() && req.scene.preview_mix.is_some() && req.scene.instances.iter().any(|i| matches!(i.compare, crate::scene::compare::POST | crate::scene::compare::POST_ONLY))).then(|| {
             let mut post = std::mem::take(&mut self.lists_post);
             post.only_post = true;
             post.lod = Some(req.style.detail);
@@ -3951,6 +3954,7 @@ impl Renderer {
             globals.viewport[3] = PICK_PASS;
             self.queue.write_buffer(&self.globals_pick, 0, bytemuck::bytes_of(&globals));
             let mut lists = std::mem::take(&mut self.lists);
+            lists.skip_post_only = false;
             lists.mesh_error_px = last.style.detail.mesh_error_px;
             lists.coarsest = last.style.software;
             // A feature preview picks the model with the feature: the frame's

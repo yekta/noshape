@@ -749,6 +749,8 @@ pub struct UiState {
     /// Parts an open Transform moves (not copies): drawn moved and
     /// display-only, with the original as a faded, selectable ghost.
     pub transform_ghost: Vec<BodyId>,
+    /// The Transform's picked edges (its axis, line or direction) on a moved part: kept on the ghost, so they draw lit.
+    pub transform_ghost_edges: Vec<Reference>,
     /// Default geometry row being renamed in place.
     pub dg_renaming: Option<(Reference, Entity<InputState>, Subscription)>,
     /// Parts list › Rename: the part's inline input (live part-studio/450).
@@ -1087,6 +1089,7 @@ impl UiState {
             std_point_hover: None,
             triad_drag: None,
             transform_ghost: Vec::new(),
+            transform_ghost_edges: Vec::new(),
             dg_renaming: None,
             part_renaming: None,
             plane_dependencies: None,
@@ -3114,12 +3117,12 @@ impl PartStudioView {
 
     /// The parts an open Transform moves away from where they were (no
     /// ghost while they still coincide, or when it copies them).
-    pub(super) fn transform_ghost(&self, cx: &App) -> Vec<BodyId> {
-        let (Some(e), Some(before)) = (&self.edit, &self.ui.preview_before) else { return Vec::new() };
+    pub(super) fn transform_ghost(&self, cx: &App) -> (Vec<BodyId>, Vec<Reference>) {
+        let (Some(e), Some(before)) = (&self.edit, &self.ui.preview_before) else { return Default::default() };
         let d = e.dialog.read(cx);
         let p = &d.feature.params;
         if d.feature.type_id != "transform" || p.bool("makeCopy") || p.is("transformType", "COPY") {
-            return Vec::new();
+            return Default::default();
         }
         let moved = |id: &BodyId| match (before.bodies.iter().find(|b| &b.id == id), self.display.bodies.iter().find(|b| &b.id == id)) {
             (Some(a), Some(b)) => match (a.bounds, b.bounds) {
@@ -3134,7 +3137,9 @@ impl PartStudioView {
                 out.push(b);
             }
         }
-        out
+        // Live (manip-feel-1122, qa TRANSFORM-ROTATE-EDGE-SENSE): the axis edge picked on the moved part stays lit orange.
+        let edges = ["transformAxis", "transformLine", "transformDirection"].iter().flat_map(|k| p.query(k)).filter(|r| matches!(r, Reference::Edge(_))).cloned().collect();
+        (out, edges)
     }
 
     pub(super) fn display_for_scene_inner(&self) -> Arc<StudioDisplay> {
@@ -3187,7 +3192,10 @@ impl PartStudioView {
             for b in before.bodies.iter().filter(|b| self.ui.transform_ghost.contains(&b.id)) {
                 let mut b = b.clone();
                 b.color = [grey[0], grey[1], grey[2], GHOST_ALPHA];
-                b.mesh = Arc::new(noshape_model::display::MeshBuffers { edges: Vec::new(), vertices: Vec::new(), ..(*b.mesh).clone() });
+                let keep: Vec<bool> = b.edge_refs.iter().map(|r| self.ui.transform_ghost_edges.contains(r)).collect();
+                let edges = b.mesh.edges.iter().zip(&keep).filter(|(_, k)| **k).map(|(e, _)| e.clone()).collect();
+                b.edge_refs = b.edge_refs.iter().zip(&keep).filter(|(_, k)| **k).map(|(r, _)| r.clone()).collect();
+                b.mesh = Arc::new(noshape_model::display::MeshBuffers { edges, vertices: Vec::new(), ..(*b.mesh).clone() });
                 b.coarser.clear();
                 // Its own id, so `display_only` (the moved copy) skips only the copy.
                 b.id.index |= GHOST_INDEX_BIT;

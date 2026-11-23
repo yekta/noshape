@@ -3559,6 +3559,41 @@ fn a_transforms_old_place_is_a_light_grey_ghost(cx: &mut TestAppContext) {
     assert!(moved.color == own && moved.color[3] == 1.0 && !moved.mesh.edges.is_empty(), "the moved part in its own colour, opaque, with its edges: {:?} (its own {own:?})", moved.color);
 }
 
+/// Live manip-feel-1122 (qa TRANSFORM-ROTATE-EDGE-SENSE): a Rotate about one of the moved part's own edges keeps that
+/// axis edge lit orange; the old place shows no other edge.
+#[gpui::test]
+fn a_transforms_axis_edge_on_the_moved_part_stays_lit(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "transform-axis-lit");
+    let (body, axis) = cx.update(|cx| {
+        let b = view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part").clone();
+        let vertical = |pl: &Vec<[f32; 3]>| pl.len() >= 2 && (pl[0][0] - pl[pl.len() - 1][0]).abs() < 1e-6 && (pl[0][1] - pl[pl.len() - 1][1]).abs() < 1e-6;
+        let e = b.edge_refs.iter().zip(&b.mesh.edges).find(|(_, pl)| vertical(pl)).map(|(r, _)| r.clone()).expect("a vertical edge");
+        (b.id.clone(), e)
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_feature("transform", w, cx);
+            let d = v.edit.as_ref().expect("the Transform dialog").dialog.clone();
+            d.update(cx, |d, cx| {
+                d.set_value("entities", noshape_model::ParamValue::Query(vec![Reference::Body(body.clone())]), cx);
+                d.set_value("transformType", noshape_model::ParamValue::Enum("ROTATION".into()), cx);
+                d.set_value("transformAxis", noshape_model::ParamValue::Query(vec![axis.clone()]), cx);
+            });
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui.transform_ghost.is_empty() && !view.read(cx).ui_busy());
+    draw(cx, window);
+    let shown = cx.update(|cx| view.read(cx).display_for_scene_inner());
+    let ghost = shown.bodies.iter().find(|b| b.id.index & (1 << 31) != 0).expect("the old place's ghost");
+    let lit = cx.update(|cx| {
+        let v = view.read(cx);
+        let scene = v.viewport.read(cx).scene();
+        v.built.as_ref().map(|b| b.picks.ids_for(&axis).iter().any(|&id| scene.states.get(id as usize).is_some_and(|st| st & noshape_render::state::SELECTED != 0)))
+    });
+    assert_eq!((ghost.edge_refs.clone(), ghost.mesh.edges.len(), lit), (vec![axis.clone()], 1, Some(true)), "(the ghost's edges, drawn, the axis edge selected)");
+}
+
 /// Live shortcuts-ps-1118: Shift+T (Make transparent) with Part 1 selected makes it transparent and clears the
 /// selection, as Isolate does.
 #[gpui::test]
@@ -7674,6 +7709,18 @@ fn a_custom_features_dialog_is_generated_and_fails_as_live(cx: &mut TestAppConte
         draw(cx, window);
     }
     assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Probe all 1 did not regenerate properly: Probe failure on purpose A parameter value is not valid."));
+}
+
+/// Live workflow 13 step 10 (qa CUSTOM-FEATURE-DIALOG-HELP): a custom feature's dialog has no "?" help; a built-in's has.
+#[gpui::test]
+fn a_custom_features_dialog_has_no_help(cx: &mut TestAppContext) {
+    let (window, _view) = probe_dialog(cx, "cf-probe-help");
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dlg-help").is_none(), "no help in a custom feature's dialog");
+    let (window, view) = part_studio(cx, "builtin-help");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    assert!(gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dlg-help").is_some(), "Extrude's dialog has its help");
 }
 
 /// Live2 custom-feature-1118 (Feature Studio edits): a committed edit is picked up by the document at once (the next

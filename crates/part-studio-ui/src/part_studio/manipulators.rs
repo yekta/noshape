@@ -461,7 +461,10 @@ impl PartStudioView {
             return None;
         }
         let grey = crate::theme::lin(0x595959);
-        Some(noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.46]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER))
+        let mut cap = noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.46]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
+        // Once, over the mix (qa FEEL-EDIT-BODY-SHADE: drawn with the frame too, the top read (118,127,133), live (132,146,155)).
+        cap.compare = noshape_render::scene::compare::POST_ONLY;
+        Some(cap)
     }
 
     /// Drag handles of other features (Onshape): plane offset, fillet

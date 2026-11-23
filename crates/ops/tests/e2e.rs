@@ -2820,6 +2820,52 @@ fn documents_import_splits_an_iges_subassembly_placed_twice() {
     call(&mut ctx, "document_close", json!({}));
 }
 
+/// User P0 Mac mini (core's note: "Mac mini body/base" never reached the user's file): an import's two parts both named
+/// "root" (the STEP's one product) renamed one by one keep their names through undo / redo, a Transform after the
+/// import added, deleted and added again, a Boolean after it, and the file reopened.
+#[test]
+fn renamed_same_named_imported_parts_keep_their_names() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "rename-roots.noshape");
+    let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/parts3.step")).unwrap();
+    let step = scratch("roots.step");
+    std::fs::write(&step, ["'Part 1'", "'Part 2'", "'Part 3'"].iter().fold(text, |t, n| t.replace(n, "'root'"))).unwrap();
+    let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let ps = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").and_then(|t| t["name"].as_str()).unwrap().to_string();
+    let names = |ctx: &mut Ctx| -> Vec<(String, String)> {
+        let mut v: Vec<(String, String)> = call(ctx, "query_parts", json!({ "tab": ps }))["parts"].as_array().unwrap().iter().map(|p| (p["id"].as_str().unwrap().to_string(), p["name"].as_str().unwrap().to_string())).collect();
+        v.sort();
+        v
+    };
+    let before = names(&mut ctx);
+    assert!(before.len() >= 2 && before.iter().all(|p| p.1 == "root"), "{before:?}");
+    let (a, b) = (before[0].0.clone(), before[1].0.clone());
+    call(&mut ctx, "part_rename", json!({ "tab": ps, "part": a, "name": "Mac mini body" }));
+    call(&mut ctx, "part_rename", json!({ "tab": ps, "part": b, "name": "Mac mini base" }));
+    let renamed = |v: &[(String, String)]| -> Vec<String> { [&a, &b].iter().map(|id| v.iter().find(|p| &&p.0 == id).map_or("gone".to_string(), |p| p.1.clone())).collect() };
+    assert_eq!(renamed(&names(&mut ctx)), ["Mac mini body", "Mac mini base"]);
+    call(&mut ctx, "history_undo", json!({}));
+    assert_eq!(renamed(&names(&mut ctx)), ["Mac mini body", "root"], "one undo: the second rename");
+    call(&mut ctx, "history_undo", json!({}));
+    assert_eq!(renamed(&names(&mut ctx)), ["root", "root"]);
+    call(&mut ctx, "history_redo", json!({}));
+    call(&mut ctx, "history_redo", json!({}));
+    assert_eq!(renamed(&names(&mut ctx)), ["Mac mini body", "Mac mini base"], "redone");
+    let centre = json!({ "tab": ps, "type": "transform", "params": { "entities": [a, b], "transformType": "TRANSLATION_3D", "dx": "5 mm" } });
+    let t = call(&mut ctx, "feature_add", centre.clone());
+    assert_eq!(renamed(&names(&mut ctx)), ["Mac mini body", "Mac mini base"], "after a Transform");
+    call(&mut ctx, "feature_delete", json!({ "tab": ps, "features": [t["feature"].clone()] }));
+    assert_eq!(renamed(&names(&mut ctx)), ["Mac mini body", "Mac mini base"], "the Transform deleted");
+    call(&mut ctx, "feature_add", centre);
+    call(&mut ctx, "feature_add", json!({ "tab": ps, "type": "booleanBodies", "params": { "operationType": "UNION", "tools": [a, b] } }));
+    let after = names(&mut ctx);
+    assert_eq!(renamed(&after)[0], "Mac mini body", "the union keeps the first tool: {after:?}");
+    let path = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("rename-roots.noshape");
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    assert_eq!(names(&mut ctx), after, "reopened");
+}
+
 #[test]
 fn import_step_round_trip() {
     let mut ctx = Ctx::new();

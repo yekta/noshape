@@ -1187,7 +1187,7 @@ impl PartStudioView {
         }
         self.ui.measure_lines = None;
         self.opts.vertex_colors = self.vertex_colors(cx);
-        self.ui.transform_ghost = self.transform_ghost(cx);
+        (self.ui.transform_ghost, self.ui.transform_ghost_edges) = self.transform_ghost(cx);
         let shown = self.display_for_scene();
         let opts = self.scene_options(cx);
         let base = self.preview_base_job(&opts, cx);
@@ -1427,7 +1427,7 @@ impl PartStudioView {
             return;
         }
         self.opts.vertex_colors = self.vertex_colors(cx);
-        self.ui.transform_ghost = self.transform_ghost(cx);
+        (self.ui.transform_ghost, self.ui.transform_ghost_edges) = self.transform_ghost(cx);
         let shown = self.display_for_scene();
         let opts = self.scene_options(cx);
         let base = self.preview_base_job(&opts, cx);
@@ -1811,7 +1811,7 @@ impl PartStudioView {
             }
             for (k, inst) in scene.instances.iter_mut().enumerate().take(extra_end).skip(built.static_instances) {
                 let fill = matches!(inst.drawable, noshape_render::Drawable::Mesh(_)) && inst.layer == scene_builder::HIGHLIGHT_FILL_LAYER;
-                if (k < highlights_end && (fill || (matches!(inst.drawable, noshape_render::Drawable::Lines(_)) && inst.layer == scene_builder::HIGHLIGHT_LINES_LAYER))) || (k >= highlights_end && fill) {
+                if inst.compare != noshape_render::scene::compare::POST_ONLY && ((k < highlights_end && (fill || (matches!(inst.drawable, noshape_render::Drawable::Lines(_)) && inst.layer == scene_builder::HIGHLIGHT_LINES_LAYER))) || (k >= highlights_end && fill)) {
                     inst.compare = noshape_render::scene::compare::POST;
                 }
             }

@@ -419,6 +419,9 @@ pub mod compare {
     /// model with it, against the frame's depth, so the mix keeps them whole
     /// (live: a picked region under the new boss stays fully outlined).
     pub const POST: u8 = 3;
+    /// A see-through highlight fill drawn only over the mix, once (live: an Extrude's end cap; drawn with the frame
+    /// too it darkened twice).
+    pub const POST_ONLY: u8 = 4;
 }
 
 /// The compare blend of a frame (0 = base, 1 = target).

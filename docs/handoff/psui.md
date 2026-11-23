@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-22 23:58 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-23 01:15 UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,37 +33,38 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## Now (23:25 UTC 11-22)
-Batch 1 LANDED 613b06bb; batch 2 LANDED b6812aae (live's box-hover / multi-part-menu / see-through in it).
-Batch 3 (commit "psui: a picked edge solid and bright under the preview…", rebased on 5e634b35e): FEEL-MC-AXIS-UNDER-DISC,
-FEEL-FILLET-FACE-OVER-PICKED (#ffaf25 via `LineSegment::OVER_LIT_FACE` on consumed_picks_overlay's band),
-FEEL-PICKED-EDGE-DASHED-UNDER-PREVIEW, FEEL-CORNER-BREAK-VERTEX-PICK (disc only), FEEL-HOVER-DISC-AFTER-COMMIT
-(`ui.hover_held_at`), PARTS-ROW-OF-PICK-SHEET-METAL; and the macOS CI P0 (run 45071676527: list × viewport p04
-"Top plane outline not lit"): not MSAA (t73 passes at NOSHAPE_PERF_MSAA=4); p04 now samples 28 points along the
-plane's 4 edges and prints viewport size + hover on failure. t72: psui lib 504/505 (the one: my test's 3 px move
-needed `approach`, fixed), scene, render green. t74 (clippy + both tests, ~/tmp/psui/t74.log) → land.sh → watch macOS CI.
-USER P0 (23:3x, lead): Mac mini M6 appearance + union. Live answered (behaviours "psui P0: STEP import colours…").
-TICKETS block "psui, 2026-11-22 23:5x": dx IMPORT-SOLID-COLOUR-ON-EVERY-FACE, core BOOLEAN-UNION-FIRST-TOOL-IDENTITY,
-psui APPEARANCE-PART-UNDER-FACE-COLOURS (test + app check after dx). Both told. t76 (kernel dump_step_colours on
-~/tmp/psui/mm.step on vibex8, log ~/tmp/psui/t76.log) → send dx the per-part face colour counts (live: 152/258, 14/529).
-Render side already as live (display.rs: part props > import colour; a face colour over it).
-Corner break arrow: solid in our render at f5ebb8b3 (dumped): ask qa to re-check after it lands.
-EDIT-BODY-SHADE stays open (ours top (118,127,133), live (132,147,155)).
-Queue: (CONFIG-FILTER-HELP-STILL-POINTER landed: app-core `ui::help_tooltip`, title beside the box then the 400 px
-help under it after TOOLTIP_EXPAND_DELAY; tell asm, its assembly panel has the same box) P2 FEEL-ROW-TIP-AFTER-DBLCLICK, UIS-LIST-ROW-MENU-ROWS, CUSTOM-FEATURE-ROW-ICON,
-CUSTOM-FEATURE-DIALOG-HELP, UIS-FEATURE-INITIALS (row test-named "feature:…" only, mod.rs ~4770).
-- CONFIG-FILTER-HELP-STILL-POINTER: we have no hover help on the filter box at all (only the funnel's menu,
-  config_panel.rs CONFIG_FILTER_COMMANDS); live: 'Filter inputs' tooltip, then a 'Supported filters' popover. To build.
-- FEEL-SKETCH-INF-END-DOT: lead deciding whether it counts; sketch_mode is skasm's (tell skasm first).
-- asm (lead ruling): software draws 1x while moving, 4x after 150 ms quiet (worker `Settle`, pipelines_alt); tests
-  calling Renderer::render stay 1x. asm sends the sha: rebase, re-run render + hover_matrix.
-- PS-RAIL-STOPWATCH-WARNING: the red badge is the software-renderer performance error (workspace.rs rail-performance,
-  `perf_error`, live's own badge); replays run on llvmpipe. Tell qa: environment, not a bug.
+## Now (01:15 UTC 11-23)
+Landing: this commit (TRANSFORM-ROTATE-EDGE-SENSE axis edge, FEEL-EDIT-BODY-SHADE top via render `compare::POST_ONLY`,
+CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN mark, Mac mini rename e2e, TICKETS: CTX-MENU-FLIP-UP closed (lead (a)),
+6 union duplicates dropped). Earlier queue (f5ebb8b3, 02f48bdd, 975844f0) all on main. asm's c6ec3d1c (software settle):
+once landed, rebase, re-run render + hover_matrix (end cap test tol 9: (131,140,147)/(138,148,154) vs live (132,146,155)).
+NEXT (qa 11-23, TICKETS rows have the evidence):
+- P0 FEEL-PS-SELECTED-EDGE-DARK-CORE: a selected visible edge's orange band has a dark 1 px line down its middle (old
+  dc779 too, so not b6812's hidden-only copy alone). live/psui/sel-gestures-1122/ps-box-crossing-result.png vs
+  qa-scratch/tickets/FEEL-PS-SELECTED-SEE-THROUGH-ver-1122.png. Suspects: renderer colour pass order (line_hidden
+  before lines, renderer.rs ~1581), the selected band vs the base edge core. Probe with a hover_matrix frame first.
+- P1 FEEL-PS-SELECTED-FRONT-FILL: selected front face (199,148,52) vs live (184,136,45); top/right match.
+- TRANSFORM-ROTATE-EDGE-SENSE rest: radius lines + arc bold white, live thin grey.
+- FEEL-EDIT-BODY-SHADE rest: sketch region (180,179,154) vs live (185,186,164).
+- FEEL-DIM-SELECTED-REF-LINE-YELLOW PARTLY: line ok; leader/arrows ours ~2 px (106,79,6) big filled heads, live 1 px
+  (131,111,53) small heads (tickets/FEEL-DIM-SELECTED-REF-LINE-YELLOW-ver-1123.png). Label in plane = skasm's.
+- TRANSFORM-PLANE-HANDLE (verified) X/Y split: 12 px right gives 2.6/1.5 vs live 2.5/2.5; +40,+30 px 16.3/-8.1 vs
+  19/-2.5 (feel1122/manipnav/r8).
+- PARTLY rows (qa 11-22 notes in TICKETS): TRANSFORM-TRIAD-LOOK (dashed X arrow; orange outline at the original place
+  while dragging), TRIAD-RELEASE-FOCUS (focus leaves the dropdown at drag start), PS-BOX-DRAG-HOVER (lit plane's edge
+  hidden behind the part), ROLLBACK-CLAMP-HOVER (pill ~18 px, drop line has no dot).
+- Appearance: live/psui/appearance-1123/index.md (41 shots; behaviours "psui the Appearance panel in full"): part
+  dialog 220x400 Palette|Mixer, ✓ off until a change, no Reset; Face appearance rows only in the Appearances panel;
+  Boolean/split/pattern colour rules. Compare ours after the Mac mini P0.
+- skasm (lead ruling): range-error field tip behind Hints::RANGE_TIP (sheet metal only, skasm, in feature_dialog.rs);
+  if live's recapture shows it general, making it the default for non-integer fields is psui's.
+USER P0 Mac mini: dx IMPORT-SOLID-COLOUR-ON-EVERY-FACE pending; core's union (6d3caf84) queued. Then
+APPEARANCE-PART-UNDER-FACE-COLOURS: test + the user's doc on a mode-700 copy (~/tmp/psui/macmini-m6.noshape, same as
+lead-scratch's), then delete it and /root/psui-scratch/Mac-mini-2024.step. Rename: not reproducible (TICKETS line).
+Queue P2: FEEL-ROW-TIP-AFTER-DBLCLICK, UIS-LIST-ROW-MENU-ROWS, CUSTOM-FEATURE-ROW-ICON, UIS-FEATURE-INITIALS.
+- FEEL-SKETCH-INF-END-DOT: lead deciding; sketch_mode is skasm's (tell skasm first).
+- PS-RAIL-STOPWATCH-WARNING: the software-renderer performance badge (live's own); environment, not a bug.
 
-Open qa P0s (TICKETS "psui, 2026-11-22 …"):
-- TRANSFORM-ROTATE-EDGE-SENSE: the sense matches live (qa amended); only the preview look is left (batch 2's opaque moved
-  part should cover it; the orange axis edge to check).
-- CTX-MENU-FLIP-UP (P1): the vertical flip already exists (anchored SwitchAnchorOrSnap, nav-feel-1119). Ask qa to re-check.
 skasm owns FEEL-MC-* Part Studio set (10) + SKETCH-DIM-PLACE-PICKS-PLANE (11-22 18:0x); mate connector inference code is
 skasm's. Told them batch 1 carries the Shift lock, ConnectorLook::Placed and the with-layer hover mask.
 Then: assembly column of sel-gestures (tell asm first); autocomplete list position. Lead rule: end turns at ~180k context.

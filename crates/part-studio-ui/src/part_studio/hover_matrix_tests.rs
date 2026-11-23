@@ -2018,3 +2018,20 @@ fn nothing_lights_under_the_still_pointer_after_enter(cx: &mut TestAppContext) {
     approach(cx, &m, mid + DVec2::new(0.0, -3.0));
     assert!(cx.update(|cx| m.view.read(cx).hover.is_some()), "nothing lit once the pointer moved");
 }
+
+// Extrude 1 edited (live manip-feel-1122 edit-body-shade, qa FEEL-EDIT-BODY-SHADE): the top under the end cap reads live's
+// (132,146,155) within 9 (ours (131,140,147) and (138,148,154): the cap's grey once over the preview mix; drawn with the
+// frame too, it read (118,127,133)).
+#[gpui::test]
+fn an_edited_extrudes_end_cap_greys_its_top_once(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "edit-body-shade");
+    let id = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").map(|f| f.id)).expect("Extrude 1");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let tops: Vec<DVec2> = [[20., 15., 20.], [30., 8., 20.]].iter().map(|p| m.screen(cx, *p)).collect();
+    let (w, _, px) = m.frame(cx);
+    let at: Vec<[u8; 3]> = tops.iter().map(|p| px[(p.y as u32 * w + p.x as u32) as usize]).collect();
+    assert!(at.iter().all(|c| close(*c, 0x84929b, 9)), "the top under the end cap {at:?}, live (132,146,155)");
+}

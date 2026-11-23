@@ -3667,6 +3667,8 @@ impl FeatureDialog {
                     let error = !(active || inner_active) && self.field_error(arr_id).is_some();
                     let mut field = v_flex()
                         .id(SharedString::from(format!("q-{path}")))
+                        // qa UIS-FIELD-NOT-SHOWN (wf12 step 23): Loft's Guides named for scripts as a plain query field.
+                        .map(|d| crate::ui_script::mark(d, || format!("field:{}", crate::i18n::spec(s.label))))
                         .flex_1()
                         .min_h(px({
                             let h = self.live_h(LIVE_EMPTY_FIELD);
@@ -4776,8 +4778,9 @@ impl Render for FeatureDialog {
                     .when(self.final_available && !self.nested, |d| d.child(self.render_final_button(&final_focus, cx)))
                     .child(div().flex_1())
                     .children(footer_extra)
-                    .child(
-                        Self::tab_stop_element(div().id("dlg-help").map(|d| crate::ui_script::mark(d, || "button:?".into())), &help_focus, Focus::Ring)
+                    // Live workflow 13 step 10 (qa CUSTOM-FEATURE-DIALOG-HELP): a custom feature's dialog has no help.
+                    .when(!noshape_model::custom::is_custom(&self.feature.type_id), |d| d.child(
+                        Self::tab_stop_element(div().id("dlg-help").debug_selector(|| "dlg-help".into()).map(|d| crate::ui_script::mark(d, || "button:?".into())), &help_focus, Focus::Ring)
                             // Live: a 12 px `#a0a0a0` disc, its centre 1 px
                             // above the slider track, 11 px from the frame's
                             // right edge (dialogs/*-01-open: disc x 449–461).
@@ -4803,7 +4806,7 @@ impl Render for FeatureDialog {
                                 window.focus(&h, cx);
                                 cx.notify();
                             })),
-                    ),
+                    )),
             )
             // Live: the frame ends 24.5 px under the list's unrounded end
             // (one more pixel when that rounds up, e.g. Fillet).
