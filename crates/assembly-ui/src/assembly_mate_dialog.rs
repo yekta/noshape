@@ -65,7 +65,7 @@ fn limit_label(key: &str) -> &'static str {
         "rz" => "Z angle",
         "x" => "X distance",
         "y" => "Y distance",
-        "cone" => "Maximum cone angle",
+        "cone" => "cone angle",
         _ => "Z distance",
     }
 }
@@ -94,6 +94,9 @@ pub struct MateDialog {
     /// An option was changed (a checkbox, a value, a flip): ✓ is on though the title is red (live
     /// asm-cylindrical-limits, asm-tangent-propagation). Picks don't count.
     pub touched: bool,
+    /// A limit typed in this session: only then are crossed limits flagged (pink, the title's "A parameter value is not
+    /// valid."); a committed mate reopened keeps white fields (live errors-1123 mates, limits).
+    limits_typed: bool,
     /// The connector chip under the pointer: its entity lights yellow-green (live2 asm-dialogs-1119 chip).
     pub hovered_field: Option<usize>,
     pub flip_primary: bool,
@@ -126,9 +129,15 @@ pub struct MateDialog {
     labeler: ConnectorLabeler,
     /// The mate's regeneration error (the red title's tooltip).
     pub status: Option<String>,
+    /// Why the mate is inactive (an instance suppressed): the black title's tooltip.
+    pub inactive: Option<String>,
     /// Slots on an instance whose part is gone, with the instance's name
     /// (live E15: red chips; Tangent's read "Missing entity of <instance>").
     pub lost: HashMap<usize, String>,
+    /// Slots whose connector can't resolve (live errors-1123 mates: a red "Mate connector") and slots on a suppressed
+    /// instance (grey).
+    pub unresolved: Vec<usize>,
+    pub dimmed: Vec<usize>,
     units: noshape_units::UnitPrefs,
     variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
     focus: FocusHandle,
@@ -305,6 +314,7 @@ impl MateDialog {
             advance_disarmed: None,
             picks_undo: Vec::new(),
             touched: false,
+            limits_typed: false,
             hovered_field: None,
             picks_redo: Vec::new(),
             flip_primary: mate.flip_primary,
@@ -325,6 +335,9 @@ impl MateDialog {
             labeler,
             status: None,
             lost: HashMap::new(),
+            unresolved: Vec::new(),
+            dimmed: Vec::new(),
+            inactive: None,
             units,
             variables,
             focus: cx.focus_handle(),
@@ -616,7 +629,7 @@ impl MateDialog {
 
     /// Limit keys whose minimum is above the maximum (live E11: both inputs pink).
     fn crossed_limits(&self, cx: &App) -> Vec<&'static str> {
-        if !self.use_limits {
+        if !self.use_limits || !self.limits_typed {
             return Vec::new();
         }
         limit_keys(self.mate_type)
@@ -629,6 +642,16 @@ impl MateDialog {
                 matches!((v(lo), v(hi)), (Some(a), Some(b)) if a > b)
             })
             .collect()
+    }
+
+    /// A Ball's cone angle outside 0–180°, in degrees (live errors-1123 mates: the field pink, "Error regenerating.").
+    fn cone_out_of_range(&self, cx: &App) -> Option<f64> {
+        if !self.use_limits || self.mate_type != MateType::Ball {
+            return None;
+        }
+        let e = Self::expr(&self.limits["cone"].1, cx)?;
+        let v = noshape_units::evaluate_as(&e.text, noshape_units::Dim::ANGLE, &self.units, &self.variables).ok()?.value.to_degrees();
+        (!(0.0..=180.0).contains(&v)).then_some(v)
     }
 
     /// Live's title tooltip text: "<name> did not regenerate properly: <message>".
@@ -644,7 +667,14 @@ impl MateDialog {
         }
     }
 
-    fn regen_error(&self, cx: &App) -> Option<String> {
+    pub(crate) fn inactive_tip(&self) -> Option<String> {
+        let why = self.inactive.as_deref()?;
+        let mut c = why.chars();
+        let first = c.next()?;
+        Some(format!("{} is inactive: {}{}.", self.name, first.to_lowercase(), c.as_str()))
+    }
+
+    pub(crate) fn regen_error(&self, cx: &App) -> Option<String> {
         let incomplete = match self.mate_type {
             // Live: "Nothing selected." while empty, then "Tangent mate needs two entities.".
             MateType::Tangent if self.a.is_none() && self.b.is_none() => Some("Nothing selected."),
@@ -655,14 +685,14 @@ impl MateDialog {
             _ if self.same_instance() => Some(SAME_INSTANCE),
             _ => None,
         };
-        let msg = incomplete.map(str::to_string).or_else(|| (!self.crossed_limits(cx).is_empty()).then(|| format!("{CROSSED_LIMITS} A parameter value is not valid."))).or_else(|| self.status.clone())?;
+        let msg = incomplete.map(str::to_string).or_else(|| (!self.crossed_limits(cx).is_empty()).then(|| format!("{CROSSED_LIMITS} A parameter value is not valid."))).or_else(|| self.cone_out_of_range(cx).map(|_| "Error regenerating. A parameter value is not valid.".to_string())).or_else(|| self.status.clone())?;
         Some(format!("{} did not regenerate properly: {msg}", self.name))
     }
 
     /// ✓ and Enter take the mate: both connectors set and no minimum limit above its maximum (live2 errors-1119 a5: ✓
     /// disabled while they cross).
     pub fn can_accept(&self, cx: &App) -> bool {
-        self.to_mate(cx).is_some() && self.crossed_limits(cx).is_empty()
+        self.to_mate(cx).is_some() && self.crossed_limits(cx).is_empty() && self.cone_out_of_range(cx).is_none()
     }
 
     /// The mate as currently defined (None until both connectors are set).
@@ -715,7 +745,7 @@ impl MateDialog {
     /// (feel3-1118; behaviours "While typing (before Enter) there is no live solve").
     fn limit_event(&mut self, st: &Entity<InputState>, dim: noshape_units::Dim, ev: &InputEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev {
-            InputEvent::Change => self.touched = true,
+            InputEvent::Change => (self.touched, self.limits_typed) = (true, true),
             InputEvent::PressEnter { .. } | InputEvent::Blur => {
                 let text = st.read(cx).value().to_string();
                 let rewritten = commit_limit_text(&text, dim, &self.units, &self.variables);
@@ -862,8 +892,10 @@ impl MateDialog {
         for &field in fields {
             let Some(c) = self.slot(field) else { continue };
             let lost = self.lost.get(&field);
+            let unresolved = self.unresolved.contains(&field);
             let text: SharedString = match lost {
                 Some(inst) if self.mate_type == MateType::Tangent => format!("Missing entity of {inst}").into(),
+                _ if unresolved => "Mate connector".into(),
                 _ => (self.labeler)(c).into(),
             };
             let text_del = text.clone();
@@ -881,7 +913,8 @@ impl MateDialog {
                         }
                     }))
                     .when(bold, |d| d.font_weight(FontWeight::BOLD))
-                    .when(lost.is_some(), |d| d.text_color(pal.text_invalid))
+                    .when(lost.is_some() || unresolved, |d| d.text_color(pal.text_invalid))
+                    .when(self.dimmed.contains(&field), |d| d.text_color(gpui_kit::rgb(0x999999)))
                     .hover(|d| d.bg(pal.row_hover))
                     // The connector glyph opens the connector for editing.
                     .when(self.mate_type != MateType::Tangent, |d| {
@@ -1052,7 +1085,17 @@ impl Render for MateDialog {
             // Y green, Z blue), the right-aligned field ("No minimum" /
             // "No maximum") right after it.
             let crossed = self.crossed_limits(cx);
+            let cone = self.cone_out_of_range(cx);
             let limit_field = |key: &'static str, max: bool, st: &Entity<InputState>, cx: &App| {
+                let pink = crossed.contains(&key) || (key == "cone" && cone.is_some());
+                let end = if max { "Maximum" } else { "Minimum" };
+                // Live errors-1123 mates: a cone out of range gives its range; the axial angle "<name>: <value>".
+                let tip = match (key, cone) {
+                    _ if crossed.contains(&key) => CROSSED_LIMITS.to_string(),
+                    ("cone", Some(v)) => format!("Enter a value between 0 and 180. Current value is {}.", (v * 1e6).round() / 1e6),
+                    ("rz", _) => format!("Limit axial Z {} angle: {}", end.to_lowercase(), st.read(cx).text()),
+                    _ => format!("{end} {}", limit_label(key)),
+                };
                 let icon = match (key, max) {
                     ("cone", _) => "mate-limit-cone",
                     ("rz", false) => "mate-limit-z-rot-min",
@@ -1064,14 +1107,14 @@ impl Render for MateDialog {
                     (_, false) => "mate-limit-z-lin-min",
                     (_, true) => "mate-limit-z-lin-max",
                 };
-                let target = format!("field:{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key));
+                let target = format!("field:{end} {}", limit_label(key));
                 crate::ui_script::mark(h_flex()
                     .id(SharedString::from(format!("mate-limit-{key}-{max}")))
                     // Live: a 194 x 29 row, the field ends 26 px before the dialog's edge.
                     .w(px(194.))
                     .h(px(29.))
                     // Crossed, the field's tooltip is the error (live2 errors-1119 a5).
-                    .tooltip(crate::ui::tooltip(if crossed.contains(&key) { CROSSED_LIMITS.to_string() } else { format!("{} {}", if max { "Maximum" } else { "Minimum" }, limit_label(key)) }))
+                    .tooltip(crate::ui::tooltip(tip))
                     .child(crate::assets::icon(&icon_path(icon), 26., cx))
                     .child(gpui_kit::base::input::input_frame(
                         div()
@@ -1079,7 +1122,7 @@ impl Render for MateDialog {
                             .border_b_1()
                             .border_color(pal.border)
                             // Live E11: min above max turns both pink (#f9ebec, 2 px #bd3039).
-                            .when(crossed.contains(&key), |d| d.bg(gpui_kit::rgb(0xf9ebec)).border_b_2().border_color(gpui_kit::rgb(0xbd3039)))
+                            .when(pink, |d| d.bg(gpui_kit::rgb(0xf9ebec)).border_b_2().border_color(gpui_kit::rgb(0xbd3039)))
                             .child(crate::os_ui::input_h(Input::new(st).appearance(false).text_size(px(13.33)).px(px(3.)).text_right(), 25.)),
                     )), move || target)
             };
@@ -1095,6 +1138,12 @@ impl Render for MateDialog {
         let regen_error = self.regen_error(cx);
         let invalid = self.to_mate(cx).is_none();
         let crossed = !self.crossed_limits(cx).is_empty();
+        // Live errors-1123 mates: ✓ pale on a mate that can't solve (connectors lost, between fixed instances, bad
+        // limits, inactive), green on one that only fights other mates.
+        let unsolvable = self.inactive.is_some() || self.cone_out_of_range(cx).is_some() || self.status.as_deref().is_some_and(|m| !matches!(m, "Mate overdefines the assembly." | "Mate is not consistent."));
+        // (A Tangent with one entity keeps it green, live errors-1123 mates.)
+        let one_tangent = t == MateType::Tangent && (self.a.is_some() || self.b.is_some());
+        let pale = (invalid && !self.touched && !one_tangent) || crossed || unsolvable;
         let query_boxes = match t {
             // Live (dom/dialog-mate-tangent-*): one "Face, edge or vertex" field per entity.
             MateType::Tangent => vec![self.query_box("mate-q-ent-a", "Face, edge or vertex", &[0], cx), self.query_box("mate-q-ent-b", "Face, edge or vertex", &[1], cx)],
@@ -1153,8 +1202,9 @@ impl Render for MateDialog {
                             .text_color(if regen_error.is_some() { pal.text_invalid } else { pal.text })
                             .truncate()
                             .child(crate::ui::user_text(self.name.clone()))
-                            // Live: the title's tooltip is the name, or the regeneration error.
-                            .tooltip(crate::ui::tooltip(regen_error.unwrap_or_else(|| self.name.clone()))),
+                            // Live: the title's tooltip is the name, the regeneration error, or why it is inactive
+                            // (errors-1123 mates: "Fastened 1 is inactive: one or more instances is suppressed.").
+                            .tooltip(crate::ui::tooltip(regen_error.or_else(|| self.inactive_tip()).unwrap_or_else(|| self.name.clone()))),
                     )
                     // Configure mode: only ✕ (live 194).
                     .when(self.configuring.is_none(), |d| d.child(
@@ -1164,8 +1214,8 @@ impl Render for MateDialog {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(pal.accept).when((invalid && !self.touched) || crossed, crate::ui::disabled_accept)
-                            .when(!invalid && !crossed, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
+                            .bg(pal.accept).when(pale, crate::ui::disabled_accept)
+                            .when(!invalid && !pale, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))))
                             .cursor_pointer()
                             .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(MateDialogEvent::Accept))),

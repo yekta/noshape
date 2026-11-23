@@ -867,12 +867,25 @@ impl Prepared {
         // Degrees of freedom of the whole assembly with the mate being
         // defined (the instance list), not of the one-mate preview solve:
         // every mate and relation, nothing held, at the previewed poses.
+        let mut every_mate = false;
         if only_mate.is_some() {
             let mut all: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: self.fixed[i] }).collect();
             let full = solver::solve(&mut all, &mates, &all_rels, &[]);
-            r.dof = full.dof;
-            r.body_dof = full.body_dof;
+            let moved = |b: usize| bodies[b].pose.origin.distance(poses0[b].origin) > 1e-12 || bodies[b].pose.rotation.angle_between(poses0[b].rotation) > 1e-12;
+            if full.held_back.iter().any(|&b| moved(b)) {
+                // A mate that overdefines the assembly moves nothing, in its dialog too: it and the mates it fights
+                // red (live errors-1123 mates, qa ERR-MATE-SOLVE-MOVES).
+                for (b, p) in bodies.iter_mut().zip(&poses0) {
+                    b.pose = *p;
+                }
+                r = solver::solve_with(&mut bodies, &mates, &all_rels, &[], !opts.skip_dof);
+                every_mate = true;
+            } else {
+                r.dof = full.dof;
+                r.body_dof = full.body_dof;
+            }
         }
+        let solved_ix = |i: usize| if every_mate { Some(i) } else { active_ix.get(i).copied().flatten() };
         let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let n = self.mates.len();
         let mut out = Solved { converged: r.converged, dof: r.dof, placements: Vec::with_capacity(self.instances.len()), mate_ok: HashMap::with_capacity(n), mate_frames: HashMap::with_capacity(n), mate_values: HashMap::with_capacity(n), ..Default::default() };
@@ -895,12 +908,12 @@ impl Prepared {
             }
         }
         for (i, (id, _, m)) in self.mates.iter().enumerate() {
-            let ok = match active_ix.get(i).copied().flatten() {
+            let ok = match solved_ix(i) {
                 Some(k) => r.mate_ok.get(k).copied().unwrap_or(false),
                 None => true,
             };
             out.mate_ok.insert(*id, ok);
-            if active_ix.get(i).copied().flatten().is_some_and(|k| r.mate_unheld.get(k).copied().unwrap_or(false)) {
+            if solved_ix(i).is_some_and(|k| r.mate_unheld.get(k).copied().unwrap_or(false)) {
                 out.mate_unheld.insert(*id);
             }
             let fa = poses[m.a].mul(&m.a_local);
@@ -946,7 +959,13 @@ impl AssemblyResult {
     /// qa5 A19): a failed mate, relation or pattern, an instance in error, or
     /// a mate connector that couldn't be placed.
     pub fn has_errors(&self) -> bool {
-        self.mates.iter().any(|m| !m.ok)
+        self.has_errors_besides(None)
+    }
+
+    /// [`Self::has_errors`] leaving out mate `mate`'s own failure (a mate being created: live errors-1123 mates, its
+    /// bad limits mark neither the root nor the mate folder).
+    pub fn has_errors_besides(&self, mate: Option<MateId>) -> bool {
+        self.mates.iter().any(|m| !m.ok && Some(m.id) != mate)
             || self.nodes.iter().any(|n| n.error.is_some())
             || self.connectors.iter().any(|c| c.message.is_some() && c.frame.is_none())
             || !self.pattern_errors.is_empty()
@@ -1048,6 +1067,15 @@ impl AssemblyResult {
 
     /// World frame of any mate connector reference (occurrence geometry,
     /// assembly connector or the origin) at the current display transforms.
+    /// Whether a mate's pick (not a mate connector feature) still finds its entity (a Tangent's face, a connector's).
+    pub fn pick_resolves(&self, c: &MateConnectorRef, units: &UnitPrefs) -> bool {
+        if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
+            return true;
+        }
+        let path: Vec<InstanceId> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
+        self.occurrences.iter().find(|o| o.path == path).is_none_or(|o| entity_resolves(&o.context, Some(&o.body), &c.reference, units))
+    }
+
     pub fn connector_world(&self, c: &MateConnectorRef, units: &UnitPrefs) -> Option<Frame> {
         let mut f = if let Some(id) = c.connector {
             self.connector_frame(id)?
@@ -1684,6 +1712,11 @@ fn limits_crossed(m: &super::Mate, units: &UnitPrefs) -> bool {
         let dim = if ix == 0 || ix == 4 { Dim::ANGLE } else { Dim::LENGTH };
         limit_keys(m.mate_type).contains(&key.as_str()) && matches!((eval_opt(&l.min, dim, units), eval_opt(&l.max, dim, units)), (Some(a), Some(b)) if a > b)
     })
+}
+
+/// A Ball's cone angle limit outside 0–180°.
+fn cone_out_of_range(m: &super::Mate, units: &UnitPrefs) -> bool {
+    m.mate_type == MateType::Ball && m.limits.iter().any(|(key, l)| key == "cone" && eval_opt(&l.max, Dim::ANGLE, units).is_some_and(|v| !(0.0..=std::f64::consts::PI + 1e-12).contains(&v)))
 }
 
 /// A mate's limits that apply to its type: (solver free value index (`limit_index`), min, max), SI.
@@ -2560,6 +2593,10 @@ impl AssemblyEvaluator {
                 (!m.suppressed && instance_off).then(|| "One or more instances is suppressed".to_string())
             } else if let Some(f) = failed {
                 Some(f)
+            } else if !ok && prepared.mates.iter().find(|(id, _, _)| *id == m.id).and_then(|(_, _, sm)| sm.geom.as_ref()).is_some_and(|g| !matches!((&g.a, &g.b), (TangentGeom::Plane { .. }, TangentGeom::Plane { .. }))) {
+                // Live errors-1123 mates: a Tangent on a curved entity its part's other mates keep away (two planes
+                // "overdefine").
+                Some("Mate is not consistent.".into())
             } else if !ok && ((m.mate_type == MateType::Fastened && solved.mate_unheld.contains(&m.id)) || (m.mate_type == MateType::Parallel && !solved.mate_unheld.contains(&m.id))) && prepared.conflict_pieces(&solved, m.id) >= 3 {
                 // (A Parallel that held, caught in a conflict over three
                 // pieces, too: live probes 1798 (b), f69 with its flip
@@ -3340,9 +3377,14 @@ impl AssemblyEvaluator {
                 prepared.failed_mates.push((m.id, text.into()));
                 continue;
             }
-            // Live (E11): a minimum limit above its maximum.
+            // Live errors-1123 mates (Ball, cone −10°): a cone angle outside 0–180°.
+            if cone_out_of_range(m, &units) {
+                prepared.failed_mates.push((m.id, "Error regenerating.".into()));
+                continue;
+            }
+            // Live (E11, errors-1123 mates: committed, no "A parameter value is not valid."): a minimum limit above its maximum.
             if limits_crossed(m, &units) {
-                prepared.failed_mates.push((m.id, "Minimum mate limit should be smaller than maximum limit. A parameter value is not valid.".into()));
+                prepared.failed_mates.push((m.id, "Minimum mate limit should be smaller than maximum limit.".into()));
                 continue;
             }
             // Live (E3): a mate between two fixed instances fails.
@@ -3664,7 +3706,8 @@ impl AssemblyEvaluator {
                 Reference::Implicit { on, .. } => (**on).clone(),
                 r => r.clone(),
             };
-            let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or("Tangent mate geometry not supported (use planes, cylinders, cones, spheres, tori, straight or circular edges, or vertices)")?;
+            // Live errors-1123 mates: a face that is gone, "Selection is invalid.".
+            let g = tangent_geometry(&leaf.regen.context, leaf.body.as_ref(), &entity, units).ok_or_else(|| if entity_resolves(&leaf.regen.context, leaf.body.as_ref(), &entity, units) { "Tangent mate geometry not supported (use planes, cylinders, cones, spheres, tori, straight or circular edges, or vertices)" } else { "Selection is invalid." })?;
             let (bi, to_body) = match &leaf.flex {
                 Some((key, rest)) => {
                     let (bi, off) = *prepared.nested_body_of.get(key).ok_or("Instance no longer exists")?;
@@ -3683,8 +3726,9 @@ impl AssemblyEvaluator {
         };
         let (a, ga, chain_a) = geom(&m.a)?;
         let (b, gb, chain_b) = geom(&m.b)?;
+        // Live errors-1123 mates: both entities on one instance.
         if a == b {
-            return Err("Mate connectors are on same instance.".into());
+            return Err("Mate is invalid.".into());
         }
         if !solver::tangent_supported(&ga, &gb) {
             return Err("Geometry is not supported for tangent mate.".into());
@@ -3821,6 +3865,20 @@ fn face_tangent_geometry(face: &noshape_kernel::Shape) -> Option<TangentGeom> {
 }
 
 /// Analytic tangent-mate geometry of a face / edge / vertex (studio coordinates).
+/// Whether a face, edge or vertex reference still finds its entity in its Part Studio.
+pub fn entity_resolves(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Reference, units: &UnitPrefs) -> bool {
+    let params = ParamValues::default();
+    let vars = BTreeMap::new();
+    let ev = studio_eval_ctx(ctx, body, units, &params, &vars);
+    match entity {
+        Reference::Implicit { on, .. } => entity_resolves(ctx, body, on, units),
+        Reference::Face(_) => !ev.resolve_faces(std::slice::from_ref(entity)).is_empty(),
+        Reference::Edge(_) => !ev.resolve_edges(std::slice::from_ref(entity)).is_empty(),
+        Reference::Vertex(_) => ev.resolve_vertex_point(entity).is_some(),
+        _ => true,
+    }
+}
+
 pub fn tangent_geometry(ctx: &Arc<Context>, body: Option<&BodyId>, entity: &Reference, units: &UnitPrefs) -> Option<TangentGeom> {
     let params = ParamValues::default();
     let vars = BTreeMap::new();

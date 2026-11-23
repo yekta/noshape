@@ -104,6 +104,53 @@ impl RenderJob {
     }
 }
 
+/// How long a software rasteriser's view stays unchanged before its frame is drawn again at the full sample count.
+const SETTLE: Duration = Duration::from_millis(150);
+
+/// A software rasteriser's frames (lead 11-22: 4x MSAA on llvmpipe was ~7x the frame): 1x while the view changes
+/// (orbit, drag, animation, hover), the last one again at the style's sample count once it has settled.
+#[derive(Default)]
+struct Settle {
+    /// Per target: its newest job at the full sample count, due then.
+    due: Vec<(RenderJob, Instant)>,
+}
+
+impl Settle {
+    /// `job`'s frame now (1x when it has more samples), its full frame queued for [`SETTLE`] after `now`.
+    fn moving(&mut self, job: RenderJob, now: Instant) -> FrameRequest {
+        if job.style.msaa <= 1 {
+            self.forget(job.target);
+            return job.request();
+        }
+        self.queue(job.clone(), now);
+        FrameRequest { style: Style { msaa: 1, ..job.style }, ..job.request() }
+    }
+
+    /// A frame shown again without drawing ([`RenderWorker::adopt`]): its full frame once settled too.
+    fn queue(&mut self, job: RenderJob, now: Instant) {
+        self.forget(job.target);
+        if job.style.msaa > 1 {
+            self.due.push((RenderJob { pick: false, ..job }, now + SETTLE));
+        }
+    }
+
+    fn forget(&mut self, target: u64) {
+        self.due.retain(|d| d.0.target != target);
+    }
+
+    /// The settled job due by `now` whose target `ready` takes, taken.
+    fn take_due(&mut self, now: Instant, ready: impl Fn(u64) -> bool) -> Option<RenderJob> {
+        let i = self.due.iter().position(|d| d.1 <= now && ready(d.0.target))?;
+        Some(self.due.swap_remove(i).0)
+    }
+
+    /// How long until the next one is due (none: nothing to wait for).
+    fn wait(&self, now: Instant) -> Option<Duration> {
+        // (At least 1 ms: a due job whose target has no free slot yet must not spin the thread.)
+        self.due.iter().map(|d| d.1.saturating_duration_since(now).max(Duration::from_millis(1))).min()
+    }
+}
+
 enum Msg {
     Render(Box<RenderJob>),
     Adopt(Box<RenderJob>),
@@ -156,7 +203,8 @@ impl RenderWorker {
                 let mut picks: Vec<(u64, u64, PickRect)> = Vec::new();
                 let mut connected = true;
                 let mut cpu_at_frame: Option<std::time::Duration> = None;
-                let absorb = |m: Msg, jobs: &mut Vec<RenderJob>, picks: &mut Vec<(u64, u64, PickRect)>, renderer: &mut Renderer| match m {
+                let mut settle = Settle::default();
+                let absorb = |m: Msg, jobs: &mut Vec<RenderJob>, picks: &mut Vec<(u64, u64, PickRect)>, renderer: &mut Renderer, settle: &mut Settle| match m {
                     Msg::Render(job) => {
                         let job = *job;
                         // Coalesce: keep only the newest waiting job per target,
@@ -170,13 +218,19 @@ impl RenderWorker {
                             jobs.push(job);
                         }
                     }
-                    Msg::Adopt(job) => renderer.adopt_frame(job.target, job.request()),
+                    Msg::Adopt(job) => {
+                        if software {
+                            settle.queue((*job).clone(), Instant::now());
+                        }
+                        renderer.adopt_frame(job.target, job.request())
+                    }
                     Msg::Pick { target, token, rect } => picks.push((target, token, rect)),
                     Msg::SetPresent(target, present) => renderer.set_present(target, present),
                     Msg::SetOverlay(target, overlay) => renderer.set_overlay(target, overlay),
                     Msg::SetCameraGeometry(target, geometry) => renderer.set_camera_geometry(target, geometry),
                     Msg::SetTextShading(shading) => renderer.set_text_shading(shading),
                     Msg::Drop(target) => {
+                        settle.forget(target);
                         jobs.retain(|j| j.target != target);
                         picks.retain(|p| p.0 != target);
                         renderer.drop_target(target);
@@ -187,29 +241,37 @@ impl RenderWorker {
                     if !connected {
                         jobs.clear();
                         picks.clear();
+                        settle.due.clear();
                     }
                     // Block for input only when there is nothing else to do.
                     if jobs.is_empty() && picks.is_empty() && !renderer.has_pending() {
                         if !connected {
                             break;
                         }
-                        match rx.recv() {
-                            Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer),
-                            Err(_) => break,
+                        match settle.wait(Instant::now()) {
+                            None => match rx.recv() {
+                                Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer, &mut settle),
+                                Err(_) => break,
+                            },
+                            Some(wait) => match rx.recv_timeout(wait) {
+                                Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer, &mut settle),
+                                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                                Err(mpsc::RecvTimeoutError::Disconnected) => connected = false,
+                            },
                         }
                     } else if picks.is_empty() && !renderer.has_pending() && !jobs.iter().any(|j| renderer.can_submit(j.target)) {
                         // Only jobs whose target waits for the UI to release a
                         // presented texture: nothing signals that, so look
                         // again shortly (or as soon as a message arrives).
                         match rx.recv_timeout(std::time::Duration::from_millis(1)) {
-                            Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer),
+                            Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer, &mut settle),
                             Err(mpsc::RecvTimeoutError::Timeout) => {}
                             Err(mpsc::RecvTimeoutError::Disconnected) => connected = false,
                         }
                     }
                     loop {
                         match rx.try_recv() {
-                            Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer),
+                            Ok(m) => absorb(m, &mut jobs, &mut picks, &mut renderer, &mut settle),
                             Err(mpsc::TryRecvError::Empty) => break,
                             Err(mpsc::TryRecvError::Disconnected) => {
                                 connected = false;
@@ -223,13 +285,20 @@ impl RenderWorker {
                         if renderer.can_submit(jobs[i].target) {
                             let job = jobs.swap_remove(i);
                             let (target, seq) = (job.target, job.seq);
-                            let req = job.request();
+                            let req = if software { settle.moving(job, Instant::now()) } else { job.request() };
                             perf::frame_milestone(seq, "taken by the render thread");
                             if let Err(e) = renderer.submit_frame(target, seq, req) {
                                 on_done(Completed::Frame { target, seq, result: Err(e) });
                             }
                         } else {
                             i += 1;
+                        }
+                    }
+                    // A settled view drawn again at the full sample count (none waits behind a newer job).
+                    if let Some(job) = settle.take_due(Instant::now(), |t| !jobs.iter().any(|j| j.target == t) && renderer.can_submit(t)) {
+                        let (target, seq) = (job.target, job.seq);
+                        if let Err(e) = renderer.submit_frame(target, seq, job.request()) {
+                            on_done(Completed::Frame { target, seq, result: Err(e) });
                         }
                     }
                     // Pick queries must see the newest frame of their target:
@@ -348,5 +417,44 @@ impl Drop for RenderWorker {
         if let Some(thread) = self.thread.take().filter(|t| t.thread().id() != std::thread::current().id()) {
             let _ = thread.join();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn job(target: u64, seq: u64, msaa: u32) -> RenderJob {
+        RenderJob {
+            target,
+            scene: Arc::new(Scene::default()),
+            camera: Camera::default(),
+            width: 8,
+            height: 8,
+            device_pixel_ratio: 1.0,
+            style: Style { msaa, ..Style::default() },
+            pick: true,
+            seq,
+        }
+    }
+
+    #[test]
+    fn a_software_view_moves_at_1x_and_settles_at_its_samples() {
+        let t0 = Instant::now();
+        let mut s = Settle::default();
+        assert_eq!(s.moving(job(1, 1, 4), t0).style.msaa, 1, "moving: 1x");
+        assert_eq!(s.wait(t0), Some(SETTLE));
+        // A newer frame before it settled: the settle waits again.
+        assert_eq!(s.moving(job(1, 2, 4), t0 + SETTLE / 2).style.msaa, 1);
+        assert!(s.take_due(t0 + SETTLE, |_| true).is_none(), "the view changed 75 ms ago");
+        assert!(s.take_due(t0 + SETTLE * 2, |_| false).is_none(), "no free frame slot: it waits");
+        let settled = s.take_due(t0 + SETTLE * 2, |_| true).expect("settled");
+        assert_eq!((settled.seq, settled.style.msaa, settled.pick), (2, 4, false), "the newest view at 4x, its pick buffer kept");
+        assert_eq!(s.wait(t0), None, "drawn once");
+        // A 1x style and a dropped target settle nothing.
+        assert_eq!(s.moving(job(2, 3, 1), t0).style.msaa, 1);
+        s.moving(job(3, 4, 4), t0);
+        s.forget(3);
+        assert_eq!(s.wait(t0), None);
     }
 }

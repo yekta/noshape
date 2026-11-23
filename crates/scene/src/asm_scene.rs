@@ -92,9 +92,15 @@ impl AsmPickMap {
         Arc::new(move |id| if id == 0 { -1 } else if noshape_render::section_cap_of_pick(id).is_some() { 0 } else { prio.get(id as usize - 1).copied().unwrap_or(100) })
     }
 
-    /// Each pick id's class (an edge reached further over a face, as in a Part Studio: live reach-px-1119).
+    /// Each pick id's class (an edge reached further over a face, as in a Part Studio: live reach-px-1119); a vertex
+    /// within the pick radius, not the Part Studio's square (live mc-infer-1122 reach-asm-corner: lit 6 px off, the
+    /// edge at 10 along the diagonal; the Part Studio's 9 px diagonal is the square's, interaction-feel "Vertex").
     pub fn class_fn(&self) -> Arc<dyn Fn(u32) -> noshape_render::PickClass + Send + Sync> {
-        let class: Vec<noshape_render::PickClass> = self.targets.iter().map(|t| crate::builder::pick_class(t.kind)).collect();
+        let class: Vec<noshape_render::PickClass> = self
+            .targets
+            .iter()
+            .map(|t| if t.kind == crate::builder::PickKind::Vertex { noshape_render::PickClass::Vertex } else { crate::builder::pick_class(t.kind) })
+            .collect();
         Arc::new(move |id| if id == 0 { noshape_render::PickClass::Other } else { class.get(id as usize - 1).copied().unwrap_or(noshape_render::PickClass::Other) })
     }
 }
@@ -603,6 +609,9 @@ pub struct Highlights {
     /// The face whose boundary is outlined (live: hovering a face while
     /// picking a mate connector outlines it, no fill).
     pub hover_outline: Option<(InstancePath, Reference)>,
+    /// A curved `hover_outline` face: outlined round its whole image, its hidden part too (a cylinder side's
+    /// silhouettes and bottom rim; a planar face keeps its boundary lines under its corner dots).
+    pub hover_outline_image: bool,
     /// A dialog's hovered selection row's entities: yellow-green (`state::QUERY`).
     pub query_entities: Vec<(InstancePath, Reference)>,
     /// Entities a mate dialog picked: filled yellow (`state::PICKED`), their boundary #FFC20E (live feel cov-1120 A2:
@@ -1217,8 +1226,23 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             line_faces(e, &mut scene);
         }
     }
-    // A solid 2 device px line, not the band of an edge hovered itself (live2 asm-dialogs-1119 hz: outlined once).
-    if let Some(e @ (p, r)) = &h.hover_outline {
+    // A curved face's whole image outlined, its hidden part too: a cylinder side's two silhouettes and its bottom rim, the
+    // top rim's front arc left dark (live mc-infer-1122 asm-cyl10, qa FEEL-MC-ASM-CYL-SIDE-OUTLINE). Its boundary lines
+    // when the hover band already outlines a part (one mask) or the face is selected.
+    let banded = |(p, r): &(InstancePath, Reference), scene: &Scene| {
+        h.hover_outline_image && !scene.hover_outline && h.hover_part.is_none() && h.crossing_tops.is_empty() && !built.picks.ids_for(p, r).any(|id| scene.states.get(id as usize).is_some_and(|s| s & state::SELECTED != 0))
+    };
+    let face_band = h.hover_outline.as_ref().is_some_and(|e| banded(e, &scene));
+    if let Some(e @ (p, r)) = h.hover_outline.as_ref().filter(|_| face_band) {
+        if !h.picked_parts.is_empty() {
+            line_faces(e, &mut scene);
+        }
+        for id in built.picks.ids_for(p, r) {
+            scene.add_flag(id, state::HOVER | state::OUTLINE);
+        }
+        scene.hover_outline = true;
+    } else if let Some(e @ (p, r)) = &h.hover_outline {
+        // A solid 2 device px line, not the band of an edge hovered itself (live2 asm-dialogs-1119 hz: outlined once).
         if !h.picked_parts.is_empty() {
             line_faces(e, &mut scene);
         }
@@ -1237,7 +1261,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         }
     }
     // A part's own mate connector hovered or selected: the part banded as a mate pick's, (242,195,108) at 85 %.
-    if let Some(p) = h.mc_owner.as_ref().filter(|_| !scene.hover_outline) {
+    if let Some(p) = h.mc_owner.as_ref().filter(|_| !scene.hover_outline || face_band) {
         for id in built.picks.faces_at(p) {
             scene.add_flag(id, state::BAND | state::PICKED);
             scene.body_outline = true;
@@ -1410,7 +1434,9 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             // Shaft and outlined arrowhead (pickable as the axis).
             let id = overlay_id(built, OverlayPick::Manip(ManipHandle::Axis(k)));
             let hl = *hovered == Some(ManipHandle::Axis(k));
-            let (r0, base, tip) = (size * 0.07, size * 0.62, size * 0.86);
+            // (The shaft starts outside the centre ring, 9 px foreshortened: none of its core in the ring's hole, live
+            // hover-matrix b4-as-face-selhover_f.)
+            let (r0, base, tip) = (size * 0.11, size * 0.62, size * 0.86);
             stroke(&mut ol, &[f.origin + axis * r0, f.origin + axis * base], false, id, hl);
             let w = size * 0.07;
             stroke(&mut ol, &[f.origin + axis * base + side * w, f.origin + axis * tip, f.origin + axis * base - side * w], true, id, hl);

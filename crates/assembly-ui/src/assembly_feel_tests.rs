@@ -91,7 +91,8 @@ fn open_from_top_on(cx: &mut TestAppContext, path: &std::path::Path, front: bool
         (w, view.unwrap())
     });
     draw(cx, window);
-    wait_until(cx, window, &view, |v, _| v.built.is_some() && ready(v));
+    // (The evaluation itself, not an opening cache's result: a loaded host's drags raycast a result replaced later.)
+    wait_until(cx, window, &view, |v, _| v.built.is_some() && v.ui.real_result_in && ready(v));
     cx.update_window(window, |_, _, cx| {
         view.update(cx, |v, cx| {
             let (lo, hi) = v.result.bounds().unwrap();
@@ -899,8 +900,15 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
     settle(cx, window, &view);
     assert!(cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors().len() == 1)), "the first connector picked");
+    // (The click's rebuilt scene picks under the pointer again before the hover is back.)
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    settle(cx, window, &view);
     // Live workflows-1122 08 s06: with the pointer still on it the picked face shows plain, its part outlined.
-    assert_eq!(picked_faces(cx, &view), 0, "the pick under the pointer unfilled");
+    let state = cx.update(|cx| {
+        let v = view.read(cx);
+        format!("hover {:?}, click {:?}, infer {:?}", v.hover.as_ref().map(|t| (&t.path, &t.reference)), v.manip_click.map(|(at, _)| at), v.infer.as_ref().map(|i| &i.0))
+    });
+    assert_eq!(picked_faces(cx, &view), 0, "the pick under the pointer unfilled ({state})");
     assert!(part_banded(cx, &view, "Part 1 <1>"), "its part outlined");
     move_to(cx, window, &view, on_top + DVec2::new(400.0, 200.0));
     settle(cx, window, &view);
@@ -924,6 +932,17 @@ fn a_mate_dialogs_dots_are_white_and_the_first_pick_outlines_its_instance(cx: &m
     let i = (y * w + x) * 4;
     let c = [px[i + 2], px[i + 1], px[i]];
     assert!(!c.iter().all(|v| *v >= 235), "no corner dot on the re-hovered pick: rgb {c:?}");
+    // Back on the very pixel of its click, from empty space (qa mcinfer asm-picked step 10).
+    move_to(cx, window, &view, on_top + DVec2::new(400.0, 200.0));
+    settle(cx, window, &view);
+    move_to(cx, window, &view, on_top);
+    wait_until(cx, window, &view, |v, _| v.infer.is_some());
+    settle(cx, window, &view);
+    let (px, _) = frame_pixels(cx, window, &view);
+    let c = [px[i + 2], px[i + 1], px[i]];
+    assert!(!c.iter().all(|v| *v >= 235), "no corner dot on the pick re-hovered at its click: rgb {c:?}");
+    // ... but the glyph of the point under the pointer, as live (picked-asm 10, qa FEEL-MC-ASM-PICKED-REHOVER).
+    assert!(cx.update(|cx| view.read(cx).ui.inference_marks.is_some()), "the hover glyph on the re-hovered pick");
 }
 
 /// Live mc-infer-1122 reach-asm-corner (qa FEEL-MC-VERTEX-FROM-FACE-ASM): brought onto a corner across its face, the
@@ -975,6 +994,127 @@ fn a_vertex_reached_from_its_face_keeps_the_connector_glyph(cx: &mut TestAppCont
     move_to(cx, window, &view, corner);
     settle(cx, window, &view);
     assert_eq!(vertex_glyph(cx), (true, false), "straight from empty space: no glyph");
+}
+
+/// Live mc-infer-1122 reach-asm-corner (qa FEEL-MC-EDGE-BEFORE-VERTEX-ASM): swept from the top face toward its corner,
+/// the edge lights at 10 px (the connector at its midpoint) and the vertex at 6, along the diagonal too (the pick
+/// square's corner had the vertex 10 px off).
+#[gpui::test]
+fn a_corner_swept_from_its_face_lights_its_edge_before_its_vertex(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mc-edge-before-vertex", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let on_top = (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2);
+    let corner = cx.update(|cx| {
+        let v = view.read(cx);
+        let o = &v.result.occurrences[0];
+        let vp = v.viewport.read(cx);
+        o.mesh.positions.iter().map(|p| o.transform.transform_point3(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64))).filter_map(|p| vp.project(p)).min_by(|a, b| a.y.total_cmp(&b.y)).unwrap()
+    });
+    let along = (on_top - corner).normalize();
+    let mut seen = Vec::new();
+    for d in [30.0, 15.0, 10.0, 8.0, 6.0, 3.0, 0.0] {
+        move_to(cx, window, &view, corner + along * d);
+        settle(cx, window, &view);
+        let kind = cx.update(|cx| {
+            let v = view.read(cx);
+            match v.hover.as_ref().map(|h| &h.reference) {
+                Some(noshape_model::reference::Reference::Face(_)) => "face",
+                Some(noshape_model::reference::Reference::Edge(_)) => "edge",
+                Some(noshape_model::reference::Reference::Vertex(_)) => "vertex",
+                Some(_) => "other",
+                None => "none",
+            }
+        });
+        seen.push((d, kind));
+    }
+    let at = |d: f64| seen.iter().find(|s| s.0 == d).unwrap().1;
+    assert_eq!((at(10.0), at(6.0), at(0.0)), ("edge", "vertex", "vertex"), "{seen:?}");
+    let diagonal = DVec2::new(along.x.signum(), along.y.signum()) * (10.0 / 2f64.sqrt());
+    move_to(cx, window, &view, corner + diagonal);
+    settle(cx, window, &view);
+    let lit = cx.update(|cx| view.read(cx).hover.as_ref().map(|h| h.reference.clone()));
+    assert!(!matches!(lit, Some(noshape_model::reference::Reference::Vertex(_))), "10 px off along the diagonal: not the vertex ({lit:?})");
+}
+
+/// Live mc-infer-1122 asm-cyl10 (qa FEEL-MC-ASM-CYL-SIDE-OUTLINE): a cylinder's side hovered in the Fastened dialog is
+/// outlined round its whole image, both silhouettes and the bottom rim; its top rim's front arc stays dark.
+#[gpui::test]
+fn a_hovered_cylinder_side_is_outlined_round_its_image(cx: &mut TestAppContext) {
+    use noshape_render::state;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mc-cyl-side", |ctx| {
+        let sk = call(ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[70, 50], [80, 50]] }));
+        let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+        call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "20 mm", "operationType": "NEW" } }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 3" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    // The side's line nearest the eye at mid height, its top rim's front point and a silhouette at mid height.
+    let (side, top_front, silhouette) = cx.update(|cx| {
+        let v = view.read(cx);
+        let (lo, hi) = v.result.bounds().unwrap();
+        let (c, r, up) = ((lo + hi) * 0.5, (hi.x - lo.x) * 0.5, glam::DVec3::Z * (hi.z - lo.z) * 0.5);
+        let vp = v.viewport.read(cx);
+        let e = vp.camera.eye() - c;
+        let front = glam::DVec3::new(e.x, e.y, 0.0).normalize();
+        let across = glam::DVec3::new(-front.y, front.x, 0.0);
+        (vp.project(c + front * r).unwrap(), vp.project(c + front * r + up).unwrap(), vp.project(c + across * r).unwrap())
+    });
+    move_to(cx, window, &view, side);
+    wait_until(cx, window, &view, |v, _| v.infer.is_some());
+    settle(cx, window, &view);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(matches!(v.hover.as_ref().map(|h| &h.reference), Some(noshape_model::reference::Reference::Face(_))), "the side under the pointer");
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        let rims = (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & state::HOVER != 0 && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Edge)).count();
+        assert!(scene.hover_outline && rims == 0, "the side's image outlined ({}), {rims} rims lit", scene.hover_outline);
+    });
+    let scale = cx.update_window(window, |_, w, _| f64::from(w.scale_factor())).unwrap();
+    let (px, w) = frame_pixels(cx, window, &view);
+    let rgb = |p: DVec2| {
+        let i = ((p.y * scale).round() as usize * w + (p.x * scale).round() as usize) * 4;
+        [px[i + 2], px[i + 1], px[i]]
+    };
+    let hover = |c: &[u8; 3]| c[0] >= 200 && (150..=215).contains(&c[1]) && i16::from(c[0]) - i16::from(c[2]) >= 50;
+    let out = (silhouette - side).normalize();
+    let across: Vec<[u8; 3]> = (-4..=4).map(|k| rgb(silhouette + out * f64::from(k))).collect();
+    assert!(across.iter().any(hover), "the silhouette in the hover colour: {across:?}");
+    let rim: Vec<[u8; 3]> = (-3..=3).map(|k| rgb(top_front + DVec2::new(0.0, f64::from(k)))).collect();
+    assert!(!rim.iter().any(hover), "the top rim's front arc not lit: {rim:?}");
 }
 
 /// The faces a mate dialog's picks fill yellow.
@@ -1037,7 +1177,39 @@ fn releasing_shift_over_another_face_lights_it_at_once(cx: &mut TestAppContext) 
         settle(cx, window, &view);
         assert!(infer_on(cx, "Part 2 <1>"), "released (by a move: {release_by_move}): Part 2's top at once");
         assert!(cx.update(|cx| !view.read(cx).infer_locked), "unlocked");
+        // ... and drawn so: the scene shown lights Part 2's top, not Part 1's (qa r8: the state moved, the frame didn't).
+        let lit = cx.update(|cx| {
+            let v = view.read(cx);
+            let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+            let id = |name: &str| v.assembly(cx).unwrap().instances.iter().find(|i| i.name == name).unwrap().id;
+            let lit_on = |top| (1..scene.states.len() as u32).any(|i| scene.states[i as usize] & noshape_render::state::HOVER != 0 && built.picks.get(i).is_some_and(|t| t.path[0] == top));
+            (lit_on(id("Part 1 <1>")), lit_on(id("Part 2 <1>")))
+        });
+        assert_eq!(lit, (false, true), "released (by a move: {release_by_move}): drawn lit (Part 1, Part 2)");
     }
+}
+
+/// Live errors-1123 mates (suppressed): a mate whose instance is suppressed keeps a black title; its tooltip says why.
+#[gpui::test]
+fn a_mate_with_a_suppressed_instance_says_so_on_its_title(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mate-inactive-title", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 2 <1>"], "suppressed": true }));
+    });
+    let (window, view) = open_from_top_when(cx, &path, |v| v.result.mates.first().is_some_and(|m| m.inactive));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let id = v.result.mates[0].id;
+        v.edit_mate(id, w, cx);
+    }))
+    .unwrap();
+    settle(cx, window, &view);
+    let tip = cx.update(|cx| view.read(cx).mate.as_ref().and_then(|m| m.dialog.read(cx).inactive_tip()));
+    assert_eq!(tip.as_deref(), Some("Fastened 1 is inactive: one or more instances is suppressed."));
 }
 
 /// Live asm/mate-edit-look-1122 a4: an edited mate's moving part takes the selected look (no preview edges), the other

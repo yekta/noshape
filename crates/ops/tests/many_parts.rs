@@ -266,5 +266,24 @@ fn thousand_pins_frame_time() {
     let mean = times.iter().sum::<f64>() / times.len() as f64;
     let worst = times.iter().cloned().fold(0.0, f64::max);
     eprintln!("1000 pins, {} instances, {tris} triangles, {w}x{h}: frame mean {mean:.1} ms, worst {worst:.1} ms (skip {:?}, msaa {:?}, ao {})", built.scene.instances.len(), std::env::var("NOSHAPE_PERF_SKIP").ok(), std::env::var("NOSHAPE_PERF_MSAA").ok(), style.ambient_occlusion);
+    // A software rasteriser's settle (render worker.rs Settle): 5 orbit frames at 1x, then the view at the style's
+    // samples once settled; x3 (the first settled frame builds its pipelines and textures).
+    let (mut orbit, mut settled) = (Vec::new(), Vec::new());
+    let moving = noshape_render::Style { msaa: 1, ..style };
+    for _ in 0..3 {
+        for s in [&moving; 5].into_iter().chain([&style]) {
+            let t = std::time::Instant::now();
+            off.renderer.render(RenderParams { scene: &built.scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: s, pick: false }).unwrap();
+            let ms = t.elapsed().as_secs_f64() * 1000.0;
+            if s.msaa == 1 {
+                orbit.push(ms);
+                cam.rotation = glam::DQuat::from_rotation_z(0.05) * cam.rotation;
+            } else {
+                settled.push(ms);
+            }
+        }
+    }
+    let orbit_mean = orbit.iter().sum::<f64>() / orbit.len() as f64;
+    eprintln!("settle: orbit at 1x mean {orbit_mean:.1} ms, worst {:.1} ms; settled at {}x {settled:.1?} ms", orbit.iter().cloned().fold(0.0, f64::max), style.msaa);
     let _ = std::fs::remove_dir_all(&dir);
 }

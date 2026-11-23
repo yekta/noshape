@@ -792,8 +792,8 @@ pub struct Style {
     pub detail: Detail,
     /// A hovered or selected line's width in CSS px (drawings: live's 2 px solid + antialiasing); 0: the 3D band.
     pub lit_line_px: f32,
-    /// A software rasteriser draws it (llvmpipe, WARP, SwiftShader): 1× MSAA and each body at its coarsest display
-    /// level (TICKETS P0 HEAVY-ASM-SOFTWARE-FRAME: a big assembly's frame took ~47 s at 4× and the finest levels).
+    /// A software rasteriser draws it (llvmpipe, WARP, SwiftShader): each body at its coarsest display level (TICKETS
+    /// P0 HEAVY-ASM-SOFTWARE-FRAME: a big assembly's frame took ~47 s at the finest levels).
     pub software: bool,
 }
 

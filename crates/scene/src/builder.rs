@@ -2258,8 +2258,9 @@ pub struct InferenceMark {
 }
 
 /// Live (psui/hole-mc-1851/4, asm/mc-infer-1122 ps-frontc): a corner's mark is a ~12 px disc, an edge midpoint's a
-/// ~7 px square, the other points' (a cap's centre) an ~8 px disc, all lying in the point's plane (ellipses and
-/// rhombi at an angle), white with a thin grey rim.
+/// ~7 px square, the other points' (a cap's centre) a ~12 px disc with a grey inner ring at half its radius (asm-cylL10
+/// 13 x 7 px on the cap, qa FEEL-MC-MARKER-LOOK-ASM), all lying in the point's plane (ellipses and rhombi at an angle),
+/// white with a thin grey rim.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MarkShape {
     Corner,
@@ -2287,7 +2288,7 @@ impl From<(DVec3, DVec3, DVec3)> for InferenceMark {
 }
 
 const MARK_CORNER_PX: f64 = 6.0;
-const MARK_POINT_PX: f64 = 4.0;
+const MARK_POINT_PX: f64 = 6.0;
 const MARK_MIDPOINT_PX: f64 = 3.5;
 
 impl InferenceMarks {
@@ -2354,6 +2355,10 @@ impl InferenceMarks {
             }
             let ring: Vec<[f32; 3]> = outline.iter().chain(outline.first()).map(|q| f(*q)).collect();
             rim.push_polyline(&ring, [0x9f, 0x9f, 0x9f, 255], 0, 1.0, 0);
+            if mk.shape == MarkShape::Point {
+                let inner: Vec<[f32; 3]> = outline.iter().chain(outline.first()).map(|q| f(o + (*q - o) * 0.5)).collect();
+                rim.push_polyline(&inner, [0x9f, 0x9f, 0x9f, 255], 0, 1.0, 0);
+            }
         }
         let n = m.positions.len();
         m.normals = vec![[0.0, 0.0, 1.0]; n];

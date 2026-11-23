@@ -9,8 +9,6 @@ use glam::DVec2;
 /// (live's COORDINATESYSTEM_INFERENCE_PICK_RADIUS_PX; mc-reach-1122 R1-R3: a corner swept along the screen's x from
 /// 50 px, an edge midpoint swept at 30 degrees from 58 px, 50 px in x).
 pub const FACE_REACH_PX: f64 = 50.0;
-/// Over an edge, how near (px) the pointer brings it to an end; else it sits at the midpoint (a circle's centre).
-pub const EDGE_END_REACH_PX: f64 = 15.0;
 
 /// The hovered entity's inference points as the chooser sees them: each point's reference and where it lies on the
 /// screen (None: behind the eye).
@@ -22,7 +20,8 @@ pub struct OnScreen<'a> {
 /// The chosen point's index, as live (asm/feel-1117 reach-corner-strip, asm-feel3-1118, mc-infer-1122, mc-reach-1122):
 /// over a planar face the nearest point (the centroid too) of those within the square around the pointer, else the
 /// face's centroid (a cylinder's side at its axis
-/// midpoint at any height); over an edge its midpoint (a circle's centre) unless an end is within 15 px. `entered`:
+/// midpoint at any height); over an edge its midpoint (a circle's centre) wherever the pointer is on it (mc-infer-1122
+/// reach-asm-corner d=10, qa FEEL-MC-EDGE-BEFORE-VERTEX-ASM: an end comes with its vertex's own pick). `entered`:
 /// the pointer has just come onto the entity, so the face's centroid (its points from the next move on: live2
 /// place-1118 21:05). Shift locks the entity, not the point: the same rule wherever the pointer is (mc-infer-1122
 /// shift.png). Other entities (a vertex): the nearest point.
@@ -33,9 +32,8 @@ pub fn choose(s: &OnScreen, pointer: DVec2, entered: bool) -> Option<usize> {
         return near.min_by(|a, b| a.2.length().total_cmp(&b.2.length())).map(|(i, ..)| i);
     }
     let best = match s.on {
-        Reference::Face(_) if entered => None,
-        Reference::Face(_) => near.filter(|(.., d)| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
-        _ => near.filter(|(.., d)| d.length() <= EDGE_END_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
+        Reference::Face(_) if !entered => near.filter(|(.., d)| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
+        _ => None,
     };
     Some(best.map_or(0, |(i, ..)| i))
 }
@@ -98,12 +96,12 @@ mod tests {
     }
 
     #[test]
-    fn an_edge_takes_an_end_within_15_px_else_its_midpoint() {
+    fn an_edge_keeps_its_midpoint_near_an_end() {
         let edge = Reference::Edge(edge());
         let (m, e) = (implicit(&edge, Inference::Midpoint), implicit(&edge, Inference::Vertex));
         let s = OnScreen { on: &edge, points: vec![(&m, Some(DVec2::ZERO)), (&e, Some(DVec2::new(50.0, 0.0)))] };
         assert_eq!(choose(&s, DVec2::new(34.0, 0.0), false), Some(0), "16 px from the end: the midpoint");
-        assert_eq!(choose(&s, DVec2::new(36.0, 0.0), false), Some(1), "14 px from the end: the end");
+        assert_eq!(choose(&s, DVec2::new(40.0, 0.0), false), Some(0), "10 px from the end: the midpoint still (live d=10)");
     }
 
     #[test]

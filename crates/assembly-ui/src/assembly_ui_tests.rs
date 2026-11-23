@@ -3925,6 +3925,7 @@ fn a_pattern_direction_pick_lights_only_its_entity(cx: &mut TestAppContext) {
     draw(cx, window);
     let banded = cx.update(|cx| view.read(cx).viewport.read(cx).scene().body_outline);
     assert!(!banded, "no instance band for a pattern field's pick");
+    assert!(cx.update(|cx| !view.read(cx).origin_as_triad(cx)), "the ringed origin, no axes");
 }
 
 /// Live workflows-1123 05 s10: Second direction ticked with Direction filled activates the empty second Direction, and

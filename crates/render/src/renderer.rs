@@ -281,12 +281,14 @@ pub struct Frame {
 }
 
 /// What a pick id is to [`PickBuffer::pick_reaching`]: an edge (reached by its distance, further over a face), a face,
-/// a sketch line (its pick band reached by its distance, at any slant), a datum plane or anything else (the pick square).
+/// a sketch line (its pick band reached by its distance, at any slant), an assembly's vertex (its pixels within the
+/// pick radius: the square's corners reached one 10 px off, live 6), a datum plane or anything else (the pick square).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PickClass {
     Edge,
     Face,
     Line,
+    Vertex,
     Plane,
     Other,
 }
@@ -396,6 +398,8 @@ impl PickBuffer {
                 let kept = match class(id) {
                     PickClass::Edge => dx * dx + dy * dy <= edge_reach2,
                     PickClass::Line => dx * dx + dy * dy <= radius * radius + 4,
+                    // (Live mc-infer-1122 reach-asm-corner: lit 6 px off, the edge at 10 along the diagonal.)
+                    PickClass::Vertex => dx * dx + dy * dy <= radius * radius,
                     _ => dx.abs() <= radius && dy.abs() <= radius,
                 };
                 if !kept {
@@ -581,7 +585,8 @@ impl FrameState {
     fn same_frame(&self, other: &FrameState) -> bool {
         self.camera == other.camera
             && self.device_pixel_ratio == other.device_pixel_ratio
-            && self.style == other.style
+            // (A software rasteriser's settled frame differs only in its samples: the same pick buffer.)
+            && Style { msaa: other.style.msaa, ..self.style } == other.style
             && self.scene.same_as(&other.scene)
             && self.scene.signature() == other.scene.signature()
     }
@@ -632,6 +637,8 @@ struct FrameState {
 #[derive(Default)]
 struct TargetState {
     tex: Option<Textures>,
+    /// The other sample count's colour and depth (a software rasteriser's moving and settled frames, worker.rs).
+    tex_alt: Option<Textures>,
     present: Present,
     /// Free color readback buffers of the current size.
     spare: Vec<wgpu::Buffer>,
@@ -1669,10 +1676,8 @@ fn perf_overrides() -> &'static PerfOverrides {
     })
 }
 
+/// The sample count (a software rasteriser's moving frames ask for 1: worker.rs Settle).
 fn msaa_of(style: &Style) -> u32 {
-    if style.software && perf_overrides().msaa.is_none() {
-        return 1;
-    }
     match perf_overrides().msaa.unwrap_or(style.msaa) {
         0 | 1 => 1,
         2 => 2,
@@ -2046,6 +2051,7 @@ impl Renderer {
             self.sil = if on { SilCull::new(&self.device, &self.globals_layout, &self.inst_layout, &self.compare_layout, &self.shader) } else { None };
             // The pulled silhouettes' pipeline joins (or leaves) the set.
             self.pipelines = None;
+            self.pipelines_alt = None;
         }
         self.sil.is_some()
     }
@@ -2432,8 +2438,11 @@ pub struct Renderer {
     section_caps: crate::section_caps::SectionCaps,
     cap_pipeline_layout: wgpu::PipelineLayout,
     pipelines: Option<Pipelines>,
+    /// The other sample count's set (a software rasteriser's moving and settled frames, worker.rs).
+    pipelines_alt: Option<Pipelines>,
     /// Ambient occlusion pass (built for the current MSAA count when used).
     ao: Option<crate::ao::AoPass>,
+    ao_alt: Option<crate::ao::AoPass>,
     /// A hovered whole part's outline band (built when first used).
     hover_outline: Option<crate::hover_outline::HoverOutline>,
     /// The selected whole parts' band (its own uniform: both bands go into one encoder).
@@ -2888,7 +2897,9 @@ impl Renderer {
             sil,
             cap_pipeline_layout,
             pipelines: None,
+            pipelines_alt: None,
             ao: None,
+            ao_alt: None,
             hover_outline: None,
             body_outline: None,
             globals_color,
@@ -2967,6 +2978,11 @@ impl Renderer {
         if self.pipelines.as_ref().is_some_and(|p| p.msaa == msaa) {
             return;
         }
+        if self.pipelines_alt.as_ref().is_some_and(|p| p.msaa == msaa) {
+            std::mem::swap(&mut self.pipelines, &mut self.pipelines_alt);
+            return;
+        }
+        self.pipelines_alt = self.pipelines.take();
         let built = std::time::Instant::now();
         let m = PipelineMaker {
             device: self.device.clone(),
@@ -3263,7 +3279,19 @@ impl Renderer {
         let device = &self.device;
         let ts = self.targets.entry(target).or_default();
         ts.stamp = self.stamp;
-        if !ts.tex.as_ref().is_some_and(|t| t.width == width && t.height == height && t.msaa == msaa) {
+        let fits = |t: &Option<Textures>, msaa: u32| t.as_ref().is_some_and(|t| t.width == width && t.height == height && t.msaa == msaa);
+        if !fits(&ts.tex, msaa) && ts.tex.as_ref().is_some_and(|t| t.width == width && t.height == height) {
+            // Only the samples changed: the other set (kept), with the pick buffer drawn for the view shown.
+            let mut next = if fits(&ts.tex_alt, msaa) { ts.tex_alt.take().expect("alt") } else { create_textures(device, width, height, msaa) };
+            let mut shown = ts.tex.take().expect("tex");
+            std::mem::swap(&mut next.pick, &mut shown.pick);
+            std::mem::swap(&mut next.pick_view, &mut shown.pick_view);
+            std::mem::swap(&mut next.pick_depth, &mut shown.pick_depth);
+            ts.tex = Some(next);
+            ts.tex_alt = Some(shown);
+        }
+        if !fits(&ts.tex, msaa) {
+            ts.tex_alt = None;
             if perf::enabled() {
                 log::info!(target: "perf", "target {target} textures created ({width}x{height}, {msaa}x MSAA)");
             }
@@ -3342,8 +3370,8 @@ impl Renderer {
     /// (shader compilation otherwise delays it).
     pub fn prewarm(&mut self, msaa: u32) {
         let _t = perf::scope("r.prewarm_pipelines");
-        // (A software rasteriser draws without MSAA: its 4x set was 100 ms of the render thread's start, unused.)
-        let msaa = msaa_of(&Style { msaa, software: self.is_software(), ..Style::default() });
+        // (A software rasteriser's first frames are its moving ones, 1x: worker.rs Settle.)
+        let msaa = msaa_of(&Style { msaa: if self.is_software() { 1 } else { msaa }, ..Style::default() });
         // The first frame's ambient occlusion pass and overlay (labels, view
         // cube) too, compiled alongside the pipelines.
         let device = self.device.clone();
@@ -3480,7 +3508,11 @@ impl Renderer {
         let ao_strength = if req.scene.no_occlusion { 0.0 } else { req.style.ambient_occlusion };
         let ao_extent = onshape_near_far(&req.camera, req.scene.bounds()).map_or(1.0, |(_, near, far)| (far - near) as f32);
         if ao_strength > 0.001 && self.ao.as_ref().is_none_or(|a| a.msaa != msaa) {
-            self.ao = Some(crate::ao::AoPass::new(&self.device, msaa, COLOR_FORMAT));
+            if self.ao_alt.as_ref().is_some_and(|a| a.msaa == msaa) {
+                std::mem::swap(&mut self.ao, &mut self.ao_alt);
+            } else {
+                self.ao_alt = self.ao.replace(crate::ao::AoPass::new(&self.device, msaa, COLOR_FORMAT));
+            }
         }
         // A hovered whole part: its outline band after the color pass (hover_outline.rs).
         let hover_band = req.scene.hover_outline;
@@ -4813,11 +4845,6 @@ mod tests {
         assert_eq!(lods.len(), LINE_LOD_TOLERANCES.len() - 1);
         assert!(lods.windows(2).all(|w| w[1].segments.len() <= w[0].segments.len()));
         assert_eq!(lods[2].segments.last().map(|s| s.pick_id), Some(2));
-    }
-
-    #[test]
-    fn a_software_rasteriser_draws_without_msaa() {
-        assert_eq!((msaa_of(&Style::default()), msaa_of(&Style { software: true, ..Style::default() })), (4, 1));
     }
 
     #[test]

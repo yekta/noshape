@@ -905,7 +905,13 @@ fn relation_measured_from_stored_reference() {
     asm.mates[1].limits = vec![("rz".into(), Limits { min: Some(ExprValue::new("30 deg")), max: Some(ExprValue::new("10 deg")) })];
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     let m11 = res.mates.iter().find(|m| m.id == MateId(11)).unwrap();
-    assert_eq!(m11.message.as_deref(), Some("Minimum mate limit should be smaller than maximum limit. A parameter value is not valid."));
+    assert_eq!(m11.message.as_deref(), Some("Minimum mate limit should be smaller than maximum limit."));
+    // Live errors-1123 mates: a Ball's cone angle of −10°.
+    asm.mates[1].mate_type = MateType::Ball;
+    asm.mates[1].limits = vec![("cone".into(), Limits { min: None, max: Some(ExprValue::new("-10 deg")) })];
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let m11 = res.mates.iter().find(|m| m.id == MateId(11)).unwrap();
+    assert_eq!((m11.ok, m11.message.as_deref()), (false, Some("Error regenerating.")));
 }
 
 fn x_axis_connector(id: u64) -> AsmMateConnector {
@@ -7079,6 +7085,49 @@ fn redundant_mates_are_fine_until_they_disagree() {
     let (res, before) = add(vec![planar(10, 1, 2), planar(20, 2, 3)], fastened);
     assert_eq!(res.solved.placements, before, "nothing moved");
     assert_eq!(status(&res), vec![(10, over()), (20, over()), (40, Some("Mate is not consistent.".to_string()))]);
+}
+
+/// Live errors-1123 mates (qa ERR-MATE-SOLVE-MOVES / ERR-MATE-OVERDEF-BOTH): a pin on Revolute 1 in a plate's hole,
+/// then a second mate from the pin's mid axis to the plate's side face: nothing moves, created (the dialog's one-mate
+/// preview) or solved, and both mates read "Mate overdefines the assembly.".
+#[test]
+fn an_overdefining_mate_moves_nothing_and_both_mates_are_red() {
+    let f = doc_with(vec![plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let (hole, pin_face) = (cylinder_face(&rp), cylinder_face(&rq));
+    let b = &rp.context.bodies[0];
+    let side = (0..b.faces.len())
+        .find(|&i| matches!(b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).unwrap().face_surface(), Ok(noshape_kernel::Surface::Plane(p)) if p.normal.z.abs() < 1e-9))
+        .map(|i| Reference::Face((*b.faces[i]).clone()))
+        .expect("a side face");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
+            part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.05, 0.04, 0.02), false),
+        ],
+        mates: vec![mate(10, MateType::Revolute, conn(1, hole, Inference::MidAxis), conn(2, pin_face.clone(), Inference::MidAxis))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok);
+    asm.instances[1].placement = res.solved.placement(InstanceId(2)).unwrap();
+    let (before, turned) = (DVec3::from(asm.instances[1].placement.translation), DQuat::from_array(asm.instances[1].placement.rotation));
+    let units = f.doc.settings.units;
+    for t in [MateType::Revolute, MateType::Slider, MateType::Cylindrical, MateType::Parallel, MateType::Planar, MateType::Ball] {
+        let mut a = asm.clone();
+        let m = mate(11, t, conn(2, pin_face.clone(), Inference::MidAxis), conn(1, side.clone(), Inference::Centroid));
+        let preview = SolveOptions { only_mate: Some(m.id), hold_values: eval::new_mate_holds(&m, &units), ..Default::default() };
+        a.mates.push(m);
+        for (what, opts) in [("solved", SolveOptions::default()), ("previewed", preview)] {
+            let res = ev.evaluate(&f.doc, &a, &opts, None);
+            let p = res.solved.placement(InstanceId(2)).unwrap();
+            assert!((DVec3::from(p.translation) - before).length() < 1e-9 && DQuat::from_array(p.rotation).angle_between(turned) < 1e-9, "{t:?} {what}: the pin moved to {p:?}");
+            let status: Vec<_> = res.mates.iter().map(|s| (s.ok, s.message.as_deref())).collect();
+            assert_eq!(status, vec![(false, Some("Mate overdefines the assembly.")); 2], "{t:?} {what}");
+        }
+    }
 }
 
 /// Live 2979: each family's frame (its height range) and mate connectors (height, Z up), in live's order.

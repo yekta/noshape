@@ -548,6 +548,8 @@ pub struct AssemblyView {
     /// The hovered vertex was reached from a face or edge: its connector glyph shows (live mc-infer-1122 reach-corner
     /// d=6..0); straight from empty space it doesn't.
     infer_vertex_glyph: bool,
+    /// The inference's face is curved: outlined round its whole image (live mc-infer-1122 asm-cyl10).
+    infer_curved: bool,
     mate: Option<MateSession>,
     relation: Option<RelationSession>,
     /// The relation dialog's type select (live dom/dialog-relation-*:
@@ -794,6 +796,7 @@ impl AssemblyView {
             infer: None,
             infer_choice: None,
             infer_vertex_glyph: false,
+            infer_curved: false,
             mate: None,
             relation: None,
             relation_select,
@@ -1167,14 +1170,29 @@ impl AssemblyView {
         }
         if let Some(s) = &self.mate {
             let id = s.dialog.read(cx).id;
-            let msg = self.result.mates.iter().find(|m| m.id == id).filter(|m| !m.ok).and_then(|m| m.message.clone());
+            let status = self.result.mates.iter().find(|m| m.id == id);
+            let msg = status.filter(|m| !m.ok).and_then(|m| m.message.clone());
+            let inactive = status.filter(|m| m.inactive).and_then(|m| m.message.clone());
             // Instances whose part is gone (live E15).
             let lost: HashMap<InstanceId, String> = self.result.nodes.iter().filter(|n| n.error.as_ref().is_some_and(|e| !e.is_empty()) && n.path.len() == 1).map(|n| (n.path[0], n.name.clone())).collect();
+            let units = self.units(cx);
+            let unresolvable = matches!(msg.as_deref(), Some("Mate cannot resolve mate connectors." | "Selection is invalid."));
+            let off: Vec<InstanceId> = self.assembly(cx).map(|a| a.instances.iter().filter(|i| i.suppressed).map(|i| i.id).collect()).unwrap_or_default();
             s.dialog.update(cx, |d, cx| {
                 d.lost = (0..4).filter_map(|i| d.field(i).and_then(|c| lost.get(&c.instance)).map(|n| (i, n.clone()))).collect();
+                d.unresolved = (0..4).filter(|&i| unresolvable && d.field(i).is_some_and(|c| !self.result.pick_resolves(c, &units))).collect();
+                // A Tangent's lost face: "Missing entity of <instance>" (live errors-1123 mates).
+                if d.mate_type == MateType::Tangent {
+                    for i in std::mem::take(&mut d.unresolved) {
+                        let name = d.field(i).and_then(|c| self.result.node(&[c.instance])).map(|n| n.name.clone()).unwrap_or_default();
+                        d.lost.insert(i, name);
+                    }
+                }
+                d.dimmed = (0..4).filter(|&i| d.field(i).is_some_and(|c| off.contains(&c.instance))).collect();
                 if d.a.is_some() && d.b.is_some() {
                     d.status = msg;
                 }
+                d.inactive = inactive;
                 cx.notify();
             });
         }
@@ -1539,7 +1557,7 @@ impl AssemblyView {
         let hovered_overlay = self.hover_overlay;
         // Assembly origin and assembly mate connectors (pickable).
         h.origin = (!self.ui.origin_hidden || picking).then_some((size * 0.8, picking && hovered_overlay == Some(OverlayPick::Origin)));
-        h.origin_triad = picking;
+        h.origin_triad = self.origin_as_triad(cx);
         h.origin_row_hover = self.ui.origin_row_hover;
         let mut overlay_connectors = Vec::new();
         if let Some(asm) = self.assembly(cx) {
@@ -1707,15 +1725,20 @@ impl AssemblyView {
             && let Some(((_, entity), occ, cands)) = &self.infer
             && let Some(o) = self.result.occurrences.get(*occ)
             && (self.infer_locked || self.hover.as_ref().is_some_and(|h| h.occ == *occ))
-            // (A pick re-hovered later: its yellow only, no outline or points: live mc-infer-1122 2-hover-fc.)
-            && (self.manip_click.is_some() || !h.picked_entities.iter().any(|(p, r)| *p == o.path && r == entity))
         {
+            // A pick re-hovered later: its yellow under the glyph, no outline or other points (live mc-infer-1122
+            // 2-hover-fc, picked-asm: qa FEEL-MC-ASM-PICKED-REHOVER).
+            let repicked = self.manip_click.is_none() && h.picked_entities.iter().any(|(p, r)| *p == o.path && r == entity);
             // Live (qa5/asm-041, assembly/31-*): a hovered face is outlined
             // (no fill), an edge or vertex highlighted; its inference points
             // are small white dots, the one under the pointer the mate
             // connector glyph. Shift keeps the entity locked.
             match entity {
-                Reference::Face(_) => h.hover_outline = Some((o.path.clone(), entity.clone())),
+                _ if repicked => {}
+                Reference::Face(_) => {
+                    h.hover_outline = Some((o.path.clone(), entity.clone()));
+                    h.hover_outline_image = self.infer_curved;
+                }
                 _ => h.hover_entity = Some((o.path.clone(), entity.clone())),
             }
             let t = noshape_model::assembly::eval::matrix_frame(&o.transform);
@@ -1731,7 +1754,11 @@ impl AssemblyView {
             // hover-matrix-1121 b5-fastened-vertex, qa FEEL-ASM-MATE-VERTEX); reached from its face or edge, the
             // glyph stays (mc-infer-1122 reach-asm-corner, qa FEEL-MC-VERTEX-FROM-FACE-ASM).
             chosen = self.infer_choice.filter(|_| !matches!(entity, Reference::Vertex(_)) || self.infer_vertex_glyph);
-            h.hover_vertex_open = matches!(entity, Reference::Vertex(_)) && chosen.is_none();
+            h.hover_vertex_open = matches!(entity, Reference::Vertex(_)) && chosen.is_none() && !repicked;
+            if repicked {
+                marks = chosen.and_then(|c| marks.get(c).copied()).into_iter().collect();
+                chosen = (!marks.is_empty()).then_some(0);
+            }
         }
         // A mate dialog's picked face under the pointer keeps the hover look after its click, and once both picks are in
         // (live workflows-1122 08 s06 / s07: plain, not filled, its boundary and its part's outline lit; yellow once the
@@ -1740,7 +1767,7 @@ impl AssemblyView {
         // Part 1's top): Part 1's top as hovered all the same, the moved part's face under the pointer lit as hovered.
         let still = self.mate.as_ref().is_some_and(|s| s.hud.is_some() && self.manip_click.is_some_and(|(at, _)| s.hud == Some(at)));
         let hovered = self.hover.as_ref().filter(|t| matches!(t.reference, Reference::Face(_))).map(|t| (t.path.clone(), t.reference.clone()));
-        let under = hovered.filter(|k| self.manip_click.is_some() && h.hover_outline.is_none() && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
+        let under = hovered.filter(|k| self.manip_click.is_some() && h.hover_outline.as_ref().is_none_or(|o| o == k) && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
         if self.mate.is_some()
             && let Some((path, face)) = under
         {
@@ -3115,6 +3142,12 @@ impl AssemblyView {
     }
 
     /// What viewport clicks currently feed (a dialog's connector field, snap mode...).
+    /// The origin drawn as a triad while it can be picked as a mate connector's origin; a pattern field's edge pick
+    /// keeps the ringed origin (live workflows-1123 04 s5, qa FEEL-ASM-PATTERN-PICK-LOOK).
+    pub(super) fn origin_as_triad(&self, cx: &App) -> bool {
+        self.pick_mode(cx) == Some(PickMode::Inference)
+    }
+
     fn pick_mode(&self, cx: &App) -> Option<PickMode> {
         if self.std_auto_size_active() || self.mass_face_picking() {
             return Some(PickMode::Entity);
@@ -3173,7 +3206,9 @@ impl AssemblyView {
             if self.infer.as_ref().is_none_or(|(k, occ, _)| *k != key || *occ != h.occ) {
                 self.infer_vertex_glyph = noshape_model::assembly::inference::vertex_glyph(&h.reference, self.infer.as_ref().map(|((_, r), _, _)| (r, self.infer_vertex_glyph)));
                 let units = self.units(cx);
-                let cands = self.result.occurrences.get(h.occ).map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
+                let o = self.result.occurrences.get(h.occ);
+                let cands = o.map(|o| inference_candidates(&o.context, Some(&o.body), &h.reference, &units)).unwrap_or_default();
+                self.infer_curved = matches!(h.reference, Reference::Face(_)) && o.is_some_and(|o| !noshape_model::assembly::standard::planar_face(&o.context, Some(&o.body), &h.reference));
                 self.infer = Some((key, h.occ, cands));
                 self.infer_choice = None;
                 entered = true;
@@ -3184,7 +3219,9 @@ impl AssemblyView {
         let vp = self.viewport.read(cx);
         let points = cands.iter().map(|p| (&p.reference, vp.project(o.transform.transform_point3(p.frame.origin)))).collect();
         self.infer_choice = noshape_model::assembly::inference::choose(&noshape_model::assembly::inference::OnScreen { on: &key.1, points }, self.pointer, entered);
-        old != self.infer_choice
+        // (Another entity with the same choice index changed too: Shift released by a move over the cylinder top,
+        // qa FEEL-MC-ASM-SHIFT-RELEASE.)
+        entered || old != self.infer_choice
     }
 
     fn update_capture(&mut self, cx: &mut Context<Self>) {
@@ -3539,12 +3576,8 @@ impl AssemblyView {
                     if self.update_placing(cx) {
                         self.rebuild_scene(true, cx);
                     }
-                } else if self.pick_mode(cx).is_some() {
-                    let before = self.infer_choice;
-                    self.update_inference(cx);
-                    if before != self.infer_choice {
-                        self.refresh_scene(false, cx);
-                    }
+                } else if self.pick_mode(cx).is_some() && self.update_inference(cx) {
+                    self.refresh_scene(false, cx);
                 }
             }
             ViewportEvent::Click { pick, position, modifiers, .. } => {
@@ -5263,8 +5296,11 @@ impl AssemblyView {
         });
         // Live (qa5 A19): the root row carries an error badge while a feature
         // (or the pattern being defined) is in error.
-        let has_error = self.result.has_errors()
+        let creating = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx).id);
+        let has_error = self.result.has_errors_besides(creating)
             || self.pattern.as_ref().is_some_and(|s| s.editing.is_none() && self.pattern_from_session(s, cx).is_err());
+        // (Live errors-1123 mates: "Assembly contains mate error" for a failed mate.)
+        let error_tip = if self.result.mates.iter().any(|m| !m.ok) { "Assembly contains mate error" } else { "Assembly contains error" };
         let view = cx.entity();
         h_flex()
             .id("asm-top-row")
@@ -5288,7 +5324,7 @@ impl AssemblyView {
                     .justify_center()
                     .relative()
                     .child(crate::assets::icon(&icon_path("assembly"), 16., cx))
-                    .when(has_error, |d| d.child(div().id("asm-error").absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("regen-error"), 11., cx)).tooltip(crate::ui::tooltip("Assembly contains error")))),
+                    .when(has_error, |d| d.child(div().id("asm-error").absolute().right(px(-4.)).bottom(px(-4.)).child(crate::assets::icon(&icon_path("regen-error"), 11., cx)).tooltip(crate::ui::tooltip(error_tip)))),
             )
             .child(match self.rename_field(behaviors::RenameRow::Instance(InstanceId::ORIGIN), cx) {
                 Some(field) => field,
@@ -5792,10 +5828,11 @@ impl AssemblyView {
         // Live (assembly/2219): a new mate's row ("Revolute 1", selected, red
         // until both connectors are picked) is in the list while its dialog
         // is open.
-        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some() && !d.same_instance(), d.a.is_some() || d.b.is_some(), d.same_instance()));
-        if let Some((id, mate_type, name, complete, _, same)) = new_mate.clone() {
+        let new_mate = self.mate.as_ref().filter(|m| m.editing.is_none()).map(|m| m.dialog.read(cx)).filter(|d| !asm.mates.iter().any(|m| m.id == d.id)).map(|d| (d.id, d.mate_type, d.name.clone(), d.a.is_some() && d.b.is_some() && !d.same_instance(), d.a.is_some() || d.b.is_some(), d.same_instance(), d.regen_error(cx).is_some()));
+        if let Some((id, mate_type, name, complete, _, same, red)) = new_mate.clone() {
             let message = if same { Some(crate::assembly_mate_dialog::SAME_INSTANCE.to_string()) } else { (!complete).then(|| "Mate cannot resolve mate connectors.".to_string()) };
-            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete, inactive: false, suppressed: false, message, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
+            // Live errors-1123 mates: red with its "!" while its title is (bad limits while creating).
+            let row = self.feature_row(FeatureRow { id, icon: mate_icon(mate_type), name, ok: complete && !red, inactive: false, suppressed: false, message, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
@@ -5839,7 +5876,8 @@ impl AssemblyView {
         // collapsible "Mate features (N)" folder holding the mates.
         let mates_open = !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]);
         let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some()) + usize::from(new_group.is_some()) + usize::from(new_mc.is_some());
-        let mate_error = result.mates.iter().any(|m| !m.ok) || result.relations.iter().any(|r| !r.ok);
+        let creating = new_mate.as_ref().map(|m| m.0);
+        let mate_error = result.mates.iter().any(|m| !m.ok && Some(m.id) != creating) || result.relations.iter().any(|r| !r.ok);
         if !filtering || (tree && !mate_rows.is_empty()) {
             let folder = crate::ui::tree_row("mates-folder", false)
                     // Live (ui-parity asm-fastened-two-faces): also while a new mate has a picked connector.

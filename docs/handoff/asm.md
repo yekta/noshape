@@ -5,25 +5,75 @@ scenarios, the assembly parity suite (`parity_assemblies`) and the parity transl
 the assembly corpora's studios. History (everything before 11-18 21:25): docs/handoff/archive/asm.md. Rulings:
 docs/DECISIONS.md (speed counts only ≥100 ms and ≥2× on a whole user action, 9e5b481d4).
 
-## State (2026-11-22 23:16 UTC) — RESUME HERE
-- LANDED 22:49 75a0b871 as f8301b7c. lc-t A/B inconclusive (loaded host); rerun interleaved off-peak if asked.
-- HELD IN THE TREE (uncommitted, waiting for the lead's ruling): software MSAA: renderer.rs msaa_of without the software
-  early return, test a_software_rasteriser_draws_with_the_gpus_msaa (4, 4); scene.rs Style::software doc. vibex6
-  many_parts::thousand_pins_frame_time (1000 pins, 284k tris, 1194x794; mf6.log / mf7.log), mean / worst:
-  AO on: 1x 105/206, 75/124, 82/136 ms; 4x 460/531, 625/970, 500/537 ms. AO off: 1x 62/117, 60/115; 4x 451/676,
-  453/495 ms. MSAA itself is the cost (~7x), not AO. Asked the lead: keep 4x / 2x / 1x? Commit body = these numbers.
-- QUEUED (23:1x): SELECT-SAME-CONFIG-TRIAD, INSERT-OK-KEEPS-SELECTION, PATTERN-SECOND-DIRECTION-EMPTY,
-  PATTERN-PREVIEW-LATE, UIS-MATE-PATTERN-ROW, INSERT-FILTER-BUTTONS (REQUESTS 23:04 asks live2 to confirm),
-  LAST-VIEWED-TOAST, MC-LOOK rest; tests; clippy + full assembly-ui lib (187) green on vibex6 (mf7).
-- vibex6 ~/target-asm 26 GB: clear debug/incremental after this batch.
-- MARKER-LOOK: skasm's stack is on main now (InferenceMark::new); add the circle-centre grey inner ring.
-- EDGE-BEFORE-VERTEX: probe first; shared chooser (tell skasm). FIXED-GLYPH-AA: should be settled by software MSAA.
+## Update (2026-11-23 02:11 UTC) — RESUME HERE FIRST
+- cs8 GREEN (clippy + 190 assembly-ui incl. the repicked glyph edit and the flaky dialog test).
+- cs9 running on vibex8 (bg; log /root/asm-scratch/cs9.log: CLIPPY / NEWTEST / ASMLIB / EXIT) over these UNCOMPILED edits
+  (all in the tree, committed WIP below):
+  - eval.rs only_mate block: if the full solve at the preview poses holds back a moved body, revert to poses0 and
+    solve_with every mate (`every_mate`, `solved_ix`): an overdefining mate moves nothing, both red (ERR-MATE-SOLVE-MOVES /
+    OVERDEF-BOTH; cause: the dialog/ops preview enforced only the new mate and saved the moved pin). Test
+    tests.rs an_overdefining_mate_moves_nothing_and_both_mates_are_red.
+  - eval: cone_out_of_range -> "Error regenerating." (test at the end of the E11 test); entity_resolves +
+    AssemblyResult::pick_resolves; Tangent face gone "Selection is invalid.", same instance "Mate is invalid.", curved
+    Tangent in conflict "Mate is not consistent."; has_errors_besides(Option<MateId>).
+  - dialog: cone pink + "Enter a value between 0 and 180. Current value is -10.", title suffix; limit_label cone
+    "cone angle" (no doubled Maximum); rz tip "Limit axial Z minimum angle: <text>"; ✓ pale on unsolvable status /
+    inactive / cone (green for overdefines, not consistent, one-entity Tangent); chips: `unresolved` red "Mate connector",
+    `dimmed` grey (suppressed); regen_error pub(crate).
+  - view: dialog sync fills unresolved/dimmed (Tangent's unresolved go to `lost` = "Missing entity of"); creating row red
+    when its title is; folder ⬇ and root ! ignore the mate being created.
+  - feel test a_mate_dialogs_dots…: failure message prints hover/click/infer state (remove it once the flake is understood).
+- cs9 green -> squash WIP commits (msg.txt + "an overdefining mate moves nothing, both red; Ball cone range; dialog ✓/chips;
+  Tangent words; creating row"), land, sha to qa (SHIFT-RELEASE, CYL-SIDE-OUTLINE, PICKED-REHOVER glyph, PATTERN-PICK-LOOK
+  origin, ERR-MATE-SOLVE-MOVES, OVERDEF-BOTH, LIMITS-COMMITTED, BALL-CONE, DIALOG-STATE, TANGENT-WORDS, CREATING-LIST)
+  and psui (ring notch). Red -> fix forward; tests that expect "overdefines" for curved Tangents may need the new words.
+- Open: Tangent "not consistent" ✓ pale when reopened (needs an is_new flag in the dialog); suppressed title grey italic?
+  (mates.md says black; ticket says grey italic: check qa's shot by script); errors-1123 audit #2 #3 #10 #15 part gone #18.
+- qa 02:1x (04-07 on green ed11f7c48): VERIFIED ASM-FIXES-NOT-IN-FLOW, INSERT-OK-KEEPS-SELECTION, SELECT-SAME-CONFIG-TRIAD,
+  PATTERN-SECOND-DIRECTION-EMPTY. PARTLY INSERT-LAST-VIEWED-TOAST (07 s19 Part Studio row 300x40 at 247,318 + caret box light
+  blue, live neither; s20 a 166x25 light-blue box at 374,360), PATTERN-PICK-LOOK (fix in this batch). Open: INSERT-FIRST-FIT-
+  BESIDE-DIALOG (~160 px right), TAB-TO-FLIP-FOCUS, CHANGE-CONFIG-PANEL-LOOK, INSERT-THUMB-CONFIG. REOPENED P2
+  UIS-MATE-PATTERN-ROW: assembly_panels.rs pattern_row needs a ui-script mark ("mate:Circular pattern 1", 04 s13).
+- live 02:2x: Insert Flat patterns row DONE (live/asm/insert-flat-patterns-1123/): absent without sheet metal; ours matches.
+- psui told (02:0x): ERR-MATE-HOVER-GLYPH and ERR-LIST-TOOLTIP-CHROME are theirs (row hover highlight, mate_flyout).
+
+## State (2026-11-23 01:4x UTC)
+- asm-tip rebased on origin/main 01:0x. Unlanded: the failed c6ec3d1c content (MSAA settle, vertex reach, tickets,
+  handoffs) + one batch (msg /root/asm-scratch/msg.txt; two WIP commits on top ("asm: WIP" + "asm: WIP (handoff…)"): squash them into one with msg.txt, after the land of nothing else queued):
+  SHIFT-RELEASE redraw (update_inference returns `entered || changed`), CYL-SIDE-OUTLINE (hover_outline_image),
+  ring notch (shafts from size*0.11), pattern pick ringed origin (`origin_as_triad`), committed crossed limits
+  (eval drops " A parameter value is not valid."; dialog `limits_typed`: pink only once typed), suppressed
+  instance's title tip (`inactive`/`inactive_tip`), root tip "Assembly contains mate error", feel tests wait for
+  `ui.real_result_in`, and the flaky a_mate_dialogs_dots fix (`under` also when hover_outline is that face: the
+  click's apply_result clears infer, a re-pick re-enters it → was filled under load), and PICKED-REHOVER's glyph
+  (`repicked` in the inference block: no outline/dots, only the chosen mark as glyph; test asserts
+  ui.inference_marks on the re-hover; NOT yet built). cs8 (vibex8, before the repicked edit) = clippy +
+  full assembly-ui lib; cs7 = assembly relation_measured_from_stored_reference. Then touch -c + rerun cs6.sh
+  (rb.sh vibex8) for the repicked edit. Green → commit (amend WIP with
+  msg.txt), land, send qa the sha (SHIFT-RELEASE, CYL-SIDE-OUTLINE, ERR-MATE-LIMITS-COMMITTED part,
+  FEEL-ASM-PATTERN-PICK-LOOK origin) and psui (ring notch).
+- qa 01:4x: ASM-FIXES-NOT-IN-FLOW withdrawn (stale binary); wf23f verdicts coming. PICKED-REHOVER now PARTLY:
+  live draws the hover glyph over the placed connector when the picked face is re-hovered at the click spot;
+  ours (r8 shot 10) nothing (probably the placed connector's overlay takes the hover → no infer).
+- qa errors-1123 set c P0s (TICKETS 01:4x), worst first: ERR-MATE-SOLVE-MOVES (over-defining mate moves the pin
+  on create/reopen; reopen clears the error), ERR-MATE-OVERDEF-BOTH (new Slider/Cylindrical/Parallel stays OK,
+  only Revolute 1 red), ERR-MATE-BALL-CONE (-10°: "Error regenerating.", pink field, range tip; our tip doubles
+  "Maximum Maximum cone angle"), ERR-MATE-DIALOG-STATE (✓ pale for noresolve/fixed/suppressed/bad limits; lost
+  chip red "Mate connector"; suppressed chip grey, title grey italic), ERR-MATE-TANGENT-WORDS, ERR-MATE-CREATING-
+  LIST, (psui) ERR-MATE-HOVER-GLYPH. My audit with file:line: /root/asm-scratch/errors-1123-audit.md.
+- Open P2 ASM-INSERT-FIRST-FIT-BESIDE-DIALOG (assembly_view.rs ~1164 inset 324 px while Insert is open, from qa5
+  1.4; wf23 06 s19 says live fits the whole area: check live before changing).
+- psui 23:5x FYI: assembly_config.rs filter box: once psui's land with app-core `ui::help_tooltip(title, text, body,
+  anchor)` is on main, use it ("Filter inputs" tooltip, then ~1.8 s later the 400 px "Supported filters" help centred
+  3 px under; live workflows-1123 06 s2-s4); body = config_panel.rs `config_filter_help` (share it).
 - qa 18:3x ≠: TYRES (~1.6 m off), wf25 s28 Gear dialog yellow, wf08 s07 quadrant fill.
+- Replays of qa's cells on my build: vibex8 ~/tmp/asm/mi (cells/run.sh on :493) and ~/tmp/asm/wf (run.sh, XD=:494);
+  build + run script /root/asm-scratch/cs3.sh; pixel compare by script (no PNG reads).
 - rb.sh after a rebase: touch -c the files main changed (git diff --name-only HEAD~60 HEAD -- crates), else stale.
-- vibex6 ~/target-asm is 26 GB: clear its debug/incremental after this batch (rule < 20 GB).
 - Next after: first frame from StudioDisplay rows; infento parity rerun; xdev-subs / pinslot reruns; bjr Fastened 3/4;
   pinslot Revolute 5; tvc 41/43; keyboard BOM 15/16. dx's e52b091a re-measure. Cleanup: /root/asm-scratch/solver.rs.keep,
-  asm-base worktree, vibex7 ops-bis/ops-1120/ops-bt/ops-mc, vibex8 ops-subs/ops-mc/ops-tc/cli-tc, branch asm-rb-check.
+  asm-base worktree, vibex7 ops-bis/ops-1120/ops-bt/ops-mc, vibex8 ops-subs/ops-mc/ops-tc/cli-tc, branch asm-rb-check,
+  vibex8 ~/tmp/asm/mi + wf + wfout.
 
 ## State (2026-11-20 18:50 UTC)
 
