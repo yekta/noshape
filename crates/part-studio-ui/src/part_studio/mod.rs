@@ -3311,6 +3311,16 @@ impl PartStudioView {
         true
     }
 
+    /// How long the timed message has left: a notice with a link stays its time from the last input too.
+    fn notice_left(&self, cx: &App) -> Option<Duration> {
+        let (until, stays) = self.ui.message_until?;
+        let until = match (stays, self.doc.read(cx).notice_input) {
+            (Some(s), Some(t)) => until.max(t + s),
+            _ => until,
+        };
+        Some(until.saturating_duration_since(cx.background_executor().now()))
+    }
+
     /// Restore link of the "has been canceled" toast: reopen the draft.
     fn restore_canceled_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((feature, index, is_new, _)) = self.canceled_edit.take() else { return };
@@ -7033,9 +7043,14 @@ impl PartStudioView {
             if st == FeatureStatus::Info && !dialogs && self.ui.message_timed.as_ref() != Some(&key) {
                 self.ui.message_timed = Some(key.clone());
                 // A notice with a link stays as long as it says (live 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
-                let stays = self.doc.read(cx).notice_link(&msg).map_or(Duration::from_secs(5), |l| l.stays);
+                let link = self.doc.read(cx).notice_link(&msg).map(|l| l.stays);
+                let stays = link.unwrap_or(Duration::from_secs(5));
+                self.ui.message_until = Some((cx.background_executor().now() + stays, link));
                 cx.spawn(async move |this, cx| {
-                    cx.background_executor().timer(stays).await;
+                    // Each input in the window pushes a linked notice's close back (`DocModel::notice_input`).
+                    while let Some(left) = this.update(cx, |this, cx| this.notice_left(cx)).ok().flatten().filter(|d| !d.is_zero()) {
+                        cx.background_executor().timer(left).await;
+                    }
                     let _ = this.update(cx, |this, cx| {
                         if this.message.as_ref() == Some(&key) {
                             this.message = None;
@@ -7043,6 +7058,7 @@ impl PartStudioView {
                         }
                         if this.ui.message_timed.as_ref() == Some(&key) {
                             this.ui.message_timed = None;
+                            this.ui.message_until = None;
                         }
                     });
                 })

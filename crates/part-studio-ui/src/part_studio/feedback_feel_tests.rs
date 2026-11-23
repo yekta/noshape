@@ -282,3 +282,40 @@ fn the_feedback_matrix_matches_live(cx: &mut TestAppContext) {
     eprintln!("feedback matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
+
+/// qa HIST-TOAST-DROPPED-ON-RCLICK (live workflows-1123 19: the Merge toast still up 58 s after the merge, the user
+/// clicking ≤ 11 s apart; 2351: left alone, gone at ≈ 35 s): a notice with a link stays its time from the last input
+/// in the window, and closes that long after it.
+#[gpui::test]
+fn a_linked_notice_stays_while_the_user_works(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_from(cx, "feedback-merge-toast", None);
+    draw(cx, window);
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    let msg = "Merged B1 into Main.".to_string();
+    let shown = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).message.as_ref().is_some_and(|(_, m)| *m == msg));
+    let wait = |cx: &mut TestAppContext, secs: u64| {
+        cx.executor().advance_clock(std::time::Duration::from_secs(secs));
+        draw(cx, window);
+    };
+    let input = |cx: &mut TestAppContext| cx.update(|cx| {
+        let now = cx.background_executor().now();
+        doc.update(cx, |d, _| d.note_input(now));
+    });
+    cx.update(|cx| doc.update(cx, |d, cx| d.info_with_link(msg.clone(), "Revert to before this merge", 35, |_, _| {}, cx)));
+    draw(cx, window);
+    assert!(shown(cx), "the toast");
+    for _ in 0..6 {
+        wait(cx, 10);
+        input(cx);
+    }
+    wait(cx, 10);
+    assert!(shown(cx), "70 s on, the last input 10 s ago: still up");
+    wait(cx, 26);
+    assert!(!shown(cx), "35 s after the last input: gone");
+    cx.update(|cx| doc.update(cx, |d, cx| d.info_with_link(msg.clone(), "Revert to before this merge", 35, |_, _| {}, cx)));
+    draw(cx, window);
+    wait(cx, 34);
+    assert!(shown(cx), "left alone: up at 34 s");
+    wait(cx, 2);
+    assert!(!shown(cx), "left alone: gone at 36 s");
+}

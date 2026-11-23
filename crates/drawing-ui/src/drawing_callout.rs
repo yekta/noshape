@@ -1,7 +1,7 @@
 //! Drawing editor: Onshape's Callout dialog (live drawing/180–185): five
 //! property buttons (Part property, BOM table property, Instance property,
 //! Flag note, Cut list table property) that insert tokens, the text above,
-//! the left | centre | right boxes (the centre empty = "Table: Item No."),
+//! the left | centre | right boxes (the centre "Table: Item No.", focused),
 //! the text below, then Insert symbol, Text height, Border shape and Border
 //! size. Shown while the Callout tool is active (new callouts take it) or
 //! to edit a callout (double-click / Edit…).
@@ -24,6 +24,9 @@ const RIGHT: usize = 3;
 const BELOW: usize = 4;
 const HEIGHT: usize = 5;
 
+/// The centre box's default: the BOM item number (a callout's empty text).
+const ITEM: &str = "{bom.item}";
+
 /// Border size choices: 0 = Tight Fit.
 const SIZES: [(u8, &str); 6] = [(0, "Tight Fit"), (1, "1 Character"), (2, "2 Characters"), (3, "3 Characters"), (4, "4 Characters"), (5, "5 Characters")];
 
@@ -43,6 +46,10 @@ pub struct CalloutDlg {
     target: usize,
     /// The values as last read (for previews without a context).
     cached: (String, CalloutStyle),
+    /// The focused box (its blue frame).
+    focused: Option<usize>,
+    /// Once the anchor is picked: the centre's text as the callout shows it ("1"; live workflows-1123 10 s15).
+    shown: Option<String>,
 }
 
 /// The callout dialog's property tokens: group (its button and the token's
@@ -89,12 +96,10 @@ impl DrawingEditor {
         let h = style.height.unwrap_or(self.drawing.props.ann_type(noshape_model::drawing::sheet::AnnType::Callouts).height.unwrap_or(self.drawing.props.ann_text_height));
         let height = if self.drawing.units_mm { noshape_model::drawing::format::format_number(h, None, 2).to_string() } else { format!("{:.4}", h / 25.4) };
         let vals = [style.above.clone(), style.left.clone(), text.to_string(), style.right.clone(), style.below.clone(), height];
-        let phs = ["", "", "Table: Item No.", "", "", ""];
         let inputs = vals
             .into_iter()
-            .zip(phs)
-            .map(|(v, ph)| {
-                let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder(ph).default_value(v.clone()));
+            .map(|v| {
+                let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(v.clone()));
                 // Its properties as tokens.
                 let mut c = gpui_kit::component::input::InputContent::new(v.clone());
                 for r in crate::drawing_note::field_codes(&v).into_iter().chain(callout_codes(&v)) {
@@ -110,7 +115,7 @@ impl DrawingEditor {
                 st
             })
             .collect();
-        CalloutDlg { edit, cached: (text.to_string(), style.clone()), style, inputs, target: CENTRE }
+        CalloutDlg { edit, cached: (text.to_string(), style.clone()), style, inputs, target: CENTRE, focused: None, shown: None }
     }
 
     /// Create / drop the dialog with the Callout tool (called from render).
@@ -118,10 +123,33 @@ impl DrawingEditor {
         let active = matches!(self.tool, Tool::Balloon { .. });
         let placing = self.callout_dlg.as_ref().is_some_and(|d| d.edit.is_none());
         if active && self.callout_dlg.is_none() {
-            self.callout_dlg = Some(self.new_callout_dlg(None, "", CalloutStyle::default(), window, cx));
+            // Live: "Table: Item No." in the centre box, focused.
+            let d = self.new_callout_dlg(None, ITEM, CalloutStyle::default(), window, cx);
+            d.inputs[CENTRE].update(cx, |s, cx| s.focus(window, cx));
+            self.callout_dlg = Some(d);
         } else if !active && placing {
             self.callout_dlg = None;
         }
+        // The anchor click shows the centre's text resolved, unfocused; the
+        // placement click brings the token back, focused (live workflows-1123 10 s15-s16).
+        let anchor = match &self.tool {
+            Tool::Balloon { anchor: Some(p) } => Some(p.clone()),
+            _ => None,
+        };
+        let shown = match (&anchor, self.callout_dlg.as_ref().map(|d| d.shown.is_some())) {
+            (Some(p), Some(false)) => Some(self.pending_annotation().and_then(|mut a| {
+                self.pk().finish_callout(&mut a, p);
+                noshape_model::drawing::build::callout_shown_text(&self.drawing, self.sheet, &self.sources, &self.info, &a)
+            })),
+            _ => None,
+        };
+        let Some(d) = &mut self.callout_dlg else { return };
+        if let Some(t) = shown {
+            d.shown = Some(t.unwrap_or_default());
+        } else if anchor.is_none() && d.shown.take().is_some() {
+            d.inputs[CENTRE].update(cx, |s, cx| s.focus(window, cx));
+        }
+        d.focused = d.inputs.iter().position(|s| s.read(cx).focus_handle(cx).is_focused(window));
     }
 
     /// Edit… / double-click on a callout.
@@ -134,6 +162,7 @@ impl DrawingEditor {
         };
         self.tool = Tool::Select;
         self.panel = None;
+        let text = if text.trim().is_empty() { ITEM.to_string() } else { text };
         self.callout_dlg = Some(self.new_callout_dlg(Some(id), &text, style, window, cx));
         cx.notify();
     }
@@ -149,7 +178,9 @@ impl DrawingEditor {
         s.below = v(BELOW);
         let inch = !self.drawing.units_mm;
         s.height = v(HEIGHT).trim().trim_end_matches("in").trim_end_matches("mm").trim().parse::<f64>().ok().filter(|h| *h > 0.0).map(|h| if inch { h * 25.4 } else { h });
-        Some((v(CENTRE), s))
+        // The token alone is the item number: an empty text, as before.
+        let centre = v(CENTRE);
+        Some((if centre.trim() == ITEM { String::new() } else { centre }, s))
     }
 
     /// The cached values (refreshed by [`Self::refresh_callout_values`]).
@@ -209,6 +240,7 @@ impl DrawingEditor {
         let inputs = d.inputs.clone();
         let style = d.style.clone();
         let editing = d.edit.is_some();
+        let (focused, shown) = (d.focused, d.shown.clone());
         let ed = cx.entity();
         // Flag notes and cut lists enable their buttons.
         let sheet = self.current_sheet();
@@ -233,11 +265,24 @@ impl DrawingEditor {
         };
         let tokens_of = |group: &str| CALLOUT_TOKENS.iter().filter(|(g, _, _)| *g == group).map(|(_, l, c)| (*l, c.to_string())).collect::<Vec<(&str, String)>>();
         let (part_props, bom_props, inst_props) = (tokens_of("Part"), tokens_of("Table"), tokens_of("Instance"));
-        // A text box that becomes the token target when clicked.
+        // A text box that becomes the token target when clicked (live: 1 px
+        // #ddd frame, radius 4, the focused one #1b5faa; its text centred
+        // on the first line).
         let boxed = |i: usize, w: f32, h: f32, cx: &mut Context<Self>| {
+            let text = match (i == CENTRE, &shown) {
+                (true, Some(t)) => h_flex().h(px(20.)).justify_center().child(div().bg(gpui_kit::rgb(0xdddddd)).text_color(gpui_kit::rgb(0x000000)).child(t.clone())).into_any_element(),
+                _ => Input::new(&inputs[i]).appearance(false).text_align(TextAlign::Center).h(px(20.)).xsmall().into_any_element(),
+            };
             div()
                 .w(px(w))
-                .when(h > 30., |d| d.py(px((h - 24.) / 2.)))
+                .h(px(h))
+                .px(px(3.))
+                .py(px(2.))
+                .bg(gpui_kit::rgb(0xffffff))
+                .border_1()
+                .border_color(gpui_kit::rgb(if focused == Some(i) { 0x1b5faa } else { 0xdddddd }))
+                .rounded(px(4.))
+                .text_size(px(13.33))
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, _: &MouseDownEvent, _, _| {
@@ -246,7 +291,7 @@ impl DrawingEditor {
                         }
                     }),
                 )
-                .child(Input::new(&inputs[i]).small())
+                .child(text)
         };
         let select = |id: &'static str, label: String, w: f32, items: Vec<StyleChoice>| {
             let ed = ed.clone();
@@ -271,7 +316,7 @@ impl DrawingEditor {
         let size_label = SIZES.iter().find(|s| s.0 == style.chars).map(|s| s.1).unwrap_or("2 Characters");
         let symbols = {
             let ed = ed.clone();
-            Button::new("callout-symbol").label("Ø").ghost().xsmall().w(px(40.)).dropdown_caret(true).os_dropdown_menu("callout-symbol-dd", false, move |mut m, _, _| {
+            Button::new("callout-symbol").label("Ø").ghost().xsmall().w(px(45.)).dropdown_caret(true).os_dropdown_menu("callout-symbol-dd", false, move |mut m, _, _| {
                 for (sym, name) in SYMBOLS {
                     let e = ed.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new(format!("{sym}  {name}")).on_click(move |_, window, cx| e.update(cx, |t, cx| t.callout_insert(sym, window, cx))));
@@ -282,6 +327,7 @@ impl DrawingEditor {
         Some(
             v_flex()
                 .id("dr-callout-dlg")
+                .key_context("CalloutDialog")
                 .absolute()
                 .top(px(DIALOG_TOP))
                 .left(px(self.dialog_left()))
@@ -309,23 +355,23 @@ impl DrawingEditor {
                         .gap(px(4.))
                         .child(
                             h_flex()
-                                .gap(px(6.))
+                                .gap(px(2.))
                                 .child(prop("callout-part", "part", "Part property", true, part_props))
                                 .child(prop("callout-bom", "bom", "BOM table property", true, bom_props))
                                 .child(prop("callout-inst", "instance", "Instance property", true, inst_props))
                                 .child(prop("callout-flag", "note", "Flag note", has_flags, vec![]))
                                 .child(prop("callout-cut", "cut-list", "Cut list table property", has_cut_list, tokens_of("Cut list"))),
                         )
-                        .child(boxed(ABOVE, 356., 24., cx))
-                        .child(h_flex().gap(px(8.)).child(boxed(LEFT, 82., 66., cx)).child(boxed(CENTRE, 172., 66., cx)).child(boxed(RIGHT, 82., 66., cx)))
-                        .child(boxed(BELOW, 356., 24., cx))
+                        .child(boxed(ABOVE, 356., 26., cx))
+                        .child(h_flex().gap(px(10.)).child(boxed(LEFT, 83., 66., cx)).child(boxed(CENTRE, 170., 66., cx)).child(boxed(RIGHT, 83., 66., cx)))
+                        .child(boxed(BELOW, 356., 26., cx))
                         .child(
                             h_flex()
-                                .gap(px(4.))
+                                .gap(px(2.))
                                 .child(symbols)
-                                .child(div().w(px(70.)).child(Input::new(&inputs[HEIGHT]).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall()))
-                                .child(select("callout-border", style.border.name().into(), 110., borders))
-                                .child(select("callout-size", size_label.into(), 116., sizes)),
+                                .child(div().w(px(75.)).child(Input::new(&inputs[HEIGHT]).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).xsmall()))
+                                .child(select("callout-border", style.border.name().into(), 115., borders))
+                                .child(select("callout-size", size_label.into(), 115., sizes)),
                         ),
                 )
                 .into_any_element(),
@@ -576,5 +622,14 @@ impl DrawingEditor {
                 )
                 .into_any_element(),
         )
+    }
+}
+
+#[cfg(test)]
+impl DrawingEditor {
+    /// The Callout dialog's centre box: its text, the focused box, the text shown once the anchor is picked.
+    pub(crate) fn callout_centre_state(&self, cx: &App) -> Option<(String, Option<usize>, Option<String>)> {
+        let d = self.callout_dlg.as_ref()?;
+        Some((d.inputs[CENTRE].read(cx).value().to_string(), d.focused, d.shown.clone()))
     }
 }

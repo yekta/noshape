@@ -556,6 +556,10 @@ pub struct UiState {
     /// The info message whose 5 s auto-dismiss is running (live: Onshape's
     /// message bubbles close after 5000 ms; errors and warnings stay).
     pub message_timed: Option<(noshape_model::display::FeatureStatus, String)>,
+    /// When the timed message closes, and (a notice with a link) how long it stays after each input in the window:
+    /// live keeps the Merge toast while the user works (workflows-1123 19: 58 s, inputs ≤ 11 s apart; left alone
+    /// ≈ 35 s, 2351).
+    pub message_until: Option<(Instant, Option<Duration>)>,
     /// Preview slider value (the preview blend's alpha, 0.7 at rest) and
     /// the model before the edited feature.
     pub preview_opacity: f32,
@@ -1010,6 +1014,7 @@ impl UiState {
             iso_slider_drag: None,
             manip_last_text: None,
             message_timed: None,
+            message_until: None,
             preview_opacity: crate::feature_dialog::PREVIEW_REST,
             preview_before: None,
             feature_names: Default::default(),

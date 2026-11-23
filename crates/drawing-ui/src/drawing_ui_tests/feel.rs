@@ -3029,6 +3029,49 @@ fn the_callout_tool_lights_an_edge_within_the_pickbox(cx: &mut TestAppContext) {
     assert!(guides.iter().any(|(p, q)| (p[0] - q[0]).abs() < 1e-6 && (p[1] - q[1]).abs() > 5.0), "a vertical guide through both: {guides:?}");
 }
 
+/// qa DRW-CALLOUT-DIALOG-LOOK (live workflows-1123 10 s14-s16): the Callout dialog opens with "Table: Item No." in its
+/// centre box, focused; the anchor click shows there the text the callout will show, unfocused; placing it brings the
+/// token back, focused, and the callout keeps the item number (an empty text). Esc in the box ends the tool.
+#[gpui::test]
+fn the_callout_dialog_centre_holds_the_item_token_focused(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-callout-dialog");
+    real_sheet(cx, window, &editor);
+    let mid = cx.update(|cx| {
+        let e = editor.read(cx);
+        let pl = e.built.as_ref().expect("built").placements.first().cloned().expect("a view");
+        let g = e.geoms.get(&pl.id).cloned().expect("geometry");
+        let len = |p: &[[f64; 2]]| (p[1][0] - p[0][0]).hypot(p[1][1] - p[0][1]);
+        let edge = g.edges.iter().filter(|x| x.visible && x.points.len() == 2).max_by(|a, b| len(&a.points).total_cmp(&len(&b.points))).expect("a straight edge");
+        let (a, b) = (pl.to_sheet(edge.points[0]), pl.to_sheet(edge.points[1]));
+        [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Balloon { anchor: None }, cx)));
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).callout_centre_state(cx));
+    assert_eq!(state(cx), Some(("{bom.item}".into(), Some(2), None)), "the token, focused");
+    click_at(cx, window, &editor, mid, Modifiers::default());
+    draw(cx, window);
+    let (_, focus, shown) = state(cx).expect("the dialog stays");
+    assert_eq!(focus, None, "the anchor click takes the focus");
+    let shown = shown.expect("the callout's text shown");
+    click_at(cx, window, &editor, [mid[0] + 20.0, mid[1] + 20.0], Modifiers::default());
+    draw(cx, window);
+    assert_eq!(state(cx), Some(("{bom.item}".into(), Some(2), None)), "placed: the token again, focused");
+    let placed = cx.update(|cx| {
+        let e = editor.read(cx);
+        let a = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, AnnotationKind::Balloon { .. })).cloned().expect("the callout placed");
+        let AnnotationKind::Balloon { text, .. } = &a.kind else { unreachable!() };
+        (text.clone(), noshape_model::drawing::build::callout_shown_text(&e.drawing, e.sheet, &e.sources, &e.info, &a))
+    });
+    assert_eq!(placed, (String::new(), Some(shown)), "the item number, as the box showed it");
+    cx.update(|cx| cx.bind_keys(noshape_app_core::actions::default_key_bindings()));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Select)), "Esc in the box ends the Callout tool");
+}
+
 /// ui-parity drw-copy-annotation-drag (qa 11-19 regression): Alt+drag on a selected note, pressed on its end where its
 /// side grip is, leaves a copy and lands the dragged one where the pointer is released (live: 40.4 mm along; ours
 /// resized the note from its grip).
@@ -4401,8 +4444,8 @@ fn move_to_sheet_shows_the_picked_sheet_before_ok(cx: &mut TestAppContext) {
     draw(cx, window);
     let state = |cx: &mut TestAppContext| cx.update(|cx| {
         let e = editor.read(cx);
-        let shown = e.preview.as_ref().is_some_and(|d| !d.sheets[1].views.is_empty());
-        (e.sheet, e.drawing.sheets[1].views.len(), shown, e.selection.len())
+        let shown = e.preview.as_ref().is_some_and(|d| d.sheets[1].real_views().count() == 1);
+        (e.sheet, e.drawing.sheets[1].real_views().count(), shown, e.selection.len())
     });
     assert_eq!(state(cx), (0, 0, false, 1));
     cx.update(|cx| editor.update(cx, |e, cx| e.pick_move_sheet(1, cx)));
@@ -4422,6 +4465,17 @@ fn move_to_sheet_shows_the_picked_sheet_before_ok(cx: &mut TestAppContext) {
         e.accept_move_sheet(cx);
     }));
     draw(cx, window);
-    let (sheet, there, _, _) = state(cx);
-    assert!(sheet == 1 && there > 0, "✓ moves it and stays on Sheet2");
+    assert_eq!(state(cx), (1, 1, false, 0), "✓ moves it alone, stays on Sheet2 and clears the selection (live workflows-1123 11 s10)");
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        let (one, two) = (&e.drawing.sheets[0], &e.drawing.sheets[1]);
+        assert!(one.view(view).is_none(), "the view left Sheet1");
+        let moved = two.real_views().next().expect("the moved view");
+        let mirror = two.parent_of(moved.id).expect("still linked to its parent");
+        let (uid, pid) = mirror.link().expect("its parent stays on Sheet1, linked");
+        assert_eq!(uid, one.uid);
+        assert!(one.view(pid).is_some_and(|p| !p.id.is_ghost()), "the parent is a real view on Sheet1");
+        let ids: Vec<_> = two.views.iter().map(|v| v.id).collect();
+        assert_eq!(ids, vec![mirror, moved.id], "Sheet2 holds the moved view and its parent's undrawn mirror only");
+    });
 }

@@ -57,6 +57,8 @@ pub struct DocModel {
     pub comparing: bool,
     /// The link of the notice shown last ([`DocModel::info_with_link`]).
     notice_link: Option<NoticeLink>,
+    /// The last input in the window while a notice with a link was set.
+    pub notice_input: Option<std::time::Instant>,
     /// Commits the pending edit when the app quits (Quit, logout, shutdown, SIGTERM): Drop alone misses it while
     /// anything else (a background task) still holds the model.
     quit_commit: Option<Subscription>,
@@ -124,7 +126,7 @@ impl DocModel {
         session.forget_undo();
         let studio_cache = crate::derived::StudioCache::default();
         let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator_with_store(studio_cache.clone(), crate::result_store::store())));
-        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None, quit_commit: None }
+        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None, notice_input: None, quit_commit: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice), gone after
@@ -146,6 +148,13 @@ impl DocModel {
     pub fn error_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
         self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::MAX, kind: None });
         cx.emit(DocEvent::Error(notice));
+    }
+
+    /// An input in the document's window (a linked notice stays its time from the last one).
+    pub fn note_input(&mut self, now: std::time::Instant) {
+        if self.notice_link.is_some() {
+            self.notice_input = Some(now);
+        }
     }
 
     /// The link of the notice `notice`, if it has one.

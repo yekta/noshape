@@ -2534,6 +2534,14 @@ impl Render for Workspace {
             .text_color(pal.text)
             .key_context("Workspace")
             .track_focus(&self.focus)
+            .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                let now = cx.background_executor().now();
+                this.doc.update(cx, |d, _| d.note_input(now));
+            }))
+            .capture_key_down(cx.listener(|this, _: &KeyDownEvent, _, cx| {
+                let now = cx.background_executor().now();
+                this.doc.update(cx, |d, _| d.note_input(now));
+            }))
             .on_action(cx.listener(|this, _: &Undo, _, cx| this.doc.update(cx, |d, cx| d.undo(cx))))
             .on_action(cx.listener(|this, _: &Redo, _, cx| this.doc.update(cx, |d, cx| d.redo(cx))))
             .on_action(cx.listener(|this, _: &ToggleVersionGraph, window, cx| this.toggle_history(window, cx)))

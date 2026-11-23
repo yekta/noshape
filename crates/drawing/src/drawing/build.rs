@@ -1372,6 +1372,17 @@ pub fn shown_text(drawing: &Drawing, si: usize, sources: &Sources, info: &SheetI
     }
 }
 
+/// A callout's text with its properties filled in (its part's BOM item: "1"): the Callout dialog's centre box once
+/// the anchor is picked (live workflows-1123 10 s15).
+pub fn callout_shown_text(drawing: &Drawing, si: usize, sources: &Sources, info: &SheetInfo, a: &Annotation) -> Option<String> {
+    let AnnotationKind::Balloon { text, .. } = &a.kind else { return None };
+    let sheet = drawing.sheets.get(si)?;
+    let fields = |k: &str| field_value(drawing, si, info, sources, k);
+    let (views, used, unresolved) = (HashMap::new(), std::cell::RefCell::new(Vec::new()), std::cell::RefCell::new(Vec::new()));
+    let env = Env { drawing, sheet, placements: &[], views: &views, sources, fields: &fields, revisions: &info.revisions, used: &used, unresolved: &unresolved, auto_marks: &[] };
+    Some(env.balloon_text(a, text))
+}
+
 /// A run of a hole callout preview line: its text and, for a value, which.
 pub type PreviewRun = (String, Option<super::HoleValue>);
 
