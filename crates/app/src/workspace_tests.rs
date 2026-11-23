@@ -281,6 +281,44 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// qa SPEED-FILE-TAB-IMPORT-MENU (live's menu closes at 58 ms): a STEP file tab's Import… opens the dialog at once and
+/// writes the import's temporary copy off the UI thread; Import waits for it and adds the Part Studio.
+#[gpui::test]
+fn a_file_tabs_import_opens_its_dialog_before_the_file_is_written(cx: &mut TestAppContext) {
+    let (w, ws, _) = workspace(cx, "file-tab-import");
+    let dir = std::env::temp_dir().join(format!("noshape-workspace-file-tab-import-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let step = dir.join("block.step");
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": dir.join("src.noshape").to_str().unwrap() }));
+        call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+        call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"][0]["id"].clone();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+        call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": step.to_str().unwrap() }));
+    }
+    let doc = cx.update(|cx| ws.read(cx).doc.clone());
+    let bytes = std::fs::read(&step).unwrap();
+    let file = doc.update(cx, |d, _| d.session.doc.add_tab("block.step", noshape_model::TabContent::File(noshape_model::file_tab::FileTab::new("block.step", &bytes, 0))));
+    let copy = std::env::temp_dir().join(format!("noshape-translate-{}-{file}", std::process::id())).join("block.step");
+    let _ = std::fs::remove_file(&copy);
+    let d = dialog_window(cx);
+    cx.update_window(d, |_, window, cx| ws.update(cx, |ws, cx| ws.translate_file(file, window, cx))).unwrap();
+    let open = |cx: &mut TestAppContext| cx.update_window(d, |_, window, cx| gpui_kit::component::WindowExt::has_active_dialog(window, cx)).unwrap();
+    assert!(open(cx), "the dialog at once");
+    assert!(!copy.exists(), "the copy is written off the UI thread");
+    draw(cx, d);
+    VisualTestContext::from_window(d, cx).simulate_keystrokes("enter");
+    cx.run_until_parked();
+    draw(cx, w);
+    assert!(!open(cx), "Import closed the dialog");
+    let tabs = doc.read_with(cx, |d, _| d.session.doc.ordered_tabs().iter().map(|t| t.name.clone()).collect::<Vec<_>>());
+    assert!(tabs.iter().any(|n| n == "block"), "the Part Studio: {tabs:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+    let _ = std::fs::remove_dir_all(copy.parent().unwrap());
+}
+
 /// Live upload-only-1118: a bare assembly file (.sldasm) gets the Import dialog's info box with ☐ Upload only; Import
 /// (Enter) does nothing until Upload only is ticked, then keeps the file as it is, as a file tab right after the active
 /// tab (not in CAD Imports, nothing translated), the view staying, with "probe.sldasm has been imported." and its link.

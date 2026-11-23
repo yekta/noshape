@@ -76,6 +76,27 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
     show(paths, false, keep_files, Rc::new(on_ok), window, cx);
 }
 
+/// A file tab's Import…: the dialog at once while `written` puts the file at `path`; Import waits for it.
+pub fn open_written(doc: Entity<DocModel>, path: PathBuf, written: Task<bool>, after: TabId, window: &mut Window, cx: &mut App) {
+    let written = std::cell::RefCell::new(Some(written));
+    let paths = vec![path];
+    let ok_paths = paths.clone();
+    let on_ok = move |c: Choice, _: &mut Window, cx: &mut App| {
+        let Some(written) = written.borrow_mut().take() else { return };
+        let (doc, paths) = (doc.clone(), ok_paths.clone());
+        cx.spawn(async move |cx| {
+            let ok = written.await;
+            cx.update(|cx| match ok {
+                true => import(&doc, &paths, c, Some(after), false, cx),
+                false => doc.update(cx, |_, cx| cx.emit(DocEvent::Error("Translate failed: cannot write a temporary file".into()))),
+            })
+        })
+        .detach();
+    };
+    // A CAD file tab's own Import… has no Join adjacent surfaces (live2 2403).
+    show(paths, false, false, Rc::new(on_ok), window, cx);
+}
+
 /// The documents page's Import files… (live dom/dialog-import-to-onshape.txt):
 /// the 590 px modal with three tiles, "Import to a single document", "Split
 /// into multiple documents" (each file its own document) and "Combine to a

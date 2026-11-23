@@ -1422,21 +1422,19 @@ impl Workspace {
 
     /// File tab › Import… (CAD files): the file through the Import dialog
     /// (Part Studio); a DXF / DWG makes a drawing.
-    fn translate_file(&mut self, id: TabId, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn translate_file(&mut self, id: TabId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(TabContent::File(f)) = self.doc.read(cx).session.doc.tab(id).map(|t| t.content.clone()) else { return };
-        let Some(bytes) = f.bytes() else { return };
         match f.kind() {
             noshape_model::file_tab::FileKind::Drawing2d => self.create_cad_drawing(id, window, cx),
             _ => {
-                // The Import dialog reads files from disk: hand it a temporary copy.
-                let dir = std::env::temp_dir().join(format!("noshape-translate-{}", id));
+                // The import reads a temporary copy, written off the UI thread while the dialog is open (qa
+                // SPEED-FILE-TAB-IMPORT-MENU: live's menu closes at 58 ms).
+                let dir = std::env::temp_dir().join(format!("noshape-translate-{}-{id}", std::process::id()));
                 let path = dir.join(&f.file_name);
-                if std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&path, &bytes)).is_err() {
-                    self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error("Translate failed: cannot write a temporary file".into())));
-                    return;
-                }
+                let target = path.clone();
+                let written = cx.background_spawn(async move { f.bytes().is_some_and(|b| std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(&target, b)).is_ok()) });
                 // Live doc-cad-file-import: the new tabs are added and the open tab stays.
-                crate::import_dialog::open(self.doc.clone(), vec![path], Some(id), false, window, cx);
+                crate::import_dialog::open_written(self.doc.clone(), path, written, id, window, cx);
             }
         }
     }
