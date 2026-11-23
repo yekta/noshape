@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 05:35 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 05:41 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -157,38 +157,20 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    (part pattern Add with NO_GEOMETRY_CHANGE -> error_shapes = the instances; regen tessellates them on Info; mod.rs
    draws an Info feature's error_mesh while open; T1 an_add_pattern_changing_nothing_draws_its_instances_red).
    Probes out of git: ~/core-keep/probes2.patch.
-0. IN TEST (core-rf, UNCOMMITTED; run .er2.sh on vibex8 -> /root/core-scratch/er2.log, task b72jr4rw2; then rerun it for
-   kernel_robustness/engine edits made during the run, already touched): ERR-SEL-RED-ALL-INPUTS: FeatureState/EvalCtx
-   `error_refs` (the inputs an error blames); set by extrude "Failed to extrude selections" (entities), thicken "Failed to
-   thicken all selections." (entities), chamfer "Failed to chamfer selections." (entities); scene Highlighting
-   `errors: &[Reference]` (was `error: bool`): only those red, other inputs orange; mod.rs passes failed_state.error_refs.
-   ERR-HOLE-DESTROYS-SILENT: hole.rs keeps the tool shapes as error_shapes on "The hole destroyed…" (engine.rs test checks
-   the mesh x -10..50 mm). ERR-LOFT-GUIDES-EMPTY: feature_dialog.rs an array entry without its pick reads "No selections"
-   (no UI test yet); the row tip order (live "Sketch 3, Sketch 2") not changed: live's other loft lists profile order.
-   T1s: features_c failed_extrude_reads_onshape_text (+depth0 red, upnext not), a_cylinder_thickened_past_its_axis_fails
-   (+error_refs), kernel_robustness oversize_chamfers_like_onshape (+edges blamed), scene edge_looks (errors slice).
-   Green -> commit, touch -c, land. qa 05:05 rescore: the other open core rows are in queued 318c67d5/96180a1c.
-0. HOSE-RINGS (dx 11-23; live exact everywhere, 144 edges no tolerance): the model's walls are accurate (sweep 1e-14,
-   smooth Shell by_smooth shell.cpp ~3025 inner edges 1e-7, edge tol 2.8e-7); dx's xt writer restores the offset
-   (offsets_restored) and cuts closed edges > 1e-8 off it: 6 rings a hose. Why: (a) END rings: the true offset meets the
-   cap plane 2.5e-8 off the iso-line (live: INTERSECTION offset x plane; dx can write that); (b) JOINTS: our sweep's 5
-   wall B-surfaces meet with normals 4.7e-5 rad apart, so the inner offsets are 4.7e-8 apart. Live: straight runs are
-   CYLINDERs (outer and inner), bends OFFSET_SURF(B_SURFACE), joints exact CIRCLEs / SP_CURVEs. dx TOOK the END rings
-   (writer INTERSECTION, 02:50). JOINTS mine. Probe probe_hose_lines (line-bend-line, Discrete): straight runs as LINES
-   give cylinders (OCCT KPart; as Bezier splines: SurfaceOfLinearExtrusion), but joint kink 1.2e-5 rad either way (pipe
-   SetTolerance features.cpp ~2105: 3D size*1e-6, angular 1e-2); tol 1e-10/ang 1e-12 -> kink 3.7e-8 but the smooth Shell
-   then splits a face (tol 3.2e-5) and x_t still 14->18 edges. Idea: shell of a round pipe = outer minus inner-circle sweep
-   (exact joints), or fix by_smooth with tight sweeps. Refit experiment: /root/core-scratch/hose-refit-exp.patch.
-0. qa ERR rows left after the above: LOFT-TITLE-SUFFIX is psui's (done); then the errors-1123 rest, then Fill 1.
-0. ERR-MISSING-SELECTION flag IN TEST (core-rf, uncommitted, after the set above): eval.rs drop_filtered_picks (a face
-   in a field without face bits, a non-planar face in a planar-only field, an edge in a field without edge/axis/point
-   bits; parts/feature fields skipped; built-in features only) -> mod.rs adds them to missing / missing_refs.
-   T1 features_c a_pick_its_field_refuses_is_missing. Then a full noshape-model run (it can drop picks in old tests).
-   FEATPATTERN-TITLE-SUFFIX: psui fixed it (0c1d80e6c), nothing for core.
-0. qa APPEAR P0s (TICKETS 01:5x): SUBTRACT-CUT-FACES (cut faces take the target's colour, not the tool feature's
-   appearance: part-studio-ui appearance.rs face_colors Feature target hits r.depends_on()==f), SPLIT-LOSES-COLOURS
-   (halves keep name "Red block", colour, face appearances; other parts' default names unchanged), PATTERN-COPY-COLOURS
-   (pattern/mirror copies keep colours and face appearances).
+0. QUEUED 7cc94a23 (11-23 05:40; full noshape-model 618 ok, scene + psui UI tests ok): FeatureState.error_refs (only
+   the blamed inputs red: extrude depth0/up-to region, thicken face, chamfer edges; others orange); hole that destroys
+   its part -> body red; empty loft guide row "No selections"; ERR-MISSING-SELECTION: eval.rs drop_filtered_picks (a
+   face in a field without face bits, a non-planar face in a planar-only field, an edge in a field without edge/axis/
+   point bits; parts/feature fields and custom features skipped) -> missing / missing_refs. Loft row tip order (live
+   "Sketch 3, Sketch 2") not changed: live's other loft lists profile order. FEATPATTERN-TITLE-SUFFIX: psui's 0c1d80e6c.
+0. APPEAR P0s IN TEST (core-rf uncommitted; .er4.sh on vibex8 -> /root/core-scratch/er4.log): Context.part_source
+   (split pieces -> target, keeps name; part pattern/mirror/transform/copy-part/feature-pattern copies -> source) and
+   regen/display.rs inherits part_properties appearance (and a split piece's name) along it; part-studio-ui
+   appearance.rs lineage(): face and feature appearances follow Split parents and Role::Copy sources. T1 features_c
+   split_pieces_and_pattern_copies_keep_their_parts_appearance, psui unit copies_and_split_pieces_keep_their_faces_appearances.
+   Green -> commit, land. Left: SUBTRACT-CUT-FACES (cut faces take the target's colour even with a feature appearance
+   on the tool's feature: tool faces keep their names in a subtract, so face_colors can't tell; needs a mark on them),
+   "default names unchanged" part of SPLIT-LOSES-COLOURS (alloc_part_name for the pieces).
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
