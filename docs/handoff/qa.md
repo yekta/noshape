@@ -5,14 +5,14 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 02:3x (after a compaction, first)
-- **DONE 01:2x-02:3x** (TICKETS, owners told): errors-1123 sets a/b/c (37 rows), appearance-1123 (12), IMPELLER-SHELL-INVALID ok,
-  workflows-1123 01-12 rescored 02:1x on ed11f7c48 (out-wf23g/f: 8 verified, 7 partly, UIS-MATE-PATTERN-ROW reopened); live notes on
-  CLICK-EMPTY-SELECTS-PLANE, LINE-STORES-PERPENDICULAR, FIELD-RANGE-TIP-ENTER, MC-PS-MARKER-REACH; SPEED-IMPELLER split (bool/blend).
-- DONE 02:3x: import fidelity (8 STEPs) filed TICKETS "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm), told. Not checked: NEMA BOMs, toast duration,
-  dialog focus. Xvfb :496 on vibe2 left running by the subagent (not ours to kill by pid). Data qa-scratch/imp.
+## IN FLIGHT 04:0x (after a compaction, first)
+- **DONE 01:2x-03:0x** (TICKETS, owners told): errors-1123 a/b/c (37 rows), appearance (12), wf-1123 01-12 (02:1x) and 13-20 (03:0x),
+  import fidelity "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm; data qa-scratch/imp; Xvfb :496 on vibe2 is the subagent's, left running).
 - **Subagent 03:4x**: sketch tools vs live/sketch-tools-1123 (brief qa-scratch/brief-sk23.md, vibe2 :498, scratch qa-scratch/sk23) -> file SKT-* (skasm), tell skasm. dx 3b6086ed + psui 0c1d80e6/7e017ac17 on main 03:39, waiting for green.
-  If its notification never comes, read qa-scratch/imp and rerun from the brief.
+- **CUT v0.4.68 (lead 03:5x)**: unit qa-cut0468 (tmp/cut0468.sh): first green with 0c1d80e6c -> qa-compat-loop (now 0.4.67) checks it ->
+  CUT_G=<g> cut-verdict.sh -> qa-alerts; if none by 04:30, 0c1d80e6c CLI built in qa-bisect (qa-cand0468) + COMPAT_BIN compat-check. Timers
+  qa-cut-0415/0450 stopped today, restarted 05:02 by qa-timers-back. Add the verdict + rings-loft/impeller/surface-pattern lines for the lead.
+  dx 79b0abcb (import fidelity) -> qa-wimp "IN-GREEN" -> subagent from qa-scratch/brief-impver.md.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
   wf-1122 12 out-wfv4: ROTATE-EDGE-SENSE, EDIT-BODY-SHADE, CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN);
