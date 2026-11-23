@@ -1558,6 +1558,8 @@ impl PartStudioView {
         // (An Add pattern that changes nothing, an info, shows its instances so too: live lp-dist0.)
         let failed_state = self.edit.as_ref().and_then(|e| self.display.feature_state(e.dialog.read(cx).feature.id)).filter(|s| failing || s.status == noshape_model::display::FeatureStatus::Info);
         let error_mesh = failed_state.and_then(|s| s.error_mesh.clone());
+        // A failed Fillet's attempted round (magenta) keeps its picks orange (live errors-1123).
+        let attempt = failed_state.is_some_and(|s| s.debug.colored.iter().any(|c| matches!(c, noshape_model::display::ColoredDebug::Solid(..))));
         if let Some(m) = &error_mesh {
             extra.extend(scene_builder::error_geometry(m, true, self.gpu.uploader()));
         }
@@ -1647,7 +1649,7 @@ impl PartStudioView {
         // A plane being resized: its highlight follows the drag.
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
-        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none(), dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)), faces_hovered: !sm_lit.is_empty() }, self.gpu.uploader());
+        let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, scene_builder::Highlighting { error: failing && error_mesh.is_none() && !attempt, dialog: self.edit.is_some(), untinted_parts: self.edit.is_some() || self.ui.appearance_edit.as_ref().is_some_and(|e| matches!(e.target, appearance::EditTarget::Parts(_))), curves_hovered: self.sketch.is_none() && self.ui.list_hover.is_some_and(|f| self.display.sketches.iter().any(|s| s.feature == f)), faces_hovered: !sm_lit.is_empty() }, self.gpu.uploader());
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }

@@ -1774,7 +1774,7 @@ export const debugProbe = defineFeature(function(context is Context, id is Id, d
         .colored
         .iter()
         .map(|d| match d {
-            ColoredDebug::Faces(_, c) => ("face", *c),
+            ColoredDebug::Faces(_, c) | ColoredDebug::Solid(_, c) => ("face", *c),
             ColoredDebug::Line(_, c) => ("line", *c),
             ColoredDebug::Point(_, c) => ("point", *c),
         })

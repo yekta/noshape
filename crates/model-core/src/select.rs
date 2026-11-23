@@ -152,7 +152,7 @@ fn curvature_sign(b: &Body, f: usize, m: DVec3) -> i32 {
 /// 0 neither. Like Onshape (query.fs, qConvexConnectedFaces): a tangent
 /// edge is convex when one face curves convexly and the other is flat or
 /// convex (an exterior fillet's edges), concave in the opposite case.
-fn edge_convexity(b: &Body, e: usize, fa: usize, fb: usize) -> i32 {
+pub(crate) fn edge_convexity(b: &Body, e: usize, fa: usize, fb: usize) -> i32 {
     let Some(m) = edge_mid(b, e) else { return 0 };
     if smooth_edge(b, e, fa, fb) {
         let (ka, kb) = (curvature_sign(b, fa, m), curvature_sign(b, fb, m));
@@ -629,9 +629,12 @@ pub fn with_pattern_instances(ctx: &Context, found: &[Reference]) -> Vec<Referen
 /// width's chord per radius).
 pub fn fillet_handle(ctx: &Context, edge: &Reference) -> Option<(DVec3, DVec3, f64, f64)> {
     let (b, kind, e) = body_of(ctx, edge)?;
-    if kind != ShapeType::Edge {
-        return None;
-    }
+    // A picked face: on one of its edges between two faces (live errors-1123: a round of a block's top face).
+    let e = match kind {
+        ShapeType::Edge => e,
+        ShapeType::Face => b.shape.edge_faces().ok()?.iter().position(|f| f.len() == 2 && f.contains(&(e as u32)))?,
+        _ => return None,
+    };
     let m = edge_mid(b, e)?;
     let &[fa, fb] = b.shape.edge_faces().ok()?.get(e)?.as_slice() else { return None };
     let normal = |f: u32| b.shape.sub_shape(ShapeType::Face, f as usize).ok()?.normal_at_point(m).ok().map(|v| v.normalize_or_zero());

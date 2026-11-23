@@ -1,48 +1,50 @@
 # Blends (agent "blend"): current state
 
-Updated 11-23 00:53 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
+Updated 11-23 02:12 UTC. History: docs/handoff/archive/blend.md. Rulings: docs/DECISIONS.md.
 
 Owns fillets, chamfers, face blends: crates/kernel/cpp/features.cpp (op_fillet, scaled / checked builds,
 fillet_by_tools), blend_direct.cpp (the direct build), crates/kernel/src/rim_chamfer.rs, model-core
 regen/features/detail.rs, detail_a.rs, blend_section.rs (sections, rolling balls, run-ons, rims), custom host ops.rs
 (opChamfer / opFillet).
 
-## Now (11-23 00:53 UTC)
+## Now (11-23 02:12 UTC)
 
-- ORDER: knifehandle Fillet 1 (below; a fold-handling build, large) -> c2-surfaces-lofts-projected's Face blend 2 (core
-  11-22: feature 9 ERROR "Failed to blend faces", live OK, 8 -> 9/45 after core's Loft 1 fix e3e73b362) -> Suspension's
-  cusp end -> scissor 2d82a0 F13. Speed follow-up: knifehandle Fillet 2 ~6 s (below).
-- Impeller bisect (qa, Part 3 invalid since 0.4.65): NOT blend's (qa's bisect-imp.log: my 11-21 trio valid).
-- NOT YET LANDED (blend10 branch blend-khtip, 6ee607290 on 02cea338f, squashed): knifehandle Chamfer 1 (7/15/10) +
-  Fillet 2 (11/27/18): chamfer section tangent along the walk; Fillet 2 tip caps < sewing tol dropped, run-on over
-  free-form faces cut by the tip faces' whole surfaces, ball builds fork their supports. Gate: features 408/0, g13 OK;
-  the PAIR never got a vibex7 slot (queue 6 deep 22:31-00:10); restarted 00:10 11-23 as systemd unit blend-khpair
-  (bin/kh-pair.sh -> logs/kh-pair.out, "== done" at the end, cmp in suite-khf2.cmp). If clean: `git diff --stat
-  origin/main...HEAD` in blend10 (4 files), land.sh from blend10.
-- LIVE ERRORS (live/errors-1123/fillet.md, chamfer.md): our messages match. To test (T1, a 40x30x10 block's top front
-  edge): Chamfer TWO_DISTANCES 5/40, 12/45 (both ways), 35/35 BUILD in live (a flat cut kept while part of the block
-  is left); Equal 45 fails. Fillet R20 on the top face fails; an L part's concave corner R12 fails, R9 builds.
-- FILLET 2 SPEED: ~6 s on the doc's input (live time unrecorded; main errored in 0.4 s). 3.7 s is two splits of each
-  236 mm round's whole tool by the tip bevel faces' surfaces (the bevels run the blade's length beside the round, so
-  OCCT intersects along all of it). Ideas: split only the tool's tip end (pieces per tool are a Vec already) or cut the
-  two tools in parallel.
-- KNIFEHANDLE FILLET 1 (live: Handle 2/1/1 205332.687 mm3 -> 6/10/7 205165.767, removes 167 mm3; a 4.5 mm CONIC rho
-  0.5 round of the closed 140.75 mm cap edge). Live faces (live.jsonl line 32 bodies JnD): band 487.8, top 118.4 (y
-  +-8.22, z 6.13-11.41), two transitions 16.3, cap 1121.2 (z <= 6.781), wall 22061.8; edges band-wall 117.7, band-cap
-  105.6, top-cap 17.0, top-wall 13.2, band-trans 6.06 x2, trans-top 7.75 x2, trans-wall 4.0 x2.
-  FOUND (blend12, probe bin/kh-f1balls.sh, ZZ_BALLS prints each station): (1) the edge's parameter runs ~20x faster in
-  one stretch: stations even in parameter looked like a jump -> stations now even in arc length (`at` by a 256-span
-  length table) and the jump checks compare a centre's step with the edge point's step; (2) a closed edge's first
-  ball found the handle's far side from a stale projection seed -> Support::reseed before the first guess; (3) the
-  cap's top has two humps (z 11.76 at y +-6.7, dip z 10.54 at y 0) bending tighter than the round: the ball centres
-  run forward, back, forward (stations ~ k14-16 and k23-25 of 76) -> "zones" from the last ball before the turn to
-  the first past it; there the ball interpolated between those two and the section's sides run along the faces to
-  the edge point (fn bend_section). With that: ball loft VALID, 154 mm3 (live removes 167). The direct build then
-  declined: the loft's sides strayed up to 1 mm off the tightly curved wall between sections (ZZ_LIES prints
-  lies_on's failing sample) -> now 4 sections per station around each zone (+-2 stations), run at 00:50 -> logs/kh-f1balls6.out.
-  If the sides still stray: relax lies_on to the samples near the touch curve, or build those stretches as their
-  own tools (live's own split: band / 2 transitions / top). Input kept at vibex7 ~/agents/blend-keep/kh-f1-input.brep
-  (make it a test input).
+- ORDER: land 6ee607290 (pair) -> land ERR-FILLET-FAIL-PREVIEW (blend-fp) -> knifehandle Fillet 1 -> Face blend 2
+  (c2-surfaces-lofts-projected feature 9 "Failed to blend faces", live OK) -> Suspension's cusp end -> scissor 2d82a0
+  F13 -> Fillet 2 speed (~6 s: split only the tool's tip end, or cut the two tools in parallel).
+- NOT YET LANDED (blend10 branch blend-khtip, 6ee607290 on 02cea338f): knifehandle Chamfer 1 + Fillet 2. Gate
+  features 408/0, g13 OK. PAIR moved to vibe2 (lead 01:2x: vibex7's queue too deep) as systemd unit blend-khpair2
+  (bin/kh-pair.sh, PAIR_HOST default vibe2 -> logs/kh-pair.out, "== done", cmp suite-khf2.cmp), started 01:26.
+  If clean: `git diff --stat origin/main...HEAD` in blend10 (4 files), NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh.
+  Don't edit blend10 until the pair is done (its new run syncs blend10 after the base run).
+- P0 ERR-FILLET-FAIL-PREVIEW (qa TICKETS 01:5x "set a"; worktree blend-fp, branch blend-failpreview on 95e523939,
+  uncommitted): a fillet failing "Failed to fillet selections." shows the round it tried: detail.rs attempted_round
+  (each edge's ball strip along its length from the faces' tangent planes, 32 stations on curves) as
+  display::ColoredDebug::Solid (new: lit opaque faces among the model + edges, scene builder debug_geometry), magenta;
+  part-studio-ui keeps picks orange when the failed state has a Solid (`attempt`); select::fillet_handle on a picked
+  face uses one of its edges (live's arrow with the top face picked); select::edge_convexity pub(crate). Tests:
+  kernel_robustness two_distance_chamfers_past_the_faces_build_as_live + oversize_fillets_fail_as_live (the live
+  error catalogue; attempt 4 strips / 16 edges / lowest z -10 mm; L corner R12 3 strips, R9 none), feedback matrix row
+  "error / a fillet too big shows the round it tried", interaction-feel.md row. Run going -> logs/fp-tests.out. Then
+  ticket [x] fixed, commit, land (part-studio-ui + model-core + scene: clippy them).
+- KNIFEHANDLE FILLET 1 (live 6/10/7, removes 167 mm3; 4.5 mm CONIC rho 0.5 round of the closed 140.75 mm cap edge).
+  Live faces (live.jsonl line 32 bodies JnD): band 487.8, top 118.4, two transitions 16.3 (box x -0.47..3.91, y
+  6.26..9.99, z 6.78..11.40), cap 1121.2, wall 22061.8; edges band-wall 117.7, band-cap 105.6, top-cap 17.0, top-wall
+  13.2, band-trans 6.06 x2, trans-top 7.75 x2, trans-wall 4.0 x2 (no trans-cap edge).
+  FOUND (blend12, bin/kh-f1balls.sh, ZZ_BALLS/ZZ_LIES): arc-length stations; Support::reseed; at the two humps the
+  planes square to the edge cross within the ball (the "turn back" was that, not the round): stations from 2 before
+  to 2 past each turn replaced by balls in planes square to the chord between those two centres (8 a station): the
+  centres then run on smoothly. The WALL CONTACT JUMPS ~4 mm there (a ball touching the wall at both ends of a gap):
+  the bisected ball c (3.626, 6.355, 6.889), cap contact (-0.469, 8.218, 6.771), wall contacts (3.897, 9.733, 9.851)
+  and (3.889, 6.412, 11.382) = live's transition box exactly. So live's transition = a 3-sided patch from that ball's
+  cap contact across the wall gap. Code (uncommitted in blend12): ball_wire (ball_section's edge-point Newton + sides,
+  shared), fan_section (a section from a cap point to a wall point, tangent to both faces, ball-like weight), in the
+  zones: jump detection (a contact step > 4x the centre step), bisection (ball seeded on the near contact until the
+  wall's global foot comes within r: the second hump's reseeded solve failed "no rolling ball fits" at um 0.645),
+  16 fan sections across the gap (plane normals lerped, wall point = the wall in that plane nearest the ball). One
+  loft for now (3 faces); live's topology needs band / fan / top as separate tools later. Run going ->
+  logs/kh-f1balls11.out. Last result before the fans: loft valid 153 mm3, direct build "a part face that wouldn't
+  split" (sides 1 mm off the wall across the gap). Old bend_section is now unused (delete when cleaning up).
 - Probe worktree blend12 (branch blend-khf1 on 0322a568e, never land): ZZ_SBDUMP (each section_blend call's body +
   edges, ZZSB timing), ZZSPLIT (run-on split timings), ZZ_MAXSTEP, ZZ_SPLITN / ZZ_N (pieces / sections), tests
   zz_khchain (ZZ_BREP), zz_f2_on (ZZ_F2IN), zz_f1_on (ZZ_F1IN: edges, faces, curvature, fillet result). Scripts:

@@ -3143,6 +3143,93 @@ fn oversize_chamfers_like_onshape() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
+/// Live's error catalogue (errors-1123, the 40 × 30 × 10 block's top front edge): Two distances build even past both
+/// faces (5/40, 12/45 either way, 35/35: the bevel runs out through the bottom or the back), Equal distance 45 cuts
+/// the whole section away ("Failed to chamfer selections."). Volumes are the bevel's exact prism.
+#[test]
+fn two_distance_chamfers_past_the_faces_build_as_live() {
+    let mut base = T::new();
+    base.block(40.0, 30.0, 10.0);
+    let front = base.edges_where(|i| !vertical(i) && (i.start.z - 0.01).abs() < 1e-9 && i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    assert_eq!(front.len(), 1);
+    let two = |t: &mut T, d1: &str, d2: &str, opposite: bool| {
+        t.add("chamfer", &[("entities", q(front.clone())), ("chamferType", en("TWO_OFFSETS")), ("width1", e(d1)), ("width2", e(d2)), ("oppositeDirection", ParamValue::Bool(opposite)), ("tangentPropagation", ParamValue::Bool(true))])
+    };
+    // (d1, d2, the two volumes (top distance first, then front first), their face counts)
+    let cases = [("5 mm", "40 mm", [10250.0, 8250.0], [6, 6]), ("12 mm", "45 mm", [7733.3333, 2700.0], [6, 5]), ("35 mm", "35 mm", [500.0, 500.0], [5, 5])];
+    let mut bad = Vec::new();
+    for (d1, d2, want, faces) in cases {
+        let mut got = Vec::new();
+        for opposite in [false, true] {
+            let mut t = base.fork();
+            let f = two(&mut t, d1, d2, opposite);
+            let (st, msg, v) = status(&mut t, f);
+            let n = t.regen().context.bodies.first().map_or(0, |b| b.faces.len());
+            if st != FeatureStatus::Ok {
+                bad.push(format!("{d1}/{d2} opposite {opposite}: {st:?} {msg:?}"));
+            }
+            got.push((v, n));
+        }
+        got.sort_by(|a, b| b.0.total_cmp(&a.0));
+        let ok = got.iter().zip(want.iter().zip(faces)).all(|(&(v, n), (&wv, wf))| (v - wv).abs() < 5e-3 && n == wf);
+        if !ok {
+            bad.push(format!("{d1}/{d2}: {got:?}, live {want:?} {faces:?}"));
+        }
+    }
+    let mut t = base.fork();
+    let f = t.chamfer(front.clone(), "45 mm");
+    let (st, msg, v) = status(&mut t, f);
+    if (st, msg.as_deref()) != (FeatureStatus::Error, Some("Failed to chamfer selections.")) || (v - 12000.0).abs() > 5e-3 {
+        bad.push(format!("Equal 45: {st:?} {msg:?} {v} mm³"));
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// Live's error catalogue (errors-1123): a 20 mm round of the 40 × 30 × 10 block's whole top face fails; on an L
+/// part (arms 10 wide, 10 tall) the concave corner's two top edges and its vertical edge round at R9, not at R12.
+#[test]
+fn oversize_fillets_fail_as_live() {
+    let mut t = T::new();
+    t.block(40.0, 30.0, 10.0);
+    let top = t.faces_where(|c| (c.z - 10.0).abs() < 1e-6);
+    assert_eq!(top.len(), 1);
+    let f = t.add("fillet", &[("entities", q(top)), ("radius", e("20 mm")), ("tangentPropagation", ParamValue::Bool(true))]);
+    let (st, msg, v) = status(&mut t, f);
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Failed to fillet selections.")), "{v} mm³");
+    assert!((v - 12000.0).abs() < 5e-3, "{v} mm³");
+    // The round it tried, magenta: one strip a top edge, hanging past the 10 mm sides (live fillet-too-big-vp).
+    let attempt = |t: &mut T, f: FeatureId| {
+        let r = t.regen();
+        let st = r.display.features.iter().find(|s| s.id == f).expect("feature state");
+        st.debug.colored.iter().find_map(|c| match c {
+            noshape_model::display::ColoredDebug::Solid(m, rgb) => Some((m.face_ranges.len(), m.edges.len(), m.positions.iter().map(|p| p[2]).fold(f32::MAX, f32::min), *rgb)),
+            _ => None,
+        })
+    };
+    let (strips, edges, low, rgb) = attempt(&mut t, f).expect("the attempted round");
+    assert_eq!((strips, edges, rgb), (4, 16, [255, 0, 255]));
+    assert!((low - (0.01 - 0.02)).abs() < 1e-6, "lowest {low} m");
+
+    let mut base = T::new();
+    let (_, regions) = base.sketch(&[&[(60.0, 0.0), (90.0, 0.0), (90.0, 10.0), (70.0, 10.0), (70.0, 30.0), (60.0, 30.0)]], &[]);
+    base.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+    let into = |i: &noshape_kernel::EdgeInfo| {
+        let at = |p: glam::DVec3| (p.x - 0.07).abs() < 1e-9 && (p.y - 0.01).abs() < 1e-9;
+        if vertical(i) { at(i.start) } else { (i.start.z - 0.01).abs() < 1e-9 && (at(i.start) || at(i.end)) }
+    };
+    let corner = base.edges_where(into);
+    assert_eq!(corner.len(), 3);
+    for (r, fails) in [("9 mm", false), ("12 mm", true)] {
+        let mut t = base.fork();
+        let f = t.fillet(corner.clone(), r);
+        let (st, msg, v) = status(&mut t, f);
+        let want = if fails { (FeatureStatus::Error, Some("Failed to fillet selections.")) } else { (FeatureStatus::Ok, None) };
+        assert_eq!((st, msg.as_deref()), want, "R{r}: {v} mm³");
+        assert_eq!(attempt(&mut t, f).map(|a| a.0), fails.then_some(3), "R{r}");
+        assert!(fails == ((v - 5000.0).abs() < 5e-3), "R{r}: {v} mm³");
+    }
+}
+
 /// A chamfer of a 40 mm cube's whole top rim (live core q-chamfer-top-face-1120): edges that meet at the corners may
 /// set back until their strips meet mid-face (d 20, a pyramid on a 20 mm box), not past (20.5, 30, 40 fail).
 #[test]

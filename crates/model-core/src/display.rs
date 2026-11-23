@@ -593,6 +593,9 @@ pub struct DebugGeometry {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ColoredDebug {
     Faces(Arc<MeshBuffers>, [u8; 3]),
+    /// A failed feature's attempt (a Fillet's rounds that didn't fit, live errors-1123): lit, opaque faces among the
+    /// model's, their edges in the same colour.
+    Solid(Arc<MeshBuffers>, [u8; 3]),
     Line(Vec<[f32; 3]>, [u8; 3]),
     Point([f32; 3], [u8; 3]),
 }
@@ -600,7 +603,7 @@ pub enum ColoredDebug {
 impl PartialEq for ColoredDebug {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::Faces(a, ca), Self::Faces(b, cb)) => Arc::ptr_eq(a, b) && ca == cb,
+            (Self::Faces(a, ca), Self::Faces(b, cb)) | (Self::Solid(a, ca), Self::Solid(b, cb)) => Arc::ptr_eq(a, b) && ca == cb,
             (Self::Line(a, ca), Self::Line(b, cb)) => a == b && ca == cb,
             (Self::Point(a, ca), Self::Point(b, cb)) => a == b && ca == cb,
             _ => false,

@@ -190,6 +190,27 @@ fn rows() -> Vec<Row> {
             // (Live's recorder reads the field itself "ok": fillet-too-big; the entry is what turns red.)
             expect((d["titleState"].as_str(), query["state"].as_str(), entry_red, tip.as_str()), (Some("error"), Some("ok"), true, "Fillet 1 did not regenerate properly: Failed to fillet selections."), "(title, field, its entry red, title's tooltip)")
         } },
+        Row { id: "error / a fillet too big shows the round it tried", live: "live errors-1123 fillet too-big (R20 on the block's top face): the attempted fillet drawn in magenta (255, 0, 255) strips, the face's picks kept orange, the radius manipulator shown", gap: false, check: |cx| {
+            let json = serde_json::json!({ "units": "mm", "features": [
+                { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+                { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+                { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["face through [20, 15, 10]"], "radius": "20 mm" } }
+            ] });
+            let (window, view) = start(cx, "fb-fail-attempt", json);
+            let id = feature_id(cx, &view, "Fillet 1");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let got = cx.update(|cx| {
+                let v = view.read(cx);
+                let magenta = v.display.feature_state(id).is_some_and(|s| s.debug.colored.iter().any(|c| matches!(c, noshape_model::display::ColoredDebug::Solid(_, [255, 0, 255]))));
+                let states = &v.viewport.read(cx).scene().states;
+                let picks = v.edit.as_ref().map(|e| e.dialog.read(cx).feature.params.query("entities").to_vec()).unwrap_or_default();
+                let red = v.built.as_ref().is_some_and(|b| picks.iter().flat_map(|r| b.picks.ids_for(r)).any(|&id| states.get(id as usize).is_some_and(|s| s & noshape_render::scene::state::ERROR != 0)));
+                (magenta, picks.len(), red, v.current_manip(cx).is_some())
+            });
+            expect(got, (true, 1, false, true), "(the attempt in magenta, the picks, any drawn red, the radius manipulator)")
+        } },
         Row { id: "error / an edge a chamfer dragged above consumed: its chip Missing", live: "workflow 33 steps 23-26 (qa FEAT-MISSING-REF-CHIP): Fillet 1's chip reads 'Missing Edge of Extrude 1' in red; its menu Clear all / Clear missing references / Edit healthy moment", gap: false, check: |cx| {
             let json = serde_json::json!({ "units": "mm", "features": [
                 { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },

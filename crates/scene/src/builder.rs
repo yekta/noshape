@@ -1848,6 +1848,7 @@ pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Upload
         lines.push_polyline(pl, color, 0, 2.5, LineSegment::ON_TOP);
     }
     let mut points = Vec::new();
+    let mut solid_lines = LineData::default();
     for item in &debug.colored {
         match item {
             ColoredDebug::Faces(mesh, [r, g, b]) => {
@@ -1856,6 +1857,13 @@ pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Upload
                 let mut fill = noshape_render::srgb(*r, *g, *b);
                 fill[3] = 0.5;
                 out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(fill).on_top().unpickable().ignore_clip().layer(8));
+            }
+            ColoredDebug::Solid(mesh, [r, g, b]) => {
+                let m = MeshData { positions: mesh.positions.clone(), normals: mesh.normals.clone(), pick_ids: vec![0; mesh.positions.len()], indices: mesh.indices.clone() };
+                out.push(Instance::new(Drawable::Mesh(up.upload_mesh(&m))).with_color(noshape_render::srgb(*r, *g, *b)).unpickable().ignore_clip().layer(8));
+                for pl in &mesh.edges {
+                    solid_lines.push_polyline(pl, [*r, *g, *b, 255], 0, 2.0, 0);
+                }
             }
             ColoredDebug::Line(pl, [r, g, b]) => lines.push_polyline(pl, [*r, *g, *b, 255], 0, 2.0, LineSegment::ON_TOP),
             ColoredDebug::Point(p, [r, g, b]) => points.push(PointSprite { position: *p, color: [*r, *g, *b, 255], pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 }),
@@ -1866,6 +1874,9 @@ pub fn debug_geometry(debug: &noshape_model::display::DebugGeometry, up: &Upload
     }
     if !lines.segments.is_empty() {
         out.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
+    }
+    if !solid_lines.segments.is_empty() {
+        out.push(Instance::new(Drawable::Lines(up.upload_lines(&solid_lines))).per_primitive_color().unpickable().ignore_clip().layer(12));
     }
     if !debug.points.is_empty() {
         let c = lin_to_u8(theme::lin(theme::viewport::DEBUG_MAGENTA_POINT));

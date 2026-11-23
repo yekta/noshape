@@ -466,7 +466,92 @@ fn in_onshape_words(r: FResult<()>, message: &str) -> FResult<()> {
 }
 
 pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
-    in_onshape_words(fillet_in(ev), "Failed to fillet selections.")
+    let r = in_onshape_words(fillet_in(ev), "Failed to fillet selections.");
+    if r.as_ref().is_err_and(|e| e.message == "Failed to fillet selections.") {
+        attempted_round(ev);
+    }
+    r
+}
+
+/// A fillet that fails shows the round it tried (live errors-1123, too big and a concave corner): each edge's ball strip
+/// along its whole length, in lit magenta with magenta edges, among the model.
+fn attempted_round(ev: &mut EvalCtx) {
+    const MAGENTA: [u8; 3] = [255, 0, 255];
+    const ARC: usize = 12;
+    let r = match () {
+        _ if ev.is("blendControlType", "WIDTH") => ev.length("width").map(|w| w / std::f64::consts::SQRT_2),
+        _ if ev.is("crossSection", "CONIC") || ev.is("crossSection", "CURVATURE") => ev.length("nonCircularRadius"),
+        _ => ev.length("radius"),
+    };
+    let Some(r) = r.ok().filter(|&r| r > 0.0) else { return };
+    let refs = ev.query("entities");
+    let mut mesh = crate::display::MeshBuffers::default();
+    for (bi, edges) in by_body(sharp_of_picked_faces(ev, refs)) {
+        let Some(body) = ev.ctx.bodies.get(bi) else { continue };
+        let (Ok(ef), all, faces) = (body.shape.edge_faces(), body.shape.edges(), body.shape.faces()) else { continue };
+        for e in edges {
+            let (Some(edge), Some(&[fa, fb])) = (all.get(e), ef.get(e).map(Vec::as_slice)) else { continue };
+            let Ok(info) = edge.edge_info() else { continue };
+            if info.degenerated {
+                continue;
+            }
+            let side = if crate::select::edge_convexity(body, e, fa as usize, fb as usize) >= 0 { 1.0 } else { -1.0 };
+            let stations = if matches!(info.curve, k::Curve::Line { .. }) { 2 } else { 32 };
+            let mut rings: Vec<Vec<(DVec3, DVec3)>> = Vec::new();
+            for i in 0..stations {
+                let t = info.first_param + (info.last_param - info.first_param) * i as f64 / (stations - 1) as f64;
+                let Ok(p) = edge.point_at(t) else { continue };
+                let (Ok(n0), Ok(n1)) = (faces[fa as usize].normal_at_point(p), faces[fb as usize].normal_at_point(p)) else { continue };
+                let (n0, n1) = (n0.normalize_or_zero(), n1.normalize_or_zero());
+                let d = 1.0 + n0.dot(n1);
+                if d < 1e-6 {
+                    continue;
+                }
+                // The ball touching both faces' tangent planes: in the material at a convex edge, outside at a concave.
+                let c = p - (n0 + n1) * (side * r / d);
+                let (v0, v1) = (n0 * side * r, n1 * side * r);
+                let turn = (v0.dot(v1) / (r * r)).clamp(-1.0, 1.0).acos();
+                if turn < 1e-6 {
+                    continue;
+                }
+                rings.push(
+                    (0..=ARC)
+                        .map(|k| {
+                            let u = k as f64 / ARC as f64;
+                            let q = (v0 * ((1.0 - u) * turn).sin() + v1 * (u * turn).sin()) / turn.sin();
+                            (c + q, q * (side / r))
+                        })
+                        .collect(),
+                );
+            }
+            if rings.len() < 2 {
+                continue;
+            }
+            let f32s = |v: DVec3| v.as_vec3().to_array();
+            let base = mesh.positions.len() as u32;
+            for ring in &rings {
+                for &(q, n) in ring {
+                    mesh.positions.push(f32s(q));
+                    mesh.normals.push(f32s(n));
+                }
+            }
+            let first = mesh.indices.len() as u32;
+            let w = (ARC + 1) as u32;
+            for i in 0..rings.len() as u32 - 1 {
+                for k in 0..ARC as u32 {
+                    let (a, b) = (base + i * w + k, base + (i + 1) * w + k);
+                    mesh.indices.extend([a, b, b + 1, a, b + 1, a + 1]);
+                }
+            }
+            mesh.face_ranges.push((first, mesh.indices.len() as u32 - first));
+            let end = rings.len() - 1;
+            mesh.edges.extend([0, end].map(|i| rings[i].iter().map(|&(q, _)| f32s(q)).collect()));
+            mesh.edges.extend([0, ARC].map(|k| rings.iter().map(|ring| f32s(ring[k].0)).collect()));
+        }
+    }
+    if !mesh.indices.is_empty() {
+        ev.debug.colored.push(crate::display::ColoredDebug::Solid(std::sync::Arc::new(mesh), MAGENTA));
+    }
 }
 
 fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {

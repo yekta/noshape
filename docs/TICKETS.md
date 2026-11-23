@@ -599,6 +599,8 @@ Enter on out-of-range values (✓ checked: disabled, as live).
 - [ ] P0 **ERR-SWEEP-FAIL-BODY (core)**: sweep/tight-bend, profile-in-path-plane: live draws the failed sweep dark red, translucent, red edges; ours nothing. ERR-SWEEP-TIGHT-BEND-1123.png
 - [ ] P0 **ERR-FILLET-FAIL-PREVIEW (blend)**: fillet too big / concave corner: live draws the attempted fillet magenta (255,0,255), keeps the selection orange and shows the radius manipulator; ours red edges, no magenta, no manipulator. ERR-FILLET-TOO-BIG-1123.png
 - [ ] STILL OPEN (qa 05:05, green 975bab060: title hover still adds " A parameter value is not valid.") P0 **ERR-LOFT-TITLE-SUFFIX (core)**: Loft with no profiles: our title hover appends " A parameter value is not valid."; same root as ERR-FEATPATTERN-TITLE-SUFFIX (01:2x). ERR-LOFT-EMPTY-1123.png
+- [x] fixed P0 **ERR-FILLET-FAIL-PREVIEW (blend)**: fillet too big / concave corner: live draws the attempted fillet magenta (255,0,255), keeps the selection orange and shows the radius manipulator; ours red edges, no magenta, no manipulator. ERR-FILLET-TOO-BIG-1123.png
+- [ ] P0 **ERR-LOFT-TITLE-SUFFIX (core)**: Loft with no profiles: our title hover appends " A parameter value is not valid."; same root as ERR-FEATPATTERN-TITLE-SUFFIX (01:2x). ERR-LOFT-EMPTY-1123.png
 - Range tooltip ("Enter a value between 0.0100 and 500000. Current value is 0.", Draft "between 0 and 89.9…") missing on shell/fillet/chamfer zero and draft 90 too: see ERR-FIELD-RANGE-TIP-ENTER (01:4x, psui). ERR-SHELL-ZERO-N-1123.png
 - P3 shell/hollow-too-thick: ours draws an orange outline over the red edges. ERR-SHELL-HOLLOW-TOO-THICK-1123.png
 
