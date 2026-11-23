@@ -2418,6 +2418,8 @@ fn a_geometric_tolerance_clicked_on_an_edge_is_placed_there_and_the_next_click_p
     let (a, b, out) = horizontal_edge(cx, &editor);
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
     draw(cx, window);
+    VisualTestContext::from_window(window, cx).simulate_input("0.1");
+    draw(cx, window);
     let gdts = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Gdt { .. })).cloned().collect::<Vec<_>>());
     let mid = [(a[0] + b[0]) / 2.0, a[1]];
     click_sheet(cx, window, &editor, mid);
@@ -2650,6 +2652,8 @@ fn a_gtol_lines_up_with_a_woken_vertex_within_8_px(cx: &mut TestAppContext) {
     real_sheet(cx, window, &editor);
     let (_, b, out) = horizontal_edge(cx, &editor);
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
+    draw(cx, window);
+    VisualTestContext::from_window(window, cx).simulate_input("0.1");
     draw(cx, window);
     let zoom = cx.update(|cx| editor.read(cx).zoom);
     let hover = |cx: &mut TestAppContext, s: [f64; 2]| {
@@ -4581,4 +4585,263 @@ fn the_bom_dialogs_insert_opens_select_a_bom(cx: &mut TestAppContext) {
         (e.chooser.bom, e.insert.chooser, tab)
     });
     assert_eq!(picked, (false, None, Some(id)), "the chooser closes, the assembly is the table's");
+}
+
+/// Live drw-dims-1123 (linear.md): with a dimension tool on, a right-click on empty sheet does nothing; on a placed
+/// dimension the tool ends and that dimension's menu opens (it is selected).
+#[gpui::test]
+fn a_right_click_in_a_dimension_tool_opens_only_a_placed_dimensions_menu(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::DimTool;
+    SUGGESTED.set(true);
+    DIMENSIONED.set(true);
+    let (window, editor) = drawing(cx, "feel-dim-rclick");
+    DIMENSIONED.set(false);
+    real_sheet(cx, window, &editor);
+    let (id, on) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        e.current_sheet().annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|a| {
+            let l = b.geometry.lines.iter().find(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::Annotation(a.id)) && l.points.len() >= 2)?;
+            Some((a.id, [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0]))
+        }).expect("a dimension with a line")
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Dimension { kind: DimTool::Linear, picks: Vec::new() }, cx)));
+    let rclick = |cx: &mut TestAppContext, at: [f64; 2]| {
+        let p = at_window(cx, &editor, at);
+        let mut v = VisualTestContext::from_window(window, cx);
+        v.simulate_mouse_move(p, None, Modifiers::default());
+        v.simulate_mouse_down(p, MouseButton::Right, Modifiers::default());
+        v.simulate_mouse_up(p, MouseButton::Right, Modifiers::default());
+        draw(cx, window);
+    };
+    let empty = [30.0, 150.0];
+    assert_eq!(lit_at(cx, window, &editor, empty), None, "nothing at the empty spot");
+    rclick(cx, empty);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Dimension { .. })), "empty sheet: the tool stays");
+    rclick(cx, on);
+    let (tool, sel) = cx.update(|cx| (editor.read(cx).tool.name(), editor.read(cx).selection.clone()));
+    assert_eq!(tool, "Select", "the tool ends");
+    assert_eq!(sel, vec![Sel::Annotation(id)], "its menu: the dimension selected");
+}
+
+/// Live drw-dims-1123 angular.md: Line to line angular refuses a parallel or repeated second line (the first pick
+/// stays), takes a slanted one, and no third.
+#[gpui::test]
+fn line_to_line_angular_refuses_a_parallel_second_line(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::{DimTool, Pick, view_of};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-angular-parallel");
+    real_sheet(cx, window, &editor);
+    // Every straight edge pick of the first view, with its direction.
+    let lines: Vec<(u32, Pick, [f64; 2])> = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.tool = Tool::Dimension { kind: DimTool::Angle, picks: vec![] };
+            let n = e.built.as_ref().map_or(0, |b| b.picks.len());
+            let mut out = Vec::new();
+            for i in 0..n as u32 {
+                if !matches!(e.built.as_ref().and_then(|b| b.picks.get(i as usize)), Some(PickTarget::Edge { .. })) {
+                    continue;
+                }
+                e.hover = Some(i);
+                if let Some(p @ Pick::Line { .. }) = e.pk().line_pick() {
+                    let Pick::Line { a, b } = &p else { unreachable!() };
+                    let d = [b.p[0] - a.p[0], b.p[1] - a.p[1]];
+                    let l = d[0].hypot(d[1]);
+                    out.push((i, p.clone(), [d[0] / l, d[1] / l]));
+                }
+            }
+            out
+        })
+    });
+    let cross = |u: [f64; 2], v: [f64; 2]| (u[0] * v[1] - u[1] * v[0]).abs();
+    let (h0, first, u) = lines.first().cloned().expect("a straight edge");
+    let same_view = |p: &Pick| view_of(p) == view_of(&first);
+    let parallel = lines.iter().find(|(h, p, v)| *h != h0 && same_view(p) && cross(u, *v) < 1e-6 && !noshape_scene::drawing_tools::same(p, &first)).map(|l| l.0).expect("a parallel edge");
+    let slanted = lines.iter().find(|(_, p, v)| same_view(p) && cross(u, *v) > 1e-3).map(|l| l.0).expect("a non-parallel edge");
+    let click = |cx: &mut TestAppContext, hover: u32, picks: &mut Vec<Pick>| {
+        cx.update(|cx| editor.update(cx, |e, _| {
+            e.hover = Some(hover);
+            let c = e.cursor;
+            e.pk().dimension_click(DimTool::Angle, c, picks);
+        }))
+    };
+    let mut picks = vec![first.clone()];
+    click(cx, parallel, &mut picks);
+    assert_eq!(picks.len(), 1, "a parallel line isn't taken");
+    click(cx, h0, &mut picks);
+    assert_eq!(picks.len(), 1, "nor the same line again");
+    click(cx, slanted, &mut picks);
+    assert_eq!(picks.len(), 2, "a slanted one is");
+    click(cx, parallel, &mut picks);
+    assert_eq!(picks.len(), 2, "no third");
+}
+
+/// Live drw-dims-1123: picks a tool can't take don't light. With a first line picked, Line to line angular leaves a
+/// parallel edge unlit and lights a slanted one; Line to line the other way round; Diameter never lights a straight edge.
+#[gpui::test]
+fn dimension_tools_dont_light_picks_they_refuse(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_model::drawing::views::EdgeGeom;
+    use noshape_scene::drawing_tools::{DimTool, Pick, PickedPoint};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-dims-invalid-hover");
+    real_sheet(cx, window, &editor);
+    // Lit at an edge's midpoint with this tool: the lit pick's straight-edge direction, or None when nothing lights.
+    let lit_at = |cx: &mut TestAppContext, tool: Tool, h: u32| -> Option<Option<[f64; 2]>> {
+        cx.update(|cx| editor.update(cx, |e, _| {
+            let Some(PickTarget::Edge { view, edge }) = e.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned() else { return None };
+            let Some(EdgeGeom::Line { a, b }) = e.pk().edge_geom(view, edge) else { return None };
+            let pl = e.placement(view)?;
+            e.cursor = pl.to_sheet([(a[0] + b[0]) / 2., (a[1] + b[1]) / 2.]);
+            e.tool = tool;
+            let lit = e.pk().hover_at()?;
+            let Some(PickTarget::Edge { view, edge }) = e.built.as_ref().and_then(|b| b.picks.get(lit as usize)).cloned() else { return Some(None) };
+            Some(match e.pk().edge_geom(view, edge) {
+                Some(EdgeGeom::Line { a, b }) => {
+                    let d = [b[0] - a[0], b[1] - a[1]];
+                    let l = d[0].hypot(d[1]);
+                    Some([d[0] / l, d[1] / l])
+                }
+                _ => None,
+            })
+        }))
+    };
+    // Straight edges of the first view with lines in it: (pick, view, ends, direction).
+    type EdgeLine = (u32, noshape_model::drawing::ViewId, [[f64; 2]; 2], [f64; 2]);
+    let lines: Vec<EdgeLine> = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            let n = e.built.as_ref().map_or(0, |b| b.picks.len());
+            (0..n as u32)
+                .filter_map(|i| {
+                    let Some(PickTarget::Edge { view, edge }) = e.built.as_ref().and_then(|b| b.picks.get(i as usize)).cloned() else { return None };
+                    let Some(EdgeGeom::Line { a, b }) = e.pk().edge_geom(view, edge) else { return None };
+                    let d = [b[0] - a[0], b[1] - a[1]];
+                    let l = d[0].hypot(d[1]);
+                    (l > 1e-6).then_some((i, view, [a, b], [d[0] / l, d[1] / l]))
+                })
+                .collect()
+        })
+    });
+    let cross = |u: [f64; 2], v: [f64; 2]| (u[0] * v[1] - u[1] * v[0]).abs();
+    let (h0, view, [a, b], u) = lines.first().cloned().expect("a straight edge");
+    let same = |e: &[[f64; 2]; 2]| (e[0][0] - a[0]).hypot(e[0][1] - a[1]).min((e[0][0] - b[0]).hypot(e[0][1] - b[1])) < 1e-9 && (e[1][0] - a[0]).hypot(e[1][1] - a[1]).min((e[1][0] - b[0]).hypot(e[1][1] - b[1])) < 1e-9;
+    let parallel = lines.iter().find(|(h, v, e, d)| *h != h0 && *v == view && cross(u, *d) < 1e-6 && !same(e)).map(|l| l.0).expect("a parallel edge");
+    let slanted = lines.iter().find(|(_, v, _, d)| *v == view && cross(u, *d) > 1e-3).map(|l| l.0).expect("a non-parallel edge");
+    let first = Pick::Line { a: PickedPoint { view, p: a, r: None }, b: PickedPoint { view, p: b, r: None } };
+    let with = |kind: DimTool| Tool::Dimension { kind, picks: vec![first.clone()] };
+    let unlit_or_crossing = |l: Option<Option<[f64; 2]>>| l.is_none_or(|d| d.is_some_and(|d| cross(u, d) > 1e-6));
+    assert!(unlit_or_crossing(lit_at(cx, with(DimTool::Angle), parallel)), "Angular: a parallel 2nd line doesn't light");
+    assert!(lit_at(cx, with(DimTool::Angle), slanted).flatten().is_some_and(|d| cross(u, d) > 1e-6), "Angular: a slanted 2nd line lights");
+    assert!(lit_at(cx, with(DimTool::LineLine), slanted).is_none_or(|d| d.is_some_and(|d| cross(u, d) < 1e-6)), "Line to line: a slanted 2nd line doesn't light");
+    assert!(lit_at(cx, with(DimTool::LineLine), parallel).flatten().is_some_and(|d| cross(u, d) < 1e-6), "Line to line: a parallel one lights");
+    assert!(lit_at(cx, Tool::Dimension { kind: DimTool::Diameter, picks: vec![] }, slanted).is_none_or(|d| d.is_none()), "Diameter: no straight edge lights");
+}
+
+/// Live drw-dims-1123 hole-callout.md: Hole callout lights a hole's circle under the pointer, and no straight edge.
+#[gpui::test]
+fn hole_callout_lights_a_holes_circle_only(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_model::drawing::views::EdgeGeom;
+    START.set(Some("holes-plate-drawing"));
+    let (window, editor) = drawing(cx, "feel-hcallout-hover");
+    real_sheet(cx, window, &editor);
+    let (on_hole, on_line) = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.tool = Tool::HoleCallout { circle: None };
+            let edge_geom = |e: &DrawingEditor, h: u32| match e.built.as_ref().and_then(|b| b.picks.get(h as usize)).cloned() {
+                Some(PickTarget::Edge { view, edge }) => e.pk().edge_geom(view, edge).map(|g| (view, g)),
+                _ => None,
+            };
+            let n = e.built.as_ref().map_or(0, |b| b.picks.len()) as u32;
+            let bore = (0..n).find_map(|h| match edge_geom(e, h) {
+                Some((view, EdgeGeom::Circle { face_on: true, bore: true, mid, .. })) => Some((view, mid)),
+                _ => None,
+            });
+            let line = (0..n).find_map(|h| match edge_geom(e, h) {
+                Some((view, EdgeGeom::Line { a, b })) => Some((view, [(a[0] + b[0]) / 2., (a[1] + b[1]) / 2.])),
+                _ => None,
+            });
+            let mut lit = |at: Option<(noshape_model::drawing::ViewId, [f64; 2])>| {
+                let (view, p) = at.expect("an edge");
+                e.cursor = e.placement(view).expect("placed").to_sheet(p);
+                e.pk().hover_at().and_then(|h| edge_geom(e, h)).map(|(_, g)| g)
+            };
+            (lit(bore), lit(line))
+        })
+    });
+    assert!(matches!(on_hole, Some(EdgeGeom::Circle { bore: true, .. })), "a hole's circle lights: {on_hole:?}");
+    assert!(!matches!(on_line, Some(EdgeGeom::Line { .. })), "a straight edge doesn't: {on_line:?}");
+}
+
+/// Live drw-dims-1123 gdt.md: with every slot of the Geometric tolerance panel empty, an edge doesn't light and a
+/// click places nothing (typed, it does: a_geometric_tolerance_clicked_on_an_edge_…).
+#[gpui::test]
+fn an_empty_geometric_tolerance_lights_and_places_nothing(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-gdt-empty");
+    real_sheet(cx, window, &editor);
+    let (a, b, _) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
+    draw(cx, window);
+    let mid = [(a[0] + b[0]) / 2.0, a[1]];
+    let p = at_window(cx, &editor, mid);
+    VisualTestContext::from_window(window, cx).simulate_mouse_move(p, None, Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| editor.read(cx).hover), None, "no edge lights");
+    let gdts = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Gdt { .. })).count());
+    click_sheet(cx, window, &editor, mid);
+    assert_eq!(gdts(cx), 0, "an empty frame isn't placed");
+    assert!(cx.update(|cx| editor.read(cx).note_leader.is_none()), "nor a leader started");
+}
+
+/// Live drw-dims-1123 datum.md: a Datum click on empty sheet anchors nothing (no pick pending, nothing placed); an
+/// edge click does, and the Datum target tab can't be chosen while it is pending.
+#[gpui::test]
+fn a_datum_click_on_empty_sheet_does_nothing(cx: &mut TestAppContext) {
+    use noshape_model::drawing::AnnotationKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-datum-empty");
+    real_sheet(cx, window, &editor);
+    let (a, b, _) = horizontal_edge(cx, &editor);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Datum { anchor: None }, cx)));
+    draw(cx, window);
+    click_sheet(cx, window, &editor, [30., 150.]);
+    click_sheet(cx, window, &editor, [32., 152.]);
+    cx.update(|cx| {
+        let e = editor.read(cx);
+        assert!(matches!(e.tool, Tool::Datum { anchor: None }), "no pick pending: {:?}", e.tool.name());
+        assert!(!e.drawing_sheet().annotations.iter().any(|x| matches!(x.kind, AnnotationKind::Datum { .. })), "no datum placed");
+    });
+    click_sheet(cx, window, &editor, [(a[0] + b[0]) / 2.0, a[1]]);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Datum { anchor: Some(_) })), "an edge click anchors one");
+}
+
+/// Live drw-dims-1123 linear.md: the same entity clicked twice keeps its pick (no dimension, no unpick).
+#[gpui::test]
+fn the_same_pick_twice_stays_picked(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    use noshape_scene::drawing_tools::{DimTool, Pick};
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-dims-same-pick");
+    real_sheet(cx, window, &editor);
+    let picks = cx.update(|cx| {
+        editor.update(cx, |e, _| {
+            e.tool = Tool::Dimension { kind: DimTool::LineLine, picks: vec![] };
+            let n = e.built.as_ref().map_or(0, |b| b.picks.len()) as u32;
+            let h = (0..n).find(|h| {
+                e.hover = Some(*h);
+                matches!(e.built.as_ref().and_then(|b| b.picks.get(*h as usize)), Some(PickTarget::Edge { .. })) && matches!(e.pk().line_pick(), Some(Pick::Line { .. }))
+            }).expect("a straight edge");
+            e.hover = Some(h);
+            let c = e.cursor;
+            let mut picks = Vec::new();
+            e.pk().dimension_click(DimTool::LineLine, c, &mut picks);
+            e.pk().dimension_click(DimTool::LineLine, c, &mut picks);
+            picks.len()
+        })
+    });
+    assert_eq!(picks, 1, "the line stays picked");
 }

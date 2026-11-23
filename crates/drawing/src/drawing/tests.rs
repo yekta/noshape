@@ -990,6 +990,21 @@ fn bom_hole_table_and_linked_balloons() {
     // Live 1983: a size's SIZE and QTY cells merged down its rows (B1, B2: one ⌀9.6 THRU, QTY 2).
     assert_eq!(t.iter().filter(|x| *x == "⌀9.6 THRU").count(), 1, "{t:?}");
     assert!(t.iter().any(|x| x == "2"), "{t:?}");
+    // Live drw-dims-1123 hole-table.md: a tapped hole's SIZE is its tap drill alone, no thread line.
+    {
+        let mut tapped = sources.clone();
+        if let Some((key, _)) = views::view_source(&drawing.sheets[0], ViewId(2))
+            && let Some(src) = tapped.get_mut(&key)
+        {
+            let mut ctx = (*src.context).clone();
+            let h = ctx.holes.iter_mut().find(|h| (h.diameter - 0.024).abs() < 1e-9).expect("the large hole");
+            (h.thread, h.thread_class, h.tap_drill) = (Some("M24x3".into()), Some("6H".into()), Some(0.021));
+            src.context = std::sync::Arc::new(ctx);
+        }
+        let t = texts(&render_sheet(&drawing, 0, &tapped, &cache, false).unwrap());
+        assert!(t.iter().any(|x| x == "⌀21 THRU"), "the tap drill: {t:?}");
+        assert!(!t.iter().any(|x| x.contains("M24x3")), "no thread line: {t:?}");
+    }
     // ☐ Show location data: no X / Y LOC; Order bottom to top keeps a size merged.
     if let TableKind::Hole { show_location, bottom_to_top, .. } = &mut drawing.sheets[0].tables[0].kind {
         (*show_location, *bottom_to_top) = (false, true);
@@ -4096,28 +4111,24 @@ fn a_detail_label_hangs_under_its_whole_circle() {
         assert!((first.pos[0] - c[0]).abs() < 1e-6, "clip {clip}: centred: {first:?} / {c:?}");
         assert!((first.pos[1] - (c[1] - 1.1 * r - first.height / 2.0)).abs() < 1e-6, "clip {clip}: top 0.1 r + h/2 under the circle: {first:?} / {c:?} r {r}");
     }
-    // A section's label: its top under the view's geometry, centred on it: 5.81 mm for a horizontal cut, 3.02 mm for
-    // a vertical one (live2 sec-label-1118).
-    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+    // A section's label: its top 1.524 mm under the view's frame (geometry + 2 mm x scale each side, at least 0.68 in
+    // high), centred (live section-label-gap-1123: the 10 mm block 5.160 mm under its lines at 1:1, 5.524 at 2:1).
+    assert!((super::build::frame_gap(10.0, 1.0) - 5.160).abs() < 1e-3 && (super::build::frame_gap(20.0, 2.0) - 5.524).abs() < 1e-3);
     let section = ViewId(5);
-    assert!(matches!(drawing.sheets[0].view(section).unwrap().kind, ViewKind::Section { .. }));
-    let pl = built.placement(section).unwrap();
-    let ViewKind::Section { line, .. } = &drawing.sheets[0].view(section).unwrap().kind else { unreachable!() };
-    let (a, b) = (line[0], *line.last().unwrap());
-    let gap = if (b[0] - a[0]).abs() > (b[1] - a[1]).abs() { 5.81 } else { 3.02 };
-    let t = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(section))).expect("SECTION A - A");
-    assert!((t.pos[0] - (pl.min[0] + pl.max[0]) / 2.0).abs() < 1e-6 && (t.pos[1] - (pl.min[1] - gap)).abs() < 1e-6, "{t:?} / {pl:?}");
-    // Turned the other way, the other gap.
-    if let ViewKind::Section { line, .. } = &mut drawing.sheets[0].view_mut(section).unwrap().kind {
-        for p in line.iter_mut() {
-            *p = [p[1], p[0]];
+    for turned in [false, true] {
+        if turned && let ViewKind::Section { line, .. } = &mut drawing.sheets[0].view_mut(section).unwrap().kind {
+            for p in line.iter_mut() {
+                *p = [p[1], p[0]];
+            }
         }
+        let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
+        assert!(matches!(drawing.sheets[0].view(section).unwrap().kind, ViewKind::Section { .. }));
+        let pl = built.placement(section).unwrap();
+        let scale = views::view_scale(&drawing.sheets[0], section);
+        let gap = (2.0 * scale).max((17.272 - (pl.max[1] - pl.min[1])) / 2.0) + 1.524;
+        let t = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(section))).expect("SECTION A - A");
+        assert!((t.pos[0] - (pl.min[0] + pl.max[0]) / 2.0).abs() < 1e-6 && (t.pos[1] - (pl.min[1] - gap)).abs() < 1e-6, "turned {turned}: {t:?} / {pl:?}");
     }
-    let built = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
-    let pl = built.placement(section).unwrap();
-    let t = built.geometry.texts.iter().find(|t| built.picks.get(t.pick as usize) == Some(&PickTarget::ViewLabel(section))).expect("SECTION A - A");
-    let other = if gap == 5.81 { 3.02 } else { 5.81 };
-    assert!((t.pos[1] - (pl.min[1] - other)).abs() < 1e-6, "turned: {t:?} / {pl:?}");
 }
 
 /// Detail profile In line on a circle (live qa4-r5-s11.dxf, detail B): the

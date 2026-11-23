@@ -2422,7 +2422,8 @@ impl DrawingEditor {
     pub fn update_hover(&mut self, cx: &mut Context<Self>) {
         // The table being placed is not lit: it follows the pointer in black lines (live2 place-1118).
         let placing = |t: &PickTarget| matches!(t, PickTarget::Table(id) if self.drawing_sheet().table(*id).is_none());
-        let hover = self.pk().hover_at().or_else(|| self.projecting_hover()).filter(|h| !self.pointer_off && !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
+        let gdt_empty = matches!(self.tool, Tool::Gdt) && self.gdt_empty(cx);
+        let hover = self.pk().hover_at().or_else(|| self.projecting_hover()).filter(|h| !self.pointer_off && !gdt_empty && !self.built.as_ref().and_then(|b| b.picks.get(*h as usize)).is_some_and(placing));
         if hover != self.hover {
             if hover.and_then(|h| self.sel_of_pick(h)).is_some_and(|s| !self.esc_kept.contains(&s)) {
                 self.esc_kept.clear();

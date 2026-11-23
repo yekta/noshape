@@ -82,7 +82,8 @@ pub fn dim_offset(p: [f64; 2], q: [f64; 2], o: DimOrientation, c: [f64; 2]) -> f
     dot(c, nrm) - dot(p, nrm).max(dot(q, nrm))
 }
 
-/// Orientation of a smart linear dimension from the cursor position.
+/// Orientation of a linear dimension between two points from the cursor: vertical with the cursor beside the pair (left
+/// or right, within its height), else horizontal; never aligned (live drw-dims-1123 aligned.md: 20 placements).
 pub fn auto_orientation(p: [f64; 2], q: [f64; 2], c: [f64; 2]) -> DimOrientation {
     let (x0, x1) = (p[0].min(q[0]), p[0].max(q[0]));
     let (y0, y1) = (p[1].min(q[1]), p[1].max(q[1]));
@@ -94,13 +95,13 @@ pub fn auto_orientation(p: [f64; 2], q: [f64; 2], c: [f64; 2]) -> DimOrientation
     if (y1 - y0) < 1e-6 {
         return DimOrientation::Horizontal;
     }
-    if ex > ey && ex > 0.0 {
-        DimOrientation::Vertical
-    } else if ey > 0.0 {
-        DimOrientation::Horizontal
-    } else {
-        DimOrientation::Aligned
-    }
+    if ex > 0.0 && ey == 0.0 { DimOrientation::Vertical } else { DimOrientation::Horizontal }
+}
+
+/// A single edge's linear dimension: its true length, aligned to it wherever the cursor is, unless it runs straight
+/// across or up (live drw-dims-1123 aligned.md: 5 of 5 ring positions).
+pub fn edge_orientation(p: [f64; 2], q: [f64; 2], c: [f64; 2]) -> DimOrientation {
+    if (p[0] - q[0]).abs() < 1e-6 || (p[1] - q[1]).abs() < 1e-6 { auto_orientation(p, q, c) } else { DimOrientation::Aligned }
 }
 
 /// Intersection of two infinite 2D lines.
@@ -113,6 +114,29 @@ pub fn intersect(a0: [f64; 2], a1: [f64; 2], b0: [f64; 2], b1: [f64; 2]) -> Opti
     }
     let t = ((b0[0] - a0[0]) * s[1] - (b0[1] - a0[1]) * s[0]) / den;
     Some([a0[0] + r[0] * t, a0[1] + r[1] * t])
+}
+
+#[cfg(test)]
+mod orientation_tests {
+    use noshape_model::drawing::DimOrientation as O;
+
+    /// Live drw-dims-1123 aligned.md: two vertices 45 x 20 mm apart, the pointer on a ring round their midpoint: left or
+    /// right (within their height) vertical, anywhere else horizontal, never aligned; a slanted edge alone is aligned
+    /// wherever the pointer is.
+    #[test]
+    fn two_points_give_vertical_or_horizontal_and_a_slanted_edge_its_length() {
+        let (p, q) = ([0.0, 0.0], [45.0, 20.0]);
+        let m = [22.5, 10.0];
+        let ring = |deg: f64| [m[0] + 30.0 * deg.to_radians().cos(), m[1] + 30.0 * deg.to_radians().sin()];
+        for (deg, want) in [(0.0, O::Vertical), (180.0, O::Vertical), (45.0, O::Horizontal), (90.0, O::Horizontal), (135.0, O::Horizontal), (225.0, O::Horizontal), (270.0, O::Horizontal), (315.0, O::Horizontal)] {
+            assert_eq!(super::auto_orientation(p, q, ring(deg)), want, "{deg}°");
+            assert_eq!(super::edge_orientation(p, q, ring(deg)), O::Aligned, "edge, {deg}°");
+        }
+        // Between the points: horizontal, not aligned.
+        assert_eq!(super::auto_orientation(p, q, [20.0, 12.0]), O::Horizontal);
+        // A level edge stays horizontal.
+        assert_eq!(super::edge_orientation([0.0, 0.0], [40.0, 0.0], [20.0, 9.0]), O::Horizontal);
+    }
 }
 
 #[cfg(test)]

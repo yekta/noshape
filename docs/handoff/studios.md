@@ -60,11 +60,22 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   Local handoff commit on top (not queued; goes with the next land). Background watcher b13igqtld polls for
   v0.4.68's macOS asset (none at 05:30); then run bin/mac-copycheck.sh 0.4.68 on the Mac (idle >= 600 s only) and
   report <= 3 lines to the lead. DRW-SECTION-LABEL-GAP data: live 08 s4 section view at y 125.3, label 113.6.
-- 06:05 local (after 3407a70e): e88304220 DRW-CALLOUT-DIALOG-ICONS (callout-part/bom/instance.svg, #287cbf accents,
-  assets::icon); FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 was on main). FS caret: gpui-base element.rs paints a code
-  editor's caret 2 px (Ace), test the_editors_caret_is_2_px_wide; run x269 (vibex7). DRW-SECTION-LABEL-GAP left open:
-  DXF capture asked in live REQUESTS (studios 11-23). live import-into-doc-1123: ours already matches (tabs after the
-  active tab, toast per file, "(1)", Split); the rest is dx's.
+- STATE 06:41: QUEUED 7a12ac31 (7 commits: Callout boxes, FS/history/merge look, BOM Insert/moved view/move-to-sheet,
+  callout two-tone icons e88304220, FS caret 2 px, TICKETS dup drop; green: fs-ui 32, drawing-ui 192, clippy clean).
+  3407a70e had FAILED (rebase); 5 older local commits were already on main, rebased --onto past them.
+  After 7a12ac31 lands: tell dx (roster.md id) featurescript raise_noted notices are Info now.
+- STATE 07:00: live drw-dims-1123 audit committed + land.sh'd (TICKETS block "studios, 2026-11-23 (live drw-dims-1123
+  …)"). Green: scene lib 216, drawing lib 269, drawing-ui 199, ops e2e 300, clippy scene/drawing/drawing-ui clean.
+  Done: ESC (keeps_tool_on_esc), RCLICK (hit_where Annotation), ALIGNED (geom auto/edge_orientation), ANGULAR-PARALLEL,
+  HOLE-TABLE-TAP, INVALID-HOVER (pick.rs hover_at: Radial/Diameter circles only; Angle/LineLine vs the first line),
+  HOLE-CALLOUT-HOVER (pick.rs is_hole_edge), DRW-SECTION-LABEL-GAP (build.rs frame_gap). Partial: GDT-VALUE (empty
+  slots: gdt_empty gates hover/preview/click; the edge-click leader left: gtol-1119 recorded no leader, 1123 a leader),
+  DATUM (empty sheet + greyed Datum target tab; midpoint snap unchecked), EDGE-CENTERLINE-SILENT (silent; concentric
+  circles left), SAME-POINT (pick kept; no rubber line after the 1st vertex left). Open: HOVER-COLOURS,
+  CIRCLE-CENTERLINE-QUAD.
+- FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 on main). live import-into-doc-1123: ours matches; rest is dx's.
+- Mac check: watcher bd5jb96zs polls v0.4.68's mac asset (not published at 06:28); then bin/mac-copycheck.sh 0.4.68
+  (idle >= 600 s only), report <= 3 lines to the lead. Background runs/watchers die at session end: re-arm.
 - Shortcuts (live shortcuts-1123, lead's ask 04:2x): Drawing context: Mac ⌃Z/⌃Y NoAction, ⌘Y redo; elsewhere
   Ctrl+Shift+Z redo (app-core actions.rs, test drawing_key_tests). FS: Commit/CommitAll ⌘ only on a Mac; ⇧⌘F search
   also in the editor (input's own was Replace); Mac ⌃B/⌃P/⌃H/⌃D/⌃O (SplitLine, fs_lines::split_line). FS Mac keys

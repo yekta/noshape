@@ -106,11 +106,8 @@ impl SheetPick<'_> {
             }),
         };
         let Some(p) = p else { return };
-        if let Some(i) = picks.iter().position(|q| same(q, &p)) {
-            picks.remove(i);
-            return;
-        }
-        if picks.first().is_some_and(|f| view_of(f) != view_of(&p)) {
+        // The same entity again: the pick stays, nothing more (live drw-dims-1123 linear.md).
+        if picks.iter().any(|q| same(q, &p)) || picks.first().is_some_and(|f| view_of(f) != view_of(&p)) {
             return;
         }
         if picks.len() < 2 {
@@ -272,7 +269,18 @@ impl SheetPick<'_> {
                 }
             }
             DimTool::Angle | DimTool::Chamfer => {
-                if let Some(p) = self.line_pick() {
+                // Line to line angular refuses a parallel or repeated second line silently, the first pick staying
+                // (live drw-dims-1123 angular.md).
+                let fits = |l: &Pick| match (picks.first(), l) {
+                    (Some(f @ Pick::Line { a: a1, b: b1 }), Pick::Line { a: a2, b: b2 }) if kind == DimTool::Angle => {
+                        let (u, v) = (norm(sub(b1.p, a1.p)), norm(sub(b2.p, a2.p)));
+                        !same(f, l) && view_of(f) == view_of(l) && (u[0] * v[1] - u[1] * v[0]).abs() >= 1e-6
+                    }
+                    _ => true,
+                };
+                if picks.len() < 2
+                    && let Some(p) = self.line_pick().filter(fits)
+                {
                     picks.push(p);
                 }
             }

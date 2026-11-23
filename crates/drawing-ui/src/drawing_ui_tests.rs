@@ -2386,47 +2386,40 @@ fn with_styles_open_a_clicked_dimension_reads(cx: &mut TestAppContext) {
     assert_ne!(read, json!([]), "selection {sel:?}, hover {hover:?}");
 }
 
-/// Live REQUESTS studios 17:02 (a), (d): Esc after placing a dimension leaves it hovered under the resting pointer, not
-/// selected; moved off, nothing is hovered and only its grips are kept (`esc_kept`) until something else is hovered.
+/// Live drw-dims-1123 (linear.md): Esc in a dimension tool drops a pending pick, the tool stays on (3 Escs: its button
+/// still active); nothing gets selected.
 #[gpui::test]
-fn esc_leaves_the_placed_dimension_hovered_not_selected(cx: &mut TestAppContext) {
-    use noshape_model::drawing::build::PickTarget;
-    use noshape_scene::drawing_tools::{DimTool, Sel, Tool};
+fn esc_keeps_a_dimension_tool_on(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{DimTool, Tool};
     SUGGESTED.set(true);
     DIMENSIONED.set(true);
     let (window, editor) = drawing(cx, "dim-esc-hover");
     DIMENSIONED.set(false);
     real_sheet(cx, window, &editor);
-    let (id, on) = cx.update(|cx| {
-        let e = editor.read(cx);
-        let b = e.built.as_ref().expect("built");
-        e.current_sheet().annotations.iter().filter(|a| a.kind.is_dimension()).find_map(|a| {
-            let l = b.geometry.lines.iter().find(|l| b.picks.get(l.pick as usize) == Some(&PickTarget::Annotation(a.id)) && l.points.len() >= 2)?;
-            Some((a.id, [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0]))
-        }).expect("a dimension with a line")
-    });
-    let hovered = |e: &DrawingEditor| e.hover.and_then(|h| e.sel_of_pick(h));
     cx.update(|cx| editor.update(cx, |e, cx| {
-        e.tool_start = (0, id - 1);
         e.tool = Tool::Dimension { kind: DimTool::Diameter, picks: Vec::new() };
-        e.cursor = on;
-        e.cancel(cx);
+        for _ in 0..3 {
+            e.cancel(cx);
+        }
     }));
     cx.update(|cx| {
         let e = editor.read(cx);
+        assert!(matches!(e.tool, Tool::Dimension { kind: DimTool::Diameter, ref picks } if picks.is_empty()), "{:?}", e.tool);
         assert!(e.selection.is_empty(), "nothing selected: {:?}", e.selection);
-        assert_eq!(hovered(e), Some(Sel::Annotation(id)), "hovered under the resting pointer");
-        assert!(e.esc_kept.contains(&Sel::Annotation(id)));
     });
-    cx.update(|cx| editor.update(cx, |e, cx| {
-        e.cursor = [-1.0e4, -1.0e4];
-        e.update_hover(cx);
-    }));
-    cx.update(|cx| {
-        let e = editor.read(cx);
-        assert_eq!(hovered(e), None, "moved off");
-        assert!(e.esc_kept.contains(&Sel::Annotation(id)), "its grips kept until something else is hovered");
-    });
+    // Datum, Ordinate and Surface finish alike: their panels stay (datum.md, ordinate-baseline-chain.md,
+    // surface-finish.md).
+    for tool in [Tool::Datum { anchor: None }, Tool::Ordinate { origin: None, horizontal: None, group: None }, Tool::SurfaceFinish] {
+        let name = tool.name();
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            e.set_tool(tool, cx);
+            let panel = e.panel.is_some();
+            e.cancel(cx);
+            e.cancel(cx);
+            assert_eq!(e.tool.name(), name);
+            assert_eq!(e.panel.is_some(), panel, "{name}: the panel stays");
+        }));
+    }
 }
 
 /// Live drw-centerline-2-point-cylinder-axis s5: Esc after a 2 point centerline reads its view lit (11-14.1 recorders
@@ -2457,8 +2450,7 @@ fn esc_after_a_2_point_centerline_reads_it_lit_but_not_a_line_to_line_dimension(
         })
     });
     draw(cx, window);
-    let hovered = cx.update(|cx| editor.read(cx).hover.and_then(|h| editor.read(cx).sel_of_pick(h)));
-    assert_eq!(hovered, Some(noshape_scene::drawing_tools::Sel::Annotation(dim)), "hovered under the resting pointer");
+    assert!(cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().any(|a| a.id == dim)));
     assert_eq!(read(cx), json!([]), "a line to line dimension isn't kept");
     cx.update(|cx| {
         editor.update(cx, |e, cx| {

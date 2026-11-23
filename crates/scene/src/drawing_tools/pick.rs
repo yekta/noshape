@@ -5,7 +5,7 @@
 //! `drawing_tools.rs`, `drawing_more.rs`, `drawing_smart.rs` and
 //! `drawing_images.rs`).
 
-use super::geom::{len, sub};
+use super::geom::{len, norm, sub};
 use super::{DimTool, Pick, PickedPoint, Sel, TableTool, Tool};
 use noshape_model::drawing::build::{BuiltSheet, PickTarget, ViewPlacement};
 use noshape_model::drawing::views::{self, EdgeGeom, SnapKind, Sources, ViewGeometry};
@@ -163,6 +163,8 @@ impl<'a> SheetPick<'a> {
                     (e, l) => e.or(l).map(|(k, _)| k).or(hover),
                 }
             }
+            // Hole callout lights a hole's circle (live drw-dims-1123 hole-callout.md), nothing else.
+            Tool::HoleCallout { circle: None } => self.built.and_then(|b| b.hit_where(self.cursor, tol, &|t: &PickTarget| self.is_hole_edge(t))),
             Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
             Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note | Tool::Datum { anchor: None } => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
@@ -189,8 +191,24 @@ impl<'a> SheetPick<'a> {
             },
             // Radial and diameter also take a centermark (help D13).
             (Tool::Dimension { kind: DimTool::Radius | DimTool::Diameter, .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
-                Some(PickTarget::Edge { .. }) => Some(h),
+                Some(PickTarget::Edge { view, edge }) if matches!(self.edge_geom(*view, *edge), Some(EdgeGeom::Circle { .. })) => Some(h),
                 Some(PickTarget::Annotation(id)) if self.current_sheet().annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Centermark { .. })) => Some(h),
+                _ => None,
+            },
+            // Invalid picks don't light (live drw-dims-1123): circles in Angular, a parallel or repeated 2nd line there,
+            // a non-parallel 2nd line in Line to line.
+            (Tool::Dimension { kind: kind @ (DimTool::Angle | DimTool::LineLine), picks }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+                Some(PickTarget::Edge { view, edge }) => match (self.edge_geom(*view, *edge), picks.first()) {
+                    (Some(EdgeGeom::Line { a, b }), Some(Pick::Line { a: a1, b: b1 })) => {
+                        let (u, v) = (norm(sub(b1.p, a1.p)), norm(sub(b, a)));
+                        let cross = (u[0] * v[1] - u[1] * v[0]).abs();
+                        let repeated = len(sub(a, a1.p)).min(len(sub(a, b1.p))) < 1e-9 && len(sub(b, a1.p)).min(len(sub(b, b1.p))) < 1e-9;
+                        let fits = a1.view == *view && !repeated && if *kind == DimTool::Angle { cross >= 1e-6 } else { cross < 1e-6 };
+                        fits.then_some(h)
+                    }
+                    (Some(EdgeGeom::Line { .. } | EdgeGeom::Circle { face_on: false, .. }), _) => Some(h),
+                    _ => None,
+                },
                 _ => None,
             },
             // Dimension-like tools (and the surface finish symbol) only care
@@ -200,6 +218,7 @@ impl<'a> SheetPick<'a> {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },
+            (Tool::HoleCallout { circle: None }, h) => h,
             // Geometric tolerance (help A41) and surface finish (live request
             // 1624): a dimension they attach to, or a view edge.
             (Tool::Gdt | Tool::SurfaceFinish, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
@@ -512,6 +531,14 @@ impl<'a> SheetPick<'a> {
         let g = self.geoms.get(&view)?;
         let m = g.edges.get(edge as usize)?.model?;
         Some(g.model_edges.get(m as usize)?.geom.clone())
+    }
+
+    /// A face-on circle bounding a hole: what Hole callout takes.
+    fn is_hole_edge(&self, t: &PickTarget) -> bool {
+        let PickTarget::Edge { view, edge } = t else { return false };
+        let Some(g) = self.geoms.get(view) else { return false };
+        let Some(me) = g.edges.get(*edge as usize).and_then(|e| e.model).and_then(|m| g.model_edges.get(m as usize)) else { return false };
+        matches!(me.geom, EdgeGeom::Circle { face_on: true, .. }) && self.is_hole_circle(*view, me.center_ref().as_ref())
     }
 
     pub fn hovered_edge(&self) -> Option<(ViewId, views::ModelEdge)> {

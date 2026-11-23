@@ -1283,6 +1283,8 @@ impl DrawingEditor {
                 // Read as a table just placed (live2 drw-hole-table-split s7-s10: nothing for the 11-15 recorder).
                 self.placed_table = (kind == TableTool::Hole).then_some(id);
             }
+            // On empty sheet nothing is placed (live drw-dims-1123 datum.md).
+            Tool::Datum { anchor: None } if self.datum_attach_at(c).is_none() && self.any_point(c).is_none() => {}
             Tool::Datum { anchor: None } => {
                 // On a GD&T frame edge or a dimension's lines (the red
                 // crosshair), else on the geometry.

@@ -107,8 +107,7 @@ impl SheetPick<'_> {
                 };
                 let one_edge = matches!(picks.as_slice(), [Pick::Line { .. }]);
                 let (ps, qs) = (self.pick_sheet(&a)?, self.pick_sheet(&b)?);
-                // Horizontal / vertical / aligned follows the cursor (Onshape).
-                let o = auto_orientation(ps, qs, c);
+                let o = if one_edge { edge_orientation(ps, qs, c) } else { auto_orientation(ps, qs, c) };
                 let c = self.iso_value_on_pointer(ps, qs, o, c);
                 let offset = dim_offset(ps, qs, o, c);
                 // ANSI: the value follows the pointer along the line, inside the extension lines too (live2 place-1118).

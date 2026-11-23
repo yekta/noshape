@@ -111,6 +111,16 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Dimension, ordinate, datum and surface finish tools stay on through Esc (live drw-dims-1123).
+    fn keeps_tool_on_esc(&self) -> bool {
+        match self.tool {
+            Tool::Dimension { .. } | Tool::Datum { .. } | Tool::Ordinate { .. } => true,
+            // Editing a placed symbol's panel is not the tool.
+            Tool::SurfaceFinish => !matches!(self.panel, Some(Panel::SurfaceFinish { edit: Some(_), .. })),
+            _ => false,
+        }
+    }
+
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         // The Note color panel: Esc closes it alone, wherever the keyboard is (live drw-note-format-lists s22,
         // drw-note-swatch-twice s16-later).
@@ -238,14 +248,6 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        // The Surface finish tool: Esc ends it, the symbols placed stay (live drw-surface-finish).
-        if matches!(self.tool, Tool::SurfaceFinish) && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) {
-            self.panel = None;
-            self.note_leader = None;
-            self.tool = Tool::Select;
-            cx.notify();
-            return;
-        }
         // The note editor: Esc closes it and ends the Note tool (live2 drw-note-editor).
         if matches!(self.tool, Tool::Note) && matches!(self.panel, Some(Panel::Note { .. })) {
             self.panel = None;
@@ -358,6 +360,21 @@ impl DrawingEditor {
         // Esc ends a spline being drawn (keeping it) and stays in the Spline tool; the next Esc ends the tool (live2
         // drw-sketch-spline).
         if self.finish_sketch(cx) {
+            self.redraw(cx);
+            return;
+        }
+        // Esc never ends a dimension, ordinate, datum or surface finish tool: it drops a pending pick or leader, the tool
+        // and its panel stay; an ordinate group goes on (live drw-dims-1123: linear, ordinate, datum, surface finish).
+        if self.keeps_tool_on_esc() {
+            match &mut self.tool {
+                Tool::Dimension { picks, .. } => picks.clear(),
+                Tool::Datum { anchor } => *anchor = None,
+                _ => {}
+            }
+            self.note_leader = None;
+            self.overlay = Overlay::default();
+            self.set_preview(None, cx);
+            self.update_hover(cx);
             self.redraw(cx);
             return;
         }
@@ -637,7 +654,7 @@ impl DrawingEditor {
             // The next symbol at the pointer, on the edge or extension line under it (live2 ann-1118).
             Tool::SurfaceFinish if self.note_leader.is_none() && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) => Some(self.surface_finish_symbol(c, cx)),
             // With its leader once the first click anchored one (live2 ann-1118: the arrow at the point clicked).
-            Tool::Gdt if self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => {
+            Tool::Gdt if self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none()) && !self.gdt_empty(cx) => {
                 let (frame, extra) = self.gdt_values(cx).unwrap_or_else(|| (vec![noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), String::new()], Default::default()));
                 let mut a = noshape_scene::drawing_tools::gdt(0, c, frame, extra);
                 if let (Some(l), AnnotationKind::Gdt { leaders, .. }) = (self.note_leader.clone(), &mut a.kind) {
@@ -1283,10 +1300,8 @@ impl DrawingEditor {
                 }
             }
             Tool::EdgeCenterline { first } => {
-                let Some(Pick::Line { a, b }) = self.line_pick() else {
-                    self.status = Some("Select a straight edge".into());
-                    return;
-                };
+                // Wrong picks are silent (live drw-dims-1123 centerline.md).
+                let Some(Pick::Line { a, b }) = self.line_pick() else { return };
                 // A cylinder's silhouette (a drawn line with no model edge, or its seam: not an edge in Onshape) gives
                 // its axis at once, each pick another (live drw-centerline-edge-to-edge-cylinder: annotations 1, then 2,
                 // the first pick on the seam's side); a plate's edges take two picks.
@@ -1305,7 +1320,6 @@ impl DrawingEditor {
                     None => self.tool = Tool::EdgeCenterline { first: Some((a, b)) },
                     Some((a1, b1)) => {
                         if a.view != a1.view {
-                            self.status = Some("Select an edge in the same view".into());
                             return;
                         }
                         // The middle line of the two edges (ends paired along the first edge).
@@ -2571,7 +2585,21 @@ impl DrawingEditor {
         if self.sheet_props.is_some() || self.section_edit.is_some() {
             return;
         }
-        if !matches!(self.tool, Tool::Select) {
+        // A dimension-type tool: a right-click on empty sheet does nothing; on a placed annotation the tool ends and that
+        // annotation's menu opens (live drw-dims-1123 linear.md).
+        let mut pick = pick;
+        if self.keeps_tool_on_esc() {
+            // The tool's hover takes model geometry only: look for an annotation under the pointer.
+            let tol = self.pk().tol_mm(noshape_scene::drawing_tools::PICKBOX_PX);
+            let Some(on) = self.built.as_ref().and_then(|b| b.hit_where(self.cursor, tol, &|t| matches!(t, PickTarget::Annotation(_)))) else { return };
+            pick = Some(on);
+            self.tool = Tool::Select;
+            self.overlay = Overlay::default();
+            self.note_leader = None;
+            self.hover_snap = None;
+            self.panel = None;
+            self.set_preview(None, cx);
+        } else if !matches!(self.tool, Tool::Select) {
             self.cancel(cx);
             return;
         }

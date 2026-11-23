@@ -457,8 +457,11 @@ impl DrawingEditor {
         let ed = cx.entity();
         let blue = gpui_kit::rgb(0x1651b0);
         let tab = d.tab;
+        // The other tab greys while a pick is pending (live drw-dims-1123 datum.md).
+        let pending = matches!(self.tool, Tool::Datum { anchor: Some(_) } | Tool::DatumTarget { anchor: Some(_) });
         let tabs = h_flex().border_b_1().border_color(gpui_kit::rgb(0xe0e0e0)).children([(0u8, "Datum"), (1, "Datum target")].into_iter().map(|(t, name)| {
             let on = t == tab;
+            let greyed = pending && !on;
             div()
                 .id(("dt-tab", t as usize))
                 .map(|d| crate::ui_script::mark(d, || format!("tab:{name}")))
@@ -469,10 +472,14 @@ impl DrawingEditor {
                 .items_center()
                 .justify_center()
                 .text_size(px(13.))
-                .cursor_pointer()
+                .when(!greyed, |e| e.cursor_pointer())
+                .when(greyed, |e| e.text_color(gpui_kit::rgb(0xb3b3b3)))
                 .when(on, |e| e.text_color(blue).border_b_2().border_color(blue))
                 .child(name)
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if greyed {
+                        return;
+                    }
                     if let Some(d) = &mut this.datum_dlg {
                         d.tab = t;
                     }

@@ -2706,12 +2706,13 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             }).flatten();
             let (lo, hi, gap) = match profile {
                 Some(p) => p,
-                // A section's label top under its lowest geometry: 5.81 mm for a horizontal cut, 3.02 mm for a vertical
-                // one (live2 sec-label-1118, five DXFs: horizontal 5.81 / 5.81 / 5.16, vertical 3.02 / 3.52; neither
-                // the click, the width nor the height alone explains the rest). Auxiliary views as a vertical cut.
+                // A section's or auxiliary view's label top sits 1.524 mm under the view's frame: the geometry + 2 mm x
+                // scale each side, at least 0.68 in high (live section-label-gap-1123 DXFs: 5.160 mm under the lines
+                // at 1:1, 5.524 at 2:1).
                 None => (pl.min, pl.max, match &v.kind {
-                    ViewKind::Section { line, .. } if horizontal_cut(line) => 5.81,
-                    _ if auto_label || aux_label => 3.02,
+                    ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => frame_gap(pl.max[1] - pl.min[1], views::view_scale(sheet, v.id)),
+                    _ if aux_label => frame_gap(pl.max[1] - pl.min[1], views::view_scale(sheet, v.id)),
+                    _ if auto_label => 3.02,
                     _ => 6.0,
                 }),
             };
@@ -3307,10 +3308,10 @@ pub fn foot_on_line(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     [a[0] + d[0] * t, a[1] + d[1] * t]
 }
 
-/// A cutting line running mostly across its parent view (its ends further apart in x than in y).
-fn horizontal_cut(line: &[[f64; 2]]) -> bool {
-    let (Some(a), Some(b)) = (line.first(), line.last()) else { return false };
-    (b[0] - a[0]).abs() > (b[1] - a[1]).abs()
+/// How far a view label's top hangs under geometry `height` mm high: live's view frame adds 2 mm x `scale` each side and
+/// is at least 0.68 in high; the label's top is 0.06 in under the frame.
+pub(crate) fn frame_gap(height: f64, scale: f64) -> f64 {
+    (2.0 * scale).max((17.272 - height) / 2.0) + 1.524
 }
 
 /// Where a pick reach ends: a pointer `tol` away is out (live2 recheck-1119 callout: an edge lights 6 px away, not 7,
