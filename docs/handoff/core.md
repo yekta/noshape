@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 00:51 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-23 01:40 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -162,6 +162,26 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
+0. HOSE-RINGS (dx 11-23): cf-hose-routing (hoseRouting FS: opSweep (Discrete) of a circle along fitSplines, then
+   opShell of the 2 plane caps, 1 mm in): end ring edges 1.2e-4 m off the outer BSplineSurface in the model (dx's
+   probe, branch dx-wip-step-refit, NOSHAPE_XT_DEBUG=1); live exact. FOUND: the sweeps are exact (every edge within
+   1e-14 m of its faces, re-run and as fed to the Shell: dumps vibex7 ~/tmp/core/hose/{sweep,shell}-N.brep/.txt via
+   NOSHAPE_DUMP_OPS). k::shell (OCCT MakeThickSolid, shell.cpp op_shell_solid_unbudgeted ~10770) FAILS on that input,
+   so the model takes a fallback (likely the inner offset solid cut out, ~10750): the cut re-intersects the cap planes
+   with the B-spline wall -> approximated rings, tol 1e-4. Next: find the path FS opShell takes (custom host ops.rs
+   opShell -> model-core shell), keep the outer wall's own ring edges (they are exact) in the fallback. Probe (UNCOMMITTED,
+   never commit): kernel core::probe_hose_sweep (edge devs via max_deviation), scripts .hd.sh / .hp2.sh.
+0. qa ERR rows (TICKETS "qa, 2026-11-23 01:2x"): ERR-HOLE-DESTROYS-SILENT (QUEUED with revolve 0° + loft guides info, see
+   land.sh --status), ERR-MOVEFACE-STATUS
+   (side-through: ours a 0-volume part, live "Could not offset selected faces as requested."; cyl-r0/neg: live OK, the
+   boss gone, ours errors / leaves r2: direct.rs 440-470 offset -> offset_by_booleans; P1 NEG-RADIUS),
+   ERR-THICKEN-CYL-TOO-THICK (r4 cylinder 6 mm in: live "Failed to thicken all selections.", ours builds),
+   ERR-FACE-PATTERN-FAILED-PREVIEW (failed instances drawn dark red), ERR-ADD-PATTERN-PREVIEW-TINT (lp-dist0 Add preview
+   red), ERR-FEATPATTERN-TITLE-SUFFIX (psui's feature_dialog.rs ~4553: a Bool field (std flags fullFeaturePattern,
+   patternUtils.fs 391) must not append "A parameter value is not valid."; psui took it 11-23).
+0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md, 78/96 match). LANDING
+   2245e27a: Boolean subtract Targets field, intersect apart w/o Keep tools removes both silently. Never add errors
+   for live's "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 0000. DONE 8631c5717 (stale) STD-3132: bundled std 3112 -> 3132 (live/std-3132 +
    live/std-3132-vs-3112.diff, 14 files / 181 lines: SM pattern keeps collapsed walls V3128, hole error preview on a start
    plane, 7/8"-14 UNF tap drill 0.8125 in, thin extrude's new builtin @setThinWallOneSided: no-op unless annotations need
