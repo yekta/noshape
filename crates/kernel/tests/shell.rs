@@ -1490,6 +1490,10 @@ fn dumped_shell_probe() {
     let t: f64 = txt.split("thickness ").nth(1).and_then(|r| r.split(' ').next()).unwrap().parse().unwrap();
     let all = s.faces();
     println!("input: {:.6} mm3, {} faces, valid {}; thickness {} mm", vol(&s) * 1e9, all.len(), s.is_valid(), t * 1e3);
+    for (i, f) in all.iter().enumerate().filter(|_| std::env::var_os("NOSHAPE_SHELL_FACES").is_some()) {
+        let c = f.centroid().unwrap();
+        println!("face {i}: {}, area {:.4} mm2, centroid ({:.4}, {:.4}, {:.4}) mm", format!("{:?}", f.face_surface().ok()).chars().take(24).collect::<String>(), f.area().unwrap() * 1e6, c.x * 1e3, c.y * 1e3, c.z * 1e3);
+    }
     for &i in &faces {
         let f = &all[i];
         let c = f.centroid().unwrap();

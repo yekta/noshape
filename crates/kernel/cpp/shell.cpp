@@ -5967,32 +5967,87 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
       const int a1 = efi[(size_t)sp.e1][0], b1 = efi[(size_t)sp.e1][1], a2 = efi[(size_t)sp.e2][0], b2 = efi[(size_t)sp.e2][1];
       sp.hinge = (a1 == a2 || a1 == b2) ? a1 : (b1 == a2 || b1 == b2) ? b1 : -1;
       if (sp.hinge < 0)
-        return no("a corner of two tangent edges on no common face");
-      const int x1 = a1 == sp.hinge ? b1 : a1, x2 = a2 == sp.hinge ? b2 : a2;
-      sp.wall = -1;
-      for (int f : fs)
-        if (f != sp.hinge && f != x1 && f != x2)
-          sp.wall = f;
-      for (int e : es)
       {
-        const int p = efi[(size_t)e][0], q = efi[(size_t)e][1];
-        if ((p == x1 && q == sp.wall) || (q == x1 && p == sp.wall))
-          sp.w1 = e;
-        if ((p == x2 && q == sp.wall) || (q == x2 && p == sp.wall))
-          sp.w2 = e;
+        // Two tangent edges across (two smooth sheets meeting along a crease through the vertex; c2-rings-loft's
+        // Shell 1 after the ring's Ø20.5 edit): along the crease's offset one sheet's face changes where its tangent
+        // edge's offset crosses, then the other's, and between the two corners runs an edge on two faces that don't
+        // meet in the solid (the first's second face and the other's first). Of the two pairings, the one whose
+        // corners come in that order along the crease.
+        int sh[2] = {-1, -1};
+        for (int e : es)
+          if (!tangent[(size_t)e])
+            (sh[0] < 0 ? sh[0] : sh[1]) = e;
+        auto away = [&](int e) {
+          BRepAdaptor_Curve c(TopoDS::Edge(edges(e)));
+          const bool        first = c.Value(c.FirstParameter()).Distance(V) <= c.Value(c.LastParameter()).Distance(V);
+          gp_Pnt            p;
+          gp_Vec            d;
+          c.D1(first ? c.FirstParameter() : c.LastParameter(), p, d);
+          return d.Magnitude() < 1e-12 ? gp_XYZ() : (first ? d : -d).Normalized().XYZ();
+        };
+        auto in = [&](int f, int e) { return efi[(size_t)e][0] == f || efi[(size_t)e][1] == f; };
+        auto side = [&](int e, int sharp) { return in(efi[(size_t)e][0], sharp) ? efi[(size_t)e][0] : efi[(size_t)e][1]; };
+        int found = 0;
+        for (int k = 0; k < 2 && sh[1] >= 0; ++k)
+        {
+          const int s1 = sh[k], s2 = sh[1 - k];
+          if (!in(side(sp.e1, s1), s1) || !in(side(sp.e2, s1), s1) || !in(side(sp.e1, s2), s2) || !in(side(sp.e2, s2), s2))
+            continue;
+          SplitCorner c = sp;
+          c.hinge = side(sp.e1, s2);
+          c.wall  = side(sp.e2, s1);
+          c.w1    = s1;
+          c.w2    = sp.e2;
+          c.e2    = s2;
+          gp_XYZ c1;
+          if (tangent_corner(sp.e1, side(sp.e1, s1), c.wall, c1) || tangent_corner(sp.e2, side(sp.e2, s2), c.hinge, c.pb))
+            continue;
+          const gp_XYZ along = away(s2) - away(s1);
+          if (along.Modulus() < 1e-9 || (c1 - V.XYZ()).Dot(along) > (c.pb - V.XYZ()).Dot(along))
+            continue;
+          if (++found > 1)
+            break;
+          x  = c1;
+          sp = c;
+        }
+        if (dbg)
+          std::fprintf(stderr, "quadrics: tangent edges across at %.4f %.4f %.4f mm: %d pairings in order (sharp %d %d, root %d)\n", V.X() * 1e3, V.Y() * 1e3, V.Z() * 1e3, found, sh[0], sh[1], (int)(find(i) == i));
+        if (found != 1 || find(i) != i || std::any_of(fs.begin(), fs.end(), [&](int f) { return !kept[(size_t)f]; }))
+          return no("a corner of two tangent edges on no common face");
+        if ((sp.pb - x).Modulus() > 10 * tol)
+        {
+          vsplit[(size_t)i] = (int)splits.size();
+          splits.push_back(sp);
+        }
       }
-      if (sp.wall < 0 || sp.w1 < 0 || sp.w2 < 0 || find(i) != i)
-        return no("a corner of four faces not two tangent edges and a wall");
-      if (!kept[(size_t)sp.hinge] || !kept[(size_t)x1] || !kept[(size_t)x2])
-        return no("a corner of two tangent edges on a removed face");
-      if (const char* why = tangent_corner(sp.e1, efi[(size_t)sp.e1][0], sp.wall, x))
-        return no(why);
-      if (const char* why = tangent_corner(sp.e2, efi[(size_t)sp.e2][0], sp.wall, sp.pb))
-        return no(why);
-      if ((sp.pb - x).Modulus() > 10 * tol)
+      else
       {
-        vsplit[(size_t)i] = (int)splits.size();
-        splits.push_back(sp);
+        const int x1 = a1 == sp.hinge ? b1 : a1, x2 = a2 == sp.hinge ? b2 : a2;
+        sp.wall = -1;
+        for (int f : fs)
+          if (f != sp.hinge && f != x1 && f != x2)
+            sp.wall = f;
+        for (int e : es)
+        {
+          const int p = efi[(size_t)e][0], q = efi[(size_t)e][1];
+          if ((p == x1 && q == sp.wall) || (q == x1 && p == sp.wall))
+            sp.w1 = e;
+          if ((p == x2 && q == sp.wall) || (q == x2 && p == sp.wall))
+            sp.w2 = e;
+        }
+        if (sp.wall < 0 || sp.w1 < 0 || sp.w2 < 0 || find(i) != i)
+          return no("a corner of four faces not two tangent edges and a wall");
+        if (!kept[(size_t)sp.hinge] || !kept[(size_t)x1] || !kept[(size_t)x2])
+          return no("a corner of two tangent edges on a removed face");
+        if (const char* why = tangent_corner(sp.e1, efi[(size_t)sp.e1][0], sp.wall, x))
+          return no(why);
+        if (const char* why = tangent_corner(sp.e2, efi[(size_t)sp.e2][0], sp.wall, sp.pb))
+          return no(why);
+        if ((sp.pb - x).Modulus() > 10 * tol)
+        {
+          vsplit[(size_t)i] = (int)splits.size();
+          splits.push_back(sp);
+        }
       }
     }
     else if (fs.size() > 3 && es.size() == fs.size() && std::none_of(es.begin(), es.end(), [&](int e) { return tangent[(size_t)e] != 0 || seam[(size_t)e] != 0; }))
@@ -6612,9 +6667,22 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           if (kept[(size_t)fa] && kept[(size_t)fb] && na.Dot(nb) > std::cos(1e-4))
             return true;
           const gp_XYZ y0m = y;
-          bool         ok  = quad::solve3_grad(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          // (Near its first guess, on both offsets: a solve can end on a false zero where a free-form offset's foot is
+          // held at its extension's end, 3 mm off (c2-rings-loft's band after the ring's Ø20.5 edit).)
+          auto fits = [&]() {
+            if ((y - p.XYZ()).Modulus() >= 10 * thickness || (y - y0m).Modulus() > 3 * std::max((y0m - p.XYZ()).Modulus(), t))
+              return false;
+            for (const int f : {fa, fb})
+            {
+              gp_XYZ g;
+              if (sf[(size_t)f].general && !(std::abs(quad::eval_grad_near(sf[(size_t)f], y, g, size)) < 1e-6 * size))
+                return false;
+            }
+            return true;
+          };
+          bool ok = quad::solve3_grad(s3, y, size) && fits();
           if (!ok)
-            ok = (y = y0m, quad::solve3_damped(s3, y, size)) && (y - p.XYZ()).Modulus() < 10 * thickness;
+            ok = (y = y0m, quad::solve3_damped(s3, y, size)) && fits();
           if (!ok && dbg)
           {
             gp_XYZ g0, g1;
