@@ -3486,7 +3486,15 @@ fn sheet_metal_failures_say_what_live_says() {
     bend(&mut s, &line, &top, Some("100 mm"));
     check("bend radius 100", last_message(&s), failed(divide));
     s.ps.features.pop();
-    // (Live's bd-twice, Bend 2 on Bend 1's line and face, "Select a planar sheet metal face.": ERR-SM-BEND-WORDS, open.)
+    // Live's bd-twice: Bend 2 on Bend 1's line and face; Bend 1 split the face, "Select a planar sheet metal face.".
+    {
+        let (mut s, line, r) = plate_bend([(30.0, 0.0), (30.0, 40.0)]);
+        let top = face_at(&r, DVec3::new(15.0, 20.0, 2.0));
+        bend(&mut s, &line, &top, None);
+        s.ok();
+        bend(&mut s, &line, &top, None);
+        check("bend twice", last_message(&s), failed("Select a planar sheet metal face."));
+    }
     for (case, l) in [("bend off the plate", [(80.0, 0.0), (80.0, 40.0)]), ("bend on the plate's edge", [(0.0, 0.0), (60.0, 0.0)])] {
         let (mut s, line, r) = plate_bend(l);
         let top = face_at(&r, DVec3::new(15.0, 20.0, 2.0));

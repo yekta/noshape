@@ -178,7 +178,22 @@ fn rows() -> Vec<Row> {
             s.frames(cx);
             let lit = cx.update(|cx| s.view.read(cx).sm_hover_refs().len());
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).hovered_bend()));
-            expect((lit > 0, flat), (true, Some(Some(0))), "(the bend lit in 3D, its zone on the flat)")
+            expect((lit > 0, flat), (true, Some(Some(0))), "(the bend lit in 3D, its zone on the flat)")?;
+            // Clicked, as live workflows-1123 02 s19 (the pointer stays on the row): its faces filled flat in the hover colour.
+            s.press(cx, "sm-cell-0-0-1", MouseButton::Left)?;
+            s.frames(cx);
+            let filled = cx.update(|cx| {
+                let v = s.view.read(cx);
+                let (Some(built), refs) = (v.built.as_ref(), v.sm_hover_refs()) else { return (0, 0, 0) };
+                let states = &v.viewport.read(cx).scene().states;
+                let ids: Vec<u32> = refs.iter().flat_map(|r| built.picks.ids_for(r).iter().copied()).collect();
+                let lit = noshape_render::scene::state::HOVER | noshape_render::scene::state::FILLED;
+                (refs.len(), ids.len(), ids.iter().filter(|&&id| states.get(id as usize).is_some_and(|s| s & lit == lit)).count())
+            });
+            if !(filled.0 > 0 && filled.1 > 0 && filled.2 == filled.1) {
+                return Err(format!("clicked: refs {}, faces {}, filled {}", filled.0, filled.1, filled.2));
+            }
+            Ok(())
         } },
         Row { id: "table / a joint row hovered lights its rip", live: "hovering Joint A (a rip) lights it in the 3D view and its edges in the flat view (live 11-17 sm-feel-1117)", gap: false, check: |s, cx| {
             s.press(cx, "sm-cell-0-0-0", MouseButton::Right)?;
