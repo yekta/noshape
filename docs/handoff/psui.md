@@ -33,9 +33,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (08:56 UTC 11-23): QUEUED cc8570b3 (batch incl. 1de902059: mate flyout unticked rows + root ⬇ badge
-+ 400 px wrap). Committed, not landed: 825f6603f UIS-STATE-GEOMETRY (live recorder side in live/REQUESTS 07:17).
-UNCOMMITTED, t114 green apart from the triad bound (fixed since), t115 = the two tests + clippy:
+## RESUME HERE (09:05 UTC 11-23): cc8570b3 batch LANDED. QUEUED 78be1090 = 825f6603f UIS-STATE-GEOMETRY + 7506baee8
+(below; t114/t115 green, clippy clean). Live recorder side of the geometry state: live/REQUESTS 07:17.
+In 7506baee8:
 - ERR-TOOL-BODY-COLOUR: failing tool matte (preview_body_ids), alpha 0.8, TOOL_PREVIEW_FAIL 0x9b3d40 (scene palette):
   extrude (129,60,63) vs live (130,62,67), revolve (129,63,66) vs (135,63,69). Test a_failing_tool_body_is_lives_matte_dark_red.
 - FEEL-TRANSFORM-TRIAD-LOOK drag: ghost_outline_only(.., &selection) marks a selected part's ghost faces; renderer.rs
