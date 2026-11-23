@@ -517,14 +517,13 @@ bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
 // plate's faces 1.4 s → 0.1 s). Any face it can't take
 // (self-intersecting or seam wires, a ring it refuses) goes to `fallback`
 // (BRepMesh's own planar algorithm).
-// Planar faces PlanarCdtAlgo gave to BRepMesh's algorithm (mesh_prepare
-// reports its meshing's; tests).
-std::atomic<size_t> g_planar_fallbacks{0};
+// Planar faces PlanarCdtAlgo gave to BRepMesh's algorithm, counted per meshing (mesh_prepare reports them; tests).
+using FallbackCount = std::shared_ptr<std::atomic<size_t>>;
 
 class PlanarCdtAlgo : public IMeshTools_MeshAlgo
 {
 public:
-  explicit PlanarCdtAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+  PlanarCdtAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback, FallbackCount fallbacks) : myFallback(fallback), myFallbacks(std::move(fallbacks)) {}
 
   void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
   {
@@ -538,7 +537,7 @@ public:
     }
     if (!done)
     {
-      ++g_planar_fallbacks;
+      ++*myFallbacks;
       myFallback->Perform(f, prm, range);
     }
   }
@@ -549,6 +548,7 @@ private:
   static bool triangulate(const IMeshData::IFaceHandle& f) { return cdt_face(f, MIN_NODES, false); }
 
   occ::handle<IMeshTools_MeshAlgo> myFallback;
+  FallbackCount                    myFallbacks;
 };
 
 // A curved face bounded by long rails of edge nodes and nothing to fill
@@ -956,10 +956,12 @@ private:
 class PlanarCdtAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
+  explicit PlanarCdtAlgoFactory(FallbackCount fallbacks) : myFallbacks(std::move(fallbacks)) {}
+
   occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
   {
     if (type == GeomAbs_Plane)
-      return new PlanarCdtAlgo(myDefault->GetAlgo(type, prm));
+      return new PlanarCdtAlgo(myDefault->GetAlgo(type, prm), myFallbacks);
     const bool bands = std::getenv("NOSHAPE_MESH_NO_BANDS") == nullptr;
     occ::handle<IMeshTools_MeshAlgo> own = myDefault->GetAlgo(type, prm);
     if (bands)
@@ -971,6 +973,7 @@ public:
 
 private:
   occ::handle<IMeshTools_MeshAlgoFactory> myDefault = new BRepMesh_MeshAlgoFactory();
+  FallbackCount                           myFallbacks;
 };
 
 // An export's sphere or torus GridAlgo can't take: `export_grid`'s nodes, through BRepMesh's Delaunay.
@@ -1042,6 +1045,8 @@ private:
 class ExportAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
+  explicit ExportAlgoFactory(FallbackCount fallbacks) : myOwn(new PlanarCdtAlgoFactory(std::move(fallbacks))) {}
+
   occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
   {
     if (type == GeomAbs_Torus || type == GeomAbs_Sphere || type == GeomAbs_SurfaceOfRevolution || type == GeomAbs_BSplineSurface ||
@@ -1051,7 +1056,7 @@ public:
   }
 
 private:
-  occ::handle<IMeshTools_MeshAlgoFactory> myOwn = new PlanarCdtAlgoFactory();
+  occ::handle<IMeshTools_MeshAlgoFactory> myOwn;
 };
 
 // BRepMesh's model post-processing without its deflection estimate
@@ -1396,7 +1401,8 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // on macOS arm64 (features_a pattern_instance_references_survive_upstream_edit,
     // v0.4.6 CI run 39827462890).
     occ::handle<BRepMesh_Context> ctx = new BRepMesh_Context();
-    ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(exact ? occ::handle<IMeshTools_MeshAlgoFactory>(new ExportAlgoFactory()) : occ::handle<IMeshTools_MeshAlgoFactory>(new PlanarCdtAlgoFactory())));
+    const FallbackCount           fallbacks = std::make_shared<std::atomic<size_t>>(0);
+    ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(exact ? occ::handle<IMeshTools_MeshAlgoFactory>(new ExportAlgoFactory(fallbacks)) : occ::handle<IMeshTools_MeshAlgoFactory>(new PlanarCdtAlgoFactory(fallbacks))));
     if (std::getenv("NOSHAPE_MESH_BREPMESH_POST") == nullptr)
       ctx->SetPostProcessor(new DisplayPostProcessor());
     lap = std::make_unique<KernelTimer>("mesh.cache");
@@ -1544,7 +1550,6 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       if (copy)
         slot.emplace();
       const KernelTimer timer("mesh.brepmesh");
-      const size_t      fallbacks = g_planar_fallbacks.load();
       const auto brep_t0 = std::chrono::steady_clock::now();
       // Stopped by a cancel and by a deadline, by the wall clock (its work is on the pool), unless a tighter one
       // is set: a face it can't mesh in time (a displacement map's million-pole B-spline took it half an hour) fails
@@ -1562,7 +1567,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
       fail_if_cancelled();
       if (std::getenv("NOSHAPE_MESH_DEBUG"))
         std::fprintf(stderr, "mesh: BRepMesh meshed %d faces in %.1f ms\n", meshed.ShapeType() == TopAbs_COMPOUND ? meshed.NbChildren() : m->faces.Extent(), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - brep_t0).count());
-      m->planar_fallbacks = g_planar_fallbacks.load() - fallbacks;
+      m->planar_fallbacks = fallbacks->load();
       if (std::getenv("NOSHAPE_MESH_DEBUG"))
         std::fprintf(stderr, "mesh: %zu planar faces to BRepMesh's algorithm\n", m->planar_fallbacks);
       if (copy)

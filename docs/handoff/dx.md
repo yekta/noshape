@@ -59,7 +59,8 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - 538aa4b0's batch FAILED 07:18 on kernel planar_mesh::a_notched_plate_at_a_tiny_chord_keeps_the_planar_triangulation
   (1 face to BRepMesh; mine, 43b024a8a). The batch only changed xt.cpp's writer. Not reproduced: on vibe2 it passes 3x
   alone and in the full kernel run (591, dx-scratch/pm-run1.log); main's watcher is green. If 7781b07e fails on it again:
-  print the face (tessellate_export's fallback) on the land host's build; suspect a non-deterministic parallel Cut.
+  FIXED: the fallback count was one process-wide counter read as a before/after difference (another test meshing
+  at once added its fallbacks); now counted per meshing (mesh.cpp FallbackCount), green kernel 591 (pm2-run1.log).
 - Lead was at 320-340k (not messaged): tell it about the flake + "queue empty, next task?" once it is under 200k.
 - After landing: tell qa IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK; tell core the hose
   end rings are whole and the 4 tangent joints are their sweep's.
