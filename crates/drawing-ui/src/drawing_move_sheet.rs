@@ -13,7 +13,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::{AnnotationKind, RenderStyle, TableCorner, ViewId};
+use noshape_model::drawing::{AnnotationKind, Drawing, RenderStyle, TableCorner, ViewId, ViewMoves as _};
 
 /// What "Move to sheet" moves.
 #[derive(Clone, Copy, PartialEq)]
@@ -28,6 +28,11 @@ pub struct MoveSheetDlg {
     /// Where the menu was opened (editor px).
     pub at: [f64; 2],
     pub sheet: usize,
+    /// The sheet it was opened on and the selection then.
+    pub from: usize,
+    before: Vec<Sel>,
+    /// Another sheet picked: the drawing with the object moved there, shown until ✓ or ✕.
+    preview: Option<Drawing>,
 }
 
 /// The open general "Table properties" dialog.
@@ -40,14 +45,66 @@ const CORNERS: [TableCorner; 4] = [TableCorner::TopLeft, TableCorner::TopRight, 
 
 impl DrawingEditor {
     pub fn open_move_sheet(&mut self, target: MoveTarget, cx: &mut Context<Self>) {
-        self.move_sheet = Some(MoveSheetDlg { target, at: self.menu_at, sheet: self.sheet });
+        self.move_sheet = Some(MoveSheetDlg { target, at: self.menu_at, sheet: self.sheet, from: self.sheet, before: self.selection.clone(), preview: None });
         self.first_due = true;
         cx.notify();
     }
 
-    fn accept_move_sheet(&mut self, cx: &mut Context<Self>) {
+    /// A sheet picked: live shows that sheet at once, the object moved there and selected; ✓ keeps it (qa
+    /// DRW-MOVE-TO-SHEET-PREVIEW, workflow 11 s9).
+    pub(crate) fn pick_move_sheet(&mut self, i: usize, cx: &mut Context<Self>) {
+        let Some(d) = self.move_sheet.as_mut() else { return };
+        d.sheet = i;
+        d.preview = None;
+        let (from, target, before) = (d.from, d.target, d.before.clone());
+        if i == from {
+            self.show_sheet(from, cx);
+            self.selection = before;
+            return self.update_preview(cx);
+        }
+        let mut dr = self.drawing.clone();
+        let sel = match target {
+            MoveTarget::View(id) => {
+                let mut ids: Vec<ViewId> = before.iter().filter_map(|s| s.as_view()).collect();
+                if !ids.contains(&id) {
+                    ids = vec![id];
+                }
+                dr.move_views_to_sheet_linked(from, &ids, i).ok().map(|m| m.iter().map(|(_, n)| Sel::View(*n)).collect::<Vec<_>>())
+            }
+            MoveTarget::Table(id) => crate::drawing_custom_table::move_table(&mut dr, from, id, i).map(|n| vec![Sel::Table(n)]),
+        };
+        let Some(sel) = sel else { return };
+        if let Some(d) = self.move_sheet.as_mut() {
+            d.preview = Some(dr);
+        }
+        self.show_sheet(i, cx);
+        self.selection = sel;
+        self.update_preview(cx);
+    }
+
+    /// The drawing a picked sheet shows while Move to sheet is open.
+    pub(crate) fn move_sheet_preview(&self) -> Option<Drawing> {
+        self.move_sheet.as_ref()?.preview.clone()
+    }
+
+    /// Move to sheet closed unapplied: back on its sheet with its selection.
+    pub(crate) fn cancel_move_sheet(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(d) = self.move_sheet.take() else { return false };
+        if self.sheet != d.from {
+            self.show_sheet(d.from, cx);
+            self.selection = d.before;
+        }
+        true
+    }
+
+    pub(crate) fn accept_move_sheet(&mut self, cx: &mut Context<Self>) {
         let Some(d) = self.move_sheet.take() else { return };
-        if d.sheet != self.sheet {
+        if d.sheet != d.from {
+            // Moved from the sheet it was opened on (a picked sheet only previewed it).
+            if self.sheet != d.from {
+                self.show_sheet(d.from, cx);
+                self.selection = d.before.clone();
+            }
             match d.target {
                 // Live2 drw-view-move-to-sheet-ok: the drawing shows the other sheet with nothing selected.
                 MoveTarget::View(id) => {
@@ -285,7 +342,7 @@ impl DrawingEditor {
         let cur = names.get(d.sheet).cloned().unwrap_or_default();
         let at = d.at;
         let (shown, value) = (cur.clone(), cur.clone());
-        let moves = d.sheet != self.sheet;
+        let moves = d.sheet != d.from;
         // Live 284: 120 px, the value at 13.33 px; ✓ pale until another sheet is picked.
         let sheet = Button::new("ms-sheet").accessibility_label(cur.clone()).child(div().min_w_0().overflow_hidden().whitespace_nowrap().text_size(px(13.33)).child(cur)).ghost().xsmall().w(px(120.)).h(px(25.)).text_color(gpui_kit::rgb(0x555555)).dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).rounded(px(0.));
         let sheet = self.first_lit_underline(sheet).os_dropdown_menu("ms-sheet-dd", true, move |mut m, _, _| {
@@ -293,9 +350,7 @@ impl DrawingEditor {
                 let e = ed.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(n.clone()).on_click(move |_, _, cx| {
                     e.update(cx, |t, cx| {
-                        if let Some(d) = &mut t.move_sheet {
-                            d.sheet = i;
-                        }
+                        t.pick_move_sheet(i, cx);
                         cx.notify();
                     })
                 }));
@@ -325,7 +380,7 @@ impl DrawingEditor {
                 .on_mouse_move(cx.listener(Self::pointer_off_sheet))
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(Self::dialog_header("Move to sheet", moves, |t, cx| t.accept_move_sheet(cx), |t, cx| {
-                    t.move_sheet = None;
+                    t.cancel_move_sheet(cx);
                     cx.notify();
                 }, ("ms-ok", "ms-close"), cx))
                 .child(h_flex().h(px(27.)).pl(px(10.)).pr(px(4.)).justify_between().child(div().pt(px(6.)).child("Sheet")).child(sheet))

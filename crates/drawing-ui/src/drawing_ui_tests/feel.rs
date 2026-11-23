@@ -1097,6 +1097,15 @@ fn a_hovered_bom_header_shades_like_a_row(cx: &mut TestAppContext) {
     cx.update(|cx| editor.update(cx, |e, _| e.selection = vec![Sel::Table(id)]));
     hover(cx, None);
     assert_eq!(fills(cx), (false, false, false), "selected, the pointer away: the rows white");
+    // Its two middle grips are 10 x 10 px squares (qa DRW-TABLE-MID-HANDLES, workflow 10 s6-8).
+    let grips = cx.update(|cx| {
+        let e = editor.read(cx);
+        let mut o = crate::drawing_scene::Overlay::default();
+        e.table_grip_overlay(&mut o);
+        let px = e.zoom;
+        o.tinted.iter().map(|(pts, _, w)| (((pts[1][0] - pts[0][0]) * px).round(), *w)).collect::<Vec<_>>()
+    });
+    assert_eq!(grips, vec![(10.0, 10.0); 2], "two 10 x 10 squares");
     // On its corner dot just outside it (live workflows-1123 10 s6-7): white; its right-click menu open (s8): filled.
     let corner = cx.update(|cx| {
         let built = editor.read(cx).built.clone().expect("built");
@@ -4346,4 +4355,73 @@ fn section_and_detail_view_properties_open_as_live(cx: &mut TestAppContext) {
         (st.value().to_string(), st.selected_value().to_string())
     });
     assert_eq!(selected, value, "a click in Scale selects all of it");
+    let editable = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).view_props.as_ref().is_some_and(|p| editor.read(cx).view_rotation_editable(p)));
+    assert!(!editable(cx), "a section is aligned with its parent: no rotation");
+    // qa DRW-DETAIL-ROTATION-ANGLE (workflow 09 s11): a detail's Rotation angle is editable.
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| e.open_view_props(detail, w, cx))).unwrap();
+    draw(cx, window);
+    assert!(editable(cx), "a detail turns on its own");
+}
+
+/// qa DRW-SHEETS-CHEVRON-STATE (workflow 11 s3) / DRW-SHEETS-EMPTY-CHEVRON (s4): Sheet1 keeps its open chevron while
+/// its views are listed under it, whichever sheet is active; an empty sheet has none.
+#[gpui::test]
+fn a_sheet_listing_its_views_keeps_its_chevron_open(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (_window, editor) = drawing(cx, "feel-sheet-chevron");
+    let (first, empty) = cx.update(|cx| {
+        let d = &editor.read(cx).drawing;
+        let mut empty = d.sheets[0].clone();
+        empty.views.clear();
+        (crate::drawing_extra::sheet_caret(&d.sheets[0]), crate::drawing_extra::sheet_caret(&empty))
+    });
+    assert_eq!(first, Some(true), "Sheet1 lists its views: open");
+    assert_eq!(empty, None, "an empty sheet: no chevron");
+}
+
+/// qa DRW-MOVE-TO-SHEET-PREVIEW (workflow 11 s9): picking Sheet2 in Move to sheet shows Sheet2 at once with the view
+/// there, selected; the drawing changes only at ✓. ✕ goes back to Sheet1 with the view selected where it was.
+#[gpui::test]
+fn move_to_sheet_shows_the_picked_sheet_before_ok(cx: &mut TestAppContext) {
+    use crate::drawing_move_sheet::MoveTarget;
+    use noshape_model::drawing::ViewKind;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "feel-move-sheet-preview");
+    let view = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let mut d = e.drawing.clone();
+            d.add_sheet(0);
+            e.commit("Add sheet", d, cx);
+            let view = e.current_sheet().views.iter().find(|v| matches!(v.kind, ViewKind::Projected { .. })).map(|v| v.id).expect("a projected view");
+            e.selection = vec![Sel::View(view)];
+            e.open_move_sheet(MoveTarget::View(view), cx);
+            view
+        })
+    });
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = editor.read(cx);
+        let shown = e.preview.as_ref().is_some_and(|d| !d.sheets[1].views.is_empty());
+        (e.sheet, e.drawing.sheets[1].views.len(), shown, e.selection.len())
+    });
+    assert_eq!(state(cx), (0, 0, false, 1));
+    cx.update(|cx| editor.update(cx, |e, cx| e.pick_move_sheet(1, cx)));
+    draw(cx, window);
+    assert_eq!(state(cx), (1, 0, true, 1), "Sheet2 shown with the view there, selected; nothing moved yet");
+    let moved = cx.update(|cx| editor.read(cx).selection.clone());
+    assert_ne!(moved, vec![Sel::View(view)], "the moved view's own id on Sheet2");
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.cancel_move_sheet(cx);
+    }));
+    draw(cx, window);
+    assert_eq!(state(cx), (0, 0, false, 1), "✕: back on Sheet1");
+    assert_eq!(cx.update(|cx| editor.read(cx).selection.clone()), vec![Sel::View(view)]);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.open_move_sheet(MoveTarget::View(view), cx);
+        e.pick_move_sheet(1, cx);
+        e.accept_move_sheet(cx);
+    }));
+    draw(cx, window);
+    let (sheet, there, _, _) = state(cx);
+    assert!(sheet == 1 && there > 0, "✓ moves it and stays on Sheet2");
 }

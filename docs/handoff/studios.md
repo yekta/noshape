@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-23 02:33 UTC.
+Updated 2026-11-23 02:41 UTC.
 
 ## In flight
 
@@ -32,6 +32,16 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
     update_preview's chain), N:N text, Scale label follows scale != sheet scale, selection kept; ✓ applies on the
     preview; ✕/Esc/tool/sheet props/reopen go through `drop_view_props`. Feel test
     `enter_in_view_properties_scale_previews_until_ok`.
+- QUEUED 14f567d6 (02:35) carries 58eda2cb: one result for both.
+- UNCOMMITTED (02:41), x256 on vibex8 (log /root/studios-scratch/x256.log, x254r.sh = drawing-ui tests + clippy;
+  x255 green on the first three; x256: the move-sheet test fixed (Sheet2 gets 2 views: assert non-empty), x257 reruns): DRW-TABLE-MID-HANDLES (10 x 10 grips, BOM header test), DRW-SHEETS-CHEVRON-STATE +
+  EMPTY-CHEVRON (`drawing_extra::sheet_caret`: open while views listed, none when empty), DRW-DETAIL-ROTATION-ANGLE
+  (`view_rotation_editable`, section test), DRW-MOVE-TO-SHEET-PREVIEW (MoveSheetDlg from/before/preview,
+  `pick_move_sheet`, `cancel_move_sheet`, `move_sheet_preview` in update_preview's chain, `drawing_custom_table::move_table`;
+  test `move_to_sheet_shows_the_picked_sheet_before_ok`). TICKETS [x] for those + DRW-SCALE-ENTER-LABEL. If green:
+  commit, land.
+- Next: DRW-CALLOUT-DIALOG-LOOK (live: centre box preset with a "Table: Item No." token, focused, ~66 px; resolves to
+  "1" after the anchor click; ours an italic placeholder), then FS / HIST / TOAST rows below.
 - qa 01:1x block left (TICKETS "qa, 2026-11-23 01:1x"): DRW-DETAIL-ROTATION-ANGLE, DRW-CALLOUT-DIALOG-LOOK,
   DRW-TABLE-MID-HANDLES, DRW-MOVE-TO-SHEET-PREVIEW, DRW-SHEETS-CHEVRON-STATE, FS-NOTICES-ICON-RED-ON-REGEN-ERROR,
   FS-OUTLINE-ENCLOSING-SYMBOL, FS-TOOLBAR-RIGHT-GROUP, FS-EDITOR-SELECTION-COLOUR, HIST-MERGE-DIALOG-LOOK,

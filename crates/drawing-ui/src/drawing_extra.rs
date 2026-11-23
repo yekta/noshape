@@ -680,7 +680,10 @@ impl DrawingEditor {
                 .pl(px(13.))
                 .cursor_pointer()
                 .when(active, |d| d.bg(rgb(0xe9eef2)).text_color(blue).font_weight(FontWeight::SEMIBOLD).border_b_1().border_color(rgb(0x90cef1)))
-                .child(crate::ui::caret(active))
+                .child(match sheet_caret(s) {
+                    Some(open) => crate::ui::caret(open),
+                    None => div().w(px(16.)).ml(px(-3.)).mr(px(3.)).flex_none(),
+                })
                 .child(div().w(px(20.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon("sheet-page", 18., cx)))
                 // Live: "Sheet2 (2)" = the name and the sheet's position; an
                 // imported model space is "Model" (unnumbered, the layouts count
@@ -1608,9 +1611,10 @@ impl DrawingEditor {
             for c in l.corners() {
                 o.dots.push((c, if c == fixed { [0, 0, 0, 255] } else { TAN }));
             }
+            // The middle grips are 10 x 10 px squares (qa DRW-TABLE-MID-HANDLES, workflow 10 s6-8).
             for g in l.resize_grips(t.corner) {
-                let h = 3.5 * k;
-                o.tinted.push((vec![[g[0] - h, g[1]], [g[0] + h, g[1]]], TAN, 7.0));
+                let h = 5.0 * k;
+                o.tinted.push((vec![[g[0] - h, g[1]], [g[0] + h, g[1]]], TAN, 10.0));
             }
         }
         if let Drag::MoveTable { id, .. } = &self.drag
@@ -2527,4 +2531,10 @@ pub(crate) fn divider_widths(widths: &[f64], i: usize, dx: f64, fixed_right: boo
         w[k] = (w[k] + dw).max(MIN);
     }
     w
+}
+
+/// A sheet row's chevron: open while its views are listed under it, active or not (qa DRW-SHEETS-CHEVRON-STATE,
+/// workflow 11 s3); none on an empty sheet (DRW-SHEETS-EMPTY-CHEVRON, workflow 11 s4).
+pub(crate) fn sheet_caret(s: &Sheet) -> Option<bool> {
+    (!s.views.is_empty()).then_some(true)
 }

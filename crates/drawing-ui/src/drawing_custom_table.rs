@@ -371,12 +371,11 @@ impl DrawingEditor {
     /// the same place.
     pub fn move_table_to_sheet(&mut self, id: u64, to: Option<usize>, cx: &mut Context<Self>) {
         let mut d = self.drawing.clone();
-        let Some(i) = d.sheets[self.sheet].tables.iter().position(|t| t.id == id) else { return };
+        if !d.sheets[self.sheet].tables.iter().any(|t| t.id == id) {
+            return;
+        }
         let to = to.unwrap_or_else(|| d.add_sheet(self.sheet));
-        let mut t = d.sheets[self.sheet].tables.remove(i);
-        let nid = d.sheets[to].next_table_id();
-        t.id = nid;
-        d.sheets[to].tables.push(t);
+        let Some(nid) = move_table(&mut d, self.sheet, id, to) else { return };
         let name = d.sheets[to].name.clone();
         self.commit("Move to sheet", d, cx);
         self.switch_sheet(to, cx);
@@ -776,4 +775,14 @@ impl DrawingEditor {
             .child(body)
             .into_any_element()
     }
+}
+
+/// Moves table `id` from sheet `from` to sheet `to`: its id there.
+pub(crate) fn move_table(d: &mut noshape_model::drawing::Drawing, from: usize, id: u64, to: usize) -> Option<u64> {
+    let i = d.sheets.get(from)?.tables.iter().position(|t| t.id == id)?;
+    let mut t = d.sheets[from].tables.remove(i);
+    let nid = d.sheets.get(to)?.next_table_id();
+    t.id = nid;
+    d.sheets[to].tables.push(t);
+    Some(nid)
 }

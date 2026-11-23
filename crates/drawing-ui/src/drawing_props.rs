@@ -855,6 +855,16 @@ impl DrawingEditor {
         self.view_props.as_ref()?.entered.clone()
     }
 
+    /// Rotation angle (0–360) with the reverse-direction button: editable without parent and children, with the parent
+    /// alignment suppressed (help H:views), and on a detail view (qa DRW-DETAIL-ROTATION-ANGLE, workflow 09 s11).
+    pub(crate) fn view_rotation_editable(&self, p: &ViewProps) -> bool {
+        let sheet = self.current_sheet();
+        let Some(v) = sheet.view(p.view) else { return false };
+        let has_children = sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(p.view));
+        let free = sheet.parent_of(p.view).is_none() || p.unaligned || self.apart_from_parent(p.view) || matches!(v.kind, ViewKind::Detail { .. });
+        free && !has_children && p.multi.is_none()
+    }
+
     /// A child view on another sheet than its parent's (Move to sheet: linked to it).
     pub fn apart_from_parent(&self, id: ViewId) -> bool {
         let sheet = self.current_sheet();
@@ -899,7 +909,6 @@ impl DrawingEditor {
         let apart = self.apart_from_parent(props.view);
         let parent_is_section = parent.and_then(|p| sheet.view(p)).is_some_and(|p| matches!(p.kind, ViewKind::Section { .. }));
         let parent_cut_row = parent_is_section && multi.is_none() && matches!(v.kind, ViewKind::Projected { .. });
-        let has_children = sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(props.view));
         let ink = gpui_kit::rgb(0x333333);
         let field_ink = gpui_kit::rgb(0x555555);
         let line = gpui_kit::rgb(0xdddddd);
@@ -1127,10 +1136,7 @@ impl DrawingEditor {
         if multi.is_none() && matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Section { .. }) {
             rows.push(check("vp-sync-breaks", "Synchronize breaks from parent", props.sync_breaks, |p, on| p.sync_breaks = on, cx));
         }
-        // Rotation angle (0–360) with the reverse-direction button: editable
-        // only without parent and children, or with the parent alignment
-        // suppressed (help H:views).
-        let can_rotate = (!has_parent || props.unaligned || apart) && !has_children && multi.is_none();
+        let can_rotate = self.view_rotation_editable(props);
         let rev = props.rot_reverse;
         let angle = if can_rotate {
             field(&props.rotation)

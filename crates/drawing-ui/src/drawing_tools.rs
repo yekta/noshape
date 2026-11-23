@@ -324,7 +324,7 @@ impl DrawingEditor {
             return;
         }
         // Live: Esc closes Move to sheet and clears the selection.
-        if self.move_sheet.take().is_some() {
+        if self.cancel_move_sheet(cx) {
             self.selection.clear();
             self.redraw(cx);
             return;
@@ -1002,7 +1002,7 @@ impl DrawingEditor {
             preview = base;
         }
         // Edit detail / Edit section: the edited view as the dialog has it.
-        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()).or_else(|| self.break_preview()).or_else(|| self.view_props_preview()) {
+        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()).or_else(|| self.break_preview()).or_else(|| self.view_props_preview()).or_else(|| self.move_sheet_preview()) {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());
