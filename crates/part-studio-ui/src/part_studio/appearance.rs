@@ -12,7 +12,7 @@ use crate::os_menu::OsContextMenuExt as _;
 use gpui_kit::*;
 use noshape_model::BodyId;
 use noshape_model::partstudio::{Appearance, AppearanceTarget, FaceAppearance, TessQuality};
-use noshape_model::reference::{FeatureId, Reference};
+use noshape_model::reference::{FeatureId, Reference, Role, TopoName};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -144,9 +144,13 @@ pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[Fa
     for a in appearances.iter().filter(|a| !a.suppressed) {
         let c = [lin_to_srgb(a.color[0]), lin_to_srgb(a.color[1]), lin_to_srgb(a.color[2]), 255];
         for (fi, r) in body.face_refs.iter().enumerate() {
+            let from = match r {
+                Reference::Face(n) => lineage(n),
+                _ => Vec::new(),
+            };
             let hit = match &a.target {
-                AppearanceTarget::Faces(faces) => faces.contains(r),
-                AppearanceTarget::Feature(f) => r.depends_on() == Some(*f) || (body.id.feature == *f && r.depends_on().is_none_or(|d| !own.contains(&d))),
+                AppearanceTarget::Faces(faces) => faces.contains(r) || faces.iter().any(|f| matches!(f, Reference::Face(m) if from.contains(&m))),
+                AppearanceTarget::Feature(f) => r.depends_on() == Some(*f) || from.iter().any(|m| m.creator() == Some(*f)) || (body.id.feature == *f && r.depends_on().is_none_or(|d| !own.contains(&d))),
             };
             if !hit {
                 continue;
@@ -161,6 +165,22 @@ pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[Fa
         }
     }
     colors
+}
+
+/// The faces a face stands for: the faces it was split from and those a pattern, mirror or transform copied it from
+/// (live appearance-1123 Q5: split pieces and copies keep their source's face and feature appearances).
+fn lineage(n: &TopoName) -> Vec<&TopoName> {
+    let mut out = Vec::new();
+    let mut todo = vec![n];
+    while let Some(n) = todo.pop() {
+        out.push(n);
+        match n {
+            TopoName::Split { parent, .. } => todo.push(parent),
+            TopoName::Face { role: Role::Copy { of, .. }, .. } => todo.push(of),
+            _ => {}
+        }
+    }
+    out
 }
 
 impl PartStudioView {
@@ -1323,6 +1343,44 @@ mod tests {
     use super::*;
     // The glob import brings GPUI's `test` attribute; use the built-in one.
     use std::prelude::v1::test;
+
+    /// Live appearance-1123 Q5: a pattern's copy of a face and a split's piece of it keep the face's face appearance
+    /// and its feature's appearance.
+    #[test]
+    fn copies_and_split_pieces_keep_their_faces_appearances() {
+        use noshape_model::display::{BodyDisplay, BodyKind, MeshBuffers};
+        let a = Arc::new(TopoName::face(FeatureId(2), Role::New(0)));
+        let faces = [
+            TopoName::face(FeatureId(9), Role::Copy { instance: 1, of: a.clone() }),
+            TopoName::Split { parent: a.clone(), by: FeatureId(5), ordinal: 0 },
+            TopoName::face(FeatureId(1), Role::New(1)),
+        ];
+        let mesh = MeshBuffers { positions: vec![[0.0; 3]; 9], indices: (0..9).collect(), face_ranges: vec![(0, 3), (3, 3), (6, 3)], ..Default::default() };
+        let body = BodyDisplay {
+            id: BodyId { feature: FeatureId(9), index: 0 },
+            name: "Part 2".into(),
+            kind: BodyKind::Solid,
+            color: [1.0; 4],
+            hidden: false,
+            mesh: Arc::new(mesh),
+            coarser: Vec::new(),
+            levels_from: 0,
+            face_refs: faces.into_iter().map(Reference::Face).collect(),
+            edge_refs: Vec::new(),
+            vertex_refs: Vec::new(),
+            bounds: None,
+            composite: None,
+            is_mesh: false,
+            face_colors: Vec::new(),
+        };
+        let own = [1, 2, 5, 9].into_iter().map(FeatureId).collect();
+        let per_face = |targets: AppearanceTarget| {
+            let c = face_colors(&body, &[FaceAppearance::new(targets, [0.0, 0.0, 1.0, 1.0])], &own).unwrap_or_default();
+            [0, 3, 6].map(|i| c.get(i).is_some_and(|v| v[3] == 255))
+        };
+        assert_eq!(per_face(AppearanceTarget::Faces(vec![Reference::Face((*a).clone())])), [true, true, false]);
+        assert_eq!(per_face(AppearanceTarget::Feature(FeatureId(2))), [true, true, false]);
+    }
 
     #[test]
     fn hex_and_srgb_round_trip() {

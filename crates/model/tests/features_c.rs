@@ -6021,6 +6021,42 @@ fn an_add_pattern_changing_nothing_draws_its_instances_red() {
     assert!((lo - 0.0).abs() < 1e-6 && (hi - mm(20.0)).abs() < 1e-6, "{lo} {hi}");
 }
 
+/// Live appearance-1123 Q5: a Split's pieces keep their part's name and colour (new ids); a pattern's copies its
+/// colour, not its name.
+#[test]
+fn split_pieces_and_pattern_copies_keep_their_parts_appearance() {
+    use noshape_model::partstudio::{Appearance, PartProperties};
+    let red = [1.0, 0.0, 0.0, 1.0];
+    let props = PartProperties { name: Some("Red block".into()), appearance: Some(Appearance { color: red }), ..Default::default() };
+    let mut s = boss_block();
+    let part = s.ok().context.bodies[0].id.clone();
+    s.ps.part_properties.insert(part.clone(), props.clone());
+    let p1 = part.clone();
+    s.add("splitPart", move |p| {
+        p.set("targets", q(Reference::Body(p1)));
+        p.set("tool", q(Reference::Plane(DatumPlane::Right)));
+    });
+    let res = s.regen();
+    let parts: Vec<(String, [f32; 4])> = res.display.bodies.iter().map(|b| (b.name.clone(), b.color)).collect();
+    assert_eq!(parts, vec![("Red block".to_string(), red); 2]);
+    assert!(res.display.bodies.iter().all(|b| b.id != part), "new ids");
+    let mut s = boss_block();
+    let part = s.ok().context.bodies[0].id.clone();
+    s.ps.part_properties.insert(part.clone(), props);
+    s.add("linearPattern", move |p| {
+        p.set("entities", q(Reference::Body(part)));
+        p.set("directionOne", q(Reference::Plane(DatumPlane::Right)));
+        p.set("distance", expr("60 mm"));
+        p.set("instanceCount", expr("2"));
+        p.set("operationType", en("NEW"));
+    });
+    let res = s.regen();
+    let parts: Vec<(&str, [f32; 4])> = res.display.bodies.iter().map(|b| (b.name.as_str(), b.color)).collect();
+    assert_eq!(parts.len(), 2, "{parts:?}");
+    assert_eq!(parts[0], ("Red block", red));
+    assert!(parts[1].0 != "Red block" && parts[1].1 == red, "{parts:?}");
+}
+
 /// Live errors-1123 mi-cylplane / cv-path-face: a pick its field doesn't take (the boss's cylinder as Mirror plane, the
 /// block's top face as Curve pattern's path) is a missing selection: left out, the feature's own empty-input error and
 /// "1 missing selection".

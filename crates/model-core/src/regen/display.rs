@@ -496,11 +496,17 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
             d.shared_meshes.insert(b.id.clone(), SharedMesh { mesh: local, coarser: local_coarser, transform: b.shape.location(), world: mesh.clone() });
         }
         let props = studio.part_properties.get(&b.id);
-        let color = props
-            .and_then(|p| p.appearance)
-            .map(|a| a.color)
-            .or_else(|| ctx.part_appearance.get(&b.id).copied())
+        // A split piece or a copy without its own takes its source part's appearance, a split piece its name too
+        // (live appearance-1123 Q5).
+        let mut sources: Vec<(&crate::reference::BodyId, bool)> = Vec::new();
+        while let Some((s, keeps)) = ctx.part_source.get(sources.last().map_or(&b.id, |l| l.0)).filter(|_| sources.len() < 64) {
+            sources.push((s, *keeps));
+        }
+        let color = std::iter::once(&b.id)
+            .chain(sources.iter().map(|s| s.0))
+            .find_map(|id| studio.part_properties.get(id).and_then(|p| p.appearance).map(|a| a.color).or_else(|| ctx.part_appearance.get(id).copied()))
             .unwrap_or(PART_COLORS[b.color % PART_COLORS.len()]);
+        let name = props.and_then(|p| p.name.clone()).or_else(|| sources.iter().take_while(|s| s.1).find_map(|s| studio.part_properties.get(s.0).and_then(|p| p.name.clone())));
         // Faces a feature colored (an import's face colours), kept on a part another was merged into (live psui
         // step-colours-1122: a union keeps both parts' face appearances, split faces' pieces included).
         let face_colors: Vec<Option<[f32; 4]>> = if ctx.face_appearance.is_empty() {
@@ -514,7 +520,7 @@ pub fn build(ctx: &Context, studio: &PartStudio, opts: &RegenOptions, meshes: &m
         let bounds = mesh_bounds(&mesh).or_else(|| b.shape.bounding_box(false).ok().map(|x| (x.min, x.max)));
         d.bodies.push(BodyDisplay {
             id: b.id.clone(),
-            name: props.and_then(|p| p.name.clone()).unwrap_or_else(|| b.name.clone()),
+            name: name.unwrap_or_else(|| b.name.clone()),
             kind: b.kind,
             color,
             hidden: props.is_some_and(|p| p.hidden),

@@ -698,7 +698,9 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
                 }
             }
             let color = ev.ctx.bodies[bodies[bj]].color;
-            push_body_colored(ev, BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 }, kind, ns.shape, ns.names.faces, color);
+            let id = BodyId { feature: ev.feature, index: (ii * nb + bj) as u32 };
+            ev.ctx.part_source.insert(id.clone(), (ev.ctx.bodies[bodies[bj]].id.clone(), false));
+            push_body_colored(ev, id, kind, ns.shape, ns.names.faces, color);
         }
         return Ok(());
     }
@@ -1191,6 +1193,7 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
             for (ii, bj, kind, ns) in copies {
                 let index = (f.0 as u32 & 0xFFF).wrapping_mul(1 << 20).wrapping_add((ii * nb + bj) as u32);
                 let color = ev.ctx.bodies[created[bj]].color;
+                ev.ctx.part_source.insert(BodyId { feature: ev.feature, index }, (ev.ctx.bodies[created[bj]].id.clone(), false));
                 push_body_colored(ev, BodyId { feature: ev.feature, index }, kind, ns.shape, ns.names.faces, color);
             }
         }
@@ -2388,6 +2391,7 @@ pub fn transform(ev: &mut EvalCtx) -> FResult<()> {
             let name = ev.ctx.alloc_part_name(kind);
             let f = ev.feature;
             let id = BodyId { feature: f, index: bj as u32 };
+            ev.ctx.part_source.insert(id.clone(), (ev.ctx.bodies[bodies[bj]].id.clone(), false));
             if let Some(p) = m.and_then(|m| placed(&ev.ctx, &ev.ctx.bodies[bodies[bj]].id, m)) {
                 ev.ctx.placements.insert(id.clone(), p);
             }
@@ -2443,7 +2447,9 @@ pub fn copy_part(ev: &mut EvalCtx) -> FResult<()> {
     let inst = [Instance { code: 1, t: k::Transform::Translate(DVec3::ZERO) }];
     for (_, bj, kind, ns) in copy_bodies(ev, &bodies, &inst)? {
         let color = ev.ctx.bodies[bodies[bj]].color;
-        push_body_colored(ev, BodyId { feature: ev.feature, index: bj as u32 }, kind, ns.shape, ns.names.faces, color);
+        let id = BodyId { feature: ev.feature, index: bj as u32 };
+        ev.ctx.part_source.insert(id.clone(), (ev.ctx.bodies[bodies[bj]].id.clone(), false));
+        push_body_colored(ev, id, kind, ns.shape, ns.names.faces, color);
     }
     Ok(())
 }

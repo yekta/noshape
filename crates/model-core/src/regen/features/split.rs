@@ -308,7 +308,9 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         // source's colour, at the end of the parts list.
         ev.ctx.bodies.remove(ti);
         for (j, (_, _, p)) in pieces.into_iter().enumerate() {
-            kept.push((BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 }, target.kind, target.color, p));
+            let bid = BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 };
+            ev.ctx.part_source.insert(bid.clone(), (id.clone(), true));
+            kept.push((bid, target.kind, target.color, p));
         }
     }
     // One tool through several bodies names each body's cut face alike (it comes from the tool): apart per part, as

@@ -802,6 +802,10 @@ pub struct Context {
     /// Appearances features gave single faces (Import), by body and face
     /// name: the body's faces descending from it keep it. Linear RGBA.
     pub face_appearance: Vec<(BodyId, crate::naming::Name, [f32; 4])>,
+    /// The part each split piece or pattern / mirror / transform copy came from, and whether it keeps that part's name
+    /// (live appearance-1123 Q5: copies take their source's appearance, a Split's pieces its name too).
+    #[serde(default, with = "pairs")]
+    pub part_source: BTreeMap<BodyId, (BodyId, bool)>,
     /// FeatureScript attributes (`setAttribute`), kept from feature to
     /// feature (custom/host loads and saves them around each custom feature).
     #[serde(skip)]
@@ -987,6 +991,7 @@ impl Context {
             decals,
             part_appearance,
             face_appearance,
+            part_source,
             fs_attributes,
             fs_variables,
             fs_hidden_bodies,
@@ -1032,6 +1037,7 @@ impl Context {
             && *decals == o.decals
             && *part_appearance == o.part_appearance
             && *face_appearance == o.face_appearance
+            && *part_source == o.part_source
             && fs_attributes.is_empty()
             && o.fs_attributes.is_empty()
             && fs_variables.is_empty()
