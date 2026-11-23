@@ -4005,3 +4005,28 @@ fn a_surface_mirrored_with_add_joins_its_mirror() {
         assert!(res.context.bodies.iter().all(|b| b.kind == noshape_model::display::BodyKind::Surface && b.shape.faces().len() == faces), "{op}");
     }
 }
+
+/// Live split-default-names-1123: Part 1 (x 0..40) split by Part 2's (x 30..50) x = 30 face: the untouched part (same id)
+/// is now "Part 1", the pieces new parts "Part 2" and "Part 3" after it. Renamed, Part 2 keeps its number. (Live lists
+/// the x 30..40 piece first; ours the x 0..30 one: which piece comes first is asked of live, core REQUESTS 11-23.)
+#[test]
+fn split_pieces_take_the_default_names_after_the_parts_before_them() {
+    for renamed in [false, true] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+        t.block(0.03, 0.0, 0.05, 0.02, "10 mm");
+        let r = t.ok();
+        let (p1, p2) = (r.context.bodies[0].id.clone(), r.context.bodies[1].id.clone());
+        let face = face_with_normal(&r.context.bodies[1], DVec3::NEG_X);
+        if renamed {
+            t.ps.part_properties.insert(p2.clone(), noshape_model::partstudio::PartProperties { name: Some("Orange block".into()), ..Default::default() });
+        }
+        t.add("splitPart", &[("targets", q(vec![body_ref(&p1)])), ("tool", q(vec![face])), ("keepTools", b(true)), ("keepBothSides", b(true))]);
+        let r = t.ok();
+        let xs: Vec<(String, f64)> = r.context.bodies.iter().map(|b| (b.name.clone(), b.shape.bounding_box(true).unwrap().min.x * 1e3)).collect();
+        assert_eq!(r.context.bodies[0].id, p2, "{xs:?}");
+        assert!(r.context.bodies.iter().all(|b| b.id != p1), "{xs:?}");
+        let names: Vec<&str> = r.display.bodies.iter().map(|b| b.name.as_str()).collect();
+        assert_eq!(names, [if renamed { "Orange block" } else { "Part 1" }, "Part 2", "Part 3"], "{xs:?}");
+    }
+}
