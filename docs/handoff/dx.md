@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-22 19:3x UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-23 00:14 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -13,29 +13,39 @@ Before any crates/drawing land: the full `cargo test -p noshape-ops --test all e
 Display rows `display:<tag>` in the .noshape meta table (app-core display_cache: key = blake3(document, tag inputs,
 build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, only when the lead says.
 
-## STATE 22:4x 11-22 (read first)
-- QUEUED 4c8ee668 (22:3x): STL that closes = the model's solids (mesh_body.cpp mesh_pieces: 3+-triangle edges pair
-  each triangle with the one it meets turning into its solid, one-to-one, ties to the nearest file index; only what
-  can't close splits as live, DECISIONS 11-22 lead) + qa P1 DX-STEP-ASM-IMPORTS-AS-PART-STUDIO (one NAUO = Part
-  Studio only; live one-part-asm-1122; ticket ticked). Bottle 2 / duct 4 solids.
-- QUEUED (22:4x, after 4c8ee668): SAT refit_loose_edges (xt_read.cpp; sat_read.cpp before heal_import): B-spline
-  edges > 1 um off their two faces refitted onto both (on_both Newton + bspline_through). Spring SAT per face = its
-  x_t (600.7296 / 600.7285 mm2, was 600.7174). T1 export::a_sat_edge_off_its_faces_is_put_back_on_them. And parity.rs:
-  the import time counts document_create + import_files only (rings-loft x_t 8.8 s was 3.9 import + 4.9 query_parts).
-- NEXT: rings-loft STEP "revolved ring" +0.093 mm2: per face (probe /root/dx-scratch/step-probe.keep.rs, append to
-  kernel tests/export.rs, run like satp2.sh) the groove faces differ: Torus 0.767390 vs x_t 0.763936, Plane 1.815663 vs
-  1.810812 (each of 12 grooves). Try refit_loose_edges after STEP read (io.cpp fix_pole_pcurves at 881 / 1100), but
-  STEP edges have pcurves: rebuild them (ShapeFix_Edge FixRemovePCurve / FixAddPCurve, SameParameter). Then rerun the
-  exchange suite (vibe2: /root/dx-scratch/exa-run.sh style) and report the score.
-- Rows left after the a2 run: spring SAT area 600.7855 (live's own 600.7224, band to 600.7827); rings-loft STEP
-  "revolved ring" area 1450.036 (live's imports 1449.945, ours x_t matches) + Extruded ring 273/762/508 = model (live's
-  own STEP 767/513); hose x_t read-back 12/14/4: writer splits the inner-wall end rings (off their faces > 1e-8,
-  xt.cpp ~2563); live's x_t writes them as exact SP_CURVE rings (tolerance None). Idea: snap the B-surface's
-  boundary pole row onto the cap plane, write the iso as the ring.
-- !! /root/dx-scratch/env.sh does `cd /root/projects/noshape-wt/dx` : scripts must `. env.sh; cd
-  /root/projects/noshape-wt/dx-open`. ssh remote ~ paths in quotes; rb.sh remote scripts as `bash -c 'bash $HOME/..'`.
-- extension-spring Isometric DXF line: LIVE'S HLR ERROR (b6338c85e). housing-draft: TICKETS P3
-  DRW-DXF-DRAFT-EDGE-POLYLINE.
+## USER P0s (lead 11-22 23:0x-23:4x) -- STATE 11-23 00:14: 4 commits green, NOT landed, waiting for the lead
+Lead: when built + green TELL THE LEAD BEFORE land.sh (release.yml changed: lead's workflow_dispatch dry run first).
+studios keeps only the copy identity and -wal cleanup; the open path is ours. Hose x_t end rings are core's now.
+Commits on dx-open4 (after b25d8b219, d6a37defd, which re-land with them):
+- 318315fe9 open-file: Info.plist CFBundleDocumentTypes + exported UTI app.noshape.document (icon noshape);
+  noshape.iss association; packaging/linux/noshape-mime.xml (install.sh, .deb, release.yml verify steps);
+  ops live.rs serve_app/open_in_app/APP_OPEN/app_info_path (test ops tests/live.rs
+  a_second_start_hands_its_document_to_the_running_app); app open_requests.rs (on_open_urls at launch + running,
+  second start hands over, open = focus if open). TODO after landing: verify on the Mac's release build (does
+  openURLs at launch arrive before run()? start window flash?).
+- 185a83a46 Download: no toast on success (live shows none), error only on failure. Test
+  a_download_that_works_shows_no_toast. Noted, not fixed: drawing status bubble guesses red by text (drawing_ui.rs ~33).
+- 61a29a3c2 pickers: file_dialogs picker_filter/filtered: no filter for "*" (macOS greyed every file), named filters
+  in both cases. Import takes any file (non-CAD -> file tab, as live).
+- 70edeb41d STEP: io.cpp sub_colors: solid/shell styles -> solidColors (part colour), faces only from face styles;
+  split_connected_pieces names a body's several solids after them (live: Main/Fan), split solid "<part>__<solid>".
+  T1 export::step_solid_colours_are_part_colours_and_face_styles_stay_on_their_face. Mac mini: Main #ececec 258 f /
+  152 face colours, Fan #4a4848 529 f / 14, as live. Private copy on vibe2 deleted.
+Green (vibe2): kernel all 586, ops live:: + import, app-core file_, noshape open_requests, clippy kernel/app-core/
+ops/noshape --all-targets. Scripts /root/dx-scratch/p0-remote.sh, p0-remote2.sh.
+
+## Parked: rings-loft STEP refit (branch dx-wip-step-refit, patch /root/dx-scratch/step-refit-wip.patch)
+- refit_loose_edges(shape, over, pcurves) after STEP read at 1e-4 mm: revolved ring 1449.9415 vs x_t 1449.9431
+  (was 1450.036), read 2.5 s vs 1.7 (cached ShapeAnalysis_Surface; on_both eps scaled by |x0|). T1
+  a_step_edge_off_its_faces_is_put_back_on_them. BUT our own rings-loft ours.step "Part 1" read back 360.6 mm3 for
+  440.8 (two cylinders: rebuilt pcurve in another period); the period guard I added rejects every fit (debug GUARD
+  prints in the branch show nothing yet: test read via read_step -> check the guard's prints are reached). Fix, then
+  rerun exa1 (c2-rings-loft,cf-hose-routing). Branch also holds xt.cpp XTDBG print + probes: strip before landing.
+- Hose x_t end rings (exa1 r1 XTDBG): model's ring edges are 1e-4 m off their B-surfaces (tolerant 1.8e-4..3.2e-4 m)
+  and 1.1e-7 m off the offset inner wall: model geometry, not the writer; live writes exact SP_CURVE rings on the
+  OFFSET_SURF. Report to the lead (core sweep) before writer work.
+- 4c8ee668 / d6a37def: both CHECKING at 23:3x (land.sh --status).
+- Also from live: psui P0 STEP colours answer in behaviours.md (see 4).
 
 ## In flight: data exchange (lead 08:0x)
 Task: 10 corpus docs x every format + a drawing vs live's exports; re-import live's STEP / x_t; times vs live's.
