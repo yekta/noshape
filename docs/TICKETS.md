@@ -167,7 +167,7 @@ Ours is at or under live on every edit, undo and roll except c2-rings-loft (belo
 0.16-0.19 (0.44-0.50), pipe 0.33-0.36 (1.6-3.4), knifehandle 1.8-1.9 (1.4-2.4), standoffs 1.29-1.31 (0.91-1.01), loft-paths-guides
 1.2-1.3 (1.0-2.3), rocker 0.8-1.0 (1.7-2.4), saw-table 0.20-0.23 (1.0-2.1), linear-rail 0.21-0.30 (0.56-0.60); undo and rolls
 0.01-0.9 s (live 0.08-2.7). Script: vibex6 ~/agents/dx-keep/sr/sr3.sh (qa's speedref.py), results sr/sr3.json.
-- [ ] P1 **SPEED-RINGS-SHELL (bool)**: c2-rings-loft, Extrude 1 at 8.8 / 9.6 / 10.4 mm (live's +10/20/30 % edit): the edit takes
+- [ ] P0 (raised qa 00:5x: Mac M6, 0.4.67, live timing-1123: the +4 % Ø20.5 edit takes 31204 ms [21848-32533] CLI compute vs live 5124 regenerated, 6.1x; Shell 1 30.6 s then Error, Ok before; qa-scratch/t23/cli/rings-loft-dim.json) **SPEED-RINGS-SHELL (bool)**: c2-rings-loft, Extrude 1 at 8.8 / 9.6 / 10.4 mm (live's +10/20/30 % edit): the edit takes
   11.5 / 29.4 / 25.1 s vs live's server 2.46-2.82 s (4-10x); open 4.0 s. Shell 1 fails ("Error") after 18.9 s at 9.6 mm, the
   other features <= 0.31 s each. Live (behaviours "dx (11-21 13:02)", live/dx/rings-shell-1121): Shell 1 OK at 8 / 8.8 / 9.6 /
   10.4 mm; after it 44 faces, 521.793 / 568.750 mm3 at 8.8 / 9.6, 36 faces, 732.479 mm3 at 10.4 (a second 6-face body of 1103.593
@@ -449,6 +449,14 @@ feature (lead 11-20 22:4x), so each is P1 even where counts match live. Repro: t
   reader's Compare state read the panel's row over a graphics pick (ui_script.rs `comparing_state`).
 - 13 "no recording" scenarios of run 07879475 (the app exited silently) all ran in the loop's next run: not filed. rolled-back-row-menu
   matches since psui 9ffded3f6.
+
+## qa, 2026-11-23 00:5x (ours on the Mac vs live timing-1123: 10 docs x 6 actions, 3 runs each, 0.4.67, load-gated; table qa-scratch/t23/table.txt)
+- Ours at or below live on every timed action except the two sketch dimension edits above (SPEED-RINGS-SHELL, SPEED-IMPELLER, raised
+  to P0) and two under the bar: isaac suppress 1443 vs 1318 ms (1.09x), knifehandle dimension 2760 vs 1821 ms (1.52x). Assembly open
+  14-1836 ms vs live 5990-11945. Not timed: standoffs dimension (our copy has none), assembly open of the 5 Part-Studio-only copies.
+- [ ] P2 **UIS-DIM-LABEL-TARGET (skasm)**: the scripted session can't target a sketch dimension label (the sketch state gives no
+  label positions), so a dimension edit in the UI (dblclick the label, type, Enter) can't be replayed or timed; the Mac timing used
+  the CLI's sketch_set_dimension (compute only, no drawing). Wanted: a {"dimension": "<name or value>"} target.
 
 ## qa, 2026-11-22 23:5x (re-verify of skasm's workflows-1122 + sketch walk 4 rows on green 172785c95, vibe2; shots hm2/out-wf-v, hm2/out-wkv; 8 verified, 5 partly, rows above)
 - [ ] P0 **FEEL-DIM-PICKED-SIDE-BLACK (skasm)**: workflow 01 steps 16-19 (green 172785c95): while the dimension value box is open live keeps the picked side orange; ours draws it black. At step 15 (first pick) ours also writes "37.556" on the face where live shows no value. tickets/FEEL-DIM-PICKED-SIDE-BLACK-wf01-1122.png
@@ -2194,7 +2202,7 @@ per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 ## Speed backlog: whole rebuilds >= 100 ms and >= 2x live (DECISIONS 11-18; qa 19:5x, the Mac, v0.4.58 release CLI, nice 19, 3 runs each,
 ## every Part Studio; Mac load 9-11 with a build in the other slot; live = live.jsonl fresh-copy totals; 127 corpus documents)
 8 of 127 over the bar; nothing smaller is a gap. Median (range) vs live, top 3 features (Mac ms):
-- [ ] **P1 SPEED-IMPELLER (blend / bool / core, already with them)**: c2-impeller-loft 13485 (12436-13900) vs 2509 ms (5.4x): Fillet 3 4897,
+- [ ] **P0 SPEED-IMPELLER (blend / bool / core, already with them)** (raised qa 00:5x: Mac M6, 0.4.67, live timing-1123: the sketch dimension edit takes 7667 ms [7508-7930] CLI compute vs live 3239 regenerated, 2.4x; the edit regenerates nearly the whole studio: Fillet 3 1.9 s, Fillet Bohrungssitz (Error) 1.5 s, Extrude Bohrungssitz 0.85 s, Delete face 2 (Error) 0.83 s; 7 features fail in ours; qa-scratch/t23/cli/impeller-dim.json): c2-impeller-loft 13485 (12436-13900) vs 2509 ms (5.4x): Fillet 3 4897,
   Delete face 2 2170, Extrude Bohrungssitz Ansaugflansch 1335.
   Opening it (qa 19:5x, release app of 125e4d41, vibex7 load 4-6, NOSHAPE_PERF): cold (no stored results) last frame 32.7 s, of which the
   full regeneration 30.4 s, meshing 0.6 s (Part 1 0.5 s), document load 0.15 s; reopened with stored results 1.5 / 2.6 s. Live 25.5 s
