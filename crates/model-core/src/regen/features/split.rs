@@ -301,6 +301,15 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         changed = true;
         let q = |x: f64| (x * 1e9).round() as i64;
         pieces.sort_by(|a, b| q(b.0).cmp(&q(a.0)).then(q(a.1.x).cmp(&q(b.1.x))).then(q(a.1.y).cmp(&q(b.1.y))).then(q(a.1.z).cmp(&q(b.1.z))));
+        // Live split-order-1123: the piece keeping the target's first face (in its creation order) that not every
+        // piece keeps comes first, whichever way the tool faces and however big the pieces.
+        if let Some(order) = crate::naming::extrude_face_order(&target.faces) {
+            let holds = |p: &NamedShape, i: usize| p.names.faces.iter().any(|f| f.descends_from(&target.faces[i]));
+            let keys: Vec<usize> = pieces.iter().map(|p| order.iter().position(|&i| holds(&p.2, i) && !pieces.iter().all(|o| holds(&o.2, i))).unwrap_or(usize::MAX)).collect();
+            let mut keyed: Vec<_> = keys.into_iter().zip(pieces).collect();
+            keyed.sort_by_key(|k| k.0);
+            pieces = keyed.into_iter().map(|k| k.1).collect();
+        }
         if !both {
             pieces.retain(|p| if front { p.0 > 0.0 } else { p.0 < 0.0 });
         }

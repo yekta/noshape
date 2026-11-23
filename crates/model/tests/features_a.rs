@@ -4007,8 +4007,8 @@ fn a_surface_mirrored_with_add_joins_its_mirror() {
 }
 
 /// Live split-default-names-1123: Part 1 (x 0..40) split by Part 2's (x 30..50) x = 30 face: the untouched part (same id)
-/// is now "Part 1", the pieces new parts "Part 2" and "Part 3" after it. Renamed, Part 2 keeps its number. (Live lists
-/// the x 30..40 piece first; ours the x 0..30 one: which piece comes first is asked of live, core REQUESTS 11-23.)
+/// is now "Part 1", the pieces new parts "Part 2" (x 30..40: it keeps the x = 40 face, the block's first face not both
+/// keep, live split-order-1123) and "Part 3" (x 0..30). Renamed, Part 2 keeps its number.
 #[test]
 fn split_pieces_take_the_default_names_after_the_parts_before_them() {
     for renamed in [false, true] {
@@ -4028,5 +4028,25 @@ fn split_pieces_take_the_default_names_after_the_parts_before_them() {
         assert!(r.context.bodies.iter().all(|b| b.id != p1), "{xs:?}");
         let names: Vec<&str> = r.display.bodies.iter().map(|b| b.name.as_str()).collect();
         assert_eq!(names, [if renamed { "Orange block" } else { "Part 1" }, "Part 2", "Part 3"], "{xs:?}");
+        assert!((xs[1].1 - 30.0).abs() < 1e-6 && xs[2].1.abs() < 1e-6, "Part 2 is x 30..40, Part 3 x 0..30: {xs:?}");
+    }
+}
+
+/// Live split-order-1123: the first piece keeps the block's first face (y = 0, z = 0, z = 10, x = 40, y = 30, x = 0)
+/// that not both keep, whichever way the tool faces (the -x face case: split_pieces_take_the_default_names…): x cuts
+/// the +x piece, y = 20 the y 0..20 one, z = 3 the z 0..3 one.
+#[test]
+fn the_first_split_piece_keeps_the_targets_first_face_not_both_keep() {
+    // (Front faces -y: y = 20 is its offset the opposite way.)
+    for (base, at, opposite, axis, first_min) in [(DatumPlane::Right, 10.0, false, 0, 10.0), (DatumPlane::Right, 30.0, false, 0, 30.0), (DatumPlane::Front, 20.0, true, 1, 0.0), (DatumPlane::Top, 3.0, false, 2, 0.0)] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+        let part = t.ok().context.bodies[0].id.clone();
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(base)])), ("cplaneType", en("OFFSET")), ("offset", e(&format!("{at} mm"))), ("oppositeDirection", b(opposite))]);
+        t.add("splitPart", &[("targets", q(vec![body_ref(&part)])), ("tool", q(vec![Reference::FeaturePlane(pl)])), ("keepBothSides", b(true))]);
+        let r = t.ok();
+        let mins: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.bounding_box(true).unwrap().min[axis] * 1e3).collect();
+        assert_eq!(mins.len(), 2, "{base:?} {at}");
+        assert!((mins[0] - first_min).abs() < 1e-6, "{base:?} {at}: {mins:?}");
     }
 }
