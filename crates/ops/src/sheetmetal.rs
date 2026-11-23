@@ -175,7 +175,8 @@ pub fn edit_bend(ps: &mut PartStudio, model: FeatureId, data: &SheetMetalData, b
         BendField::Radius => plain(b.radius / units.si_factor(noshape_units::Dim::LENGTH)),
         BendField::KFactor => plain(b.k_factor),
     };
-    if text.is_empty() || text == current {
+    // (The Radius editor opens on the value with its unit, live sm-table-cell-edit-1123: "2 mm" unchanged is no edit.)
+    if text.is_empty() || text == current || (field == BendField::Radius && text == format!("{current} {}", units.length.symbol())) {
         return false;
     }
     let bare = text.parse::<f64>().is_ok();

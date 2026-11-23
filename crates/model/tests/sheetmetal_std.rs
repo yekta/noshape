@@ -3350,3 +3350,149 @@ fn a_second_flange_beside_the_first_ends_its_bend_at_the_plate() {
     let has = |kind: &str, area: f64| faces.iter().any(|f| f.starts_with(kind) && f.split(' ').nth(1).and_then(|a| a.parse::<f64>().ok()).is_some_and(|a| (a - area).abs() < 0.01));
     assert!(faces.len() == 23 && has("CYLINDER", 364.42) && has("CYLINDER", 182.21) && has("PLANE", 4.0), "{faces:#?}");
 }
+
+/// The part's straight edge along x nearest `(y, z)` mm (within 10 mm).
+fn x_edge_near(r: &RegenResult, y: f64, z: f64) -> Reference {
+    let b = &r.context.bodies[part(r)];
+    let (v10, v50) = (noshape_kernel::make_vertex(DVec3::new(10.0, y, z) * 1e-3).unwrap(), noshape_kernel::make_vertex(DVec3::new(50.0, y, z) * 1e-3).unwrap());
+    let along_x = |e: &noshape_kernel::Shape| {
+        let (a, c) = (noshape_kernel::distance(&v10, e).ok()?, noshape_kernel::distance(&v50, e).ok()?);
+        let straight = (a.point_b.x * 1e3 - 10.0).abs() < 1e-6 && (c.point_b.x * 1e3 - 50.0).abs() < 1e-6 && (a.distance - c.distance).abs() < 1e-9;
+        (straight && a.distance < 10e-3).then_some(a.distance)
+    };
+    let i = b.shape.edges().iter().enumerate().filter_map(|(i, e)| along_x(e).map(|d| (i, d))).min_by(|a, b| a.1.total_cmp(&b.1)).map(|(i, _)| i);
+    Reference::Edge((*b.edges[i.unwrap_or_else(|| panic!("no edge along x near ({y}, {z})"))]).clone())
+}
+
+/// The highest straight edge along x on the y < 1 mm side (a y = 0 flange wall's top), the outer one first.
+fn top_x_edge(r: &RegenResult) -> Reference {
+    let b = &r.context.bodies[part(r)];
+    let (v10, v50) = (noshape_kernel::make_vertex(DVec3::new(0.010, 0.0, 0.0)).unwrap(), noshape_kernel::make_vertex(DVec3::new(0.050, 0.0, 0.0)).unwrap());
+    let at = |e: &noshape_kernel::Shape| {
+        let (a, c) = (noshape_kernel::distance(&v10, e).ok()?, noshape_kernel::distance(&v50, e).ok()?);
+        let straight = (a.point_b.x - 0.010).abs() < 1e-9 && (c.point_b.x - 0.050).abs() < 1e-9 && (a.point_b.y - c.point_b.y).abs() < 1e-9 && (a.point_b.z - c.point_b.z).abs() < 1e-9;
+        (straight && a.point_b.y < 1e-3).then_some(a.point_b)
+    };
+    let edges = b.shape.edges();
+    let i = edges.iter().enumerate().filter_map(|(i, e)| at(e).map(|p| (i, p))).max_by(|a, b| a.1.z.total_cmp(&b.1.z).then(b.1.y.total_cmp(&a.1.y))).map(|(i, _)| i);
+    Reference::Edge((*b.edges[i.expect("a straight edge along x")]).clone())
+}
+
+/// The last feature's (status, message) after a regeneration that may fail.
+fn last_message(s: &Studio) -> (FeatureStatus, Option<String>) {
+    let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+    let f = r.display.features.last().unwrap();
+    (f.status, f.message.clone())
+}
+
+/// A 60 × 40 × 2 mm plate with a line across it at x = 30 (Sketch 2; live errors-1123 plate-bend), or `line` instead.
+fn plate_bend(line: [(f64, f64); 2]) -> (Studio, Reference, RegenResult) {
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("1 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let [a, b] = line.map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let line = sk.add_line_between(a, b).unwrap().0;
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    (s, Reference::SketchEntity { sketch, entity: line }, r)
+}
+
+/// Live errors-1123 (sheet-metal.md): Flange, Hem and Bend failures give live's messages, word for word.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn sheet_metal_failures_say_what_live_says() {
+    let failed = |m: &str| (FeatureStatus::Error, Some(m.to_string()));
+    let joint = |op: &str| format!("Cannot create {op} on an edge that is a joint, fillet, chamfer, or internal to the sheet metal model.");
+    let mut seen = Vec::new();
+    let mut check = |case: &str, got: (FeatureStatus, Option<String>), want: (FeatureStatus, Option<String>)| seen.push((case.to_string(), got.clone(), got == want, want));
+    // Flange / Hem on g34 (Flange 1 on y = 0's top edge, its bend along x).
+    // The joint edge: Flange 1's bend's straight edge on the wall's inner side, (30, 0, 4).
+    for (ty, op, empty) in [("sheetMetalFlange", "flange", true), ("sheetMetalFlange", "flange", false), ("sheetMetalHem", "hem", true), ("sheetMetalHem", "hem", false)] {
+        let mut s = g34();
+        let r = s.ok();
+        let edges = if empty { vec![] } else { vec![x_edge_near(&r, -1.0, 3.0)] };
+        s.add(ty, |p| p.set("edges", ParamValue::Query(edges)));
+        let want = if empty { format!("Select edges to {op}.") } else { joint(op) };
+        check(&format!("{op} {}", if empty { "empty" } else { "joint" }), last_message(&s), failed(&want));
+    }
+    // Hem 30 mm on Flange 1's top edge folds back into the base (live u-hm-long); the other way is fine.
+    for opposite in [false, true] {
+        let mut s = g34();
+        let r = s.ok();
+        let top = top_x_edge(&r);
+        s.add("sheetMetalHem", |p| {
+            p.set("edges", ParamValue::Query(vec![top]));
+            p.set("length", expr("30 mm"));
+            p.set("oppositeDirection", ParamValue::Bool(opposite));
+        });
+        let got = last_message(&s);
+        if opposite {
+            check("hem long opposite", (got.0, None), (FeatureStatus::Ok, None));
+        } else {
+            check("hem long", got, failed("Cannot create hem."));
+        }
+    }
+    // The same on sm-box (qa's ERR-SM-HEM-LONG: Flange 1 and Flange 2 apart, default distances): live "Cannot create hem."
+    let mut s = Studio::new();
+    let region = s.rectangle(60.0, 40.0);
+    s.add("sheetMetalStart", |p| {
+        p.set("process", en("THICKEN"));
+        p.set("regions", ParamValue::Query(vec![region]));
+        p.set("thickness", expr("2 mm"));
+        p.set("radius", expr("2 mm"));
+    });
+    for at in [DVec3::new(20.0, 0.0, 2.0), DVec3::new(60.0, 25.0, 2.0)] {
+        let r = s.ok();
+        let e = edge_at(&r, at);
+        s.add("sheetMetalFlange", |p| p.set("edges", ParamValue::Query(vec![e])));
+    }
+    let r = s.ok();
+    let top = top_x_edge(&r);
+    s.add("sheetMetalHem", |p| {
+        p.set("edges", ParamValue::Query(vec![top]));
+        p.set("length", expr("30 mm"));
+    });
+    check("hem long on sm-box", last_message(&s), failed("Cannot create hem."));
+    // Bend.
+    let divide = "The bend line did not divide the sheet metal into at least two parts.";
+    let (mut s, line, r) = plate_bend([(30.0, 0.0), (30.0, 40.0)]);
+    let top = face_at(&r, DVec3::new(15.0, 20.0, 2.0));
+    s.add("sheetMetalBend", |p| p.set("face", ParamValue::Query(vec![top.clone()])));
+    check("bend no line", last_message(&s), failed("Select a line."));
+    s.ps.features.pop();
+    s.add("sheetMetalBend", |p| p.set("bendReference", ParamValue::Query(vec![line.clone()])));
+    check("bend no face", last_message(&s), failed("Select a planar sheet metal face."));
+    s.ps.features.pop();
+    let bend = |s: &mut Studio, line: &Reference, top: &Reference, radius: Option<&str>| {
+        let (line, top) = (line.clone(), top.clone());
+        s.add("sheetMetalBend", move |p| {
+            p.set("bendReference", ParamValue::Query(vec![line]));
+            p.set("face", ParamValue::Query(vec![top]));
+            if let Some(r) = radius {
+                p.set("useDefaultRadius", ParamValue::Bool(false));
+                p.set("bendRadius", expr(r));
+            }
+        });
+    };
+    bend(&mut s, &line, &top, Some("100 mm"));
+    check("bend radius 100", last_message(&s), failed(divide));
+    s.ps.features.pop();
+    // (Live's bd-twice, Bend 2 on Bend 1's line and face, "Select a planar sheet metal face.": ERR-SM-BEND-WORDS, open.)
+    for (case, l) in [("bend off the plate", [(80.0, 0.0), (80.0, 40.0)]), ("bend on the plate's edge", [(0.0, 0.0), (60.0, 0.0)])] {
+        let (mut s, line, r) = plate_bend(l);
+        let top = face_at(&r, DVec3::new(15.0, 20.0, 2.0));
+        bend(&mut s, &line, &top, None);
+        check(case, last_message(&s), failed(divide));
+    }
+    let wrong: Vec<String> = seen.iter().filter(|c| !c.2).map(|(case, got, _, want)| format!("{case}: {got:?}, live {want:?}")).collect();
+    assert!(wrong.is_empty(), "\n{}", wrong.join("\n"));
+}

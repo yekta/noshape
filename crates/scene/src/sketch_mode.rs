@@ -173,6 +173,10 @@ impl Tool {
             Tool::Constraint(c) => c.label(),
         }
     }
+    /// The tool's name without its key: its section of the user guide (F1 in a sketch).
+    pub fn help_title(self) -> &'static str {
+        self.label().split(" (").next().unwrap_or_default()
+    }
     pub fn icon(self) -> &'static str {
         match self {
             Tool::Select => "select-box",
@@ -631,6 +635,8 @@ pub struct SketchEditor {
     /// sketch has. The overlay draws the others, so an arm the display doesn't have yet still shows.
     pub scene_arms: Option<std::collections::HashSet<EntityId>>,
     pub tool: Tool,
+    /// The last tool turned on or constraint applied: F1 opens its help when no tool is on (live shortcuts-1123).
+    pub last_tool: Option<Tool>,
     clicks: Vec<Click>,
     /// End point of the previous line (chaining).
     chain_end: Option<EntityId>,
@@ -688,8 +694,12 @@ pub struct SketchEditor {
     pub drag_external: Option<ExternalSnap>,
     /// Entities picked so far for a constraint/dimension tool.
     picks: Vec<(EntityId, DVec2)>,
-    /// Picks of the dimension being placed (click positions decide min/max).
+    /// What the dimension whose value box is open measures: still lit as picked until the box closes (live
+    /// workflows-1122 01 s16-19: the side stays orange).
     picks_placed: Vec<(EntityId, DVec2)>,
+    /// A pick the pointer hasn't moved off yet: no dimension preview (live workflows-1122 01 s15: no value at the
+    /// pointer right after the first pick).
+    dim_pick_rests: bool,
     pub dim_edit: Option<DimEdit>,
     /// The value box to open after `dim_edit` is accepted (a chamfer's
     /// second distance; live: Enter goes from distance 1 to distance 2).
@@ -725,8 +735,6 @@ pub struct SketchEditor {
     pub offset_pending: Option<Vec<EntityId>>,
     /// The pointer is on the offset's distance label (set by the host): its arrowheads aren't drawn (live offset-look-1121).
     pub offset_label_hovered: bool,
-    /// An offset was made: later curve clicks repeat it with the same distance.
-    offset_repeat: bool,
     pub conic_rho: f64,
     pub text_string: String,
     pub text_height: f64,
@@ -775,11 +783,15 @@ pub struct SketchEditor {
     fillet_session: Option<EntityId>,
     /// Fillet/chamfer preview is isolated from the document until Enter.
     pending_corner: Option<(SketchData, noshape_sketch::EditResult)>,
-    /// The corner point of the pending fillet (clicked on its vertex).
+    /// The corner point of the pending fillet (clicked on its vertex), while it is the only one.
     pending_corner_pid: Option<EntityId>,
-    /// Where the press that made the pending fillet / chamfer was: dragged from there and released, it is made
-    /// (live feel/sketchtools.json "sketchFillet": the radius box opens).
+    /// Every corner point previewed (live sketch-tools-1123: a second corner adds its preview).
+    pending_corners: Vec<EntityId>,
+    /// Where the press that made the pending fillet / chamfer was: dragged from there, the radius / distances follow
+    /// the pointer, and the release makes it (live sketch-tools-1123 fillet.md, chamfer.md).
     corner_pressed: Option<DVec2>,
+    /// The last chamfer's two distance dimensions: typed values become the next chamfer's (live: sticky 4 / 6).
+    chamfer_session: Option<(ConstraintId, ConstraintId)>,
     /// A corner whose fillet at the current radius is invalid: previewed red
     /// (live), its arrow drags the radius to one that fits.
     invalid_corner: Option<EntityId>,
@@ -787,6 +799,7 @@ pub struct SketchEditor {
     /// leaving the tool commits it): the previewed data and the new curves.
     pending_slot: Option<(SketchData, Vec<EntityId>)>,
     pub chamfer_distance: f64,
+    pub chamfer_distance_b: f64,
     pub slot_width: f64,
     /// End cap of the first slot of the session (later slots are equal to it).
     slot_session: Option<EntityId>,
@@ -1070,14 +1083,15 @@ const XF_SCALE_BOX_FROM_POINTER: (f64, f64) = (45.5, -47.0);
 /// transform-2-after-drag: up and right of the arrow's head).
 const XF_MOVE_BOX_FROM_POINTER: (f64, f64) = (72.0, -48.0);
 const XF_SCALE_BOX_AFTER: (f64, f64) = (138.5, 46.0);
-/// The line shader's dash-dot period (`fs_line`, style 4) in pixels.
-const DASH_DOT_PERIOD_PX: f64 = 16.0;
+/// A drawing preview's dash-dot guide (the text box, the polygon's and the centre point arc's circles): 30 px on,
+/// 6 off, 4 on, 6 off (live sketch-tools-1123 text.md; arcs.md ≈25 / 6 sampled on a circle).
+const DASH_DOT_PERIOD_PX: f64 = 46.0;
 
 /// The dash and dot pieces of a dash-dot polyline with the given period,
-/// measured along the whole polyline (the shader's proportions: dash
-/// 0–0.55, dot 0.68–0.8 of each period).
+/// measured along the whole polyline (live's proportions: dash 0–30/46,
+/// dot 36/46–40/46 of each period).
 pub fn dash_dot_pieces(pts: &[DVec2], period: f64) -> Vec<Vec<DVec2>> {
-    const MARKS: [(f64, f64); 2] = [(0.0, 0.55), (0.68, 0.8)];
+    const MARKS: [(f64, f64); 2] = [(0.0, 30.0 / 46.0), (36.0 / 46.0, 40.0 / 46.0)];
     let mut out: Vec<Vec<DVec2>> = Vec::new();
     if period <= 0.0 || pts.len() < 2 {
         return vec![pts.to_vec()];
@@ -1488,6 +1502,7 @@ impl SketchEditor {
             pointer_rests: false,
             scene_arms: None,
             tool: Tool::Select,
+            last_tool: None,
             clicks: Vec::new(),
             chain_end: None,
             cursor: None,
@@ -1518,6 +1533,7 @@ impl SketchEditor {
             drag_external: None,
             picks: Vec::new(),
             picks_placed: Vec::new(),
+            dim_pick_rests: false,
             dim_edit: None,
             value_box_next: None,
             construction: false,
@@ -1536,7 +1552,6 @@ impl SketchEditor {
             refusal: None,
             offset_pending: None,
             offset_label_hovered: false,
-            offset_repeat: false,
             conic_rho: 0.5,
             text_string: "Default text".into(),
             text_height: 0.01,
@@ -1572,10 +1587,13 @@ impl SketchEditor {
             fillet_session: None,
             pending_corner: None,
             pending_corner_pid: None,
+            pending_corners: Vec::new(),
             corner_pressed: None,
+            chamfer_session: None,
             invalid_corner: None,
             pending_slot: None,
             chamfer_distance: 0.005,
+            chamfer_distance_b: 0.005,
             slot_width: 0.005,
             slot_session: None,
             mirror_axis: None,
@@ -1631,6 +1649,9 @@ impl SketchEditor {
         let previous = self.tool;
         self.polygon_readout = None;
         self.tool = if self.tool == tool && tool != Tool::Select { Tool::Select } else { tool };
+        if self.tool != Tool::Select {
+            self.last_tool = Some(self.tool);
+        }
         // Live: a polygon tool session starts at 6 sides; within it the next
         // polygon keeps the last count.
         if self.tool != previous && matches!(self.tool, Tool::Polygon | Tool::CircumPolygon) {
@@ -1655,6 +1676,7 @@ impl SketchEditor {
         self.fillet_session = None;
         self.pending_corner = None;
         self.pending_corner_pid = None;
+        self.pending_corners.clear();
         self.invalid_corner = None;
         self.pending_slot = None;
         self.editing_text = None;
@@ -1666,7 +1688,6 @@ impl SketchEditor {
         self.slot_session = None;
         self.offset_pending = None;
         self.offset_label_hovered = false;
-        self.offset_repeat = false;
         self.mirror_axis = None;
         // Extend's pending pick goes with the tool (live: Esc, selection 0).
         self.extend_end = None;
@@ -1757,6 +1778,11 @@ impl SketchEditor {
         if self.editing_text.take().is_some() {
             return true;
         }
+        // One Esc with a new text's dialog open closes it: the tool off, nothing kept (live sketch-tools-1123 text.md).
+        if self.pending_text.is_some() {
+            self.set_tool(Tool::Select);
+            return true;
+        }
         // A box being typed into closes first; an idle box goes away with
         // the chain / tool.
         if self.otf_typing && self.otf.take().is_some() {
@@ -1789,6 +1815,7 @@ impl SketchEditor {
         }
         // Live (ui-parity sketch-chamfer-tool): the corner a fillet / chamfer previews doesn't stay selected.
         if matches!(self.tool, Tool::Fillet | Tool::Chamfer) && self.pending_corner.take().is_some() {
+            self.pending_corners.clear();
             self.selection.clear();
             self.set_tool(Tool::Select);
             return true;
@@ -2181,6 +2208,7 @@ impl SketchEditor {
             self.center_arc_sweep = 0.0;
         }
         self.pointer_rests &= self.cursor == Some(p);
+        self.dim_pick_rests &= self.cursor == Some(p);
         self.cursor = Some(p);
         if self.tool == Tool::Extend && self.extend_end.is_some() {
             self.extend_crossed |= self.extend_preview(&data.sketch, p).is_some_and(|(_, on)| on.is_some());
@@ -2351,6 +2379,7 @@ impl SketchEditor {
         let (fillet, quarter, slot, spacing) = if imperial { (0.5 * IN, 0.25 * IN, 0.5 * IN, IN) } else { (0.005, 0.005, 0.02, 0.025) };
         self.fillet_radius = fillet;
         self.chamfer_distance = quarter;
+        self.chamfer_distance_b = quarter;
         self.offset_distance = quarter;
         self.slot_width = slot;
         self.pattern_distance = spacing;
@@ -2915,16 +2944,7 @@ impl SketchEditor {
                     }
                     // (Placed by a click the tool ends: live's tool is none after it.)
                     let out = self.commit_offset(data);
-                    if out.changed {
-                        self.tool = Tool::Select;
-                        self.offset_repeat = false;
-                    }
                     return out;
-                }
-                if self.offset_repeat && self.offset_pending.is_none() {
-                    // Later clicks offset by the same distance right away.
-                    self.start_offset(&data.sketch, ids);
-                    return self.commit_offset(data);
                 }
                 match &mut self.offset_pending {
                     // Add connected curves to the pending offset (chain
@@ -3109,13 +3129,19 @@ impl SketchEditor {
     }
 
     fn corner_click(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
+        let chamfer = self.tool == Tool::Chamfer;
+        let corner = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| if hovered.is_none() { nearest_point(&data.sketch, p, self.world_per_px * 10.0) } else { None });
+        // Live sketch-tools-1123: with a preview pending, another corner adds its own; the same corner again (a
+        // double-click) keeps a fillet pending and makes a chamfer; anything else makes them.
         if self.pending_corner.is_some() {
-            return self.commit_corner(data);
+            return match corner {
+                Some(pid) if self.pending_corners.contains(&pid) && !chamfer => EditOutcome::none(),
+                Some(pid) if !self.pending_corners.contains(&pid) && !self.pending_corners.is_empty() => self.add_pending_corner(pid, p),
+                _ => self.commit_corner(data),
+            };
         }
         // Another corner replaces a red preview.
         self.invalid_corner = None;
-        let chamfer = self.tool == Tool::Chamfer;
-        let corner = hovered.filter(|e| is_point(&data.sketch, *e)).or_else(|| if hovered.is_none() { nearest_point(&data.sketch, p, self.world_per_px * 10.0) } else { None });
         // The corner point, or the two curves.
         let target = if let Some(pid) = corner {
             self.picks.clear();
@@ -3133,11 +3159,11 @@ impl SketchEditor {
         };
         let mut preview = data.clone();
         let sk = &mut preview.sketch;
-        let (dist, r) = (self.chamfer_distance, self.fillet_radius);
+        let (da, db, r) = (self.chamfer_distance, self.chamfer_distance_b, self.fillet_radius);
         let made = match (target, chamfer) {
-            ((pid, None), true) => sk.chamfer_corner(pid, dist, dist),
+            ((pid, None), true) => sk.chamfer_corner(pid, da, db),
             ((pid, None), false) => sk.fillet_corner(pid, r),
-            ((a, Some(b)), true) => sk.chamfer(a, b, dist, dist),
+            ((a, Some(b)), true) => sk.chamfer(a, b, da, db),
             ((a, Some(b)), false) => sk.fillet(a, b, r),
         };
         match made {
@@ -3145,6 +3171,7 @@ impl SketchEditor {
                 self.pending_corner = Some((preview, res));
                 self.corner_pressed = Some(p);
                 self.pending_corner_pid = target.1.is_none().then_some(target.0);
+                self.pending_corners = self.pending_corner_pid.into_iter().collect();
                 // Live (ui-parity sketch-fillet-corner): the clicked corner
                 // stays selected until the fillet is confirmed.
                 if target.1.is_none() {
@@ -3160,6 +3187,7 @@ impl SketchEditor {
             // nothing; its arrow drags it to one that fits.
             Err(_) if !chamfer && target.1.is_none() && corner_arc(&data.sketch, target.0, r).is_some() => {
                 self.invalid_corner = Some(target.0);
+                self.corner_pressed = Some(p);
                 self.message = None;
                 EditOutcome::redraw()
             }
@@ -3170,6 +3198,33 @@ impl SketchEditor {
                 EditOutcome::redraw()
             }
         }
+    }
+
+    /// A second corner's fillet / chamfer added to the pending preview (both corners selected, nothing made yet).
+    fn add_pending_corner(&mut self, pid: EntityId, p: DVec2) -> EditOutcome {
+        let chamfer = self.tool == Tool::Chamfer;
+        let (da, db, r) = (self.chamfer_distance, self.chamfer_distance_b, self.fillet_radius);
+        let Some((preview, result)) = &mut self.pending_corner else { return EditOutcome::none() };
+        let mut next = preview.clone();
+        let made = if chamfer { next.sketch.chamfer_corner(pid, da, db) } else { next.sketch.fillet_corner(pid, r) };
+        let Ok(res) = made else {
+            self.message = Some(if chamfer { "Cannot chamfer selected point.".to_string() } else { "Cannot add sketch fillet.".to_string() });
+            return EditOutcome::redraw();
+        };
+        *preview = next;
+        result.created.extend(res.created);
+        result.removed.extend(res.removed);
+        result.modified.extend(res.modified);
+        result.constraints_added.extend(res.constraints_added);
+        result.constraints_removed.extend(res.constraints_removed);
+        self.pending_corners.push(pid);
+        self.pending_corner_pid = None;
+        self.corner_pressed = Some(p);
+        if !self.selection.contains(&pid) {
+            self.selection.push(pid);
+        }
+        self.message = None;
+        EditOutcome::redraw()
     }
 
     /// The fillet of the corner `pid` at `r` on a copy of `data`, if valid.
@@ -3186,9 +3241,9 @@ impl SketchEditor {
     pub fn commit_corner(&mut self, data: &mut SketchData) -> EditOutcome {
         // Enter on a red preview does nothing (live).
         let Some((preview, result)) = self.pending_corner.take() else { return EditOutcome::none() };
-        if let Some(pid) = self.pending_corner_pid.take() {
-            self.selection.retain(|e| *e != pid);
-        }
+        self.pending_corner_pid = None;
+        let corners = std::mem::take(&mut self.pending_corners);
+        self.selection.retain(|e| !corners.contains(e));
         *data = preview;
         self.finish_create(data, &result.created);
         if self.tool == Tool::Chamfer {
@@ -3211,12 +3266,10 @@ impl SketchEditor {
     fn after_fillet(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
         let Some(arc) = r.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc)) else { return };
         let rad_dim = r.constraints_added.iter().copied().find(|c| data.sketch.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Radius { .. })));
-        if let (Some(d), Some(m)) = (rad_dim, curve_mid(&data.sketch, arc)) {
-            let c = match data.sketch.curve(arc) {
-                Some(Curve2::Arc { center, .. }) => center,
-                _ => m,
-            };
-            let l = m + (m - c).try_normalize().unwrap_or(DVec2::X) * self.world_per_px * 30.0;
+        if let (Some(d), Some(foot)) = (rad_dim, arc_upper_end(&data.sketch, arc)) {
+            // The box where the preview's R label was, up-left of the arc's upper end (live sketch-tools-1123: its
+            // centre 61 px left of and 30 px above an R5 top-right fillet's middle at 3.9 px/mm).
+            let l = foot + DVec2::new(-47.0, 24.0) * self.world_per_px;
             data.dimension_labels.insert(d.0, [l.x, l.y]);
             self.open_value_box(data, d);
         }
@@ -3225,13 +3278,14 @@ impl SketchEditor {
 
     fn after_chamfer(&mut self, data: &mut SketchData, r: &noshape_sketch::EditResult) {
         let dims = chamfer_dims(&data.sketch, r);
-        for (cid, at) in chamfer_dim_labels(&data.sketch, &dims, self.world_per_px) {
+        for (cid, at) in chamfer_box_places(&data.sketch, &dims, self.world_per_px) {
             data.dimension_labels.insert(cid.0, [at.x, at.y]);
         }
         if let Some(d) = dims.first() {
             self.open_value_box(data, *d);
         }
         self.value_box_next = dims.get(1).copied();
+        self.chamfer_session = dims.first().copied().zip(dims.get(1).copied());
     }
 
     /// After a value box was accepted: opens the queued one (a chamfer's
@@ -3434,14 +3488,15 @@ impl SketchEditor {
         Some((mid, n * sign))
     }
 
-    /// Create the pending offset (Enter / click in space); later clicks repeat it.
+    /// Create the pending offset (Enter / click in space); the tool ends with it.
     pub fn commit_offset(&mut self, data: &mut SketchData) -> EditOutcome {
         let d = self.offset_signed();
         let Some(ids) = self.offset_pending.take() else { return EditOutcome::none() };
         self.selection.retain(|e| !ids.contains(e));
         match data.sketch.offset(&ids, d) {
             Ok(r) => {
-                self.offset_repeat = true;
+                // The tool ends with it, by Enter or a click (live sketch-tools-1123 offset.md); its value box stays.
+                self.tool = Tool::Select;
                 self.finish_create(data, &r.created);
                 // Live (qa4 OFF-BOX): Enter creates the offset and opens its
                 // distance's value box, the value pre-selected.
@@ -3460,6 +3515,10 @@ impl SketchEditor {
 
     /// The fillet radius manipulator: the pending fillet's arc and its midpoint (live 1935: gone once Enter commits).
     fn fillet_handle(&self) -> Option<(EntityId, DVec2)> {
+        // (Two picked curves' fillet shows nothing until Enter: live sketch-tools-1123.)
+        if self.pending_corners.is_empty() {
+            return None;
+        }
         let (data, result) = self.pending_corner.as_ref()?;
         let arc = result.created.iter().copied().find(|e| data.sketch.kind(*e) == Some(EntityKind::Arc))?;
         Some((arc, curve_mid(&data.sketch, arc)?))
@@ -3486,9 +3545,7 @@ impl SketchEditor {
     fn fillet_label_foot(&self, sk: &Sketch) -> Option<DVec2> {
         let (arc, _) = self.fillet_handle()?;
         let sk = self.pending_corner.as_ref().map(|(d, _)| &d.sketch).unwrap_or(sk);
-        let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = sk.curve(arc) else { return None };
-        let (a, b) = (center + DVec2::from_angle(start_angle) * radius, center + DVec2::from_angle(end_angle) * radius);
-        Some(if (a.y - b.y).abs() > 1e-12 { if a.y > b.y { a } else { b } } else if a.x < b.x { a } else { b })
+        arc_upper_end(sk, arc)
     }
 
     /// The pending fillet's radius label ("R5", live sketch/1934): its
@@ -3528,6 +3585,7 @@ impl SketchEditor {
 
     /// Open the value box of a dimension (the Onshape dimension context dialog).
     fn open_value_box(&mut self, data: &SketchData, cid: ConstraintId) {
+        self.picks_placed.clear();
         let Some(text) = dimension_edit_text(data, cid, &UnitPrefs::default()) else { return };
         self.dim_edit = Some(DimEdit { constraint: cid, text, created: true });
     }
@@ -3986,6 +4044,10 @@ impl SketchEditor {
                 }
             }
             Tool::CenterArc => {
+                // A double-click at the start point makes nothing (live sketch-tools-1123 arcs.md).
+                if self.clicks.len() == 2 && (click.pos - self.clicks[1].pos).length() <= self.world_per_px * 4.0 {
+                    return EditOutcome::redraw();
+                }
                 self.clicks.push(click);
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
@@ -4001,8 +4063,11 @@ impl SketchEditor {
                     attach(sk, end, Some(id), e_click);
                 }
                 self.finish_create(data, &[id]);
-                // Live: the box opposite the start click, as a circle's.
-                let away = (c[0].pos - c[1].pos).try_normalize().map(BoxPlace::Rim);
+                // Live sketch-tools-1123 (6 arcs): the box on the horizontal or vertical through the centre nearest the
+                // side opposite the start click, whatever the sweep.
+                let back = c[0].pos - c[1].pos;
+                let axis = if back.x.abs() >= back.y.abs() { DVec2::new(back.x.signum(), 0.0) } else { DVec2::new(0.0, back.y.signum()) };
+                let away = (back.length() > 0.0).then_some(BoxPlace::Rim(axis));
                 self.set_otf(data, vec![radius_field(&data.sketch, id, self.world_per_px, away)]);
                 EditOutcome::changed()
             }
@@ -4474,6 +4539,12 @@ impl SketchEditor {
             }
             attach(sk, first, Some(id), clicks.first().expect("clicks"));
         }
+        // The points between carry theirs too (live s6-spline-esc: (0, 10) placed over the Origin keeps VERTICAL).
+        if let Some(noshape_sketch::Entity { geometry: noshape_sketch::Geometry::FitSpline { points, .. }, .. }) = sk.entity(id).cloned() {
+            for (p, click) in points.iter().zip(&clicks).take(points.len().saturating_sub(1)).skip(1) {
+                attach(sk, *p, Some(id), click);
+            }
+        }
         self.finish_create(data, &[id]);
         EditOutcome::changed()
     }
@@ -4482,11 +4553,10 @@ impl SketchEditor {
     /// placed points commits the curve through them (the rubber-band point
     /// is dropped) and keeps the tool; the next Esc exits it.
     pub fn escape_commit(&mut self, data: &mut SketchData) -> Option<EditOutcome> {
-        // A slot preview commits when leaving the tool (live).
-        if self.pending_slot.is_some() {
-            let out = self.commit_slot(data);
+        // Esc discards a slot preview and leaves the tool (live sketch-tools-1123 slot.md; Enter or a click commits it).
+        if self.pending_slot.take().is_some() {
             self.set_tool(Tool::Select);
-            return Some(out);
+            return Some(EditOutcome::redraw());
         }
         if !matches!(self.tool, Tool::Spline | Tool::Bezier) || self.clicks.len() < 2 {
             return None;
@@ -4671,6 +4741,23 @@ impl SketchEditor {
 
     pub fn tool_drag(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
         self.cursor = Some(p);
+        // A press on a corner dragged past the click slop: the radius / distances follow the pointer as its arrow's
+        // (live sketch-tools-1123: the preview follows the drag).
+        if self.drag.is_none()
+            && let Some(start) = self.corner_pressed
+            && (p - start).length() > self.world_per_px * 4.0
+        {
+            self.drag = match self.tool {
+                // (The pressed corner's arc, when two are pending.)
+                Tool::Fillet if self.pending_corner.is_none() => self.invalid_corner.map(|_| DragState::FilletInvalid),
+                Tool::Fillet => self.pending_corner.as_ref().and_then(|(d, r)| {
+                    let arcs = r.created.iter().copied().filter(|e| d.sketch.kind(*e) == Some(EntityKind::Arc));
+                    arcs.filter_map(|a| Some((a, curve_mid(&d.sketch, a)?.distance(start)))).min_by(|x, y| x.1.total_cmp(&y.1)).map(|(arc, _)| DragState::FilletRadius { arc })
+                }),
+                Tool::Chamfer if self.chamfer_frame().is_some() => Some(DragState::ChamferDistance),
+                _ => None,
+            };
+        }
         match self.drag.clone() {
             Some(DragState::Pending { entity, start, .. }) => {
                 if self.below_drag_start(p - start) {
@@ -4771,15 +4858,39 @@ impl SketchEditor {
                     }
                     preview.sketch.solve();
                     self.chamfer_distance = d;
+                    self.chamfer_distance_b = d;
                 }
                 EditOutcome::redraw()
             }
             Some(DragState::FilletRadius { arc }) => {
                 let pending = self.pending_corner.is_some();
+                // One clicked corner pending: its fillet is made again from the sketch at the radius under the pointer
+                // (re-dimensioning the preview let the solver move the legs, and the corner with them).
+                if pending
+                    && self.pending_corners.len() == 1
+                    && let Some(pid) = self.pending_corner_pid
+                    && let Some(a) = corner_arc(&data.sketch, pid, self.fillet_radius)
+                {
+                    let k = 1.0 / (a.theta * 0.5).sin() - 1.0;
+                    let r = ((p - a.vertex).dot(a.bisector) / k.max(1e-9)).max(self.world_per_px);
+                    self.fillet_radius = r;
+                    match Self::try_fillet_corner(data, pid, r) {
+                        Some(made) => self.pending_corner = Some(made),
+                        None => {
+                            self.pending_corner = None;
+                            self.pending_corner_pid = None;
+                            self.pending_corners.clear();
+                            self.invalid_corner = Some(pid);
+                            self.drag = Some(DragState::FilletInvalid);
+                        }
+                    }
+                    return EditOutcome::redraw();
+                }
                 let data = if let Some((preview, _)) = &mut self.pending_corner { preview } else { data };
                 // The arc midpoint follows the cursor along the corner bisector.
                 let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = data.sketch.curve(arc) else { return EditOutcome::none() };
-                let half = (end_angle - start_angle) * 0.5;
+                // (Counter-clockwise from start to end: a fillet's end angle can be below its start.)
+                let half = (end_angle - start_angle).rem_euclid(TAU) * 0.5;
                 let u = DVec2::from_angle(start_angle + half);
                 let k = 1.0 / half.cos().max(1e-6) - 1.0;
                 let sharp = center + u * radius / half.cos().max(1e-6);
@@ -4811,6 +4922,7 @@ impl SketchEditor {
                         if let Some(pid) = self.pending_corner_pid.filter(|_| pending) {
                             self.pending_corner = None;
                             self.pending_corner_pid = None;
+                            self.pending_corners.clear();
                             self.invalid_corner = Some(pid);
                             self.fillet_radius = r;
                             self.drag = Some(DragState::FilletInvalid);
@@ -4835,6 +4947,7 @@ impl SketchEditor {
                 {
                     self.pending_corner = Some(made);
                     self.pending_corner_pid = Some(pid);
+                    self.pending_corners = vec![pid];
                     self.invalid_corner = None;
                     self.drag = Some(DragState::FilletRadius { arc });
                 }
@@ -4986,6 +5099,13 @@ impl SketchEditor {
             })
     }
 
+    /// A press not yet a drag lets go without selecting what it pressed (a long press).
+    pub fn drop_pending_click(&mut self) {
+        if matches!(self.drag, Some(DragState::Pending { .. })) {
+            self.drag = None;
+        }
+    }
+
     pub fn tool_up(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
         let out = self.tool_up_inner(data, p);
         self.follow_transform_selection(&data.sketch);
@@ -5027,13 +5147,17 @@ impl SketchEditor {
     }
 
     fn tool_up_inner(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
-        // A fillet / chamfer press dragged from its corner and released makes it (a click only previews).
+        // A fillet / chamfer press dragged from its corner and released makes it at the dragged size (a click only
+        // previews); released red, nothing is made (live sketch-tools-1123).
         if let Some(start) = self.corner_pressed.take()
-            && self.drag.is_none()
-            && self.pending_corner.is_some()
             && (p - start).length() > self.world_per_px * 4.0
+            && matches!(self.drag, None | Some(DragState::FilletRadius { .. } | DragState::ChamferDistance | DragState::FilletInvalid))
         {
             self.press = None;
+            if matches!(self.drag.take(), Some(DragState::FilletInvalid)) {
+                self.toast = Some("The current fillet radius produces invalid geometry.".into());
+                return EditOutcome::redraw();
+            }
             return self.commit_corner(data);
         }
         // Live (feel round 2 R1): a click on the chain's last point ends the chain, the tool stays.
@@ -5858,6 +5982,7 @@ impl SketchEditor {
             }
             if self.picks.len() < 2 || arc_length {
                 self.picks.push((e, p));
+                self.dim_pick_rests = true;
                 return EditOutcome::redraw();
             }
         }
@@ -5866,8 +5991,7 @@ impl SketchEditor {
         }
         // This click places the dimension and opens its value box.
         let ids: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
-        self.picks_placed = std::mem::take(&mut self.picks);
-        let picks = std::mem::take(&mut self.picks_placed);
+        let picks = std::mem::take(&mut self.picks);
         // Live (behaviours "qa (2026-10-28) sketch.md 7.22", SKETCH-DIM-CURVE-PAIR):
         // the yellow warning bubble; the picks clear, the tool stays on.
         let Some(kind) = smart_dimension(&data.sketch, &ids, p).map(|k| circle_mode(&data.sketch, k, &picks, self.world_per_px)) else {
@@ -5882,13 +6006,14 @@ impl SketchEditor {
         // over-define the sketch is added driven and still opens its value
         // box ("10 mm" selected); no toast, nothing red.
         self.open_value_box(data, cid);
+        self.picks_placed = picks;
         EditOutcome::changed()
     }
 
     /// Live preview of the dimension being placed: kind, label position and
     /// displayed value.
     pub fn dimension_preview(&self, data: &SketchData) -> Option<(ConstraintKind, DVec2, f64)> {
-        if self.tool != Tool::Dimension || self.picks.is_empty() {
+        if self.tool != Tool::Dimension || self.picks.is_empty() || self.dim_pick_rests {
             return None;
         }
         let c = self.cursor?;
@@ -5976,6 +6101,17 @@ impl SketchEditor {
             && report.is_solved()
         {
             self.fillet_radius = value;
+        }
+        // The next chamfer takes the distances just typed (live sketch-tools-1123: 4 / 6 reused).
+        if report.is_solved()
+            && let Some((a, b)) = self.chamfer_session
+            && let Some(v) = data.sketch.constraint(cid).and_then(|c| c.kind.value())
+        {
+            if cid == a {
+                self.chamfer_distance = v;
+            } else if cid == b {
+                self.chamfer_distance_b = v;
+            }
         }
         if !report.is_solved() {
             // Live (qa5 dim conflict): the value is taken (the label reads it,
@@ -6310,6 +6446,7 @@ impl SketchEditor {
     /// selection cleared, no tool, the message in [`Self::refusal`]); nothing selected starts the tool.
     pub fn constraint_command(&mut self, data: &mut SketchData, c: ConstraintTool) -> bool {
         self.refusal = None;
+        self.last_tool = Some(Tool::Constraint(c));
         // Select-first: the constraint applies to the whole selection at once.
         if already_coincident(&data.sketch, c, &self.selection) {
             return false;
@@ -6694,7 +6831,8 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::Arc3 => match anchors.len() {
-                    1 => poly(&[anchors[0], c], preview_color, true),
+                    // Live sketch-tools-1123: a solid chord to the pointer.
+                    1 => poly(&[anchors[0], c], preview_color, false),
                     2 => {
                         let c = self.arc3_semicircle(anchors[0], anchors[1], c).unwrap_or(c);
                         if let Some((ctr, r)) = noshape_sketch::shapes::circle_through(anchors[0], c, anchors[1]) {
@@ -6709,9 +6847,10 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::CenterArc => match anchors.len() {
+                    // Live sketch-tools-1123: a dash-dot circle through the pointer.
                     1 => {
                         poly(&[anchors[0], c], preview_color, true);
-                        poly(&circle_pts(anchors[0], (c - anchors[0]).length(), 72), preview_color, true);
+                        dash_dot.push(circle_pts(anchors[0], (c - anchors[0]).length(), 72));
                     }
                     2 => {
                         let ctr = anchors[0];
@@ -6742,9 +6881,10 @@ impl SketchEditor {
                     }
                 }
                 Tool::Ellipse => match anchors.len() {
+                    // Live sketch-tools-1123: the ellipse starts as a solid circle through the pointer.
                     1 => {
                         poly(&[anchors[0], c], preview_color, true);
-                        poly(&circle_pts(anchors[0], (c - anchors[0]).length(), 72), preview_color, true);
+                        poly(&circle_pts(anchors[0], (c - anchors[0]).length(), 72), preview_color, false);
                     }
                     2 => {
                         let ctr = anchors[0];
@@ -6761,6 +6901,10 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::Spline => {
+                    // Each placed point keeps its dot (live s6-spline-esc s6-9).
+                    for a in &anchors {
+                        points.points.push(PointSprite { position: w(*a), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
+                    }
                     // The pointer still on the last click: the spline through the clicks (live walk3-5 c2still).
                     let mut pts = anchors.clone();
                     if pts.last().is_none_or(|l| l.distance(c) > self.world_per_px * 0.5) {
@@ -6783,20 +6927,17 @@ impl SketchEditor {
                     }
                 }
                 Tool::Conic => match anchors.len() {
-                    1 => poly(&[anchors[0], c], preview_color, true),
+                    // Live sketch-tools-1123: already bowed to the left of start → pointer (8 mm over a 30 mm chord): the
+                    // conic whose shoulder is half the chord off its middle.
+                    1 => {
+                        let (p0, p2) = (anchors[0], c);
+                        let shoulder = (p0 + p2) * 0.5 + (p2 - p0).perp() * 0.5;
+                        poly(&conic_pts(p0, shoulder, p2, self.conic_rho), preview_color, false);
+                    }
                     2 => {
                         let (p0, p2) = (anchors[0], anchors[1]);
                         poly(&[p0, c, p2], [0x80, 0x80, 0x80, 255], true);
-                        let rho = self.conic_rho.clamp(0.01, 0.99);
-                        let wgt = rho / (1.0 - rho);
-                        let pts: Vec<DVec2> = (0..=64)
-                            .map(|i| {
-                                let t = i as f64 / 64.0;
-                                let (b0, b1, b2) = ((1.0 - t) * (1.0 - t), 2.0 * t * (1.0 - t) * wgt, t * t);
-                                (p0 * b0 + c * b1 + p2 * b2) / (b0 + b1 + b2)
-                            })
-                            .collect();
-                        poly(&pts, preview_color, false);
+                        poly(&conic_pts(p0, c, p2, self.conic_rho), preview_color, false);
                     }
                     _ => {}
                 },
@@ -6881,7 +7022,13 @@ impl SketchEditor {
         // Fillet: preview at the hovered corner (red when it doesn't fit) and the
         // radius manipulator of the session's first fillet.
         if self.tool == Tool::Fillet {
-            if let Some((arc, ok)) = self.fillet_preview(&data.sketch) {
+            // (Every pending corner's arc: a second corner adds its preview; two picked curves' none, live
+            // sketch-tools-1123.)
+            if let Some((pd, result)) = &self.pending_corner {
+                for id in result.created.iter().filter(|_| !self.pending_corners.is_empty()).filter(|e| pd.sketch.kind(**e) == Some(EntityKind::Arc)) {
+                    poly(&pd.sketch.tessellate(*id, self.world_per_px), preview_color, false);
+                }
+            } else if let Some((arc, ok)) = self.fillet_preview(&data.sketch) {
                 poly(&arc, if ok { preview_color } else { crate::palette::rgb8(crate::palette::pick(crate::palette::viewport::SKETCH_OVER, crate::palette::viewport_dark::SKETCH_OVER)) }, false);
             }
             // Live (sketch/1934): the radius manipulator is the hollow drag
@@ -7001,8 +7148,8 @@ impl SketchEditor {
                 points.points.push(PointSprite { position: w(q), color, pick_id: 0, size: 9.0, style: on_top, _pad: 0 });
             }
         }
-        // Mirror: its line yellow-green while it waits selected for the entities (live workflows-1122 22 s34:
-        // (189, 199, 100), no hover band); unlit once something is mirrored (s35).
+        // Mirror: its line yellow-green while it waits selected for the entities (live sketch-tools-1123, no hover band);
+        // unlit once something is mirrored (workflows-1122 22 s35).
         if let Some(axis) = self.shown_mirror_line() {
             let color = crate::palette::rgb8(crate::palette::viewport::MIRROR_LINE);
             wide.push((data.sketch.tessellate(axis, self.world_per_px * 0.25), color, 2.0));
@@ -7411,6 +7558,19 @@ impl SketchEditor {
         self.picks.iter().map(|p| p.0).collect()
     }
 
+    /// What the new dimension whose value box is open measures (lit as picked until the box closes).
+    pub fn dim_box_picks(&self) -> Vec<EntityId> {
+        if !self.dim_edit.as_ref().is_some_and(|d| d.created) {
+            return Vec::new();
+        }
+        self.picks_placed.iter().map(|p| p.0).collect()
+    }
+
+    /// Whether the snap aligns with the Origin: it lights as hovered (live s6-spline-esc s6-8, the peach disc).
+    pub fn inference_lights_origin(&self, sk: &Sketch) -> bool {
+        self.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|c| matches!(c, AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN || is_origin(sk, *p))))
+    }
+
     /// The curves the snap relates to, lit as hovered (the caller marks them): a parallel / perpendicular / tangent's
     /// reference and a curve the end lands on, both for a combined snap (live2 combo perpLine: the last segment and the
     /// line; live hover-matrix-1121 sk/inference-on-line-at: the hovered band, the blue line through it).
@@ -7620,12 +7780,12 @@ fn diameter_field(sk: &Sketch, circle: EntityId, wpp: f64, away: Option<DVec2>) 
 
 /// Primary then secondary axis diameter boxes of an ellipse / elliptical arc.
 fn ellipse_fields(sk: &Sketch, id: EntityId, wpp: f64) -> Vec<OtfField> {
-    let Some(Curve2::Ellipse { center, major, minor } | Curve2::EllipticalArc { center, major, minor, .. }) = sk.curve(id) else { return Vec::new() };
-    let u = major.try_normalize().unwrap_or(DVec2::X);
-    let off = wpp * 26.0;
+    let Some(Curve2::Ellipse { center, major, .. } | Curve2::EllipticalArc { center, major, .. }) = sk.curve(id) else { return Vec::new() };
+    // Live sketch-tools-1123: the major box centred on the major radius's middle, the minor value just below it.
+    let mid = center + major * 0.5;
     vec![
-        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: center + major + u * off, place: None, place_active: None, label_at: None },
-        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: center + u.perp() * (minor + off), place: None, place_active: None, label_at: None },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: true, value: 0.0 }, scale: 2.0, label: mid, place: None, place_active: None, label_at: None },
+        OtfField { kind: ConstraintKind::EllipseRadius { ellipse: id, major: false, value: 0.0 }, scale: 2.0, label: mid - DVec2::Y * wpp * 26.0, place: None, place_active: None, label_at: None },
     ]
 }
 
@@ -8219,11 +8379,32 @@ fn prune_exprs(data: &mut SketchData) {
     data.patterns.retain(|p| p.seeds.iter().any(|e| sk.entity(EntityId(*e)).is_some()));
 }
 
+/// An arc's upper end (the left one when level): where a fillet's R label hangs (live sketch/1934).
+fn arc_upper_end(sk: &Sketch, arc: EntityId) -> Option<DVec2> {
+    let Some(Curve2::Arc { center, radius, start_angle, end_angle }) = sk.curve(arc) else { return None };
+    let (a, b) = (center + DVec2::from_angle(start_angle) * radius, center + DVec2::from_angle(end_angle) * radius);
+    Some(if (a.y - b.y).abs() > 1e-12 { if a.y > b.y { a } else { b } } else if a.x < b.x { a } else { b })
+}
+
+/// A conic from `p0` to `p2` with shoulder `c` and `rho`, as points.
+fn conic_pts(p0: DVec2, c: DVec2, p2: DVec2, rho: f64) -> Vec<DVec2> {
+    let rho = rho.clamp(0.01, 0.99);
+    let wgt = rho / (1.0 - rho);
+    (0..=64)
+        .map(|i| {
+            let t = i as f64 / 64.0;
+            let (b0, b1, b2) = ((1.0 - t) * (1.0 - t), 2.0 * t * (1.0 - t) * wgt, t * t);
+            (p0 * b0 + c * b1 + p2 * b2) / (b0 + b1 + b2)
+        })
+        .collect()
+}
+
 fn curve_mid(sk: &Sketch, id: EntityId) -> Option<DVec2> {
     match sk.curve(id)? {
         Curve2::Line { a, b } => Some((a + b) * 0.5),
         Curve2::Circle { center, radius } => Some(center + DVec2::new(radius, 0.0)),
-        Curve2::Arc { center, radius, start_angle, end_angle } => Some(center + DVec2::from_angle((start_angle + end_angle) * 0.5) * radius),
+        // (Counter-clockwise from start to end, which can be below it.)
+        Curve2::Arc { center, radius, start_angle, end_angle } => Some(center + DVec2::from_angle(start_angle + (end_angle - start_angle).rem_euclid(TAU) * 0.5) * radius),
         c => {
             let (t0, t1) = c.domain();
             Some(c.point((t0 + t1) * 0.5))
@@ -8495,6 +8676,19 @@ fn angle_arc(out: &mut Vec<[DVec2; 2]>, c: DVec2, s1: DVec2, s2: DVec2, r: f64, 
 /// A sketch chamfer's two distance dimensions (virtual sharp → chamfer end).
 fn chamfer_dims(sk: &Sketch, r: &noshape_sketch::EditResult) -> Vec<ConstraintId> {
     r.constraints_added.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| matches!(c.kind, ConstraintKind::Distance { .. }))).collect()
+}
+
+/// Where a committed chamfer's distance boxes open (live sketch-tools-1123 at 3.9 px/mm): distance A's 15 mm off its
+/// edge and 7.5 mm past its middle toward its end, distance B's level with the corner, beside its edge.
+fn chamfer_box_places(sk: &Sketch, dims: &[ConstraintId], px: f64) -> Vec<(ConstraintId, DVec2)> {
+    let place = |i: usize, cid: ConstraintId, label: DVec2| -> Option<(ConstraintId, DVec2)> {
+        let ConstraintKind::Distance { a, b, .. } = sk.constraint(cid)?.kind else { return None };
+        let (sharp, end) = (sk.point(a)?, sk.point(b)?);
+        let mid = (sharp + end) * 0.5;
+        let (n, u) = ((label - mid).try_normalize()?, (end - sharp).try_normalize()?);
+        Some((cid, if i == 0 { mid + n * px * 58.5 + u * px * 29.0 } else { sharp + n * px * 50.0 }))
+    };
+    chamfer_dim_labels(sk, dims, px).into_iter().enumerate().filter_map(|(i, (cid, label))| place(i, cid, label)).collect()
 }
 
 /// Where a chamfer's distance labels go (live sketch/1960–1961): 50 px
@@ -9845,6 +10039,9 @@ mod tests {
         }
         let o = ed.otf.as_ref().expect("the boxes");
         assert!(matches!(o.fields[o.active].kind, ConstraintKind::EllipseRadius { major: true, .. }), "the major box first");
+        // Live sketch-tools-1123: the major box on the major radius's middle, the minor value just below it.
+        let b = ed.otf_boxes(&d, &UnitPrefs::default());
+        assert!((b[0].0 - v(0.015, 0.0)).length() < 1e-9 && (b[1].0 - v(0.015, -26.0 * PX)).length() < 1e-9, "{:?}", b.iter().map(|x| x.0).collect::<Vec<_>>());
         ed.otf_step(1);
         ed.commit_otf(&mut d, "12", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
         assert_eq!(ellipse_dims(&d), vec![false]);
@@ -9926,18 +10123,18 @@ mod tests {
         assert_eq!(count(&d, EntityKind::Arc), 2, "the empty-space click committed it");
         assert!(!d.sketch.entity(line).unwrap().construction, "centerline stays solid");
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Diameter { .. })), "Ø width dimension");
-        // Leaving the tool (Esc) commits a pending slot as well.
+        // Esc discards a pending slot and leaves the tool (live sketch-tools-1123 slot.md).
         let other = d.sketch.add_line(v(0.01, 0.06), v(0.05, 0.06));
         click(&mut ed, &mut d, v(0.03, 0.06));
         assert!(ed.slot_pending());
-        assert!(ed.escape_commit(&mut d).is_some_and(|o| o.changed));
+        assert!(ed.escape_commit(&mut d).is_some_and(|o| !o.changed));
         assert_eq!(ed.tool, Tool::Select);
-        assert_eq!(count(&d, EntityKind::Arc), 4);
+        assert_eq!(count(&d, EntityKind::Arc), 2);
         assert!(!d.sketch.entity(other).unwrap().construction);
     }
 
-    /// qa SKETCH-SLOT-ON-ARC: the Slot tool on a free 3-point arc wraps it in a slot of the tool's width (live behaviours 164); Esc
-    /// commits it with the arc kept (ours drew "Ø0", no slot, and Esc left the arc's centre and a Ø0 dimension).
+    /// qa SKETCH-SLOT-ON-ARC: the Slot tool on a free 3-point arc wraps it in a slot of the tool's width (live behaviours 164); Enter
+    /// commits it with the arc kept (ours drew "Ø0", no slot, and left the arc's centre and a Ø0 dimension).
     #[test]
     fn a_slot_on_a_free_arc_wraps_it_and_esc_keeps_the_arc() {
         let (mut ed, mut d) = editor(Tool::Slot);
@@ -9946,7 +10143,7 @@ mod tests {
         click(&mut ed, &mut d, c + DVec2::from_angle(std::f64::consts::FRAC_PI_4) * 0.0227);
         let (_, _, w) = ed.slot_dimension().expect("the preview shows its Ø dimension");
         assert!((w - ed.slot_width).abs() < 1e-12, "{w}");
-        assert!(ed.escape_commit(&mut d).is_some_and(|o| o.changed));
+        assert!(ed.commit_slot(&mut d).changed);
         let r = |d: &SketchData, e: EntityId| d.sketch.curve(e).map(|k| (k.start_point() - c).length());
         assert!(r(&d, arc).is_some_and(|r| (r - 0.0227).abs() < 1e-9), "the arc kept: {:?}", r(&d, arc));
         assert_eq!(count(&d, EntityKind::Arc), 5, "the arc, two sides and two caps");
@@ -11650,9 +11847,146 @@ mod tests {
         assert_eq!(count(&d, EntityKind::Arc), 0, "the second curve stages the preview");
         assert!(ed.corner_pending());
         assert!(ed.dim_edit.is_none(), "the radius box waits for Enter");
+        // Live sketch-tools-1123: no preview after the second pick (no arc, arrow or R label).
+        assert!(ed.fillet_arrow(&d.sketch).is_none() && ed.fillet_value_label(&d.sketch).is_none());
         assert!(ed.commit_corner(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Arc), 1);
         assert!(ed.dim_edit.is_some(), "Enter opens the radius box");
+    }
+
+    /// A 30 × 20 mm corner rectangle with `tool` on (live sketch-tools-1123's corners).
+    fn rect_with(tool: Tool) -> (SketchEditor, SketchData) {
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        ed.apply_unit_defaults(noshape_units::LengthUnit::Millimeter);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        ed.set_tool(tool);
+        (ed, d)
+    }
+
+    /// Live sketch-tools-1123 fillet.md: a second corner while one previews adds its own preview (both selected,
+    /// nothing made); the same corner again (a double-click) keeps it pending; Enter makes both.
+    #[test]
+    fn a_second_fillet_corner_adds_a_preview() {
+        let (mut ed, mut d) = rect_with(Tool::Fillet);
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        assert!(ed.corner_pending(), "a double-click keeps the fillet pending");
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        assert_eq!((count(&d, EntityKind::Arc), ed.selection.len(), ed.corner_pending()), (0, 2, true), "(arcs made, corners selected, pending)");
+        assert!(ed.commit_corner(&mut d).changed);
+        assert_eq!((count(&d, EntityKind::Arc), ed.selection.len()), (2, 0), "(arcs made, corners selected) after Enter");
+    }
+
+    /// Live sketch-tools-1123 fillet.md: the committed fillet's radius box opens where its R label was, up-left of the
+    /// arc's upper end (a top-right corner's: the tangent point on the top edge).
+    #[test]
+    fn a_fillets_radius_box_opens_up_left_of_the_arc() {
+        let (mut ed, mut d) = rect_with(Tool::Fillet);
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        assert!(ed.commit_corner(&mut d).changed);
+        let cid = ed.dim_edit.as_ref().expect("the radius box").constraint;
+        let at = d.dimension_labels.get(&cid.0).map(|l| v(l[0], l[1]));
+        let want = v(0.035, 0.03) + v(-47.0, 24.0) * PX;
+        assert!(at.is_some_and(|a| (a - want).length() < 1e-6), "the box at {at:?}, want {want:?}");
+    }
+
+    /// Live sketch-tools-1123 chamfer.md: the first box opens 15 mm off distance A's edge and 7.5 mm past its middle
+    /// (at 3.9 px/mm), the second beside the other edge, level with the corner.
+    #[test]
+    fn a_chamfers_boxes_open_at_lives_places() {
+        let (mut ed, mut d) = rect_with(Tool::Chamfer);
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        assert!(ed.commit_corner(&mut d).changed);
+        let first = ed.dim_edit.as_ref().expect("distance A's box").constraint;
+        let second = ed.value_box_next.expect("distance B's box queued");
+        let geo = |cid: ConstraintId| match d.sketch.constraint(cid).map(|c| c.kind.clone()) {
+            Some(ConstraintKind::Distance { a, b, .. }) => (d.sketch.point(a).unwrap_or_default(), d.sketch.point(b).unwrap_or_default(), d.dimension_labels.get(&cid.0).map_or(DVec2::ZERO, |l| v(l[0], l[1]))),
+            _ => (DVec2::ZERO, DVec2::ZERO, DVec2::ZERO),
+        };
+        let (sharp, end, at) = geo(first);
+        let u = (end - sharp).normalize();
+        let off = at - (sharp + end) * 0.5;
+        assert!((off.dot(u) - 29.0 * PX).abs() < 1e-9 && (off.perp_dot(u).abs() - 58.5 * PX).abs() < 1e-9, "A's box {off:?} from its middle");
+        let (sharp, end, at) = geo(second);
+        assert!((at - sharp).dot((end - sharp).normalize()).abs() < 1e-9 && ((at - sharp).length() - 50.0 * PX).abs() < 1e-9, "B's box level with the corner: {:?}", at - sharp);
+    }
+
+    /// Live sketch-tools-1123 chamfer.md: the distances typed in a chamfer's boxes (4, then 6) are the next chamfer's.
+    #[test]
+    fn chamfer_distances_are_sticky() {
+        let (mut ed, mut d) = rect_with(Tool::Chamfer);
+        click(&mut ed, &mut d, v(0.04, 0.03));
+        assert!(ed.commit_corner(&mut d).changed);
+        for text in ["4", "6"] {
+            let cid = ed.dim_edit.as_ref().expect("a distance box").constraint;
+            ed.apply_dimension(&mut d, cid, text, &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+            ed.dim_edit = None;
+            ed.open_next_value_box(&d);
+        }
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        assert!(ed.commit_corner(&mut d).changed, "{:?}", ed.message);
+        let mut values: Vec<i64> = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Distance { .. })).filter_map(|c| c.kind.value()).map(|x| (x * 1e6).round() as i64).collect();
+        values.sort();
+        assert_eq!(values, vec![4000, 4000, 6000, 6000], "both chamfers' distances (µm)");
+    }
+
+    /// Live sketch-tools-1123 fillet.md: pressed on a corner and dragged, the radius follows the pointer (the arc's
+    /// middle under it, r (√2 − 1) from a square corner) and the release makes it; dragged too far it is red and the
+    /// release makes nothing.
+    #[test]
+    fn a_fillet_dragged_from_its_corner_follows_the_pointer() {
+        let corner = || {
+            let (ed, mut d) = editor(Tool::Fillet);
+            let c = d.sketch.add_point(v(0.01, 0.01));
+            let a = d.sketch.add_point(v(0.05, 0.01));
+            let b = d.sketch.add_point(v(0.01, 0.05));
+            d.sketch.add_line_between(c, a).unwrap();
+            d.sketch.add_line_between(c, b).unwrap();
+            (ed, d)
+        };
+        let (mut ed, mut d) = corner();
+        ed.pointer_move(&mut d, v(0.01, 0.01), false, false);
+        let h = d.sketch.pick(v(0.01, 0.01), PX * 4.0);
+        ed.hover = h;
+        ed.tool_down(&mut d, v(0.01, 0.01), h, false, false);
+        for k in 1..=4 {
+            ed.tool_drag(&mut d, v(0.01, 0.01).lerp(v(0.012, 0.012), k as f64 / 4.0));
+        }
+        ed.tool_up(&mut d, v(0.012, 0.012));
+        let r = d.sketch.entities().find_map(|e| match d.sketch.curve(e.id) {
+            Some(Curve2::Arc { radius, .. }) => Some(radius),
+            _ => None,
+        });
+        let want = 0.002 * 2f64.sqrt() / (2f64.sqrt() - 1.0);
+        assert!(r.is_some_and(|r| (r - want).abs() < 1e-6), "the fillet made at the dragged radius: {r:?}, want {want}");
+        let (mut ed, mut d) = corner();
+        drag(&mut ed, &mut d, v(0.01, 0.01), v(0.04, 0.04));
+        assert_eq!(count(&d, EntityKind::Arc), 0, "too big: nothing made");
+        // The default radius too big for the corner: the press previews red, the drag still sizes it.
+        let (mut ed, mut d) = corner();
+        ed.fillet_radius = 0.2;
+        ed.pointer_move(&mut d, v(0.01, 0.01), false, false);
+        let h = d.sketch.pick(v(0.01, 0.01), PX * 4.0);
+        ed.hover = h;
+        ed.tool_down(&mut d, v(0.01, 0.01), h, false, false);
+        assert!(ed.invalid_corner.is_some(), "red at R200");
+        for k in 1..=4 {
+            ed.tool_drag(&mut d, v(0.01, 0.01).lerp(v(0.012, 0.012), k as f64 / 4.0));
+        }
+        ed.tool_up(&mut d, v(0.012, 0.012));
+        assert_eq!(count(&d, EntityKind::Arc), 1, "dragged from red into a fit: made");
+    }
+
+    /// Live sketch-tools-1123 arcs.md: a double-click at the start point after the centre creates nothing.
+    #[test]
+    fn a_center_arc_double_click_at_its_start_makes_nothing() {
+        let (mut ed, mut d) = editor(Tool::CenterArc);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.03, 0.01));
+        ed.tool_down(&mut d, v(0.03, 0.01), None, false, true);
+        ed.tool_up(&mut d, v(0.03, 0.01));
+        assert_eq!(count(&d, EntityKind::Arc), 0, "no zero arc");
     }
 
     /// SK5 in the editor (live, qa5 sketch tools): Corner rectangle
@@ -11748,6 +12082,7 @@ mod tests {
         assert!(ed.cancel());
         assert!(ed.pending_text.is_none());
         assert!(d.texts.is_empty(), "cancel never adds text geometry");
+        assert_eq!(ed.tool, Tool::Select, "one Esc: the tool off");
         ed.set_tool(Tool::Text);
         click(&mut ed, &mut d, v(0.01, 0.01));
         click(&mut ed, &mut d, v(0.03, 0.02));
@@ -12196,7 +12531,7 @@ mod tests {
     }
 
     #[test]
-    fn offset_preview_arrow_and_repeat() {
+    fn offset_preview_arrow_and_enter() {
         let (mut ed, mut d) = editor(Tool::Offset);
         let l1 = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
         d.sketch.add_line(v(0.01, 0.03), v(0.03, 0.03));
@@ -12224,10 +12559,10 @@ mod tests {
         ed.dim_edit = None;
         let beyond = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y - y).abs() < 1e-9);
         assert!(beyond, "offset toward the dragged side");
-        // later clicks repeat the offset right away
+        // The tool ended with Enter (live sketch-tools-1123 offset.md): a later click offsets nothing.
+        assert_eq!(ed.tool, Tool::Select);
         click(&mut ed, &mut d, v(0.02, 0.03));
-        assert_eq!(count(&d, EntityKind::Line), 4);
-        let _ = l1;
+        assert_eq!(count(&d, EntityKind::Line), 3);
     }
 
     /// Live offset-look-1121 (3): the pointer on the distance label hides the dimension's two arrowheads, not its line.
@@ -12279,7 +12614,7 @@ mod tests {
         assert!(ed.commit_offset(&mut d).changed);
         assert!(ed.dim_edit.is_some(), "Enter opens the value box");
         ed.dim_edit = None;
-        ed.offset_repeat = false;
+        ed.set_tool(Tool::Offset);
         click(&mut ed, &mut d, v(0.11, 0.0));
         let (tmp, created) = ed.offset_result(&d.sketch).unwrap();
         let Some(Curve2::Circle { radius, .. }) = tmp.curve(created[0]) else { panic!() };
@@ -13004,7 +13339,8 @@ mod tests {
         let (mut ed, mut d) = editor(Tool::Dimension);
         let l = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
         click(&mut ed, &mut d, v(0.02, 0.01));
-        assert!(ed.dimension_preview(&d).is_none() || ed.picked(None) == vec![l]);
+        // Live workflows-1122 01 s15: no value at the pointer until it moves off the pick.
+        assert!(ed.dimension_preview(&d).is_none(), "no preview before the pointer moves");
         ed.pointer_move(&mut d, v(0.02, 0.015), false, false);
         let (k, _, val) = ed.dimension_preview(&d).expect("preview follows the cursor");
         assert!(matches!(k, ConstraintKind::Length { .. }));
@@ -13012,6 +13348,8 @@ mod tests {
         click(&mut ed, &mut d, v(0.02, 0.015));
         assert!(ed.dim_edit.is_some(), "placement opens the value box");
         assert_eq!(ed.tool, Tool::Dimension, "tool stays active");
+        // Live workflows-1122 01 s16-19: the measured line stays lit while the box is open.
+        assert_eq!(ed.dim_box_picks(), vec![l]);
         let cid = ed.dim_edit.as_ref().unwrap().constraint;
         ed.apply_dimension(&mut d, cid, "-30", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
         let c = d.sketch.curve(l).unwrap();
@@ -13321,6 +13659,16 @@ mod tests {
         click(&mut ed, &mut d, v(0.030, 0.040));
         let b = ed.otf_boxes(&d, &units);
         assert!(b[0].0.x < 0.020 - 14.0 * PX && (b[0].0.y - 0.030).abs() < 1e-9, "box left: {:?}", b[0].0);
+        // Live sketch-tools-1123 #5: the start at -31° still puts it level with the centre, on the left.
+        let (mut ed, mut d) = editor(Tool::CenterArc);
+        click(&mut ed, &mut d, v(0.030, 0.030));
+        click(&mut ed, &mut d, v(0.040, 0.024));
+        for a in [-0.3f64, 0.0, 0.3, 0.5] {
+            ed.pointer_move(&mut d, v(0.030, 0.030) + DVec2::from_angle(a) * 0.01, false, false);
+        }
+        click(&mut ed, &mut d, v(0.040, 0.036));
+        let b = ed.otf_boxes(&d, &units);
+        assert!(b[0].0.x < 0.030 - 0.0116 - 14.0 * PX && (b[0].0.y - 0.030).abs() < 1e-9, "box level on the left: {:?}", b[0].0);
         // 3 point arc: on the chord's midpoint
         let (mut ed, mut d) = editor(Tool::Arc3);
         for p in [v(0.020, 0.030), v(0.040, 0.030), v(0.030, 0.036)] {
@@ -13962,6 +14310,30 @@ mod tests {
         }
     }
 
+    /// Live s6-spline-esc s6-9: every placed point keeps its dot while the spline is drawn, the Origin lights while a
+    /// point aligns with it, and the point placed over the Origin keeps its VERTICAL.
+    #[test]
+    fn a_splines_placed_points_keep_their_dots_and_alignments() {
+        let (mut ed, mut d) = editor(Tool::Spline);
+        click(&mut ed, &mut d, v(-0.02, 0.0));
+        click(&mut ed, &mut d, v(0.0, 0.01));
+        assert!(ed.inference_lights_origin(&d.sketch), "aligned over the Origin: {:?}", ed.inference);
+        click(&mut ed, &mut d, v(0.02, 0.0));
+        ed.pointer_move(&mut d, v(0.03, 0.01), false, false);
+        let (_, points) = ed.overlay(&d, &UnitPrefs::default());
+        for c in [v(-0.02, 0.0), v(0.0, 0.01), v(0.02, 0.0)] {
+            assert!(points.points.iter().any(|p| p.color == PREVIEW_COLOR && (p.position[0] as f64 - c.x).abs() < 1e-6 && (p.position[1] as f64 - c.y).abs() < 1e-6), "dot at {c}");
+        }
+        ed.escape_commit(&mut d).expect("Esc commits the spline");
+        let fit = d.sketch.entities().find_map(|e| match &e.geometry {
+            noshape_sketch::Geometry::FitSpline { points, .. } => Some(points.clone()),
+            _ => None,
+        });
+        let fit = fit.expect("a fit spline");
+        assert_eq!(fit.len(), 3);
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { a, b: Some(_) } if a == fit[1])), "the middle point's VERTICAL");
+    }
+
     /// Live sketch/132: with the Text dialog open only the dash-dot box and its 4 corner points, no text.
     #[test]
     fn the_text_box_is_drawn_without_its_text_while_the_dialog_is_open() {
@@ -13988,14 +14360,15 @@ mod dash_dot_tests {
     /// qa5 POLY1: the pattern runs along the whole circle, not per segment.
     #[test]
     fn dash_dot_follows_the_whole_polyline() {
-        // A 100-long line in 50 segments of 2: period 10 → 10 dashes of 5.5
-        // and 10 dots of 1.2, whatever the segment length.
-        let pts: Vec<DVec2> = (0..=50).map(|i| DVec2::new(i as f64 * 2.0, 0.0)).collect();
-        let pieces = dash_dot_pieces(&pts, 10.0);
+        // A 460-long line in 230 segments of 2: period 46 → 10 dashes of 30
+        // and 10 dots of 4 (live's 30 / 6 / 4 / 6), whatever the segment length.
+        let pts: Vec<DVec2> = (0..=230).map(|i| DVec2::new(i as f64 * 2.0, 0.0)).collect();
+        let pieces = dash_dot_pieces(&pts, 46.0);
         assert_eq!(pieces.len(), 20);
         let len = |p: &Vec<DVec2>| p.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>();
-        assert!((len(&pieces[0]) - 5.5).abs() < 1e-9, "{}", len(&pieces[0]));
-        assert!((len(&pieces[1]) - 1.2).abs() < 1e-9);
-        assert!((pieces[2][0].x - 10.0).abs() < 1e-9);
+        assert!((len(&pieces[0]) - 30.0).abs() < 1e-9, "{}", len(&pieces[0]));
+        assert!((len(&pieces[1]) - 4.0).abs() < 1e-9);
+        assert!((pieces[1][0].x - 36.0).abs() < 1e-9);
+        assert!((pieces[2][0].x - 46.0).abs() < 1e-9);
     }
 }

@@ -351,6 +351,15 @@ fn every_help_link_names_a_guide_section() {
     assert!(bad.is_empty(), "help links to sections the guide doesn't have:\n{}", bad.join("\n"));
 }
 
+/// F1 in a sketch opens the guide at the current or last tool (live shortcuts-1123): every sketch tool has a section.
+#[test]
+fn every_sketch_tool_has_a_guide_section() {
+    let missing: Vec<_> = noshape_ops::tool_search::all_sketch_tools().map(|t| t.help_title()).chain(["Sketch tools"]).filter(|t| noshape_ops::about::guide_section(t).is_none()).collect();
+    assert!(missing.is_empty(), "sketch tools without a guide section: {missing:?}");
+    let line = noshape_ops::about::guide_section("Line").unwrap_or_default();
+    assert!(line.starts_with("#### Line") && !line.contains("#### Midpoint line"), "one tool's section: {line}");
+}
+
 /// Live 11-18 (Preferences › Keyboard shortcuts, General): "Create release", Unassigned, before "Create version".
 #[test]
 fn the_general_shortcuts_list_create_release_unassigned() {

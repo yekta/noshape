@@ -699,6 +699,10 @@ impl PartStudioView {
             let at = self.annotation_point(letter, cx).ok_or_else(|| format!("no annotation {letter} shown"))?;
             return Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)));
         }
+        if let Some(want) = t.get("dimension").and_then(Value::as_str) {
+            let (x, y) = self.dimension_label_at(want, cx)?;
+            return Ok(vp.origin() + point(px(x), px(y)));
+        }
         let world = if let Some(name) = t.get("plane").and_then(Value::as_str) {
             let p = self.display.planes.iter().find(|p| p.name == name && !p.hidden).ok_or_else(|| format!("no shown plane {name}"))?;
             self.visible_plane_point(p, cx).ok_or_else(|| format!("plane {name} is covered everywhere"))?

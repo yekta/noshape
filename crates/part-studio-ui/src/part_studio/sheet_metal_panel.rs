@@ -716,6 +716,9 @@ impl PartStudioView {
             let next = order.iter().position(|&i| i == row).and_then(|p| order.get(p + 1)).copied().unwrap_or(row);
             self.ui.sm_cell = Some((0, next, col));
             self.ui.sm_hover = None;
+            if let Some(f) = &mut self.ui.sm_cell_focus {
+                f.1 = true;
+            }
         }
         let field = if col == 2 { noshape_ops::sheetmetal::BendField::Radius } else { noshape_ops::sheetmetal::BendField::KFactor };
         let Some(mut copy) = self.studio(cx).cloned() else { return };
@@ -859,11 +862,18 @@ impl PartStudioView {
                 })
                 .when_some(at, |d, a| {
                     let v = hover_view.clone();
-                    d.on_mouse_down(MouseButton::Left, move |_, _, cx| {
+                    d.on_mouse_down(MouseButton::Left, move |e, _, cx| {
+                        let first = e.click_count <= 1;
                         v.update(cx, |this, cx| {
+                            if first {
+                                this.ui.sm_cell_held = this.ui.sm_cell == Some(a);
+                            }
                             // Live (feel/sheetmetal.json "rowClick"): the row (cell) only, nothing selected in 3D; the
                             // bend lights from the table's highlight.
                             this.ui.sm_cell = Some(a);
+                            if a.0 == 0 && matches!(a.2, 2 | 5) && let Some(f) = &mut this.ui.sm_cell_focus {
+                                f.1 = true;
+                            }
                             if a.0 == 0 && a.2 == 0 {
                                 this.refresh_scene(false, cx);
                             }
@@ -934,21 +944,36 @@ impl PartStudioView {
             let tip = if *n == "Radius" { format!("Radius ({unit})") } else { n.replace("(deg)", " (deg)") };
             cell(*w, col_head(0, c), true, label, None).tooltip(crate::ui::tooltip(tip))
         }));
-        // Radius and K Factor: a double-click edits the value in place (live
-        // (6): a 2 px #1651b0 outline, the number selected, no unit); Enter
-        // or Tab applies it as a Modify joint feature, Esc cancels.
+        // Radius and K Factor (live sm-table-cell-edit-1123): a double-click on the selected cell, or Enter, edits the
+        // value in place (a 2 px #1651b0 outline, an inset shadow, the value selected); a key typed into the selected
+        // cell starts the editor with it. Enter or Tab applies it as a Modify joint feature, Esc cancels.
         let editing = self.ui.sm_edit;
+        let cell_focus = self.ui.sm_cell_focus.get_or_insert_with(|| (cx.focus_handle(), false)).0.clone();
+        if editing.is_none()
+            && matches!(selected, Some((0, _, 2 | 5)))
+            && let Some((_, want)) = &mut self.ui.sm_cell_focus
+            && std::mem::take(want)
+        {
+            window.focus(&cell_focus, cx);
+        }
         let mut edit_input: Option<(usize, usize, Entity<gpui_kit::component::input::InputState>)> = None;
         if let Some((row, col)) = editing
             && let Some(r) = bends.get(row)
         {
-            let value = if col == 2 { len(r.radius) } else { plain(r.k_factor) };
-            let st = self.cell_input(format!("sm-edit-{row}-{col}"), value, window, cx, move |this, v, cx| this.sm_apply_edit(row, col, v, cx));
+            // (The Radius editor shows its unit, the cell doesn't: live sm-table-cell-edit-1123 "2 mm".)
+            let value = if col == 2 { format!("{} {unit}", len(r.radius)) } else { plain(r.k_factor) };
+            let st = self.cell_input(format!("sm-edit-{row}-{col}"), value.clone(), window, cx, move |this, v, cx| this.sm_apply_edit(row, col, v, cx));
             if self.ui.sm_edit_focus {
                 self.ui.sm_edit_focus = false;
+                let typed = self.ui.sm_edit_initial.take();
                 st.update(cx, |s, cx| {
+                    s.set_value(typed.clone().unwrap_or(value), window, cx);
                     s.focus(window, cx);
-                    s.select_all(window, cx);
+                    // The caret after a typed key, set after `focus` so it wins over select-on-focus.
+                    match &typed {
+                        Some(t) => s.set_selected_range(t.len()..t.len(), cx),
+                        None => s.select_all(window, cx),
+                    }
                 });
             }
             edit_input = Some((row, col, st));
@@ -968,12 +993,16 @@ impl PartStudioView {
                     .bg(editable)
                     .border_2()
                     .border_color(gpui_kit::rgb(0x1651b0))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.247), offset: point(px(1.), px(1.)), blur_radius: px(6.), spread_radius: px(0.), inset: true }])
                     .text_size(px(13.33))
                     .on_key_down(move |e: &KeyDownEvent, _, cx| {
                         if e.keystroke.key == "escape" {
                             cx.stop_propagation();
                             v.update(cx, |this, cx| {
                                 this.ui.sm_edit = None;
+                                if let Some(f) = &mut this.ui.sm_cell_focus {
+                                    f.1 = true;
+                                }
                                 cx.notify();
                             });
                         }
@@ -986,10 +1015,35 @@ impl PartStudioView {
                     .into_any_element();
             }
             let v = edit_view.clone();
+            let keys = edit_view.clone();
+            let held = selected == Some((0, row, col));
             cell(140., editable, false, text.into(), Some((0, row, col)))
+                // An "Input" context: the Part Studio's single-key shortcuts stay quiet while typing here.
+                .when(held, |d| {
+                    d.key_context("Input").track_focus(&cell_focus).on_key_down(move |e: &KeyDownEvent, _, cx| {
+                        let k = &e.keystroke;
+                        let plain = !(k.modifiers.control || k.modifiers.alt || k.modifiers.platform);
+                        let typed = match k.key_char.clone().filter(|c| plain && !c.trim().is_empty()) {
+                            Some(c) => Some(c),
+                            None if k.key == "enter" => None,
+                            None => return,
+                        };
+                        cx.stop_propagation();
+                        keys.update(cx, |this, cx| {
+                            this.ui.sm_edit = Some((row, col));
+                            this.ui.sm_edit_focus = true;
+                            this.ui.sm_edit_enter = false;
+                            this.ui.sm_edit_initial = typed;
+                            cx.notify();
+                        });
+                    })
+                })
                 .on_click(move |e, _, cx| {
                     if e.click_count() >= 2 {
                         v.update(cx, |this, cx| {
+                            if !this.ui.sm_cell_held {
+                                return;
+                            }
                             this.ui.sm_edit = Some((row, col));
                             this.ui.sm_edit_focus = true;
                             this.ui.sm_edit_enter = false;
@@ -1021,7 +1075,8 @@ impl PartStudioView {
             .children(h_scrollbar(&scroll, 15., 15., cx))
             .into_any_element();
         // Other joints: Name (frozen) | Type ▾ | Style ▾.
-        let select_cell = |text: &'static str| {
+        // While its list is open the cell is an empty blue box (live workflows-1123 03 s23).
+        let select_cell = |text: &'static str, open: bool, boxed: String| {
             div()
                 .w(px(140.))
                 .h(px(34.))
@@ -1034,9 +1089,10 @@ impl PartStudioView {
                 .border_b_1()
                 .border_color(grid)
                 .bg(editable)
-                .child(div().flex_1().truncate().child(text))
-                .child(crate::ui::glyph("ui-select-caret", 7., gpui_kit::rgb(0x333333)))
+                .when(open, |d| d.relative().child(div().debug_selector(move || boxed.clone()).absolute().top(px(-1.)).left(px(-1.)).right_0().bottom_0().border_2().border_color(gpui_kit::rgb(0x1651b0))))
+                .when(!open, |d| d.child(div().flex_1().truncate().child(text)).child(crate::ui::glyph("ui-select-caret", 7., gpui_kit::rgb(0x333333))))
         };
+        let lists_open: Vec<[bool; 2]> = (0..joints.len()).map(|i| ["sm-joint-type", "sm-joint-style"].map(|k| crate::os_ui::dropdown_open(&format!("{k}-{i}"), cx))).collect();
         let joint_head = h_flex()
             .border_l_1()
             .border_color(grid)
@@ -1050,11 +1106,12 @@ impl PartStudioView {
         let joint_rows_el = joints.iter().enumerate().map(|(i, r)| {
             let (v1, v2) = (view.clone(), view.clone());
             let style = r.style;
+            let [type_open, style_open] = lists_open[i];
             h_flex()
                 .border_l_1()
                 .border_color(grid)
                 .child(cell(140., head, true, r.name.clone().into(), Some((1, i, 0))))
-                .child(select_cell("Rip").debug_selector(move || format!("sm-joint-type-{i}")).id(("sm-joint-type", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-type-{i}")), true, move |mut m, _, _| {
+                .child(select_cell("Rip", type_open, format!("sm-joint-type-box-{i}")).debug_selector(move || format!("sm-joint-type-{i}")).id(("sm-joint-type", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-type-{i}")), true, move |mut m, _, _| {
                     for (label, edit) in [("Bend", Some(RipEdit::Bend)), ("Rip", None)] {
                         let v = v1.clone();
                         m = m.item(OsMenuItem::new(label).checked(edit.is_none()).on_click(move |_, _, cx| {
@@ -1065,7 +1122,7 @@ impl PartStudioView {
                     }
                     m
                 }))
-                .child(select_cell(style).debug_selector(move || format!("sm-joint-style-{i}")).id(("sm-joint-style", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-style-{i}")), true, move |mut m, _, _| {
+                .child(select_cell(style, style_open, format!("sm-joint-style-box-{i}")).debug_selector(move || format!("sm-joint-style-{i}")).id(("sm-joint-style", i)).os_dropdown_menu(SharedString::from(format!("sm-joint-style-{i}")), true, move |mut m, _, _| {
                     for (label, key) in RIP_STYLES {
                         let v = v2.clone();
                         m = m.item(OsMenuItem::new(label).checked(label == style).on_click(move |_, _, cx| v.update(cx, |this, cx| this.sm_edit_rip(i, RipEdit::Style(key), cx))));

@@ -316,7 +316,7 @@ fn a_hovered_table_rows_faces_take_the_hover_look() {
         built.picks.ids_for(&top).iter().map(|&id| scene.states[id as usize]).collect::<Vec<u32>>()
     };
     let (row, other) = (flags(true), flags(false));
-    assert!(!row.is_empty() && row.iter().all(|f| f & state::HOVER != 0 && f & state::ACCENT == 0), "a row's face: {row:?}");
+    assert!(!row.is_empty() && row.iter().all(|f| f & (state::HOVER | state::FILLED) == state::HOVER | state::FILLED && f & state::ACCENT == 0), "a row's face, filled: {row:?}");
     assert!(other.iter().all(|f| f & state::ACCENT != 0 && f & state::HOVER == 0), "other accents keep theirs: {other:?}");
 }
 

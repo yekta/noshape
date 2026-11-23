@@ -72,6 +72,214 @@ In an Assembly, **Exploded views** (right strip) move instances away from their 
 
 In an Assembly, **Named positions** (right strip) keep positional variations of the assembly: the values of its driving mates and the positions of its subassemblies, each under a name. Apply one to put the assembly in that position.
 
+### Sketch tools
+
+Press a tool's key or its toolbar button; the key again, or Esc, goes back to selecting. **F1** in a sketch opens this guide at the tool that is on, or the last one used.
+
+#### Line
+
+**L**. Click a start and an end point; each click after that draws the next line from the last end. Drag from a point for a single line. Esc or a double-click ends the chain.
+
+#### Midpoint line
+
+Click the line's midpoint, then one end.
+
+#### Corner rectangle
+
+**G**. Click two opposite corners.
+
+#### Center rectangle
+
+**R**. Click the centre, then a corner.
+
+#### Aligned rectangle
+
+Click two corners along one side, then a point on the opposite side.
+
+#### Center point circle
+
+**C**. Click the centre, then a point on the circle.
+
+#### 3 point circle
+
+Click three points on the circle.
+
+#### 3 point arc
+
+**A**. Click both ends, then a point the arc passes through.
+
+#### Tangent arc
+
+Click the end of a line or arc, then the arc's other end; the arc is tangent where it starts.
+
+#### Center point arc
+
+Click the centre, the start and the end.
+
+#### Elliptical arc
+
+Click the centre, the end of the major axis, a point for the minor radius, then the start and the end.
+
+#### Point
+
+**Shift+S**. Click to place a point.
+
+#### Spline
+
+Click the points the curve passes through; double-click the last one, or click the first to close it.
+
+#### Bezier
+
+Click the curve's control points.
+
+#### Spline control point
+
+Click a point on a spline to add a control point there.
+
+#### Conic
+
+Click both ends, the point the end tangents meet at, then a point the curve passes through.
+
+#### Slot
+
+Click the centre line's points, then a point for the width. Esc discards a slot not yet finished.
+
+#### Inscribed polygon
+
+Click the centre, then a corner. The number of sides can be typed while drawing.
+
+#### Circumscribed polygon
+
+Click the centre, then the middle of a side.
+
+#### Ellipse
+
+Click the centre, the end of the major axis, then a point for the minor radius.
+
+#### Text
+
+Click to place a text box, then type the text.
+
+#### Sketch fillet
+
+**Shift+F**. Click a corner, or drag from it, to round it. The radius stays for the next fillet; type a value to change it.
+
+#### Sketch chamfer
+
+Click a corner, or drag from it, to bevel it. The distances stay for the next chamfer.
+
+#### Trim
+
+**M**. Click a piece of a curve, or drag across several, to cut it back to the nearest intersections.
+
+#### Extend
+
+**X**. Click near a curve's end to extend it to the next curve.
+
+#### Split
+
+Click a curve where it should be cut in two.
+
+#### Offset
+
+**O**. Select curves, then drag or type the distance; Enter makes the offset.
+
+#### Mirror
+
+Select the mirror line, then each curve to mirror.
+
+#### Linear pattern
+
+Select curves, then set the directions, counts and distances. A click on empty space makes the pattern.
+
+#### Circular pattern
+
+Select curves, then the centre, count and angle. A click on empty space makes the pattern.
+
+#### Transform
+
+Select curves, then drag the arrows and rings to move or rotate them.
+
+#### Use / project edges
+
+**U**. Click model edges or faces to project them into the sketch, linked to the model.
+
+#### Intersection
+
+Click faces or parts to add their intersection with the sketch plane, linked to the model.
+
+#### Insert DXF or DWG
+
+Places the curves of a DXF or DWG file in the sketch.
+
+#### Insert image
+
+Places a picture in the sketch, to trace over.
+
+#### Dimension
+
+**D**. Click one or two curves or points, place the dimension, then type its value.
+
+#### Coincident
+
+**I**. The selected points share one place, or a point lies on a curve.
+
+#### Concentric
+
+**Shift+O**. Circles, arcs and ellipses share a centre.
+
+#### Parallel
+
+**B**. The selected lines are parallel.
+
+#### Tangent
+
+**T**. A curve touches another without crossing it.
+
+#### Horizontal
+
+**H**. Lines, or two points, are horizontal.
+
+#### Vertical
+
+**V**. Lines, or two points, are vertical.
+
+#### Midpoint
+
+**Shift+M**. A point stays at the middle of a line or between two points.
+
+#### Perpendicular
+
+**Shift+L**. Two lines meet at a right angle.
+
+#### Equal
+
+**E**. Lines are of equal length, or circles and arcs of equal radius.
+
+#### Symmetric
+
+**Shift+Q**. Two curves or points are mirrored about a line.
+
+#### Fix
+
+**Shift+J**. A curve or point keeps its place.
+
+#### Normal
+
+**Shift+K**. A line is normal to a curve.
+
+#### Pierce
+
+**Shift+G**. A point lies where a model curve crosses the sketch plane.
+
+#### Curvature
+
+**Shift+U**. Two curves meet with the same curvature.
+
+#### Flow
+
+A spline's end flows along a model face's direction.
+
 ## Versions and workspaces
 
 - **Versions and history** (the clock on the left rail) lists versions, workspaces and every change.

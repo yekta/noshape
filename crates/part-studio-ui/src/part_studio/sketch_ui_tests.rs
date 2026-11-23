@@ -8792,3 +8792,91 @@ fn the_offset_value_box_is_an_opaque_white_box_with_a_thin_caret(cx: &mut TestAp
     draw(cx, window);
     assert_eq!(cx.update(|cx| st.read(cx).value().to_string()), "asdf", "Tab types nothing");
 }
+
+/// qa UIS-DIM-LABEL-TARGET: `{"dimension": …}` is a sketch dimension's label, by its shown text or its value, so a
+/// session can double-click it to edit.
+#[gpui::test]
+fn a_ui_script_dimension_target_is_its_label(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "uis-dim", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, t: serde_json::Value| cx.update(|cx| view.read(cx).ui_target_point(&t, cx));
+    let by_text = at(cx, serde_json::json!({ "dimension": "50 mm" }));
+    let by_value = at(cx, serde_json::json!({ "dimension": "50" }));
+    assert!(by_text.is_ok() && by_text == by_value, "text {by_text:?}, value {by_value:?}");
+    let label = cx.update(|cx| {
+        let v = view.read(cx);
+        let data = v.sketch_data(cx).unwrap();
+        let cid = data.sketch.constraints().find(|c| c.value().is_some()).unwrap().id;
+        let (_, pos, ..) = v.sketch.as_ref().unwrap().dimension_labels(&data, &v.doc.read(cx).session.doc.settings.units).into_iter().find(|l| l.0 == cid).unwrap();
+        let vp = v.viewport.read(cx);
+        let s = vp.project(v.sketch.as_ref().unwrap().frame.to_world(pos)).unwrap();
+        vp.origin() + gpui::point(gpui::px(s.x as f32), gpui::px(s.y as f32))
+    });
+    assert_eq!(by_text.unwrap(), label);
+    assert!(at(cx, serde_json::json!({ "dimension": "51" })).is_err(), "no 51 shown");
+}
+
+/// Live click-empty-plane-1123 (qa FEEL-CLICK-EMPTY-SELECTS-PLANE): in a sketch, a click on empty space inside the
+/// sketch's own plane selects nothing: the selected point is cleared and the plane is not selected.
+#[gpui::test]
+fn a_click_on_empty_sketch_space_selects_nothing(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "click-empty-plane", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape", "escape"]);
+    let end = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let l = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+        d.sketch.endpoints(l).unwrap().1
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.activate_tool(Tool::Select, w, cx);
+            if let Some(ed) = &mut v.sketch {
+                ed.selection = vec![end];
+            }
+            // The own plane under the pointer, as a GPU hover pick would give it.
+            v.hover = Some(Reference::Plane(DatumPlane::Top));
+        })
+    })
+    .unwrap();
+    click(cx, window, &view, (300., 250.));
+    let after = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        (ed.selection.clone(), ed.model_selection.clone())
+    });
+    assert_eq!(after, (vec![], vec![]), "(sketch selection, model selection) after the click");
+}
+
+/// Live shortcuts-1123: F1 in a sketch opens help on the tool that is on, or the last one used (Concentric right after
+/// Shift+O), and on the sketch tools before any.
+#[gpui::test]
+fn f1_in_a_sketch_opens_help_on_the_current_or_last_tool(cx: &mut TestAppContext) {
+    static OPENED: parking_lot::Mutex<Vec<String>> = parking_lot::Mutex::new(Vec::new());
+    noshape_app_core::help::set_opener(|section, _| OPENED.lock().push(section.to_string()));
+    let (window, _view) = sketch_with(cx, "f1-help", Tool::Select);
+    keys(cx, window, &["f1", "l", "f1", "escape", "f1", "shift-o", "escape", "f1"]);
+    assert_eq!(*OPENED.lock(), ["Sketch tools", "Line", "Line", "Concentric"]);
+}
+
+/// Live sketch-tools-1123 text.md: with a new text's dialog open a canvas click starts and commits nothing (the
+/// dialog stays, its field focused again); one Esc closes the dialog, the tool off, nothing kept.
+#[gpui::test]
+fn the_text_dialog_closes_with_one_esc_and_survives_a_canvas_click(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "text-keys", Tool::Text);
+    click(cx, window, &view, (400., 300.));
+    click(cx, window, &view, (500., 340.));
+    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| (ed.text_dialog_open(), ed.tool)));
+    assert_eq!(state(cx), Some((true, Tool::Text)), "the dialog open");
+    click(cx, window, &view, (300., 200.));
+    assert_eq!(state(cx), Some((true, Tool::Text)), "a canvas click keeps it");
+    let focused = cx.update_window(window, |_, w, cx| view.read(cx).ui_ref().and_then(|u| u.opts.get("text.text").cloned()).is_some_and(|st| st.read(cx).focus_handle(cx).is_focused(w))).unwrap();
+    assert!(focused, "the field focused again");
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx), Some((false, Tool::Select)), "one Esc: closed, the tool off");
+    assert!(cx.update(|cx| view.read(cx).sketch_data(cx).is_some_and(|d| d.texts.is_empty())), "nothing kept");
+}

@@ -754,8 +754,9 @@ impl Sketch {
     /// Mirrors entities about line `axis` as Onshape's sketch Mirror (live/feel/mirror.json): each copy tied to its
     /// source by a mirror (symmetric) constraint of its own (a line, an arc, a circle, a spline) and a segment's ends
     /// by one each (Onshape's `.begCons` / `.endCons`; a circle's or an arc's centre, a spline's inner points only
-    /// through its curve's); a point by one; an ellipse by its points and EQUAL. Points on the axis are reused; an entity whose mirror image is already
-    /// there makes nothing.
+    /// through its curve's); a point by one; an ellipse by its points and EQUAL. A point on the axis is copied too, tied by
+    /// its own (live workflows-1122 22 s35: a line ending on the axis, 3 SYMMETRIC); an entity whose mirror image is
+    /// already there makes nothing.
     pub fn mirror(&mut self, ids: &[EntityId], axis: EntityId) -> Result<EditResult> {
         let (a, b) = self.line_pts(axis).ok_or_else(|| SketchError::OperationFailed("mirror axis must be a line".into()))?;
         let tol = self.tool_tol();
@@ -767,8 +768,7 @@ impl Sketch {
         let ids: Vec<EntityId> = ids.iter().copied().filter(|i| *i != axis && !self.has_image(*i, &f, tol)).collect();
         let mut res = EditResult::default();
         let vf = move |v: DVec2| d * (2.0 * v.dot(d)) - v;
-        let on_axis = move |p: DVec2| (p - a).perp_dot(d).abs() <= 4.0 * tol;
-        let (pmap, emap) = self.copy_entities(&ids, &f, &vf, true, &on_axis, &mut res)?;
+        let (pmap, emap) = self.copy_entities(&ids, &f, &vf, true, &|_| false, &mut res)?;
         let curve_pair = |sk: &Sketch, e: EntityId| {
             matches!(sk.kind(e), Some(EntityKind::Line | EntityKind::Arc | EntityKind::Circle | EntityKind::BSpline | EntityKind::FitSpline | EntityKind::Conic))
         };

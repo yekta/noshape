@@ -364,6 +364,37 @@ fn mirror_constrains_each_copy_as_live() {
     assert!(again.created.is_empty() && again.constraints_added.is_empty(), "{again:?}");
 }
 
+/// Live workflows-1122 22 s35: a line ending on the mirror line gets a copy with its own end there, three SYMMETRIC
+/// (the line and both ends) and no COINCIDENT; the sketch solves and the copy follows its source.
+#[test]
+fn mirror_copies_an_end_on_the_axis_too() {
+    let mut sk = Sketch::new();
+    let axis = sk.add_line(v(0.0, -10.0), v(0.0, 30.0));
+    sk.add_constraint(ConstraintKind::Vertical { a: axis, b: None }).unwrap();
+    let l = sk.add_line(v(0.0, 5.0), v(25.0, 5.0));
+    let (s, e) = sk.endpoints(l).unwrap();
+    sk.add_constraint(ConstraintKind::Coincident { a: s, b: axis }).unwrap();
+    sk.add_constraint(ConstraintKind::Horizontal { a: l, b: None }).unwrap();
+    let before = sk.constraints().count();
+    let res = sk.mirror(&[l], axis).unwrap();
+    let copy = res.created.iter().copied().find(|x| sk.kind(*x) == Some(EntityKind::Line)).unwrap();
+    let (cs, ce) = sk.endpoints(copy).unwrap();
+    assert!(cs != s && ce != e, "the copy has its own ends");
+    let added: Vec<&ConstraintKind> = sk.constraints().skip(before).map(|c| &c.kind).collect();
+    assert_eq!(added.len(), 3, "{added:?}");
+    assert!(added.iter().all(|k| matches!(k, ConstraintKind::Symmetric { .. })), "{added:?}");
+    let rep = sk.solve();
+    assert!(rep.is_solved(), "{rep:?}");
+    sk.drag(&[(DragHandle::Point(e), v(20.0, 5.0))]);
+    let pe = sk.point(e).unwrap();
+    assert!(pe.x < 24.0, "the source end moved: {pe:?}");
+    // The axis is only vertical: the drag may slide it, so mirror about where it is.
+    let (a0, _) = sk.endpoints(axis).unwrap();
+    let ax = sk.point(a0).unwrap().x;
+    assert!((sk.point(ce).unwrap() - v(2.0 * ax - pe.x, pe.y)).length() < 1e-6, "{:?} for {pe:?}, axis x {ax}", sk.point(ce));
+    assert!((sk.point(cs).unwrap() - sk.point(s).unwrap()).length() < 1e-6, "{:?}", sk.point(cs));
+}
+
 /// Live's mirrored spline (live/feel/mirror.json, 17-18): one mirror constraint for the curve and one for each end;
 /// its inner fit points and handles held through the curve's. Moving a source fit point moves the copy's.
 #[test]

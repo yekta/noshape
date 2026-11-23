@@ -751,6 +751,11 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     ev.replace_body(first, res.shape, names);
                 }
                 stitch_sheet_pieces(ev, &all[0])?;
+                // Parasolid keeps a sheet manifold: sheets crossing (a hem folded back through a wall) don't join
+                // (live u-hm-long, "Cannot create hem.").
+                if sheets && !make_solid && index(ev, &all[0]).is_some_and(|bi| ev.ctx.bodies[bi].shape.edge_faces().is_ok_and(|m| m.iter().any(|f| f.len() > 2))) {
+                    return Err(super::code_error("BOOLEAN_INVALID"));
+                }
                 if let (Some(side), Some(bi)) = (side, index(ev, &all[0])) {
                     orient_like(ev, bi, side)?;
                 }
@@ -2488,6 +2493,7 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("keepToolSurfaces", ParamValue::Bool(def_bool(&def, "keepToolSurfaces", false)));
     p.set("extendToCompletion", ParamValue::Bool(def_bool(&def, "extendToCompletion", false)));
     let own_existing = def_bool(&def, "ownExistingImprints", false);
+    let extend = def_bool(&def, "extendToCompletion", false);
     if super::trace_ops() {
         eprintln!("[fs op] splitFace targets {:?} tools {:?}", p.query("faceTargets"), p.query("faceTools"));
     }
@@ -2501,7 +2507,10 @@ fn op_split_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         match crate::regen::features::split::split_part(ev) {
             // Owning existing imprints (std Jog splits up front): nothing new
             // to split is fine; the edges already there are this split's.
-            Err(e) if own_existing && e.message == crate::regen::features::split::NO_SPLIT => {}
+            // Extended to completion (std Bend's imprint) nothing split is no
+            // error either: live's Bend off the plate fails on its own check,
+            // "The bend line did not divide the sheet metal into at least two parts."
+            Err(e) if (own_existing || extend) && e.message == crate::regen::features::split::NO_SPLIT => {}
             r => r?,
         }
         // The pieces of the target faces (their snapshot points: uv middle, on the face).

@@ -567,6 +567,34 @@ mod sketch_key_tests {
             assert_eq!(found.first().map(|b| b.action().name()), Some(want), "{key}");
         }
     }
+
+    /// Live's press test in a sketch (shortcuts-1123): ⌃V and ⌘V paste on a Mac, only Ctrl+V on Windows; ⇧E / ⇧W are
+    /// Extrude and Revolve (closing the sketch), ⇧F the sketch fillet; Ctrl+A / ⌘A are unbound; Control-only keys
+    /// stay on ⌃ on a Mac (⌘M, ⌘Space, ⌘arrows do nothing).
+    #[test]
+    fn sketch_keys_follow_lives_press_test() {
+        for mac in [true, false] {
+            let keymap = Keymap::new(key_bindings_for(mac));
+            let stack: Vec<KeyContext> = ["Workspace", "PartStudio Sketch", "FeatureDialog"].iter().map(|n| KeyContext::parse(n).unwrap()).collect();
+            let action = |key: &str| keymap.bindings_for_input(&[Keystroke::parse(key).unwrap()], &stack).0.first().map(|b| b.action().name());
+            assert_eq!(action("ctrl-v"), Some(Paste.name()), "mac {mac}");
+            assert_eq!(action("cmd-v"), mac.then(|| Paste.name()), "mac {mac}");
+            for (key, want) in [
+                ("shift-e", Extrude.name()),
+                ("shift-w", Revolve.name()),
+                ("shift-f", SketchFillet.name()),
+                ("ctrl-m", MateConnectorTool.name()),
+                ("ctrl-space", SwitchRecentTab.name()),
+                ("ctrl-left", RotateLeftFine.name()),
+                ("ctrl-shift-left", PanLeft.name()),
+            ] {
+                assert_eq!(action(key), Some(want), "{key} (mac {mac})");
+            }
+            for key in ["ctrl-a", "cmd-a", "cmd-m", "cmd-space", "cmd-left", "cmd-shift-left", "cmd-u", "f2"] {
+                assert_eq!(action(key), None, "{key} unbound (mac {mac})");
+            }
+        }
+    }
 }
 
 #[cfg(test)]

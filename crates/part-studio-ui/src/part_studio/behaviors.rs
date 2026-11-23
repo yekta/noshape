@@ -664,8 +664,15 @@ pub struct UiState {
     /// whether its field still needs the focus.
     pub sm_edit: Option<(usize, usize)>,
     pub sm_edit_focus: bool,
+    /// The key typed into a selected Bends cell: its editor starts with it, the caret after it (lead 11-23: not live's
+    /// glitch that keeps the first key selected).
+    pub sm_edit_initial: Option<String>,
     /// The selected cell (table, row, column; column 0 selects the row).
     pub sm_cell: Option<(u8, usize, usize)>,
+    /// The pressed cell was already selected: a double-click edits only such a cell (live sm-table-cell-edit-1123).
+    pub sm_cell_held: bool,
+    /// The selected Bends value cell's keyboard focus (typing into it edits), and whether it still needs the focus.
+    pub sm_cell_focus: Option<(FocusHandle, bool)>,
     /// Dynamic suppression editor: feature, expression input.
     /// The Dynamic suppression dialog: what it sets and its input.
     pub dyn_suppression: Option<(DynTarget, Entity<InputState>, Subscription)>,
@@ -1061,7 +1068,10 @@ impl UiState {
             sm_select_other: None,
             sm_edit: None,
             sm_edit_focus: false,
+            sm_edit_initial: None,
             sm_cell: None,
+            sm_cell_held: false,
+            sm_cell_focus: None,
             dyn_suppression: None,
             recent_tools: Vec::new(),
             orient_on_edit: false,

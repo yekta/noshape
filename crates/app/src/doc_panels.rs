@@ -200,7 +200,7 @@ pub(crate) fn markdown(src: &str) -> Div {
     };
     for line in src.lines() {
         let t = line.trim_end();
-        let heading = [("### ", 15.), ("## ", 17.), ("# ", 20.)].into_iter().find(|(m, _)| t.starts_with(m));
+        let heading = [("#### ", 14.), ("### ", 15.), ("## ", 17.), ("# ", 20.)].into_iter().find(|(m, _)| t.starts_with(m));
         let bullet = t.strip_prefix("- ").or_else(|| t.strip_prefix("* "));
         let numbered = t.split_once(". ").filter(|(n, _)| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
         if t.trim().is_empty() {

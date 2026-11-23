@@ -31,7 +31,7 @@ use std::sync::Arc;
 /// NOSHAPE_SNAP_TRACE: log each pointer move's snap in viewport px.
 static SNAP_TRACE: std::sync::LazyLock<bool> = std::sync::LazyLock::new(|| std::env::var_os("NOSHAPE_SNAP_TRACE").is_some());
 
-actions!(sketch_entry, [SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab, SketchDimBoxTab]);
+actions!(sketch_entry, [SketchEntryTab, SketchEntryBackTab, SketchEntryCancel, SketchHintTab, SketchHintBackTab, SketchDimBoxTab, SketchHelp]);
 
 /// Keys of the on-the-fly value box: Tab (the value with its unit,
 /// selected, or the other box), Esc. Alt+arrows do nothing (live).
@@ -46,8 +46,13 @@ pub(super) fn entry_key_bindings() -> Vec<KeyBinding> {
         // With no input open (the hints showing): the other hint (live).
         KeyBinding::new("tab", SketchHintTab, Some("Sketch")),
         KeyBinding::new("shift-tab", SketchHintBackTab, Some("Sketch")),
+        // F1: help on the current or last sketch tool, in a sketch only (live shortcuts-1123).
+        KeyBinding::new("f1", SketchHelp, Some("Sketch")),
     ]
 }
+
+/// The guide's sketch section, F1's page before any tool was used.
+pub(super) const SKETCH_HELP: &str = "Sketch tools";
 
 static BIND_ENTRY_KEYS: std::sync::Once = std::sync::Once::new();
 
@@ -1405,6 +1410,15 @@ impl PartStudioView {
             }
             ViewportEvent::ToolDown { position, modifiers, click_count } => {
                 self.close_dim_menu(cx);
+                // A click on the canvas with a new text's dialog open: nothing starts or commits, the focus goes back
+                // to its field, all selected (live sketch-tools-1123 text.md).
+                if self.sketch.as_ref().is_some_and(|s| s.pending_text.is_some()) {
+                    if let Some(ui) = self.ui_mut() {
+                        ui.text_dialog_focused = false;
+                    }
+                    cx.notify();
+                    return true;
+                }
                 let tool = self.sketch.as_ref().map(|s| s.tool);
                 let overlay_pressed = self.sketch.as_ref().is_some_and(|s| s.pressed_label.is_some() || s.pressed_glyph.is_some());
                 // Live2 "feel (sketch)" (3): Ctrl+click opens the sketch's context menu, as a right-click, for the
@@ -1626,9 +1640,17 @@ impl PartStudioView {
                     ed.drop_onto_external(id);
                 }
                 let model_before = self.sketch.as_ref().map(|ed| ed.model_selection.len());
+                // Held 0.5 s or more, a click selects nothing (live longpress-1122, qa FEEL-SK-LONGPRESS-SELECTS).
+                if self.viewport.read(cx).long_pressed()
+                    && let Some(ed) = &mut self.sketch
+                {
+                    ed.drop_pending_click();
+                }
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
                     self.apply_outcome(out, window, cx);
                 }
+                // A fillet / chamfer made by a drag's release opens its box (live sketch-tools-1123).
+                self.sync_dim_edit(window, cx);
                 self.sync_sketch_dragging(cx);
                 // A plane clicked joins the selection on release: drawn selected.
                 if self.sketch.as_ref().map(|ed| ed.model_selection.len()) != model_before {
@@ -1669,8 +1691,8 @@ impl PartStudioView {
         selection.extend(ed.model_selection.iter().cloned());
         accent.clear();
         // Live (sketch/12): what the Dimension tool measures shows selected
-        // (amber) while the dimension is placed.
-        let tool_picks = if ed.tool == Tool::Dimension { ed.tool_picks() } else { Vec::new() };
+        // (amber) while the dimension is placed, and while its value box is open (workflows-1122 01 s16-19).
+        let tool_picks = if ed.tool == Tool::Dimension { [ed.tool_picks(), ed.dim_box_picks()].concat() } else { Vec::new() };
         selection.extend(tool_picks.iter().map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         accent.extend(ed.lit_picks(data.as_deref()).iter().filter(|e| !tool_picks.contains(e)).map(|e| Reference::SketchEntity { sketch: f, entity: e.0 }));
         let Some(data) = data else { return Vec::new() };
@@ -2663,7 +2685,8 @@ impl PartStudioView {
             return Some(st);
         }
         let text = self.option_text(key);
-        let state = cx.new(|cx| InputState::new(window, cx).default_value(text));
+        // (The Text dialog's field: one Esc closes the dialog, live sketch-tools-1123 text.md.)
+        let state = cx.new(|cx| InputState::new(window, cx).default_value(text).revert_on_escape(key != "text.text"));
         let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => {
                 let t = st.read(cx).value().to_string();
@@ -3336,6 +3359,12 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("sk-text-dialog")
+                .key_context("SketchEntry")
+                // Live sketch-tools-1123 text.md: one Esc closes the dialog, the tool off, nothing kept.
+                .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| {
+                    this.sketch_cancel(cx);
+                    window.focus(&this.focus, cx);
+                }))
                 .absolute()
                 .top(px(3.))
                 .left(px(0.))
@@ -4026,6 +4055,20 @@ impl PartStudioView {
             out.push(PlacedDimension { cid, at: (x, y), anchor, text, driving, configured: is_configured });
         }
         out
+    }
+
+    /// Where the shown dimension label `want` is (viewport px), by its text ("25 mm") or value ("25", "R 5"): the
+    /// ui-session `{"dimension": …}` target.
+    pub(super) fn dimension_label_at(&self, want: &str, cx: &App) -> Result<(f32, f32), String> {
+        let data = self.sketch_data(cx).ok_or("not in a sketch")?;
+        let labels = self.placed_dimension_labels(&data, cx);
+        let number = |s: &str| s.trim_start_matches(|c: char| !(c.is_ascii_digit() || c == '-' || c == '.')).split_whitespace().next().and_then(|n| n.parse::<f64>().ok());
+        let want = want.trim();
+        let found = labels.iter().find(|d| d.text == want).or_else(|| {
+            let w = number(want)?;
+            labels.iter().find(|d| number(&d.text).is_some_and(|n| (n - w).abs() < 1e-9))
+        });
+        found.map(|d| d.at).ok_or_else(|| format!("no dimension {want} shown (shown: {:?})", labels.iter().map(|d| d.text.as_str()).collect::<Vec<_>>()))
     }
 
     /// The sketch frame's name ("Sketch 1", light blue, top-left inside) as
@@ -6112,6 +6155,10 @@ impl PartStudioView {
             // the active box, nothing applied (live).
             .on_action(cx.listener(|this, _: &SketchHintTab, _, cx| this.otf_hint_tab(1, cx)))
             .on_action(cx.listener(|this, _: &SketchHintBackTab, _, cx| this.otf_hint_tab(-1, cx)))
+            .on_action(cx.listener(|this, _: &SketchHelp, _, cx| {
+                let tool = this.sketch.as_ref().and_then(|ed| if ed.tool == Tool::Select { ed.last_tool } else { Some(ed.tool) });
+                noshape_app_core::help::open(tool.map_or(SKETCH_HELP, Tool::help_title), cx);
+            }))
             .capture_action(cx.listener(|this, _: &crate::actions::DialogTabPrev, _, cx| this.otf_hint_tab(-1, cx)))
             .capture_action(cx.listener(|this, _: &ClearSelection, _, cx| {
                 if let Some(ed) = &mut this.sketch {

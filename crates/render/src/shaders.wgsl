@@ -64,6 +64,7 @@ const BAND: u32 = 2048u;
 const PICKED: u32 = 4096u;
 const INSTANCE: u32 = 8192u;
 const LINED: u32 = 16384u;
+const FILLED: u32 = 32768u;
 // Entity of a hovered dialog selection row (Onshape, live: #f2ff80).
 const QUERY_COLOR: vec3<f32> = vec3<f32>(0.888, 1.0, 0.216);
 
@@ -424,6 +425,8 @@ fn mesh_shade(i: MeshOut, front: bool, st: u32) -> vec4<f32> {
     }
     // A light selection tint over the shading, mixed in sRGB (state TINT).
     if ((st & TINT) != 0u) { c = srgb_to_linear(mix(linear_to_srgb(c), linear_to_srgb(g.select.rgb), 0.2)); }
+    // A table row's lit face: flat in the hover colour (state FILLED).
+    if ((st & (HOVER | FILLED)) == (HOVER | FILLED)) { c = g.hover.rgb; }
     // Back faces revealed by a section cut are tinted so cut solids read well (not the planes and their names: live
     // workflow 28 keeps them blue).
     if (!front && !unlit && g.flags.x != 0u) { c = mix(c, g.accent.rgb * 0.5, 0.5); }

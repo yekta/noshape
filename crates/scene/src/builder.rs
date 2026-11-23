@@ -587,6 +587,8 @@ pub struct BuiltScene {
     pub decals: Vec<(usize, Reference, FeatureId)>,
     /// The first pick id of the edges a preview consumed ([`add_consumed_edge_picks`]); every pick from it on is one.
     pub consumed_from: u32,
+    /// The Origin glyph's instances (its pickable copy and its on-top one).
+    pub origin_glyphs: Vec<usize>,
 }
 
 impl BuiltScene {
@@ -999,12 +1001,14 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     }
 
     // ---------------------------------------------------------------- origin
+    let mut origin_glyphs = Vec::new();
     if opts.show_origin && display.show_origin {
         let id = picks.push(PickTarget { reference: Reference::Origin, kind: PickKind::Origin, anchor: Some(DVec3::ZERO) });
         // Onshape draws the origin as an 11 px ring with a center dot (point style 4), over everything: the edge-on
         // planes crossing it while sketching (live sketch/06), a part through it or in front (live workflows 21, 37).
         // Only where it shows does it take the pointer: the on-top copy (lit with it) is out of the pick pass.
         let glyph = |pick_id: u32, style: u32| PointData { points: vec![PointSprite { position: [0.0; 3], color: theme::rgb8(theme::pick(theme::viewport::ORIGIN, theme::viewport_dark::ORIGIN)), pick_id, size: 11.0, style, _pad: 0 }] };
+        origin_glyphs = vec![scene.instances.len(), scene.instances.len() + 1];
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&glyph(id, 4)))).per_primitive_color().ignore_clip().layer(6));
         scene.instances.push(Instance::new(Drawable::Points(up.upload_points(&glyph(id, 4 | LineSegment::ON_TOP)))).per_primitive_color().unpickable().ignore_clip().layer(6));
     }
@@ -1207,7 +1211,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     }
     let static_instances = scene.instances.len();
     scene.states = vec![0; picks.len() + 1];
-    BuiltScene { scene, picks, static_instances, decals: decal_instances, consumed_from: u32::MAX }
+    BuiltScene { scene, picks, static_instances, decals: decal_instances, consumed_from: u32::MAX, origin_glyphs }
 }
 
 /// While a dialog previews: the edges of `base` (the model before the feature) the preview no longer has, as pick-only
@@ -1606,6 +1610,11 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
         let hovered = (curves_hovered && matches!(r, Reference::SketchEntity { .. })) || (faces_hovered && matches!(r, Reference::Face(_)));
         let lit = if hovered { state::HOVER } else { state::ACCENT };
         mark(r, lit, &mut scene);
+        if faces_hovered && matches!(r, Reference::Face(_)) {
+            for &id in built.picks.ids_for(r) {
+                scene.add_flag(id, state::FILLED);
+            }
+        }
     }
     // A whole selected part: Onshape's lighter part amber (live #c09039 …
     // #f0b850, part-studio/09), not a selected face's. In a dialog its band, also while the feature fails (live
@@ -2332,6 +2341,11 @@ const MARK_POINT_PX: f64 = 6.0;
 const MARK_MIDPOINT_PX: f64 = 3.5;
 
 impl InferenceMarks {
+    /// Whether a mark sits at `p` (its white disc covers the Origin glyph there, live mc-infer-1122 r6 ps-frontc).
+    pub fn marks_at(&self, p: DVec3) -> bool {
+        self.marks.iter().any(|m| m.origin.distance(p) <= 1e-9)
+    }
+
     /// `points`: each point's mark (an `(origin, x, z)` a plain point's); `chosen` the one under the pointer.
     pub fn new<P: Into<InferenceMark>>(points: impl IntoIterator<Item = P>, chosen: Option<usize>) -> Arc<Self> {
         let mut marks = Vec::new();

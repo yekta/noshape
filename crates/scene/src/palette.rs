@@ -19,8 +19,9 @@ pub mod viewport {
     /// A dialog chip's entity while the chip is hovered (live qa4 round 5
     /// s7, CHIP-HOVER: the query-hover yellow-green).
     pub const QUERY_HOVER: u32 = 0xf2ff80;
-    /// The Mirror tool's picked line (live workflows-1122 22 s34).
-    pub const MIRROR_LINE: u32 = 0xbdc764;
+    /// The Mirror tool's picked line: the query yellow-green (live sketch-tools-1123 mirror-pattern.md, sampled on a bare
+    /// line: (242,255,128), 2 px; workflows-1122 22 s34 had read (189,199,100)).
+    pub const MIRROR_LINE: u32 = 0xf2ff80;
     /// A spline's handle line (live sketch/100–101); its tip is drawn in the point's colour (live 2221).
     pub const SKETCH_HANDLE_LINE: u32 = 0x808080;
     /// Selection (`ENTITY_HIGHLIGHT_COLOR_BORDER`).

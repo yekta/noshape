@@ -1,32 +1,36 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-22 23:01 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-23 05:56 UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NEXT (23:0x)
-- LANDED today: d2b509fc, e0fc1afc, 4179663c (651dc0fa), 37df74ed (42727e6e: SM cells, joint lights, Trim S4,
-  query_entities sketches). Rebased on origin/main 23:00; local unlanded: 35b3fe17a + da3069b02 (handoffs).
-- IN PROGRESS, UNCOMMITTED (5 files): SM-TAB-MERGE-PICK (P1) + SM-TABLE-SPLIT-KEPT (P2) + TICKETS (13 lines of
-  union-merge duplicate rows dropped: BEND-LIT-LOOK, JOINT-LIT, CELL-EDIT, LENGTH-LABEL, BEND-FACE-PICKED, HEM-NAME,
-  USE-VERTEX, FORM-REMEMBERED; each duplicated a fixed/verified row).
-  * TAB-MERGE: the click (30,35,2) sits ~1 px above Flange 1's inner top edge; live lit the OUTER face. Ours took the
-    plate top, then (muted) the wall's inner face via back-face slivers in the pick buffer. Fix: behaviors.rs
-    sync_pick_filter (sm dialog + face-only field mutes side faces; while previewing, faces of a held wall the preview
-    changed are muted); renderer.rs mesh_pick_closed (cull Back), pick pass draws opaque_runs (Closed -> culled), no
-    reorder in pick. Test sm_feel_tests a_tabs_merge_click_on_the_walls_top_edge_takes_the_wall.
-  * SPLIT-KEPT: sheet_metal_panel.rs stores the tables' height in px (sheet_metal_tables_px.txt, was a share in
-    sheet_metal_split.txt), default 50 %, flex_shrink so a short window keeps the flat's 210 px; dragged_split +
-    unit test a_dragged_split_is_kept_in_px (no GPUI test: the config dir is shared by the lib's tests).
-  * Run b7wgn2vlu (vibex8 slot, queued behind bool's release gates at 22:58): ~/tmp/skasm/tm.sh (clippy render+psui,
-    the tab test, render tests, full psui lib), log /root/skasm-scratch/tm-run.log (tail only). Green -> commit
-    "skasm: ...", TICKETS both fixed (to verify), land. The renderer change touches every pick: tell psui in the report.
-- c2-constrained-surface parity pair NOT run: rb.sh bash -c '~/bin/slot bash ~/tmp/skasm/ut3t.sh c2-constrained-surface'
-  run_in_background timeout >= 60 min.
-- JOINT-LIT list above the cell: live's capture had a 358 px pane (a kept drag). Wait for qa's replay at 50 %; if live
-  still opens above, the os dropdown needs the tables pane as its bounds (app-core, ask psui).
-- Trim: live's tinted core (curve ~1/3 over the band) not drawn (sketch mode has no curve states); minor.
-- Report to lead at queue empty (<=5 lines). Context: never cat task output files or logs whole; tail -40 / grep.
-
+## NOW (06:11 UTC 11-23) — read first
+- P0 Offset box (user): ef72904e6 QUEUED alone (CHECKING since 06:09 in a batch of 4); lead cherry-picks it into
+  release/v0.4.68. Cause: the box copied the on-the-fly box style (transparent, blue line); the "black block" was a typed
+  Tab drawn as a missing glyph. Fix: white box + #ccc border + blue line, red on non-distance text; one-line fields drop
+  control-char text (vendor/gpui-base state.rs). Test the_offset_value_box_is_an_opaque_white_box_with_a_thin_caret.
+- BATCH COMMITTED, NOT QUEUED: 905844ae3-amended HEAD "skasm: sketch tools while drawing as live (sketch-tools-1123)..."
+  on top of ef72904e6 (backup branch skasm-wip2 = pre-squash). Tested (tm14): clippy 0 scene/psui, scene 222 ok, psui
+  matrix/text/offset/sm-flange serial ok; tm12 full psui 519/521 (the 2 = fillet-drag row, fixed since: oblique test
+  view made 28 px a too-big radius; and an sm GPU pixel test flaky in parallel). NEXT: once ef72904e6 LANDED (lead says),
+  `NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh < /dev/null` (rebase drops the landed patch); diff --stat first.
+  If ef72904e6 FAILS: fix forward on it first.
+- qa SKT P0s (TICKETS top; evidence /root/qa-scratch/tickets/SKT-*-1123.png; qa ran on main, without this batch):
+  in the batch: FILLET-DRAG, FILLET-PENDING-SET (2nd corner preview, Esc drops all), ENDINGS-COMMIT (Offset tool off,
+  slot Esc, CA double-click at start), DASHDOT (30/6/4/6 px, CA circle), TEXT-KEYS (one Esc closes + tool off, canvas
+  click refocuses). OPEN: TEXT Enter = new line (needs TextareaState for "text.text" + multi-line text geometry);
+  CHAMFER-BOX-B (open_next_value_box exists; verify after land + stored structure: live point + 2 construction lines +
+  chamfer line); two-line fillet pick amber; then the P1 SKT rows (INFER-STORED, VB-PLACE-LENGTH, MENU-HEAD,
+  PATTERN-DESELECT, MIRROR-AGAIN, TANGENT-ARC-DOT).
+- P1 rings (lead, from blend): c2-rings-loft "Extruded ring" Ø20.5→21.32. CAUSE FOUND: arcs wZIh/MirrorCS (R3.137) are
+  under-defined (ends on the trimmed ellipse + mirror only). Ours: r 3.0703, c (-6.0062,14.0286), s (-7.7781,11.5212),
+  e (-2.9445,14.2577) → 980.743. Live: r 3.1374 kept, c (-6.0539,14.2168), s (-7.731,11.5653), e (-2.9169,14.2652) →
+  989.99 (area check by /tmp script reproduces both). Tried metrics, none = live: radius-kept min point movement (979.19),
+  centre+angles, centre+ellipse params. Our arc = centre + 2 points (no radius param), min-norm weighted step. Next: ask
+  live for a simple capture (one free arc with ends on a resized circle/ellipse) to learn DCM's rule; then a radius aux
+  param + weights in crates/sketch/src/solver.rs. Probe test: /root/skasm-scratch/rings-edit-probe.patch (ops parity T2;
+  run: tmrings.sh on vibex6). Report this to lead (not yet sent).
+- Skipped (report): Tab mid-draw = browser focus artefact. DECISION NEEDED (lead): duplicate Use / Mirror copies.
+- Later: bend-twice naming, ERR-SM-FILTER-FACE, FEEL-MC-PS-MARKER-REACH (asm), c2-constrained-surface pair.
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
   Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =

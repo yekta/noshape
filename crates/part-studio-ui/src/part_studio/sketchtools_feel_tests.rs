@@ -359,16 +359,37 @@ fn rows() -> Vec<Row> {
             keys(cx, window, &["escape"]);
             expect((after_click, arcs(cx)), (0, 0), "arcs after the click, after Esc")
         } },
-        Row { id: "fillet / a drag from the corner creates it", live: "pressing on the corner and dragging: on release the fillet is created (an arc, two tangents, a radius) and its radius box opens", gap: false, check: |cx| {
+        Row { id: "fillet / a drag from the corner creates it", live: "pressing on the corner and dragging: the radius follows the pointer, on release the fillet is created at it (an arc, two tangents, a radius) and its radius box opens (live sketch-tools-1123)", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-fillet-drag", Tool::Line);
             for at in [(400., 300.), (500., 300.), (500., 400.)] {
                 click(cx, window, &view, at);
             }
             keys(cx, window, &["escape"]);
             keys(cx, window, &["shift-f"]);
-            drag(cx, window, &view, (500., 300.), (480., 320.), 6);
+            let st = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| format!("tool {:?} pending {} sel {} msg {:?}", ed.tool, ed.corner_pending(), ed.selection.len(), ed.message)));
+            let ev = |cx: &mut TestAppContext, ev: ViewportEvent| {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ev, w, cx);
+                }))
+                .unwrap();
+                draw(cx, window);
+            };
+            let at = |x: f64, y: f64| glam::DVec2::new(x, y);
+            ev(cx, ViewportEvent::PointerMove { position: at(500., 300.), modifiers: Modifiers::default() });
+            ev(cx, ViewportEvent::ToolDown { position: at(500., 300.), modifiers: Modifiers::default(), click_count: 1 });
+            let pressed = st(cx);
+            // (A short drag in: the test's view is oblique, 28 px there is a radius the corner can't take, red, as live.)
+            for k in 1..=6 {
+                let t = k as f64 / 6.0;
+                ev(cx, ViewportEvent::ToolDrag { position: at(500. - 4. * t, 300. + 4. * t) });
+            }
+            let dragged = st(cx);
+            ev(cx, ViewportEvent::ToolUp { position: at(496., 304.), modifiers: Modifiers::default() });
             let arcs = cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Arc).count()));
-            expect(arcs, 1, "arcs after the drag")
+            expect(arcs, 1, &format!("arcs after the drag (pressed: {pressed:?}; dragged: {dragged:?})"))?;
+            let boxed = cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.dim_edit.is_some()) && view.read(cx).dim_input.is_some());
+            expect(boxed, true, "the radius box open after the release")
         } },
         Row { id: "fillet / Shift+F", live: "the sketch fillet's key", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-fillet", Tool::Select);

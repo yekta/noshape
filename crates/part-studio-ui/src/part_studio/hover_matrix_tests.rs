@@ -1901,6 +1901,18 @@ fn a_vertex_reached_from_its_face_keeps_the_connector_glyph(cx: &mut TestAppCont
     hover(cx, None);
     assert!(hover(cx, Some((&top, K::Face))), "on the face");
     assert!(hover(cx, Some((&corner, K::Vertex))), "reached across the face: the glyph kept on the vertex");
+    // Live mc-infer-1122 r6 ps-frontc (qa FEEL-MC-PS-ORIGIN-CORNER-MARKER): the front face's corner mark on the Origin
+    // covers the Origin's glyph; the top face's marks don't reach it.
+    let front = cx.update(|cx| {
+        let b = &m.view.read(cx).display.bodies[0];
+        let on = |&(first, count): &(u32, u32)| b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| b.mesh.positions[k as usize][1].abs() < 1e-6);
+        b.face_refs.iter().zip(&b.mesh.face_ranges).find(|(_, r)| on(r)).map(|(r, _)| r.clone()).expect("the front face")
+    });
+    hover(cx, Some((&top, K::Face)));
+    assert!(!cx.update(|cx| m.view.read(cx).origin_marked(cx)), "the top face: the Origin shown");
+    hover(cx, Some((&front, K::Face)));
+    assert!(cx.update(|cx| m.view.read(cx).origin_marked(cx)), "the front face: its corner mark on the Origin");
+    assert_eq!(cx.update(|cx| m.view.read(cx).built.as_ref().map(|b| b.origin_glyphs.len())), Some(2), "the Origin's two glyph instances");
 }
 
 // Live mc-infer-1122, the Part Studio Mate connector feature (Part 1 block, Part 2 cylinder): Shift keeps the hovered face

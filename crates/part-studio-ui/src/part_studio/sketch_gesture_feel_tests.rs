@@ -174,3 +174,33 @@ fn backtick_on_a_clicked_sketch_line_opens_select_other_by_the_pointer(cx: &mut 
     assert!(anchor.distance(at) < 3.0, "by the pointer {at:?}: {anchor:?}");
     assert_eq!(rows.first().map(String::as_str), Some("Edge of Sketch 1"), "the line first: {rows:?}");
 }
+
+/// Live longpress-1122 (qa FEEL-SK-LONGPRESS-SELECTS): in a sketch as in the Part Studio, a release selects the line
+/// only when the press was held under ~0.5 s.
+#[gpui::test]
+fn a_long_press_on_a_sketch_line_selects_nothing(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = rectangle_and_circle(cx, "sketch-gesture-long-press");
+    let (lines, _) = shapes(cx, &view);
+    let (line, a, b) = lines[0];
+    let at = (a + b) * 0.5;
+    let pointer = Pointer::new(cx, window, &view);
+    let clock = std::rc::Rc::new(std::cell::Cell::new(cx.update(|cx| pointer.vp.read(cx).now())));
+    let c = clock.clone();
+    cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_clock(move || c.get())));
+    let hold = |cx: &mut TestAppContext, ms: u64| {
+        select_only(cx, &view, &[]);
+        pointer.move_to(cx, &view, at);
+        let win = pointer.window_point(cx, at);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_mouse_down(win, gpui_kit::MouseButton::Left, Modifiers::default());
+        clock.set(clock.get() + std::time::Duration::from_millis(ms));
+        vcx.simulate_mouse_up(win, gpui_kit::MouseButton::Left, Modifiers::default());
+        pointer.settle(cx, &view);
+        selected(cx, &view)
+    };
+    assert_eq!(hold(cx, 460), vec![line], "held 460 ms: selected");
+    assert_eq!(hold(cx, 600), Vec::<u32>::new(), "held 600 ms: nothing");
+    assert_eq!(hold(cx, 4000), Vec::<u32>::new(), "held 4 s: nothing");
+}

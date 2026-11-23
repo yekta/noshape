@@ -781,6 +781,9 @@ pub mod state {
     /// #ffc685 or #FFC20E line over the instance's amber). On a selected edge: it bounds a selected face, whose
     /// boundary line covers its band's core (one solid band).
     pub const LINED: u32 = 16384;
+    /// With HOVER on faces: filled flat in the hover colour (a Sheet metal table row's bend or rip, live workflows-1123
+    /// 02 s19: the band #FFC685), where a face hovered in the graphics keeps its shading and is outlined.
+    pub const FILLED: u32 = 32768;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

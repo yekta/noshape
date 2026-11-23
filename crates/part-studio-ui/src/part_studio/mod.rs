@@ -1676,6 +1676,16 @@ impl PartStudioView {
         if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
+        // A mate connector's mark on the Origin covers its glyph (live mc-infer-1122 r6 ps-frontc, qa
+        // FEEL-MC-PS-ORIGIN-CORNER-MARKER): the glyph is drawn over everything, so it goes.
+        if self.origin_marked(cx) {
+            let none = self.gpu.uploader().upload_points(&noshape_render::PointData::default());
+            for &i in &built.origin_glyphs {
+                if let Some(inst) = scene.instances.get_mut(i) {
+                    inst.drawable = noshape_render::Drawable::Points(none.clone());
+                }
+            }
+        }
         self.ghost_outline_only(&mut scene, built, &selection);
         // A face hovered under a preview lights its edges of the model before the feature: the edges the preview made
         // (a Fillet's tangent lines) stay plain (live hover-matrix-recheck-1123 cell 4: the dark tangent line 3 px over
@@ -1701,6 +1711,11 @@ impl PartStudioView {
         {
             for e in ed.inference_lit(&data.sketch) {
                 for &id in built.picks.ids_for(&Reference::SketchEntity { sketch: ed.feature, entity: e.0 }) {
+                    scene.add_flag(id, noshape_render::state::HOVER);
+                }
+            }
+            if ed.inference_lights_origin(&data.sketch) {
+                for &id in built.picks.ids_for(&Reference::Origin) {
                     scene.add_flag(id, noshape_render::state::HOVER);
                 }
             }

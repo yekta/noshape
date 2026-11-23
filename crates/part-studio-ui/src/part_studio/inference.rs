@@ -101,6 +101,12 @@ impl PartStudioView {
         true
     }
 
+    /// Whether a mark sits on the Origin: its disc covers the Origin's glyph, which goes (live mc-infer-1122 r6
+    /// ps-frontc).
+    pub(super) fn origin_marked(&self, cx: &App) -> bool {
+        self.inference_marks().filter(|_| self.inference_applies(cx)).is_some_and(|m| m.marks_at(glam::DVec3::ZERO))
+    }
+
     /// The marks to draw (with the camera's other glyphs).
     pub(super) fn inference_marks(&self) -> Option<Arc<scene_builder::InferenceMarks>> {
         self.ui.inference.as_ref()?.marks.clone()

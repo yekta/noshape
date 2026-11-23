@@ -66,7 +66,7 @@ impl Pointer {
         self.settle(cx, view);
     }
 
-    fn settle(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
+    pub(super) fn settle(&self, cx: &mut TestAppContext, view: &Entity<PartStudioView>) {
         let t = std::time::Instant::now();
         self.frames(cx, view);
         while cx.update(|cx| view.read(cx).ui.scene_task.is_some() || self.vp.read(cx).pick_pending() || self.vp.read(cx).hover_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {

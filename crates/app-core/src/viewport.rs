@@ -970,6 +970,11 @@ impl Viewport {
         (self.clock)().saturating_duration_since(self.press_at)
     }
 
+    /// The left press being released was held long enough to select nothing (`long_press_cancels`).
+    pub fn long_pressed(&self) -> bool {
+        self.long_press_cancels.is_some_and(|d| self.press_held() >= d)
+    }
+
     pub fn box_drag(&self) -> bool {
         self.drag == Drag::Box
     }
@@ -2920,7 +2925,7 @@ impl Viewport {
             // 3, every platform): a Ctrl+click opens the context menu on
             // release and leaves the selection as it is.
             Drag::Pending(MouseButton::Left) if e.modifiers.control => self.context_menu_at(p, e.position, cx),
-            Drag::Pending(MouseButton::Left) if self.long_press_cancels.is_some_and(|d| self.press_held() >= d) => {}
+            Drag::Pending(MouseButton::Left) if self.long_pressed() => {}
             Drag::Pending(MouseButton::Left) => self.click_at(p, e.modifiers, e.click_count, cx),
             Drag::Pending(MouseButton::Right) if menu => self.context_menu_at(p, e.position, cx),
             Drag::Box => {

@@ -448,11 +448,16 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             // Started on it off the midpoint, or from its end as a chain: Vertical, as on a free one (live
             // sketch-tools-1119, the 11-19 trim retakes, sketch-line-chain).
             let px = r / SNAP_RADIUS_PX;
+            // Live perp-reach-vertical-1123: off a held vertical line, from 9 px out to its exact midpoint, a
+            // horizontal line stays Horizontal; only a vertical line takes Perpendicular (to a held horizontal one).
             let square_near = |horizontal: bool| {
+                if horizontal {
+                    return None;
+                }
                 sk.entities().map(|e| e.id).find(|&w| {
                     let Some(Curve2::Line { a: la, b: lb }) = sk.curve(w) else { return false };
                     let t = (lb - la).normalize_or_zero();
-                    if excluded(sk, ctx, w) || !(if horizontal { t.y.abs() > 1.0 - 1e-12 } else { t.x.abs() > 1.0 - 1e-12 }) || !direction_held(sk, w) {
+                    if excluded(sk, ctx, w) || t.x.abs() <= 1.0 - 1e-12 || !direction_held(sk, w) {
                         return false;
                     }
                     let on = 1e-9 * (1.0 + a.length());
@@ -672,6 +677,18 @@ mod tests {
         ] {
             assert_eq!(up(x, y), kind, "{take}");
         }
+        // Live workflows-1122 22 s10: across a held vertical line, started 15.5 px off it and 27.7 px off its
+        // midpoint: Horizontal.
+        let mut sk = Sketch::new();
+        let held = sk.add_line(v(0.0, -40.0), v(0.0, 120.0));
+        sk.add_constraint(ConstraintKind::Vertical { a: held, b: None }).unwrap();
+        let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(-15.5, 22.0)), snap_radius: 7.5, woken: vec![held], ..Default::default() };
+        let r = infer(&sk, v(100.0, 22.01), &ctx).into_iter().next().unwrap();
+        assert_eq!((r.kind, r.constraints), (InferenceKind::Horizontal, vec![AutoConstraint::HorizontalLine]));
+        // From its exact midpoint too (live perp-reach-vertical-1123 "mid": MIDPOINT + HORIZONTAL).
+        let ctx = InferenceContext { anchor: Some(v(0.0, 40.0)), ..ctx };
+        let r = infer(&sk, v(100.0, 40.01), &ctx).into_iter().next().unwrap();
+        assert_eq!((r.kind, r.constraints), (InferenceKind::Horizontal, vec![AutoConstraint::HorizontalLine]));
     }
 
     #[test]

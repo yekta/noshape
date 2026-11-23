@@ -47,6 +47,23 @@ impl Sm {
         Ok(())
     }
 
+    fn double_click(&self, cx: &mut TestAppContext, sel: &str) -> Result<(), String> {
+        let at = self.bounds(cx, sel).ok_or(format!("no {sel}"))?.center();
+        let mut vcx = gpui_kit::VisualTestContext::from_window(self.window, cx);
+        vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
+        for n in [1, 2] {
+            vcx.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: NONE, click_count: n, first_mouse: false });
+            vcx.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: NONE, click_count: n });
+        }
+        self.frames(cx);
+        Ok(())
+    }
+
+    /// The Bends cell editor's text and selected range.
+    fn editor(&self, cx: &mut TestAppContext, row: usize, col: usize) -> Option<(String, std::ops::Range<usize>)> {
+        cx.update(|cx| self.view.read(cx).panel_inputs.get(&format!("sm-edit-{row}-{col}")).map(|(st, _)| (st.read(cx).value().to_string(), st.read(cx).selected_range())))
+    }
+
     fn keys(&self, cx: &mut TestAppContext, keys: &str) {
         gpui_kit::VisualTestContext::from_window(self.window, cx).simulate_keystrokes(keys);
         self.frames(cx);
@@ -100,6 +117,26 @@ fn rows() -> Vec<Row> {
             s.press(cx, "sm-cell-0-0-2", MouseButton::Left)?;
             s.keys(cx, "enter");
             expect(cx.update(|cx| s.view.read(cx).ui.sm_edit), Some((0, 2)), "editing")
+        } },
+        Row { id: "table / a double-click on an unselected Radius cell only selects it", live: "the blue box, no editor (live sm-table-cell-edit-1123 a)", gap: false, check: |s, cx| {
+            s.double_click(cx, "sm-cell-0-0-2")?;
+            let got = cx.update(|cx| (s.view.read(cx).ui.sm_edit, s.view.read(cx).ui.sm_cell));
+            expect(got, (None, Some((0, 0, 2))), "(editing, selected cell)")
+        } },
+        Row { id: "table / a double-click on the selected Radius cell edits it", live: "the editor with '2 mm' all selected; a second single click doesn't edit (live sm-table-cell-edit-1123 b)", gap: false, check: |s, cx| {
+            s.press(cx, "sm-cell-0-0-2", MouseButton::Left)?;
+            s.press(cx, "sm-cell-0-0-2", MouseButton::Left)?;
+            expect(cx.update(|cx| s.view.read(cx).ui.sm_edit), None, "editing after a second single click")?;
+            s.double_click(cx, "sm-cell-0-0-2")?;
+            expect(cx.update(|cx| s.view.read(cx).ui.sm_edit), Some((0, 2)), "editing after the double-click")?;
+            expect(s.editor(cx, 0, 2), Some(("2 mm".to_string(), 0..4)), "the editor's text and selection")
+        } },
+        Row { id: "table / typing into a selected Radius cell edits it", live: "the editor starts with the typed key (live keeps that key selected, so 45 gives 5: lead 11-23, a table takes 45)", gap: false, check: |s, cx| {
+            s.press(cx, "sm-cell-0-0-2", MouseButton::Left)?;
+            // (A typed key carries its text, as the platform's.)
+            s.keys(cx, "4->4");
+            s.keys(cx, "5->5");
+            expect(s.editor(cx, 0, 2).map(|e| e.0), Some("45".to_string()), "the editor's text")
         } },
         Row { id: "table / a Radius edit adds Modify joint 1 at the end", live: "typing 4 + Enter: 'Modify joint 1' added at the end of the list", gap: false, check: |s, cx| {
             s.press(cx, "sm-cell-0-0-2", MouseButton::Left)?;
@@ -160,15 +197,9 @@ fn rows() -> Vec<Row> {
             let flat = cx.update(|cx| s.view.read(cx).flat_view.as_ref().map(|f| f.read(cx).joint_edges().len())).ok_or("no flat view")?;
             expect((!lit.is_empty() && lit.iter().all(|r| matches!(r, Reference::Face(_))), flat > 0), (true, true), "(the rip's faces lit in 3D, its edges on the flat)")
         } },
-        Row { id: "table / Enter in a Radius cell moves the box down", live: "double-click Bend A's Radius, select all, 4, Enter: the box (2 px #1651b0) moves to Bend B's Radius, not editing, and no bend stays lit (live workflows-1123 02 s19-23)", gap: false, check: |s, cx| {
-            let at = s.bounds(cx, "sm-cell-0-0-2").ok_or("no Radius cell")?.center();
-            let mut vcx = gpui_kit::VisualTestContext::from_window(s.window, cx);
-            vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: NONE });
-            for n in [1, 2] {
-                vcx.simulate_event(MouseDownEvent { button: MouseButton::Left, position: at, modifiers: NONE, click_count: n, first_mouse: false });
-                vcx.simulate_event(MouseUpEvent { button: MouseButton::Left, position: at, modifiers: NONE, click_count: n });
-            }
-            s.frames(cx);
+        Row { id: "table / Enter in a Radius cell moves the box down", live: "select Bend A's Radius, double-click it, select all, 4, Enter: the box (2 px #1651b0) moves to Bend B's Radius, not editing, and no bend stays lit (live workflows-1123 02 s19-23)", gap: false, check: |s, cx| {
+            s.press(cx, "sm-cell-0-0-2", MouseButton::Left)?;
+            s.double_click(cx, "sm-cell-0-0-2")?;
             if cx.update(|cx| s.view.read(cx).ui.sm_edit) != Some((0, 2)) {
                 return Err("no editor after the double-click".into());
             }
@@ -201,6 +232,10 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| (s.view.read(cx).ui.sm_joint_open, crate::os_ui::dropdown_open("sm-joint-style-0", cx)));
             if !(!lit.1.is_empty() && lit.1.iter().all(|r| matches!(r, Reference::Face(_))) && flat > 0) {
                 return Err(format!("on the list: hover {:?}, lit {:?}, flat edges {flat}, open {open:?}", lit.0, lit.1.len()));
+            }
+            // The cell under the open list: an empty blue box (live workflows-1123 03 s23).
+            if s.bounds(cx, "sm-joint-style-box-0").is_none() {
+                return Err("the Style cell under its open list is no blue box".into());
             }
             Ok(())
         } },
