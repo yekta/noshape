@@ -576,7 +576,7 @@ mod tests {
             { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
             { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
         ], "assembly": { "instances": [{ "part": "Part 1" }, { "part": "Part 1", "at": [0, 0, 10] }, { "part": "Part 1", "fixed": true }] } });
-        let dir = std::env::temp_dir().join(format!("noshape-uip-asm-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("noshape-uip-asm-place-{}", std::process::id()));
         let mut ctx = Ctx::new();
         build_start(&mut ctx, &dir.join("instances.noshape"), &start).unwrap();
         let l = call(&mut ctx, "assembly_list", json!({})).unwrap();
