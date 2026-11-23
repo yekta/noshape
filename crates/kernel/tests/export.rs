@@ -2240,8 +2240,9 @@ fn a_step_surface_models_closed_shell_reads_as_a_solid() {
 /// outer walls, approximated as non-rational degree-12 single-span B-surfaces) won't go round periodic, and Parasolid
 /// dropped the hoses whose walls were written so (live 2452, 2975). Written as live writes its own hose, offsets of the
 /// periodic outer walls (OFFSET_SURF), every face whole: 12 faces read back (before, the one stiff seam had every
-/// closed face split in two: 22 / 44 / 24); live imports the four hoses so (3054). Only its tolerant end rings are cut
-/// (10-20 nm off their walls), the others kept whole (before, one tolerant ring had all twelve cut: 12 / 34 / 24).
+/// closed face split in two: 22 / 44 / 24); live imports the four hoses so (3054). The two end rings (wall against
+/// cap) are written as live writes its own, whole INTERSECTION curves of the two surfaces; only the four tolerant
+/// tangent joints between walls are cut (before, one tolerant ring had all twelve cut: 12 / 34 / 24).
 #[test]
 fn a_hoses_walls_write_whole() {
     let dir = std::env::temp_dir().join(format!("noshape-xt-hose-{}", std::process::id()));
@@ -2253,7 +2254,7 @@ fn a_hoses_walls_write_whole() {
     let back = read_parasolid(&file, LengthUnit::Meter).unwrap();
     // (Its inner walls' tolerant end rings split in two: tolerant edges closed on one vertex made Parasolid drop the hose,
     // live 3054.)
-    assert_eq!((back.count(ShapeType::Face), back.count(ShapeType::Edge), back.count(ShapeType::Vertex)), (12, 28, 18), "every face whole, six rings cut");
+    assert_eq!((back.count(ShapeType::Face), back.count(ShapeType::Edge), back.count(ShapeType::Vertex)), (12, 26, 16), "every face whole, end rings whole, four joints cut");
     // (The model's inner walls are the offsets approximated, ~1 nm off on the 1 mm wall: 1e-6 of the volume.)
     let (v0, v1) = (hose.volume().unwrap(), back.volume().unwrap());
     assert!((v1 - v0).abs() < 2e-6 * v0, "{v1} vs {v0}");

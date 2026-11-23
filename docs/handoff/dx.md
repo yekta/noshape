@@ -35,14 +35,14 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   Fixed (queued after 79b0abcb): the app adds the kept file first ("Insert tab(s) : <file>"), the tabs after. Open:
   live's second entry reads "Import document", ours "Import <file>". No T1 test for the styled-face merge rule yet.
 
-## In flight: hose x_t END rings (core 11-23 03:0x: "please take the END rings"), patch /root/dx-scratch/hose-rings-v2.patch (xt.cpp + export.rs)
+## Committed: hose x_t END rings (core 11-23 03:0x: "please take the END rings")
 - xt.cpp: Chart + chart_of (19 exact points + closing, damped Newton), intersection_curve (CHART, LIMIT H,
   INTERSECTION, INTERSECTION_DATA from 30.0 via Writer::schema), prepared() keeps a charted ring whole, edge pass
   charts closed off-face edges before refit. Debug stripped. a_hoses_walls_write_whole now (12, 26, 16): the 2 end
   rings (offset wall x cap plane) whole; the 4 rings left cut are TANGENT joints between two offset walls (angle
   ~1e-6: ill-posed, Newton stalls ~1e-9 m) = core's sweep, not mine. exa1 hose1: ours reads ours back 7/7.
-- Waiting: live import of live/dx/hose-rings-1123/ours-hose.x_t (REQUESTS "dx 04:1x"), then land + tell core.
-  Kernel/ops export/clippy run: dx-scratch/hr-run1.log.
+- Green: kernel 590, ops export 17, clippy. Live 04:47 imports ours clean (live/dx/hose-rings-1123): 8 solids,
+  hoses 12 faces / 16 edges / 8 vertices. Committed after 66f66b451; land once 79b0abcb is through, tell core.
 - Live (python3 dx-scratch/bin/xtdumpfull.py /root/parity/exchange/cf-hose-routing/live.x_t 40,41,204): ring edge
   curve = INTERSECTION(surface=[OFFSET_SURF, PLANE], chart, start=end=LIMIT type H at the first chart point),
   edge tolerance None, fins curve 0, no vertex. CHART: Base_parameter 0, Base_scale 1, Chart_count 20 (closed: last

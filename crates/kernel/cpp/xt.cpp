@@ -106,6 +106,7 @@
 #include <cstdint>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <functional>
@@ -589,12 +590,24 @@ struct XSurface
   std::function<gp_Vec(const gp_Pnt&, double, double)> natural; // point, OCCT u, v
 };
 
+// A closed edge's exact points on its two faces' intersection (the last the first), with their (u, v) on each face's
+// surface and the intersection's direction there, as Parasolid writes a tolerant ring: an INTERSECTION curve.
+struct Chart
+{
+  int                   face[2] = {0, 0};
+  std::vector<gp_Pnt>   p;
+  std::vector<gp_Pnt2d> uv[2];
+  std::vector<gp_Vec>   tangent;
+  double                chordal = 0, angular = 0;
+};
+
 struct Writer
 {
   std::vector<Node>     nodes;
   std::map<int, size_t> pos; // node index -> position in `nodes`
   int                   next_index = 1;
   int                   next_id    = 1;
+  int                   schema     = 0; // the written version's schema code (0: the base schema's)
   // Solid mesh bodies' meshes (points in metres, 0-based triangles), for the .xmm_txt written beside the file; null:
   // mesh bodies go as planar facets.
   struct Mesh
@@ -987,6 +1000,7 @@ struct BodyWriter
   std::vector<double>    edge_tol, vertex_tol; // 0 = accurate
   std::vector<int>       edge_curve;
   std::vector<occ::handle<Geom_Curve>> edge_fit;          // refitted curves (same range), or null
+  std::vector<Chart>                   edge_chart;        // closed edges written as intersections, or empty
   std::map<int, gp_XYZ>                vertex_fit;        // vertex index -> point on refitted ends
   std::vector<int>       chain_surface, chain_curve, chain_point; // boundary chains (node indices)
 
@@ -1541,6 +1555,75 @@ struct BodyWriter
     node(next).fields[2].i = g;
   }
 
+  // A face's OCCT (u, v) as its XT surface's (as fin_curve maps a pcurve's poles).
+  gp_Pnt2d xt_uv(int face, gp_Pnt2d q) const
+  {
+    const XSurface&                 xs = surfaces[face];
+    TopLoc_Location                 sl;
+    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(TopoDS::Face(faces(face + 1)), sl);
+    if (xs.bounded && !xs.swap && !s.IsNull())
+    {
+      const auto into = [](double x, double lo, double hi, double per) {
+        return per <= 0 || (x >= lo && x <= hi) ? x : x - std::floor((x - lo) / per) * per;
+      };
+      q.SetCoord(s->IsUPeriodic() ? into(q.X(), xs.bu0, xs.bu1, s->UPeriod()) : q.X(), s->IsVPeriodic() ? into(q.Y(), xs.bv0, xs.bv1, s->VPeriod()) : q.Y());
+    }
+    const double qu = xs.swap ? q.Y() : q.X(), qv = xs.swap ? q.X() : q.Y();
+    return gp_Pnt2d(xs.su * qu + xs.ou, xs.sv * qv);
+  }
+
+  // An INTERSECTION through a chart (its LIMITs at the first point, as live's rings), its surfaces in the order that
+  // makes the curve run along the edge: their natural normals' cross product. From 30.0 on with its INTERSECTION_DATA.
+  int intersection_curve(int owner, const Chart& ch)
+  {
+    int          k0 = 0;
+    const gp_Vec n0 = surfaces[ch.face[0]].natural(ch.p[0], ch.uv[0][0].X(), ch.uv[0][0].Y());
+    const gp_Vec n1 = surfaces[ch.face[1]].natural(ch.p[0], ch.uv[1][0].X(), ch.uv[1][0].Y());
+    if (n0.Crossed(n1).Dot(ch.tangent[0]) < 0)
+      k0 = 1;
+    const int k1 = 1 - k0, n = (int)ch.p.size();
+    const int chart = w.alloc(), limit = w.alloc(), idx = w.alloc();
+    {
+      Node& c     = add(40, chart);
+      c.variable  = true;
+      c.var_count = n;
+      c.fields    = {ff(0), ff(1), fd(n), ff(ch.chordal), ff(ch.angular), ff_null(), ff_null()};
+      for (const gp_Pnt& p : ch.p)
+        c.fields.push_back(fv(p.XYZ()));
+    }
+    {
+      Node& lm     = add(41, limit);
+      lm.variable  = true;
+      lm.var_count = 1;
+      lm.fields    = {fc('H'), fv(ch.p[0].XYZ())};
+    }
+    const int s0 = surfaces[ch.face[k0]].index, s1 = surfaces[ch.face[k1]].index;
+    {
+      Node& x = add(38, idx);
+      Writer::geom_head(x, w.next_id++, owner, '+');
+      x.fields.insert(x.fields.end(), {fp(s0), fp(s1), fp(chart), fp(limit), fp(limit)});
+    }
+    if (w.schema >= 30000)
+    {
+      const int data = w.alloc();
+      Node&     d    = add(204, data);
+      d.variable     = true;
+      d.var_count    = 4 * n;
+      d.fields       = {fu(4)};
+      for (int j = 0; j < n; ++j)
+      {
+        const gp_Pnt2d a = xt_uv(ch.face[k0], ch.uv[k0][j]), b = xt_uv(ch.face[k1], ch.uv[k1][j]);
+        for (const double v : {a.X(), a.Y(), b.X(), b.Y()})
+          d.fields.push_back(ff(v));
+      }
+      node(idx).extra["intersection_data"] = fp(data);
+    }
+    chain_curve.push_back(idx);
+    depend(s0, idx);
+    depend(s1, idx);
+    return idx;
+  }
+
   int trimmed(int owner, int basis, const gp_Pnt& p1, const gp_Pnt& p2, double t1, double t2)
   {
     const int idx = w.alloc();
@@ -1722,6 +1805,148 @@ struct BodyWriter
     return {};
   }
 
+  // on_both for a chart point: steps halved until the residual drops, the point taken when it's within a tenth of the
+  // precision (it isn't where two walls meet tangent, as cf-hose-routing's joints do: no chart, the edge stays tolerant).
+  static bool on_both_damped(const BRepAdaptor_Surface& a1, const BRepAdaptor_Surface& a2, gp_Pnt2d& p1, gp_Pnt2d& p2, const gp_Pnt& x0,
+                             const gp_Vec& t, gp_Pnt& out)
+  {
+    double x[4] = {p1.X(), p1.Y(), p2.X(), p2.Y()};
+    auto   residual = [&](const double* y, gp_Pnt& q1, gp_Pnt& q2, gp_Vec* s) {
+      if (s)
+      {
+        a1.D1(y[0], y[1], q1, s[0], s[1]);
+        a2.D1(y[2], y[3], q2, s[2], s[3]);
+      }
+      else
+      {
+        q1 = a1.Value(y[0], y[1]);
+        q2 = a2.Value(y[2], y[3]);
+      }
+      const double g = t.Dot(gp_Vec(x0, q1));
+      return q1.SquareDistance(q2) + g * g;
+    };
+    gp_Pnt q1, q2;
+    gp_Vec s[4];
+    double r = residual(x, q1, q2, s);
+    for (int it = 0; it < 60 && r > 1e-28; ++it)
+    {
+      const gp_Vec d(q2, q1);
+      math_Matrix  J(1, 4, 1, 4);
+      math_Vector  F(1, 4), X(1, 4);
+      for (int k = 1; k <= 3; ++k)
+      {
+        J(k, 1) = s[0].Coord(k);
+        J(k, 2) = s[1].Coord(k);
+        J(k, 3) = -s[2].Coord(k);
+        J(k, 4) = -s[3].Coord(k);
+        F(k)    = -d.Coord(k);
+      }
+      J(4, 1) = t.Dot(s[0]);
+      J(4, 2) = t.Dot(s[1]);
+      J(4, 3) = J(4, 4) = 0;
+      F(4)              = -t.Dot(gp_Vec(x0, q1));
+      math_Gauss G(J);
+      if (!G.IsDone())
+        break;
+      G.Solve(F, X);
+      bool better = false;
+      for (double lambda = 1; lambda > 1e-4 && !better; lambda /= 2)
+      {
+        const double y[4] = {x[0] + lambda * X(1), x[1] + lambda * X(2), x[2] + lambda * X(3), x[3] + lambda * X(4)};
+        gp_Pnt       r1, r2;
+        const double ry = residual(y, r1, r2, nullptr);
+        if (ry < r)
+        {
+          std::copy(y, y + 4, x);
+          better = true;
+        }
+      }
+      if (!better)
+        break;
+      r = residual(x, q1, q2, s);
+    }
+    if (r > kPrecision * kPrecision / 100)
+      return false;
+    p1.SetCoord(x[0], x[1]);
+    p2.SetCoord(x[2], x[3]);
+    out = q1;
+    return true;
+  }
+
+  // A closed edge's chart (live's tolerant hose rings: INTERSECTION of the offset wall and the cap plane, 20 points):
+  // exact points of its faces' surfaces' intersection near the edge, or empty when Newton fails, a point strays past
+  // the edge's tolerance or the surfaces meet at less than 6 degrees.
+  static Chart chart_of(const TopoDS_Edge& e, const TopoDS_Face& F1, const TopoDS_Face& F2)
+  {
+    double                    f, l, f1, l1, f2, l2;
+    occ::handle<Geom_Curve>   c  = BRep_Tool::Curve(e, f, l);
+    occ::handle<Geom2d_Curve> q1 = BRep_Tool::CurveOnSurface(e, F1, f1, l1), q2 = BRep_Tool::CurveOnSurface(e, F2, f2, l2);
+    if (c.IsNull() || q1.IsNull() || q2.IsNull() || F1.IsSame(F2) || std::abs(f1 - f) + std::abs(l1 - l) + std::abs(f2 - f) + std::abs(l2 - l) > 1e-9 * (1 + std::abs(l - f)))
+      return {};
+    const BRepAdaptor_Surface a1(F1, false), a2(F2, false);
+    const double              tol = 2 * BRep_Tool::Tolerance(e);
+    // The exact point at t (its (u, v) on each surface and the intersection's direction there, along the edge's).
+    auto exact = [&](double t, gp_Pnt& o, gp_Pnt2d& p1, gp_Pnt2d& p2, gp_Vec& dir) {
+      gp_Pnt p;
+      gp_Vec d;
+      c->D1(t, p, d);
+      p1 = q1->Value(t), p2 = q2->Value(t);
+      try
+      {
+        if (d.Magnitude() < 1e-12 || !on_both_damped(a1, a2, p1, p2, p, d.Normalized(), o) || o.Distance(p) > tol)
+          return false;
+        gp_Pnt x;
+        gp_Vec u1, v1, u2, v2;
+        a1.D1(p1.X(), p1.Y(), x, u1, v1);
+        a2.D1(p2.X(), p2.Y(), x, u2, v2);
+        const gp_Vec n1 = u1.Crossed(v1), n2 = u2.Crossed(v2);
+        if (n1.Magnitude() < 1e-12 || n2.Magnitude() < 1e-12)
+          return false;
+        dir = n1.Normalized().Crossed(n2.Normalized());
+        if (dir.Magnitude() < std::sin(6 * M_PI / 180))
+          return false;
+        dir.Normalize();
+        if (dir.Dot(d) < 0)
+          dir.Reverse();
+        return true;
+      }
+      catch (const Standard_Failure&)
+      {
+        return false;
+      }
+    };
+    constexpr int n = 19;
+    Chart         ch;
+    for (int j = 0; j < n; ++j)
+    {
+      gp_Pnt   o;
+      gp_Pnt2d p1, p2;
+      gp_Vec   dir;
+      if (!exact(f + (l - f) * j / n, o, p1, p2, dir))
+        return {};
+      ch.p.push_back(o);
+      ch.uv[0].push_back(p1);
+      ch.uv[1].push_back(p2);
+      ch.tangent.push_back(dir);
+    }
+    for (int j = 0; j < n; ++j)
+    {
+      gp_Pnt   o;
+      gp_Pnt2d p1, p2;
+      gp_Vec   dir;
+      if (!exact(f + (l - f) * (j + 0.5) / n, o, p1, p2, dir))
+        return {};
+      const gp_Pnt mid((ch.p[j].XYZ() + ch.p[(j + 1) % n].XYZ()) / 2);
+      ch.chordal = std::max(ch.chordal, mid.Distance(o));
+      ch.angular = std::max(ch.angular, ch.tangent[j].Angle(ch.tangent[(j + 1) % n]));
+    }
+    ch.p.push_back(ch.p[0]);
+    ch.uv[0].push_back(ch.uv[0][0]);
+    ch.uv[1].push_back(ch.uv[1][0]);
+    ch.tangent.push_back(ch.tangent[0]);
+    return ch;
+  }
+
   // Largest distance between the edge's curve and its faces (same parameter).
   static double deviation(const TopoDS_Edge& e, const std::vector<TopoDS_Face>& fs)
   {
@@ -1891,6 +2116,7 @@ struct BodyWriter
     edge_idx.resize(ne);
     edge_tol.assign(ne, 0.0);
     edge_fit.assign(ne, occ::handle<Geom_Curve>());
+    edge_chart.assign(ne, Chart());
     for (int i = 0; i < ne; ++i)
     {
       edge_idx[i] = w.alloc();
@@ -1905,7 +2131,13 @@ struct BodyWriter
       for (int k : edge_fins[i])
         fs.push_back(TopoDS::Face(faces(fins[k].face + 1)));
       const double dev = deviation(e, fs);
-      if (dev > kPrecision && fs.size() == 2 && !(edge_fit[i] = refit(e, fs[0], fs[1])).IsNull())
+      if (dev > kPrecision && fs.size() == 2 && TopExp::FirstVertex(e).IsSame(TopExp::LastVertex(e)))
+      {
+        edge_chart[i] = chart_of(e, fs[0], fs[1]);
+        for (int k = 0; k < 2 && !edge_chart[i].p.empty(); ++k)
+          edge_chart[i].face[k] = fins[edge_fins[i][k]].face;
+      }
+      if (dev > kPrecision && fs.size() == 2 && edge_chart[i].p.empty() && !(edge_fit[i] = refit(e, fs[0], fs[1])).IsNull())
         for (int end = 0; end < 2; ++end)
         {
           // The vertex moves onto the refitted end (exact points, closer than its tolerance).
@@ -1921,7 +2153,7 @@ struct BodyWriter
           if (!vertex_fit.count(vi))
             vertex_fit[vi] = p.XYZ();
         }
-      if (dev > kPrecision && edge_fit[i].IsNull())
+      if (dev > kPrecision && edge_fit[i].IsNull() && edge_chart[i].p.empty())
         edge_tol[i] = std::max(BRep_Tool::Tolerance(e), 2 * dev);
     }
     for (auto& [fi, v] : apexes)
@@ -1944,7 +2176,7 @@ struct BodyWriter
       while (auto t = occ::down_cast<Geom_TrimmedCurve>(c))
         c = t->BasisCurve();
       const bool conic = (!occ::down_cast<Geom_Circle>(c).IsNull() || !occ::down_cast<Geom_Ellipse>(c).IsNull()) && std::abs(l - f - 2 * M_PI) < 1e-9;
-      const bool whole = a.IsSame(b) && edge_tol[i] == 0 && edge_fit[i].IsNull() && (conic || !ring_bspline(c, f, l).IsNull());
+      const bool whole = a.IsSame(b) && edge_tol[i] == 0 && edge_fit[i].IsNull() && (conic || !edge_chart[i].p.empty() || !ring_bspline(c, f, l).IsNull());
       if (!whole)
       {
         ring[vertices.FindIndex(a) - 1] = false;
@@ -2073,6 +2305,11 @@ struct BodyWriter
         for (int k : edge_fins[i])
           if (!fins[k].dummy)
             fins[k].curve = fin_curve(fins[k].index, e, fins[k].face, fins[k].positive);
+        continue;
+      }
+      if (!edge_chart[i].p.empty())
+      {
+        edge_curve[i] = intersection_curve(edge_idx[i], edge_chart[i]);
         continue;
       }
       double                  f, l;
@@ -2576,7 +2813,8 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round,
       c = t->BasisCurve();
     bool closed = c.IsNull() || (occ::down_cast<Geom_Circle>(c).IsNull() && occ::down_cast<Geom_Ellipse>(c).IsNull() && ring_bspline(c, f, l).IsNull());
     // (Nor one off its faces by more than the precision: a tolerant edge has no curve of its own, and Parasolid
-    // dropped the hoses whose inner walls' end rings were such, closed on one vertex: live 2975, 3016; split, 3054.)
+    // dropped the hoses whose inner walls' end rings were such, closed on one vertex: live 2975, 3016; split, 3054.
+    // Kept whole when written as live writes its own hose's rings, an intersection of its two faces.)
     if (!closed && ef.Contains(e))
       for (NCollection_List<TopoDS_Shape>::Iterator it(ef.FindFromKey(e)); it.More() && !closed; it.Next())
       {
@@ -2594,6 +2832,11 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, RoundSplines round,
           closed = c3->Value(f + (l - f) * i / 20.0).Distance(sf->Value(uv.X(), uv.Y()).Transformed(loc.Transformation())) > kPrecision;
         }
       }
+    if (closed && ef.Contains(e) && ef.FindFromKey(e).Extent() == 2)
+    {
+      const std::vector<TopoDS_Face> fs = {TopoDS::Face(ef.FindFromKey(e).First()), TopoDS::Face(ef.FindFromKey(e).Last())};
+      closed = BodyWriter::deviation(e, fs) <= kPrecision || BodyWriter::chart_of(e, fs[0], fs[1]).p.empty();
+    }
     if (closed)
       cut.Add(e);
   }
@@ -3175,6 +3418,7 @@ static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust
 {
   const XtVersion ver = xt_version(std::string(version));
   Writer           w;
+  w.schema = schema_code(ver);
   AttrWriter       aw{w};
   std::vector<int> bodies;
   // Solid mesh bodies as meshes in a text file (their MESH and the .xmm's nodes are laid out alike from 28.1 to 38.1:
@@ -3238,6 +3482,7 @@ void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const rust::
   if (tf.size() != inst_part.size() * 12)
     fail_invalid("one transform per instance");
   Writer           w;
+  w.schema = schema_code(ver);
   AttrWriter       aw{w};
   const int        root = w.alloc();
   std::vector<int> bodies;
