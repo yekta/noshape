@@ -18,6 +18,7 @@
 #include <ShapeUpgrade_ShapeDivideClosed.hxx>
 
 #include <BRepAdaptor_Surface.hxx>
+#include <BRepLProp_SLProps.hxx>
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
@@ -5671,6 +5672,29 @@ static OpOut thicken(const OcShape& s, double t1, double t2, bool exact_step)
     if (pinched_free_form(TopoDS::Face(x.Current())))
       fail_op("thicken: a face pinched to a point has no normal there");
   require_non_null(s.shape, "shape");
+  // Parasolid refuses a side reaching a centre of curvature of a quadric or torus face (live errors-1123 th-cyl-in: an
+  // r 4 boss thickened 6 mm in, "Failed to thicken all selections."); OCCT's offset turns it inside out.
+  for (TopExp_Explorer x(s.shape, TopAbs_FACE); x.More(); x.Next())
+  {
+    const TopoDS_Face&        f = TopoDS::Face(x.Current());
+    BRepAdaptor_Surface       a(f);
+    const GeomAbs_SurfaceType k = a.GetType();
+    if (k != GeomAbs_Cylinder && k != GeomAbs_Cone && k != GeomAbs_Sphere && k != GeomAbs_Torus)
+      continue;
+    const double rho = f.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
+    double       u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    for (int i = 0; i <= 4; ++i)
+      for (int j = 0; j <= 4; ++j)
+      {
+        BRepLProp_SLProps lp(a, u0 + (u1 - u0) * i / 4, v0 + (v1 - v0) * j / 4, 2, 1e-9);
+        if (!lp.IsCurvatureDefined())
+          continue;
+        for (const double kappa : {lp.MinCurvature(), lp.MaxCurvature()})
+          if (std::max(t1 * rho * kappa, -t2 * rho * kappa) >= 1 - 1e-9)
+            fail_op("thicken: a side reaches a face's centre of curvature");
+      }
+  }
   if (std::getenv("NOSHAPE_DUMP_OPS"))
   {
     std::ostringstream p;

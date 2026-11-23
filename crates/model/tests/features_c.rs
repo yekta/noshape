@@ -1847,6 +1847,35 @@ fn a_thickened_cylinder_has_circle_and_line_edges() {
     assert!((v - exact).abs() < 1e-6 * exact, "{v} mm³, {exact}");
 }
 
+/// Live errors-1123 th-cyl-in / th-cyl-both: an r 4 cylinder thickened 6 mm toward its axis fails ("Failed to thicken
+/// all selections."); 3 mm in builds.
+#[test]
+fn a_cylinder_thickened_past_its_axis_fails() {
+    for (t1, t2, ok) in [("0 mm", "6 mm", false), ("2 mm", "6 mm", false), ("0 mm", "3 mm", true)] {
+        let mut s = Studio::new();
+        let sid = circle_sketch(&mut s, 4.0);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let r = s.ok();
+        let side = cylinder_face(&r, 0);
+        s.add("thicken", move |p| {
+            p.set("entities", ParamValue::Query(vec![side]));
+            p.set("thickness1", expr(t1));
+            p.set("thickness2", expr(t2));
+            p.set("operationType", ParamValue::Enum("NEW".into()));
+        });
+        let st = s.last_status();
+        if ok {
+            assert_eq!(st.0, FeatureStatus::Ok, "{t1} / {t2}: {st:?}");
+        } else {
+            assert_eq!(st, (FeatureStatus::Error, "Failed to thicken all selections.".to_string()), "{t1} / {t2}");
+        }
+    }
+}
+
 /// Live L7: Flip alignment against a plane facing the same way as the
 /// replaced face fails ("Could not replace faces as requested.").
 #[test]

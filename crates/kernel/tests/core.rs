@@ -1222,23 +1222,31 @@ fn a_guided_surface_loft_through_more_profiles_is_one_face() {
     }
 }
 
-/// A guide off a profile (live loft-stations3 J/K, psb 10-24 g): beside a middle circle by 3 mm, live's LOFT_FAILED;
-/// short of an end circle, its "All guides should intersect each profile boundary.".
+/// A guide off a profile is live's LOFT_FAILED, never "All guides should intersect each profile boundary.": beside a
+/// middle circle by 3 mm (loft-stations3 J/K), past, at or 2 mm short of an end circle (loft-guide-past-end-1123 L/M/N).
 #[test]
 fn a_guided_loft_refuses_a_guide_off_a_profile_as_live() {
     let circle = |x: f64, cz: f64, r: f64| make_wire(&[make_circle(DVec3::new(x, 0.0, cz), DVec3::X, r).unwrap()]).unwrap();
-    let guides = |top: [f64; 3], bottom: [f64; 3], last: f64| {
-        [top, bottom].map(|z| make_interpolated_spline(&[DVec3::new(0.0, 0.0, z[0]), DVec3::new(40.0, 0.0, z[1]), DVec3::new(last, 0.0, z[2])], &[], false).unwrap())
+    let guides = |ends: &[f64]| {
+        [1.0, -1.0].map(|side: f64| {
+            let mut pts = vec![DVec3::new(0.0, 0.0, 10.0 * side), DVec3::new(40.0, 0.0, if side > 0.0 { 18.0 } else { -6.0 })];
+            pts.extend(ends.iter().map(|&x| DVec3::new(x, 0.0, 10.0 * side)));
+            make_interpolated_spline(&pts, &[], false).unwrap()
+        })
     };
-    let on = guides([10.0, 18.0, 10.0], [-10.0, -6.0, -10.0], 100.0);
+    let refused = |profiles: &[Shape], g: &[Shape], case: &str| {
+        let e = loft_guided_multi(profiles, g).unwrap_err();
+        assert!(matches!(&e, KernelError::OperationFailed(m) if !m.starts_with("All guides")), "{case}: {e:?}");
+    };
+    let on = guides(&[100.0]);
     assert!(loft_guided_multi(&[circle(0.0, 0.0, 10.0), circle(40.0, 6.0, 12.0), circle(100.0, 0.0, 10.0)], &on).is_ok());
     for (cz, r) in [(6.0, 9.0), (9.0, 12.0)] {
-        let e = loft_guided_multi(&[circle(0.0, 0.0, 10.0), circle(40.0, cz, r), circle(100.0, 0.0, 10.0)], &on).unwrap_err();
-        assert!(matches!(&e, KernelError::OperationFailed(m) if !m.starts_with("All guides")), "middle ({cz}, {r}): {e:?}");
+        refused(&[circle(0.0, 0.0, 10.0), circle(40.0, cz, r), circle(100.0, 0.0, 10.0)], &on, &format!("middle ({cz}, {r})"));
     }
-    let short = guides([10.0, 18.0, 10.0], [-10.0, -6.0, -10.0], 98.0);
-    let e = loft_guided_multi(&[circle(0.0, 0.0, 10.0), circle(40.0, 6.0, 12.0), circle(100.0, 0.0, 10.0)], &short).unwrap_err();
-    assert!(matches!(&e, KernelError::OperationFailed(m) if m.starts_with("All guides")), "{e:?}");
+    let r7 = [circle(0.0, 0.0, 10.0), circle(40.0, 6.0, 12.0), circle(100.0, 0.0, 7.0)];
+    refused(&r7, &guides(&[100.0, 110.0]), "L: past an R 7 end");
+    refused(&r7, &on, "M: at an R 7 end");
+    refused(&[circle(0.0, 0.0, 10.0), circle(40.0, 6.0, 12.0), circle(100.0, 0.0, 10.0)], &guides(&[98.0]), "N: 2 mm short");
 }
 
 /// c2-surf-workshop-knifehandle's Loft 1 itself (its sketches, in metres): P1 two Bézier halves, P2..P6 ellipses, to the
