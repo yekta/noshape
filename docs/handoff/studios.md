@@ -9,7 +9,7 @@ Owner: studios. Areas:
 
 History: docs/handoff/archive/studios.md (dated entries up to 11-15 18:03). Rulings: docs/DECISIONS.md.
 
-Updated 2026-11-23 00:29 UTC.
+Updated 2026-11-23 01:31 UTC.
 
 ## In flight
 
@@ -25,6 +25,22 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   CALLOUT-SELECTED-LOOK, FS-COMMIT-DISABLED-HOVER, RELATED-MARKS-BLUE, SECTION-EDIT-MARKS, CALLOUT-PLACED-HOVER,
   DRW-SELECTION-AFTER-ACTION, DRW-MOVED-VIEW-PROPS part); HIST-COMPARE-FEATURE-ICONS; HIST-COMPARE-FEATURE-HIGHLIGHT
   + HIST-COMPARE-PARAMS-PANEL (x240); DRW-DETAIL-CONNECTED-OPTIONS + preview scale label (x241 ops e2e 296, x242).
+- COMMITTED (11-23 01:31, x249 green: drawing 269, drawing-ui 164, ops e2e 492, clippy 6 crates), queued with land.sh:
+  drag gaps L + N (leader end lights its target edge SELECTED, picked after the preview rebuild; no tan box on a hovered
+  leader note); DRW-DIM-HIDDEN-VERTEX-SNAP (views.rs: a vertex snaps only on a visible edge's points, hash grid);
+  DRW-CALLOUT-MENU-REMOVE-LEADERS; DRW-SECTION-DETAIL-VIEW-PROPS-ROWS part (LEFT: sections' Synchronize breaks row);
+  P0 FEEL-PRIMARY-BUTTON-HOVER (Reverse compare + material Remove hover `p().accent_hover` #769fcc).
+- NEXT: sections' Synchronize breaks row: `View.sync_breaks` -> Option<bool> (None = kind default: Section on,
+  Projected off; old files never stored false), `syncs_breaks()` in effective_breaks, ops + dialog row for sections.
+- NEXT: DRW-TABLE-PREVIEW-UNDER-PANEL (P1): drawing_tools.rs update_preview's `hole_table_preview().or_else(table_dlg_preview)`
+  only while `canvas_hovered` (the table panel occludes); on hover-out clear infer_lines + update_preview.
+- qa 01:1x block (TICKETS "qa, 2026-11-23 01:1x"): P1 HIST-REVERSE-COMPARE-BAND; P2s DRW-DETAIL-ROTATION-ANGLE,
+  DRW-CALLOUT-DIALOG-LOOK, DRW-TABLE-MID-HANDLES, DRW-MOVE-TO-SHEET-PREVIEW, DRW-SHEETS-CHEVRON-STATE,
+  DRW-SCALE-CLICK-SELECTS, FS-NOTICES-ICON-RED-ON-REGEN-ERROR, FS-OUTLINE-ENCLOSING-SYMBOL, FS-TOOLBAR-RIGHT-GROUP,
+  FS-EDITOR-SELECTION-COLOUR, HIST-COMPARE-EXIT-CAMERA, HIST-MERGE-DIALOG-LOOK, TOAST-ABOVE-MODAL, HIST-LEGEND-LOOK.
+  Evidence /root/qa-scratch/tickets/wf23b-*.png: compare by script (pixel counts), never Read PNGs.
+- Mac check of the P0: no studios target on the Mac, load 7.3 at 00:47 (gate 6): verify on the next release build
+  (scratch folder under ~/noshape-host, GUI only when HIDIdleTime >= 600 s), not the user's documents.
 - USER P0 (lead 11-22 23:45, macOS ~/Documents/noshape): DOC-COPY-IDENTITY + DOC-SIDE-FILES:
   - No per-document id exists: windows (OpenDocs, canonical path), recents, last-viewed are keyed by path, so a Finder
     copy is already its own document; only its name was the original's. store `Document::meta().name` =
@@ -44,10 +60,9 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
 - DRW-VIEWPROPS-ENTER-APPLIES held: conflicts with live2 drw-view-properties-scale-typed; REQUESTS studios 22:43 asks live.
 - DRW-DETAIL-PREVIEW-LOOK open: ink dark vs light (live2 164 vs qa shot), the dashed radius line in the parent circle.
 - qa P1/P2 left: DRW-SECTION-DETAIL-VIEW-PROPS-ROWS, DRW-SECTION-PREVIEW-IN-PARENT, the 22:0x P2s.
-- drw-drag-feel-1122 left: L (leader end re-attach #CC925C over an edge), N (note text hover no tan box).
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre; ours takes it. Decision needed
   from the lead (copy or record as live's failure).
-- QUEUE: DRW-DIM-HIDDEN-VERTEX-SNAP fix; the drag gaps above; the Compare highlight not yet looked at in the app.
+- QUEUE: the Compare highlight not yet looked at in the app.
 
 ## Next, in order
 1. Drawing matrix (11-21 05:21): 1419 = / 381 shown / 0 differs / 0 present-only / 0 missing of 1842 (05:21: the Note
