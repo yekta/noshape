@@ -6,34 +6,17 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
 ## IN FLIGHT 06:5x
-- **Subagents done** (psui errors-1123, asm dff49b598: applied, see DONE lines below). IMP-* subagent RUNNING (brief-impver.md; resume by SendMessage or rerun).
-- psui asked FEEL-EDIT-BODY-SHADE spots: answered 06:3x (ours r9/m01-ex-hover/03 (1700,800), region (1791,907); live ver-1122 crop (170,102) / (262,207); both flat).
-- **DONE today**: cut v0.4.68 GO on green 31f1866d8 05:38 (lead cuts; 45dc53023's asm red didn't recur). sk23 sketch tools filed
-  (cd5c34163, 9 P0 + 8 P1 + user P0 SKT-OFFSET-BOX-LOOK; skasm/psui told). errors-1123 core rows on 975bab060 (b6d50d9d3; core told).
-  psui b8a1 rescored (200ca055e; UIS-FIELD-NOT-SHOWN + CUSTOM-FEATURE-DIALOG-HELP verified, axis edge verified, EDIT-BODY-SHADE partly
-  top (138,148,154) vs (132,147,155), radius lines STILL white: correction 8433b44fe, psui told). SPEED-FILE-TAB-IMPORT-MENU verified
-  (cb63b6770, dx told). Hover matrix 114/125 (8433b44fe, kit hm2/score-31f1/bin: script scoring, no PNG reads).
-- **Waiting on green / results**:
-  DONE 06:5x: rings (blend 7a39ced9) Chamfer 1 as live, SPEED-RINGS-SHELL PARTLY (Shell 1 15.4 s, still errors; efe187dea; blend + bool told).
-  cf9f959a IN GREEN 05:46: IMP subagent (brief-impver.md, vibe2 Xvfb :495) RUNNING 06:2x. dx 538aa4b0 IMP-NO-FEEDBACK queued: recheck when green.
-  DONE 06:2x: errors-1123 recheck (e7de64235: core BUBBLE + TINT verified; new P0 ERR-OK-ENABLED-OUT-OF-RANGE psui); asm dff49b598 (4f1583757: 12 verified, new P0 ERR-MATE-CREATING-REV-RED); psui + asm told.
+- **Waiting**: unit qa-w538 (tmp/w538.sh -> tmp/w538.log "IN-GREEN"): dx's IMP-NO-FEEDBACK commit (subject has IMP-NO-FEEDBACK or CAD Imports)
+  in green -> rerun the IMP app cells (qa-scratch/imp/ui, brief-impver.md; Mac mini copies mode 700, deleted after) for the CAD Imports tab timing.
+  Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
+- **DONE 11-23 (all filed, owners told, lead via qa-alerts)**: cut v0.4.68 GO (green 31f1866d8). sk23 sketch tools (cd5c34163). Hover matrix
+  114/125 (8433b44fe). psui b8a1 (200ca055e). errors-1123 recheck (e7de64235: core BUBBLE + TINT verified; P0 ERR-OK-ENABLED-OUT-OF-RANGE
+  psui). asm dff49b598 (4f1583757: 12 verified; P0 ERR-MATE-CREATING-REV-RED). Rings 7a39ced9 (efe187dea: Chamfer 1 as live;
+  SPEED-RINGS-SHELL PARTLY, Shell 1 15.4 s + still errors; tmp/rf.sh = failing / slow features per edit). IMP-* (e6e1ad1f3: 6 verified,
+  2 partly, 2 new P1 dx). Workflow 34 = live (b45aed281). COMPAT-SURFACE-PATTERN-SLOWER verified (278f9dc50). psui EDIT-BODY-SHADE
+  spots answered (ours r9/m01-ex-hover/03 (1700,800); live ver-1122 crop (170,102)).
 - Note: vibe2 ~/tmp/qa/apps/noshape-green upload fails while an app runs from it (scp onto a busy binary): check noshape-green.sha.
-- **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
-  qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
-  wf-1122 12 out-wfv4: ROTATE-EDGE-SENSE, EDIT-BODY-SHADE, CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN);
-  qa-ver7 (replaces ver6; when psui b8a17535 AND c318cefa "psui: Enter commits no value out of range…" are in green, after
-  rr-b8a1/wf23i: full matrix b* + [ips]* -> hm2/hmr7-b, hmr7-ips; "in green" line in ver7.log = start the subagent from
-  qa-scratch/brief-errver.md: psui ERR-* rows + CTX-MENU-FLIP-UP re-verify);
-  DONE 03:0x wf 13-20 rescored on 26abe20b8 (TICKETS, studios/psui told); 18 s24 Compare: shot-timing artefact, not a bug (variant out-wfv6 +1 s: 381k px as 24f1566de; ours settles 0.9-1.5 s vs live 7.7 s);
-  qa-rr-2782 (dx re-queued 834b5a0a, same subject "dx: a file tab's Import… opens its dialog at once" -> wf23 17 out-wf23e, step 2:
-  ours 192 ms vs live 58: SPEED-FILE-TAB-IMPORT-MENU);
-  qa-rr-a936 (asm a936c3a6 "asm: an over-defining mate moves nothing…" -> mcinfer r9 asm cells (MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM,
-  SHIFT-RELEASE, CYL-SIDE-OUTLINE, PICKED-REHOVER glyph), out-af-a936 dr-BaseR (FIXED-GLYPH-AA), wf23 04/05 out-wf23h
-  (PATTERN-PICK-LOOK origin), matrix hmr6-mc (rim/notch); THEN a subagent reruns errors-1123 set c mate cells from qa-scratch/err/c,
-  RE-MAKING the overdef .noshape files (old ones saved the moved pin): SOLVE-MOVES, OVERDEF-BOTH, LIMITS-COMMITTED, BALL-CONE,
-  DIALOG-STATE (suppressed title left black per mates.md), TANGENT-WORDS (bar ✓ pale on reopened "not consistent"), CREATING-LIST);
-  qa-wait-sp (bool ed272c73, same subject as e7c98cc5a -> compat: expect ~13.6 s + Part 1 129/385/258 (live 131/387/258), close
-  COMPAT-SURFACE-PATTERN-SLOWER, tell bool). ver6 stopped (-> ver7).
+  vibe2 Xvfb :496 / :497 belong to other runs; start your own display (:491, :495 free).
 - Kit: hm2/crop2.sh, score-a087/bin/sbs.sh, hm2/wf/wfcrop.py (WF_SET/WF_OUT), manipnav fm.sh (+fm992.sh), cells m15v-tr-xy-*.
   Runners take QA_HOST; wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT + glob arg.
 - Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
