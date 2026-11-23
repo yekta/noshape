@@ -189,9 +189,19 @@ impl<'a> SheetPick<'a> {
                 Some(t) if self.is_centerline(t) => Some(h),
                 _ => None,
             },
-            // Radial and diameter also take a centermark (help D13).
-            (Tool::Dimension { kind: DimTool::Radius | DimTool::Diameter, .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
-                Some(PickTarget::Edge { view, edge }) if matches!(self.edge_geom(*view, *edge), Some(EdgeGeom::Circle { .. })) => Some(h),
+            // Radial and diameter also take a centermark (help D13); diameter a cylinder's silhouette (live drw-dims-1123
+            // diameter.md, help D15).
+            (Tool::Dimension { kind: kind @ (DimTool::Radius | DimTool::Diameter), .. }, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+                Some(PickTarget::Edge { view, edge }) => match self.edge_geom(*view, *edge) {
+                    Some(EdgeGeom::Circle { .. }) => Some(h),
+                    Some(EdgeGeom::Line { a, b }) if *kind == DimTool::Diameter && self.silhouette_axis_offset(*view, a, b).is_some() => Some(h),
+                    None if *kind == DimTool::Diameter
+                        && matches!(self.silhouette_line_of(h), Some(Pick::Line { a, b }) if self.silhouette_axis_offset(a.view, a.p, b.p).is_some()) =>
+                    {
+                        Some(h)
+                    }
+                    _ => None,
+                },
                 Some(PickTarget::Annotation(id)) if self.current_sheet().annotations.iter().any(|a| a.id == *id && matches!(a.kind, AnnotationKind::Centermark { .. })) => Some(h),
                 _ => None,
             },
@@ -617,7 +627,10 @@ impl<'a> SheetPick<'a> {
     /// of a cylinder or cone): its ends, unreferenced. Two of them on one
     /// cylinder give a Ø dimension (help drawing_-_dimension, D2).
     fn silhouette_line_pick(&self) -> Option<Pick> {
-        let h = self.hover?;
+        self.silhouette_line_of(self.hover?)
+    }
+
+    fn silhouette_line_of(&self, h: u32) -> Option<Pick> {
         let PickTarget::Edge { view, edge } = self.built?.picks.get(h as usize)?.clone() else { return None };
         let e = self.geoms.get(&view)?.edges.get(edge as usize)?;
         if e.model.is_some() {

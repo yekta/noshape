@@ -990,8 +990,11 @@ fn bom_hole_table_and_linked_balloons() {
     // Live 1983: a size's SIZE and QTY cells merged down its rows (B1, B2: one ⌀9.6 THRU, QTY 2).
     assert_eq!(t.iter().filter(|x| *x == "⌀9.6 THRU").count(), 1, "{t:?}");
     assert!(t.iter().any(|x| x == "2"), "{t:?}");
-    // Live drw-dims-1123 hole-table.md: a tapped hole's SIZE is its tap drill alone, no thread line.
-    {
+    // A tapped hole's SIZE: in ANSI its tap drill alone (live drw-dims-1123 hole-table.md), in ISO the thread line
+    // under it (holetable-1119).
+    for (size, thread_line) in [(SheetSize::AnsiA, false), (SheetSize::A3, true)] {
+        let mut drawing = drawing.clone();
+        drawing.sheets[0].size = size;
         let mut tapped = sources.clone();
         if let Some((key, _)) = views::view_source(&drawing.sheets[0], ViewId(2))
             && let Some(src) = tapped.get_mut(&key)
@@ -1002,8 +1005,8 @@ fn bom_hole_table_and_linked_balloons() {
             src.context = std::sync::Arc::new(ctx);
         }
         let t = texts(&render_sheet(&drawing, 0, &tapped, &cache, false).unwrap());
-        assert!(t.iter().any(|x| x == "⌀21 THRU"), "the tap drill: {t:?}");
-        assert!(!t.iter().any(|x| x.contains("M24x3")), "no thread line: {t:?}");
+        assert!(t.iter().any(|x| x.starts_with("⌀21 THRU")), "the tap drill: {t:?}");
+        assert_eq!(t.iter().any(|x| x.contains("M24x3")), thread_line, "{size:?}: {t:?}");
     }
     // ☐ Show location data: no X / Y LOC; Order bottom to top keeps a size merged.
     if let TableKind::Hole { show_location, bottom_to_top, .. } = &mut drawing.sheets[0].tables[0].kind {

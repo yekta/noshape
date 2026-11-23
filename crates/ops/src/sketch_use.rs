@@ -141,7 +141,10 @@ impl Model<'_> {
 pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, cursor: DVec2, r: &Reference, pierce: bool, construction: bool) -> Option<EntityId> {
     let frame = model.frame;
     let want_point = pierce || matches!(r, Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::Origin | Reference::Implicit { .. });
-    if let Some(id) = data.external_refs.iter().find(|(id, v)| *v == r && !data.use_ends.contains_key(*id) && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point)).map(|(id, _)| EntityId(*id)) {
+    // Use of an already-used edge makes another, coincident copy (live sketch-tools-1123, DECISIONS 11-23); a reference
+    // the dimension / constraint tools pick, or one only a dimension refers to, is reused.
+    let reusable = |e: &noshape_sketch::Entity| construction || e.reference_only;
+    if let Some(id) = data.external_refs.iter().find(|(id, v)| *v == r && !data.use_ends.contains_key(*id) && data.sketch.entity(EntityId(**id)).is_some_and(|e| (e.kind() == EntityKind::Point) == want_point && reusable(e))).map(|(id, _)| EntityId(*id)) {
         // Use on geometry a dimension already refers to makes it sketch geometry.
         if !construction && data.sketch.entity(id).is_some_and(|e| e.reference_only) {
             let _ = data.sketch.set_reference_only(id, false);

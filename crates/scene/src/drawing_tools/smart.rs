@@ -66,21 +66,27 @@ impl SheetPick<'_> {
     /// cylinder's axis.
     pub fn silhouette_pair(&self) -> Option<Vec<Pick>> {
         let Some(Pick::Line { a, b }) = self.line_pick() else { return None };
-        let g = self.geoms.get(&a.view)?;
-        let u = norm(sub(b.p, a.p));
+        let n = self.silhouette_axis_offset(a.view, a.p, b.p)?;
+        let mirror = |p: &PickedPoint| PickedPoint { view: p.view, p: [p.p[0] + 2.0 * n[0], p.p[1] + 2.0 * n[1]], r: None };
+        Some(vec![Pick::Line { a: a.clone(), b: b.clone() }, Pick::Line { a: mirror(&a), b: mirror(&b) }])
+    }
+
+    /// For a line of a view that is a silhouette of a cylinder seen side on, the offset from the line to the
+    /// cylinder's axis.
+    pub fn silhouette_axis_offset(&self, view: ViewId, a: [f64; 2], b: [f64; 2]) -> Option<[f64; 2]> {
+        let g = self.geoms.get(&view)?;
+        let u = norm(sub(b, a));
         let off = |p: [f64; 2]| {
-            let t = dot(sub(p, a.p), u);
-            sub(p, [a.p[0] + u[0] * t, a.p[1] + u[1] * t])
+            let t = dot(sub(p, a), u);
+            sub(p, [a[0] + u[0] * t, a[1] + u[1] * t])
         };
-        let n = g.model_edges.iter().find_map(|me| match me.geom {
+        g.model_edges.iter().find_map(|me| match me.geom {
             views::EdgeGeom::Circle { center, radius, face_on: false, .. } => {
                 let n = off(center);
                 ((len(n) - radius).abs() < radius * 1e-3).then_some(n)
             }
             _ => None,
-        })?;
-        let mirror = |p: &PickedPoint| PickedPoint { view: p.view, p: [p.p[0] + 2.0 * n[0], p.p[1] + 2.0 * n[1]], r: None };
-        Some(vec![Pick::Line { a: a.clone(), b: b.clone() }, Pick::Line { a: mirror(&a), b: mirror(&b) }])
+        })
     }
 
     /// 2 point linear, Point to line and Line to line: the click adds only

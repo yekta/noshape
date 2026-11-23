@@ -19,60 +19,17 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
 `scp -3 vibex7:tmp/studios/noshape-uip vibex8:tmp/studios/noshape-uip`, sync vibex8 with `rb.sh bash -c true`, then
 `ssh vibex8 "bash -s" < script` (x184b.sh all, x184d.sh drw + hover matrices). Never vibe2. Every run under `timeout`;
 `touch -c` edited files before rb.sh. Full ops e2e before a crates/drawing or store land. Read logs with tail/grep only.
-- QUEUED 58eda2cb (11-23 02:3x; cb2709aa FAILED 02:14 on a handoff rebase conflict: rebuilt on origin/main by
-  cherry-pick): drag gaps L + N (leader end lights its target edge), DRW-DIM-HIDDEN-VERTEX-SNAP, DRW-CALLOUT-MENU-REMOVE-
-  LEADERS, section/detail View properties rows, P0 FEEL-PRIMARY-BUTTON-HOVER. Earlier stack LANDED.
-- QUEUED after it (11-23 02:3x; x253 green: ops e2e 492 + AGENT_API regenerated, drawing-ui 165, part-studio-ui
-  compare 5, clippy 5 crates; x254: the Enter test + drawing-ui clippy):
-  - DRW-TABLE-PREVIEW-UNDER-PANEL (table preview only while `!pointer_off`).
-  - Sections' Synchronize breaks row: `View.sync_breaks: Option<bool>`, `syncs_breaks()`, stored only off the kind default.
-  - HIST-REVERSE-COMPARE-BAND (compare_graphics watches the compared documents), HIST-COMPARE-EXIT-CAMERA
-    (`before_compare` camera), DRW-SCALE-CLICK-SELECTS.
-  - DRW-VIEWPROPS-ENTER-APPLIES (live viewprops-scale-enter-1123): Enter in Scale previews (ViewProps.entered ->
-    update_preview's chain), N:N text, Scale label follows scale != sheet scale, selection kept; ✓ applies on the
-    preview; ✕/Esc/tool/sheet props/reopen go through `drop_view_props`. Feel test
-    `enter_in_view_properties_scale_previews_until_ok`.
-- QUEUED 14f567d6 (02:35) carries 58eda2cb: one result for both.
-- QUEUED 52b9cfb9 (02:44, #2, carries 14f567d6 + 58eda2cb): DRW-TABLE-MID-HANDLES, DRW-SHEETS-CHEVRON-STATE /
-  EMPTY-CHEVRON, DRW-DETAIL-ROTATION-ANGLE, DRW-MOVE-TO-SHEET-PREVIEW. qa's 02:5x "still open" FEEL-PRIMARY-BUTTON-HOVER
-  and HIST-COMPARE-EXIT-CAMERA are in it (not on main when scored).
-- COMMITTED 11-23 04:0x (x260 green: drawing-ui 169, clippy 5 crates; x259 ops e2e 297 green), queued with the next
-  commit: move-to-sheet test, DRW-CALLOUT-DIALOG-LOOK (+ P3 DRW-CALLOUT-DIALOG-ICONS), HIST-TOAST-DROPPED-ON-RCLICK
-  (DocModel.notice_input; part studio notice stays 35 s after the last input).
-- Second commit (x261 + x262: part-studio feedback, feature-studio-ui, featurescript, model custom_features,
-  history-ui, clippy): FEEL-FS-COMMIT-DISABLED-HOVER (▾ 18 px, no divider, hover (128,158,205)); FS-EDITOR-SELECTION-
-  COLOUR #90bbf1 (vendor gpui-component Input/Editor `selection_color` patch; the caret claim not reproduced: left
-  open); FS-OUTLINE-ENCLOSING-SYMBOL (top-level symbols only, a table named alone: `Symbol::label`);
-  FS-TOOLBAR-RIGHT-GROUP (toolbar `w_full`: qa's run had the right group end at x 1640); FS-NOTICES-ICON-RED-ON-REGEN-
-  ERROR (featurescript `raise_noted` notices are Info = live's "Runtime/Modeling information"; dx's crate, tell dx);
-  FS-EDITOR-SOFT-WRAP (soft_wrap on); HIST-LEGEND-LOOK position (pb 20; the pin glyphs still open);
-  HIST-MERGE-DIALOG-LOOK (body min_h 432, a version source plain bold, select borderless); HIST-GRAPH-LOOK (lanes 12 px
-  apart, open lane 4 px / others 2 px, merge line source -> Merge node; version dot size not changed);
-  CUSTOM-TABLE-INFO-CELL (ⓘ 11 px at the right edge, section … #333).
-- STATE 05:30: QUEUED 3407a70e (8 commits: 8f66ab565 .. dac3f08e4, carries 52b9cfb9 / 14f567d6 / 58eda2cb's
-  content). Green before land: drawing-ui 192, fs-ui 31 (key_tests), history-ui 17, vs-ui 15, app-core actions 6,
-  part-studio feedback 2; land.sh clippy precheck passed on 14 crates. dac3f08e4: DRW-BOM-DIALOG-INSERT-ROW
-  (chooser.bom "Select a BOM", Assemblies only, Import = BOM data; the Other documents… modal + link row removed),
-  DRW-MOVED-VIEW-PROPS (linked projected view's orientation dropdown; ops apply_view_props makes it a Base view +
-  sync_links), DRW-MOVE-TO-SHEET-PLACE (open_move_sheet_at), UIP-ANNOTATION-STALE-POS (locator presses the drawn
-  text), DRW-DETAIL-PREVIEW-LOOK closed (live ink over empty sheet 160-175 = ours 164), HIST-TOAST-DROPPED-ON-RCLICK
-  closed (29331de49). After it lands: tell dx (roster.md id) featurescript raise_noted notices are Info now.
-  Local handoff commit on top (not queued; goes with the next land). Background watcher b13igqtld polls for
-  v0.4.68's macOS asset (none at 05:30); then run bin/mac-copycheck.sh 0.4.68 on the Mac (idle >= 600 s only) and
-  report <= 3 lines to the lead. DRW-SECTION-LABEL-GAP data: live 08 s4 section view at y 125.3, label 113.6.
-- STATE 06:41: QUEUED 7a12ac31 (7 commits: Callout boxes, FS/history/merge look, BOM Insert/moved view/move-to-sheet,
-  callout two-tone icons e88304220, FS caret 2 px, TICKETS dup drop; green: fs-ui 32, drawing-ui 192, clippy clean).
-  3407a70e had FAILED (rebase); 5 older local commits were already on main, rebased --onto past them.
-  After 7a12ac31 lands: tell dx (roster.md id) featurescript raise_noted notices are Info now.
-- STATE 07:16: QUEUED e6667368 (carries 7a12ac31) and c1a6b8de (on it): the drw-dims-1123 audit (Esc/right-click, H/V vs aligned, angular
-  parallel, tapped hole cell, invalid hover, hole callout hover, empty GD&T, datum, section label frame_gap).
-  Next land (this commit): DRW-DIMS-HOVER-COLOURS (edge_hover_colour: tan in Angle/PointLine/LineLine/Radius, orange
-  in the other edge tools + Hole callout + GD&T; SnapMark::VividDisc for Point2/PointLine/Angle3),
-  CIRCLE-CENTERLINE-QUAD (pick.rs circle_click_point: top quadrant, PointRef::Quadrant k 1), GDT edge click = leader
-  (drawing_gdt.rs; gtol-1119's no-leader test rewritten to 1123), datum needs snap_or_edge_point, edge-to-edge
-  non-parallel = bisector (commit.rs edge_pair_centerline), dx's DRW-FLOW-* rows (all matched or done). Green x277:
-  scene 218, drawing-ui 201, clippy scene + drawing-ui. DRW-DIMS-EDGE-CENTERLINE-SILENT concentric circles
-  closed: live fails there (red object), ours refuses silently. All DRW-DIMS-* / DRW-FLOW-* rows done.
+- STATE 07:46: NOT yet on main (queued: 7a12ac31 batch c5264d17d..aa2bc79cc, e6667368 = 3f9e8e994 drw-dims-1123,
+  c1a6b8de3, d607d23ad TICKETS). drw-dims-1123 / DRW-FLOW-* all done. Told dx at 07:2x raise_noted = Info, corrected:
+  only once landed.
+- Lead 07:2x: skasm did SKT-MENU-HEAD / PATTERN-DESELECT / MIRROR-AGAIN / TANGENT-ARC-DOT (mine reverted); studios
+  keeps SKT-USE-AGAIN: ops sketch_use external_entity reuses an external only for constraint/dimension picks
+  (construction) or a reference_only one; a 2nd Use of an edge makes a new copy (DECISIONS 11-23). e2e
+  sketch_use_intersection_and_model_references asserts 4 new lines on a 2nd top-face Use.
+- 07:5x: ops e2e (x278) caught 2 reds in queued c1a6b8de/3f9e8e994: Diameter hover refused a
+  cylinder silhouette (now lit: pick.rs silhouette_line_of + smart.rs silhouette_axis_offset), tapped hole table cell
+  dropped ISO's thread line (now ANSI only, drawing test covers both). x281 green: ops e2e 300, scene, clippy. 28462984f-ish
+  tip (with USE-AGAIN) queued on top of the stack.
 - FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 on main). live import-into-doc-1123: ours matches; rest is dx's.
 - Mac check: watcher bd5jb96zs polls v0.4.68's mac asset (not published at 06:28); then bin/mac-copycheck.sh 0.4.68
   (idle >= 600 s only), report <= 3 lines to the lead. Background runs/watchers die at session end: re-arm.
@@ -100,10 +57,8 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
     app-core start_library a_finder_copy_is_named_after_its_file_and_leftover_side_files_go; app quit_tests (2).
   - File association / open-file events are dx's (open_requests.rs); dx keys "already open" on canonical(path) and its
     second start never opens the store. Not yet verified on the Mac's release build.
-- DRW-DETAIL-PREVIEW-LOOK open: ink dark vs light (live2 164 vs qa shot), the dashed radius line in the parent circle.
 - drw-centerline-circle-3-point-hole-centres: live takes nothing on an exact Ø8 centre; ours takes it. Decision needed
   from the lead (copy or record as live's failure).
-- QUEUE: the Compare highlight not yet looked at in the app.
 
 
 ## Next, in order

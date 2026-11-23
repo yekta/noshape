@@ -817,6 +817,9 @@ fn sketch_use_intersection_and_model_references() {
     let lines = created(&used, "line");
     assert_eq!(lines.len(), 4, "{used}");
     assert!(lines.iter().all(|l| l["external"] == true), "{used}");
+    // Used again: another, coincident copy of each edge (live sketch-tools-1123, DECISIONS 11-23).
+    let again = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [top.clone()] }));
+    assert_eq!(created(&again, "line").len(), 4, "{again}");
     // The Origin used: a point where it projects, linked to it.
     let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": ["origin"] }));
     let p = created(&used, "point");

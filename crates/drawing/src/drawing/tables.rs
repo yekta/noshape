@@ -672,9 +672,9 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                         let hole = ctx.holes.iter().find(|x| x.matches_circle(c, r, r * 1e-3 + 1e-7))?;
                         let a = super::Annotation { format: DimFormat { precision: *precision, ..Default::default() }, ..Default::default() };
                         let mut lines = super::build::hole_callout_text(drawing, hole, 1, &a);
-                        // A tapped hole shows its tap drill alone, no thread line (live drw-dims-1123 hole-table.md: M8x1.25
-                        // reads "Ø.268 THRU").
-                        if hole.thread.is_some() && hole.tap_drill.is_some() {
+                        // A tapped hole in an ANSI drawing shows its tap drill alone (live drw-dims-1123 hole-table.md:
+                        // M8x1.25 reads "Ø.268 THRU"); ISO's adds the thread line (holetable-1119: "Ø5 THRU / M6x1 THRU").
+                        if drawing.is_ansi() && hole.thread.is_some() && hole.tap_drill.is_some() {
                             lines.truncate(1);
                         }
                         Some(lines.join("\n"))
