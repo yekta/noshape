@@ -413,7 +413,7 @@ pub fn prompt_open(gpu: Gpu, cx: &mut App) {
     // The folder a document was last opened from (user 11-12).
     let dir = start_dir(DialogPurpose::Document);
     cx.spawn(async move |cx| {
-        let file = rfd::AsyncFileDialog::new().set_title("Open Noshape document").set_directory(&dir).add_filter("Noshape document", &["noshape"]).pick_file().await;
+        let file = noshape_app_core::file_dialogs::filtered(rfd::AsyncFileDialog::new().set_title("Open Noshape document").set_directory(&dir), "Noshape document", &["noshape"]).pick_file().await;
         if let Some(f) = file {
             let path = f.path().to_path_buf();
             remember_choice(DialogPurpose::Document, &path);
