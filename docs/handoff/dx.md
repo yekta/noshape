@@ -58,6 +58,8 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   1362592de ordinate fan-out, 6778c1914 part_appearances `imported` rows, the styled-face merge T1, dcd70e18e import history entry
   "Import document" (green hd-run1: clippy ops+app, ops e2e 301, app import 5). Land all three with land.sh once
   538aa4b0 is through (the lead reports lands; no polling).
+- Queue otherwise empty (07:15): the rest waits on live (11-24 07:00), on other agents, or is parked by the lead.
+  Lead was at 320k at 07:15 (not messaged): tell it "queue empty, next task?" once it is under 200k.
 - Then tell qa: IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK once landed.
 - Blocked on live (PAUSED until 11-24 07:00): REQUESTS "dx 11-23 06:57" (a) composite colour, (b) panel rows +
   live STEP face colours.
