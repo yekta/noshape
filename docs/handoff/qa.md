@@ -13,8 +13,8 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   FEEL-CLICK-EMPTY-SELECTS-PLANE, SKETCH-LINE-STORES-PERPENDICULAR, ERR-FIELD-RANGE-TIP-ENTER (in-range 0 commits),
   FEEL-MC-PS-MARKER-REACH (half-way rule: ours' 18 px right; corner approach + back midpoint still differ); SPEED-IMPELLER split
   (bool ~1.1 s x2, the fillets are blend's). CTX-MENU-FLIP-UP open with psui.
-- **Subagent**: import fidelity (live/dx/import-fidelity-1123, 8 STEPs) vs ours, brief qa-scratch/brief-imp.md, vibe2 :496,
-  scratch qa-scratch/imp (resumed after a restart 02:15). On its result: file IMP-* rows per owner (dx, psui, asm), tell them.
+- DONE 02:3x: import fidelity (8 STEPs) filed TICKETS "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm), told. Not checked: NEMA BOMs, toast duration,
+  dialog focus. Xvfb :496 on vibe2 left running by the subagent (not ours to kill by pid). Data qa-scratch/imp.
   If its notification never comes, read qa-scratch/imp and rerun from the brief.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
