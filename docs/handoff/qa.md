@@ -5,17 +5,22 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 04:5x (new thread 04:1x, first)
-- **DONE 01:2x-03:0x** (TICKETS, owners told): errors-1123 a/b/c (37 rows), appearance (12), wf-1123 01-12 (02:1x) and 13-20 (03:0x),
-  import fidelity "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm; data qa-scratch/imp; Xvfb :496 on vibe2 is the subagent's, left running).
-- **sk23 DONE 04:5x**: TICKETS "qa 11-23 04:5x" (9 P0 + 8 P1, + user P0 SKT-OFFSET-BOX-LOOK); kit fixes sk23/an/ana2.py (window offset 562,350), gen_fix.py (chamfer cells). Verify on skasm/psui lands.
-- **CUT v0.4.68 DONE**: GO on green 31f1866d8 05:38 (qa-alerts, + detail line; 45dc53023's asm red did not recur). Lead cuts.
-  dx cf9f959a (=79b0abcb, 8 IMP rows) on main -> qa-wimp "IN-GREEN" -> subagent brief-impver.md; dx 538aa4b0 IMP-NO-FEEDBACK queued: recheck when green.
-- **errors-1123 core rows** rescored on 975bab060 (b6d50d9d3; core told). Core landed 099bb7abc/8417f0a85 (Add-pattern tint, bubble): rescore when green.
-- **Units on green 31f1866d8 05:1x**: ver7 matrix (hmr7-b, hmr7-ips) running on vibe2; rr-2782, rr-a936 running; rr-b8a1 done 05:16 (review out-wf23d/out-wfv4).
-- **qa-wait-5191** (blend 51916f785, c2-rings-loft Chamfer 1 "Overlapping chamfers." after the Ø20.5 edit): in green + compat -> qa-alerts line,
-  then the Ø20.5 edit (t23 cli_dim.py, +4/8/12 %) 0.4.67 vs green on vibex7 -> tmp/wait-5191.log "DIM-DONE". Close SPEED-RINGS-SHELL if
-  ~live (5.1 s) and Chamfer 1 errors as live; tell blend the numbers.
+## IN FLIGHT 06:3x (compaction next; first)
+- **Two subagents running (their results arrive as task notifications after the compaction; if lost, rerun from the briefs)**:
+  (1) psui errors-1123 re-verify: brief qa-scratch/brief-errver.md (+ brief-err.md), vibe2 :497, CTX-MENU-FLIP-UP via wf.sh out-wfv5 ->
+  apply row prefixes in TICKETS, tell psui. (2) asm dff49b598 scoring: rr-a936 outputs (mcinfer r9 asm cells, hm2/out-af-a936,
+  hm2/out-wf23h 04/05, hm2/hmr6-mc) + errors-1123 set c mate cells rerun with RE-MADE overdef docs (qa-scratch/err/c, vibe2 :496)
+  -> row prefixes, tickets/<T>-a936-1123.png; then tell asm (+ P1 FEEL-ASM-MOVE-RING-RIMS filed 8433b44fe).
+- **DONE today**: cut v0.4.68 GO on green 31f1866d8 05:38 (lead cuts; 45dc53023's asm red didn't recur). sk23 sketch tools filed
+  (cd5c34163, 9 P0 + 8 P1 + user P0 SKT-OFFSET-BOX-LOOK; skasm/psui told). errors-1123 core rows on 975bab060 (b6d50d9d3; core told).
+  psui b8a1 rescored (200ca055e; UIS-FIELD-NOT-SHOWN + CUSTOM-FEATURE-DIALOG-HELP verified, axis edge verified, EDIT-BODY-SHADE partly
+  top (138,148,154) vs (132,147,155), radius lines STILL white: correction 8433b44fe, psui told). SPEED-FILE-TAB-IMPORT-MENU verified
+  (cb63b6770, dx told). Hover matrix 114/125 (8433b44fe, kit hm2/score-31f1/bin: script scoring, no PNG reads).
+- **Waiting on green**: qa-wait-5191 (blend 7a39ced9 = 51916f785 subject: compat line + Ø20.5 edit 0.4.67 vs green on vibex7 ->
+  tmp/wait-5191.log DIM-DONE; close SPEED-RINGS-SHELL if ~live 5.1 s + Chamfer 1 "Overlapping chamfers."; tell blend + lead).
+  qa-wimp (dx cf9f959a = 79b0abcb, 8 IMP rows) -> "IN-GREEN" -> subagent brief-impver.md. dx 538aa4b0 IMP-NO-FEEDBACK queued: recheck when green.
+  core 099bb7abc/8417f0a85 (Add-pattern tint, bubble): rescore ERR-ADD-PATTERN-PREVIEW-TINT / ERR-BUBBLE-ON-ERROR when green (err/a r3 kit).
+- Note: vibe2 ~/tmp/qa/apps/noshape-green upload fails while an app runs from it (scp onto a busy binary): check noshape-green.sha.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
   wf-1122 12 out-wfv4: ROTATE-EDGE-SENSE, EDIT-BODY-SHADE, CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN);
