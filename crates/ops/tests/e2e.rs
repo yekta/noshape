@@ -2975,6 +2975,66 @@ fn import_composite_part_is_named_after_the_file() {
     assert!(parts["parts"].as_array().unwrap().iter().all(|p| p["kind"] == "Solid") && parts["parts"].as_array().unwrap().len() == 2, "{parts}");
 }
 
+/// The user's Mac mini (APPEARANCE-PART-UNDER-FACE-COLOURS: "I changed the part's appearance and nothing showed"): an
+/// imported part whose STEP colours the solid and one face of its own. A part appearance set later turns every other
+/// face and the styled face keeps its colour (live step-colours-1122: Main's 106 uncoloured faces turn, its 152 face
+/// appearances stay), also once the document is reopened.
+#[test]
+fn a_part_appearance_over_an_imports_face_colour_turns_the_other_faces() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "mm-appearance.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "parts": [part], "color": "#ececec" }));
+    let step = scratch("mm-block.step");
+    call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": step.to_str().unwrap() }));
+    // A face of its own colour, as the Mac mini's logo: a green STYLED_ITEM on the file's first face.
+    let text = std::fs::read_to_string(&step).unwrap();
+    let entities: Vec<(usize, String)> = text
+        .split(';')
+        .map(|e| e.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter_map(|e| e.strip_prefix('#').and_then(|l| l.split_once('=')).and_then(|(id, rest)| Some((id.trim().parse().ok()?, rest.trim().to_string()))))
+        .collect();
+    let find = |kind: &str| entities.iter().find(|(_, b)| b.contains(kind)).map(|(i, _)| *i).unwrap_or_else(|| panic!("no {kind} in {text}"));
+    let (face, context) = (find("ADVANCED_FACE("), find("GEOMETRIC_REPRESENTATION_CONTEXT(3)"));
+    let n = entities.iter().map(|(i, _)| *i).max().unwrap() + 1;
+    let added = format!(
+        "#{}=COLOUR_RGB('',0.,1.,0.);\n#{}=FILL_AREA_STYLE_COLOUR('',#{});\n#{}=FILL_AREA_STYLE('',(#{}));\n#{}=SURFACE_STYLE_FILL_AREA(#{});\n\
+         #{}=SURFACE_SIDE_STYLE('',(#{}));\n#{}=SURFACE_STYLE_USAGE(.BOTH.,#{});\n#{}=PRESENTATION_STYLE_ASSIGNMENT((#{}));\n\
+         #{}=STYLED_ITEM('color',(#{}),#{face});\n#{}=MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION('',(#{}),#{context});\n",
+        n, n + 1, n, n + 2, n + 1, n + 3, n + 2, n + 4, n + 3, n + 5, n + 4, n + 6, n + 5, n + 7, n + 6, n + 8, n + 7
+    );
+    let end = text.rfind("ENDSEC;").unwrap();
+    std::fs::write(&step, format!("{}{added}{}", &text[..end], &text[end..])).unwrap();
+    let r = call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let tab = r["tabs"].as_array().unwrap().iter().find(|t| t["kind"] == "Part Studio").unwrap_or_else(|| panic!("{r}"))["id"].as_str().unwrap().to_string();
+    let srgb = |c: f32| {
+        let c = c.clamp(0.0, 1.0);
+        let s = if c <= 0.0031308 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 };
+        (s * 255.0).round() as u8
+    };
+    let hex = |c: [f32; 4]| format!("#{:02x}{:02x}{:02x}", srgb(c[0]), srgb(c[1]), srgb(c[2]));
+    let looks = |ctx: &mut Ctx| {
+        let od = ctx.doc(None).unwrap();
+        let id = noshape_ops::doc::find_tab(od.doc(), &tab).unwrap();
+        let display = od.regenerate(id, None).unwrap().display;
+        assert_eq!(display.bodies.len(), 1, "one imported part");
+        let b = &display.bodies[0];
+        let own: Vec<String> = b.face_colors.iter().flatten().map(|c| hex(*c)).collect();
+        (hex(b.color), own, b.face_colors.iter().filter(|c| c.is_none()).count())
+    };
+    let (part_colour, own, plain) = looks(&mut ctx);
+    assert_eq!((part_colour.as_str(), own.clone()), ("#ececec", vec!["#00ff00".to_string()]), "as imported: the solid's colour, one green face");
+    assert!(plain >= 6, "the block's other faces take the part's colour: {plain}");
+    let imported = call(&mut ctx, "query_parts", json!({ "tab": tab }))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "tab": tab, "parts": [imported], "color": "#3b61b4" }));
+    let set = looks(&mut ctx);
+    assert_eq!(set, ("#3b61b4".to_string(), own.clone(), plain), "the part appearance turns every face but the green one");
+    let path = ctx.current_path().unwrap().to_path_buf();
+    ctx.close(None).unwrap();
+    call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+    assert_eq!(looks(&mut ctx), set, "reopened: as it was set");
+}
+
 #[test]
 fn materials_and_appearances() {
     let mut ctx = Ctx::new();
