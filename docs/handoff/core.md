@@ -168,12 +168,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    basic.rs boolean: SUBTRACTION non-offset tools named helpers_a::rebrand (Face{boolean, Generated(n)}), so the tool's
    face/feature appearances stop reaching the cut faces. T1 engine::subtract_cut_faces_are_the_booleans (both flags;
    a legacy flag only counts on a fresh Regenerator: set before the first regen, as on load).
-0. SPLIT NAMES + ORDER: landing (14ada4d50 + f69e26acf/d82ae7d31 in queue f30c88bf). Names = "Part <list position>",
+0. SPLIT NAMES + ORDER: QUEUED 1a64b9cb (07:2x, carries all core commits; rebase fix: psui blamed = failing && !attempt, main's Fillet attempt rule). Names = "Part <list position>",
    renamed parts count (ours already). Order (live split-order-1123): first piece = the one keeping the target's first
    face in creation order (model-data naming::extrude_face_order, moved from custom query.rs creation_order) not every
    piece keeps; only for one-Extrude bodies (else the old side sort). T1 features_a::split_pieces_take_… and
    the_first_split_piece_keeps_…; kernel/model/custom suites green with it.
-0. HOSE JOINTS: QUEUED f30c88bf (f69e26acf): op_sweep records (profile, path, options + the frame
+0. HOSE JOINTS: QUEUED in 1a64b9cb: op_sweep records (profile, path, options + the frame
    sweep_any_frame took) in CtxState.sweeps keyed by body SHAPE; op_shell Inside with both caps of a round sweep ->
    ring_sweep = the sweep cut by the sweep of the circle r-t (a ring face's sweep lay 3.6e-6 off the disc's walls);
    names: outer walls kept, inner Offset(wall) (|d-t| < 1e-5), ends Offset(rim edge). T1 custom_features::
@@ -189,7 +189,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    face); face history AddModified. Results: #7 698 -> 72 ms, #21 1008 ms (OCCT result garbage, volume -6.6e12) ->
    ~100 ms exact, #19/#22 (OCCT fails) valid; #8 (concave moved pair) falls back. BUG: dump #14 (1 plane +4 mm,
    neighbours CPCCP, a fuse) returns a NULL shape (probe panics at r.shape.volume()); a SLABDBG fprintf in the WIP
-   prints the result type: was running (vibex7 task) at 07:1x. Fix, drop SLABDBG + probe, then a T1 kernel test
+   prints the result type: read the remote ~/tmp/core/sc/od.out (grep SLABDBG/NULL; run started 07:1x). Fix, drop SLABDBG + probe, then a T1 kernel test
    (block with a pocket/boss: move a top face -/+; a hole wall), model/custom/ops suites, land; then Delete face 2
    (op_defeature 1.15 s). Many fillets/chamfers/Move face 2 there are Error in ours: maybe OCCT's broken offsets.
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
