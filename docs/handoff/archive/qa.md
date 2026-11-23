@@ -2373,3 +2373,36 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    qa-wait-psui-readout), P2 ASM-INSTANCE-PROPS-FIELD (asm), DOCS-CRUMB-TOOLTIP and VER-COMPARE-READOUT (studios); re-run-alone
    matches were artefacts. When score.log lands: diff vs 1119-1302 for the last ~40, route, then restart qa-suites (rm suites/stop).
    P2 T2-NIGHTLY-22-FAILURES filed for the lead. Speed left: FORM-PREVIEW gap vs live ~1.5 s on a quiet host.
+
+## 11-23 moved (06:2x): items 0z3, 0z2, 0z, 0y (11-18/11-19)
+0z3. **live2 fills interaction-feel's "Ours ?" cells on P0 rows (lead 11-18 ~12:15)**: done (2e8057c34): hover-p0 sketch reach outside
+   sketch mode, hover-pick-1120 edge vs face, sel-feel press + move over a default plane, measure-mass-1118 place, ps-feel2-1118
+   Y / Shift+Y. Next (live2's): manip-feel-1118 triad, other ps-feel2 rows, chips-expr-1118, field-keys-1118, asm, studios. Don't redo
+   them; ticket any "Ours != live" row live2 reports that has no ticket yet.
+   Ticketed 12:2x (batch 1: 5 rows, 9434d439a) and 12:3x (batch 2: 7 rows, 2ead983df). psui 12:4x: FILLET-DIALOG-WIDTH and the
+   MASS place came from /root's shared config (live2 retakes with a fresh NOSHAPE_CONFIG_DIR; close FILLET at 220); PLANE-FIRST-MOVE
+   and HIDE-TIMING fixed in psui's land queue: re-run both on their green (or take live2's retake).
+   13:2x-13:31: batches 7-8 ticketed (DRW-TOOLBAR-TOOLTIP-DELAY studios; ROLLBACK-DROP-INPLACE, MASS-VALUES-DELAY psui); rows 1088 / 1089
+   filled by qa (c563b91c4: wf/mkspd.py builds live's speed document, wf/spd.sh + spdlat.py on :153; ours faster). live2: every
+   UI-measurable "?" row done; the rest are client constants for owners' tests. live2 re-measures 1313 + hover-p0 on skasm's green.
+   Batch 3 (manip-feel 981-983) ticketed; live2 next: view-tools 992/993/995, field-keys 1309-1313, pattern-hole 1268-1280 (skip them).
+0z2. **P0 HEAVY-ASM-SOFTWARE-FRAME (lead 11:45; asm leads, psui later)**: xDev frames render in 46.7-49.4 s on llvmpipe (live 3.4 s
+   per zoom on SwiftShader); 84% llvmpipe in the profile. Repro + data sent 12:00 (TICKETS; qa-scratch/heavy perf1, prof1). Re-run
+   runperf.sh / probe.py (screen timings; the frame log's presents are UI frames only) on asm's fix. Driven-pattern rows wait for core's
+   DRIVEN-PATTERN-SWEEP (live's 723k-triangle solid is missing in ours).
+   asm 12:2x: cause = the angle-based display mesh (7.76 M triangles, 3 bodies blow up; a chord mesh is 1.05 M, render 15-18 s ->
+   2.95 s headless), handed to psui. Re-run heavy/runperf.sh + probe.py on psui's mesh fix. Snap reach: asm's live2-retake rule (51 px
+   box of the face under the pointer) queued; HOLD (lead 12:28: asm pulls / redoes e2c20cb2, which froze off-part): qa-wait-reach stopped;
+   start af/wait-reach.sh again only when asm says (it re-runs up / 45 deg on the first green with an asm
+   snap/reach commit after 12:20 (live 50-51 / 72 px).
+0z. Heavy-model feel (lead 09:10; c2-loft-guide-curves-driven-pattern r1-0914): full notes in archive "11-20 moved"; re-run when live's numbers land.
+0y. **Dock tab return P0 (lead 09:00)**: fff088e5 didn't fix v0.4.54's regression (09:01 same-run: v0.4.53 settle A / B-again
+   137 / 189 ms, release build of 80a64725 829 / 813; speed/tab-80a64725.txt, sent to psui). bin/tabrel.sh <sha> [nobuild]
+   (release build on vibe2, tabab vs v0.4.53 on vibex7, lock speed/tabrel.lock); unit qa-tabwatch runs it on the green of every
+   psui commit whose subject mentions a tab / hover card (seen list speed/tabwatch.seen). cut-must.txt has a "pending:DOCK-TAB-RETURN"
+   line (always HOLD): replace it with subject:<text>|<label> once a candidate brings settle to v0.4.53's. qa-wait-67eb retired.
+   rel-pub-all.sh's alert now names each compat section.
+   12:10: psui's fix is 9595bbf05 (handoff 182c0efc is skipped now). psui: the frame pair ~600-800 ms after each click is the UI
+   driver's state-read redraw (all builds), so "settle" flips 200 / 800 ms; tabrel now reports psui's "tab drawn (2nd frame)" and the
+   last frame over 10 returns (5 rounds), and lat-steps.py ends settle at the first "driver" event (logged once psui's 3de2cd04 lands;
+   v0.4.53 has none, so compare the 2nd frame across builds). psui's A/B: 2nd frame fix 224 / 0.4.53 218 / green 321 ms.

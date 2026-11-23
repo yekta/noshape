@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-23 02:4x)
+# QA handoff (agent qa; current state only, updated 2026-11-23 06:2x)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -17,9 +17,9 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   top (138,148,154) vs (132,147,155), radius lines STILL white: correction 8433b44fe, psui told). SPEED-FILE-TAB-IMPORT-MENU verified
   (cb63b6770, dx told). Hover matrix 114/125 (8433b44fe, kit hm2/score-31f1/bin: script scoring, no PNG reads).
 - **Waiting on green**: qa-wait-5191 (blend 7a39ced9 = 51916f785 subject: compat line + Ø20.5 edit 0.4.67 vs green on vibex7 ->
-  tmp/wait-5191.log DIM-DONE; close SPEED-RINGS-SHELL if ~live 5.1 s + Chamfer 1 "Overlapping chamfers."; tell blend + lead).
-  qa-wimp (dx cf9f959a = 79b0abcb, 8 IMP rows) -> "IN-GREEN" -> subagent brief-impver.md. dx 538aa4b0 IMP-NO-FEEDBACK queued: recheck when green.
-  core 099bb7abc/8417f0a85 (Add-pattern tint, bubble): rescore ERR-ADD-PATTERN-PREVIEW-TINT / ERR-BUBBLE-ON-ERROR when green (err/a r3 kit).
+  tmp/wait-5191.log DIM-DONE; compat 06:17 SAME (rings 12.0 vs 10.7 s); 0.4.67 dim edits 34-43 s, green edits RUNNING; close SPEED-RINGS-SHELL if ~live 5.1 s + Chamfer 1 "Overlapping chamfers."; tell blend + lead).
+  cf9f959a IN GREEN 05:46: IMP subagent (brief-impver.md, vibe2 Xvfb :495) RUNNING 06:2x. dx 538aa4b0 IMP-NO-FEEDBACK queued: recheck when green.
+  core 099bb7abc/8417f0a85 (Add-pattern tint, bubble): IN GREEN 3bfecbbda: rerun 06:2x err/a/bin/go.sh r4 "c-*remove-miss*" (bubble) + err/b/batch.sh lp-dist0 (tint, out/lp-dist0); score vs r3.
 - Note: vibe2 ~/tmp/qa/apps/noshape-green upload fails while an app runs from it (scp onto a busy binary): check noshape-green.sha.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
@@ -152,37 +152,6 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
    Live's selection latency with qa's method (behaviours "qa (lead 11-18): live's selection / hover latency"): face 964 / plane 955 /
    row 693 / box 15321 ms screen medians (software); ours 216 / 153 / 163 / 218: ours faster on every row.
    feat3 done 06:32: features > 5x live routed (blend 12, core 11, bool 5 rows; messages 06:40).
-0z3. **live2 fills interaction-feel's "Ours ?" cells on P0 rows (lead 11-18 ~12:15)**: done (2e8057c34): hover-p0 sketch reach outside
-   sketch mode, hover-pick-1120 edge vs face, sel-feel press + move over a default plane, measure-mass-1118 place, ps-feel2-1118
-   Y / Shift+Y. Next (live2's): manip-feel-1118 triad, other ps-feel2 rows, chips-expr-1118, field-keys-1118, asm, studios. Don't redo
-   them; ticket any "Ours != live" row live2 reports that has no ticket yet.
-   Ticketed 12:2x (batch 1: 5 rows, 9434d439a) and 12:3x (batch 2: 7 rows, 2ead983df). psui 12:4x: FILLET-DIALOG-WIDTH and the
-   MASS place came from /root's shared config (live2 retakes with a fresh NOSHAPE_CONFIG_DIR; close FILLET at 220); PLANE-FIRST-MOVE
-   and HIDE-TIMING fixed in psui's land queue: re-run both on their green (or take live2's retake).
-   13:2x-13:31: batches 7-8 ticketed (DRW-TOOLBAR-TOOLTIP-DELAY studios; ROLLBACK-DROP-INPLACE, MASS-VALUES-DELAY psui); rows 1088 / 1089
-   filled by qa (c563b91c4: wf/mkspd.py builds live's speed document, wf/spd.sh + spdlat.py on :153; ours faster). live2: every
-   UI-measurable "?" row done; the rest are client constants for owners' tests. live2 re-measures 1313 + hover-p0 on skasm's green.
-   Batch 3 (manip-feel 981-983) ticketed; live2 next: view-tools 992/993/995, field-keys 1309-1313, pattern-hole 1268-1280 (skip them).
-0z2. **P0 HEAVY-ASM-SOFTWARE-FRAME (lead 11:45; asm leads, psui later)**: xDev frames render in 46.7-49.4 s on llvmpipe (live 3.4 s
-   per zoom on SwiftShader); 84% llvmpipe in the profile. Repro + data sent 12:00 (TICKETS; qa-scratch/heavy perf1, prof1). Re-run
-   runperf.sh / probe.py (screen timings; the frame log's presents are UI frames only) on asm's fix. Driven-pattern rows wait for core's
-   DRIVEN-PATTERN-SWEEP (live's 723k-triangle solid is missing in ours).
-   asm 12:2x: cause = the angle-based display mesh (7.76 M triangles, 3 bodies blow up; a chord mesh is 1.05 M, render 15-18 s ->
-   2.95 s headless), handed to psui. Re-run heavy/runperf.sh + probe.py on psui's mesh fix. Snap reach: asm's live2-retake rule (51 px
-   box of the face under the pointer) queued; HOLD (lead 12:28: asm pulls / redoes e2c20cb2, which froze off-part): qa-wait-reach stopped;
-   start af/wait-reach.sh again only when asm says (it re-runs up / 45 deg on the first green with an asm
-   snap/reach commit after 12:20 (live 50-51 / 72 px).
-0z. Heavy-model feel (lead 09:10; c2-loft-guide-curves-driven-pattern r1-0914): full notes in archive "11-20 moved"; re-run when live's numbers land.
-0y. **Dock tab return P0 (lead 09:00)**: fff088e5 didn't fix v0.4.54's regression (09:01 same-run: v0.4.53 settle A / B-again
-   137 / 189 ms, release build of 80a64725 829 / 813; speed/tab-80a64725.txt, sent to psui). bin/tabrel.sh <sha> [nobuild]
-   (release build on vibe2, tabab vs v0.4.53 on vibex7, lock speed/tabrel.lock); unit qa-tabwatch runs it on the green of every
-   psui commit whose subject mentions a tab / hover card (seen list speed/tabwatch.seen). cut-must.txt has a "pending:DOCK-TAB-RETURN"
-   line (always HOLD): replace it with subject:<text>|<label> once a candidate brings settle to v0.4.53's. qa-wait-67eb retired.
-   rel-pub-all.sh's alert now names each compat section.
-   12:10: psui's fix is 9595bbf05 (handoff 182c0efc is skipped now). psui: the frame pair ~600-800 ms after each click is the UI
-   driver's state-read redraw (all builds), so "settle" flips 200 / 800 ms; tabrel now reports psui's "tab drawn (2nd frame)" and the
-   last frame over 10 returns (5 rounds), and lat-steps.py ends settle at the first "driver" event (logged once psui's 3de2cd04 lands;
-   v0.4.53 has none, so compare the 2nd frame across builds). psui's A/B: 2nd frame fix 224 / 0.4.53 218 / green 321 ms.
 0b. **LOADED runs (lead 21:50)**: speed / timing at load > 16 (2 x 8 cores) don't count. suites-diff.py prints "LOADED: …" first,
    skips speed lines and tags timing scenarios "(LOADED)"; qa-suites.sh touches <run>/LOADED and alerts. Absolute speed only from
    the 02:00-04:00 nightly. The 21:03 run (vibex7, load ~60) and 11:19 run (load 19) are LOADED.
