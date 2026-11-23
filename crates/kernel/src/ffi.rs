@@ -267,6 +267,11 @@ pub(crate) mod ffi {
         solid_index: Vec<u32>,
         solid_names: Vec<String>,
         solid_body: Vec<u32>,
+        /// Colours the file gives a shape's solids (STEP: a MANIFOLD_SOLID_BREP's or its shell's style): (shape
+        /// index, solid index, sRGB) per entry; each is its part's colour.
+        solid_color_part: Vec<u32>,
+        solid_color_index: Vec<u32>,
+        solid_colors: Vec<f32>,
     }
 
     /// A STEP assembly: its distinct parts (own coordinates, OCCT mm) and
