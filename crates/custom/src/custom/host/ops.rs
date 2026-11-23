@@ -1426,6 +1426,7 @@ fn op_shell(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let refs = evaluate_refs(i, &cx, def.get("entities"))?;
     let t = def_length(i, &def, "thickness")?;
+    let sweeps = cx.state.lock().sweeps.clone();
     run_op(i, &cx, &id, "SHELL_FAILED", |ev| {
         let faces = ev.resolve_faces(&refs);
         let mut bodies: Vec<usize> = faces.iter().map(|f| f.0).collect();
@@ -1436,6 +1437,13 @@ fn op_shell(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let body = ev.ctx.bodies[bi].clone();
             let removed: Vec<Shape> = faces.iter().filter(|f| f.0 == bi).filter_map(|f| body.shape.sub_shape(ShapeType::Face, f.1).ok()).collect();
             let side = if t < 0.0 { k::ShellSide::Inside } else { k::ShellSide::Outside };
+            if side == k::ShellSide::Inside
+                && let Some((_, r)) = sweeps.iter().find(|(s, _)| *s == body.shape)
+                && let Some((shape, names)) = ring_sweep(r, &body, &removed, t.abs(), ev.feature)
+            {
+                ev.replace_body(bi, shape, names);
+                continue;
+            }
             // As the Shell feature (live 1765: std's own opShell is what the feature calls).
             let res = crate::regen::features::detail::shell_part(&body.shape, &removed, t.abs(), side)?;
             let names = body.shape_names();
@@ -1446,6 +1454,46 @@ fn op_shell(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         Ok(())
     })?;
     Ok(Value::Undefined)
+}
+
+/// A round sweep shelled inwards with both ends open, as the sweep cut by the sweep of the circle `t` inside: the inner
+/// walls meet at the path's joints as exactly as the outer ones (cf-hose-routing's hoses; an offset of each wall leaves
+/// them 5e-8 apart where the walls' normals differ by 5e-5, live's meet exactly). Named as the shell names them: the
+/// outer walls keep their names, an inner wall is its outer wall's offset, an end the offset of its circle.
+fn ring_sweep(r: &super::SweepRecipe, body: &crate::regen::context::Body, removed: &[Shape], t: f64, feature: crate::reference::FeatureId) -> Option<(Shape, Vec<Name>)> {
+    let caps: Vec<k::Plane> = removed.iter().filter_map(|f| f.face_plane().ok().flatten()).collect();
+    let [edge] = r.profile.edges().try_into().ok()?;
+    let k::Curve::Circle { center, axis, radius, .. } = edge.edge_curve().ok()? else { return None };
+    if caps.len() != 2 || removed.len() != 2 || radius - t < 1e-6 || r.profile.faces().len() != 1 {
+        return None;
+    }
+    let plane = r.profile.face_plane().ok().flatten()?;
+    let disc = k::make_face(&plane, &k::make_wire(&[k::make_circle(center, axis, radius - t).ok()?]).ok()?, &[]).ok()?;
+    let core = k::sweep(&disc, &r.path, &r.opts).ok()?.shape;
+    let res = k::cut(&body.shape, &core).ok()?.shape;
+    let walls: Vec<(Shape, Name)> = body.shape.faces().into_iter().zip(body.faces.iter().cloned()).filter(|(f, _)| f.face_plane().ok().flatten().is_none()).collect();
+    if !res.is_valid() || res.count(ShapeType::Solid) != 1 || res.faces().len() != 2 * walls.len() + 2 || body.shape.faces().len() != walls.len() + 2 {
+        return None;
+    }
+    let mid = |f: &Shape| f.uv_bounds().ok().and_then(|[u0, u1, v0, v1]| f.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok());
+    let off = |f: &Shape, p: DVec3| k::max_deviation(f, &[p]).unwrap_or(f64::MAX);
+    let names = body.shape_names();
+    let rim = |c: &k::Plane| body.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| e.point_at((i.first_param + i.last_param) * 0.5).is_ok_and(|p| (p - c.origin).dot(c.normal).abs() < 1e-7))).and_then(|i| names.edges.get(i).cloned());
+    let offset = |n: Name| Arc::new(TopoName::face(feature, Role::Offset(n)));
+    let mut out = Vec::new();
+    for f in res.faces() {
+        let p = mid(&f)?;
+        let name = match f.face_plane().ok().flatten() {
+            Some(_) => offset(rim(caps.iter().find(|c| (p - c.origin).dot(c.normal).abs() < 1e-7)?)?),
+            None => match walls.iter().map(|(w, n)| (off(w, p), n)).min_by(|a, b| a.0.total_cmp(&b.0))? {
+                (d, n) if d < 1e-7 => n.clone(),
+                (d, n) if (d - t).abs() < 1e-5 => offset(n.clone()),
+                _ => return None,
+            },
+        };
+        out.push(name);
+    }
+    Some((res, out))
 }
 
 fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -1620,7 +1668,7 @@ fn round_about_path(profile: &Shape, path: &Shape) -> bool {
     })
 }
 
-fn sweep_any_frame(profile: &Shape, path: &Shape, opts: &k::SweepOptions) -> k::Result<k::OpResult> {
+fn sweep_any_frame(profile: &Shape, path: &Shape, opts: &k::SweepOptions) -> k::Result<(k::OpResult, k::SweepMode)> {
     let mut last = None;
     // A round profile by the discrete frame first: the corrected Frenet frame turns back and forth along a hose's
     // straight pieces (cf-hose-routing: 2 mm³ off the exact tube, its seam 0.25 mm off its plane).
@@ -1631,8 +1679,8 @@ fn sweep_any_frame(profile: &Shape, path: &Shape, opts: &k::SweepOptions) -> k::
     };
     for mode in modes {
         match k::sweep(profile, path, &k::SweepOptions { mode, ..opts.clone() }) {
-            Ok(r) if r.shape.is_valid() => return Ok(r),
-            Ok(r) => last = Some(Ok(r)),
+            Ok(r) if r.shape.is_valid() => return Ok((r, mode)),
+            Ok(r) => last = Some(Ok((r, mode))),
             Err(e) => last = Some(Err(e)),
         }
     }
@@ -1646,7 +1694,7 @@ fn op_sweep(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // The profile's own orientation kept, or kept square to a direction (sweep.fs sets these from Profile control).
     let keep = def_bool(&def, "keepProfileOrientation", false) || def_enum(&def, "profileControl").is_some_and(|c| &*c == "KEEP_ORIENTATION");
     let lock_dir = vec3_of(def.get("lockDirection")).filter(|d| d.length() > 1e-12).map(|d| d.normalize());
-    run_op(i, &cx, &id, "SWEEP_FAILED", |ev| {
+    let recipe = run_op(i, &cx, &id, "SWEEP_FAILED", |ev| {
         // Onshape's opSweep on empty selections, path first (as the Sweep feature).
         if path.is_empty() {
             return Err(super::code_error_faulty("SWEEP_SELECT_PATH", &["path"]));
@@ -1660,16 +1708,18 @@ fn op_sweep(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         // A sharp corner of the path mitred, as the Sweep feature (Onshape's: the pieces meet in the plane that halves
         // it); the transformed sections where that fails.
         let mitred = k::SweepOptions { transition: k::SweepTransition::RightCorner, ..opts.clone() };
+        let mut recipes = Vec::new();
         for p in ev.profiles(&profiles)? {
             let mode = if keep { Some(k::SweepMode::Fixed { z: p.frame.normal, x: p.frame.x }) } else { lock_dir.map(k::SweepMode::Binormal) };
-            let run = |o: &k::SweepOptions| match &mode {
-                Some(m) => k::sweep(&p.shape, &wire, &k::SweepOptions { mode: *m, ..o.clone() }),
+            let run = |o: &k::SweepOptions| match mode {
+                Some(m) => k::sweep(&p.shape, &wire, &k::SweepOptions { mode: m, ..o.clone() }).map(|r| (r, m)),
                 None => sweep_any_frame(&p.shape, &wire, o),
             };
-            let res = match run(&mitred) {
-                Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) > 0 => r,
-                _ => run(&opts).map_err(|e| fe(format!("Sweep failed: {e}")))?,
+            let ((res, mode), used) = match run(&mitred) {
+                Ok(r) if r.0.shape.is_valid() && r.0.shape.count(ShapeType::Solid) > 0 => (r, &mitred),
+                _ => (run(&opts).map_err(|e| fe(format!("Sweep failed: {e}")))?, &opts),
             };
+            recipes.push(super::SweepRecipe { profile: p.shape.clone(), path: wire.clone(), opts: k::SweepOptions { mode, ..used.clone() } });
             let names = sweep_names(ev, &p, &res, true, true);
             tools.push(NamedShape::new(res.shape.clone(), names));
         }
@@ -1679,8 +1729,18 @@ fn op_sweep(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             tools.push(NamedShape::new(res.shape, names));
         }
         let kind = if tools.iter().all(|t| t.shape.solids().is_empty()) { BodyKind::Surface } else { BodyKind::Solid };
-        add_bodies(ev, tools, kind)
+        let before: HashSet<BodyId> = ev.ctx.bodies.iter().map(|b| b.id.clone()).collect();
+        add_bodies(ev, tools, kind)?;
+        // One profile swept into one body: its recipe, for a Shell of it.
+        let made: Vec<Shape> = ev.ctx.bodies.iter().filter(|b| !before.contains(&b.id)).map(|b| b.shape.clone()).collect();
+        Ok(match (made.as_slice(), recipes.len()) {
+            ([one], 1) => recipes.pop().map(|r| (one.clone(), Arc::new(r))),
+            _ => None,
+        })
     })?;
+    if let Some(made) = recipe {
+        cx.state.lock().sweeps.push(made);
+    }
     Ok(Value::Undefined)
 }
 

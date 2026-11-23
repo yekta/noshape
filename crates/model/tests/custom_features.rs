@@ -5008,3 +5008,69 @@ fn a_documents_notices_compile_is_the_regenerations() {
     }
     assert_ne!(custom::doc_imports(&doc).key(), key, "a new key for an edited studio");
 }
+
+const HOSE: &str = r#"
+annotation { "Feature Type Name" : "Hose" }
+export const hose = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Shell" }
+        definition.shell is boolean;
+    }
+    {
+        const p = [vector(0, 0, 0), vector(0, 0, 50), vector(30, 0, 80), vector(80, 0, 80)];
+        const d = [[vector(0, 0, 50), vector(0, 0, 50)], [vector(0, 0, 40), vector(40, 0, 0)], [vector(50, 0, 0), vector(50, 0, 0)]];
+        var path = qUnion([]);
+        for (var i = 0; i < 3; i += 1)
+        {
+            opFitSpline(context, id + ("fit" ~ i), { "points" : [p[i] * millimeter, p[i + 1] * millimeter], "startDerivative" : d[i][0] * millimeter, "endDerivative" : d[i][1] * millimeter });
+            path = qUnion([path, qCreatedBy(id + ("fit" ~ i), EntityType.EDGE)]);
+        }
+        const sketch = newSketchOnPlane(context, id + "sketch", { "sketchPlane" : plane(vector(0, 0, 0) * millimeter, vector(0, 0, 1)) });
+        skCircle(sketch, "circle", { "center" : vector(0, 0) * millimeter, "radius" : 5 * millimeter });
+        skSolve(sketch);
+        opSweep(context, id + "sweep", { "profiles" : qSketchRegion(id + "sketch", false), "path" : path });
+        if (definition.shell)
+            opShell(context, id + "shell", { "entities" : qGeometry(qCreatedBy(id + "sweep", EntityType.FACE), GeometryType.PLANE), "thickness" : -1 * millimeter });
+    });
+"#;
+
+/// cf-hose-routing's hose (dx HOSE-RINGS): a circle swept along fitted splines and shelled inwards with its ends open is
+/// the sweep of the ring, its inner walls meeting at the joints as exactly as the outer ones (live's x_t: every edge on
+/// its faces; an offset of each wall left the inner joints 5e-8 apart): every edge within 1e-8 of its faces.
+#[test]
+fn a_shelled_round_sweep_meets_exactly_at_its_joints() {
+    let fx = Fixture::new(&studio(HOSE));
+    let hose = PartStudio::new().new_feature(&fx.ty("hose"), &fx.units).unwrap();
+    let run = |shell: bool| {
+        let mut ps = PartStudio::new();
+        let mut f = hose.clone();
+        f.params.set("shell", ParamValue::Bool(shell));
+        ps.features.push(f);
+        let r = fx.regen(&mut Regenerator::new(), &ps);
+        assert_ok(&r);
+        r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the hose").clone()
+    };
+    let (solid, hose) = (run(false), run(true));
+    let walls = solid.faces.len() - 2;
+    assert_eq!(hose.faces.len(), 2 * walls + 2, "outer and inner walls, two ring ends");
+    let v = |b: &noshape_model::regen::context::Body| b.shape.volume().unwrap();
+    assert!((v(&hose) / v(&solid) - 9.0 / 25.0).abs() < 1e-6, "{} {}", v(&hose), v(&solid));
+    // Each edge's distance off its faces.
+    let devs = |s: &noshape_kernel::Shape| -> Vec<f64> {
+        let (faces, ef) = (s.faces(), s.edge_faces().unwrap());
+        s.edges()
+            .iter()
+            .zip(&ef)
+            .map(|(e, fs)| {
+                let i = e.edge_info().unwrap();
+                let pts: Vec<_> = (0..=20).map(|k| e.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / 20.0).unwrap()).collect();
+                fs.iter().map(|&f| noshape_kernel::max_deviation(&faces[f as usize], &pts).unwrap()).fold(0.0, f64::max)
+            })
+            .collect()
+    };
+    let hd = devs(&hose.shape);
+    assert!(hd.iter().all(|d| *d < 1e-8), "{hd:?}");
+    // The outer walls keep the sweep's names.
+    assert!(solid.faces.iter().filter(|n| hose.faces.contains(n)).count() >= walls);
+}

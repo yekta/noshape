@@ -112,6 +112,13 @@ type AttrField = (usize, HashMap<Arc<str>, Vec<usize>>);
 /// A sketch piece's points that are only curves' ends.
 pub type CurveEnds = Arc<std::collections::HashSet<u32>>;
 
+/// An opSweep's inputs: its profile face, its path wire and the options it swept with (the frame it took too).
+pub struct SweepRecipe {
+    pub profile: noshape_kernel::Shape,
+    pub path: noshape_kernel::Shape,
+    pub opts: noshape_kernel::SweepOptions,
+}
+
 pub struct CtxState {
     pub ctx: Context,
     /// The Part Studio feature being evaluated.
@@ -127,6 +134,10 @@ pub struct CtxState {
     /// bodies are modifiable there (std derive keeps a form studio's flat
     /// sketch with its tools).
     pub loaded: bool,
+    /// How opSweep made each body it swept from one profile (the profile, the path, the options that worked), by the
+    /// body's shape (a body's id changes when the feature's operation ends): opShell of a round one sweeps the ring
+    /// instead ([`SweepRecipe`]).
+    pub sweeps: Vec<(noshape_kernel::Shape, Arc<SweepRecipe>)>,
     transient_ids: HashMap<Arc<str>, Reference>,
     /// Transient ids earlier features of the regeneration handed out ([`Context::fs_transient_next`]): this one's
     /// count on from there.
@@ -335,6 +346,7 @@ impl FsContext {
                 outer_vars,
                 xform,
                 loaded: false,
+                sweeps: Vec::new(),
                 transient_ids: HashMap::new(),
                 transient_base,
                 transient_of: HashMap::new(),
