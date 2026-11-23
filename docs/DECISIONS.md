@@ -201,3 +201,7 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-22 (lead) Our Boolean moves to per-pair tolerances (bool, P1): one global tolerance band (2x the largest input's)
   breaks junctions between precise tools when one input is imported loose (c2-gamma-imported Boolean 1, 87 tools, ~24 s
   on OCCT vs live's ~0.25 s document). Staged, each stage through the full Boolean gate (+0 -0 on every corpus).
+- 11-23 (lead) Subtract's cut faces take the target part's colour, as live's (core). They get Boolean-based names for
+  that, gated by the Part Studio's feature version: older studios keep their current names so references don't break.
+- 11-23 (lead) Importing into an existing Part Studio is Onshape's route: Derived › the picker's Import… (the file becomes
+  its own tab, Derived brings its parts in, linked). No direct "import into this Part Studio" beyond what live offers.
