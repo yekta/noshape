@@ -3954,3 +3954,22 @@ All below is UNCOMMITTED in dx-open; UI crates + app check clean (b4), ops tests
   coverage:: (UPDATE_DOCS) -> commit "dx: agent API: …" -> land. Then batch 2 (drawings), then (b) below.
 - c2e4fc1b LANDED 10:02 (52581c36); af0bd186 LANDED (4b51bd939). Hex DXF rerun matches.
 
+
+## Committed: hose x_t END rings (core 11-23 03:0x: "please take the END rings")
+- xt.cpp: Chart + chart_of (19 exact points + closing, damped Newton), intersection_curve (CHART, LIMIT H,
+  INTERSECTION, INTERSECTION_DATA from 30.0 via Writer::schema), prepared() keeps a charted ring whole, edge pass
+  charts closed off-face edges before refit. Debug stripped. a_hoses_walls_write_whole now (12, 26, 16): the 2 end
+  rings (offset wall x cap plane) whole; the 4 rings left cut are TANGENT joints between two offset walls (angle
+  ~1e-6: ill-posed, Newton stalls ~1e-9 m) = core's sweep, not mine. exa1 hose1: ours reads ours back 7/7.
+- Green: kernel 590, ops export 17, clippy. Live 04:47 imports ours clean (live/dx/hose-rings-1123): 8 solids,
+  hoses 12 faces / 16 edges / 8 vertices. Committed after 66f66b451; land once 79b0abcb is through, tell core.
+- Live (python3 dx-scratch/bin/xtdumpfull.py /root/parity/exchange/cf-hose-routing/live.x_t 40,41,204): ring edge
+  curve = INTERSECTION(surface=[OFFSET_SURF, PLANE], chart, start=end=LIMIT type H at the first chart point),
+  edge tolerance None, fins curve 0, no vertex. CHART: Base_parameter 0, Base_scale 1, Chart_count 20 (closed: last
+  point = first), Chordal_error 1.13e-4, Angular_error 0.337, Parameter_error [None,None]. INTERSECTION_DATA (v30+
+  only; our writer's v12 schema has none): uv_type 4, (u1,v1,u2,v2) per chart point.
+- Writer xt.cpp: edge pass ~1895 (deviation -> refit -> else edge_tol = tolerant SP_CURVE fins); add: a closed
+  tolerant edge between two faces -> exact chart points (march + refine on both surfaces), INTERSECTION node;
+  surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
+  xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
+

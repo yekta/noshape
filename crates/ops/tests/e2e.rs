@@ -2972,6 +2972,50 @@ fn an_imports_own_face_colours_are_listed_as_its_face_appearances() {
     assert!(a["appearances"].as_array().is_none_or(|l| l.is_empty()), "the panel's own rows stay apart: {a}");
 }
 
+/// Two files in one import: each file's Part Studio goes right after the open tab, so the later one sits nearest it
+/// (live import-into-doc-1123: clamp-guillem, then c2-duct-multipart in front of it); one blob each in CAD Imports.
+#[test]
+fn two_imported_files_each_go_right_after_the_open_tab() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("import-two.noshape").to_str().unwrap() }));
+    let data = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/");
+    call(&mut ctx, "import_files", json!({ "files": [format!("{data}face-colour.step"), format!("{data}parts3.step")] }));
+    let tabs: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    let at = |n: &str| tabs.iter().position(|t| t == n).unwrap_or_else(|| panic!("{n}: {tabs:?}"));
+    assert_eq!((at("parts3"), at("face-colour")), (at("Part Studio 1") + 1, at("Part Studio 1") + 2), "{tabs:?}");
+}
+
+/// Bringing a file into an existing Part Studio (live import-into-doc-1123 §6): Import adds its own tab, and a Derived of
+/// that tab gives the Part Studio the same parts, names and colours ("Derived 1"); the link is live (a part deleted in the
+/// imported tab goes from the Part Studio at once), and a second Derived of the same tab is refused in live's words.
+#[test]
+fn an_imported_tab_derived_into_a_part_studio_keeps_its_parts_names_and_colours() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("import-derived.noshape").to_str().unwrap() }));
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/face-colour.step");
+    call(&mut ctx, "import_files", json!({ "files": [file] }));
+    let looks = |ctx: &mut Ctx, tab: &str| -> Vec<(String, String)> {
+        let mut l: Vec<(String, String)> = call(ctx, "query_parts", json!({ "tab": tab }))["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), p["color"].as_str().unwrap_or("").to_string())).collect();
+        l.sort();
+        l
+    };
+    let imported = looks(&mut ctx, "face-colour");
+    assert_eq!(imported.len(), 3, "{imported:?}");
+    let d = call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": "importDerived", "params": { "partStudio": "face-colour" } }));
+    assert_eq!(d["feature_status"]["status"], "Ok", "{d}");
+    let g = call(&mut ctx, "feature_get", json!({ "tab": "Part Studio 1", "feature": d["feature"].clone() }));
+    assert_eq!(g["name"], "Derived 1", "{g}");
+    assert_eq!(looks(&mut ctx, "Part Studio 1"), imported);
+    let again = call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": "importDerived", "params": { "partStudio": "face-colour" } }));
+    assert_eq!(again["feature_status"]["message"], "Creating multiple Derived features from the same source and configuration is not allowed. Consider editing the previous Derived feature.", "{again}");
+    call(&mut ctx, "feature_delete", json!({ "tab": "Part Studio 1", "features": [again["feature"].clone()] }));
+    let first = call(&mut ctx, "query_parts", json!({ "tab": "face-colour" }))["parts"][0].clone();
+    call(&mut ctx, "feature_add", json!({ "tab": "face-colour", "type": "deleteBodies", "params": { "entities": [first["id"].clone()] } }));
+    let left = looks(&mut ctx, "Part Studio 1");
+    assert_eq!(left.len(), 2, "{left:?}");
+    assert!(!left.iter().any(|(n, _)| n == first["name"].as_str().unwrap()), "{left:?}");
+}
+
 /// Import's "Create a composite part" on a file of two solids: one closed composite named after the file, in a
 /// colour of its own (live import-fidelity-1123: usbc, Mac mini); with Combine the option is off, as its hidden box.
 #[test]

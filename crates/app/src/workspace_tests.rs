@@ -275,6 +275,18 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     // Live import-toast-1122: the green ✓ bubble, gone after 5 s.
     let look = doc.read_with(cx, |d, _| d.notice_link("block.step has been imported.").map(|l| (l.kind, l.stays)));
     assert_eq!(look, Some((Some(crate::os_ui::BubbleKind::Success), std::time::Duration::from_secs(5))));
+    // Two files in one pick (live import-into-doc-1123): each translated and added on its own, right after the active
+    // tab (the later one nearest it), each with its bubble.
+    let plate = dir.join("plate.step");
+    std::fs::copy(&good, &plate).unwrap();
+    cx.update(|cx| crate::import_dialog::import(&doc, &[good.clone(), plate.clone()], Default::default(), Some(c), true, cx));
+    cx.run_until_parked();
+    let newest = doc.read_with(cx, |d, _| d.session.store.history(d.session.branch).unwrap().iter().take(3).map(|m| m.description.clone()).collect::<Vec<_>>());
+    assert_eq!(newest, ["Import document", "Import document", "Insert tab(s) : block.step, plate.step"]);
+    let after = tabs(cx);
+    let at = after.iter().position(|n| n == "C").unwrap();
+    assert_eq!(after[at + 1..at + 4], ["plate", "block (1)", "block"], "{after:?}");
+    assert!(doc.read_with(cx, |d, _| d.notice_link("plate.step has been imported.").is_some()));
     cx.update(|cx| crate::import_dialog::import(&doc, std::slice::from_ref(&broken), Default::default(), Some(c), true, cx));
     cx.run_until_parked();
     assert!(kept(cx, "broken.step"), "a file that didn't translate is kept too");

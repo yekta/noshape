@@ -35,23 +35,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   entry unrecorded in live. Styled-face merge rule: T1 export::a_coloured_face_is_not_merged_into_its_neighbour_on_the_plane
   (committed, green: clippy kernel, export::step_ 7).
 
-## Committed: hose x_t END rings (core 11-23 03:0x: "please take the END rings")
-- xt.cpp: Chart + chart_of (19 exact points + closing, damped Newton), intersection_curve (CHART, LIMIT H,
-  INTERSECTION, INTERSECTION_DATA from 30.0 via Writer::schema), prepared() keeps a charted ring whole, edge pass
-  charts closed off-face edges before refit. Debug stripped. a_hoses_walls_write_whole now (12, 26, 16): the 2 end
-  rings (offset wall x cap plane) whole; the 4 rings left cut are TANGENT joints between two offset walls (angle
-  ~1e-6: ill-posed, Newton stalls ~1e-9 m) = core's sweep, not mine. exa1 hose1: ours reads ours back 7/7.
-- Green: kernel 590, ops export 17, clippy. Live 04:47 imports ours clean (live/dx/hose-rings-1123): 8 solids,
-  hoses 12 faces / 16 edges / 8 vertices. Committed after 66f66b451; land once 79b0abcb is through, tell core.
-- Live (python3 dx-scratch/bin/xtdumpfull.py /root/parity/exchange/cf-hose-routing/live.x_t 40,41,204): ring edge
-  curve = INTERSECTION(surface=[OFFSET_SURF, PLANE], chart, start=end=LIMIT type H at the first chart point),
-  edge tolerance None, fins curve 0, no vertex. CHART: Base_parameter 0, Base_scale 1, Chart_count 20 (closed: last
-  point = first), Chordal_error 1.13e-4, Angular_error 0.337, Parameter_error [None,None]. INTERSECTION_DATA (v30+
-  only; our writer's v12 schema has none): uv_type 4, (u1,v1,u2,v2) per chart point.
-- Writer xt.cpp: edge pass ~1895 (deviation -> refit -> else edge_tol = tolerant SP_CURVE fins); add: a closed
-  tolerant edge between two faces -> exact chart points (march + refine on both surfaces), INTERSECTION node;
-  surfaces order so that the curve runs along n0 x n1 (XT natural normals), chart along the edge. Our reader:
-  xt_read.cpp chart_points ~1246. Check: exa1 hose x_t round trip edges + live translation of ours.x_t.
+## Hose x_t END rings: in 0ea77f1c (details in archive/dx.md, 11-23)
 
 ## STATE 07:37
 - QUEUED 0ea77f1c (07:37, carries 7781b07e of 07:28; lead: land now): the stack + the mesh counter fix (764f763a7 import file tab first, 538aa4b0 hose end
@@ -67,6 +51,17 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   end rings are whole and the 4 tangent joints are their sweep's.
 - Blocked on live (PAUSED until 11-24 07:00): REQUESTS "dx 11-23 06:57" (a) composite colour, (b) panel rows +
   live STEP face colours.
+
+## Import into an existing document (lead 07:4x, live import-into-doc-1123 parts 1-2; Derived route P0)
+- Fixed (committed 07:5x): two files in one pick each go right after the active tab (the later nearest), each read +
+  added on its own ("Import document" each) with its own toast (app import_dialog::import per file unless Combine /
+  upload-only); ops apply places every file's group after `after`. Tests: e2e two_imported_files_each_go_right_after_the_open_tab,
+  an_imported_tab_derived_into_a_part_studio_keeps_its_parts_names_and_colours (Derived 1, same names + colours, live
+  link on delete, second Derived refused in live's words); workspace_tests an_import_translates… (2 files).
+- Already as live: + menu order (Import… last; cloud entries left out), chooser all files + multiple, no file drop
+  anywhere, no Import in Derived's picker or the Part Studio's right-click menus, Derived tooltip "Derived 1 <- <tab>",
+  re-import "<name> (1)" + same-name blob, documents-page import (3 cards, no Part Studio 1 / Assembly 1, ".step" name).
+- Open: our toast slot holds one bubble (live stacks the two files' toasts when they overlap: unrecorded how).
 
 ## qa 06:5x import recheck (TICKETS e6e1ad1f3): 6 verified; new P1s
 - IMP-FACE-APPEARANCE-ROWS (COMMITTED 07:0x, green fa-run3: clippy, e2e, coverage): part_appearances lists the import's face

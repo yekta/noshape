@@ -374,53 +374,58 @@ pub(crate) fn import(doc: &Entity<DocModel>, paths: &[PathBuf], c: Choice, after
                 }
             });
         }
-        let read = {
-            let paths = paths.clone();
-            cx.background_spawn(async move { imp::read_inputs(&paths, &choice, false, &units) }).await
-        };
-        cx.update(|cx| {
-            let Some(doc) = doc.upgrade() else { return };
-            let (inputs, mut errors) = read;
-            let mut first = None;
-            doc.update(cx, |doc, cx| {
-                if !inputs.is_empty() {
-                    let description = imp::description();
-                    let mut failed = Vec::new();
-                    doc.edit_document(&description, cx, |d| (first, failed) = imp::apply(d, inputs, &choice, after, &units));
-                    errors.extend(failed);
-                }
-                for e in &errors {
-                    crate::notifications::push(cx, format!("Import {} failed", import_name(e).unwrap_or_default()), e.clone(), true);
-                }
-                // Live's bell entry: "Import <file>" with its steps done.
-                if errors.is_empty() && first.is_some() && !choice.upload_only {
-                    for p in &paths {
-                        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-                        crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);
+        // Each file translated and added on its own, with its own bubble (live import-into-doc-1123: two files, two
+        // tabs 2.5 s apart, two toasts); Combine makes one tab of them all.
+        let groups: Vec<Vec<PathBuf>> = if choice.combine || choice.upload_only { vec![paths] } else { paths.into_iter().map(|p| vec![p]).collect() };
+        for paths in groups {
+            let read = {
+                let paths = paths.clone();
+                cx.background_spawn(async move { imp::read_inputs(&paths, &choice, false, &units) }).await
+            };
+            cx.update(|cx| {
+                let Some(doc) = doc.upgrade() else { return };
+                let (inputs, mut errors) = read;
+                let mut first = None;
+                doc.update(cx, |doc, cx| {
+                    if !inputs.is_empty() {
+                        let description = imp::description();
+                        let mut failed = Vec::new();
+                        doc.edit_document(&description, cx, |d| (first, failed) = imp::apply(d, inputs, &choice, after, &units));
+                        errors.extend(failed);
                     }
-                }
-                // The bubble's link shows what the import made: the new tab, or the kept file of one that failed.
-                // A file that didn't translate gets live's red bubble (rr-import-1118: alert-danger, stays until ×).
-                let (notice, tab, failed) = match (paths.as_slice(), errors.first()) {
-                    ([p], None) => (format!("{} has been imported.", file_name(p)), first, false),
-                    (_, Some(e)) => (failed_toast(e), import_name(e).and_then(|n| kept_file(&doc.session.doc, &n)), true),
-                    _ => return,
-                };
-                let Some(tab) = tab else {
-                    cx.emit(if failed { DocEvent::Error(notice) } else { DocEvent::Info(notice) });
-                    return;
-                };
-                let me = cx.entity().downgrade();
-                let open = move |_: &mut Window, cx: &mut App| {
-                    let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
-                };
-                match failed {
-                    true => doc.error_with_link(notice, "Open document", open, cx),
-                    // Live import-toast-1122: the green ✓ bubble, gone by itself 5 s after the import lands.
-                    false => doc.success_with_link(notice, "Open document", 5, open, cx),
-                }
+                    for e in &errors {
+                        crate::notifications::push(cx, format!("Import {} failed", import_name(e).unwrap_or_default()), e.clone(), true);
+                    }
+                    // Live's bell entry: "Import <file>" with its steps done.
+                    if errors.is_empty() && first.is_some() && !choice.upload_only {
+                        for p in &paths {
+                            let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                            crate::notifications::push(cx, format!("Import {name}"), format!("Uploaded · Translated · Post-processing done · Created {name}"), false);
+                        }
+                    }
+                    // The bubble's link shows what the import made: the new tab, or the kept file of one that failed.
+                    // A file that didn't translate gets live's red bubble (rr-import-1118: alert-danger, stays until ×).
+                    let (notice, tab, failed) = match (paths.as_slice(), errors.first()) {
+                        ([p], None) => (format!("{} has been imported.", file_name(p)), first, false),
+                        (_, Some(e)) => (failed_toast(e), import_name(e).and_then(|n| kept_file(&doc.session.doc, &n)), true),
+                        _ => return,
+                    };
+                    let Some(tab) = tab else {
+                        cx.emit(if failed { DocEvent::Error(notice) } else { DocEvent::Info(notice) });
+                        return;
+                    };
+                    let me = cx.entity().downgrade();
+                    let open = move |_: &mut Window, cx: &mut App| {
+                        let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(tab))));
+                    };
+                    match failed {
+                        true => doc.error_with_link(notice, "Open document", open, cx),
+                        // Live import-toast-1122: the green ✓ bubble, gone by itself 5 s after the import lands.
+                        false => doc.success_with_link(notice, "Open document", 5, open, cx),
+                    }
+                });
             });
-        });
+        }
     })
     .detach();
 }

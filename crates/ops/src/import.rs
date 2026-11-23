@@ -816,13 +816,13 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         at = Some(id);
     }
     add_kept_files(d, inputs.files);
+    // Each file's tabs go right after the active tab, so the later file sits nearest it (live import-into-doc-1123).
     for a in &inputs.assemblies {
         // Combine: one Part Studio, no Assembly (live G41 (5)).
         if c.combine {
             match noshape_model::native_assembly::add_native_assembly_combined(d, &a.root, &a.components, &a.files, c.appearances, units) {
                 Ok(studio) => {
-                    crate::docedit::place_after(d, studio, at);
-                    at = Some(studio);
+                    crate::docedit::place_after(d, studio, after);
                     first.get_or_insert(studio);
                 }
                 Err(_) => errors.push(failed_to_translate(&format!("{}.zip", a.zip))),
@@ -831,14 +831,12 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         }
         match noshape_model::native_assembly::add_native_zip(d, a, c.appearances, units) {
             Ok(noshape_model::native_assembly::NativeTabs::Assembly { studio, assembly }) => {
-                crate::docedit::place_after(d, assembly, at);
+                crate::docedit::place_after(d, assembly, after);
                 crate::docedit::place_after(d, studio, Some(assembly));
-                at = Some(studio);
                 first.get_or_insert(assembly);
             }
             Ok(noshape_model::native_assembly::NativeTabs::Studio(studio)) => {
-                crate::docedit::place_after(d, studio, at);
-                at = Some(studio);
+                crate::docedit::place_after(d, studio, after);
                 first.get_or_insert(studio);
             }
             Err(_) => errors.push(failed_to_translate(&format!("{}.zip", a.zip))),
@@ -852,7 +850,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         let pvz = noshape_model::native_assembly::PvzImport { stem: p.name.clone(), root: p.root.clone(), brep: p.foreign.brep.clone(), info: p.foreign.parts.clone(), foreign_id: p.file.clone(), instances: p.instances.clone(), names: p.names.clone(), step: p.step, options, nesting: p.nesting.clone(), part_shapes: p.part_shapes.clone() };
         match noshape_model::native_assembly::add_pvz_assembly(d, &pvz, units) {
             Ok((studio, assembly)) => {
-                crate::docedit::place_after(d, assembly, at);
+                crate::docedit::place_after(d, assembly, after);
                 // Its subassemblies' Assemblies next, as they are used (live
                 // request 1742: Assembly 1, Sub, the parts' Part Studio).
                 let mut last = assembly;
@@ -871,7 +869,6 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
                     }
                 }
                 crate::docedit::place_after(d, studio, Some(last));
-                at = Some(studio);
                 first.get_or_insert(assembly);
             }
             Err(_) => errors.push(failed_to_translate(&p.file)),
@@ -895,8 +892,7 @@ pub fn apply(d: &mut Document, inputs: ImportInputs, c: &ImportChoice, after: Op
         // A name already used: "<name> (1)", "(2)", … (live).
         let name = noshape_model::native_assembly::unique_name(d, &g[0].0);
         let id = d.add_tab(&name, TabContent::PartStudio(ps));
-        crate::docedit::place_after(d, id, at);
-        at = Some(id);
+        crate::docedit::place_after(d, id, after);
         first.get_or_insert(id);
     }
     (first, errors)
