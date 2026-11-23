@@ -5,25 +5,31 @@ edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: doc
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 22:1x (after the compaction, first)
-- **DONE since 20:2x**: asm 3900b9e1e scored (5 of 6 =, PICKED-REHOVER reopened, 3 P0s). Hover matrix 109/125 on a08754b16 (psui 613b06bb7:
-  7 fixed; 5 P0s: MC-AXIS-UNDER-DISC, FILLET-FACE-OVER-PICKED, SKETCH-INF-END-DOT (psui); ASM-RING-OVER-BAND, ASM-MC-LOOK (asm); rows in
-  interaction-feel.md). live's workflows-1123 (20) replayed (bin/wf23.sh, out-wf23; kit tools take WF_SET/WF_OUT; hm2/wf/files = repo
-  ui-parity files) and scored: TICKETS blocks "qa, 2026-11-22 21:4x" (01-10, 40 rows) and "22:0x" (11-20, 18 rows); owners told.
-  COMPAT-RINGS-LOFT-SLOWER verified (4.3 vs 4.7 s); P1 COMPAT-SURFACE-PATTERN-SLOWER filed; cut verdict a08754b16 GO (qa-alerts 21:50).
-- **Decisions asked of the lead** (open): Line tool end dot counts? (matrix 112 if not); ASM-MENU-WRAP-REVERSED (live now wraps).
-- **NEXT 1, bool's impeller fix 9d9369a0f**: unit qa-wait-imp (tmp/wait-imp.sh: subject "bool:.*impeller" in green -> validity.py on
-  vibex7) -> tmp/wait-imp.log (IMP-DONE). Expect no invalid part. Close IMPELLER-SHELL-INVALID, tell bool.
-- **NEXT 2, bool's surface pattern fix e7c98cc5a**: unit qa-wait-sp (wait-fix-compat.sh) -> tmp/wait-sp.log + qa-alerts. Expect
-  cf-surface-pattern ~13.6 s and Part 1 129/385/258. Close COMPAT-SURFACE-PATTERN-SLOWER, tell bool.
-- **NEXT 3**: asm's SHIFT-NEAREST release fix (asm will say); rerun chain tmp/rr-3900.sh (fieldsel fs.sh, mcinfer mi.sh, asmfeel dr-BaseR).
-  Rescore the matrix after psui/asm lands: tmp/hmr-26153.sh pattern (bin/hm-rescore.sh 'subj:<text>' 'b*' / '[ips]*' on vibe2).
-- Open: P1 PARITY-FAN-BLADE-SWEEP-TRANSLATOR (asm 4a22b2966 dedup); tyres ~1.6 m off; CROSSING-OUTLINE colour; wf25 s28 Gear look.
-- 22:4x (lead: replay workflows-1123 on newest green, rescore the matrix after psui b6812aae, re-verify skasm/asm/psui batch 2 rows):
-  unit qa-ver1 (tmp/ver1.sh, vibe2, green 02cea338f): mcinfer r6 all, fieldsel r4 sk/asm cells, workflows-1122 01/11/12/13/22/27 ->
-  hm2/out-wf-v, walk3 s5/s6/s3 cells -> hm2/out-wkv. Unit qa-ver2 (tmp/ver2.sh): waits b6812aae in green, then matrix hmr2-b/hmr2-ips
-  (vibe2), fieldsel r5 psui cells, manipnav r6; workflows-1123 -> hm2/out-wf23b on vibex8 after bool's gates (log tmp/ver2-wf.log).
-  MC matrix cells on e0fc1afc9 unchanged (8/8 same pixels). Feel runners take QA_HOST (default vibex8). skasm BEND-FACE-RECLICK reopened.
+## IN FLIGHT 00:4x (after the compaction, first)
+- **DONE since 22:1x**: matrix 113/125 on green 5e634b35e (psui b6812aae: manipulator ring over a selected edge, 4 cells =; PS cells
+  pixel-identical; psui told). Re-verify pushed: skasm wf-1122 + walk 4 on 172785c95 (8 verified, 5 partly, new P0 DIM-PICKED-SIDE-BLACK,
+  SPLINE-PLACED-POINTS, CLICK-EMPTY-SELECTS-PLANE (live asked), P1 LINE-STORES-PERPENDICULAR, P2 MIRROR-SYMMETRIC-COUNT); MC + sketch
+  gestures on 02cea338f (6 verified, 7 partly, asm 3 still open; new P0 SK-LONGPRESS-SELECTS, MC-ASM-CYL-SIDE-OUTLINE, MC-ASM-SHIFT-RELEASE,
+  P1 MC-PS-ORIGIN-CORNER-MARKER; live asked for a MARKER-REACH fine sweep). SM-TABLE-PANE-SPLIT closed (live default 50 %), P2
+  SM-TABLE-SPLIT-KEPT. PS-RAIL-STOPWATCH-WARNING closed (llvmpipe badge). skasm, asm, psui told. Briefs: qa-scratch/brief-ver.md, brief-t23.md.
+- **Subagents running (results come as notifications; if lost after compaction, rerun from the brief)**: (a) Mac timing vs live
+  timing-1123 (brief-t23.md, raw in qa-scratch/t23/, gate: load < 6 + mem >= 25 % before EVERY Mac call, GUI also idle >= 600 s; lead
+  00:0x: discard timings under load). (b) psui manip/nav + sel-gestures rows (brief-ver.md set "psui"; shots feel1122/manipnav/r6 on
+  7fe68797a, fieldsel/r5 on 5e634b35e) -> mark rows like the skasm ones, tell psui.
+- **Units (logs qa-scratch/tmp/<name>.log)**: qa-ver2 (workflows-1123 replay on vibex8 -> hm2/out-wf23b, log ver2-wf.log; then score per
+  step vs out-wf23 and TICKETS blocks 21:4x/22:0x: mark fixed rows, file new); qa-ver3 (wf-1122 40 for CTX-MENU-FLIP-UP -> out-wf-v, then
+  psui f5ebb8b3 'subj:a picked edge solid and bright under the preview' -> matrix hmr3-b/hmr3-ips: AXIS-UNDER-DISC, FILLET-FACE-OVER-PICKED
+  #ffaf25, PICKED-EDGE-DASHED-UNDER-PREVIEW, HOVER-DISC-AFTER-COMMIT, PARTS-ROW-OF-PICK-SHEET-METAL, Corner break vertex disc);
+  qa-ver4 (can't-tell reruns: xv-search-unfold + wf12/27 with WF_KEEP_WORLD=1 -> out-wfv2 (EXTRA-UNFOLD-REFOLD, UIS-WORLD-TARGET), walk3
+  s3-sk-fillet -> out-wkv2 (SKFILLET-FLOW)); qa-rr-c6ec (asm c6ec3d1c subj "asm: tickets: notes folded into qa's rewritten rows" ->
+  mcinfer r7 asm cells + asmfeel out-af-c6ec dr-BaseR: MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM, FIXED-GLYPH-AA); qa-ver5 (psui to-verify
+  FEEL-QUERY-PART-PICK-FILL wf-1122 19 + FEEL-DIM-SELECTED-REF-LINE-YELLOW 32v -> out-wfv3; then after c6ec matrix '*-mc-*' -> hmr4-mc:
+  navy rim (psui: llvmpipe 1x, c6ec draws 4x settled) + asm's white notch in the ring); qa-wait-imp (bool 448c038e impeller ->
+  wait-imp.log IMP-DONE: expect no invalid part, close IMPELLER-SHELL-INVALID, tell bool); qa-wait-sp (bool e7c98cc5a surface pattern ->
+  wait-sp.log: expect ~13.6 s + Part 1 129/385/258, close COMPAT-SURFACE-PATTERN-SLOWER, tell bool). Hold each in a background task.
+- Matrix scoring kit: hm2/crop2.sh <run> <cmpdir>; diff vs hm2/score-5e63/cmp-{b,ips}; score-a087/bin/sbs.sh for live|old|new.
+- Runners take QA_HOST (fs.sh, mi.sh, fm.sh, asmfeel.sh; default vibex8); wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT.
+- Next from owners: asm Shift-release / cyl-side / rehover sha; psui rotate axis edge + Extrude top cap. Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
 
 ## Running units
 **Start every unit with `systemd-run --setenv=HOME=/root …`** (no HOME = gh fails; 11-17 the published check polled 25 min
