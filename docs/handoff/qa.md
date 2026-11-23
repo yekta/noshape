@@ -1,4 +1,4 @@
-# QA handoff (agent qa; current state only, updated 2026-11-23 02:3x)
+# QA handoff (agent qa; current state only, updated 2026-11-23 02:4x)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
@@ -6,20 +6,19 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
 ## IN FLIGHT 02:3x (after a compaction, first)
-- **DONE 01:2x-02:3x** (all in TICKETS, owners told): errors-1123 sets a (01:5x, 12 rows), b (01:2x, 10), c (01:4x, 15);
-  appearance-1123 (01:5x, 12 rows); IMPELLER-SHELL-INVALID verified (ed11f7c48, 0 invalid); workflows-1123 01-12 rescored 02:1x on
-  ed11f7c48 (out-wf23g 01-05, out-wf23f 06-12; out-wf23b's 01-12 had run on 7fe68797a): 8 verified, 7 partly, UIS-MATE-PATTERN-ROW
-  reopened; ASM-FIXES-NOT-IN-FLOW verified; PICKED-REHOVER partly (markers gone, the re-hover glyph missing); live answers noted on
-  FEEL-CLICK-EMPTY-SELECTS-PLANE, SKETCH-LINE-STORES-PERPENDICULAR, ERR-FIELD-RANGE-TIP-ENTER (in-range 0 commits),
-  FEEL-MC-PS-MARKER-REACH (half-way rule: ours' 18 px right; corner approach + back midpoint still differ); SPEED-IMPELLER split
-  (bool ~1.1 s x2, the fillets are blend's). CTX-MENU-FLIP-UP open with psui.
+- **DONE 01:2x-02:3x** (TICKETS, owners told): errors-1123 sets a/b/c (37 rows), appearance-1123 (12), IMPELLER-SHELL-INVALID ok,
+  workflows-1123 01-12 rescored 02:1x on ed11f7c48 (out-wf23g/f: 8 verified, 7 partly, UIS-MATE-PATTERN-ROW reopened); live notes on
+  CLICK-EMPTY-SELECTS-PLANE, LINE-STORES-PERPENDICULAR, FIELD-RANGE-TIP-ENTER, MC-PS-MARKER-REACH; SPEED-IMPELLER split (bool/blend).
 - DONE 02:3x: import fidelity (8 STEPs) filed TICKETS "qa 02:3x" (2 P0 + 8 P1 dx, 1 P1 asm), told. Not checked: NEMA BOMs, toast duration,
   dialog focus. Xvfb :496 on vibe2 left running by the subagent (not ours to kill by pid). Data qa-scratch/imp.
   If its notification never comes, read qa-scratch/imp and rerun from the brief.
 - **Units (logs qa-scratch/tmp/<name>.log; hold each in a background task, re-hold at the 2 h limit)**:
   qa-rr-b8a1 (psui b8a17535 by subject "psui: a Transform's axis edge stays lit on the moved part" -> manipnav r9, wf23 13 out-wf23d,
   wf-1122 12 out-wfv4: ROTATE-EDGE-SENSE, EDIT-BODY-SHADE, CUSTOM-FEATURE-DIALOG-HELP, UIS-FIELD-NOT-SHOWN);
-  qa-ver6 (after rr-b8a1: full matrix b* + [ips]* on b8a17535's green -> hm2/hmr5-b, hmr5-ips);
+  qa-ver7 (replaces ver6; when psui b8a17535 AND c318cefa "psui: Enter commits no value out of range…" are in green, after
+  rr-b8a1/wf23i: full matrix b* + [ips]* -> hm2/hmr7-b, hmr7-ips; "in green" line in ver7.log = start the subagent from
+  qa-scratch/brief-errver.md: psui ERR-* rows + CTX-MENU-FLIP-UP re-verify);
+  qa-wf23i (workflows-1123 13-20 on 26abe20b8 -> hm2/out-wf23i; then re-verify the 13-20 rows like brief-ver23.md);
   qa-rr-2782 (dx re-queued 834b5a0a, same subject "dx: a file tab's Import… opens its dialog at once" -> wf23 17 out-wf23e, step 2:
   ours 192 ms vs live 58: SPEED-FILE-TAB-IMPORT-MENU);
   qa-rr-a936 (asm a936c3a6 "asm: an over-defining mate moves nothing…" -> mcinfer r9 asm cells (MARKER-LOOK-ASM, EDGE-BEFORE-VERTEX-ASM,
@@ -28,7 +27,7 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
   RE-MAKING the overdef .noshape files (old ones saved the moved pin): SOLVE-MOVES, OVERDEF-BOTH, LIMITS-COMMITTED, BALL-CONE,
   DIALOG-STATE (suppressed title left black per mates.md), TANGENT-WORDS (bar ✓ pale on reopened "not consistent"), CREATING-LIST);
   qa-wait-sp (bool ed272c73, same subject as e7c98cc5a -> compat: expect ~13.6 s + Part 1 129/385/258 (live 131/387/258), close
-  COMPAT-SURFACE-PATTERN-SLOWER, tell bool). qa-rr-c6ec / qa-ver5 / qa-ver3 stopped (replaced).
+  COMPAT-SURFACE-PATTERN-SLOWER, tell bool). ver6 stopped (-> ver7).
 - Kit: hm2/crop2.sh, score-a087/bin/sbs.sh, hm2/wf/wfcrop.py (WF_SET/WF_OUT), manipnav fm.sh (+fm992.sh), cells m15v-tr-xy-*.
   Runners take QA_HOST; wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT + glob arg.
 - Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
