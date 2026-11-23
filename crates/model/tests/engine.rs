@@ -1946,17 +1946,23 @@ fn union_keep_tools_makes_a_new_part() {
     assert!(ps.iter().any(|p| (p.2 - 9178.097245).abs() < 1e-4), "the union stays: {ps:?}");
 }
 
-/// qa5 INT2: Intersect of two parts that don't touch (Part 1 and Part 3),
-/// with or without ☑ Keep tools, makes nothing and changes nothing.
+/// Intersect of two parts that don't touch (Part 1 and Part 3): with ☑ Keep tools nothing changes (qa5 INT2);
+/// without it both parts go, with no message (live errors-1123 intersect-no-overlap).
 #[test]
 fn intersect_of_parts_apart_makes_nothing() {
     for keep in [true, false] {
-        let (mut t, [p1, _, p3]) = qa5_bool();
+        let (mut t, [p1, p2, p3]) = qa5_bool();
         let before = parts(&t.ok());
-        t.add("booleanBodies", &[("operationType", en("INTERSECTION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p3.clone())])), ("keepTools", b(keep))]);
-        let ps = parts(&t.regen());
-        assert_eq!(ps.len(), 3, "keep {keep}: {ps:?}");
-        assert_eq!(ps.iter().map(|p| p.0.clone()).collect::<Vec<_>>(), before.iter().map(|p| p.0.clone()).collect::<Vec<_>>(), "keep {keep}");
+        let f = t.add("booleanBodies", &[("operationType", en("INTERSECTION")), ("tools", q(vec![Reference::Body(p1.clone()), Reference::Body(p3.clone())])), ("keepTools", b(keep))]);
+        let r = t.regen();
+        let ps = parts(&r);
+        let ids: Vec<_> = ps.iter().map(|p| p.0.clone()).collect();
+        if keep {
+            assert_eq!(ids, before.iter().map(|p| p.0.clone()).collect::<Vec<_>>());
+        } else {
+            assert_eq!(ids, vec![p2.clone()], "{ps:?}");
+            assert_eq!(r.display.features.iter().find(|x| x.id == f).unwrap().message, None);
+        }
     }
 }
 

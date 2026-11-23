@@ -75,8 +75,8 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
         "SUBTRACTION" | "INTERSECTION" => {
             let targets = ev.resolve_bodies(ev.query("targets"));
             if targets.is_empty() && op == "SUBTRACTION" {
-                // Live (qa5 boolean, Subtract with no Targets).
-                return err("Cannot resolve entities.");
+                // Live (qa5 boolean, Subtract with no Targets; errors-1123: the Targets box at fault).
+                return err_at(&["targets"], "Cannot resolve entities.");
             }
             let tool_ids: Vec<_> = tools_idx.iter().map(|&i| ev.ctx.bodies[i].id.clone()).collect();
             // Offset (boolean.fs): copies of the tools with their picked faces (every face, Offset all) offset by the
@@ -172,7 +172,13 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                         ev.infos.push(TOUCHING_INTERSECT.into());
                         return Ok(());
                     }
-                    ev.infos.push(NO_GEOMETRY_CHANGE.into());
+                    // Parts apart: ☑ Keep tools changes nothing (INT2); without it both go, silently (live errors-1123
+                    // intersect-no-overlap: status OK, an empty Part Studio).
+                    if ev.bool("keepTools") {
+                        ev.infos.push(NO_GEOMETRY_CHANGE.into());
+                    } else {
+                        ev.ctx.bodies.retain(|b| !tool_ids.contains(&b.id));
+                    }
                     return Ok(());
                 }
                 let kind = ev.ctx.bodies.iter().find(|b| b.id == first_id).map(|b| b.kind).unwrap_or(crate::display::BodyKind::Solid);
