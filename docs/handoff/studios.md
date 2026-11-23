@@ -64,15 +64,15 @@ tests on vibex7 (off it 02:00-04:00 UTC: vibex8 then). Scenarios on vibex8 via ~
   callout two-tone icons e88304220, FS caret 2 px, TICKETS dup drop; green: fs-ui 32, drawing-ui 192, clippy clean).
   3407a70e had FAILED (rebase); 5 older local commits were already on main, rebased --onto past them.
   After 7a12ac31 lands: tell dx (roster.md id) featurescript raise_noted notices are Info now.
-- STATE 07:14: QUEUED e6667368 (carries 7a12ac31): the drw-dims-1123 audit (Esc/right-click, H/V vs aligned, angular
+- STATE 07:16: QUEUED e6667368 (carries 7a12ac31) and c1a6b8de (on it): the drw-dims-1123 audit (Esc/right-click, H/V vs aligned, angular
   parallel, tapped hole cell, invalid hover, hole callout hover, empty GD&T, datum, section label frame_gap).
   Next land (this commit): DRW-DIMS-HOVER-COLOURS (edge_hover_colour: tan in Angle/PointLine/LineLine/Radius, orange
   in the other edge tools + Hole callout + GD&T; SnapMark::VividDisc for Point2/PointLine/Angle3),
   CIRCLE-CENTERLINE-QUAD (pick.rs circle_click_point: top quadrant, PointRef::Quadrant k 1), GDT edge click = leader
   (drawing_gdt.rs; gtol-1119's no-leader test rewritten to 1123), datum needs snap_or_edge_point, edge-to-edge
   non-parallel = bisector (commit.rs edge_pair_centerline), dx's DRW-FLOW-* rows (all matched or done). Green x277:
-  scene 218, drawing-ui 201, clippy scene + drawing-ui. Open: DRW-DIMS-EDGE-CENTERLINE-SILENT concentric circles
-  (ops already says "two concentric arcs" but has no arc path either).
+  scene 218, drawing-ui 201, clippy scene + drawing-ui. DRW-DIMS-EDGE-CENTERLINE-SILENT concentric circles
+  closed: live fails there (red object), ours refuses silently. All DRW-DIMS-* / DRW-FLOW-* rows done.
 - FEEL-VS-CHIP-ON-CLICK ticked (0cfd58165 on main). live import-into-doc-1123: ours matches; rest is dx's.
 - Mac check: watcher bd5jb96zs polls v0.4.68's mac asset (not published at 06:28); then bin/mac-copycheck.sh 0.4.68
   (idle >= 600 s only), report <= 3 lines to the lead. Background runs/watchers die at session end: re-arm.
