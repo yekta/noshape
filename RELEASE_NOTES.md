@@ -5,6 +5,7 @@
 - A download that works shows no error toast; only a failure does.
 - STEP imports keep their colours as part colours, with face colours staying on their faces; solids are named as in the file.
 - A Boolean union keeps the face colours of every part it merges.
+- The sketch Offset value box has its white background and border again, turns red on text that isn't a distance, and Tab no longer types a stray character.
 
 **Closer to Onshape: hover, selection and dragging**
 - Sketches: the dimension box applies only on Enter, Trim and Extend previews, the length box position, and the Select other key match Onshape; mate connectors are inferred as in Onshape in Part Studios and assemblies.
