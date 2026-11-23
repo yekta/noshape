@@ -8753,3 +8753,42 @@ fn the_parity_state_lists_sketch_geometry(cx: &mut TestAppContext) {
     assert!(d.len() == 2 && d.iter().all(|v| v.as_array().is_some_and(|v| v.len() == 2)), "{spline}");
     assert!(!geometry.iter().any(|g| g["kind"] == "construction line"), "its handle arms go with the spline: {geometry:?}");
 }
+
+/// User 11-23 (v0.4.67): the Offset tool's value box drew no background (the typed text floated over the sketch
+/// with only its blue line) and a Tab typed into it showed as a black missing-glyph box. Live: a white box with its
+/// border; letters turn it red; Tab types nothing. Checked on the painted quads: an opaque white fill under the
+/// whole box, a 1 px caret.
+#[gpui::test]
+fn the_offset_value_box_is_an_opaque_white_box_with_a_thin_caret(cx: &mut TestAppContext) {
+    use gpui_kit::EntityInputHandler as _;
+    let (window, view) = sketch_with(cx, "offset-box", Tool::Line);
+    click(cx, window, &view, (400., 300.));
+    click(cx, window, &view, (500., 300.));
+    keys(cx, window, &["escape", "escape"]);
+    let (window, view) = sketch_in_tool(cx, window, view, Tool::Offset);
+    click(cx, window, &view, (450., 300.));
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.offset_pending.is_some())), "the offset preview");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_offset_input(w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["a", "s", "d", "f"]);
+    assert!(cx.update(|cx| view.read(cx).ui_ref().is_some_and(|u| u.offset_invalid)), "letters: the box red");
+    let field = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("sk-offset-field").expect("the offset box drawn");
+    let (scale, quads) = cx.update_window(window, |_, w, _| (w.scale_factor(), w.painted_quads())).unwrap();
+    let (l, t, r, b) = (f32::from(field.left()) * scale, f32::from(field.top()) * scale, f32::from(field.right()) * scale, f32::from(field.bottom()) * scale);
+    let inside = |q: &gpui_kit::Quad| q.bounds.origin.x.0 >= l - 0.5 && q.bounds.origin.y.0 >= t - 0.5 && q.bounds.origin.x.0 + q.bounds.size.width.0 <= r + 0.5 && q.bounds.origin.y.0 + q.bounds.size.height.0 <= b + 0.5;
+    let fill = quads.iter().filter(|q| inside(q)).filter(|q| q.bounds.size.width.0 >= (r - l) * 0.9 && q.bounds.size.height.0 >= (b - t) * 0.9).filter_map(|q| q.background.as_solid()).find(|c| c.a >= 0.999);
+    assert!(fill.is_some_and(|c| c.l >= 0.9), "an opaque light fill under the whole box: {fill:?}");
+    let tall = |q: &&gpui_kit::Quad| q.bounds.size.height.0 >= 8.0 * scale && q.bounds.size.width.0 < (r - l) * 0.5;
+    let marks: Vec<f32> = quads.iter().filter(|q| inside(q)).filter(tall).filter(|q| q.background.as_solid().is_some_and(|c| c.a > 0.5)).map(|q| q.bounds.size.width.0 / scale).collect();
+    let all: Vec<String> = quads.iter().filter(|q| inside(q)).map(|q| format!("{:.1}x{:.1}@{:.1},{:.1} {:?}", q.bounds.size.width.0, q.bounds.size.height.0, q.bounds.origin.x.0, q.bounds.origin.y.0, q.background.as_solid())).collect();
+    assert!(!marks.is_empty() && marks.iter().all(|w| *w <= 1.01), "only a thin caret inside the box, no block: widths {marks:?}; box {l},{t}-{r},{b} x{scale}: {all:?}");
+    let mut tab = Keystroke::parse("tab").unwrap();
+    tab.key_char = Some("\t".into());
+    cx.update_window(window, |_, w, cx| w.dispatch_keystroke(tab, cx)).unwrap();
+    draw(cx, window);
+    // (macOS inserts a key's text itself when no binding takes it.)
+    let st = cx.update(|cx| view.read(cx).ui_ref().and_then(|u| u.offset_input.as_ref().map(|(st, _)| st.clone()))).expect("the offset box open");
+    cx.update_window(window, |_, w, cx| st.update(cx, |s, cx| s.replace_text_in_range(None, "\t", w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| st.read(cx).value().to_string()), "asdf", "Tab types nothing");
+}

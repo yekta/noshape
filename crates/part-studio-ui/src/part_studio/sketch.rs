@@ -110,6 +110,8 @@ pub(super) struct SketchUi {
     degree_edit: Option<(noshape_sketch::EntityId, Entity<InputState>, Subscription)>,
     /// Distance box of the pending offset.
     offset_input: Option<(Entity<InputState>, Subscription)>,
+    /// Its text doesn't evaluate to a distance: drawn red (live).
+    offset_invalid: bool,
     /// Open pattern glyph menu: pattern id and viewport position.
     pattern_menu: Option<(u32, f32, f32)>,
     /// Dimension whose tolerance panel is open.
@@ -3247,6 +3249,10 @@ impl PartStudioView {
             let parsed = noshape_units::evaluate_as(st.read(cx).value().trim(), Dim::LENGTH, &units, &vars).ok().map(|q| q.value).filter(|v| v.is_finite() && *v != 0.0);
             match ev {
                 InputEvent::Change => {
+                    if let Some(ui) = this.ui_mut() {
+                        ui.offset_invalid = parsed.is_none();
+                    }
+                    cx.notify();
                     // A negative value flips the direction.
                     if let (Some(v), Some(ed)) = (parsed, &mut this.sketch) {
                         ed.offset_distance = v.abs();
@@ -3255,6 +3261,10 @@ impl PartStudioView {
                     }
                 }
                 InputEvent::PressEnter { .. } => {
+                    // Live: Enter on text that doesn't evaluate keeps the box open, red.
+                    if parsed.is_none() {
+                        return;
+                    }
                     if let (Some(v), Some(ed)) = (parsed, &mut this.sketch) {
                         ed.offset_distance = v.abs();
                         ed.offset_flip = v < 0.0;
@@ -3275,6 +3285,7 @@ impl PartStudioView {
         });
         if let Some(ui) = self.ui_mut() {
             ui.offset_input = Some((st, sub));
+            ui.offset_invalid = false;
         }
         cx.notify();
     }
@@ -5174,6 +5185,7 @@ impl PartStudioView {
         // ---- offset distance: its label between the curve and the copy (click
         // to type), then the box in its place
         let offset_box = self.ui_ref().and_then(|u| u.offset_input.as_ref().map(|(st, _)| st.clone()));
+        let offset_invalid = self.ui_ref().is_some_and(|u| u.offset_invalid);
         if offset_box.is_none()
             && let Some((at, d)) = ed.offset_value_label(&data.sketch)
             && let Some((x, y)) = project(at)
@@ -5232,7 +5244,19 @@ impl PartStudioView {
                         window.focus(&this.focus, cx);
                         this.refresh_scene(false, cx);
                     }))
-                    .child(div().border_b_1().border_color(p().accent).child(Input::new(&st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.))))
+                    // Live (user 11-23): a white box with its border over the sketch; text that doesn't evaluate turns it red.
+                    .child(gpui_kit::base::input::input_frame(crate::quantity_field::invalid_field(
+                        div()
+                            .id("sk-offset-field")
+                            .debug_selector(|| "sk-offset-field".into())
+                            .relative()
+                            .bg(rgb(0xffffff))
+                            .border_1()
+                            .border_color(gpui_kit::rgb_static(0xcccccc))
+                            .child(Input::new(&st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(24.)))
+                            .child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(p().accent)),
+                        offset_invalid,
+                    )))
                     .into_any_element(),
             );
         }
