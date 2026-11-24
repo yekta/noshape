@@ -7025,6 +7025,8 @@ mod sketch_box;
 mod sketch_gesture;
 #[path = "export_feel_tests.rs"]
 mod export_feel;
+#[path = "ps_audit_feel_tests.rs"]
+mod audit;
 
 /// Qa SKT-USE-HOVER (live sketch-tools-1123 use-convert, sk23 use-0-hover-vertex): seen from above, the Use tool on a
 /// top corner of the block offers an edge of the top face running across the screen, never the upright edge seen end on

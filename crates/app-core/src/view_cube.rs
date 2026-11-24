@@ -142,6 +142,7 @@ pub fn view_cube<V: 'static>(menu: AnyElement, hooks: CubeHooks<V>, viewport: DV
     };
     div()
         .id("view-cube")
+        .debug_selector(|| "view-cube".into())
         .relative()
         .left(offset.x)
         .top(offset.y)

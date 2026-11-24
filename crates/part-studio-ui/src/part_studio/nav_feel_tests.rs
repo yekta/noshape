@@ -385,6 +385,33 @@ fn rows() -> Vec<Row> {
             }
             near(crate::navigation::CAMERA_SHORT_ANIMATION.as_millis() as f64, 250., 0.5, "a step's ms")
         } },
+        Row { id: "view cube / a triangle click turns as its arrow key", live: "live 10-27 from Front: ▲ = ArrowUp (the bottom comes into view), ▼ = ArrowDown, ▶ = ArrowRight (the left face), ◀ = ArrowLeft, the graphics identical (0 px apart)", gap: false, check: |n, cx| {
+            for (dir, key) in [(DVec2::new(0., -70.), "up"), (DVec2::new(0., 70.), "down"), (DVec2::new(70., 0.), "right"), (DVec2::new(-70., 0.), "left")] {
+                let front = |cx: &mut TestAppContext| {
+                    n.settle(cx);
+                    cx.update(|cx| n.vp.update(cx, |v, cx| v.animate_to_view(noshape_render::StandardView::Front, cx)));
+                    n.settle(cx);
+                };
+                front(cx);
+                let f0 = n.cam(cx).forward();
+                let cube = gpui_kit::VisualTestContext::from_window(n.window, cx).debug_bounds("view-cube").ok_or("no view cube")?;
+                let [cx0, cy0] = noshape_render::overlay::view_cube::CENTER;
+                let p = point(cube.origin.x + px((cx0 + dir.x) as f32), cube.origin.y + px((cy0 + dir.y) as f32));
+                n.event(cx, MouseMoveEvent { position: p, pressed_button: None, modifiers: NONE });
+                n.event(cx, MouseDownEvent { button: MouseButton::Left, position: p, modifiers: NONE, click_count: 1, first_mouse: false });
+                n.event(cx, MouseUpEvent { button: MouseButton::Left, position: p, modifiers: NONE, click_count: 1 });
+                n.settle(cx);
+                let clicked = n.cam(cx);
+                front(cx);
+                n.keys(cx, key);
+                n.settle(cx);
+                let pressed = n.cam(cx);
+                near(clicked.forward().angle_between(pressed.forward()).to_degrees(), 0., 0.01, &format!("{key}: forward"))?;
+                near(clicked.up().angle_between(pressed.up()).to_degrees(), 0., 0.01, &format!("{key}: up"))?;
+                near(clicked.forward().angle_between(f0).to_degrees(), 15., 0.01, &format!("{key}: turned from Front"))?;
+            }
+            Ok(())
+        } },
         Row { id: "keys / Shift+1, 5, 7 and F: 500 ms", live: "named views and zoom to fit: CAMERA_LONG_ANIMATION_TIME_MS 500", gap: false, check: |n, cx| {
             for keys in ["shift-1", "shift-5", "shift-7", "f"] {
                 n.reset(cx);

@@ -4761,13 +4761,17 @@ impl PartStudioView {
                 // panel width: live shows "Features …" (Chrome keeps the space
                 // before its ellipsis; part-studio/94, 570). A wider panel
                 // shows it whole (qa4 F16), a narrower one truncates.
-                .child(div().min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(match &filtered_count {
-                    // (Other languages: the translated title, truncated where it
-                    // meets the icons, live "フィーチ…".)
-                    _ if errors > 0 && crate::ui::left_panel_w(self.tab) < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
-                    Some(k) => format!("Features ({k} of {n_features})"),
-                    None => format!("Features ({n_features})"),
-                }))
+                .child({
+                    let title = match &filtered_count {
+                        // (Other languages: the translated title, truncated where it
+                        // meets the icons, live "フィーチ…".)
+                        _ if errors > 0 && crate::ui::left_panel_w(self.tab) < crate::ui::LEFT_PANEL_W + 10. && crate::i18n::current() == crate::i18n::DEFAULT => "Features …".to_string(),
+                        Some(k) => format!("Features ({k} of {n_features})"),
+                        None => format!("Features ({n_features})"),
+                    };
+                    let named = format!("features-title {title}");
+                    div().debug_selector(move || named).min_w_0().truncate().text_size(px(crate::ui::ROW_TEXT)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title)
+                })
                 .child(div().flex_1())
                 // Live (navigation/301): a version keeps only the timer.
                 // Live 10-27: paused regeneration removes New folder.

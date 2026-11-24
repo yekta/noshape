@@ -1498,6 +1498,11 @@ impl FeatureDialog {
 
     /// The dropdown of parameter `path`.
     #[cfg(test)]
+    pub(crate) fn open_items_len(&self) -> usize {
+        self.open_items.len()
+    }
+
+    #[cfg(test)]
     pub(crate) fn select(&self, path: &str) -> Option<Entity<crate::os_select::OsSelect>> {
         self.selects.get(path).cloned()
     }
@@ -3770,6 +3775,7 @@ impl FeatureDialog {
                             let q_id = q.map(|q| q.id);
                             div()
                                 .id(SharedString::from(format!("dqe-{path}-{k}")))
+                                .debug_selector(|| format!("dqe-{path}-{k}"))
                                 .size(px(20.))
                                 .flex_none()
                                 .flex()
@@ -4765,6 +4771,7 @@ impl Render for FeatureDialog {
                     ))
                     .child(
                         Button::new("dlg-cancel")
+                            .debug_selector(|| "dialog-cancel".into())
                             .tab_stop(false)
                             .custom(dialog_icon_variant(cx, false))
                             .child(crate::assets::icon("dialog-cancel", 24., cx))

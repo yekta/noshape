@@ -614,6 +614,13 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "part:Part 2");
             expect(l.menu(cx), names(&["Properties…", "Assign material for 2 parts…", "Edit appearance for 2 parts…", "Check interference for 2 parts…", "Boolean", "Copy 2 items", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Export…", "Delete"]), "rows")
         } },
+        Row { id: "menu / every part: no Hide other / all parts", live: "qa4 r4 s5, 3 of 3 parts: Properties… | Assign material for 3 parts… | Edit appearance for 3 parts… | Check interference for 3 parts… | Boolean | Copy 3 items | Hide | Isolate… | Make transparent… | Export… | Delete (Release… left out: the plan's lock)", gap: false, check: |l, cx| {
+            l.click(cx, "part:Part 1", NONE);
+            l.click(cx, "part:Part 2", NONE);
+            l.click(cx, "part:Part 3", NONE);
+            l.right_click(cx, "part:Part 3");
+            expect(l.menu(cx), names(&["Properties…", "Assign material for 3 parts…", "Edit appearance for 3 parts…", "Check interference for 3 parts…", "Boolean", "Copy 3 items", "Hide", "Isolate…", "Make transparent…", "Export…", "Delete"]), "rows")
+        } },
         Row { id: "parts / the Parts header's menu shows and hides the parts list properties", live: "right-clicking 'Parts (n)': one item, 'Show parts list properties'; on, each part row shows its state chip 'In progress' (#eeeeee, 20 px high, radius 3) after its name; the item then reads 'Hide parts list properties' (live rn-1222-1223 pl1 / pl2.json, Onshape 1.222)", gap: false, check: |l, cx| {
             let chip = |l: &List, cx: &mut TestAppContext| {
                 let part = cx.update(|cx| l.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.id.clone()))?;
