@@ -417,4 +417,11 @@ fn a_selected_points_glyph_sits_above_it(cx: &mut TestAppContext) {
     assert!((3.0..=9.0).contains(&off[0].x) && (off[0].y + 40.0).abs() <= 1.5, "centred above the point: {off:?}");
     let on = boxes(cx, true);
     assert!(on.iter().any(|c| (c.x + 17.0).abs() <= 0.5 && (c.y + 16.0).abs() <= 0.5), "up-left with Show constraints on: {on:?}");
+    // Fixed too: two glyphs in a row centred above it, the corner's Coincident, then the Fix (live (-9, -40), (+13, -40)).
+    let fix = cx.update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| data.sketch.add_constraint(noshape_sketch::ConstraintKind::Fix { entity: corner }).unwrap()))).expect("in a sketch");
+    let two = boxes(cx, false);
+    let fix_x = cx.update(|cx| view.read(cx).ui.glyph_boxes.iter().find(|b| b.0 == fix).map(|b| f64::from(b.2) + 10.0 - at.x)).expect("the Fix glyph");
+    assert_eq!(two.len(), 2, "{two:?}");
+    assert!(two.iter().all(|c| (c.y + 40.0).abs() <= 1.5) && (two[1].x - two[0].x - 22.0).abs() <= 0.5, "a row 22 px apart, 40 px up: {two:?}");
+    assert!((-13.0..=-5.0).contains(&two[0].x) && (fix_x - two[1].x).abs() <= 0.5, "Coincident left, Fix right: {two:?}, Fix at {fix_x}");
 }

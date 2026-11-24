@@ -3,25 +3,21 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24, restart after the 11-23 pause) — read first
-- Branch agent/skasm reset onto psui's rebase of my stack (psui-skrebase 1c8e8b45e; psui re-lands it; old tip kept as
-  branch skasm-pre-rebase-1124). When psui's land lands: verify my tests on main, then land my work on top.
-- Uncommitted (tests on vibex6 via /root/skasm-scratch/bin/tm33.sh, rb.sh bash -c "$(cat …)"):
-  (1) ERR-SM-BAD-SELECTION-RED: failing picks' edges join the selected edges' see-through copy (scene builder.rs
-  lit_edge, shaders.wgsl selected_only keeps ERROR lines); GPU T1 a_failing_flanges_joint_edge_is_red_through_the_wall.
-  Evidence: live errors-1123 fl-joint2-vp: red line inside the wall's face (78,104,118) 3 px above its outline. TICKETS row
-  deduped (3 → 1), "fixed, to verify".
-  (2) feel audit (/root/skasm-scratch/audit-1124.md, 103 items, 70 → 83 covered): sketch tools matrix +12 rows; scene
-  pointer dot, tangent arc on a circle COINCIDENT, H/V dash colour fecb33 (DIRECTION_DASH_COLOR; guides stay e2bc2c) + 3
-  point arc chord dashes; value box: bare box look (white 102x28, #1651B0 border, shadow), invalid until the next Enter,
-  hover texts (otf_error_tip), "-3" refused; sm: SM model flip arrow test, Form point fills Target face(s) test.
-- 11:2x state: all tests green on vibex6 (part-studio-ui 124, scene sketch_mode 203); clippy fixed one match→if let,
-  re-check running (rb.sh clippy -p noshape-part-studio-ui). NEXT: commit as 2 commits (BAD-SELECTION-RED: builder.rs,
-  shaders.wgsl, hover_matrix_tests.rs, TICKETS; audit: the rest + interaction-feel.md rows), wait for psui's land of the
-  stack, rebase on main, land.sh, report lead ≤5 lines (audit counts in /root/skasm-scratch/audit-1124.md).
-- Open audit gaps: Extend B (2 mm off past the boundary drops the pick: needs a live threshold), Use tool flow rows,
-  value-box caret/selection/palette, sm-form location buttons / drag, Tab → page button (browser focus: ask lead).
-
+## NOW (11-24) — read first
+- LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
+  inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
+- psui re-landed my old stack: QUEUED 30cba9c5 (11-24). My branch sits on psui's rebase (1c8e8b45e); old tip kept as
+  branch skasm-pre-rebase-1124. When it lands: rebase on main, run my tests, land.sh my commits on top.
+- Local commits (not landed): 043f530ce failing picked edges red through the part (ERR-SM-BAD-SELECTION-RED, done,
+  tested); 8afc4b0f5 feel audit (value box look, H/V dash colour, 12 matrix rows, sm tests).
+- Uncommitted (tests: /root/skasm-scratch/bin/t6.sh on vibex6): corner glyph row Coincident first, then Fix
+  (SKETCH-SELECTED-GLYPH-OFFSET, test extended); Arc3 chord level with its first click = yellow direction dash, no guide;
+  GPU test tangent arc from a line end on the Origin (passes WITHOUT a fix: qa's failure not reproduced, asked in the
+  row); TICKETS: 6 bare duplicate SKT rows dropped, 2 rows annotated. NEXT: commit, then more sketch audit.
+- Sketch audit notes: /root/skasm-scratch/audit-1124.md (bottom section). Left: Use on a face stores no COINCIDENTs
+  between loop lines (live 12 constraints; check the solver with coincident external points first);
+  SKETCH-MIRROR-LINE-LOOK band (needs a pixel test); FEEL-SK-SELECT-OTHER: ` bolds row 2 (spec behaviours 19904)
+  vs qa's live take bolding the pick (needs a live recheck); Extend B threshold (live).
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
   Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =

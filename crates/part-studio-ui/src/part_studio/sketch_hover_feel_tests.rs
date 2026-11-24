@@ -1150,3 +1150,43 @@ fn a_hovered_edge_midpoints_marker_has_lives_pixels(cx: &mut TestAppContext) {
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
+
+/// Live walk3-1121 (6a), qa FEEL-TANGENT-ARC-AT-ORIGIN: with the real pointer and the GPU's picks, a line ended on the
+/// Origin, then Tangent arc clicked there and at (15, 12) mm: the arc is made, Tangent to the line (qa's 11-22 take saw
+/// a dashed straight preview and no arc; not reproduced here).
+#[gpui::test]
+fn a_tangent_arc_from_a_line_end_on_the_origin_with_the_pointer(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "tarc-origin-pointer", Tool::Line);
+    let px = |cx: &mut TestAppContext, p: DVec2| -> DVec2 {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().expect("sketch mode");
+            v.viewport.read(cx).project(ed.frame.to_world(p)).expect("on screen")
+        })
+    };
+    let pointer = Pointer::new(cx, window, &view);
+    let origin = px(cx, DVec2::ZERO);
+    let start = px(cx, DVec2::new(-0.03, 0.0));
+    click(cx, window, &view, (start.x, start.y));
+    click(cx, window, &view, (origin.x, origin.y));
+    keys(cx, window, &["escape"]);
+    let lines = cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count()));
+    assert_eq!(lines, 1, "the line to the origin");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::TangentArc, w, cx))).unwrap();
+    pointer.click(cx, &view, origin);
+    let end = px(cx, DVec2::new(0.015, 0.012));
+    pointer.move_to(cx, &view, (origin + end) * 0.5);
+    pointer.click(cx, &view, end);
+    let (arcs, tangent, msg) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).expect("sketch data");
+        let arcs = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Arc).count();
+        let tangent = d.sketch.constraints().any(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Tangent { .. }));
+        let kinds: Vec<_> = d.sketch.constraints().map(|c| format!("{:?}", c.kind)).chain(d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).map(|c| format!("{c:?}"))).collect();
+        (arcs, tangent, (v.sketch.as_ref().and_then(|ed| ed.message.clone()), kinds))
+    });
+    assert_eq!(arcs, 1, "the arc made ({msg:?}; line from {start:?} to the origin at {origin:?})");
+    assert!(tangent, "Tangent to the line");
+}

@@ -6255,13 +6255,14 @@ impl SketchEditor {
             }
         }
         // Shared ends: a Coincident glyph at each (live: one per corner of a
-        // rectangle, up-left of the point).
+        // rectangle, up-left of the point), first in its point's row (live glyph-flat-1122: Coincident, then Fix).
         for (p, curves) in shared_ends(sk) {
             let Some(anchor) = glyph_anchor(sk, p) else { continue };
             let cid = shared_glyph_id(p);
             let offset = data.glyph_offsets.get(&glyph_key(cid, p)).map(|o| DVec2::new(o[0], o[1]));
             let external = curves.iter().all(|c| sk.entity(*c).is_some_and(|x| x.external));
-            out.push(GlyphInfo { constraint: cid, icon: "coincident", entity: p, anchor, on_point: true, offset, external });
+            let at = out.iter().position(|g| g.entity == p).unwrap_or(out.len());
+            out.insert(at, GlyphInfo { constraint: cid, icon: "coincident", entity: p, anchor, on_point: true, offset, external });
         }
         out
     }
@@ -6884,7 +6885,9 @@ impl SketchEditor {
                     // yellow dashes (arcs.md).
                     1 => {
                         poly(&[anchors[0], c], preview_color, false);
-                        if self.inference.as_ref().is_some_and(|i| is_direction(i.kind)) {
+                        // (Level with the first click is an alignment with that point, the origin's too: the chord's.)
+                        let own = |i: &Inference| is_alignment(i) && i.reference.is_some_and(|r| r.distance(anchors[0]) <= self.world_per_px * 0.5);
+                        if self.inference.as_ref().is_some_and(|i| is_direction(i.kind) || own(i)) {
                             inferred_dash = Some((anchors[0], c));
                         }
                     }
@@ -7502,7 +7505,7 @@ impl SketchEditor {
                 })
                 .collect();
             let guides = if aligned.is_empty() { inf.reference.filter(|_| !(self.tool == Tool::Line && is_direction(inf.kind))).into_iter().collect() } else { aligned };
-            for r in guides {
+            for r in guides.into_iter().filter(|r| inferred_dash.is_none_or(|(a, _)| a.distance(*r) > self.world_per_px * 0.5)) {
                 // Live (part-studio/1032): a 1 px yellow dash, 4 px on / 4 off, as on a rubber band.
                 lines.push_polyline(&[w(r), w(inf.position)], INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
             }
