@@ -48,7 +48,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a_failing_feature_patterns_direction_... flaked once on a loaded vibex8 (white frame), passed alone.
   Tests note: a field made active by user_focus_query alone is taken back by the focused field's tab stop on the next
   render: focus `tab_stop_handle("q:<path>")` as a click does. The viewport's context menu is `view.context_menu`.
-  NEXT: ask the lead.
+  Batch 3 queued as b0f71099 (20:2x).
+- Lead task 11-24 20:3x: INTERACTION LATENCY on a ~50-feature corpus part vs live (timing-1123 + timings-1117/1118):
+  hover, click, dialog open, first preview after a field edit, Enter → rebuilt, undo; fix ≥ 100 ms AND ≥ 2× live (no
+  UI-thread blocking); report a short table. State (uncommitted): latency_tests.rs refactored (hover_and_click,
+  edit_runs with undo, perf_document_at) + T2 everyday_interactions_on_a_corpus_part (NOSHAPE_LATENCY_DOC).
+  Doc: c2-impeller-loft (= live "Impellergehaeuse", 48 features; live ✓ regenerated 3239 ms, unsuppress 1361) built by
+  an UNCOMMITTED scratch test sketch_open_perf::psui_write_model_document (live_refs + add_sketch_refs; revert it before
+  committing) → vibex8 ~/tmp/psui/impeller.noshape, Mac ~/noshape-host/psui-keep/impeller.noshape (10 steps not OK).
+  vibex8 numbers are software-GL (pick avg 448 ms): use the Mac (rb.sh mac, /root/psui-scratch/lat-mac.sh).
+  Mac run started ~21:15 UTC (background, output /root/psui-scratch/lat-mac.out; log Mac ~/noshape-host/psui-keep/lat.log).
+  vibex8 smoke (software GL, first doc broken: 36 not OK) — NOT for the report: 30-feature part hover 1239 ms (pick avg
+  448), click 93, dialog 49 (3 of 7 runs ~2 s), step 41 (outliers ~1.9 s), ✓ 485, menu 248, sketch in 83 / out 34,
+  undo 33; impeller hover 255 (a steady ~250: a timer?), click 53, dialog 1583, step 51, Enter 31, undo 29 (broken doc).
+  Watch on the Mac: periodic ~2 s spikes on dialog open / field steps; hover's steady ~250 ms; ✓ on the 30-feature
+  part (485 vs live 310-350); the impeller's full regen (SCORE: ours 6.5 s vs live 2.8 s, core's) will show in Enter.
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
