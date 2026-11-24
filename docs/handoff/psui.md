@@ -34,6 +34,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
 ## RESUME HERE (11-24 14:2x UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
+- FIRST: stack 75404bb7 / 53737a22 / 59a849f1 FAILED on rebase conflicts (lead 18:2x; skasm b99589dc landed 18:18).
+  `git fetch; git rebase origin/main` (conflicts: likely TICKETS/handoff union rows, list_feel_tests, dash_from: add
+  `dash_from: 0.0` to vertex_band_piece's LineSegment if 7e9bedfb7 is on main), touch -c, land.sh again.
+- THEN: lead task 11-24 18:2x: Part Studio feel-coverage audit (behaviours.md PS specs with no test: add a feel test
+  each, most-used first, fix failures, land in batches, report counts specs / covered before / after).
+  State: /root/psui-scratch/audit/ (scan.py -> secs.json: 186 PS sections, 72 cited by a test id; uncovered.txt 114;
+  peek.py <from> <to> <lines>; tests.txt = test names + matrix row ids; triage.tsv = verdict per section line:
+  covered / out / ADD / check). Next: resolve the "check" rows (read each section, grep code), then write tests
+  (new file e.g. part_studio/ps_audit_feel_tests.rs + merge-tests if needed). First ADD: dialog ✓/✕ have no tooltip.
+  Then write docs/parity/ps-feel-audit.md with the counts.
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
