@@ -370,3 +370,31 @@ fn fixed_curves_sharing_their_ends_reach_as_plain_ones() {
     assert_eq!(square_and_short_diagonal(true).regions().len(), 1);
     assert_eq!(square_and_short_diagonal(false).regions().len(), 2);
 }
+
+/// Live sketch-gap-1121: free ends close a region within 0.2 µm, absolute (the same at ×100 and ×0.01): a rectangle
+/// whose last side stops 0.2 µm short of its start bounds one; 0.3 µm short, none. A line's end short of another's
+/// middle joins it at 0.01 µm, not 0.02.
+#[test]
+fn free_ends_close_regions_within_0_2_um() {
+    let rect = |scale: f64, gap: f64| {
+        let mut sk = Sketch::new();
+        let (w, h) = (0.04 * scale, 0.03 * scale);
+        sk.add_line(v(0.0, 0.0), v(w, 0.0));
+        sk.add_line(v(w, 0.0), v(w, h));
+        sk.add_line(v(w, h), v(0.0, h));
+        sk.add_line(v(0.0, h), v(0.0, gap));
+        sk.regions().len()
+    };
+    for scale in [1.0, 100.0, 0.01] {
+        assert_eq!((rect(scale, 0.2e-6), rect(scale, 0.3e-6)), (1, 0), "×{scale}");
+    }
+    let tee = |gap: f64| {
+        let mut sk = Sketch::new();
+        for (a, b) in [(v(0.0, 0.0), v(0.04, 0.0)), (v(0.04, 0.0), v(0.04, 0.03)), (v(0.04, 0.03), v(0.0, 0.03)), (v(0.0, 0.03), v(0.0, 0.0))] {
+            sk.add_line(a, b);
+        }
+        sk.add_line(v(0.02, 0.0), v(0.02, 0.03 - gap));
+        sk.regions().len()
+    };
+    assert_eq!((tee(0.01e-6), tee(0.02e-6)), (2, 1), "a T-end joins the line at 0.01 µm, not 0.02");
+}

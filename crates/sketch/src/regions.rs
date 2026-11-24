@@ -543,9 +543,14 @@ impl Sketch {
     }
 }
 
+/// Live joins a T-end to a line within 0.01 µm, not 0.02 (sketch-gap-1121).
+const T_END_JOIN: f64 = 1.5e-8;
+/// Live closes a region over two free ends within 0.2 µm, not 0.3, at any scale (sketch-gap-1121).
+const FREE_END_JOIN: f64 = 2.5e-7;
+
 fn tolerance(boxes: &[BBox]) -> f64 {
     let bb = boxes.iter().fold(BBox::EMPTY, |a, b| a.union(b));
-    1e-9 * bb.size().max_element().max(1.0)
+    (1e-9 * bb.size().max_element().max(1.0)).max(T_END_JOIN)
 }
 
 fn sketch_curves(sk: &Sketch) -> Vec<(EntityId, Curve2)> {
@@ -721,7 +726,7 @@ fn build_edges(curves: &[(EntityId, Curve2)], boxes: &[BBox], tol: f64, reach: &
         pts.push(curves[i].1.point(t0));
         pts.push(curves[i].1.point(t1));
     }
-    let (cl, pos) = merge_points(&pts, tol * 4.0);
+    let (cl, pos) = merge_points(&pts, (tol * 4.0).max(FREE_END_JOIN));
     let mut edges: Vec<Edge> = Vec::new();
     // vertex pair -> midpoints of edges already present (duplicate removal)
     let mut by_pair: std::collections::HashMap<(usize, usize), Vec<DVec2>> = std::collections::HashMap::new();
