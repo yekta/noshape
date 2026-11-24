@@ -2095,123 +2095,6 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     p << "sweep mode " << mode << " profiles " << profiles.items.size();
     dump_op("sweep", c, {}, p.str());
   }
-  BRepOffsetAPI_MakePipeShell mk(sw);
-  {
-    // OCCT's defaults (1e-4 absolute) are tuned for millimetre parts: in metres
-    // that's 0.1 mm of approximation error on the swept surfaces.
-    Bnd_Box sb;
-    BRepBndLib::Add(sw, sb);
-    const double size = sb.IsVoid() ? 1.0 : std::sqrt(sb.SquareExtent());
-    mk.SetTolerance(std::min(1e-4, std::max(1e-9, size * 1e-6)), std::min(1e-4, std::max(1e-9, size * 1e-6)), 1e-2);
-  }
-  const bool twisted = std::abs(o.twist) > 1e-12;
-  if (twisted)
-  {
-    // The profile's X direction follows an auxiliary curve winding round the
-    // path: a rotation-minimizing frame (double reflection) turned by the
-    // twist in proportion to arc length, at a distance of the profile's size.
-    Bnd_Box pb;
-    for (const auto& p : profiles.items)
-      BRepBndLib::Add(p, pb);
-    BRepAdaptor_CompCurve cc(sw);
-    const double          L = GCPnts_AbscissaPoint::Length(cc);
-    if (!(L > 1e-12))
-      fail_invalid("sweep path has no length");
-    const double delta = std::max(pb.IsVoid() ? 0.0 : std::sqrt(pb.SquareExtent()), L * 1e-2);
-    const int    n     = std::max(32, (int)std::ceil(std::abs(o.twist) / (M_PI / 16.0)) + 16);
-    NCollection_Array1<gp_Pnt> pts(1, n + 1);
-    gp_Pnt                     P;
-    gp_Vec                     T;
-    cc.D1(cc.FirstParameter(), P, T);
-    gp_Vec R = std::abs(T.Normalized().Z()) < 0.9 ? T.Crossed(gp_Vec(0, 0, 1)) : T.Crossed(gp_Vec(1, 0, 0));
-    R.Normalize();
-    gp_Pnt prevP = P;
-    gp_Vec prevT = T.Normalized();
-    for (int i = 0; i <= n; ++i)
-    {
-      const double s = L * i / n;
-      GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
-      const double         u = i == 0 ? cc.FirstParameter() : (i == n ? cc.LastParameter() : ap.Parameter());
-      cc.D1(u, P, T);
-      T.Normalize();
-      if (i > 0)
-      {
-        // Double reflection (Wang et al. 2008).
-        gp_Vec v1 = gp_Vec(prevP, P);
-        double c1 = v1.SquareMagnitude();
-        if (c1 > 1e-30)
-        {
-          gp_Vec rL = R - v1 * (2.0 / c1 * v1.Dot(R));
-          gp_Vec tL = prevT - v1 * (2.0 / c1 * v1.Dot(prevT));
-          gp_Vec v2 = T - tL;
-          double c2 = v2.SquareMagnitude();
-          R = c2 > 1e-30 ? rL - v2 * (2.0 / c2 * v2.Dot(rL)) : rL;
-        }
-        R = (R - T * R.Dot(T)).Normalized();
-      }
-      prevP = P;
-      prevT = T;
-      const double th = o.twist * s / L;
-      const gp_Vec B  = T.Crossed(R);
-      pts(i + 1) = P.Translated((R * std::cos(th) + B * std::sin(th)) * delta);
-    }
-    occ::handle<NCollection_HArray1<gp_Pnt>> hp = new NCollection_HArray1<gp_Pnt>(1, n + 1);
-    for (int i = 1; i <= n + 1; ++i)
-      hp->SetValue(i, pts(i));
-    GeomAPI_Interpolate interp(hp, false, 1e-9);
-    interp.Perform();
-    if (!interp.IsDone())
-      fail_op("sweep twist: auxiliary curve failed");
-    TopoDS_Wire aw = BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(interp.Curve()).Edge()).Wire();
-    mk.SetMode(aw, false, BRepFill_NoContact);
-  }
-  else
-  switch (mode)
-  {
-    case 0:
-      mk.SetMode(false);
-      break;
-    case 1:
-      mk.SetMode(true);
-      break;
-    case 2:
-      mk.SetMode(gp_Ax2(gp_Pnt(0, 0, 0), to_dir(o.dir, "fixed direction"),
-                        to_dir(o.xdir, "fixed x direction")));
-      break;
-    case 3:
-      mk.SetMode(to_dir(o.dir, "binormal direction"));
-      break;
-    case 4: {
-      TopoDS_Wire aw = as_wire(aux.shape, "auxiliary spine");
-      mk.SetMode(aw, true, o.with_contact ? BRepFill_Contact : BRepFill_NoContact);
-      break;
-    }
-    case 5:
-      mk.SetDiscreteMode();
-      break;
-    case 6:
-      require_non_null(aux.shape, "spine support");
-      if (!mk.SetMode(aux.shape))
-        fail_invalid("invalid spine support surface");
-      break;
-    default:
-      fail_invalid("unknown sweep mode");
-  }
-  switch (o.transition)
-  {
-    case 1:
-      mk.SetTransitionMode(BRepBuilderAPI_Transformed);
-      break;
-    case 2:
-      mk.SetTransitionMode(BRepBuilderAPI_RoundCorner);
-      break;
-    case 3:
-      mk.SetTransitionMode(BRepBuilderAPI_RightCorner);
-      break;
-    default:
-      mk.SetTransitionMode(BRepBuilderAPI_Transformed);
-      break;
-  }
   bool                      anyClosed = false;
   std::vector<TopoDS_Shape> args;
   std::vector<TopoDS_Shape> used;
@@ -2228,24 +2111,154 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     args.push_back(p);
     used.push_back(prof);
   }
-  if (std::abs(o.scale_end - 1.0) > 1e-12)
+  const bool twisted = std::abs(o.twist) > 1e-12;
+  // OCCT's defaults (1e-4 absolute) are tuned for millimetre parts: in metres that's 0.1 mm of approximation error on
+  // the swept surfaces, so the path's size sets it; where that fails, looser (c2-loft-guide-curves-driven-pattern's
+  // Sweep 1: a 0.001 in wire coiled on a 40 mm routing curve builds from 1e-5).
+  double tol0 = 1e-4;
   {
-    if (used.size() != 1)
-      fail_unsupported("scale law with multiple sweep sections");
-    if (!(o.scale_end > 0))
-      fail_invalid("sweep end scale must be positive");
-    occ::handle<Law_Linear> law = new Law_Linear();
-    law->Set(0.0, 1.0, 1.0, o.scale_end);
-    mk.SetLaw(used[0], law, o.with_contact, o.with_correction);
+    Bnd_Box sb;
+    BRepBndLib::Add(sw, sb);
+    const double size = sb.IsVoid() ? 1.0 : std::sqrt(sb.SquareExtent());
+    tol0 = std::min(1e-4, std::max(1e-9, size * 1e-6));
   }
-  else
+  std::unique_ptr<BRepOffsetAPI_MakePipeShell> pipe;
+  for (const double tol : {tol0, 1e-7, 1e-6, 1e-5})
   {
-    for (const auto& p : used)
-      mk.Add(p, o.with_contact, o.with_correction);
+    if (pipe && tol <= tol0)
+      continue;
+    pipe = std::make_unique<BRepOffsetAPI_MakePipeShell>(sw);
+    BRepOffsetAPI_MakePipeShell& mk = *pipe;
+    mk.SetTolerance(tol, tol, 1e-2);
+    if (twisted)
+    {
+      // The profile's X direction follows an auxiliary curve winding round the
+      // path: a rotation-minimizing frame (double reflection) turned by the
+      // twist in proportion to arc length, at a distance of the profile's size.
+      Bnd_Box pb;
+      for (const auto& p : profiles.items)
+        BRepBndLib::Add(p, pb);
+      BRepAdaptor_CompCurve cc(sw);
+      const double          L = GCPnts_AbscissaPoint::Length(cc);
+      if (!(L > 1e-12))
+        fail_invalid("sweep path has no length");
+      const double delta = std::max(pb.IsVoid() ? 0.0 : std::sqrt(pb.SquareExtent()), L * 1e-2);
+      const int    n     = std::max(32, (int)std::ceil(std::abs(o.twist) / (M_PI / 16.0)) + 16);
+      NCollection_Array1<gp_Pnt> pts(1, n + 1);
+      gp_Pnt                     P;
+      gp_Vec                     T;
+      cc.D1(cc.FirstParameter(), P, T);
+      gp_Vec R = std::abs(T.Normalized().Z()) < 0.9 ? T.Crossed(gp_Vec(0, 0, 1)) : T.Crossed(gp_Vec(1, 0, 0));
+      R.Normalize();
+      gp_Pnt prevP = P;
+      gp_Vec prevT = T.Normalized();
+      for (int i = 0; i <= n; ++i)
+      {
+        const double s = L * i / n;
+        GCPnts_AbscissaPoint ap(cc, s, cc.FirstParameter());
+        const double         u = i == 0 ? cc.FirstParameter() : (i == n ? cc.LastParameter() : ap.Parameter());
+        cc.D1(u, P, T);
+        T.Normalize();
+        if (i > 0)
+        {
+          // Double reflection (Wang et al. 2008).
+          gp_Vec v1 = gp_Vec(prevP, P);
+          double c1 = v1.SquareMagnitude();
+          if (c1 > 1e-30)
+          {
+            gp_Vec rL = R - v1 * (2.0 / c1 * v1.Dot(R));
+            gp_Vec tL = prevT - v1 * (2.0 / c1 * v1.Dot(prevT));
+            gp_Vec v2 = T - tL;
+            double c2 = v2.SquareMagnitude();
+            R = c2 > 1e-30 ? rL - v2 * (2.0 / c2 * v2.Dot(rL)) : rL;
+          }
+          R = (R - T * R.Dot(T)).Normalized();
+        }
+        prevP = P;
+        prevT = T;
+        const double th = o.twist * s / L;
+        const gp_Vec B  = T.Crossed(R);
+        pts(i + 1) = P.Translated((R * std::cos(th) + B * std::sin(th)) * delta);
+      }
+      occ::handle<NCollection_HArray1<gp_Pnt>> hp = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+      for (int i = 1; i <= n + 1; ++i)
+        hp->SetValue(i, pts(i));
+      GeomAPI_Interpolate interp(hp, false, 1e-9);
+      interp.Perform();
+      if (!interp.IsDone())
+        fail_op("sweep twist: auxiliary curve failed");
+      TopoDS_Wire aw = BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(interp.Curve()).Edge()).Wire();
+      mk.SetMode(aw, false, BRepFill_NoContact);
+    }
+    else
+    switch (mode)
+    {
+      case 0:
+        mk.SetMode(false);
+        break;
+      case 1:
+        mk.SetMode(true);
+        break;
+      case 2:
+        mk.SetMode(gp_Ax2(gp_Pnt(0, 0, 0), to_dir(o.dir, "fixed direction"),
+                          to_dir(o.xdir, "fixed x direction")));
+        break;
+      case 3:
+        mk.SetMode(to_dir(o.dir, "binormal direction"));
+        break;
+      case 4: {
+        TopoDS_Wire aw = as_wire(aux.shape, "auxiliary spine");
+        mk.SetMode(aw, true, o.with_contact ? BRepFill_Contact : BRepFill_NoContact);
+        break;
+      }
+      case 5:
+        mk.SetDiscreteMode();
+        break;
+      case 6:
+        require_non_null(aux.shape, "spine support");
+        if (!mk.SetMode(aux.shape))
+          fail_invalid("invalid spine support surface");
+        break;
+      default:
+        fail_invalid("unknown sweep mode");
+    }
+    switch (o.transition)
+    {
+      case 1:
+        mk.SetTransitionMode(BRepBuilderAPI_Transformed);
+        break;
+      case 2:
+        mk.SetTransitionMode(BRepBuilderAPI_RoundCorner);
+        break;
+      case 3:
+        mk.SetTransitionMode(BRepBuilderAPI_RightCorner);
+        break;
+      default:
+        mk.SetTransitionMode(BRepBuilderAPI_Transformed);
+        break;
+    }
+    if (std::abs(o.scale_end - 1.0) > 1e-12)
+    {
+      if (used.size() != 1)
+        fail_unsupported("scale law with multiple sweep sections");
+      if (!(o.scale_end > 0))
+        fail_invalid("sweep end scale must be positive");
+      occ::handle<Law_Linear> law = new Law_Linear();
+      law->Set(0.0, 1.0, 1.0, o.scale_end);
+      mk.SetLaw(used[0], law, o.with_contact, o.with_correction);
+    }
+    else
+    {
+      for (const auto& p : used)
+        mk.Add(p, o.with_contact, o.with_correction);
+    }
+    if (!mk.IsReady())
+      fail_invalid("sweep is not ready (invalid profiles)");
+    mk.Build();
+    if (mk.IsDone())
+      break;
   }
-  if (!mk.IsReady())
-    fail_invalid("sweep is not ready (invalid profiles)");
-  mk.Build();
+  BRepOffsetAPI_MakePipeShell& mk = *pipe;
   if (!mk.IsDone())
     fail_op("sweep failed (status " + std::to_string((int)mk.GetStatus()) + ")");
   if (o.make_solid && anyClosed)

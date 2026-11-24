@@ -1713,3 +1713,25 @@ fn a_solid_loft_between_two_hexagons_is_a_frustum_with_line_sides() {
         assert_eq!(lines, 18, "sides and profiles");
     }
 }
+
+/// DRIVEN-PATTERN-SWEEP (c2-loft-guide-curves-driven-pattern's Sweep 1, live OK): a 0.001 in circle, 22° off square to
+/// a 40 mm routing curve coiled 0.06 in high, sweeps into one tube (OCCT's approximation failed at the tolerance the
+/// path's 3 mm size gave). Its volume is the circle's area square to the path times the path's length.
+#[test]
+fn a_thin_wire_coiled_on_a_routing_curve_sweeps() {
+    let c = Shape::from_brep_bytes(include_bytes!("data/sweep/coiled-wire.brep")).unwrap();
+    let parts = c.children();
+    let (profile, path) = (parts[0].clone(), parts[parts.len() - 1].clone());
+    let r = sweep(&profile, &path, &SweepOptions { solid: true, ..Default::default() }).unwrap().shape;
+    assert_eq!(r.count(ShapeType::Solid), 1);
+    assert!(r.is_valid());
+    let (rad, len) = (0.0254e-3, path.edges().iter().map(|e| e.edge_info().unwrap().length).sum::<f64>());
+    let e = &path.edges()[0];
+    let i = e.edge_info().unwrap();
+    let t = e.tangent_at(i.first_param).unwrap().normalize();
+    let Ok(Surface::Plane(pl)) = profile.faces()[0].face_surface() else { panic!("a planar profile") };
+    let n = pl.normal;
+    let want = PI * rad * rad * len * t.dot(n).abs();
+    let v = r.volume().unwrap();
+    assert!((v - want).abs() < 0.01 * want, "{} mm3, want {}", v * 1e9, want * 1e9);
+}

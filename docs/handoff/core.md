@@ -15,7 +15,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   TICKETS marks rows fixed-to-verify (Move face/Thicken/failed bodies landed 11-23 05:04 = 435354603, c276c745f,
   26657ac62; union 1f317d4df; thread on revolved cylinder and surface loft guide OK on green CLI). psui full suite 532
   passed + the new test, clippy clean.
-- **In worktree, uncommitted (core-rf): DRIVEN-PATTERN-SWEEP fix.** features.cpp sweep: MakePipeShell retried at
+- **DRIVEN-PATTERN-SWEEP fix (landing with 85f167b15, see the lead's land report).** features.cpp sweep: MakePipeShell retried at
   1e-7/1e-6/1e-5 m where the path-sized tolerance fails (c2-loft-guide-curves-driven-pattern Sweep 1: 0.001 in wire
   coiled on the routing curve); solid_a.rs may_self_intersect: profile gap = 2x sagitta (was chord), path steps <= size/4
   (Sweep 1 1316 -> 69 ms). T1 kernel core::a_thin_wire_coiled_on_a_routing_curve_sweeps + crates/kernel/tests/data/sweep/coiled-wire.brep (untracked: git add it).

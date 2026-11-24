@@ -59,11 +59,15 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
             .collect()
     };
     let turning = |s: &[(DVec3, DVec3)]| s.windows(2).map(|w| w[0].1.angle_between(w[1].1)).sum::<f64>();
-    let Some(pts) = profile.edges().iter().map(|e| samples(e, 16)).collect::<Option<Vec<_>>>() else { return true };
-    // (The profile's samples as far apart as the most a point between them can be beyond them.)
-    let gap = pts.iter().flat_map(|s| s.windows(2).map(|w| w[0].0.distance(w[1].0))).fold(0.0, f64::max);
-    let edge_pts: Vec<Vec<DVec3>> = pts.into_iter().map(|s| s.into_iter().map(|(p, _)| p).collect()).collect();
+    let Some(fine) = profile.edges().iter().map(|e| samples(e, 32)).collect::<Option<Vec<_>>>() else { return true };
+    // (Every other sample; the most a point between two of them can be beyond them: twice the farthest the sample
+    // between lies off the middle of their chord. The chord itself read a 0.001 in wire's reach as 1.4 times its
+    // radius: c2-loft-guide-curves-driven-pattern's Sweep 1 ran OCCT's check, 1.2 s.)
+    let gap = fine.iter().flat_map(|s| s.windows(3).step_by(2).map(|w| 2.0 * w[1].0.distance((w[0].0 + w[2].0) / 2.0))).fold(0.0, f64::max);
+    let edge_pts: Vec<Vec<DVec3>> = fine.into_iter().map(|s| s.into_iter().step_by(2).map(|(p, _)| p).collect()).collect();
     let pts: Vec<DVec3> = edge_pts.iter().flatten().copied().collect();
+    let centre = pts.iter().copied().sum::<DVec3>() / pts.len().max(1) as f64;
+    let size = pts.iter().map(|p| p.distance(centre)).fold(0.0, f64::max);
     // The path's edges end to end, each sampled the way the path runs (in the edges' own order, samples of edges
     // apart came next to each other: cf-snap-hook's Sweep 1 read a 117 mm step and checked a clear sweep, 77 ms).
     let Some(chain) = path_in_order(path) else { return true };
@@ -71,7 +75,9 @@ fn may_self_intersect(profile: &Shape, path: &Shape, tool: &Shape, scale: f64) -
     let mut arc = 0.0;
     for (e, reversed) in &chain {
         let Some(coarse) = samples(e, 64) else { return true };
-        let n = ((turning(&coarse) / 0.05).ceil() as usize + 64).min(20_000);
+        // (Steps no longer than a quarter of the profile's size: that 0.001 in wire's steps were its radius.)
+        let length: f64 = coarse.windows(2).map(|w| w[0].0.distance(w[1].0)).sum();
+        let n = ((turning(&coarse) / 0.05).ceil() as usize + 64).max((length / (0.25 * size).max(1e-12)).ceil() as usize).min(20_000);
         let Some(mut s) = samples(e, n) else { return true };
         if *reversed {
             s.reverse();
