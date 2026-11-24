@@ -1265,7 +1265,7 @@ impl PartStudioView {
             // configuration only fails once accepted; its dialog stays black
             // with ✓ enabled.
             let st = st.filter(|(_, m)| !m.starts_with("Creating multiple Derived features from the same source"));
-            let (faulty, invalid_input) = self.display.feature_state(id).map(|s| (s.faulty.clone(), s.invalid_input)).unwrap_or_default();
+            let (faulty, invalid_input, blamed) = self.display.feature_state(id).map(|s| (s.faulty.clone(), s.invalid_input, s.error_refs.clone())).unwrap_or_default();
             // Live (sketch/00-sketch-dialog-empty.png): a sketch without a
             // plane asks for one in a blue bubble over the graphics.
             const NO_PLANE: &str = NO_SKETCH_PLANE_BUBBLE;
@@ -1292,7 +1292,7 @@ impl PartStudioView {
             e.dialog.update(cx, |d, cx| {
                 d.note_regenerated(regen_ok);
                 d.set_status(st, cx);
-                d.set_faulty(faulty, invalid_input, cx);
+                d.set_faulty(faulty, invalid_input, blamed, cx);
             });
         } else if let Some(m) = self.ui.dialog_info.take()
             && self.message.as_ref().is_some_and(|(_, x)| *x == m)

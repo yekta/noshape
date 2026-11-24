@@ -177,6 +177,8 @@ pub struct FeatureDialog {
     pub faulty: Vec<String>,
     /// The error refused the inputs before any operation ran: no entry drawn failing (live L19).
     pub invalid_input: bool,
+    /// The inputs the error blames (the feature state's `error_refs`): their entries drawn red.
+    pub blamed: Vec<Reference>,
     labeler: RefLabeler,
     collapsed_groups: std::collections::HashSet<String>,
     /// Where live's layout is in the parameter list, unrounded (see
@@ -460,6 +462,7 @@ impl FeatureDialog {
             status: None,
             faulty: Vec::new(),
             invalid_input: false,
+            blamed: Vec::new(),
             labeler,
             collapsed_groups,
             live_y: Default::default(),
@@ -1584,14 +1587,16 @@ impl FeatureDialog {
 
     /// A picked reference whose creator is gone, but not one of this feature's in-feature mate connectors (not in the
     /// saved studio while it is new).
-    /// A field entry drawn as an error (live `ns-list-item-error`): its entity is gone, or the feature fails with an
-    /// error naming no field, which draws its inputs red (live feel/feedback.json "failedPreview": Fillet 100 mm's
-    /// "Edge of Extrude 1" entry red, the field itself not marked); not when the inputs were refused before any
-    /// operation (live L19: Thicken's two zero thicknesses keep the face's entry dark). An error naming the entry's own
-    /// field draws it red too (live errors-1123 fl-joint2: Flange's "Edge of Flange 1").
+    /// A field entry drawn as an error (live `ns-list-item-error`): its entity is gone, or the feature fails on it (live
+    /// errors-1123: chamfer/fillet too big's edge, a shell's face, a thickened cylinder; feel/feedback.json
+    /// "failedPreview": Fillet 100 mm's "Edge of Extrude 1"), or the error names the entry's own field (fl-joint2:
+    /// Flange's "Edge of Flange 1"). An error that blames none of its inputs leaves them dark (draft face-parallel, a
+    /// fillet too big on a picked face), as does an extrude's region drawn red at depth 0; and not when the inputs were
+    /// refused before any operation (live L19: Thicken's two zero thicknesses).
     pub(crate) fn entry_failing(&self, path: &str, r: &Reference) -> bool {
         let error = matches!(self.status, Some((FeatureStatus::Error, _))) && !self.invalid_input && self.feature.type_id != "sketch";
-        let failing = error && (self.faulty.is_empty() || self.faulty.iter().any(|f| f == path));
+        let blamed = self.blamed.contains(r) && !matches!(r, Reference::SketchRegion { .. });
+        let failing = error && (blamed || self.faulty.iter().any(|f| f == path));
         failing || self.ref_missing(r)
     }
 
@@ -1640,9 +1645,9 @@ impl FeatureDialog {
         }
     }
 
-    pub fn set_faulty(&mut self, faulty: Vec<String>, invalid_input: bool, cx: &mut Context<Self>) {
-        if self.faulty != faulty || self.invalid_input != invalid_input {
-            (self.faulty, self.invalid_input) = (faulty, invalid_input);
+    pub fn set_faulty(&mut self, faulty: Vec<String>, invalid_input: bool, blamed: Vec<Reference>, cx: &mut Context<Self>) {
+        if self.faulty != faulty || self.invalid_input != invalid_input || self.blamed != blamed {
+            (self.faulty, self.invalid_input, self.blamed) = (faulty, invalid_input, blamed);
             cx.notify();
         }
     }

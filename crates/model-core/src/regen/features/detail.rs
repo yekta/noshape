@@ -469,6 +469,8 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     let r = in_onshape_words(fillet_in(ev), "Failed to fillet selections.");
     if r.as_ref().is_err_and(|e| e.message == "Failed to fillet selections.") {
         attempted_round(ev);
+        // Its picked edges fail (live errors-1123 too-big: an edge's entry red, a picked face's not).
+        ev.error_refs = ev.query("entities").iter().filter(|r| matches!(r, crate::reference::Reference::Edge(_))).cloned().collect();
     }
     r
 }
@@ -1770,6 +1772,15 @@ pub fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edge
 }
 
 pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
+    let res = shell_in(ev);
+    // Live errors-1123 too-thick: its face to remove listed red.
+    if res.as_ref().is_err_and(|e| e.message == "Could not shell part with selections.") {
+        ev.error_refs = ev.query("entities").to_vec();
+    }
+    res
+}
+
+fn shell_in(ev: &mut EvalCtx) -> FResult<()> {
     let t = ev.length("thickness")?;
     if t <= 0.0 {
         return crate::regen::eval::err_at(&["thickness"], "Error regenerating: a parameter is out of range.");

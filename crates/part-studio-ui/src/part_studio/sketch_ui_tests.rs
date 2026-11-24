@@ -7979,7 +7979,7 @@ fn an_error_naming_a_checkbox_adds_no_value_suffix(cx: &mut TestAppContext) {
     let title = |cx: &mut TestAppContext, field: &str| {
         dialog.update(cx, |d, cx| {
             d.set_status(Some((noshape_model::display::FeatureStatus::Error, msg.to_string())), cx);
-            d.set_faulty(vec![field.to_string()], false, cx);
+            d.set_faulty(vec![field.to_string()], false, Vec::new(), cx);
             d.title_status().map(|s| s.1)
         })
     };
@@ -7997,7 +7997,7 @@ fn an_error_naming_a_list_of_selections_adds_no_value_suffix(cx: &mut TestAppCon
     let msg = "Select profiles in order from start to finish.";
     let title = dialog.update(cx, |d, cx| {
         d.set_status(Some((noshape_model::display::FeatureStatus::Error, msg.to_string())), cx);
-        d.set_faulty(vec!["sheetProfilesArray".to_string()], false, cx);
+        d.set_faulty(vec!["sheetProfilesArray".to_string()], false, Vec::new(), cx);
         d.title_status().map(|s| s.1)
     });
     assert_eq!(title.as_deref(), Some(msg));
@@ -8018,6 +8018,32 @@ fn an_empty_guide_entry_reads_no_selections(cx: &mut TestAppContext) {
     assert!(state.contains("Guides No selections"), "{state}");
 }
 
+/// Live errors-1123: an error that blames none of the inputs (draft face-parallel, a fillet too big on a picked face)
+/// leaves every entry dark; one that blames an input (a chamfer or fillet too big's edge) draws that entry red.
+#[gpui::test]
+fn only_the_inputs_an_error_blames_draw_their_entries_red(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [20, 0, 10]"], "radius": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "blamed-entry", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let fillet = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Fillet 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(fillet, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Fillet dialog").dialog.clone());
+    let red = |cx: &mut TestAppContext, blame: bool| {
+        dialog.update(cx, |d, cx| {
+            d.set_status(Some((noshape_model::display::FeatureStatus::Error, "Failed to fillet selections.".to_string())), cx);
+            let edge = d.feature.params.query("entities")[0].clone();
+            d.set_faulty(Vec::new(), false, if blame { vec![edge.clone()] } else { Vec::new() }, cx);
+            d.entry_failing("entities", &edge)
+        })
+    };
+    assert_eq!((red(cx, false), red(cx, true)), (false, true), "(blaming nothing, blaming the edge)");
+}
+
 /// Live errors-1123 fl-joint2: an error naming a selection field draws its entry red ("Edge of Flange 1"); one naming
 /// another field leaves it dark.
 #[gpui::test]
@@ -8036,7 +8062,7 @@ fn an_error_naming_a_selection_field_draws_its_entry_red(cx: &mut TestAppContext
     let red = |cx: &mut TestAppContext, field: &str| {
         dialog.update(cx, |d, cx| {
             d.set_status(Some((noshape_model::display::FeatureStatus::Error, "Failed to fillet.".to_string())), cx);
-            d.set_faulty(vec![field.to_string()], false, cx);
+            d.set_faulty(vec![field.to_string()], false, Vec::new(), cx);
             let edge = d.feature.params.query("entities")[0].clone();
             d.entry_failing("entities", &edge)
         })
