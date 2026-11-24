@@ -491,7 +491,7 @@ fn line_value_box_takes_a_variable(cx: &mut TestAppContext) {
         });
     });
     draw(cx, window);
-    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    sketch_in(cx, window, view.clone(), Tool::Line);
     click(cx, window, &view, (500., 400.));
     click(cx, window, &view, (640., 360.));
     keys(cx, window, &["=", "#", "l", "e", "n", "enter"]);
@@ -722,7 +722,7 @@ const FAN_VARS: [(&str, &str); 4] = [("fan_control_board_depth", "2.4 mm"), ("fa
 #[gpui::test]
 fn dimension_box_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext) {
     let (window, view) = studio_with_variables(cx, "dim-fan", &FAN_VARS);
-    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    sketch_in(cx, window, view.clone(), Tool::Line);
     click(cx, window, &view, (500., 400.));
     click(cx, window, &view, (640., 360.));
     keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
@@ -771,7 +771,7 @@ fn dialog_field_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext) 
 #[gpui::test]
 fn dimension_box_enter_inserts_the_highlighted_variable(cx: &mut TestAppContext) {
     let (window, view) = studio_with_wall_thickness(cx, "dim-wall");
-    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    sketch_in(cx, window, view.clone(), Tool::Line);
     click(cx, window, &view, (500., 400.));
     click(cx, window, &view, (640., 360.));
     keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
@@ -1849,7 +1849,7 @@ fn another_sketchs_point_snaps_from_its_square(cx: &mut TestAppContext) {
     });
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
-    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    sketch_in(cx, window, view.clone(), Tool::Line);
     click(cx, window, &view, (450., 400.));
     let wpp = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
     let at = |cx: &mut TestAppContext, dx: f64| {
@@ -1918,7 +1918,7 @@ fn a_model_vertex_snaps_to_its_exact_point(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_model_edge_on_the_sketch_plane_snaps_unhovered(cx: &mut TestAppContext) {
     let (window, view, _top, _bottom) = block_part(cx, "model-edge-snap");
-    let (window, view) = sketch_in(cx, window, view, Tool::Line);
+    sketch_in(cx, window, view.clone(), Tool::Line);
     let edge = cx.update(|cx| {
         let v = view.read(cx);
         let ed = v.sketch.as_ref().unwrap();
@@ -9132,4 +9132,36 @@ fn a_tools_shortcut_again_turns_it_off_and_clears_the_selection(cx: &mut TestApp
     assert_eq!(tool(cx), Tool::Line, "Enter with no pending segment does nothing");
     keys(cx, window, &["escape"]);
     assert_eq!(tool(cx), Tool::Select, "Esc exits the tool");
+}
+
+/// Live sketch mode (sketch/44, 45): a new sketch on Top from iso leaves the view where it was; N turns it normal to the
+/// sketch plane.
+#[gpui::test]
+fn a_new_sketch_keeps_the_view_and_n_turns_it_normal(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "sketch-keeps-view");
+    let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let c = clock.clone();
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |vp, _| vp.set_clock(move || c.get())));
+    let settle = |cx: &mut TestAppContext| {
+        for _ in 0..20 {
+            clock.set(clock.get() + std::time::Duration::from_millis(100));
+            cx.executor().advance_clock(std::time::Duration::from_millis(100));
+            draw(cx, window);
+        }
+    };
+    view.update(cx, |v, cx| v.view(noshape_render::StandardView::Isometric, cx));
+    settle(cx);
+    let forward = |cx: &mut TestAppContext| cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        vp.animation().map_or(vp.camera, |(to, _)| to).forward()
+    });
+    let iso = forward(cx);
+    sketch_in(cx, window, view.clone(), Tool::Line);
+    settle(cx);
+    let sketching = forward(cx);
+    assert!(sketching.distance(iso) < 1e-9, "the view stays iso: {iso:?} → {sketching:?}");
+    keys(cx, window, &["n"]);
+    settle(cx);
+    let normal = forward(cx);
+    assert!(normal.distance(glam::DVec3::NEG_Z) < 1e-6, "N: normal to Top: {normal:?}");
 }
