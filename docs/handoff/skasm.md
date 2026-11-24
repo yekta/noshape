@@ -6,17 +6,13 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 ## NOW (11-24 15:30) — read first
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
-- LEAD: psui re-queued my old stack as a2341555 (DON'T re-land it). After it lands: rebase on main (drop dups, read
-  diff --stat), rerun t6/tuse/tmc/tmc2/tst/tdim/tcl/tdl, land.sh (NOSHAPE_LAND_QUEUE_HOST=vibe2) my newer commits:
-  4e2995a8d (dim labels no hit with a drawing tool / Dimension), 1e2d84e5a (construction band opaque, no row hover in
-  sketch edit, Select other two-regions test, SM disc test T2), + the dimension-line work below. Old tip: branch
-  skasm-pre-rebase-1124.
-- IN FLIGHT (uncommitted): dimension LINES hover + press as the label (live sk-hover-matrix-1123 DL/DE): scene
-  `dimension_line_at` (4 px on screen, `pressing()`), sketch.rs PointerMove (SketchUi.dim_line_hover; Select tool, not over
-  own geometry / glyph / label), ToolDown → pressed_label (double-click opens the edit), ContextMenu → dimension menu.
-  Tests in hover_matrix_tests.rs: sk_a_dimension_line_is_lives_gold_hovered_and_selected (cores 000/9c7611/6f5610/6f5610,
-  extension line lit), sk_hovering_whats_selected_changes_nothing and sk_centres_and_regions_light_alike_whatever_else_is_selected
-  (live sk-hover-matrix-1124). Run: bin/tdl.sh (hover_matrix::sk_ + sketch_label_feel + clippy scene/ps-ui), log ~/tmp/skasm/tdl.log.
+- LEAD 15:30: I took over psui's re-land. a2341555 FAILED ops parity::filter_inner_loops_leaves_out_a_letters_counter
+  (the Text tool put the 2nd click's VERTICAL-to-Origin on the far corner: box flat, unsolvable). Fix 087761eb8 (skip a
+  2nd-click alignment to the first corner's point; scene test a_text_box_from_the_origin_drawn_straight_up_solves; parity
+  136 / scene 205 / sketch green) cherry-picked in /root/projects/noshape-wt/psui-skrebase → QUEUED 5a4491f4 (15:50).
+  When it lands: rebase agent/skasm on main (drop dups: the old stack + 087761eb8), read diff --stat, rerun tdl/tcl,
+  land.sh 4e2995a8d, 1e2d84e5a, 101d238c1 (dimension lines hover/press as the label, gold as live; selected+hovered
+  no change; centres alike). If 5a4491f4 fails: fix forward in psui-skrebase.
 - Live sk-hover-matrix-1124 (37 cells): selected+hovered = 0 change (tests above); centres light alike (test above); Arc
   tool preselect 1459 ms = live slowness, not a target; Line tool: CC disc stays lit ≥1.2 s after leaving, and inside a
   circle the Line tool lights the circle band + its centre (ours: drawing tools light no region) → REQUESTS skasm 11-24
