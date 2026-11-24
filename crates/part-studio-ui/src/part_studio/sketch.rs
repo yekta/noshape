@@ -4096,7 +4096,12 @@ impl PartStudioView {
                 border: configured.then(|| rgb(0xffc20e).into()),
                 offset: [-est_w * 0.5, -13.5],
             };
-            if let Some(l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
+            if let Some(mut l) = crate::overlay_labels::row_box(window, cx, &b, anchor, dim_label_hit(cid)) {
+                // With a drawing tool or Dimension on, a dimension doesn't hover or take a press: what is behind it does
+                // (live sk-hover-matrix-1123 TL / TD).
+                if ed.tool.draws() || ed.tool == Tool::Dimension {
+                    l.hit = None;
+                }
                 out.push(l);
             }
         }

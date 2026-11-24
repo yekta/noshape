@@ -103,3 +103,28 @@ fn a_dimension_label_hovers_tan_selects_on_a_click_and_opens_on_a_double_click(c
     let lit = cx.update_window(window, |_, w, cx| view.read(cx).dim_input.as_ref().is_some_and(|(_, st, _)| st.read(cx).focus_handle(cx).is_focused(w) && !st.read(cx).selected_range().is_empty())).unwrap();
     assert!(lit, "the box has the keyboard, its value selected");
 }
+
+/// Live sk-hover-matrix-1123 (TL / TD columns): with the Line or Dimension tool on a dimension doesn't light under the
+/// pointer (what is behind it does); with no tool it does.
+#[gpui::test]
+fn a_dimension_label_takes_no_hover_with_line_or_dimension_on(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = line_then_dimension_tool(cx, "label-tools");
+    click(cx, window, &view, (570., 380.));
+    click(cx, window, &view, (570., 440.));
+    keys(cx, window, &["enter"]);
+    let pointer = Pointer::new(cx, window, &view);
+    let mut got = Vec::new();
+    for tool in [Tool::Select, Tool::Line, Tool::Dimension] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(tool, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let at = label_at(cx, &view).expect("the length's label");
+        pointer.move_to(cx, &view, at + DVec2::new(0.0, 30.0));
+        pointer.move_to(cx, &view, at);
+        pointer.frames(cx, &view);
+        let lit = cx.update(|cx| (view.read(cx).viewport.read(cx).label_at(at).is_some(), view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover_constraint.is_some())));
+        got.push((tool, lit));
+    }
+    assert_eq!(got, vec![(Tool::Select, (true, true)), (Tool::Line, (false, false)), (Tool::Dimension, (false, false))], "tool, (label hit, dimension lit)");
+}

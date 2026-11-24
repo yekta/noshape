@@ -6,7 +6,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 ## NOW (11-24) — read first
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
-- psui re-landed my old stack: QUEUED 30cba9c5 (11-24). My branch sits on psui's rebase (1c8e8b45e); old tip kept as
+- psui's re-land of my old stack (30cba9c5) FAILED again on a rebase conflict (lead 11-24); psui redoes it. My branch sits on psui's rebase (1c8e8b45e); old tip kept as
   branch skasm-pre-rebase-1124. When it lands: rebase on main, run my tests, land.sh my commits on top.
 - LEAD 11-24 decisions: land the 2 SM commits with the rest, then no more SM; Select other keeps the current ` row-2 bold
   (behaviours 19904; lead puts the recheck on live's list).
@@ -23,6 +23,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   tuse.sh + tmir.sh + tst.sh in skasm-scratch/bin). 5c804077e MC along an edge: nearer end past half-way (live
   mc-reach-1124; shared chooser crates/assembly inference.rs; tmc.sh/tmc2.sh green: assembly 3, ps-ui 15, asm-ui 51).
   Open on FEEL-MC-PS-MARKER-REACH: live's blank vertex step at 6 px (entry rule vs glyph reach, unsettled).
+- Live sk-hover-matrix-1123 (lead P0 hover×state; live/skasm/sk-hover-matrix-1123/index.md): checked = glyph selected
+  #fab601 wins / hover #fcda7f, dimension label tints (d9a566 / d9bfa0 ≈ live). Fixed (WIP commit; tdim.sh run br5lt990y log ~/tmp/skasm/tdim.log on this host: check it first): dimension labels take no hit with a drawing tool or Dimension on (sketch.rs label build, l.hit = None); test
+  a_dimension_label_takes_no_hover_with_line_or_dimension_on. NEXT from that matrix: construction line / spline hover =
+  solid #ffc685 band, selected #ffa90a with no hover change; dimension line/extension hover #9c7611 / #aa8b38 and
+  selected #705610 / #857037; feature-list row hover while editing draws nothing. Write GPU cells for each.
 - Sketch audit notes: /root/skasm-scratch/audit-1124.md ("11-24 later"). Left: Extend B threshold (live), value-box
   caret/selection/palette looks, Select other's doubled "Face of Sketch 3" row (needs qa's scene), wf13 up-left glyph
   row (live moves it only off stale glyphs; order unmeasured).
