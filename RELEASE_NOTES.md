@@ -20,7 +20,6 @@
 - A file tab's Import… opens at once.
 
 **Fixed**
-- Shell on free-form faces builds valid parts again.
 - Errors match Onshape's for Boolean, Hole, Revolve and Loft.
 - Sheet metal: hems at a corner unfold correctly; frames' trims, end caps and gussets match Onshape.
 - STL files that close import as solids; SAT edges stay on their faces.
