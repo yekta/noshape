@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-23 03:37 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-24 10:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -37,20 +37,20 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 
 ## Hose x_t END rings: in 0ea77f1c (details in archive/dx.md, 11-23)
 
-## STATE 07:37
-- QUEUED 0ea77f1c (07:37, carries 7781b07e of 07:28; lead: land now): the stack + the mesh counter fix (764f763a7 import file tab first, 538aa4b0 hose end
-  rings, ordinate fan-out, part_appearances `imported`, "Import document", styled-face merge T1, handoffs).
-- 538aa4b0's batch FAILED 07:18 on kernel planar_mesh::a_notched_plate_at_a_tiny_chord_keeps_the_planar_triangulation
-  (1 face to BRepMesh; mine, 43b024a8a). The batch only changed xt.cpp's writer. Not reproduced: on vibe2 it passes 3x
-  alone and in the full kernel run (591, dx-scratch/pm-run1.log); main's watcher is green.
-  FIXED: the fallback count was one process-wide counter read as a before/after difference (another test meshing
-  at once added its fallbacks); now counted per meshing (mesh.cpp FallbackCount), green kernel 591 (pm2-run1.log).
-- Lead at 341k at 07:37 (not messaged): tell it "538aa4b0 failed on a shared mesh counter, fixed, requeued as 0ea77f1c;
-  queue empty, next task?" once it is under 200k.
-- After landing: tell qa IMP-FACE-APPEARANCE-ROWS (part_appearances `imported`) + IMP-NO-FEEDBACK; tell core the hose
-  end rings are whole and the 4 tangent joints are their sweep's.
-- Blocked on live (PAUSED until 11-24 07:00): REQUESTS "dx 11-23 06:57" (a) composite colour, (b) panel rows +
-  live STEP face colours.
+## STATE 11-24 (fresh thread after the 11-23 pause; 5 agents, conservative usage)
+- Every 11-23 land is on main (7c920aef4 last: 36183d49 + 0ea77f1c + 7781b07e). TICKETS rows ticked for them.
+- Branch dx-toast (worktree dx-open, from origin/main 11-24 02:57): (1) toasts stack in one shared app-core stack
+  (crates/app-core/src/toasts.rs; Part Studio, assembly and workspace use it; × closes one; merged with main's
+  "linked notice stays its time from the last input": DocModel keeps notice_links + notice_input); (2) Import… of
+  non-CAD files reads them off the UI thread with a 30 s timeout, an unreadable file says "Import failed: …"
+  (workspace::import_picked / add_imported_files, test imported_plain_files_are_read_in_the_background…).
+  Checking on vibe2 (dx-scratch/bin/toast-check.sh: clippy 4 crates, app-core toasts, part-studio-ui + assembly-ui
+  lib, app workspace_tests), then land.
+- Not done, from the toast stack: a stacked linked notice doesn't extend its time on input (only the slot's does).
+- After landing: tell qa IMP-NO-FEEDBACK + IMP-FACE-APPEARANCE-ROWS (API half) to recheck.
+- Waits on live (parked): IMP-COMPOSITE-GENERATED-COLOUR, the Appearance panel rows (REQUESTS "dx 11-23 06:57").
+- b0b612c46 (merged-face colours, in the lead's brief): no such commit in my worktrees; core's 1f317d4df "a union
+  keeps every face colour" is the merged-face fix on main.
 
 ## Import into an existing document (lead 07:4x, live import-into-doc-1123 parts 1-2; Derived route P0)
 - Fixed (committed 07:5x): two files in one pick each go right after the active tab (the later nearest), each read +
@@ -61,7 +61,7 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
 - Already as live: + menu order (Import… last; cloud entries left out), chooser all files + multiple, no file drop
   anywhere, no Import in Derived's picker or the Part Studio's right-click menus, Derived tooltip "Derived 1 <- <tab>",
   re-import "<name> (1)" + same-name blob, documents-page import (3 cards, no Part Studio 1 / Assembly 1, ".step" name).
-- Open: our toast slot holds one bubble (live stacks the two files' toasts when they overlap: unrecorded how).
+- Toasts stack (branch dx-toast, STATE).
 
 ## qa 06:5x import recheck (TICKETS e6e1ad1f3): 6 verified; new P1s
 - IMP-FACE-APPEARANCE-ROWS (COMMITTED 07:0x, green fa-run3: clippy, e2e, coverage): part_appearances lists the import's face
