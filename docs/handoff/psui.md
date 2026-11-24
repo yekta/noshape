@@ -34,16 +34,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
 ## RESUME HERE (11-24 14:2x UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
-- Stack rebased onto main and re-queued as 5175c04d (19 commits) at 18:2x; audit batch 1 bc241af85 queued after it.
-- Lead task 11-24 18:2x: Part Studio feel-coverage audit. Batch 1 done: docs/parity/ps-feel-audit.md (186 specs, 22
-  out of scope, covered before 142 of 164, after 153, 11 left). Tests: part_studio/ps_audit_feel_tests.rs (audit::),
-  nav row "view cube / a triangle click…", list row "menu / every part…". No app behaviour was off live.
-  Next batch = the doc's "Still without a test" table (later rows in /root/psui-scratch/audit/triage.tsv): Show all /
-  Show all parts effect, Camera menu disabled rows, context menu 250 px ellipsis, analysis panel position over a
-  dialog, Delete part preview look, preview self-pick, analysis panel number fields (Zebra count, Draft angle),
-  DCLICK-HEAVY, panel positions, Hole icon rows, checkbox label widths.
+- Stack re-queued as 5175c04d, batch 1 as aeddb0f4, batch 2 as e4612e55 (22 commits, includes the stack).
+- Lead task 11-24 18:2x: Part Studio feel-coverage audit (docs/parity/ps-feel-audit.md; tests part_studio/
+  ps_audit_feel_tests.rs, audit::). Batch 1 (11 specs, no app bug) in aeddb0f4; batch 2 queued as e4612e55 (6 specs:
+  Show all effect, edge-menu 250 px, Camera menu rows, Zebra/Draft fields, panels under a new sketch, analysis panel
+  corner; fixed: analysis panels top 3 px, empty Dihedral 226 high). Counts: covered before 142 of 164, after 159.
+  Left (5): Hole icon rows, checkbox label widths, Delete part preview look (pixel / text-width look tests), DCLICK-HEAVY
+  (T2 latency on a heavy part), preview self-pick (pointer on a live preview resolving pre-feature).
   Tests note: a field made active by user_focus_query alone is taken back by the focused field's tab stop on the next
   render: focus `tab_stop_handle("q:<path>")` as a click does. build_start can't name regions inside arrays (pick them).
+  The viewport's context menu is `view.context_menu` (os_menu::open_labels is empty for it).
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
