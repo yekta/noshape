@@ -351,20 +351,24 @@ fn rows() -> Vec<Row> {
             l.double_click(cx, "feature:Extrude 1");
             expect(l.editing(cx), Some("Extrude 1".to_string()), "editing")
         } },
-        Row { id: "double-click / a quick one shows no row tooltip, a shown one stays", live: "Sheet metal model 1 double-clicked at once: no tooltip at 1.35 s (qa wf23 01 s17); Extrude 1's name shown before the double-click stays (wf10); live row-tip-dblclick-1123: none after a double-click in 12 trials (0 / 50 / 300 ms leads), a shown one stays through both clicks", gap: true, check: |l, cx| {
-            crate::ui_script::clear_tooltip();
+        Row { id: "double-click / a quick one shows the name-only tip, a shown one goes", live: "pointer on the row ~50 ms, then a double-click: no hover tip; as the dialog opens a name-only tip 'Name [Type]' beside the row, fully shown 0.3-1.2 s later, staying; the tip already up (1.2 s lead): gone as the dialog opens, nothing back (live row-tip-dblclick-1124)", gap: false, check: |l, cx| {
+            l.hover(cx, "feature:Extrude 1", 50);
             l.double_click(cx, "feature:Extrude 1");
+            crate::ui_script::clear_tooltip();
             l.wait(cx, 1350);
-            let shown = crate::ui_script::shown_tooltip();
-            let quick = shown.is_some();
+            let quick = crate::ui_script::shown_tooltip();
             l.keys(cx, "escape");
             l.wait(cx, 450);
-            crate::ui_script::clear_tooltip();
+            l.hover(cx, "feature:Extrude 2", 300);
             l.hover(cx, "feature:Extrude 1", 1200);
+            let before = crate::ui_script::shown_tooltip();
             l.double_click(cx, "feature:Extrude 1");
-            let kept = crate::ui_script::shown_tooltip().is_some();
+            l.wait(cx, 100);
+            crate::ui_script::clear_tooltip();
+            l.wait(cx, 1500);
+            let after = crate::ui_script::shown_tooltip();
             l.keys(cx, "escape");
-            expect((quick, kept), (false, true), &format!("(a tooltip 1.35 s after a quick double-click {shown:?}, one shown before kept)"))
+            expect((quick.as_deref(), before.as_ref().is_some_and(|t| t.starts_with("Extrude 1 <-")), after), (Some("Extrude 1"), true, None), &format!("(the quick one's tip, the hover tip before {before:?}, any tip after)"))
         } },
         Row { id: "double-click / a feature's blank right side", live: "its dialog too", gap: false, check: |l, cx| {
             let b = l.bounds(cx, "feature:Extrude 1").ok_or("no row")?;
@@ -1444,13 +1448,13 @@ fn rows() -> Vec<Row> {
             l.click(cx, "part:Part 1", SHIFT);
             expect(l.selected(cx), names(&[]), "selected")
         } },
-        Row { id: "edit / a double-click keeps the row's name tooltip", live: "Extrude 1 double-clicked, the pointer still: its dialog opens and the row's tooltip 'Extrude 1' shows by the pointer (live workflow 10 step 1, qa FEEL-ROW-HOVER-IN-OWN-DIALOG)", gap: false, check: |l, cx| {
+        Row { id: "edit / a quick double-click shows the row's name tip", live: "Extrude 1 double-clicked, the pointer still: its dialog opens and the name tip 'Extrude 1' shows beside the row (live workflow 10 step 1, qa FEEL-ROW-HOVER-IN-OWN-DIALOG; row-tip-dblclick-1124: never by the pointer)", gap: false, check: |l, cx| {
             l.hover(cx, "feature:Extrude 1", 50);
             l.double_click(cx, "feature:Extrude 1");
             crate::ui_script::clear_tooltip();
             l.wait(cx, 600);
             let tip = crate::ui_script::shown_tooltip();
-            expect((l.editing(cx), tip.is_some_and(|t| t.starts_with("Extrude 1"))), (Some("Extrude 1".to_string()), true), "(editing, the name's tooltip shown)")
+            expect((l.editing(cx), tip), (Some("Extrude 1".to_string()), Some("Extrude 1".to_string())), "(editing, the name tip)")
         } },
     ]
 }

@@ -8974,3 +8974,23 @@ fn a_chamfers_second_box_takes_the_keys_after_the_first(cx: &mut TestAppContext)
     assert_eq!(values, vec![4000, 6000], "the chamfer's distances (µm)");
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Enter closes the box");
 }
+
+/// Live errors-1123 loft empty: a new Loft with no profiles hovers its title to "Loft 1 did not regenerate properly:
+/// Select profiles in order from start to finish." (the same while creating as when edited).
+#[gpui::test]
+fn an_empty_lofts_title_tooltip_names_its_error(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "empty-loft-tip");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("loft", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Loft dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).status.is_some());
+    let title = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dialog-title").expect("the title");
+    crate::ui_script::clear_tooltip();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(title.origin.x + px(20.), title.center().y), None, Modifiers::default());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Loft 1 did not regenerate properly: Select profiles in order from start to finish."));
+}

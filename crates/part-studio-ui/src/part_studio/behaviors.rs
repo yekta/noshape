@@ -291,6 +291,13 @@ pub struct UiState {
     /// The row the rollback bar was dropped on: no tooltip on it until the pointer leaves it, its hover band kept
     /// (live rollback-drop-tip-1120: none in 2.2 s, nor after a 1 px move).
     pub rollback_drop_row: Option<noshape_model::reference::FeatureId>,
+    /// A feature row double-clicked: no tooltip on it until the pointer leaves it (live row-tip-dblclick-1124). When
+    /// the pointer came onto a feature row; the row last pressed before its tooltip showed.
+    pub row_tip_held: Option<noshape_model::reference::FeatureId>,
+    pub row_hover_since: Option<(noshape_model::reference::FeatureId, std::time::Instant)>,
+    pub row_early_press: Option<noshape_model::reference::FeatureId>,
+    /// A quick double-click's name-only tip beside its row while the dialog is open, till the pointer leaves.
+    pub row_name_tip: Option<(noshape_model::reference::FeatureId, AnyView)>,
     /// The same for a default geometry row (live sel-gestures-1122 bar-over-top-held: Top lit, its eye shown).
     pub rollback_drop_dg: Option<Reference>,
     /// The edited sketch's splines were given handle arms on entry: regenerate once the display is applied.
@@ -889,6 +896,10 @@ impl UiState {
             rollback_hovered: None,
             rollback_tip_off: false,
             rollback_drop_row: None,
+            row_tip_held: None,
+            row_hover_since: None,
+            row_early_press: None,
+            row_name_tip: None,
             rollback_drop_dg: None,
             regen_for_arms: false,
             flashed: None,

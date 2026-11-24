@@ -6201,6 +6201,7 @@ impl PartStudioView {
         };
         let underdefined = !rolled_back && state.is_some_and(|s| s.underdefined);
         let id = f.id;
+        let (name_tip, name_anchor): (SharedString, _) = (typed_name(f).into(), self.row_anchor(slot));
         // Onshape (live part-studio/16, 90, 95): hovering a row shows its
         // error, else what it depends on ("Extrude 1 <- Sketch 1"), else its
         // name, in a box beside the row. Worked out when it opens (the
@@ -6489,6 +6490,15 @@ impl PartStudioView {
                     this.ui.rollback_drop_row = None;
                     cx.notify();
                 }
+                // (Entering another row lets it go too: the held row's leave can be lost while its dialog opens.)
+                if *h {
+                    this.ui.row_hover_since = Some((id, cx.background_executor().now()));
+                }
+                if this.ui.row_tip_held.is_some_and(|r| (r == id) != *h) {
+                    this.ui.row_tip_held = None;
+                    this.ui.row_name_tip = None;
+                    cx.notify();
+                }
                 let coming = this.ui.list_hover_next.as_ref().map(|(n, _)| *n).unwrap_or(this.ui.list_hover);
                 if coming == new || (!*h && coming != Some(id)) {
                     return;
@@ -6504,6 +6514,20 @@ impl PartStudioView {
                     });
                 });
                 this.ui.list_hover_next = Some((new, task));
+            }))
+            .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, _, cx| {
+                // A double-click drops the row's tooltip till the pointer leaves (live row-tip-dblclick-1124: a shown
+                // one goes as the dialog opens); a quick one, before it showed, gets the name-only tip once the dialog
+                // is open. A single click keeps it coming (live workflow 07, a click in Features to pattern).
+                if ev.click_count >= 2 {
+                    this.ui.row_tip_held = Some(id);
+                    this.ui.row_name_tip = (this.ui.row_early_press == Some(id)).then(|| (id, crate::ui::row_name_tip(name_tip.clone(), name_anchor(), cx)));
+                    cx.notify();
+                    return;
+                }
+                let now = cx.background_executor().now();
+                let early = this.ui.row_hover_since.is_some_and(|(r, t)| r == id && now.saturating_duration_since(t) < crate::ui::ROW_TIP_DELAY);
+                this.ui.row_early_press = early.then_some(id);
             }))
             .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
                 // A click that closed a right-click menu does nothing else (live ui-parity feature-row-mod-click-toggle).
@@ -6654,7 +6678,9 @@ impl PartStudioView {
         // No row tooltips while a row is dragged: one scheduled over a row the
         // drag passed showed after the drop over the moved row, naming the
         // other (REORDER-MISSING-MSG's stale tooltip).
-        let row = if cx.has_active_drag() || self.ui.rollback_drop_row == Some(id) { row } else { crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip) };
+        let row = if cx.has_active_drag() || self.ui.rollback_drop_row == Some(id) || self.ui.row_tip_held == Some(id) { row } else { crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), tip) };
+        let name_tip = self.ui.row_name_tip.as_ref().filter(|(r, _)| *r == id && self.edit.is_some()).map(|(_, v)| v.clone());
+        let row = row.when_some(name_tip, |d, v| d.child(deferred(v).with_priority(1)));
         let view = cx.entity();
         // Roll to here unless the bar already sits right after this
         // feature, Roll to end while it isn't at the end (live qa4 r5 s2,

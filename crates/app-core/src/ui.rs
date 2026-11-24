@@ -841,6 +841,12 @@ pub fn with_lazy_side_tooltip(row: Stateful<Div>, anchor: impl Fn() -> Bounds<Pi
     .tooltip_after_press()
 }
 
+/// A feature row's name-only tip ("Block [Extrude]"), beside the row where its tooltip goes: a quick double-click's,
+/// shown once the dialog opens (live row-tip-dblclick-1124: fully shown 0.3-1.2 s later). The caller holds it.
+pub fn row_name_tip(text: SharedString, anchor: Bounds<Pixels>, cx: &mut App) -> AnyView {
+    cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: true, fade: Some((std::time::Duration::from_millis(300), 0.)), upright: false }).into()
+}
+
 /// A square icon button with no fill at rest and `#eaeaea` on hover (§4.1):
 /// panel headers, the viewport's quick tools. `on` draws the toggled fill.
 pub fn icon_button(id: impl Into<ElementId>, icon: &str, size: f32, on: bool, cx: &App) -> Button {
