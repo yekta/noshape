@@ -61,12 +61,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   SKT-POSTCOMMIT-HOVER dropped.
 - skasm's 7e9bedfb7 (after its b99589dc) adds LineSegment::dash_from: new LineSegment literals need `dash_from: 0.0`.
   My vertex_band_piece literal (in 8e11c924) predates it: whichever lands second adds the field.
-- PARKED: FEEL-ROW-TIP-AFTER-DBLCLICK (P2): live records conflict (row-tip-dblclick-1123: no tip after a quick
-  double-click; wf10 s1: a name tip "Extrude 1" by the pointer). Capture asked in live/REQUESTS (psui 11-24 17:40).
-  Patch ready: /root/psui-scratch/row-tip-dblclick.patch (ui.row_tip_held / row_hover_since / row_early_press: a
-  double-click whose first press came before ROW_TIP_DELAY holds the row's tip till the pointer leaves; the list
-  matrix row ungapped, its second half moves off the row first). It fixes the quick case and keeps wf07's single
-  click, but breaks "edit / a double-click keeps the row's name tooltip" (wf10). Apply once live answers.
+- df1e61e44 (local, landing on 75404bb7): FEEL-ROW-TIP-AFTER-DBLCLICK per live row-tip-dblclick-1124: a
+  double-click holds the row tip (ui.row_tip_held, cleared on leave or entering another row: the leave is lost
+  while the dialog opens); a quick one (row_early_press) shows ui.row_name_tip (app-core ui::row_name_tip,
+  typed_name, 300 ms fade) while a dialog is open. Also test an_empty_lofts_title_tooltip_names_its_error: the
+  real flow already shows Loft 1's error tooltip (qa ERR-LOFT row 648's "no tooltip" not reproduced; ask qa's flow).
+- 8903d37f FAILED 17:45 = SIGTERM of the part-studio-ui lib binary (no test failed): re-queued as 75404bb7.
 - Other open rows checked 11-24 17:4x: all "fixed, to verify" (qa), sheet metal (parked), or skasm's.
 - Then: PARTLY rows in TICKETS (TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
