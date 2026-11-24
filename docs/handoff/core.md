@@ -4,34 +4,15 @@ Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-24 14:31 UTC)
-- **35dceca0 LANDED** (lead 11-24): errors-1123 blamed inputs, part colours (split/pattern/mirror/copy), Subtract cut
-  faces, Split names+order, hose joints. TODO: tell qa (roster id, agent_status first) to rescore errors-1123 core rows
-  (ERR-SEL-RED-ALL-INPUTS, ERR-HOLE body, APPEAR-*) and the 11-24 "fixed, to verify" rows; ask dx to rerun the hose x_t.
-- **Lead 11-24: scissor slab Move-face work PARKED** (WIP core-rmx cb5c5ec61, branch core-slabs). Focus: open core
-  P0/P1 TICKETS for everyday features, wrong geometry/errors before speed, small land batches.
-- **Committed, NOT landed (core-rf):** 85f167b15 Loft: an error naming a list of selections (Profiles) adds no
-  " A parameter value is not valid."; an empty guide entry reads "No selections" (feature_dialog entry_label, ui_state);
-  TICKETS marks rows fixed-to-verify (Move face/Thicken/failed bodies landed 11-23 05:04 = 435354603, c276c745f,
-  26657ac62; union 1f317d4df; thread on revolved cylinder and surface loft guide OK on green CLI). psui full suite 532
-  passed + the new test, clippy clean.
-- **DRIVEN-PATTERN-SWEEP fix (landing with 85f167b15, see the lead's land report).** features.cpp sweep: MakePipeShell retried at
-  1e-7/1e-6/1e-5 m where the path-sized tolerance fails (c2-loft-guide-curves-driven-pattern Sweep 1: 0.001 in wire
-  coiled on the routing curve); solid_a.rs may_self_intersect: profile gap = 2x sagitta (was chord), path steps <= size/4
-  (Sweep 1 1316 -> 69 ms). T1 kernel core::a_thin_wire_coiled_on_a_routing_curve_sweeps + crates/kernel/tests/data/sweep/coiled-wire.brep (untracked: git add it).
-  Verified: kernel 592 + model 628 + sweep tests pass (before the pre-check change), 25 sweep corpus docs none worse than
-  nightly pm-1122. Final run .core-check11.sh (clippy kernel/model-core/psui, model-core, model, kernel) -> log
-  /root/core-scratch/run/check11.log: if green, commit ("core: a thin wire coiled on a routing curve sweeps ...") with
-  TICKETS + handoff, then land.sh (stack 85f167b15 + this). Left gap: volume 0.0754 vs live 0.0799 (our routing curve's
-  start direction ~12 deg off live's) -> next item.
-- 14:31: qa asked to rescore (35dceca0 rows + fixed-to-verify). Speed rows profiled (TICKETS notes): SPEED-NUTS /
-  VALVE-CONFIG / SPROCKETS time is boolean.rust (bool's), OCCT slower or failing -> told the lead. nuts Sweep 1 face
-  types (live 3 cylinders, ours 2 + 1 B-spline): the thread crest line along the helix axis sweeps a cylinder, but a
-  multi-turn strip on an OCCT cylinder checks UnorientableShape (status 27) -> not doable in exact_helical_cylinders;
-  left. DRIVEN-PATTERN-SWEEP routing curve start: live capture has only bbox/volume, no rule found; left.
-  ERR-LOFT-GUIDES-EMPTY tip order: one capture, no rule.
-- MANUALBLEND-BOUNDARY1 (lead: next, 11-24): importer limit, not product (TICKETS note): Intersect links need 1 um, ours
-  0.054 mm off from Loft 1 drift -> Beziers left at live's place, fill fails. Asked lead whether to loosen use_projected.
+## Now (11-24 15:43 UTC)
+- **Landing (core-rf, this stack):** parity Intersect near-link (only one within 0.1 mm; loft-paths-guides 16 -> 29/29,
+  the other 6 Intersect docs as pm-1122; manualblend still 12/19: Sweep 2 / Split 1 drift upstream, Sketch 6 then fails
+  to solve, Boundary 1 fails -> left, upstream geometry); ERR-SEL-RED entry text (only blamed inputs red; Fillet blames
+  edges, Shell faces; psui 536 + model 628 pass, clippy clean); TICKETS notes (speed rows -> bool, EDGE-CENTRE-SEAM not
+  reproduced, APPEAR-SUBTRACT = panel swatch px).
+- Open: ERR-SEL-RED depth-0 region red outline (scene builder.rs ~1510 draws an err outline for ERROR regions; likely
+  draw order / psui). APPEAR-SUBTRACT: live check whether the panel keeps the used tool's row.
+- qa everyday-flow walk 11-24 (900905086): no core rows. Next: core rows from qa as they appear, else TICKETS P0/P1.
 - Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
   5072.2167 mm2, ours a plate 5017.6. k::edges_on_faces (boolean.cpp: all edges copied once, each face's surface made
