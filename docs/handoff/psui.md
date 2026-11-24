@@ -55,8 +55,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   cursor; test the_flip_button_flips_on_click_takes_the_keyboard_and_ignores_space).
 - Corner-break disc (FEEL-CORNER-BREAK-VERTEX-PICK): sheet metal, PARKED by the lead: test is T2, don't debug. Known:
   the scene holds the disc (layer 20 Points, POST, over_lines, mix 0.7); the renderer's preview-post pass drops it.
-- FEEL-HOVER-OWNER-SELECTED case (3) open: vertex hovered with its edge selected (live: the band over ~1/4 of the disc;
-  ours draws the disc after every line).
+- QUEUED 8e11c924 (17:3x, stacked on 8903d37f): FEEL-HOVER-OWNER-SELECTED (3): a hovered vertex at a selected edge's
+  end gets a 6 px piece of the edge's band over its disc (behaviors vertex_band_piece, layer 21 after the disc; the ON_TOP
+  disc writes near depth, so a depth-tested redraw can't cover it); TICKETS dup rows of SKT-USE-HOVER /
+  SKT-POSTCOMMIT-HOVER dropped.
 - Then: PARTLY rows in TICKETS (TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
 - USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape
