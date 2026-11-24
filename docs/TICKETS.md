@@ -5,6 +5,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-24 13:5x: everyday new-user flow (lead 11-24) on green 63731676b: live workflows-1122 01 13 32 02 21 03 34 06 04 07 19 38 28 17 39(v) replayed (vibex8, qa-scratch/hm2/out-flow-1124, bin/flow-1124.sh); state per step vs live, viewport timing and px vs ours on 11-22 (out-wf)
+- [ ] P1 **FEEL-PREVIEW-BODY-BLUE (psui; regression)**: workflow 04 step 2 (Shell, top face picked) and workflow 38 step 16 (Boolean Intersect, Part 2 picked): ours now fills the previewed body light blue (152,194,218): 8.9k px / 6.0k px around x 1075-1300, y 330-610. Live draws grey-green (172,184,172) for the shell and (208,224,232) for the intersect, and so did ours on 11-22 (out-wf: 0 px of that blue, live 0). No other step of the 15 workflows has it. Started between the 11-22 21:05 green and 63731676b; candidates core a4804bf07 (body colours on failure) and psui 6ca785d6d.
+- Still open on 63731676b, nothing new: FEEL-CLICK-EMPTY-SELECTS-PLANE (skasm P0) + SKETCH-SELECTED-GLYPH-OFFSET (skasm P1): wf13 s15 selection = corner + Front plane, Delete leaves 2 lines / 3 constraints, Sketch 1 ends "Sketch could not be solved." after the width dimension.
+- Checked, as live: sketch rectangle/dims/constraints (01, 13 until s15, 32), extrude + flip (02), revolve/helix/thread (21), fillet/chamfer/ten-feature edit (03, 34), hole (06: live's M6 is account memory, behaviours 340), shell (04), linear pattern (07), mirror + boolean (19, 38), appearance/material/section (28), export STL/SAT/IGES/x_t/STEP stored in tabs + STEP/x_t import (17, 39v). First present after every input 33-200 ms; viewport settle times as on 11-22 (no speed regression).
+
 ## studios, 2026-11-23 (live drw-dims-1123: every dimension tool vs ours, audit by script and code reading)
 - [x] P1 **DRW-DIMS-ESC (studios)**: Esc in a dimension / ordinate / datum / surface finish tool drops the pending pick, the tool and its panel stay (3 Escs: still on); ours ended the tool. Done (test esc_keeps_a_dimension_tool_on).
 - [x] P1 **DRW-DIMS-RCLICK (studios)**: with those tools on, a right-click on empty sheet does nothing; on a placed dimension the tool ends and its menu opens; ours ended the tool on any right-click. Done (test a_right_click_in_a_dimension_tool_opens_only_a_placed_dimensions_menu).
