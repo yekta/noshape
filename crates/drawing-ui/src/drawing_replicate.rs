@@ -160,7 +160,7 @@ impl DrawingEditor {
         let mut lines = LineData::default();
         let mut grips = PointData::default();
         let seg = |l: &mut LineData, a: [f64; 2], b: [f64; 2], color: [u8; 4], width: f32, style: u32| {
-            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [b[0] as f32, b[1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP | style });
+            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [b[0] as f32, b[1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP | style, dash_from: 0.0 });
         };
         let rect = |l: &mut LineData, r: [[f64; 2]; 2], color: [u8; 4], width: f32, style: u32| {
             let pts = [r[0], [r[1][0], r[0][1]], r[1], [r[0][0], r[1][1]], r[0]];

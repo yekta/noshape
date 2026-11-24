@@ -4016,7 +4016,7 @@ impl PartStudioView {
         // the scene.
         let Some(results) = self.measure_cache.as_ref().filter(|c| c.selection == self.selection).and_then(|c| c.results.clone()) else { return l };
         let f = |v: glam::DVec3| -> [f32; 3] { v.as_vec3().into() };
-        let dashed = |a: glam::DVec3, b: glam::DVec3, color: [u8; 4]| LineSegment { a: f(a), b: f(b), color, pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP };
+        let dashed = |a: glam::DVec3, b: glam::DVec3, color: [u8; 4]| LineSegment { a: f(a), b: f(b), color, pick_id: 0, width: 2.0, style: LineSegment::DASHED | LineSegment::ON_TOP, dash_from: 0.0 };
         for (label, m) in results {
             let noshape_model::regen::measure::Measurement::Distance { a, b, .. } = m else { continue };
             if label != hover.label {
@@ -4131,7 +4131,7 @@ impl PartStudioView {
         let (m, dir) = self.edge_midpoint_along(edge)?;
         let vp = self.viewport.read(cx);
         let half = dir * vp.camera.world_per_pixel(vp.size().y) * 6.0;
-        Some(LineSegment { a: (m - half).as_vec3().into(), b: (m + half).as_vec3().into(), color, pick_id, width: 5.0, style: LineSegment::CORE | LineSegment::ON_TOP })
+        Some(LineSegment { a: (m - half).as_vec3().into(), b: (m + half).as_vec3().into(), color, pick_id, width: 5.0, style: LineSegment::CORE | LineSegment::ON_TOP, dash_from: 0.0 })
     }
 
     /// A hovered vertex at a selected edge's end: that edge's band again over the vertex's disc, 6 px from it along

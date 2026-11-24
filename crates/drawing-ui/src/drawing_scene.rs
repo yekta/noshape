@@ -52,6 +52,7 @@ fn push(lines: &mut LineData, pts: &[[f64; 2]], color: [u8; 4], pick: u32, width
             pick_id: pick,
             width,
             style: 0,
+            dash_from: 0.0,
         });
     }
 }

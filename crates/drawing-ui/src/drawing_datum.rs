@@ -1005,7 +1005,7 @@ impl DrawingEditor {
             for l in &own {
                 let width = crate::drawing_scene::px_width(l.style, self.zoom).max(1.5);
                 for w in l.points.windows(2) {
-                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: DATUM_SEL, pick_id: 0, width, style: LineSegment::ON_TOP });
+                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: DATUM_SEL, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
             // The box: the datum's closed outline.
@@ -1016,7 +1016,7 @@ impl DrawingEditor {
                 quad(&mut fill, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], -0.5);
                 let inset = 3.0 * px;
                 for x in [x0 + inset, x1 - inset] {
-                    white.segments.push(LineSegment { a: [x as f32, (y0 + inset) as f32, 0.45], b: [x as f32, (y1 - inset) as f32, 0.45], color: [255, 255, 255, 255], pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
+                    white.segments.push(LineSegment { a: [x as f32, (y0 + inset) as f32, 0.45], b: [x as f32, (y1 - inset) as f32, 0.45], color: [255, 255, 255, 255], pick_id: 0, width: 1.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
                 reach = (x1 - x0).max(y1 - y0);
             }
@@ -1032,7 +1032,7 @@ impl DrawingEditor {
                 if l.points.windows(2).any(|w| dist_to_segment(*anchor, w[0], w[1]) < 0.05) {
                     let width = crate::drawing_scene::px_width(l.style, self.zoom).max(3.0);
                     for w in l.points.windows(2) {
-                        edges.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.3], b: [w[1][0] as f32, w[1][1] as f32, 0.3], color: DATUM_EDGE, pick_id: 0, width, style: LineSegment::ON_TOP });
+                        edges.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.3], b: [w[1][0] as f32, w[1][1] as f32, 0.3], color: DATUM_EDGE, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
                     }
                 }
             }

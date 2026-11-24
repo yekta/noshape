@@ -109,13 +109,13 @@ fn edges_behind_fins_stay_hidden() {
                     // and its root at the near end (concave, facing the
                     // camera). (Its front root is hidden by the fin in front.)
                     let front = (2 * k) as f64;
-                    let cyan = |a, b| LineSegment { a, b, color: [0, 255, 255, 255], pick_id: 0, width: 1.25, style: 0 };
+                    let cyan = |a, b| LineSegment { a, b, color: [0, 255, 255, 255], pick_id: 0, width: 1.25, style: 0, dash_from: 0.0 };
                     probes.segments.push(cyan(p3(10.0 + inset, front, 60.0), p3(90.0 - inset, front, 60.0)));
                     probes.segments.push(cyan(p3(10.0, front + 0.25, 40.0), p3(10.0, front + 0.75, 40.0)));
                     let y = (2 * k + 1) as f64;
                     for (a, b) in [((10.0 + inset, y, 40.0), (90.0 - inset, y, 40.0)), ((90.0, y, 40.0 + inset), (90.0, y, 60.0 - inset))] {
                         if a.0 < b.0 || a.2 < b.2 {
-                            probes.segments.push(LineSegment { a: p3(a.0, a.1, a.2), b: p3(b.0, b.1, b.2), color: [255, 0, 255, 255], pick_id: 0, width: 1.25, style: 0 });
+                            probes.segments.push(LineSegment { a: p3(a.0, a.1, a.2), b: p3(b.0, b.1, b.2), color: [255, 0, 255, 255], pick_id: 0, width: 1.25, style: 0, dash_from: 0.0 });
                         }
                     }
                 }

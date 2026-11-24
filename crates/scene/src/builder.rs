@@ -1087,7 +1087,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             for d in &sk.dimensions {
                 let color: [u8; 4] = theme::rgb8(if d.driven { theme::pick(theme::viewport::DIM_DRIVEN, theme::viewport_dark::DIM_DRIVEN) } else { theme::pick(theme::viewport::SKETCH_FULL, theme::viewport_dark::SKETCH_FULL) });
                 for seg in &d.lines {
-                    lines.segments.push(LineSegment { a: seg[0], b: seg[1], color, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
+                    lines.segments.push(LineSegment { a: seg[0], b: seg[1], color, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
             // Inserted images (Insert image): textured quads in their boxes,
@@ -1517,7 +1517,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             for &(a, b) in &outline {
                 // Live (dialogs/extrude-02, 03): 3 rows of colour on a 30°
                 // edge (~2.6 px), hovered or picked.
-                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 3.0, style: 0 });
+                overlay_lines.segments.push(LineSegment { a: flat(a), b: flat(b), color: lin_to_u8(c), pick_id: 0, width: 3.0, style: 0, dash_from: 0.0 });
             }
             // Live part-studio/2028: a picked region shows its corners as
             // small grey dots.
@@ -1559,7 +1559,7 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             for i in 0..4 {
                 // Over the parts in front of it, hovered or selected (live box-drag-plane-border-1123; at rest the
                 // plain border and the selected fill stay hidden by them).
-                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(border), pick_id: 0, width: 3.0, style: LineSegment::ON_TOP });
+                overlay_lines.segments.push(LineSegment { a: corners[i], b: corners[(i + 1) % 4], color: lin_to_u8(border), pick_id: 0, width: 3.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         for &id in built.picks.ids_for(r) {
@@ -1862,7 +1862,7 @@ pub fn error_geometry(mesh: &noshape_model::display::MeshBuffers, ghost: bool, u
     let mut lines = LineData::default();
     for pl in &mesh.edges {
         for w in pl.windows(2) {
-            lines.segments.push(LineSegment { a: w[0], b: w[1], color, pick_id: 0, width: if ghost { 3.5 } else { 5.0 }, style: LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: w[0], b: w[1], color, pick_id: 0, width: if ghost { 3.5 } else { 5.0 }, style: LineSegment::ON_TOP, dash_from: 0.0 });
         }
     }
     if !lines.segments.is_empty() {

@@ -1903,7 +1903,7 @@ const SILHOUETTE_BUFFERS: &[wgpu::VertexBufferLayout<'static>] = &[wgpu::VertexB
 const LINE_BUFFERS: &[wgpu::VertexBufferLayout<'static>] = &[wgpu::VertexBufferLayout {
     array_stride: std::mem::size_of::<LineSegment>() as u64,
     step_mode: wgpu::VertexStepMode::Instance,
-    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Unorm8x4, 3 => Uint32, 4 => Float32, 5 => Uint32],
+    attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Unorm8x4, 3 => Uint32, 4 => Float32, 5 => Uint32, 6 => Float32],
 }];
 const POINT_BUFFERS: &[wgpu::VertexBufferLayout<'static>] = &[wgpu::VertexBufferLayout {
     array_stride: std::mem::size_of::<PointSprite>() as u64,

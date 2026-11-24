@@ -2863,3 +2863,46 @@ fn a_depth_0_extrudes_circle_region_has_a_red_outline(cx: &mut TestAppContext) {
         assert!(pale > 100 && row.iter().any(|p| close(*p, 0xbd3039, 16)) && !row.iter().any(|p| p[0] == p[1] && p[1] == p[2] && p[0] < 0xc0), "creating {creating}: pale {pale}, across the outline {row:02x?}");
     }
 }
+
+// A construction circle is dashed like a construction line (live construction-dash-1124: 4 / 6 / 30 / 6 screen px, laid
+// out from the curve's start), not solid where each of its short segments started the pattern again.
+#[gpui::test]
+fn sk_a_construction_circle_is_dashed(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "construction-circle");
+    m.edit_sketch(cx);
+    let rim = m.screen(cx, [106., 20., 0.]);
+    m.pointer.move_to(cx, &m.view, rim);
+    m.pointer.click(cx, &m.view, rim);
+    cx.update_window(m.window, |_, w, cx| {
+        m.view.update(cx, |v, cx| {
+            v.toggle_construction(w, cx);
+            if let Some(ed) = &mut v.sketch {
+                ed.selection.clear();
+            }
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    // Off the circle through an empty spot of the sketch, so nothing stays hovered.
+    let empty = m.screen(cx, [60., -20., 0.]);
+    m.pointer.move_to(cx, &m.view, empty);
+    m.park(cx);
+    m.pointer.frames(cx, &m.view);
+    let centre = m.screen(cx, SK_CENTRE);
+    let c = m.crop(cx, centre);
+    let steps = 120;
+    let bare: Vec<bool> = (0..steps)
+        .map(|i| {
+            let a = i as f64 / steps as f64 * std::f64::consts::TAU;
+            let q = m.screen(cx, [100. + 6. * a.cos(), 20. + 6. * a.sin(), 0.]) - centre + DVec2::new(40.0, 40.0);
+            (-1..=1).flat_map(|dy| (-1..=1).map(move |dx| (dx, dy))).all(|(dx, dy)| {
+                let (x, y) = (q.x.round() as i32 + dx, q.y.round() as i32 + dy);
+                !(0..80).contains(&x) || !(0..80).contains(&y) || !sketch_blue(c[(y * 80 + x) as usize])
+            })
+        })
+        .collect();
+    // The gaps: runs of bare samples round the rim (2 per 46 px period, ~5.5 on its ~126 px).
+    let gaps = (0..steps).filter(|i| bare[*i] && !bare[(i + steps - 1) % steps]).count();
+    assert!((4..=7).contains(&gaps), "{gaps} gaps round the rim, {} of {steps} samples bare, r {:.0} px", bare.iter().filter(|b| **b).count(), (rim - centre).length());
+}
