@@ -17,10 +17,13 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   GPU test tangent arc from a line end on the Origin (passes WITHOUT a fix: qa's failure not reproduced, asked in the
   row); TICKETS: 6 bare duplicate SKT rows dropped, 2 rows annotated. NEXT: when 30cba9c5 lands, rebase on main,
   rerun t6.sh, land.sh (NOSHAPE_LAND_QUEUE_HOST=vibe2) all 3 commits; then more sketch audit (gaps below).
-- Sketch audit notes: /root/skasm-scratch/audit-1124.md (bottom section). Left: Use on a face stores no COINCIDENTs
-  between loop lines (live 12 constraints; check the solver with coincident external points first);
-  SKETCH-MIRROR-LINE-LOOK band (needs a pixel test); FEEL-SK-SELECT-OTHER: ` bolds row 2 (spec behaviours 19904)
-  vs qa's live take bolding the pick (needs a live recheck); Extend B threshold (live).
+- Local commits since (all tested on vibex6): 12ce9e058 Use on a face: one COINCIDENT per loop corner (ops e2e 8/8,
+  ui Use 7/7, clippy ops clean) + TICKETS Select other bold = live (live 11-24 13:20); c1420311b GPU test picked mirror
+  line = live 1123 2 px (242,255,128); 20d9bc03a matrix row Use Enter/Esc (5/5). Land them with the stack (t6.sh +
+  tuse.sh + tmir.sh + tst.sh in skasm-scratch/bin).
+- Sketch audit notes: /root/skasm-scratch/audit-1124.md ("11-24 later"). Left: Extend B threshold (live), value-box
+  caret/selection/palette looks, Select other's doubled "Face of Sketch 3" row (needs qa's scene), wf13 up-left glyph
+  row (live moves it only off stale glyphs; order unmeasured).
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
   Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =
