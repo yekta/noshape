@@ -774,6 +774,10 @@ impl Regenerator {
                                 }
                                 state.error_parts = std::mem::take(&mut ev.error_bodies);
                                 state.error_refs = std::mem::take(&mut ev.error_refs);
+                                // Else the inputs of the parameters it names (a Flange's joint edge: live errors-1123 fl-joint2).
+                                if state.error_refs.is_empty() {
+                                    state.error_refs = e.faulty.iter().flat_map(|p| ev.query(p).to_vec()).collect();
+                                }
                             }
                             Err(_) => {
                                 state.status = FeatureStatus::Error;

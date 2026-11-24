@@ -1574,8 +1574,9 @@ impl PartStudioView {
         }
         // Its parts of the result (a failed Shell's part) highlighted in place (live feedback-gaps 5).
         let error_parts = failed_state.map(|s| s.error_parts.clone()).unwrap_or_default();
-        // Only the inputs its error blames go red; the rest stay orange (live errors-1123).
-        let blamed: Vec<Reference> = failed_state.filter(|_| failing && !attempt).map(|s| s.error_refs.clone()).unwrap_or_default();
+        // Only the inputs its error blames go red, the rest stay orange (live errors-1123); none where it draws what it
+        // couldn't make.
+        let blamed: Vec<Reference> = failed_state.filter(|_| failing && error_mesh.is_none() && !attempt).map(|s| s.error_refs.clone()).unwrap_or_default();
         for b in self.display.bodies.iter().filter(|b| !b.hidden && error_parts.contains(&b.id)) {
             extra.extend(scene_builder::error_geometry(&b.mesh, false, self.gpu.uploader()));
         }
