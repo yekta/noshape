@@ -3,25 +3,24 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 19:30) — read first
-- LEAD 19:00 TASK (in progress): sketch feel audit like psui's → docs/parity/sketch-feel-audit.md (written: method,
-  counts 148 sections / 2518 items, 88 covered by citation, hand-checked list, Open list). Scripts /root/skasm-scratch/sfa/
-  (scan.py → classify.py → mapped.py; kw.py = keyword check of a section against the tests, one regex per line).
-  New test a_third_redundant_dimension_is_created_driven (scene; run tsc.sh on vibex6). NEXT: work the Open list
-  most-used first (unsolvable dim colours 26111, least-change probes 4, midpoint rule 33588/34103/34117, line value box
-  33862, Use preselected 23644, sketch-equal no badges 33657, Sketch mode 116 per item), add tests, fix what fails,
-  update the doc's Added list and counts; commit; land.sh.
+## NOW (11-24 20:00) — read first
+- LEAD TASK (in progress): docs/parity/sketch-feel-audit.md Open list, tests + fixes, land in batches. Done in the
+  worktree (uncommitted, verified on vibex6 tb2/tb3): the Added list's tests, regions free-end join 0.25 µm / T-end
+  1.5e-8 (FREE_END_JOIN / T_END_JOIN in sketch regions.rs), probes-4 T1 test. Running: tb4 (cancel → toast → Restore,
+  tool shortcut toggles). Then commit in pieces, land.sh. Next: rest of the Sketch mode (116) per-item pass (behaviours
+  lines 116-205: spline Esc commits, Line mid-chain drag no arc, Esc+menu, camera stays at sketch start), then the
+  FEEL-OFFSET-PREVIEW-LOOK offset-iso items (TICKETS ~1394). Scripts: skasm-scratch/bin/tb2-4.sh.
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
 - b99589dc LANDED as d337d0a8 (18:18): inference acquisition, dimension-line hover, hover x state, Use, MC fixes.
-- QUEUED a2d2798d (18:4x, 8 commits): renderer LineSegment::dash_from (construction circles dashed; psui told), Offset
+- LANDED b33ec97e as ce1aefee 19:58 (12 commits; a2d2798d failed 18:30 on a rebase conflict, rebased + dash_from on main's band, audit doc, 7.14 test): renderer LineSegment::dash_from (construction circles dashed; psui told), Offset
   picked curves without badges (FEEL-OFFSET-PREVIEW-LOOK), centre point arc preview per live dashdot-guides-1124
   (dash-dot radius + circle after the centre click, both gone at the start click; test a_center_arc_shows_its_dash_dot_
   circle_and_radius_until_the_start_click), TICKETS, handoff. If it fails: fix forward, land.sh again.
 - SKT-DASHDOT-GUIDES: 30/6/4/6 px (DASH_DOT_PERIOD_PX, dash_dot_pieces), #449CCD (PREVIEW_COLOR), polygon circle no
   radius, text box one closed polyline: all = live now.
-- Waiting on live: REQUESTS skasm 11-24 ~18:00 (Offset iso arrow / in-plane value / origin ring, FEEL-OFFSET-PREVIEW-LOOK
-  row ~1391); glyph row search order (wf13 up-left row, SKETCH-SELECTED-GLYPH-OFFSET row ~870: live moves the row only
+- Offset iso (FEEL-OFFSET-PREVIEW-LOOK row ~1394): live answered (behaviours "Sketch Offset preview in the iso view"); to do after
+  the audit batch (lead 19:2x). Waiting on live: glyph row search order (wf13 up-left row, SKETCH-SELECTED-GLYPH-OFFSET row ~870: live moves the row only
   off stale glyphs).
 - Sketch TICKETS rows: every open skasm SKT/SKETCH/FEEL-SK row is fixed-to-verify (qa) or waits on live; row 590 waits
   on qa. Audit notes /root/skasm-scratch/audit-1124.md (closed except the live-side items above).
@@ -92,6 +91,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   externalFirst = IF, a VERTEX at (0,0,0) on body JFD. TODO after the P0s.
 - REQUESTS 18:08 (open, live): mc-reach-1122 (the Part Studio inference reach: ratio vs px margin to the centroid).
 - SM firsts left: corner-break model F (in flight), sm-loft-basic apex (archive "Loft apex 11-21"), hem-jog corner counts.
+- REVERTED ab958b87b (Bend split-piece naming, bend-twice) by core in bad9c09e (11-24): it broke c2-sm-rocker-enclosure-sm (Bend 2 "Select a planar sheet metal face.", the rest cascades). Parked; redo later with the rocker as a counter-case. Rebase on bad9c09e once it lands.
 
 ## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
 - Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
