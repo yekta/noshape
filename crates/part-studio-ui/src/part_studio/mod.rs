@@ -1515,6 +1515,11 @@ impl PartStudioView {
         // the cursor don't light up.
         let drawing = self.sketch.as_ref().is_some_and(|s| s.tool.draws());
         let single_hover = single_hover.filter(|r| !(drawing && matches!(r, Reference::SketchRegion { .. })));
+        // A drawing tool's acquired point stays lit as hovered (live line-linger-1124).
+        let single_hover = single_hover.or_else(|| {
+            let ed = self.sketch.as_ref().filter(|_| drawing && hovered.is_empty())?;
+            ed.acquired.map(|e| Reference::SketchEntity { sketch: ed.feature, entity: e.0 })
+        });
         if single_hover.is_none() {
             accent.extend(hovered);
         }

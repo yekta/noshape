@@ -851,6 +851,9 @@ pub struct SketchEditor {
     /// The point outside the sketch woken last: snapped onto while drawing (an external vertex snap; live 11-17
     /// sketch-snap-1117, Sketch 2's point then offers its horizontal / vertical alignment, as a point of the sketch does).
     pub woken_point: Option<(noshape_model::reference::Reference, DVec2)>,
+    /// The line end or circle centre a drawing tool acquired: lit as hovered while the pointer keeps to its
+    /// horizontal or vertical (live line-linger-1124; [`Self::track_acquired`]).
+    pub acquired: Option<EntityId>,
     /// A model edge's midpoint the pointer is on while a level crosses near it: the edge, the midpoint and (once the
     /// click used the edge) its curve in the sketch.
     woken_edge_mid: Option<(noshape_model::reference::Reference, DVec2, Option<EntityId>)>,
@@ -1012,6 +1015,10 @@ const USE_HOVER_COLOR: [u8; 4] = [0xff, 0xc6, 0x85, 255];
 /// The hovered edge itself through the Use tool's band (qa SKT-USE-HOVER, live sk23 use-0-hover-edge / -vertex: across the
 /// edge 1 px (254,199,136), 2-3 px (213,182,138), 1 px (254,199,136)).
 const USE_HOVER_EDGE_COLOR: [u8; 4] = [0xd5, 0xb6, 0x8a, 255];
+/// How far off its horizontal or vertical the pointer keeps an acquired point lit, and how far away at most (live
+/// line-linger-1124: gone 15–40 px along other directions; lit to 180 px along them, gone at 250).
+const ACQUIRED_KEEP_PX: f64 = 6.0;
+const ACQUIRED_REACH_PX: f64 = 215.0;
 /// The dashed guide from an acquired point (live sketch-tools-1123: (226,188,44), 4 on / 4 off).
 const INFERRED_DASH_COLOR: [u8; 4] = [0xe2, 0xbc, 0x2c, 255];
 /// A rubber band whose direction is inferred horizontal or vertical: drawn as yellow dashes (live sketch/51,
@@ -1618,6 +1625,7 @@ impl SketchEditor {
             edge_seen: None,
             woken_edge: None,
             woken_point: None,
+            acquired: None,
             woken_edge_mid: None,
             press: None,
             chain_end_press: None,
@@ -1708,6 +1716,7 @@ impl SketchEditor {
         self.edge_acquiring = None;
         self.woken_edge = None;
         self.woken_point = None;
+        self.acquired = None;
         self.woken_edge_mid = None;
         self.press = None;
         self.chain_end_press = None;
@@ -2111,6 +2120,33 @@ impl SketchEditor {
             }
         }
         Some(inf)
+    }
+
+    /// Live line-linger-1124: a line end or a circle's centre hovered with a drawing tool stays lit after the
+    /// pointer leaves while it keeps to the point's horizontal or vertical (within [`ACQUIRED_KEEP_PX`], up to
+    /// [`ACQUIRED_REACH_PX`] away); off them, or on another point, it goes. A free point isn't acquired.
+    pub fn track_acquired(&mut self, sk: &Sketch) {
+        if !self.tool.draws() {
+            self.acquired = None;
+            return;
+        }
+        if let Some(h) = self.hover.filter(|h| sk.point(*h).is_some()) {
+            self.acquired = (!sk.users_of_point(h).is_empty()).then_some(h);
+            return;
+        }
+        let (Some(a), Some(c)) = (self.acquired, self.cursor) else { return };
+        let Some(q) = sk.point(a) else {
+            self.acquired = None;
+            return;
+        };
+        let metric = self.screen_metric().unwrap_or(noshape_sketch::ScreenMetric(glam::DMat2::IDENTITY));
+        let px = |v: DVec2| metric.len(v) / self.world_per_px;
+        let far = self.world_per_px * ACQUIRED_REACH_PX * 4.0;
+        let off = [DVec2::X, DVec2::Y].map(|d| px(c - metric.closest_on_segment(q - d * far, q + d * far, c)));
+        let keep = px(c - q) <= ACQUIRED_REACH_PX && off.iter().any(|o| *o <= ACQUIRED_KEEP_PX);
+        if !keep {
+            self.acquired = None;
+        }
     }
 
     /// `e` wakes its inferences (the most recent first, ten kept).

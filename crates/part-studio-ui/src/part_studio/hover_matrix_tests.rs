@@ -2774,3 +2774,41 @@ fn sk_centres_and_regions_light_alike_whatever_else_is_selected(cx: &mut TestApp
     }
     assert!(bad.is_empty(), "{bad:?}");
 }
+
+// Live line-linger-1124: with the Line tool a hovered line end or circle centre stays lit (acquired) while the pointer
+// leaves along its horizontal or vertical, and goes when it leaves another way; a free point never stays.
+#[gpui::test]
+fn sk_the_line_tool_keeps_an_acquired_point_lit_along_its_levels(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "acquired-point");
+    m.edit_sketch(cx);
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    let disc = |a: &[[u8; 3]], b: &[[u8; 3]]| near_centre(a, 5.0).zip(near_centre(b, 5.0)).filter(|(x, y)| x.iter().zip(y.iter()).any(|(p, q)| (*p as i32 - *q as i32).abs() > 8)).count();
+    let mut got = Vec::new();
+    for (name, away, kept) in [("CC", [0., -15.], true), ("CC", [15., 0.], true), ("CC", [6., 6.], false), ("LE", [0., -8.], true), ("LE", [6., -6.], false), ("P", [0., -8.], false)] {
+        let empty = m.screen(cx, [60., -20., 0.]);
+        m.pointer.move_to(cx, &m.view, empty);
+        m.park(cx);
+        assert!(cx.update(|cx| m.view.read(cx).sketch.as_ref().and_then(|ed| ed.acquired)).is_none(), "parked, {got:#?}");
+        let t = sk_1124(name);
+        let p = m.screen(cx, t);
+        let rest = m.crop(cx, p);
+        approach(cx, &m, p);
+        let on = cx.update(|cx| m.view.read(cx).sketch.as_ref().and_then(|ed| ed.acquired)).is_some();
+        for k in 1..=8 {
+            let f = k as f64 / 8.0;
+            let q = m.screen(cx, [t[0] + away[0] * f, t[1] + away[1] * f, 0.]);
+            m.pointer.move_to(cx, &m.view, q);
+        }
+        m.pointer.frames(cx, &m.view);
+        let held = cx.update(|cx| m.view.read(cx).sketch.as_ref().and_then(|ed| ed.acquired)).is_some();
+        let hovers = cx.update(|cx| {
+            let v = m.view.read(cx);
+            format!("{:?} / {:?}", v.hover, v.sketch.as_ref().map(|ed| (ed.hover, ed.hover_region.clone())))
+        });
+        let lit = disc(&rest, &m.crop(cx, p));
+        let ok = held == kept && (lit >= 20) == kept && on == (name != "P");
+        got.push(format!("{name} {away:?}: acquired {on}, held {held}, {lit} px lit, hover {hovers}{}", if ok { "" } else { " ✗" }));
+    }
+    assert!(got.iter().all(|g| !g.ends_with('✗')), "{got:#?}");
+}

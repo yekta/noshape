@@ -503,6 +503,19 @@ impl PartStudioView {
     }
 
     /// Run `f` with the editor and the draft sketch data.
+    /// The drawing tool's acquired point follows the pointer and the hover (scene `track_acquired`); redrawn when it
+    /// changes.
+    fn track_acquired(&mut self, cx: &mut Context<Self>) {
+        let before = self.sketch.as_ref().and_then(|s| s.acquired);
+        let after = self.with_sketch(cx, |ed, data| {
+            ed.track_acquired(&data.sketch);
+            ed.acquired
+        });
+        if after.is_some_and(|a| a != before) {
+            self.refresh_scene(false, cx);
+        }
+    }
+
     fn with_sketch<R>(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut SketchEditor, &mut SketchData) -> R) -> Option<R> {
         let dialog = self.edit.as_ref()?.dialog.clone();
         let mut editor = self.sketch.take()?;
@@ -1181,6 +1194,7 @@ impl PartStudioView {
                 ed.hover_region = None;
                 ed.hover = None;
             }
+            self.track_acquired(cx);
             self.snap_to_hover(None, cx);
             return true;
         }
@@ -1206,6 +1220,7 @@ impl PartStudioView {
                 cx.notify();
             }
         }
+        self.track_acquired(cx);
         // A drawing tool snaps to what is now drawn hovered (the pick arrives after the move).
         self.snap_to_hover(r.as_ref(), cx);
         // The GPU hover result arrives after PointerMove. Refresh Use
@@ -1329,6 +1344,7 @@ impl PartStudioView {
                 let was_shift = self.sketch.as_ref().is_some_and(|s| s.shift_held);
                 let alt = modifiers.alt;
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.pointer_move(data, p, shift, alt)) {
+                    self.track_acquired(cx);
                     let snap = if shift { None } else { self.model_snap(p, vp.read(cx)) };
                     if *SNAP_TRACE {
                         let before = self.sketch.as_ref().and_then(|ed| ed.inference.as_ref().map(|i| i.kind));
