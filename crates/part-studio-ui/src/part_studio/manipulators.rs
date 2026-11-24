@@ -816,11 +816,15 @@ impl PartStudioView {
                 let vp = self.viewport.read(cx);
                 let view = noshape_render::camera_geometry::View { camera: vp.camera, size: vp.size() };
                 let m_per_px = view.world_per_px(a.base + a.dir * len).unwrap_or(0.00025);
+                // A fillet's handle steps its offset along the bisector, not the radius (live manip-drag-1124: 28.97056 =
+                // 2.41421 × 12.0 mm), no less than std's BLEND_BOUNDS 0.01 mm (0.02414 mm of radius on a square edge).
+                let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
+                if fillet && !window.modifiers().shift {
+                    let step = linear_step(m_per_px, units.length.meters());
+                    len = (len / step).round() * step;
+                }
                 // (The parameter the length stands for: a fillet's radius is its offset over 1 / cos(φ/2) - 1.)
                 let (len, m_per_px) = (len / a.scale, m_per_px / a.scale);
-                // A fillet's handle isn't stepped (live manip-1118b: 23.41787, 28.97056 mm 5 px apart), its offset no
-                // less than std's BLEND_BOUNDS 0.01 mm (0.02414 mm of radius on a square edge).
-                let fillet = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == "fillet");
                 let len = if fillet {
                     len.max(1e-5 / a.scale)
                 } else if window.modifiers().shift {

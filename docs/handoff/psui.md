@@ -34,10 +34,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
 ## RESUME HERE (11-24 14:2x UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
-- QUEUED a2341555 (13:5x): skasm's stack (user's Offset fix) rebased again on main (kept both sides: sketch_ui_tests, mod.rs
-  ghost_outline_only(.., &selection), eval.rs refused + error_refs), 11 doubled TICKETS rows dropped. Worktree
-  psui-skrebase; after it lands: `git worktree remove` psui-skrebase and psui-strebase, rm ~/agents/psui-*rebase on
-  vibex7/8. eaa20b28 LANDED as 9d6b9fc61.
+- a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
+  16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
   keeps its tooltip" (passes: FEEL-ROW-DEPENDENCY-TIP-IN-DIALOG to verify); FEEL-EDIT-BODY-SHADE fix: an edited
   feature's (EditSession !is_new) preview bodies keep their color and rest shade (Instance::preview_lit: preview
@@ -51,7 +49,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   asm's the_second_pick_outlines_... failed once on Windows (told the lead).
 - Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
 - QUEUED dae14f97 (14:3x): TICKETS cleanup + list-tooltip row + FEEL-EDIT-BODY-SHADE fix (above).
-- LOCAL, land after dae14f97 lands (queue 15:00: core job, a2341555, then dae14f97; don't queue the stack twice):
+- LOCAL, land after dae14f97 lands (dae14f97 in the queue's run 16:xx; don't queue the stack twice):
   1190cd482 (FEEL-PREVIEW-BODY-BLUE closed), 84648f9bf (feedback row "error / a pick its field refuses": ERR-MISSING-
   SELECTION = live on main, to verify), 2e211e1ba (lead 14:4x: replay `"until": "regenerated"` waits, every step's settle
   waits for the viewport frame ≤5 s; Viewport::frame_pending, PartStudioView::ui_frame_pending; README; A/B on one core:
@@ -63,7 +61,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - FEEL-PREVIEW-BODY-BLUE closed (14:25): not a regression; qa's 13:27 run was on a loaded host (frames 200-600 ms), the
   shot came before the preview. Quiet vibex8 replay of green 35dceca06 (~/tmp/psui/wfa, qa's wf/run.sh, XD :497): wf04 s2
   and wf38 s16 show the preview. Told the lead: the replay should settle on the preview's display.
-- Next: PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
+- Next (lead 16:xx, from core bfcad85c): an Extrude with depth 0 draws its region outline red (live errors-1123); ours misses it (scene draw order).
+- Then: PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
 - USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape
   (700), delete it and /root/psui-scratch/Mac-mini-2024.step after.

@@ -266,7 +266,7 @@ fn rows() -> Vec<Row> {
             let open = cx.update(|cx| view.read(cx).edit.is_some());
             expect((dragged, open, depth(cx) == before), (true, false, true), "(the drag changed Depth, the dialog open after Esc, Extrude 1 as before)")
         } },
-        Row { id: "manipulators / Fillet's handle drags unstepped", live: "live manip-1118b: from R5, 5 px moves give 23.41787, 28.97056, 41.52447 mm (not the arrows' 0.1 mm steps); toward the edge no less than 0.02414 mm", gap: false, check: |cx| {
+        Row { id: "manipulators / Fillet's handle steps its bisector offset, not the radius", live: "live manip-drag-1124: the radius is (√2 + 1) × the pointer's offset along the inward bisector, the offset stepped to the length step (0.1 mm in iso): 28.97056 = 2.41421 × 12.0, 52.38843 = × 21.7; toward the edge no less than 0.02414 mm (manip-1118b)", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-fillet-drag")?;
             let vp = cx.update(|cx| view.read(cx).viewport.clone());
             let (at, along) = cx
@@ -292,8 +292,14 @@ fn rows() -> Vec<Row> {
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 });
             draw(cx, window);
             let mm = |t: &String| t.trim_end_matches(" mm").parse::<f64>().ok();
-            let off_grid = seen.iter().filter_map(mm).filter(|v| ((v * 10.0) - (v * 10.0).round()).abs() > 1e-6).count();
-            expect(off_grid > 0, true, &format!("a radius off the 0.1 mm grid while dragging: {seen:?}"))
+            let radii: Vec<f64> = seen.iter().filter_map(mm).collect();
+            let off_grid = radii.iter().filter(|v| ((*v * 10.0) - (*v * 10.0).round()).abs() > 1e-6).count();
+            // The offsets r / (√2 + 1) on one decimal grid (the 5-decimal radius rounds the offset by < 1e-5).
+            let offset_grid = (0..=3).any(|k| radii.iter().all(|r| {
+                let o = r / (1.0 + std::f64::consts::SQRT_2) * 10f64.powi(k);
+                (o - o.round()).abs() < 1e-5 * 10f64.powi(k)
+            }));
+            expect((radii.len(), off_grid > 0, offset_grid), (4, true, true), &format!("radii while dragging {seen:?}: off the 0.1 mm grid, their bisector offsets on one"))
         } },
         Row { id: "manipulators / a plain click on Fillet's arrow changes nothing and focuses no field", live: "live walk6-4c fillet-arrow-click (qa FEEL-FILLET-ARROW-CLICK): blue on hover; a click (no drag) neither flips nor changes the radius, no field is focused, the focus leaves the dialog", gap: false, check: |cx| {
             let (window, view, dialog, _) = fillet_on_an_edge(cx, "dlg-fillet-arrow-click")?;
