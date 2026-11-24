@@ -3,27 +3,20 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 20:00) — read first
-- LEAD TASK (in progress): sketch-feel-audit Open list. QUEUED 8f1f3c71 (audit batch, regions fix) + offset-iso batch after it. Done in the
-  worktree (uncommitted, verified on vibex6 tb2/tb3): the Added list's tests, regions free-end join 0.25 µm / T-end
-  1.5e-8 (FREE_END_JOIN / T_END_JOIN in sketch regions.rs), probes-4 T1 test. Running: tb4 (cancel → toast → Restore,
-  tool shortcut toggles). Then commit in pieces, land.sh. Next: rest of the Sketch mode (116) per-item pass (behaviours
-  lines 116-205: spline Esc commits, Line mid-chain drag no arc, Esc+menu, camera stays at sketch start), then the
-  FEEL-OFFSET-PREVIEW-LOOK offset-iso items (TICKETS ~1394). Scripts: skasm-scratch/bin/tb2-4.sh.
-- LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
-  inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
-- b99589dc LANDED as d337d0a8 (18:18): inference acquisition, dimension-line hover, hover x state, Use, MC fixes.
-- LANDED b33ec97e as ce1aefee 19:58 (12 commits; a2d2798d failed 18:30 on a rebase conflict, rebased + dash_from on main's band, audit doc, 7.14 test): renderer LineSegment::dash_from (construction circles dashed; psui told), Offset
-  picked curves without badges (FEEL-OFFSET-PREVIEW-LOOK), centre point arc preview per live dashdot-guides-1124
-  (dash-dot radius + circle after the centre click, both gone at the start click; test a_center_arc_shows_its_dash_dot_
-  circle_and_radius_until_the_start_click), TICKETS, handoff. If it fails: fix forward, land.sh again.
-- SKT-DASHDOT-GUIDES: 30/6/4/6 px (DASH_DOT_PERIOD_PX, dash_dot_pieces), #449CCD (PREVIEW_COLOR), polygon circle no
-  radius, text box one closed polyline: all = live now.
-- Offset iso (FEEL-OFFSET-PREVIEW-LOOK row ~1394): live answered (behaviours "Sketch Offset preview in the iso view"); to do after
-  the audit batch (lead 19:2x). Waiting on live: glyph row search order (wf13 up-left row, SKETCH-SELECTED-GLYPH-OFFSET row ~870: live moves the row only
-  off stale glyphs).
-- Sketch TICKETS rows: every open skasm SKT/SKETCH/FEEL-SK row is fixed-to-verify (qa) or waits on live; row 590 waits
-  on qa. Audit notes /root/skasm-scratch/audit-1124.md (closed except the live-side items above).
+## NOW (11-24 21:00) — read first
+- LEAD 11-24 20:2x TASK (in progress): sketch speed + robustness as a person feels them; short table when done.
+  Done: T2 latency_tests a_300_line_sketch_keeps_up_with_the_hand (S300: 321 lines, 483 constraints; vibex6 dev-opt,
+  real frames): open 29 ms (live 1.2-1.9 s), drag step to frame 15 ms (UI thread 13, worst 26; the 110 ms worst is a
+  hover pick's GPU readback on the software renderer), release 23, dimension edit 51 (live ~1.1 s), unsolvable value
+  warned 83, ✓ 14 (live 0.24 s). Corpus (ops sketch_open_perf T2): model sketches <= 5 ms; sk211 26-34 ms.
+  FOUND: fz211-final (qa fuzz, 438 ents, 76 CircularPatternLinks, over-defined): open 457 ms, dim edit 0.5-0.9 s,
+  drag step worst 452 ms, all on the UI thread. Probe (reverted; skasm-scratch/bin/tprobe.sh): a dim edit's
+  place_constructively (constructive.rs least change) ~440 ms; analysed solves: conflict_dims 135-200 ms (up to 12
+  whole-sketch re-solves, each 6-8 retry attempts) + redundant_nearby 130-190 ms; analyze itself 11 ms.
+  NEXT: decision from the lead: speed these (conflict_dims probes in parallel; constructive profile) or move the
+  dimension-edit solve off the UI thread. Queued: 8f1f3c71 (audit), 62e8911d (offset-iso); 47ca9b2fa + the T2 test
+  commit unqueued.
+- LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
