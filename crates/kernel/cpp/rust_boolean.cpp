@@ -4157,7 +4157,9 @@ static bool analytic_freeform_sections(const TopoDS_Face& fa, const TopoDS_Face&
 // within both faces' boxes (OCCT's: a plane's a tenth wider) interpolated. A run ends where the other surface crosses
 // a side of the face (found exactly) or leaves the other face's box (bisected). Where the branches meet inside the face,
 // the same by v round the tube (u = psi +- acos(c)). False where they meet both ways (all but tangent to the tube), or
-// a plane is across the axis or holds it or a sphere's centre is on it (the sections circles: OCCT's then).
+// a plane is across the axis or holds it or a sphere's centre is on it (the sections circles: OCCT's then). A cylinder
+// along the axis (c2-config-parts-sprockets' tooth gaps against its rim's rounds: 92 pairs of OCCT's marching, ~7 ms
+// each): by v round the tube only, u = psi +- acos((w^2 + e^2 - rho^2) / (2 w e)) at w = R + r cos v, fitted.
 bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
 {
   auto bare = [](const TopoDS_Face& face) {
@@ -4207,7 +4209,8 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   const bool                               p_first = t_b;
   const occ::handle<Geom_Plane>            pl      = occ::down_cast<Geom_Plane>(p_first ? sa : sb);
   const occ::handle<Geom_SphericalSurface> sp      = occ::down_cast<Geom_SphericalSurface>(p_first ? sa : sb);
-  if (pl.IsNull() && sp.IsNull())
+  const occ::handle<Geom_CylindricalSurface> cy    = occ::down_cast<Geom_CylindricalSurface>(p_first ? sa : sb);
+  if (pl.IsNull() && sp.IsNull() && cy.IsNull())
     return false;
   const TopoDS_Face& f   = p_first ? fb : fa;
   const gp_Torus     T   = p_first ? tor_b : tor_a;
@@ -4217,8 +4220,11 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   if (!(r > 0) || !(R > 0))
     return false;
   const gp_Pln    P  = pl.IsNull() ? gp_Pln() : pl->Pln();
-  const gp_Sphere Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
-  double          a0 = 0, a1 = 0, b0 = 0, b1 = 0, c0 = 0, psi = 0;
+  const gp_Sphere   Sp = sp.IsNull() ? gp_Sphere() : sp->Sphere();
+  const gp_Cylinder Cy = cy.IsNull() ? gp_Cylinder() : cy->Cylinder();
+  double            a0 = 0, a1 = 0, b0 = 0, b1 = 0, c0 = 0, psi = 0;
+  // (A cylinder: its axis's distance from the torus's and its radius.)
+  double e = 0, rho_c = 0;
   if (!pl.IsNull())
   {
     // (n . x = d at the tube's point: base + R h c + (r h c) cos v + (r nz) sin v.)
@@ -4228,6 +4234,19 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
     if (h < 1e-9 || (std::abs(nz) < 1e-9 && std::abs(base) < 1e-9 * R))
       return false;
     psi = std::atan2(ny, nx), a0 = base, a1 = R * h, b1 = r * h, c0 = r * nz;
+  }
+  else if (!cy.IsNull())
+  {
+    // (Only along the axis: the circle of radius w = R + r cos v round the axis meets it where cos(u - psi) =
+    // (w^2 + e^2 - rho^2) / (2 w e).)
+    const gp_XYZ D = Cy.Axis().Direction().XYZ(), d = Cy.Location().XYZ() - ax.Location().XYZ();
+    if (std::abs(std::abs(D.Dot(ax.Direction().XYZ())) - 1) > 1e-12)
+      return false;
+    const double dx = d.Dot(ax.XDirection().XYZ()), dy = d.Dot(ax.YDirection().XYZ());
+    e = std::hypot(dx, dy), rho_c = Cy.Radius();
+    if (e < 1e-9 * R || !(rho_c > 0))
+      return false;
+    psi = std::atan2(dy, dx);
   }
   else
   {
@@ -4268,8 +4287,8 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   }
   else
   {
-    const double e = 2 * BRep_Tool::MaxTolerance(p_first ? fa : fb, TopAbs_EDGE) / Sp.Radius();
-    pu0 -= e, pu1 += e, pv0 -= e, pv1 += e;
+    const double tol = 2 * BRep_Tool::MaxTolerance(p_first ? fa : fb, TopAbs_EDGE), eu = tol / (sp.IsNull() ? Cy.Radius() : Sp.Radius()), ev = sp.IsNull() ? tol : eu;
+    pu0 -= eu, pu1 += eu, pv0 -= ev, pv1 += ev;
   }
   const double pe = 1e-9 * std::max(pu1 - pu0, pv1 - pv0), ve = 1e-12;
   // A + B cos v + C sin v at u; the branch's v (branch -1 or +1), false where the circle misses the plane.
@@ -4281,7 +4300,10 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
     if (!pl.IsNull())
       return ElSLib::Parameters(P, x, pu, pv);
-    ElSLib::Parameters(Sp, x, pu, pv);
+    if (!cy.IsNull())
+      ElSLib::Parameters(Cy, x, pu, pv);
+    else
+      ElSLib::Parameters(Sp, x, pu, pv);
     pu += 2 * M_PI * std::ceil((pu0 - pu) / (2 * M_PI));
   };
   // (v as the face's range has it, the turn nearest `to` where two do (a whole tube's seam).)
@@ -4315,6 +4337,8 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   // meet (A^2 = B^2 + C^2), and where a branch leaves the plane face's box (bisected between samples).
   // By u: runs of each branch round the axis.
   auto by_u = [&](std::vector<IntTools_Curve>& found) {
+    if (!cy.IsNull())
+      return false;
     std::vector<double> cuts{u0, u1};
     auto add_cos = [&](double c) {
       if (std::abs(c) > 1)
@@ -4415,10 +4439,15 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
   // the tube, cf-snap-hook's drafted sides): by v, the circle at v round the axis meeting the other surface where
   // c = cos(u - psi) = -(a0 + b0 cos v + c0 sin v) / (a1 + b1 cos v), two branches u = psi +- acos(c), the same way.)
   auto by_v = [&](std::vector<IntTools_Curve>& found) {
-    if (!(a1 > 0))
+    if (cy.IsNull() && !(a1 > 0))
       return false;
     const double ue     = 1e-12;
-    auto         cos_at = [&](double v) { return -(a0 + b0 * std::cos(v) + c0 * std::sin(v)) / (a1 + b1 * std::cos(v)); };
+    auto         cos_at = [&](double v) {
+      if (cy.IsNull())
+        return -(a0 + b0 * std::cos(v) + c0 * std::sin(v)) / (a1 + b1 * std::cos(v));
+      const double w = R + r * std::cos(v);
+      return (w * w + e * e - rho_c * rho_c) / (2 * w * e);
+    };
     auto         ubranch = [&](int k, double v, double& u, double to = 0) {
       const double c = cos_at(v);
       if (!(std::abs(c) <= 1 + 1e-12))
@@ -4448,13 +4477,26 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
           if (const double v = w + 2 * M_PI * turn; v > v0 && v < v1)
             cuts.push_back(v);
     };
+    // (A cylinder's: where w is the root of w^2 - 2 w e c + e^2 - rho^2 = 0 (c = cos(u - psi)), cos v = (w - R) / r.)
+    auto add_w = [&](double w) {
+      if (w > 0)
+        add_trig((R - w) / r, 1, 0);
+    };
     for (const double us : {u0, u1})
     {
       const double cu = std::cos(us - psi);
-      add_trig(a0 + a1 * cu, b0 + b1 * cu, c0);
+      if (cy.IsNull())
+        add_trig(a0 + a1 * cu, b0 + b1 * cu, c0);
+      else if (const double disc = rho_c * rho_c - e * e * (1 - cu * cu); disc >= 0)
+        for (const double sg : {-1.0, 1.0})
+          add_w(e * cu + sg * std::sqrt(disc));
     }
     for (const double sg : {-1.0, 1.0})
-      add_trig(a0 + sg * a1, b0 + sg * b1, c0);
+      if (cy.IsNull())
+        add_trig(a0 + sg * a1, b0 + sg * b1, c0);
+      else
+        for (const double w : {e + sg * rho_c, rho_c - e})
+          add_w(w);
     std::sort(cuts.begin(), cuts.end());
     {
       const std::vector<double> sides = cuts;
@@ -4517,8 +4559,9 @@ bool torus_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<In
           c = p_first ? on_t : on_p;
           return true;
         };
+        // (A cylinder's fitted: interpolated, its many spans cost the Boolean more than the marching saved.)
         IntTools_Curve ic;
-        if (!interpolated(at, a, b, 8, ic))
+        if (!(!cy.IsNull() && fitted(at, a, b, ic, 1, 1)) && !interpolated(at, a, b, 8, ic))
           return false;
         found.push_back(ic);
       }

@@ -2648,6 +2648,34 @@ fn prongs_fused_onto_a_rings_tori_as_occt() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
+/// c2-config-parts-sprockets' Circular pattern 1: a sprocket's disc, its rim rounded by torus faces, cut by 15 tooth gaps
+/// whose cylinders run along the tori's axis, each such pair sectioned on noshape's own (OCCT's marching was most of
+/// the cut): the result as OCCT's once unified (OCCT's marching splits four of its sections in two: 8 more vertices
+/// between the same two faces, which the pattern's unify joins).
+#[test]
+fn a_sprockets_tooth_gaps_cut_through_its_rounded_rim_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "28812809b9ec0a38").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let occt = k::boolean(c.op, &c.objects, &c.tools, &c.opts).unwrap();
+    k::set_rust_boolean(None);
+    assert!(r.shape.is_valid());
+    let points = |s: &k::Shape| s.vertices().iter().map(|v| v.vertex_point().unwrap()).collect::<Vec<_>>();
+    let theirs = points(&occt.shape);
+    assert!(points(&r.shape).iter().all(|p| theirs.iter().any(|q| (*q - *p).length() <= 1e-7)), "a vertex OCCT's result hasn't");
+    let (r, occt) = (k::unify_same_domain(&r.shape).unwrap().shape, k::unify_same_domain(&occt.shape).unwrap().shape);
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert_eq!(counts(&r), counts(&occt));
+    let (v, vo) = (r.volume().unwrap(), occt.volume().unwrap());
+    assert!((v - vo).abs() <= 1e-7 * r.area().unwrap(), "volume {v} against OCCT's {vo}");
+}
+
 /// Parts of one torus fused (as a private document's rib ends): a half ring and a quarter of it, their torus faces one
 /// surface whose faces' own parameters hold different parts of it ("a piece's point on another solid's face" before),
 /// the quarter's end circle lying on the half's torus face across that face's seam ("an edge on another argument's
