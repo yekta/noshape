@@ -1959,6 +1959,18 @@ fn a_rounded_rectangle_keeps_its_lower_left_corner() {
     }
 }
 
+/// Live probes 4 (fuzz s115): a rectangle tied to a separate, dimensioned
+/// line keeps its lower left corner as a lone one does, all 8 cases. T1.
+#[test]
+fn a_rectangle_tied_to_a_separate_line_keeps_its_lower_left_corner() {
+    let live: Value = serde_json::from_str(&std::fs::read_to_string(fixture("sketch-probe-4.live.json")).unwrap()).unwrap();
+    let b = probe_batch(probes4());
+    for case in b["cases"].as_array().unwrap() {
+        let d = differences(case, &live["cases"][case["case"].as_str().unwrap()]);
+        assert!(d.is_empty(), "{}: {}", case["case"], d.join("; "));
+    }
+}
+
 /// s892 (batch 18) stays as live answered: a Z's bottom flange narrows and
 /// its web thickens: the flange keeps its outer end and carries the web, the
 /// thickness after (the Distance's dimensioned side isn't kept first when a

@@ -108,6 +108,9 @@ fn text_box_scales_with_its_height_and_regenerates_outlines() {
     let curves = out.add_text_outlines(&layout, &pl, Some(base));
     assert!(curves.len() > 4);
     assert!(curves.iter().all(|c| c.0 >= base && glyph_text_id(*c) == Some(7)));
+    // Live 2229: only lines and one quadratic B-spline per TrueType segment (degree 2, 3 control points, plain).
+    let odd: Vec<&Geometry> = curves.iter().map(|c| &out.entity(*c).unwrap().geometry).filter(|g| !(matches!(g, Geometry::Line { .. }) || matches!(g, Geometry::BSpline { degree: 2, control, weights: None, .. } if control.len() == 3))).collect();
+    assert!(odd.is_empty(), "{odd:?}");
     // The O is a ring and the K a single region: regions stay computable and
     // solving a sketch with frozen outline entities works.
     let regions = out.regions();
