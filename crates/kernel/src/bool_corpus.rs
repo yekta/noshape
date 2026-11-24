@@ -70,13 +70,14 @@ impl Summary {
     }
 
     /// Differences from `want` (empty: the same): counts, validity and history
-    /// exactly, the volume to 1e-9 relative.
+    /// exactly, the volume to 1e-6 relative (live's band: closer, two kernels'
+    /// section curves differ, OCCT's walked ones up to 1e-6 m off its faces).
     pub fn differences(&self, want: &Summary) -> Vec<String> {
         let mut d = Vec::new();
         if self.valid != want.valid {
             d.push(format!("valid {} (was {})", self.valid, want.valid));
         }
-        if (self.volume - want.volume).abs() > 1e-9 * want.volume.abs().max(1e-30) {
+        if (self.volume - want.volume).abs() > 1e-6 * want.volume.abs().max(1e-30) {
             d.push(format!("volume {:.12e} (was {:.12e})", self.volume, want.volume));
         }
         for (what, a, b) in [("faces", self.faces, want.faces), ("edges", self.edges, want.edges), ("vertices", self.vertices, want.vertices)] {

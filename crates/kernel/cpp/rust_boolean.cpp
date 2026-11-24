@@ -3732,14 +3732,15 @@ static bool fitted_section(const std::function<bool(double, gp_Pnt&, gp_Pnt2d&, 
   return (!corners.empty() && fitted(at, t0, t1, out, ka, kb, corners, side)) || (all.size() > corners.size() && fitted(at, t0, t1, out, ka, kb, all, side));
 }
 
-// A plane or a cylinder against a B-spline face (not a pair plane_tube_sections takes): the zero set of the analytic
+// A plane, a cylinder or a cone against a B-spline face (not a pair plane_tube_sections takes): the zero set of the analytic
 // surface's signed distance over the B-spline face's parameter box (a hair wider, as OCCT's). Its poles all on one
 // side of the plane, or all inside the cylinder: none. Else the distance on a grid of four cells a knot span each way
 // (8 to 256 a way), its sign changes along the cells' sides found exactly and joined cell by cell (a saddle by the
 // cell's middle), each chain of them a section: a curve fitted through them the guide, each point of it brought onto
 // the analytic surface by Newton's steps along the distance's gradient, fitted (fitted_section, within 1e-8) over the
 // stretches inside the analytic face's box a tenth wider each way. c2-rings-loft's pattern cut and
-// c2-tpd-fillet-variable's fillet tools: 0.3-2.5 ms a pair where OCCT's marching took 4-10. False where a side's or a
+// c2-tpd-fillet-variable's fillet tools: 0.3-2.5 ms a pair where OCCT's marching took 4-10 (c2-config-parts-nuts' thread
+// against its chamfer cones: 15-25). False where a side's or a
 // cell's distances leave room for zeros they don't show (a tangency, a loop inside a cell): OCCT's then.
 static bool analytic_freeform_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
 {
@@ -3756,8 +3757,9 @@ static bool analytic_freeform_sections(const TopoDS_Face& fa, const TopoDS_Face&
   if (off)
     return why(1);
   const BRepAdaptor_Surface ka(fa, false), kb(fb, false);
-  // (A cylinder's sections with c2-rings-loft's loft, taken so, left its pattern cut non-manifold: planes only for now.)
-  const auto                analytic = [](GeomAbs_SurfaceType t) { return t == GeomAbs_Plane; };
+  // (A cylinder's sections with c2-rings-loft's loft, taken so, left its pattern cut non-manifold: planes and cones only
+  // for now.)
+  const auto                analytic = [](GeomAbs_SurfaceType t) { return t == GeomAbs_Plane || t == GeomAbs_Cone; };
   if (analytic(ka.GetType()) == analytic(kb.GetType()))
     return why(2);
   const bool                 p_first = analytic(ka.GetType());
@@ -3771,26 +3773,38 @@ static bool analytic_freeform_sections(const TopoDS_Face& fa, const TopoDS_Face&
   if (S.IsNull())
     return why(3);
   // The analytic surface's signed distance, its gradient, and a point's parameters on it.
-  const bool        plane = K.GetType() == GeomAbs_Plane;
+  // (A cone's: its distance across its line in the plane through the axis, (rho - r(h)) cos a, nothing on the other
+  // nappe (rho = r(h) < 0 has no point).)
+  const bool        plane = K.GetType() == GeomAbs_Plane, cone = K.GetType() == GeomAbs_Cone;
   const gp_Pln      P     = plane ? K.Plane() : gp_Pln();
-  const gp_Cylinder Y     = plane ? gp_Cylinder() : K.Cylinder();
-  const gp_XYZ      n = P.Axis().Direction().XYZ(), o = Y.Location().XYZ(), ax = Y.Axis().Direction().XYZ();
-  const double      d = n.Dot(P.Location().XYZ()), r = Y.Radius();
+  const gp_Cylinder Y     = plane || cone ? gp_Cylinder() : K.Cylinder();
+  const gp_Cone     C     = cone ? K.Cone() : gp_Cone();
+  const gp_Ax1      axis  = cone ? C.Axis() : Y.Axis();
+  const gp_XYZ      n = P.Axis().Direction().XYZ(), o = axis.Location().XYZ(), ax = axis.Direction().XYZ();
+  const double      d = n.Dot(P.Location().XYZ()), r = cone ? C.RefRadius() : Y.Radius();
+  const double      cos_a = cone ? std::cos(C.SemiAngle()) : 1, sin_a = cone ? std::sin(C.SemiAngle()) : 0;
   auto              off_axis = [&](const gp_XYZ& x) {
     const gp_XYZ w = x - o;
     return w - ax * ax.Dot(w);
   };
-  auto dist = [&](const gp_XYZ& x) { return plane ? n.Dot(x) - d : off_axis(x).Modulus() - r; };
+  auto dist = [&](const gp_XYZ& x) {
+    if (plane)
+      return n.Dot(x) - d;
+    const double rho = off_axis(x).Modulus();
+    return cone ? rho * cos_a - (r * cos_a + ax.Dot(x - o) * sin_a) : rho - r;
+  };
   auto grad = [&](const gp_XYZ& x) -> gp_XYZ {
     if (plane)
       return n;
     const gp_XYZ q = off_axis(x);
     const double m = q.Modulus();
-    return m > 0 ? q / m : gp_XYZ(0, 0, 0);
+    return m > 0 ? q / m * cos_a - ax * sin_a : gp_XYZ(0, 0, 0);
   };
   auto params_on = [&](const gp_Pnt& x, double& pu, double& pv) {
     if (plane)
       ElSLib::Parameters(P, x, pu, pv);
+    else if (cone)
+      ElSLib::Parameters(C, x, pu, pv);
     else
       ElSLib::Parameters(Y, x, pu, pv);
   };

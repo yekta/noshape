@@ -1,5 +1,5 @@
 //! noshape's own Boolean (crates/brep) against OCCT over the Boolean corpus: each case it accepts must give
-//! OCCT's recorded result (validity, counts, volume to 1e-9, the history), and it is timed against OCCT run
+//! OCCT's recorded result (validity, counts, volume to 1e-6, the history), and it is timed against OCCT run
 //! here. Prints the cases it takes, why it declines the others, and the times by size.
 //!
 //! `NOSHAPE_BOOL_CORPUS=/root/core-scratch/bool-corpus cargo test -p noshape-kernel --test all
@@ -22,6 +22,25 @@ use std::cell::OnceCell;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+/// The point halfway along edge `x` by length (not its middle parameter: two kernels' section curves of one edge are
+/// parametrised otherwise, their middle parameters' points apart by more than the records' 2 µm).
+fn halfway(x: &Shape) -> Option<DVec3> {
+    let i = x.edge_info().ok()?;
+    let n = 128;
+    let at = |k: usize| x.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / n as f64).ok();
+    let ps: Vec<DVec3> = (0..=n).map(at).collect::<Option<_>>()?;
+    let total: f64 = ps.windows(2).map(|w| w[0].distance(w[1])).sum();
+    let mut run = 0.0;
+    for w in ps.windows(2) {
+        let l = w[0].distance(w[1]);
+        if run + l >= 0.5 * total && l > 0.0 {
+            return Some(w[0].lerp(w[1], (0.5 * total - run) / l));
+        }
+        run += l;
+    }
+    ps.last().copied()
+}
+
 /// Each history record as text, with its output's place (micrometres; sorted).
 fn records(r: &OpResult) -> Vec<(String, [i64; 3])> {
     let q = |x: f64| (x * 1e6).round() as i64;
@@ -36,7 +55,7 @@ fn records(r: &OpResult) -> Vec<(String, [i64; 3])> {
                 .ok()
                 .map(|x| match h.output_kind {
                     ShapeType::Face => x.centroid().unwrap_or_default(),
-                    ShapeType::Edge => x.edge_info().ok().and_then(|i| x.point_at(0.5 * (i.first_param + i.last_param)).ok()).unwrap_or_default(),
+                    ShapeType::Edge => halfway(&x).unwrap_or_default(),
                     ShapeType::Vertex => x.vertex_point().unwrap_or_default(),
                     _ => DVec3::ZERO,
                 })
@@ -495,9 +514,9 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
         if d.is_empty()
             && let (Ok(o), Some(t)) = (&o, &theirs)
         {
-            // (Faces, edges, validity; its volume to 1e-9.)
+            // (Faces, edges, validity; its volume to 1e-6, live's band.)
             let alike = |a: &Unified, b: &Unified| match (a, b) {
-                (Some(a), Some(b)) => (a.0, a.1, a.2) == (b.0, b.1, b.2) && (a.3 - b.3).abs() <= 1e-9 * a.3.abs().max(b.3.abs()),
+                (Some(a), Some(b)) => (a.0, a.1, a.2) == (b.0, b.1, b.2) && (a.3 - b.3).abs() <= 1e-6 * a.3.abs().max(b.3.abs()),
                 _ => a.is_none() && b.is_none(),
             };
             if let Some(dump) = std::env::var_os("NOSHAPE_BREP_ALWAYS") {
