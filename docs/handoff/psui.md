@@ -49,8 +49,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   run. the_pointer_lights_the_line_...: no Windows log of it yet (release/v0.4.68 run 45375844269 still running 13:3x).
 - FEEL-EDIT-BODY-SHADE region (live 2nd capture psui/edit-body-shade-1124): test held in
   /root/psui-scratch/region-test.rs (paste before "A selected edge of a selected face" in hover_matrix_tests.rs). Ours:
-  the front matches; the right face is (3,7,10) darker missed and through the region. The preview light fits (k 1.41 vs
-  1.435), so look at the model-before's 0.3 behind the right face (default planes' extent? ours vs live's doc).
+  the front matches; the right face is (3,7,10) darker missed and through the region; TICKETS row has the 230 fit and
+  why a light change alone doesn't close it. Next step: ours at slider 1 and 0 vs a live capture at slider 1 (request).
 - qa's newest hover-matrix score: /root/qa-scratch/hm2/score-a910/sc8.txt (11-24 10:37, green a9107b3a9); ascii maps
   with score-a910/bin/ascii.py; inf.py for the end dot. ps-arc/linemid-hovered and b1-mid-hovered are single-jump cells
   (not scored); b4-as-*-selhover blue = asm's FEEL-ASM-MOVE-RING-RIMS.
