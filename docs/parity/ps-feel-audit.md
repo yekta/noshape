@@ -13,13 +13,16 @@ Scripts and per-section verdicts: psui's scratch `audit/` (scan.py, triage.tsv).
 | covered before, cited by a test | 72 |
 | covered before, by a test that doesn't cite it | 70 |
 | **covered before** | **142** |
-| added in this audit | 11 |
-| **covered after** | **153** |
-| still without a test | 11 |
+| added in batch 1 | 11 |
+| added in batch 2 | 6 |
+| **covered after** | **159** |
+| still without a test | 5 |
 
 New tests: `part-studio-ui/src/part_studio/ps_audit_feel_tests.rs` (`audit::`), one row in the navigation matrix and
 one in the feature-list matrix. The audit found no behaviour of ours off live: every new test passed once its fixture
 was right (the app only gained debug selectors for the tests: the list title, the dialog ✕, the view cube, a Loft entry's ›).
+Batch 2 found the analysis panels 3 px above the feature dialogs' corner (y 36, live 39 like the dialogs) and the empty
+Dihedral panel 288 px high (live 226: its rows touch, the ? sits beside the slider); both fixed.
 
 ## Added in this audit
 
@@ -36,19 +39,19 @@ was right (the app only gained debug selectors for the tests: the list title, th
 | 23828 | qa (2026-10-28, P2) feature dialog ✓ state with a required field still empty (Revolve without axis, Mirror wit | audit::a_fillets_ok_is_off_until_a_pick_and_stays_on_after_the_chip_goes |
 | 23893 | qa (2026-10-28, P3) ✓ after the last selection is removed: stays enabled (request 1575) | audit::a_fillets_ok_is_off_until_a_pick_and_stays_on_after_the_chip_goes |
 | 33225 | psui (2026-11-03 15:05, P2) preselected edge into Fillet: a click on the edge's midpoint doesn't carry into Fi | audit::a_preselected_edge_carries_into_fillet_its_midpoint_does_not |
+| 5218 | Panels vs feature dialogs at the top-left (ui 10-21, lead) | audit::a_new_sketch_keeps_the_isolate_panel_and_closes_tool_panels (batch 2) |
+| 5258 | Input behaviour outside feature dialogs (ui 10-21, lead) | audit::analysis_panel_number_fields_commit_as_live (batch 2) |
+| 18585 | psui (10-27, PANEL-BLEED follow-up) default dialog position: the analysis panel sits on top of the feature dialog | audit::the_analysis_panel_opens_on_the_feature_dialogs_corner (batch 2; fixed: top 3 px, Dihedral 226 high) |
+| 21717 | psui (2026-10-27, P3) MENU-TRUNCATE: long feature names in context menus (request 1509) | audit::a_long_feature_name_keeps_its_menu_250_px_wide_with_one_line_rows (batch 2) |
+| 23319 | qa (2026-10-28) Part Studio empty-space right-click › Show all / Show all parts (request 1562) | audit::show_all_shows_sketches_planes_and_parts_show_all_parts_only_the_parts (batch 2) |
+| 37222 | psui (2212): Camera menu's disabled rows, the start tab rule, and Ruled surface's cubic interpolation default | audit::the_camera_menu_greys_no_row_not_even_previous_view_at_a_start (batch 2) |
 
 ## Still without a test (next batches)
 
 | behaviours.md line | spec | test / note |
 |---|---|---|
-| 5218 | Panels vs feature dialogs at the top-left (ui 10-21, lead) | panel positions vs dialogs: no position test |
-| 5258 | Input behaviour outside feature dialogs (ui 10-21, lead) | analysis panel number fields (Zebra stripe count, Draft minimum angle): no test |
 | 6364 | Hole dialog: Counterbore / Countersink icon rows (qa5 ADV4, 10-21) | Hole icon rows look |
-| 18585 | psui (10-27, PANEL-BLEED follow-up) default dialog position: the analysis panel sits on top of the feature dia | analysis panel position over a dialog (x 246, covers 14 px) |
 | 18606 | spec: psui DCLICK-HEAVY double-click on a feature row of a heavy part (live 10-27; TICKETS P1 DCLICK-HEAVY) | DCLICK-HEAVY latency on a heavy part |
 | 19497 | spec: psui p1-dialogs.md long checkbox labels: live text widths and truncation | checkbox label widths: look spec |
 | 19949 | psui (10-27) Delete part preview: outline and ghost at slider rest, 0 and 1 | Delete part preview look (silhouette only) |
-| 21717 | psui (2026-10-27, P3) MENU-TRUNCATE: long feature names in context menus (request 1509) | context menu 250 px max width / ellipsis: implemented (os_menu max_w 250), no test |
 | 21819 | qa (2026-10-27, P2) PREVIEW-SELF-PICK: hovering / clicking a feature's own preview geometry (request 1510) | preview self-pick (hover resolves pre-feature) |
-| 23319 | qa (2026-10-28) Part Studio empty-space right-click › Show all / Show all parts (request 1562) | Show all / Show all parts effect (menu order tested) |
-| 37222 | psui (2212): Camera menu's disabled rows, the start tab rule, and Ruled surface's cubic interpolation default | Camera menu disabled rows: no test |

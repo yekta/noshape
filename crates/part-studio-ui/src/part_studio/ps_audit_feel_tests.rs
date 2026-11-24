@@ -263,3 +263,193 @@ fn a_loft_profiles_expander_opens_its_field_as_the_active_one(cx: &mut TestAppCo
     let item = |k: usize| Some(format!("sheetProfilesArray.{k}.sheetProfileEntities"));
     assert_eq!((profiles, got), (2, vec![(item(0), 1), (item(1), 2), (item(1), 1)]), "(profiles, (active field, items open) after › on 1, › on 2, ⌄ on 1)");
 }
+
+/// Live 10-28 (request 1562): with Sketch 1, the Top plane and the part hidden, the empty-space menu's Show all brings
+/// back all three; Show all parts (from the same setup) brings back only the part.
+#[gpui::test]
+fn show_all_shows_sketches_planes_and_parts_show_all_parts_only_the_parts(cx: &mut TestAppContext) {
+    let mut got = Vec::new();
+    for item in ["Show all", "Show all parts"] {
+        let (window, view, _, _) = block_part(cx, &format!("audit-show-all-{}", item.len()));
+        let refs = cx.update(|cx| {
+            let d = &view.read(cx).display;
+            let sketch = Reference::Feature(d.sketches.iter().find(|s| s.name == "Sketch 1").expect("Sketch 1").feature);
+            let top = d.planes.iter().find(|p| p.name == "Top").expect("Top").reference.clone();
+            let part = Reference::Body(d.bodies.first().expect("the part").id.clone());
+            vec![sketch, top, part]
+        });
+        cx.update(|cx| view.update(cx, |v, cx| v.set_visibility(&refs, true, cx)));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.first().is_some_and(|b| b.hidden));
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(None, gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+        let sel: &'static str = Box::leak(format!("menu:{item}").into_boxed_str());
+        assert!(click_on(cx, window, sel), "no {item} row");
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.first().is_some_and(|b| !b.hidden));
+        draw(cx, window);
+        let shown = cx.update(|cx| {
+            let v = view.read(cx);
+            let d = &v.display;
+            let sketch = d.sketches.iter().find(|s| s.name == "Sketch 1").is_some_and(|s| !s.hidden) && v.opts.show_sketches;
+            let top = d.planes.iter().find(|p| p.name == "Top").is_some_and(|p| !p.hidden) && v.opts.show_planes;
+            let part = d.bodies.first().is_some_and(|b| !b.hidden);
+            (sketch, top, part)
+        });
+        got.push((item, shown));
+    }
+    assert_eq!(got, vec![("Show all", (true, true, true)), ("Show all parts", (false, false, true))], "(Sketch 1, Top, Part 1) shown after each");
+}
+
+/// Live 10-27 (MENU-TRUNCATE, request 1509): with Extrude 1 renamed "Linear pattern with a very long name 1", an
+/// edge menu is at most 250 px wide and the rows naming it (Edit, Show dependencies of, Delete) stay one 22 px line,
+/// cut with "…", never wrapped.
+#[gpui::test]
+fn a_long_feature_name_keeps_its_menu_250_px_wide_with_one_line_rows(cx: &mut TestAppContext) {
+    let long = "Linear pattern with a very long name 1";
+    let doc = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0.0, 0.0], [20.0, 20.0]] }] },
+        { "type": "extrude", "name": long, "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+    ] });
+    let (window, view) = part_studio_from(cx, "audit-menu-truncate", Some(doc));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.len() == 1);
+    draw(cx, window);
+    let edge = cx.update(|cx| view.read(cx).display.bodies.first().and_then(|b| b.edge_refs.first().cloned())).expect("an edge of the part");
+    let target = noshape_scene::builder::PickTarget { reference: edge, kind: noshape_scene::builder::PickKind::Edge, anchor: None };
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_context_menu(Some(target), gpui_kit::point(px(600.), px(400.)), w, cx))).unwrap();
+    draw(cx, window);
+    let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+    let naming: Vec<&String> = labels.iter().filter(|l| l.contains(long)).collect();
+    assert!(naming.len() >= 3, "rows naming the feature: {labels:?}");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    // (label, row width, row height): the rows fill the menu less its 1 px borders (live 248 in 250).
+    let rows: Vec<(String, f32, f32)> = naming.iter().map(|l| {
+        let b = vcx.debug_bounds(Box::leak(format!("menu:{l}").into_boxed_str()));
+        ((*l).clone(), b.map_or(0., |b| f32::from(b.size.width)), b.map_or(0., |b| f32::from(b.size.height)))
+    }).collect();
+    assert!(rows.iter().all(|(_, w, h)| *w > 0. && *w <= 248.5 && (*h - 22.).abs() < 0.5), "rows {rows:?}, live 248 wide (menu 250 at most), 22 high (one line)");
+}
+
+/// Live 2212 (11-07): the view cube's Camera menu has no greyed row, Previous view included, in a freshly opened Part
+/// Studio (no view change yet) and with a part selected.
+#[gpui::test]
+fn the_camera_menu_greys_no_row_not_even_previous_view_at_a_start(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "audit-camera-menu");
+    let part = cx.update(|cx| Reference::Body(view.read(cx).display.bodies.first().expect("the part").id.clone()));
+    let mut wrong = Vec::new();
+    for (case, selection) in [("at a start", vec![]), ("a part selected", vec![part])] {
+        cx.update(|cx| view.update(cx, |v, _| v.selection = selection));
+        assert!(click_on(cx, window, "camera-menu"), "no camera menu button");
+        let state = cx.update(|cx| crate::os_menu::ui_state(cx)).expect("the camera menu open");
+        let rows: Vec<String> = serde_json::from_value(state["rows"].clone()).unwrap_or_default();
+        let flags: Vec<bool> = serde_json::from_value(state["disabled"].clone()).unwrap_or_default();
+        let greyed: Vec<&String> = rows.iter().zip(&flags).filter(|(_, d)| **d).map(|(r, _)| r).collect();
+        if !rows.iter().any(|r| r == "Previous view") || !greyed.is_empty() {
+            wrong.push(format!("{case}: greyed {greyed:?} of {rows:?}"));
+        }
+        keys(cx, window, &["escape"]);
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+/// Live 10-27 (PANEL-BLEED follow-up): over a new Revolve at its default place, Shift+D's Dihedral panel opens at the
+/// same top-left corner and width (220), 226 high (empty), shorter than the dialog, so the Revolve's bottom rows stay visible.
+#[gpui::test]
+fn the_analysis_panel_opens_on_the_feature_dialogs_corner(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "audit-panel-corner");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("revolve", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    keys(cx, window, &["shift-d"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let dialog = vcx.debug_bounds("feature-dialog").expect("the Revolve dialog");
+    let panel = vcx.debug_bounds("analysis-tool").expect("the Dihedral panel");
+    let corner = |b: Bounds<gpui_kit::Pixels>| (f32::from(b.origin.x).round(), f32::from(b.origin.y).round(), f32::from(b.size.width).round());
+    assert_eq!(corner(panel), corner(dialog), "(x, y, width) of the panel and the dialog");
+    assert_eq!((f32::from(panel.size.width).round(), f32::from(panel.size.height).round()), (220., 226.), "the empty Dihedral panel's size");
+}
+
+/// Live 10-21 (ui, "Input behaviour outside feature dialogs"): Zebra's Stripe count takes a bare integer only ("20"
+/// stays "20"; "1 in", "1+1" and "abc" are invalid); Draft analysis's Minimum draft angle appends its unit ("5" ->
+/// "5 deg", "1+1" -> "(1+1) deg"), keeps another unit as typed ("0.1 rad") and marks "abc" invalid.
+#[gpui::test]
+fn analysis_panel_number_fields_commit_as_live(cx: &mut TestAppContext) {
+    use crate::part_studio::analysis_tools::ToolKind;
+    let (window, view, _, _) = block_part(cx, "audit-panel-fields");
+    let commit = |cx: &mut TestAppContext, field: &Entity<crate::quantity_field::QuantityInput>, text: &str| {
+        cx.update_window(window, |_, w, cx| {
+            field.update(cx, |q, cx| {
+                q.state().update(cx, |s, cx| s.set_value(text.to_string(), w, cx));
+                q.commit_now(w, cx);
+            })
+        })
+        .unwrap();
+        cx.update(|cx| (field.read(cx).text().to_string(), field.read(cx).value().is_some()))
+    };
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_analysis_tool(ToolKind::Zebra, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let stripes = cx.update(|cx| view.read(cx).ui.analysis_tool.as_ref().and_then(|t| t.inputs().first().cloned())).expect("Stripe count");
+    let mut got = Vec::new();
+    for text in ["20", "1 in", "1+1", "abc"] {
+        got.push(("Stripe count", text, commit(cx, &stripes, text)));
+    }
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_draft(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let angle = cx.update(|cx| view.read(cx).ui.draft.as_ref().map(|d| d.angle_input().clone())).expect("Minimum draft angle");
+    for text in ["5", "0.1 rad", "1+1", "abc"] {
+        got.push(("Minimum draft angle", text, commit(cx, &angle, text)));
+    }
+    let s = |t: &str| t.to_string();
+    let want = vec![
+        ("Stripe count", "20", (s("20"), true)),
+        ("Stripe count", "1 in", (s("1 in"), false)),
+        ("Stripe count", "1+1", (s("1+1"), false)),
+        ("Stripe count", "abc", (s("abc"), false)),
+        ("Minimum draft angle", "5", (s("5 deg"), true)),
+        ("Minimum draft angle", "0.1 rad", (s("0.1 rad"), true)),
+        ("Minimum draft angle", "1+1", (s("(1+1) deg"), true)),
+        ("Minimum draft angle", "abc", (s("abc"), false)),
+    ];
+    assert_eq!(got, want, "(field, typed, (text after Enter, valid))");
+}
+
+/// Live 10-21 (ui, "Panels vs feature dialogs at the top-left"): Isolate is a mode panel, it stays open under a new
+/// Sketch's dialog and after its cancel; Mass properties and Named views are tool panels, starting the sketch closes them
+/// and they don't come back after the cancel.
+#[gpui::test]
+fn a_new_sketch_keeps_the_isolate_panel_and_closes_tool_panels(cx: &mut TestAppContext) {
+    let mut got = Vec::new();
+    for panel in ["Isolate", "Mass properties", "Named views"] {
+        let (window, view, _, _) = block_part(cx, &format!("audit-panels-{}", panel.len()));
+        let part = cx.update(|cx| Reference::Body(view.read(cx).display.bodies.first().expect("the part").id.clone()));
+        cx.update(|cx| view.update(cx, |v, _| v.selection = vec![part.clone()]));
+        match panel {
+            "Isolate" => keys(cx, window, &["shift-i"]),
+            "Mass properties" => cx.update(|cx| view.update(cx, |v, cx| v.open_mass(cx))),
+            _ => cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_named_views(w, cx))).unwrap(),
+        }
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let open = |cx: &mut TestAppContext| {
+            draw(cx, window);
+            cx.update(|cx| {
+                let v = view.read(cx);
+                match panel {
+                    "Isolate" => v.ui.isolate.is_some(),
+                    "Mass properties" => v.show_mass,
+                    _ => v.named_views.is_some(),
+                }
+            })
+        };
+        let before = open(cx);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            v.selection.clear();
+            v.start_feature("sketch", w, cx);
+        }))
+        .unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let sketching = open(cx);
+        cx.update(|cx| view.update(cx, |v, cx| v.sketch_cancel(cx)));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+        got.push((panel, before, sketching, open(cx)));
+    }
+    assert_eq!(got, [("Isolate", true, true, true), ("Mass properties", true, false, false), ("Named views", true, false, false)], "(panel, open before, during the new sketch, after its cancel)");
+}

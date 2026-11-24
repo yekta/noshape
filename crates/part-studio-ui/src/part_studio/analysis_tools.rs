@@ -177,6 +177,14 @@ pub struct AnalysisTool {
     pub dim: bool,
 }
 
+impl AnalysisTool {
+    /// Its number fields (Zebra: Stripe count).
+    #[cfg(test)]
+    pub(crate) fn inputs(&self) -> &[Entity<QuantityInput>] {
+        &self.tolerance_inputs
+    }
+}
+
 /// Selections of each tool, kept for the next time it opens.
 #[derive(Default)]
 pub struct ToolMemory {
@@ -1190,6 +1198,8 @@ impl PartStudioView {
             v_flex()
                 .id(id)
                 .min_h(px(26.))
+                // Live: the empty caption (6 + 13.33 + 5) overflows its 24 px box rather than growing the field.
+                .when(empty, |d| d.h(px(26.)).overflow_hidden())
                 .rounded(px(2.))
                 .border_1()
                 .border_color(if active { pal.accent } else { gpui_kit::rgb(0xd7d7d7) })
@@ -1204,7 +1214,10 @@ impl PartStudioView {
                     cx.notify();
                 }))
         };
-        let mut body = v_flex().p(px(4.)).gap(px(6.));
+        // Live 10-27 (dom/psui-dihedral-panel.json): Dihedral's rows touch, the field 5 px under the header, Units 5 px
+        // under the field; the panel 226 high when empty.
+        let dihedral = kind == ToolKind::Dihedral;
+        let mut body = if dihedral { v_flex().px(px(3.)).pt(px(5.)).pb(px(5.)) } else { v_flex().p(px(4.)).gap(px(6.)) };
         if kind == ToolKind::Deviation {
             // Curve | Surface tabs.
             let tab = |label: &'static str, surface: bool, on: bool, cx: &mut Context<Self>| {
@@ -1469,9 +1482,9 @@ impl PartStudioView {
                 };
                 if let Some((sel, _)) = &t.units {
                     sel.update(cx, |s, _| s.set_items(vec![("RADIAN".into(), "Radians".into()), ("DEGREE".into(), "Degrees".into())], if o.radians { "RADIAN" } else { "DEGREE" }));
-                    body = body.child(h_flex().h(px(28.)).text_size(px(12.)).child(div().w(px(29.)).flex_none().text_color(muted).child("Units")).child(div().w(px(156.)).child(sel.clone())));
+                    body = body.child(h_flex().mt(px(5.)).h(px(28.)).text_size(px(12.)).child(div().w(px(29.)).flex_none().text_color(muted).child("Units")).child(div().w(px(156.)).child(sel.clone())));
                 }
-                body = body.child(readout("Max", hi)).child(readout("Min", lo)).child(check("at-thr", "Enable threshold display", o.threshold, |o, v| o.threshold = v, cx));
+                body = body.child(readout("Max", hi)).child(readout("Min", lo)).child(h_flex().h(px(27.)).child(check("at-thr", "Enable threshold display", o.threshold, |o, v| o.threshold = v, cx)));
                 if o.threshold {
                     for (i, (icon, label)) in [("dihedral-high", "High threshold"), ("dihedral-low", "Low threshold")].into_iter().enumerate() {
                         let Some(st) = t.tolerance_inputs.get(i) else { continue };
@@ -1491,7 +1504,11 @@ impl PartStudioView {
         // Live: Interference detection has no Scale slider (dom/dialog-interference-*.txt).
         // Live (Dihedral, 10-27): "Scale" on its own row over the slider.
         if kind == ToolKind::Dihedral {
-            body = body.child(div().pt(px(6.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Scale")).child(div().w_full().child(Slider::new(&t.slider)));
+            // Live: "Scale" 23 px high (5 px padded), the 195 × 18 slider 7 px under it with the help ? at its right.
+            let help = div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xa0a0a0)));
+            body = body
+                .child(div().mt(px(1.)).h(px(23.)).pt(px(5.)).px(px(2.)).text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child("Scale"))
+                .child(h_flex().mt(px(7.)).h(px(18.)).pl(px(2.)).child(div().w(px(195.)).flex_none().child(Slider::new(&t.slider))).child(div().flex_1()).child(help));
         } else if !matches!(kind, ToolKind::Connection | ToolKind::Flatten | ToolKind::Interference) && !kind.is_view_mode() {
             // Live (18): Curve/surface analysis calls its slider "Comb size".
             let label = if kind == ToolKind::CurveSurface { "Comb size" } else { "Scale" };
@@ -1514,10 +1531,12 @@ impl PartStudioView {
             let size = self.viewport.read(cx).size();
             (((size.x as f32) - 441.).max(0.), ((size.y as f32) - 202.).max(0.))
         } else {
-            (0., 0.)
+            // Live 10-27 (PANEL-BLEED): on the feature dialog's corner, 3 px under the graphics' top (page 246, 79).
+            (0., 3.)
         };
         let dialog = v_flex()
             .id("analysis-tool")
+            .debug_selector(|| "analysis-tool".into())
             .occlude()
             .absolute()
             .top(px(top))
@@ -1568,13 +1587,13 @@ impl PartStudioView {
                     ),
             )
             .child(body)
-            // The help row every analysis dialog ends with: 22 px, a 14 px
+            // The help row every analysis dialog but Dihedral ends with: 22 px, a 14 px
             // `?` 4 px in from the right (dialog-help-container).
             // Interference detection, model changed while open (live psb 10-19 i):
             // a 26 px row with a 26 px ↻ button at the left ("Interference
             // detection not accurate, instances have moved."); the old result
             // stays until it is clicked.
-            .child(
+            .when(!dihedral, |d| d.child(
                 h_flex()
                     .h(px(if stale { 26. } else { 22. }))
                     .pl(px(3.))
@@ -1600,7 +1619,7 @@ impl PartStudioView {
                     })
                     .child(div().flex_1())
                     .child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xa0a0a0)))),
-            )
+            ))
             .into_any_element();
         let mut out = vec![dialog];
         // "Min: …" / "Max: …" beside the deviation lines; the scale slider

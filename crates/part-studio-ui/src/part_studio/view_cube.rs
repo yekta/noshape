@@ -138,6 +138,6 @@ impl PartStudioView {
                 crate::os_menu::open_anchored(at, Anchor::TopRight, menu, window, cx);
             }));
         // Live (part-studio/21): the tooltip sits left of the button.
-        crate::ui::with_tip(div().id("camera-menu-tip").child(button), "Camera and render options", crate::ui::TipSide::Left).into_any_element()
+        crate::ui::with_tip(div().id("camera-menu-tip").debug_selector(|| "camera-menu".into()).child(button), "Camera and render options", crate::ui::TipSide::Left).into_any_element()
     }
 }

@@ -33,6 +33,11 @@ impl DraftState {
     pub(super) fn angle_text(&self, cx: &App) -> String {
         self.angle_input.read(cx).text().to_string()
     }
+
+    #[cfg(test)]
+    pub(crate) fn angle_input(&self) -> &Entity<QuantityInput> {
+        &self.angle_input
+    }
 }
 
 impl PartStudioView {
