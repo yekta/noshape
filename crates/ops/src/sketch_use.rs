@@ -216,14 +216,26 @@ pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cur
         Reference::Implicit { on, inference: Inference::Center | Inference::CenterRim | Inference::CenterOutward } if matches!(**on, Reference::Edge(_)) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) if model.curved_face(r) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) => {
-            let mut changed = false;
-            for er in model.edge_refs(r) {
-                changed |= external_entity(data, model, world_per_px, cursor, &er, false, false).is_some();
-            }
-            changed
+            let made: Vec<EntityId> = model.edge_refs(r).iter().filter_map(|er| external_entity(data, model, world_per_px, cursor, er, false, false)).collect();
+            join_loop_ends(data, &made);
+            !made.is_empty()
         }
         _ => false,
     }
+}
+
+/// A used face's edges meet in COINCIDENTs, each end with an earlier edge's end at its place (live sketch-tools-1123:
+/// a rectangle's loop stores one per corner).
+fn join_loop_ends(data: &mut SketchData, curves: &[EntityId]) {
+    let ends: Vec<(EntityId, DVec2)> = curves.iter().filter_map(|c| data.sketch.endpoints(*c)).flat_map(|(s, e)| [s, e]).filter_map(|p| Some((p, data.sketch.point(p)?))).collect();
+    let mut joined: Vec<EntityId> = Vec::new();
+    for (i, (p, at)) in ends.iter().enumerate() {
+        let Some((q, _)) = ends[..i - i % 2].iter().find(|(q, there)| !joined.contains(q) && (*there - *at).length() <= 1e-6) else { continue };
+        if data.sketch.add_constraint(noshape_sketch::ConstraintKind::Coincident { a: *q, b: *p }).is_ok() {
+            joined.extend([*p, *q]);
+        }
+    }
+    data.sketch.solve();
 }
 
 /// What the Use tool reports when nothing could be used.

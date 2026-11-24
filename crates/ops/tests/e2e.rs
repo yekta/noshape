@@ -819,6 +819,10 @@ fn sketch_use_intersection_and_model_references() {
     let lines = created(&used, "line");
     assert_eq!(lines.len(), 4, "{used}");
     assert!(lines.iter().all(|l| l["external"] == true), "{used}");
+    // The loop's corners meet in one COINCIDENT each (live sketch-tools-1123); the sketch stays fully defined.
+    let got = call(&mut ctx, "sketch_get", json!({ "sketch": s2 }));
+    let coincident = got["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Coincident").count();
+    assert_eq!((coincident, got["status"].as_str()), (4, Some("fully defined")), "{got}");
     // Used again: another, coincident copy of each edge (live sketch-tools-1123, DECISIONS 11-23).
     let again = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [top.clone()] }));
     assert_eq!(created(&again, "line").len(), 4, "{again}");
