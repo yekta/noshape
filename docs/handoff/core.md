@@ -30,6 +30,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   multi-turn strip on an OCCT cylinder checks UnorientableShape (status 27) -> not doable in exact_helical_cylinders;
   left. DRIVEN-PATTERN-SWEEP routing curve start: live capture has only bbox/volume, no rule found; left.
   ERR-LOFT-GUIDES-EMPTY tip order: one capture, no rule.
+- MANUALBLEND-BOUNDARY1 (lead: next, 11-24): importer limit, not product (TICKETS note): Intersect links need 1 um, ours
+  0.054 mm off from Loft 1 drift -> Beziers left at live's place, fill fails. Asked lead whether to loosen use_projected.
 - Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
   5072.2167 mm2, ours a plate 5017.6. k::edges_on_faces (boolean.cpp: all edges copied once, each face's surface made
