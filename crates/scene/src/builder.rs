@@ -2461,9 +2461,6 @@ type BoundarySide = (usize, glam::Vec3, [f32; 3], [f32; 3]);
 /// An edge by its quantized end points.
 type EdgeKey = ([i64; 3], [i64; 3]);
 
-/// The boundary of a triangulated region: the triangle edges used once
-/// (vertices matched by position, so split meshes work too).
-/// Points of an outline where it turns (not along a straight run).
 /// The outline's corners: a sketch curve's end on it, or a turn of more than 60° (a tessellated circle's vertices,
 /// turning a few degrees each, are none: live errors-1123's depth-0 circle keeps its red outline whole).
 fn outline_corners(segs: &[([f32; 3], [f32; 3])], ends: &[glam::Vec3]) -> Vec<[f32; 3]> {
@@ -2478,6 +2475,8 @@ fn outline_corners(segs: &[([f32; 3], [f32; 3])], ends: &[glam::Vec3]) -> Vec<[f
     dirs.into_values().filter(|(p, ds)| ds.len() == 2 && (ds[0].dot(-ds[1]) < 0.5 || at_end(p))).map(|(p, _)| p).collect()
 }
 
+/// The boundary of a triangulated region: the triangle edges used once
+/// (vertices matched by position, so split meshes work too).
 fn region_outline(positions: &[[f32; 3]], indices: &[u32]) -> Vec<([f32; 3], [f32; 3])> {
     let q = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
     // Edge (quantized ends) -> (uses, ends).

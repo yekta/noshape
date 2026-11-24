@@ -1560,6 +1560,7 @@ impl PartStudioView {
         extra.extend(self.measure_overlay());
         if !on_handle {
             extra.extend(self.midpoint_overlay(cx));
+            extra.extend(self.vertex_band_piece(&selection, cx));
         }
         extra.extend(self.shown_dims_overlay(cx));
         extra.extend(self.hole_callout_overlay(cx));

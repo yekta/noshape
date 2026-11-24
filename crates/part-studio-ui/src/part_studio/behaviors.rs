@@ -4123,6 +4123,26 @@ impl PartStudioView {
         Some(LineSegment { a: (m - half).as_vec3().into(), b: (m + half).as_vec3().into(), color, pick_id, width: 5.0, style: LineSegment::CORE | LineSegment::ON_TOP })
     }
 
+    /// A hovered vertex at a selected edge's end: that edge's band again over the vertex's disc, 6 px from it along
+    /// the edge (live ps-owner-matrix-1124: the selected band orange across a quarter of the 11 px disc).
+    pub(super) fn vertex_band_piece(&self, selection: &[Reference], cx: &App) -> Option<noshape_render::Instance> {
+        use noshape_render::{Drawable, Instance, LineData, LineSegment};
+        let vertex @ Reference::Vertex(_) = self.hover.as_ref()? else { return None };
+        let body = self.display.bodies.iter().filter(|b| !b.hidden).find(|b| b.vertex_refs.contains(vertex))?;
+        let p = glam::Vec3::from(*body.vertex_refs.iter().position(|v| v == vertex).and_then(|i| body.mesh.vertices.get(i))?);
+        let (edge, dir) = body.edge_refs.iter().zip(&body.mesh.edges).filter(|(e, _)| selection.contains(e)).find_map(|(e, line)| {
+            let (first, last) = (glam::Vec3::from(*line.first()?), glam::Vec3::from(*line.last()?));
+            let next = if first.distance(p) < 1e-6 { line.get(1) } else if last.distance(p) < 1e-6 { line.get(line.len().checked_sub(2)?) } else { None };
+            Some((e, (glam::Vec3::from(*next?) - p).normalize_or_zero()))
+        })?;
+        let pick_id = *self.built.as_ref()?.picks.ids_for(edge).first()?;
+        let vp = self.viewport.read(cx);
+        let b = p + dir * (vp.camera.world_per_pixel(vp.size().y) * 6.0) as f32;
+        let band = LineSegment { a: p.into(), b: b.into(), color: [0, 0, 0, 255], pick_id, width: 5.0, style: LineSegment::ON_TOP };
+        // After the disc (layer 20).
+        Some(Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&LineData { segments: vec![band] }))).per_primitive_color().unpickable().ignore_clip().no_bounds().over_lines().layer(21))
+    }
+
     /// [`Self::midpoint_overlay`]'s points.
     pub(super) fn midpoint_sprites(&self, cx: &App) -> Vec<noshape_render::PointSprite> {
         use noshape_render::{LineSegment, PointSprite};

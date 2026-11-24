@@ -2813,6 +2813,17 @@ fn sk_the_line_tool_keeps_an_acquired_point_lit_along_its_levels(cx: &mut TestAp
     assert!(got.iter().all(|g| !g.ends_with('✗')), "{got:#?}");
 }
 
+// A vertex hovered with its edge selected: the 11 px hover disc, the selected band orange (#F8A818) over a quarter of
+// it (28 px), from the centre towards the edge; ours drew the disc over every line.
+#[gpui::test]
+fn a_hovered_vertex_on_its_selected_edge_keeps_the_band_over_its_disc(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let in_disc = |c: &[[u8; 3]]| (34..=46usize).flat_map(|y| (34..=46usize).map(move |x| (x, y))).filter(|&(x, y)| (x as f64 - 40.0).hypot(y as f64 - 40.0) <= 5.5 && close(c[y * 80 + x], 0xf8a818, 14)).count();
+    let (with, plain) = (in_disc(&cell(cx, VERTEX, State::HoveredWith(EDGE))), in_disc(&cell(cx, VERTEX, State::Hovered)));
+    println!("band orange in the disc: edge selected {with}, plain hover {plain} (live 28, 0)");
+    assert!((15..=45).contains(&with) && plain <= 3, "band orange in the hover disc: with its edge selected {with} (live 28), plain {plain}");
+}
+
 /// Live errors-1123: an Extrude of depth 0 draws its circle region pale red with a whole red (189, 48, 57) outline,
 /// edited or created; no grey corner dot along the circle (a tessellated circle has no corners).
 #[gpui::test]
