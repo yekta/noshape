@@ -33,6 +33,17 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     concave edge, both ends on a piece's ends, tangent to it): 8 pieces + 2 arcs + 2 smooth edges -> rolling balls fail
     at blend_section rolling_ball's det ~ 0 ("tangent"): the arc lies on the groove's own 0.5 mm round, the ball is
     0.5 mm too, so it sits in it (degenerate contact). Live needs a vertex blend / setback there; not rolling balls.
+- **NEXT: concave balls (20:55)** /root/core-scratch/run/f2-cball.patch (apply on main): blend's ZZ_CBALL (blend-cusp
+  5a299e6fc..429750f98, diff in /root/core-scratch/run/cusp.diff) ported minimal: BallEdge.convex, a thread-local
+  with_concave_balls (concave balls on flipped supports, tools fused), new detail.rs arm after rolling_ball_blend
+  (ZZ_NOCBALL=1 turns it off for A/B). NOT ported yet: the vanishing concave ends (cusp.diff hunk @@ -2257: stations
+  packed to the end + the end point as a vertex section; main's secs[lead..lead+n+1] slice needs adapting).
+  A/B same build (.sc1ab.sh): fixes 9cbb0e Fillet 2, 6 and 2d82a0 Fillet 7, 21, 31, 37; breaks 9cbb0e Fillet 25
+  (missing edges), Chamfer 6 -> warning, 2d82a0 Fillet 39 + its Sketch 24/25 cascade. 9cbb0e Fillet 2 vs live
+  (.scp.sh <tab> <F> <parts>; live studios/9cbb0e*.live.jsonl in vibex7 ~/parity/models/asm-scissor-lift): Lower
+  Linkage exact (18/46/28, 10295.869); Upper Linkage ours 27/67/40 14783.643 mm3 6220.18 mm2, live 24/60/36
+  14783.448 6210.83 -> 3 extra faces (likely the concave tools' abrupt ends): port the vanishing ends, recheck.
+  Scripts (core-rf, untracked): .scf.sh <tab> "<F>" [nobuild] (build + debug block), .sc1.sh, .sc1ab.sh, .scp.sh.
 - Rocker P0 (lead 20:00): skasm's ab958b87b (Bend split-piece naming) broke the corpus c2-sm-rocker-enclosure-sm
   from Bend 2 on ("Select a planar sheet metal face."); reverted (d101fff85, in bad9c09e). Repro: .rk2.sh [build]
   (corpus doc vibex7 ~/qa/corpus, release CLI). Unused: /root/core-scratch/run/planar-fix.patch (drop_filtered_picks
