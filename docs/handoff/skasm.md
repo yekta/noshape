@@ -4,7 +4,7 @@ Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## NOW (11-24 20:00) — read first
-- LEAD TASK (in progress): docs/parity/sketch-feel-audit.md Open list, tests + fixes, land in batches. Done in the
+- LEAD TASK (in progress): sketch-feel-audit Open list. QUEUED 8f1f3c71 (audit batch, regions fix) + offset-iso batch after it. Done in the
   worktree (uncommitted, verified on vibex6 tb2/tb3): the Added list's tests, regions free-end join 0.25 µm / T-end
   1.5e-8 (FREE_END_JOIN / T_END_JOIN in sketch regions.rs), probes-4 T1 test. Running: tb4 (cancel → toast → Restore,
   tool shortcut toggles). Then commit in pieces, land.sh. Next: rest of the Sketch mode (116) per-item pass (behaviours
