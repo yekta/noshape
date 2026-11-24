@@ -320,6 +320,8 @@ enum State {
     Selected,
     SelectedHovered,
     HoveredOtherSelected,
+    /// Hovered with this point's entity selected (live ps-owner-matrix-1124: its owner or a part of it).
+    HoveredWith([f64; 3]),
     /// The pointer comes along the edge from 6 mm away onto its midpoint.
     Arrived,
     ArrivedOnSelectedEdge,
@@ -368,6 +370,16 @@ fn cell_in(cx: &mut TestAppContext, edit: bool, target: [f64; 3], state: State) 
             let other = m.screen(cx, if target[0] > 50. { SKETCH_OTHER } else { [40., 15., 10.] });
             m.pointer.move_to(cx, &m.view, other);
             m.pointer.click(cx, &m.view, other);
+            m.park(cx);
+            m.pointer.move_to(cx, &m.view, p);
+            rest(cx);
+        }
+        State::HoveredWith(at) => {
+            let q = m.screen(cx, at);
+            m.pointer.move_to(cx, &m.view, q);
+            rest(cx);
+            m.pointer.move_to(cx, &m.view, q);
+            m.pointer.click(cx, &m.view, q);
             m.park(cx);
             m.pointer.move_to(cx, &m.view, p);
             rest(cx);
@@ -2380,4 +2392,30 @@ fn a_dragged_triad_keeps_the_outline_and_an_opaque_part(cx: &mut TestAppContext)
     let mut vcx = gpui_kit::VisualTestContext::from_window(m.window, cx);
     let end = m.pointer.window_point(&mut vcx, grab + dir * 60.0);
     vcx.simulate_mouse_up(end, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::default());
+}
+
+/// The pixels across a lit edge's band: the column through `at` (crop px), 4 px each way.
+fn across(crop: &[[u8; 3]], at: DVec2) -> Vec<[u8; 3]> {
+    (at.y as usize - 4..=at.y as usize + 4).map(|y| crop[y * 80 + at.x as usize]).collect()
+}
+
+// Live ps-owner-matrix-1124: an edge hovered while its own face is selected draws its hover band with the face's
+// selected line under its core, #FFC06A all through (no dark edge line: the plain hover's core reads #D8B080..#C8A070).
+#[gpui::test]
+fn an_edge_hovered_on_its_selected_face_has_no_dark_core(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let c = cell(cx, EDGE, State::HoveredWith(FACE));
+    let col = across(&c, DVec2::new(40.0, 40.0));
+    assert!(col.iter().any(|p| close(*p, 0xffc06a, 8)) && !col.iter().any(|p| close(*p, 0xffa90a, 12) || (p[0] < 0xd8 && p[2] < 0x80)), "across the band {col:02x?}");
+}
+
+// A face hovered with one of its edges selected: that edge's band flat #F8A820, the face's hover line under its core
+// (at rest #D09018..#C88810 with the darker line through).
+#[gpui::test]
+fn a_selected_edge_on_its_hovered_face_is_a_flat_band(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let c = cell(cx, FACE, State::HoveredWith(EDGE));
+    let m = matrix_studio(cx, "hover-matrix-owner");
+    let col = across(&c, m.screen(cx, EDGE) - m.screen(cx, FACE) + DVec2::new(40.0, 40.0));
+    assert!(col.iter().any(|p| close(*p, 0xf8a820, 8)) && !col.iter().any(|p| p[0] < 0xe8 && p[2] < 0x30), "across the band {col:02x?}");
 }

@@ -1754,10 +1754,19 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             _ => silhouette.push(id),
         }
     }
+    // An edge lit itself on a lit face's boundary (LINED): its band's core over the face's line, not the dark edge
+    // (live ps-owner-matrix-1124: hovered on a selected face #FFC06A, selected on a hovered face #F8A820). A hovered
+    // edge keeps its hover colour (SELECTED left off: LINED alone means over a selected face's line).
     for (id, flag) in boundary {
         let own = scene.states.get(id as usize).copied().unwrap_or(0);
-        let lined = if own & flag & state::SELECTED != 0 { state::LINED } else { 0 };
-        scene.add_flag(id, if own & (state::HOVER | state::SELECTED | state::ERROR) != 0 { flag | lined } else { flag | state::OUTLINE });
+        let lit = state::HOVER | state::SELECTED;
+        let add = match (own & lit, flag & lit) {
+            (0, _) if own & state::ERROR == 0 => flag | state::OUTLINE,
+            (state::HOVER, state::SELECTED) => state::LINED,
+            (state::SELECTED, f) if f != 0 => flag | state::LINED,
+            _ => flag,
+        };
+        scene.add_flag(id, add);
     }
     for id in silhouette {
         scene.add_flag(id, state::OUTLINE);

@@ -1164,10 +1164,12 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     o.world = mix(wa, wb, t);
     o.style = l.style;
     o.across = side * half;
-    // A part edge's own highlight band (fs_line); 2: its core opaque, a selected edge of a selected face (LINED: the
-    // face's 2 px boundary over it, live sel-gestures-1122 ps-box-crossing-result).
-    o.core = select(0.0, select(1.0, 2.0, (st & LINED) != 0u), own_edge);
-    o.under = base;
+    // A part edge's own highlight band (fs_line); 2: on a lit face's boundary (LINED), its core at 78 % over the face's
+    // line instead of the dark edge: a selected face's #ffa90a (live sel-gestures-1122 ps-box-crossing-result, and a
+    // hovered edge: ps-owner-matrix-1124 #FFC06A), a hovered one's #ffc685 under a selected edge (#F8A820).
+    let lined = own_edge && (st & LINED) != 0u;
+    o.core = select(0.0, select(1.0, 2.0, lined), own_edge);
+    o.under = select(base, select(g.select.rgb, g.hover.rgb, (st & (HOVER | SELECTED)) == (HOVER | SELECTED)), lined);
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
 }
@@ -1214,7 +1216,8 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         let half = 2.5 * dpr;
         let col = linear_to_srgb(i.color.rgb);
         let rim = max(1.0, 0.6 * dpr);
-        if (a > half - rim || i.core > 1.5) { return vec4(col, i.color.a); }
+        if (a > half - rim) { return vec4(col, i.color.a); }
+        if (i.core > 1.5) { return vec4(col * 0.78 + linear_to_srgb(i.under) * 0.22, i.color.a); }
         // The plain line (1 CSS px, antialiased) under the core; none under a BAND line (style 1024).
         // Over a hovered face's boundary line (style 4096, LineSegment::OVER_LIT_FACE): the core at 78 % over that line's
         // #ffc685, uniform #ffaf25 (live b3/dlg-face-otherhover13).
@@ -1235,7 +1238,8 @@ fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
         let a = abs(i.across);
         let col = linear_to_srgb(i.color.rgb);
         let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
-        if (a > 2.5 * dpr - max(1.0, 0.6 * dpr) || i.core > 1.5) { return vec4(col, i.color.a); }
+        if (a > 2.5 * dpr - max(1.0, 0.6 * dpr)) { return vec4(col, i.color.a); }
+        if (i.core > 1.5) { return vec4(col * 0.78 + linear_to_srgb(i.under) * 0.22, i.color.a); }
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / (0.78 + edge), (0.78 + edge) * i.color.a);
     }
     return enc(i.color);
