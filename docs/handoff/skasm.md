@@ -3,7 +3,7 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 17:35) — read first
+## NOW (11-24 18:00) — read first
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
 - LEAD 15:30: I took over psui's re-land. a2341555 FAILED ops parity::filter_inner_loops_leaves_out_a_letters_counter
@@ -17,9 +17,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   live slowness. Line tool linger = inference acquisition (live line-linger-1124): DONE 5a3fb7c71 (scene track_acquired,
   ACQUIRED_KEEP_PX 6 / REACH 215; drawn as the single hover in mod.rs; test sk_the_line_tool_keeps_an_acquired_point_lit_
   along_its_levels; part-studio sketch:: 486 + scene 205 green). Land it with the stack above.
-- 17:35: stack (16 commits) QUEUED b99589dc 17:01. On top, NOT yet landed: 7e9bedfb7 (renderer: LineSegment::dash_from,
-  patterns run on along a polyline; construction circle dashed, T1 sk_a_construction_circle_is_dashed; psui told) +
-  35cf44304 (TICKETS SKT-DASHDOT-GUIDES annotated: re-measure the previews). land.sh them once b99589dc lands.
+- 18:00: stack (16 commits) QUEUED b99589dc 17:01 (checking 17:45). On top, NOT yet landed (land.sh once b99589dc
+  lands; rebase drops nothing else): 7e9bedfb7 renderer LineSegment::dash_from (patterns run on along a polyline;
+  construction circle dashed; psui told) + 35cf44304 TICKETS + f514ede02 handoff + Offset: picked curves show no badges
+  (FEEL-OFFSET-PREVIEW-LOOK, test a_tool_hides_a_hovered_lines_glyphs) + TICKETS annotation.
+- Lead 17:40: next = remaining sketch TICKETS rows (feel/hover/inference first) + rest of the audit; live re-measures
+  SKT-DASHDOT-GUIDES previews. REQUESTS skasm 11-24 ~18:00: Offset iso arrow direction / in-plane value / origin ring.
+  Rows 51-71 (SKT-*) mostly fixed by the landed stack: check each against its live note before closing; row 590
+  (perpendicular) fixed, waits on qa.
 - Live answers 11-24: construction dash = 46 px 4/6/30/6 from the line's start (= ours); Extend: no offset limit (= ours);
   Select other two Face rows = live (TICKETS row annotated).
 - Sketch audit notes: /root/skasm-scratch/audit-1124.md. Left: Extend B threshold (live), value-box caret/selection/palette
