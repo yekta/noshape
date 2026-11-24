@@ -6,6 +6,7 @@ docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
 ## IN FLIGHT 11-24 11:1x (restart after the 11-23 pause; 5 agents; context cap 150k; brief /root/lead-scratch/prompt-qa-1124.txt)
+- 11-24 13:5x everyday new-user flow (lead) DONE on green 63731676b: bin/flow-1124.sh -> hm2/out-flow-1124 (+ out-flowv/39v); TICKETS 900905086: P1 FEEL-PREVIEW-BODY-BLUE (psui), rest as live or known. Waiting: v0.4.68 published -> released-build smoke (rel-published.sh 0.4.68, rel-compat.sh), then rm vibex7 ~/agents/qa-bisect/target.
 - **v0.4.68 compat** (release/v0.4.68 57b74ac79 = 0c1d80e6c + asm/skasm fixes + Offset box, bool's Shell normal 7aa065004 reverted):
   unit qa-cand-0468 (bin/cand-0468.sh: rel-cand.sh 0.4.67 v0468 in worktree qa-bisect (detached at 57b74ac79), CLI built on vibex7,
   then the corpus) -> compat/cand-v0468.txt: GO 11:10, all 199 SAME incl. corpus (qa-alerts). Next: published check (rel-published.sh 0.4.68 <qa-bisect CLI>) when it ships; then rm vibex7 ~/agents/qa-bisect/target.
