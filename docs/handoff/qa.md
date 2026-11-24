@@ -1,42 +1,23 @@
-# QA handoff (agent qa; current state only, updated 2026-11-23 08:4x)
+# QA handoff (agent qa; current state only, updated 2026-11-24 11:1x)
 
 qa tests releases and greens against the last release and live, times speed, files tickets in docs/TICKETS.md, and never
 edits code. Standing instructions: /root/lead-scratch/prompt-qa.md. Rulings: docs/DECISIONS.md (read first). History:
 docs/handoff/archive/qa.md. Scripts: /root/qa-scratch/bin (local), results under /root/qa-scratch. Docs commits from
 /root/projects/noshape-wt/qa (`git checkout -B agent/qa origin/main`, commit, `git push origin HEAD:main`).
 
-## IN FLIGHT 06:5x
-- **Waiting**: unit qa-w538 (tmp/w538.sh -> tmp/w538.log "IN-GREEN"): dx's IMP-NO-FEEDBACK commit (subject has IMP-NO-FEEDBACK or CAD Imports)
-  in green -> rerun the IMP app cells (qa-scratch/imp/ui, brief-impver.md; Mac mini copies mode 700, deleted after) for the CAD Imports tab timing.
-- **Suites**: run 1123-0656-07264069 (green 07264069e, has the rings / surface-pattern fixes) in progress (loop.log "run done"). The b37201ea run
-  (done 06:55) listed speed x1.3-5.0 (rings, surface-pattern, impeller, loft-paths-guides, parting-line, drive-train, fill-pattern) but predates
-  bool a092a991d / c353816d6: check the 07264069e worse.txt; also scenarios drw-table-cells-insert-row (live re-recorded 883e2fe05),
-  drw-title-block-dblclick, mate-connector-shift-lock-inference match -> differs: confirm on that run, ticket if they stay.
-- **qa-wsubj** (tmp/wsubj.sh + wsubj.txt label|subject regex -> tmp/wsubj.log "IN-GREEN <label> <sha>"; lead 08:2x): queued on vibe2 land:
-  asm d7991ecb (move ring 20 px: FEEL-ASM-MOVE-RING-RIMS, hover matrix asm cells), skasm 24ca4c6e stack (Offset box, sketch-tools-1123,
-  fillet/chamfer: sk23.sh), studios stack (drw-dims-1123, drawing tool hover, Use copies, Note anchors, history legend 656a4061). Rescore each
-  once its label shows. Bg wait byd0ye9vv exits on any new line there / rr-1de9 DONE / w538.
-- blend 08:5x (lead's call): 930cad75 (queued) makes c2-rings-loft Chamfer 1 build again ("Overlapping chamfers." was OCCT noise; our ring
-  differs from live's before the chamfer = the sketch gap, skasm 24ca4c6e). NOT a regression to flag; blend rechecks after 24ca4c6e.
-- INSERT-GRAPH-RESIDUALS (asm) VERIFIED 08:3x (7bfcc65ec; kit vibe2 ~/tmp/qa/walk2: mk.py docs, run.sh/x.sh on :491; Rel opens via the 6th row
-  (333,538) only when it is named Others, then the version toggle (528,182); local shots qa-scratch/walk2/n1123).
-- Lead told (qa-alerts 07:3x): IMP-* + rings rechecks were already done. vibe2 leftover IMP wait loops killed (own, args checked).
-- **qa-rr-1de9** (tmp/rr-1de9.sh -> tmp/rr-1de9.log, lead 07:2x): psui 1de902059 (QUEUED cc8570b3; subject "psui: ✓ greyed for a value out of
-  range, hover cells") in green -> matrix hmr8-b + hmr8-ips, manipnav r10, sk23 out/r1de9, err/ver/out (old run saved err/ver/out-b6d5).
-  Then rescore psui's "fixed, to verify" rows: hover cells, FEEL-SKETCH-INF-END-DOT, plane border, rotate radius lines, SKT-POSTCOMMIT-HOVER,
-  SKT-USE-HOVER, ERR-* incl. ERR-OK-ENABLED-OUT-OF-RANGE / TIP spaces / TIP places / 400 px wrap, FEEL-EDIT-BODY-SHADE (edit-cap).
-  ERR-MATE-HOVER-GLYPH is asm's (owner fixed in TICKETS). Live PAUSED until 11-24 ~07:00: live questions go in live/REQUESTS.md.
-  Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
-- **DONE 11-23 (all filed, owners told, lead via qa-alerts)**: cut v0.4.68 GO (green 31f1866d8). sk23 sketch tools (cd5c34163). Hover matrix
-  114/125 (8433b44fe). psui b8a1 (200ca055e). errors-1123 recheck (e7de64235: core BUBBLE + TINT verified; P0 ERR-OK-ENABLED-OUT-OF-RANGE
-  psui). asm dff49b598 (4f1583757: 12 verified; P0 ERR-MATE-CREATING-REV-RED). Rings 7a39ced9 (efe187dea: Chamfer 1 as live;
-  SPEED-RINGS-SHELL PARTLY, Shell 1 15.4 s + still errors; tmp/rf.sh = failing / slow features per edit). IMP-* (e6e1ad1f3: 6 verified,
-  2 partly, 2 new P1 dx). Workflow 34 = live (b45aed281). COMPAT-SURFACE-PATTERN-SLOWER verified (278f9dc50). psui EDIT-BODY-SHADE
-  spots answered (ours r9/m01-ex-hover/03 (1700,800); live ver-1122 crop (170,102)).
-- Note: vibe2 ~/tmp/qa/apps/noshape-green upload fails while an app runs from it (scp onto a busy binary): check noshape-green.sha.
-  vibe2 Xvfb :496 / :497 belong to other runs; start your own display (:491, :495 free).
-- Kit: hm2/crop2.sh, score-a087/bin/sbs.sh, hm2/wf/wfcrop.py (WF_SET/WF_OUT), manipnav fm.sh (+fm992.sh), cells m15v-tr-xy-*.
-  Runners take QA_HOST; wf.sh WF_HOST/WF_XD/WF_SET/WF_OUT/WF_KEEP_WORLD; wf23.sh WF_OUT + glob arg.
+## IN FLIGHT 11-24 11:1x (restart after the 11-23 pause; 5 agents; context cap 150k; brief /root/lead-scratch/prompt-qa-1124.txt)
+- **v0.4.68 compat** (release/v0.4.68 57b74ac79 = 0c1d80e6c + asm/skasm fixes + Offset box, bool's Shell normal 7aa065004 reverted):
+  unit qa-cand-0468 (bin/cand-0468.sh: rel-cand.sh 0.4.67 v0468 in worktree qa-bisect (detached at 57b74ac79), CLI built on vibex7,
+  then the corpus) -> compat/cand-v0468.txt: GO 11:10, all 199 SAME incl. corpus (qa-alerts). Next: published check (rel-published.sh 0.4.68 <qa-bisect CLI>) when it ships; then rm vibex7 ~/agents/qa-bisect/target.
+  Green 9c2769a10 vs 0.4.67 (compat loop): impeller Fillet 3 Error (main still has bool's Shell change; the branch reverts it), knifehandle
+  Fillet 2 now Ok (blend eb313326a).
+- **Rescore done 11-24** (b93fb9add, 6a4b3b718): psui 6ca785d6d on green a9107b3a9 (runs from 11-23 rr-1de9): 5 verified, SKT-USE-HOVER /
+  ERR-CHROME-TIP-PLACEMENT (title 3 px low) / EDIT-BODY-SHADE region tint partly, ERR-LIST-TOOLTIP-CHROME wrap still open (400 px, clipped
+  on one line); hover matrix 115/125 (hm2/score-a910/sc8.txt). Studios b8b27ec6 stack on 9c2769a10 (bin/rs-9c27.sh, wf23 09-12+20 ->
+  hm2/out-wf23-9c27): 5 verified, 2 likely; not measured: DRW-DETAIL-ROTATION-ANGLE, DRW-TABLE-MID-HANDLES, DRW-SHEETS-CHEVRON-STATE.
+  bool cbf3444a9: rings edit unchanged (tmp/rf.sh, bin/cli_dimf.py now in vibex7 ~/agents/qa-keep). Plane border (FEEL-PS-BOX-DRAG-HOVER)
+  not rerun (feel1122/fieldsel).
+- New small tools: bin/boxcol.py, pxcount.py, closer.py (live vs new vs old diff in a box), chg.py (row bands that differ).
 - Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
 
 ## Running units
