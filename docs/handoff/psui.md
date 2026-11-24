@@ -44,6 +44,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Tests note: a field made active by user_focus_query alone is taken back by the focused field's tab stop on the next
   render: focus `tab_stop_handle("q:<path>")` as a click does. build_start can't name regions inside arrays (pick them).
   The viewport's context menu is `view.context_menu` (os_menu::open_labels is empty for it).
+  NEXT (told the lead): preview self-pick (behaviours 21819). Hover goes through the GPU pick buffer (pick_pending), so
+  the test is a pointer test like latency_tests.rs (move_to + Viewport::project); preview picks vs pre-feature:
+  mod.rs held_face_under / ui.preview_before. Fillet the block's top-front edge, radius 5, hover/click the band:
+  live hovers the original top face and adds chip "Face of Extrude 1" (not red, ✓ on).
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
