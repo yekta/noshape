@@ -1067,22 +1067,38 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         edges.iter().any(|&e| ef.get(e).is_some_and(|fs| fs.iter().any(|&f| !faces[f as usize].is_planar())))
     };
     if curved {
-        let balls = sections(ev, bi, edges, spec, true, None);
+        let balls = rolling_balls(ev, bi, edges, spec);
         if let Err(e) = &balls
             && std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some()
         {
             eprintln!("section blend: rolling balls failed: {}", e.message);
         }
-        return if balls.is_ok() { balls } else { sections(ev, bi, edges, spec, false, None).or(balls) };
+        return if balls.is_ok() { balls } else { sections(ev, bi, edges, spec, false, None, false).or(balls) };
     }
-    let first = sections(ev, bi, edges, spec, false, None);
+    let first = sections(ev, bi, edges, spec, false, None, false);
     // A conic round whose sections from the faces' tangents at the edge fail: rolling balls on the faces themselves, the
     // conic between their contacts (c2-impeller-loft's Fillet 3: R 3 on a rib's 30 deg lips curving away, each ball
     // past the rib's middle, the two rounds meeting in a ridge as live's).
     if !conic || first.is_ok() {
         return first;
     }
-    sections(ev, bi, edges, spec, true, None).or(first)
+    rolling_balls(ev, bi, edges, spec).or(first)
+}
+
+/// The round by rolling balls; where they failed beside a swept face, again with each foot on it moved to the edge's middle
+/// (the foot's own put c2-impeller-loft's Fillet 3 lips at another bound of the rib side and the build failed).
+fn rolling_balls(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec) -> FResult<()> {
+    let balls = sections(ev, bi, edges, spec, true, None, false);
+    if balls.is_ok() {
+        return balls;
+    }
+    let shape = &ev.ctx.bodies[bi].shape;
+    let (ef, faces) = (shape.edge_faces()?, shape.faces());
+    let swept = |f: &u32| matches!(faces[*f as usize].face_surface(), Ok(k::Surface::Extrusion { .. }));
+    if !edges.iter().any(|&e| ef.get(e).is_some_and(|fs| fs.iter().any(swept))) {
+        return balls;
+    }
+    sections(ev, bi, edges, spec, true, None, true).or(balls)
 }
 
 /// A round's rolling-ball tools and contact conics ([`rolling_ball_blend`]'s), made ahead (while OCCT tries the round),
@@ -1096,7 +1112,7 @@ pub fn rolling_ball_tools(shape: &Shape, edges: &[usize], r: f64, stop: &std::sy
         let ef = shape.edge_faces()?;
         let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
         let chain = chain_ordered(shape, edges, true)?;
-        let tools = ball_tools(shape, &chain, &ef, &shape.faces(), (r, Section::Circular), scale, Some(stop))?;
+        let tools = ball_tools(shape, &chain, &ef, &shape.faces(), (r, Section::Circular, false), scale, Some(stop))?;
         Ok((tools, chain.iter().map(|c| shape.sub_shape(ShapeType::Edge, c.index)).collect::<Result<Vec<_>, _>>()))
     })();
     match made {
@@ -1115,10 +1131,10 @@ pub fn rolling_ball_tools(shape: &Shape, edges: &[usize], r: f64, stop: &std::sy
 /// (`made`: its tools from [`rolling_ball_tools`] on the body as it is.)
 pub fn rolling_ball_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64, made: Option<BallTools>) -> FResult<()> {
     let spec = BlendSpec { section: Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: false, cliff: false, sides: None, overflow: false, reference: None };
-    sections(ev, bi, edges, &spec, true, made)
+    sections(ev, bi, edges, &spec, true, made, false)
 }
 
-fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball: bool, made: Option<BallTools>) -> FResult<()> {
+fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball: bool, made: Option<BallTools>, at_middle: bool) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();
     let shape = &body.shape;
@@ -1335,7 +1351,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 direct = made_direct;
                 made?
             }
-            None => ball_tools(shape, &chain, &ef, &faces, (spec.r1, spec.section), scale, None)?,
+            None => ball_tools(shape, &chain, &ef, &faces, (spec.r1, spec.section, at_middle), scale, None)?,
         };
         conics = contacts;
         // Which of each tool's faces lie on its supports (generated) and which are its blend: the tools in parallel
@@ -1898,7 +1914,8 @@ enum Support {
     /// A face swept along `d`, the same all along it: each foot that of the point moved along `d` to `at` (a point on the
     /// face), moved back; so past where the face is cut off too (c2-impeller-loft's rib side, cut by the channel's offset
     /// face where Fillet 3's lips end).
-    Extruded { face: Shape, d: DVec3, at: DVec3, s: f64, last: std::sync::Arc<std::sync::Mutex<Option<glam::DVec2>>> },
+    /// `own`: moved to its own foot's place along `d` instead (where the face narrows, `at` lies past it).
+    Extruded { face: Shape, d: DVec3, at: DVec3, s: f64, own: bool, last: std::sync::Arc<std::sync::Mutex<Option<glam::DVec2>>> },
 }
 
 impl Support {
@@ -1926,7 +1943,7 @@ impl Support {
             },
             k::Surface::Extrusion { direction } if direction.length() > 0.0 => {
                 let s = if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 };
-                Support::Extruded { face: face.clone(), d: direction.normalize(), at: p, s, last: Default::default() }
+                Support::Extruded { face: face.clone(), d: direction.normalize(), at: p, s, own: true, last: Default::default() }
             }
             _ => Support::Face(face.clone(), if face.normal_at_point(p)?.dot(inward) < 0.0 { -1.0 } else { 1.0 }, Default::default()),
         })
@@ -1938,7 +1955,7 @@ impl Support {
         match self {
             Support::Face(f, s, last) => Support::Face(f.clone(), *s, own(last)),
             Support::Nurbs { face, n, s, last } => Support::Nurbs { face: face.clone(), n: n.clone(), s: *s, last: own(last) },
-            Support::Extruded { face, d, at, s, last } => Support::Extruded { face: face.clone(), d: *d, at: *at, s: *s, last: own(last) },
+            Support::Extruded { face, d, at, s, own: by_own, last } => Support::Extruded { face: face.clone(), d: *d, at: *at, s: *s, own: *by_own, last: own(last) },
             other => other.clone(),
         }
     }
@@ -1965,7 +1982,7 @@ impl Support {
                 *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(glam::DVec2::new(pr.u, pr.v));
                 (pr.point, f.normal_at_uv(pr.u, pr.v)?.normalize() * *s)
             }
-            Support::Extruded { face, d, at, s, last } => {
+            Support::Extruded { face, d, at, s, own, last } => {
                 let seed = *last.lock().unwrap_or_else(|e| e.into_inner());
                 let project = |x: DVec3| match seed {
                     Some(uv) => face.project_point_near(x, uv),
@@ -1973,7 +1990,7 @@ impl Support {
                 };
                 // (Moved along d to where its own foot on the face lies: the face's point at the edge's middle put it
                 // past the face where that narrows, c2-surf-workshop-knifehandle's top toward the tip in Fillet 2.)
-                let reference = project(q).map_or(*at, |pr| pr.point);
+                let reference = if *own { project(q).map_or(*at, |pr| pr.point) } else { *at };
                 let shift = *d * (q - reference).dot(*d);
                 let pr = project(q - shift)?;
                 *last.lock().unwrap_or_else(|e| e.into_inner()) = Some(glam::DVec2::new(pr.u, pr.v));
@@ -2212,7 +2229,7 @@ fn tangency_ball(shape: &Shape, ef: &[Vec<u32>], [a, b]: [&BallEdge; 2], q: DVec
 /// (the straight edge's), so their tools meet exactly; at a free end the ball rolls on along its supports until it is
 /// off the part.
 /// (`stop`: given up when set, between balls and before each loft: tools made ahead that turn out not to be needed.)
-fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], (r, kind): (f64, Section), scale: f64, stop: Option<&std::sync::atomic::AtomicBool>) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
+fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shape], (r, kind, at_middle): (f64, Section, bool), scale: f64, stop: Option<&std::sync::atomic::AtomicBool>) -> FResult<(Vec<Shape>, Vec<k::Conic>)> {
     let halt = || -> FResult<()> {
         match stop.is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed)) {
             true => Err(fail("not needed")),
@@ -2220,13 +2237,18 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         }
     };
     let near = |a: DVec3, b: DVec3| (a - b).length() < scale * 1e-9;
-    let edges = chain
+    let mut edges = chain
         .iter()
         .map(|c| {
             let fs = ef.get(c.index).filter(|f| f.len() == 2).ok_or_else(|| fail("the edge doesn't have two faces"))?;
             ball_edge(c, [fs[0] as usize, fs[1] as usize], [&faces[fs[0] as usize], &faces[fs[1] as usize]], scale)
         })
         .collect::<FResult<Vec<_>>>()?;
+    for s in edges.iter_mut().flat_map(|e| e.sup.iter_mut()) {
+        if let Support::Extruded { own, .. } = s {
+            *own = !at_middle;
+        }
+    }
     // The ball at a chain vertex shared by two edges; None at a free end. On `own`: the edges there, forked for the edge
     // asking (both edges ask, each on its thread: one support's last foot shared made c2-surf-workshop-knifehandle's
     // Fillet 2 tip run-on stop a step short in one regeneration in five).
