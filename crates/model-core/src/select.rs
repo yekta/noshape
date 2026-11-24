@@ -7,7 +7,7 @@ use crate::reference::{Reference, Role, TopoName};
 use std::sync::Arc;
 use crate::regen::context::{Body, Context};
 use glam::DVec3;
-use noshape_kernel::{Curve, ShapeType, Surface};
+use noshape_kernel::{Curve, Shape, ShapeType, Surface};
 use std::collections::{BTreeSet, VecDeque};
 
 /// What to select relative to the seed.
@@ -123,19 +123,48 @@ fn smooth_edge(b: &Body, e: usize, fa: usize, fb: usize) -> bool {
     }
 }
 
-/// A point of face `f` a little away from `m` (on its edge) into the face.
-fn point_into(b: &Body, f: usize, m: DVec3) -> Option<DVec3> {
+/// A point of face `f` a little away from `m` (the middle of its edge `e`) into the face: across the edge, else toward
+/// the face's centroid.
+fn point_into(b: &Body, f: usize, e: usize, m: DVec3) -> Option<DVec3> {
     let s = b.shape.sub_shape(ShapeType::Face, f).ok()?;
+    if let Some(q) = across_edge(b, &s, e, m) {
+        return Some(q);
+    }
     let c = s.centroid().ok()?;
     Some(s.project_point(m + (c - m) * 0.1).map(|x| x.point).unwrap_or(c))
+}
+
+/// The point of face `s` a step across its edge `e` from `m`, on the side the face lies on. (Toward the centroid
+/// crosses a notch cut into the face: the scissor's Studio 9cbb0e Fillet 23, a V notch through a rounded end.)
+fn across_edge(b: &Body, s: &Shape, e: usize, m: DVec3) -> Option<DVec3> {
+    let edge = b.shape.sub_shape(ShapeType::Edge, e).ok()?;
+    let info = edge.edge_info().ok()?;
+    let tangent = edge.tangent_at((info.first_param + info.last_param) * 0.5).ok()?.normalize_or_zero();
+    let dir = s.normal_at_point(m).ok()?.normalize_or_zero().cross(tangent).normalize_or_zero();
+    if dir == DVec3::ZERO {
+        return None;
+    }
+    // Largest first: a step within the face's tolerance of its edge lands on it on both sides; one past a narrow face
+    // off it on both. The side off the face projects back near the edge, the one on it within its sag.
+    for step in [info.length * 0.05, info.length * 5e-3, info.length * 5e-4] {
+        let on = |v: DVec3| s.project_point(m + v * step).ok().map(|x| (x.distance, x.point));
+        let (Some((a, pa)), Some((c, pc))) = (on(dir), on(-dir)) else { return None };
+        if a < step * 0.2 && c > step * 0.8 {
+            return Some(pa);
+        }
+        if c < step * 0.2 && a > step * 0.8 {
+            return Some(pc);
+        }
+    }
+    None
 }
 
 /// Curvature of face `f` near `m` across the edge: +1 convex (normals
 /// spread apart, an exterior fillet), -1 concave (an interior fillet, a
 /// hole wall), 0 flat.
-fn curvature_sign(b: &Body, f: usize, m: DVec3) -> i32 {
+fn curvature_sign(b: &Body, f: usize, e: usize, m: DVec3) -> i32 {
     let Ok(s) = b.shape.sub_shape(ShapeType::Face, f) else { return 0 };
-    let Some(q) = point_into(b, f, m) else { return 0 };
+    let Some(q) = point_into(b, f, e, m) else { return 0 };
     let (Ok(nm), Ok(nq)) = (s.normal_at_point(m), s.normal_at_point(q)) else { return 0 };
     let k = (nq.normalize_or_zero() - nm.normalize_or_zero()).dot(q - m);
     let eps = 1e-6 * (q - m).length();
@@ -155,7 +184,7 @@ fn curvature_sign(b: &Body, f: usize, m: DVec3) -> i32 {
 pub(crate) fn edge_convexity(b: &Body, e: usize, fa: usize, fb: usize) -> i32 {
     let Some(m) = edge_mid(b, e) else { return 0 };
     if smooth_edge(b, e, fa, fb) {
-        let (ka, kb) = (curvature_sign(b, fa, m), curvature_sign(b, fb, m));
+        let (ka, kb) = (curvature_sign(b, fa, e, m), curvature_sign(b, fb, e, m));
         return if (ka > 0 || kb > 0) && ka >= 0 && kb >= 0 {
             1
         } else if (ka < 0 || kb < 0) && ka <= 0 && kb <= 0 {
@@ -165,7 +194,7 @@ pub(crate) fn edge_convexity(b: &Body, e: usize, fa: usize, fb: usize) -> i32 {
         };
     }
     let Ok(sa) = b.shape.sub_shape(ShapeType::Face, fa) else { return 0 };
-    let (Ok(na), Some(q)) = (sa.normal_at_point(m), point_into(b, fb, m)) else { return 0 };
+    let (Ok(na), Some(q)) = (sa.normal_at_point(m), point_into(b, fb, e, m)) else { return 0 };
     let d = na.normalize_or_zero().dot(q - m);
     let eps = 1e-9_f64.max(q.distance(m) * 1e-4);
     if d < -eps {
@@ -774,5 +803,26 @@ mod tests {
         // Protrusion from the top face crosses the convex edges (and the
         // exterior fillets' tangent edges) to the rest of the plate.
         assert!(select_related(&ctx, &seed, Criterion::Protrusion).len() > 2);
+    }
+
+    #[test]
+    fn edges_of_a_notched_face_take_their_convexity_across_the_edge() {
+        // A block with a notch from its front: the top face is a U whose centroid lies in the notch.
+        use noshape_kernel as k;
+        let block = k::make_box_corners(DVec3::ZERO, DVec3::splat(10.0)).unwrap();
+        let notch = k::make_box_corners(DVec3::new(4.0, -1.0, 5.0), DVec3::new(6.0, 9.0, 11.0)).unwrap();
+        let shape = k::cut(&block, &notch).unwrap().shape;
+        let f = crate::reference::FeatureId(1);
+        let faces = (0..shape.count(ShapeType::Face)).map(|i| Arc::new(TopoName::Face { feature: f, role: Role::New(i as u32) })).collect();
+        let b = Body::new(crate::reference::BodyId { feature: f, index: 0 }, "Part 1".into(), crate::display::BodyKind::Solid, shape, faces, 0, f);
+        let ef = b.shape.edge_faces().unwrap();
+        let near = |a: f64, lo: f64, hi: f64| a > lo - 1e-6 && a < hi + 1e-6;
+        for (e, fs) in ef.iter().enumerate() {
+            let [fa, fb] = fs[..] else { continue };
+            let m = edge_mid(&b, e).unwrap();
+            let want = if near(m.x, 4.0, 6.0) && m.y > 1e-6 && near(m.y, 0.0, 9.0) && near(m.z, 5.0, 10.0) && m.z < 10.0 - 1e-6 { -1 } else { 1 };
+            assert_eq!(edge_convexity(&b, e, fa as usize, fb as usize), want, "edge at {m}");
+            assert_eq!(edge_convexity(&b, e, fb as usize, fa as usize), want, "edge at {m}, faces swapped");
+        }
     }
 }
