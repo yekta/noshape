@@ -48,12 +48,25 @@ docs/DECISIONS.md (read first; it wins over anything here).
   45375844269 job 138469739575 still in progress 13:5x (`gh api --allow-escape-sequences .../jobs/<id>/logs`).
   asm's the_second_pick_outlines_... failed once on Windows (told the lead).
 - Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
-- QUEUED 0923c1fd (16:xx): dae14f97 + its stack (owner-selected hover cells, Fillet handle steps its bisector
-  offset (manip-drag-1124), sm tab test T2). Fix forward if it fails.
-- LOCAL (17:xx): depth-0 Extrude region outline red (live errors-1123): grey corner dots were drawn at every vertex of
-  the tessellated circle over the red line; corners now = a sketch curve end or a turn > 60° (builder outline_corners);
-  test a_depth_0_extrudes_circle_region_has_a_red_outline. Field errors (live field-errors-1124): ours = live on every
-  value (no code change); test feature_fields_reject_what_live_rejects, interaction-feel row. Land after 0923c1fd.
+- LANDED 0923c1fd as ad784f89 (16:43): owner-selected hover cells, Fillet handle bisector step, sm tab test T2.
+- LOCAL db768533d (not queued yet): depth-0 Extrude region outline red (live errors-1123): grey corner dots were drawn
+  at every vertex of the tessellated circle over the red line; corners now = a sketch curve end or a turn > 60°
+  (builder outline_corners); test a_depth_0_extrudes_circle_region_has_a_red_outline. Field errors (live
+  field-errors-1124): ours = live on every value, no code change; test feature_fields_reject_what_live_rejects +
+  interaction-feel row. Scene suite green; part-studio-ui suite green except the corner-break disc (below).
+- UNCOMMITTED: flip buttons (lead 16:5x, live flip-buttons-1124): hover adds the 1 px #1651B0 bottom line, arrow
+  cursor (was a hand) in feature_dialog.rs; test the_flip_button_flips_on_click_takes_the_keyboard_and_ignores_space
+  passes (click flips + focuses, Space nothing, Enter commits: already as live). Commit with the sm_feel_tests assert
+  message (pixels across the corner). REMOVE the temporary NOSHAPE_DIAG_CONSUMED eprintlns first: behaviors.rs
+  consumed_picks_overlay (2 blocks) and mod.rs before `let scene = Arc::new(scene)`, and the "DIAG corner" eprintln
+  in sm_feel_tests a_corner_breaks_picked_vertex_keeps_its_disc.
+- REGRESSION (my P0 FEEL-CORNER-BREAK-VERTEX-PICK): a_corner_breaks_picked_vertex_keeps_its_disc fails whenever a GPU
+  is there (the land host skips it): 0 orange px in the whole frame. Not db768533d, not the owner-selected change, not
+  the disc's compare::POST. consumed_picks_overlay does build the disc at [0,0,0.002] (vertex consumed, found in
+  preview_before), and the scene handed to set_scene holds it (layer 20 Points, compare POST, over_lines, preview_mix
+  0.7): the RENDERER drops it. Next: the preview-post pass (renderer.rs post_frame / draw_lists points_over_lines,
+  Lists::build only_post culling) for a POST Points instance; suspects since 3cfb09978: 37f7de4cf, 7e017ac17, core a4804bf07/35dceca06.
+  Run: /root/psui-scratch/run-cb2.sh via rb.sh on vibex8 (NOSHAPE_DIAG_CONSUMED=1).
 - FEEL-HOVER-OWNER-SELECTED case (3) open: vertex hovered with its edge selected (live: the band over ~1/4 of the disc;
   ours draws the disc after every line).
 - Then: PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
