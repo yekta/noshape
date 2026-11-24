@@ -3,7 +3,7 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 15:30) — read first
+## NOW (11-24 16:35) — read first
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
 - LEAD 15:30: I took over psui's re-land. a2341555 FAILED ops parity::filter_inner_loops_leaves_out_a_letters_counter
@@ -13,13 +13,13 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   When it lands: rebase agent/skasm on main (drop dups: the old stack + 087761eb8), read diff --stat, rerun tdl/tcl,
   land.sh 4e2995a8d, 1e2d84e5a, 101d238c1 (dimension lines hover/press as the label, gold as live; selected+hovered
   no change; centres alike). If 5a4491f4 fails: fix forward in psui-skrebase.
-- Live sk-hover-matrix-1124 (37 cells): selected+hovered = 0 change (tests above); centres light alike (test above); Arc
-  tool preselect 1459 ms = live slowness, not a target; Line tool: CC disc stays lit ≥1.2 s after leaving, and inside a
-  circle the Line tool lights the circle band + its centre (ours: drawing tools light no region) → REQUESTS skasm 11-24
-  15:21 asked how long / what ends it / plain points / rectangles; implement after the answer.
-- Pending GPU test (scratch /root/skasm-scratch/pending-tests.rs): construction circle dashed (saw 120/120 rim samples
-  with no blue: diagnose sampling/colour before blaming fs_line's per-segment dash restart; a renderer fix = new
-  LineSegment field, psui's area → decision for the lead).
+- Live sk-hover-matrix-1124 (37 cells): selected+hovered = 0 change; centres light alike; Arc tool preselect 1459 ms =
+  live slowness. Line tool linger = inference acquisition (live line-linger-1124): DONE 5a3fb7c71 (scene track_acquired,
+  ACQUIRED_KEEP_PX 6 / REACH 215; drawn as the single hover in mod.rs; test sk_the_line_tool_keeps_an_acquired_point_lit_
+  along_its_levels; part-studio sketch:: 486 + scene 205 green). Land it with the stack above.
+- Construction circle drawn SOLID (confirmed 0/120 rim bare): fs_line restarts the dash per segment (shaders.wgsl
+  along = t * len). Fix = per-segment dash start (new LineSegment field, psui's area) → "decision needed" sent to the
+  lead 16:35. Diag test in /root/skasm-scratch/pending-tests.rs (park via an empty sketch spot first: (30,30) keeps hover).
 - Live answers 11-24: construction dash = 46 px 4/6/30/6 from the line's start (= ours); Extend: no offset limit (= ours);
   Select other two Face rows = live (TICKETS row annotated).
 - Sketch audit notes: /root/skasm-scratch/audit-1124.md. Left: Extend B threshold (live), value-box caret/selection/palette
