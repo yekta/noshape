@@ -517,6 +517,10 @@ impl PartStudioView {
     }
 
     fn with_sketch<R>(&mut self, cx: &mut Context<Self>, f: impl FnOnce(&mut SketchEditor, &mut SketchData) -> R) -> Option<R> {
+        // A dimension solve off the UI thread owns the sketch until it's in (`commit_dimension`).
+        if self.ui.sketch_solve.is_some() {
+            return None;
+        }
         let dialog = self.edit.as_ref()?.dialog.clone();
         let mut editor = self.sketch.take()?;
         let r = dialog.update(cx, |d, _| d.sketch_data_mut().map(|data| f(&mut editor, data)));
@@ -558,6 +562,11 @@ impl PartStudioView {
         self.draft_checkpoint(cx);
         if let Some(ed) = self.sketch.as_mut() {
             ed.draft_solved = true;
+        }
+        // A slow sketch (fuzz fz211: its regeneration ~0.4 s) regenerates off the UI thread.
+        if self.sketch_solves_slowly(cx) {
+            self.schedule_regen(window, cx);
+            return;
         }
         let Some((studio, upto)) = self.effective_studio(cx) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -1262,6 +1271,10 @@ impl PartStudioView {
         if let Some(ed) = &mut self.sketch {
             ed.world_per_px = wpp;
             ed.screen_map = sketch_screen_map(vp.read(cx), ed);
+        }
+        // Sketch input waits for a dimension solve off the UI thread (the view still turns, hover still shows).
+        if self.ui.sketch_solve.is_some() && !matches!(ev, ViewportEvent::CameraChanged | ViewportEvent::Hover(_)) {
+            return true;
         }
         match ev {
             ViewportEvent::CameraChanged => {
@@ -2318,26 +2331,69 @@ impl PartStudioView {
             cx.notify();
             return;
         }
+        let created = self.sketch.as_ref().is_some_and(|ed| ed.dim_edit.as_ref().is_some_and(|d| d.constraint == cid && d.created));
+        // A slow sketch (fuzz fz211: ~0.3 s a solve) solves off the UI thread: sketch input waits for it, and Onshape's
+        // working overlay shows past its 0.9 s (pending.rs).
+        if self.sketch_solves_slowly(cx) {
+            // Stored with the workspace unit ("1" → "1 mm", `apply_dimension`).
+            let job = self.with_sketch(cx, |ed, data| ed.prepare_dimension(data, cid, text, &units, &vars).map(|job| (job, data.sketch.clone())));
+            let (job, mut sketch) = match job {
+                Some(Ok(j)) => j,
+                Some(Err(e)) => return self.dimension_applied(Some(Err(e)), window, cx),
+                None => return,
+            };
+            self.regen_seq += 1;
+            let seq = self.regen_seq;
+            self.begin_pending(seq, window, cx);
+            let solve = cx.background_spawn(async move {
+                let report = sketch.solve_with(&job.opts);
+                (job, sketch, report)
+            });
+            self.ui.sketch_solve = Some(cx.spawn_in(window, async move |this, cx| {
+                let (job, sketch, report) = solve.await;
+                let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                    this.ui.sketch_solve = None;
+                    let res = this.with_sketch(cx, |ed, data| {
+                        data.sketch = sketch;
+                        let r = ed.finish_dimension(data, job, report);
+                        if r.is_ok() {
+                            dimension_taken(ed, data, created);
+                        }
+                        r
+                    });
+                    this.dimension_applied(res, window, cx);
+                    // The sketch closed meanwhile: nothing regenerates for this edit.
+                    if this.pending.as_ref().is_some_and(|p| p.seq == seq) {
+                        this.end_pending(seq, cx);
+                    }
+                });
+            }));
+            cx.notify();
+            return;
+        }
         let res = self.with_sketch(cx, |ed, data| {
-            let created = ed.dim_edit.as_ref().is_some_and(|d| d.constraint == cid && d.created);
             // Stored with the workspace unit ("1" → "1 mm", `apply_dimension`).
             let r = ed.apply_dimension(data, cid, text, &units, &vars);
             if r.is_ok() {
-                ed.dim_edit = None;
-                // Onshape (bundle: the dimension tool's commit ends in
-                // `cleanUpAfterCommit`, which resets the selection list; the
-                // entity highlights go with the edit box; live sketch/15): a
-                // new dimension leaves nothing selected. Editing an existing
-                // one keeps the selection as it was.
-                if created {
-                    ed.selection.clear();
-                    ed.selected_constraints.clear();
-                }
-                // A chamfer's first distance → its second (live).
-                ed.open_next_value_box(data);
+                dimension_taken(ed, data, created);
             }
             r
         });
+        self.dimension_applied(res, window, cx);
+    }
+
+    /// The open sketch is slow to solve (its last regeneration took 50 ms or more): its dimension edits solve and its
+    /// edits regenerate off the UI thread.
+    fn sketch_solves_slowly(&self, _cx: &App) -> bool {
+        #[cfg(test)]
+        if self.ui.slow_sketch {
+            return self.sketch.is_some();
+        }
+        self.sketch.as_ref().is_some_and(|ed| self.display.feature_state(ed.feature).is_some_and(|s| s.time_ms >= 50.0))
+    }
+
+    /// A typed dimension value applied (`res`): the box, the message and the regeneration follow.
+    fn dimension_applied(&mut self, res: Option<Result<(), String>>, window: &mut Window, cx: &mut Context<Self>) {
         match res {
             Some(Ok(())) => {
                 self.dim_input = None;
@@ -2438,6 +2494,9 @@ impl PartStudioView {
     fn sketch_key_down(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let m = &ev.keystroke.modifiers;
         if m.control || m.platform || !self.focus.contains_focused(window, cx) || window.has_focused_input(cx) {
+            return;
+        }
+        if self.ui.sketch_solve.is_some() {
             return;
         }
         let Some(ed) = &mut self.sketch else { return };
@@ -6669,4 +6728,17 @@ fn plane_outline_px(q: &noshape_model::display::PlaneDisplay, at: DVec2, vp: &Vi
             Some((a + (b - a) * t).distance(at))
         })
         .fold(f64::INFINITY, f64::min)
+}
+
+/// A typed dimension value taken: the box closes. Onshape (bundle: the dimension tool's commit ends in
+/// `cleanUpAfterCommit`, which resets the selection list; the entity highlights go with the edit box; live sketch/15): a
+/// new dimension leaves nothing selected; editing an existing one keeps the selection as it was. A chamfer's first
+/// distance → its second (live).
+fn dimension_taken(ed: &mut SketchEditor, data: &SketchData, created: bool) {
+    ed.dim_edit = None;
+    if created {
+        ed.selection.clear();
+        ed.selected_constraints.clear();
+    }
+    ed.open_next_value_box(data);
 }

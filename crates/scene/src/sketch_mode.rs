@@ -1506,6 +1506,15 @@ pub fn inference_icons(inf: &Inference, on_model_edge: bool) -> Vec<&'static str
     icons
 }
 
+/// A typed dimension value set, its sketch still to solve ([`SketchEditor::prepare_dimension`]).
+pub struct DimensionSolve {
+    pub cid: ConstraintId,
+    pub opts: noshape_sketch::SolveOptions,
+    /// The shape kept when the value can't be solved.
+    solved: Sketch,
+    value: f64,
+}
+
 impl SketchEditor {
     /// Whether a plane's face (not only its outline) can be picked: not by the Dimension tool once an ellipse is
     /// picked (live plane-behind-1121: Front's face then lights nowhere, the Right plane's outline still does).
@@ -6138,6 +6147,14 @@ impl SketchEditor {
     /// Negative values flip the geometry where Onshape allows it (distances,
     /// angles, line lengths); radii, diameters and arc lengths must be positive.
     pub fn apply_dimension(&mut self, data: &mut SketchData, cid: ConstraintId, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<(), String> {
+        let job = self.prepare_dimension(data, cid, text, units, vars)?;
+        let report = data.sketch.solve_with(&job.opts);
+        self.finish_dimension(data, job, report)
+    }
+
+    /// [`Self::apply_dimension`] up to its solve: the value set, and how to solve the sketch for it (a slow sketch's
+    /// solve runs off the UI thread, then [`Self::finish_dimension`]).
+    pub fn prepare_dimension(&mut self, data: &mut SketchData, cid: ConstraintId, text: &str, units: &UnitPrefs, vars: &dyn noshape_units::VariableScope) -> Result<DimensionSolve, String> {
         let Some(c) = data.sketch.constraint(cid).cloned() else { return Err("Dimension no longer exists".into()) };
         // A new dimension the Dimension tool added driven (it over-defined the sketch) takes a typed value as a driving
         // one: the sketch then can't be solved and shows so (live errors-1118: a redundant 40 or a conflicting 50 on a
@@ -6209,7 +6226,12 @@ impl SketchEditor {
             Some((curve, p)) => noshape_sketch::SolveOptions { light: vec![curve], still: vec![p], ..data.sketch.dimension_edit_options(cid) },
             None => (!scaled).then(|| data.sketch.free_line_edit_options(cid)).flatten().unwrap_or_else(|| data.sketch.dimension_edit_options(cid)),
         };
-        let report = data.sketch.solve_with(&opts);
+        Ok(DimensionSolve { cid, opts, solved, value })
+    }
+
+    /// [`Self::apply_dimension`] after its solve (`report`, `data.sketch` solved).
+    pub fn finish_dimension(&mut self, data: &mut SketchData, job: DimensionSolve, report: noshape_sketch::SolveReport) -> Result<(), String> {
+        let DimensionSolve { cid, solved, value, .. } = job;
         // The next fillet defaults to the radius just typed (live, 568).
         if let Some(ConstraintKind::Radius { curve, value }) = data.sketch.constraint(cid).map(|c| c.kind.clone())
             && self.fillet_session == Some(curve)

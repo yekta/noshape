@@ -596,6 +596,11 @@ pub struct UiState {
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
+    /// A slow sketch's dimension solve running off the UI thread (sketch.rs `commit_dimension`): sketch input waits.
+    pub sketch_solve: Option<Task<()>>,
+    /// Tests: every sketch counts as slow to solve (`sketch_solves_slowly`).
+    #[cfg(test)]
+    pub slow_sketch: bool,
     /// The `oldDefinition` of the editing logic run in flight.
     pub std_edit_run_old: Option<noshape_model::params::ParamValues>,
     /// A new feature's preview waits for std's editing logic to run once (a new Extrude on a part's face opens as
@@ -1047,6 +1052,9 @@ impl UiState {
             std_remembered: Vec::new(),
             panel_check_focus: None,
             std_edit_task: None,
+            sketch_solve: None,
+            #[cfg(test)]
+            slow_sketch: false,
             std_edit_run_old: None,
             std_logic_first: None,
             std_manip_live: None,

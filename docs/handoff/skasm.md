@@ -14,11 +14,15 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   base; sketch crate, scene lib, part-studio sketch suites green. fz211 (qa fuzz, 438 ents, over-defined), probe
   (tprobe.sh + skasm-scratch/probes/speed-instrumented.diff): edit 1146 -> 225 ms / 431 -> 153 ms; ops T2: open
   457 -> 211 ms, change a dim 0.5-0.9 s -> 253 ms, drag step median 16, worst 452 -> 205 ms.
-- NEXT (lead decision 21:0x): fz211 edits still > 100 ms -> off the UI thread with a visible "solving" state. The
-  UI path: sketch.rs commit_dimension -> ed.apply_dimension (scene sketch_mode.rs ~6212 solve_with) -> regen_sync
-  (sketch feature regen re-solves: analysis_current -> analyze:false constructive solve, ~50 ms on fz211) ->
-  apply_display. Precedent: the entering regen_task / pending state. Remaining fz211 cost per analysed solve:
-  8 exclusion attempts x 5 ms + analyses 25 + probes 74.
+- IN FLIGHT (lead 11-24 "off the UI thread"): a slow sketch (its feature's last regeneration >= 50 ms;
+  `sketch_solves_slowly`, tests force it with `ui.slow_sketch`) solves a typed dimension off the UI thread:
+  scene `prepare_dimension` / `finish_dimension` (apply_dimension = both + the solve); sketch.rs commit_dimension
+  spawns the solve, `ui.sketch_solve` holds the sketch (with_sketch -> None, viewport input but camera/hover and
+  sketch keys ignored), pending (live's overlay past 0.9 s); regen_sync of a slow sketch -> schedule_regen (the
+  async completion now also runs update_profile_issues). T1 latency_tests
+  a_slow_sketch_solves_a_dimension_off_the_ui_thread. fz211 UI probe (skasm-scratch/probes/zz_probe_fz211_ui.rs):
+  commit_dimension on the UI thread 627-742 ms -> 3-5 ms, done 0.54-0.65 s later, same warning. Suites running.
+  Not covered: drags (median 16 ms, worst ~205 ms on fz211), other tools' own solves (sync, regen async).
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
 
 ## In flight (11-22 17:45 UTC)

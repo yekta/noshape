@@ -436,3 +436,53 @@ fn a_300_line_sketch_keeps_up_with_the_hand(cx: &mut TestAppContext) {
     let stall = ms[2].iter().cloned().fold(0.0, f64::max);
     assert!(stall < 100.0, "a drag step held the UI thread {stall:.0} ms");
 }
+
+/// A slow sketch's dimension edit (fuzz fz211: ~0.3 s a solve, ~0.4 s its regeneration) leaves the UI thread free: the
+/// sketch is held while its solve runs off it, pending (Onshape's working overlay past 0.9 s), then shows the new size;
+/// a value it can't take warns as on a quick sketch, its last solved shape kept.
+#[gpui::test]
+fn a_slow_sketch_solves_a_dimension_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_with(cx, "slow-solve", |path| crate::session::Session::create(path, crate::user_units::new_document()).unwrap());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Plane(DatumPlane::Top)];
+        v.start_feature("sketch", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    let (bottom, width, line, len) = cx
+        .update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| {
+            use noshape_sketch::ConstraintKind;
+            let s = data.sketch.corner_rectangle(DVec2::ZERO, DVec2::new(0.01, 0.006));
+            let width = crate::sketch_mode::add_dimension(data, ConstraintKind::Length { curve: s.curves[0], value: 0.0 }, Some(DVec2::new(0.005, -0.003)), None).unwrap();
+            // A 30-40-50 triangle, each side dimensioned (live errors-1118: its 50 typed longer than the other two).
+            let (a, b, c) = (data.sketch.add_point(DVec2::new(0.0, 0.02)), data.sketch.add_point(DVec2::new(0.04, 0.02)), data.sketch.add_point(DVec2::new(0.0, 0.05)));
+            let sides = [data.sketch.add_line_between(a, b).unwrap(), data.sketch.add_line_between(b, c).unwrap(), data.sketch.add_line_between(c, a).unwrap()];
+            let lens: Vec<_> = sides.iter().map(|l| crate::sketch_mode::add_dimension(data, ConstraintKind::Length { curve: *l, value: 0.0 }, None, None).unwrap()).collect();
+            (s.curves[0], width, sides[1], lens[1])
+        })))
+        .unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.regen_sync(w, cx);
+        v.ui.slow_sketch = true;
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let length = |cx: &mut TestAppContext, curve| cx.update(|cx| view.read(cx).sketch_data(cx).and_then(|d| d.sketch.curve(curve)).map(|c| c.length() * 1e3).unwrap());
+
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.commit_dimension(width, "12 mm", w, cx))).unwrap();
+    let held = cx.update(|cx| view.update(cx, |v, cx| (v.ui.sketch_solve.is_some(), v.pending.is_some(), v.with_sketch(cx, |_, _| ()).is_none())));
+    assert_eq!(held, (true, true, true), "solving off the UI thread: pending, the sketch held");
+    assert!((length(cx, bottom) - 10.0).abs() < 1e-6, "the old shape shown meanwhile");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert!((length(cx, bottom) - 12.0).abs() < 1e-6, "the new width: {}", length(cx, bottom));
+    let after = cx.update(|cx| (view.read(cx).ui.sketch_solve.is_none(), view.read(cx).message.clone()));
+    assert_eq!(after, (true, None), "done, no message");
+
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.commit_dimension(len, "100 mm", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let warned = cx.update(|cx| view.read(cx).message.clone().map(|m| m.1));
+    assert_eq!(warned.as_deref(), Some(crate::sketch_mode::SKETCH_NOT_SOLVED), "the warning");
+    assert!((length(cx, line) - 50.0).abs() < 1e-6, "the last solved shape kept: {}", length(cx, line));
+    assert!((length(cx, bottom) - 12.0).abs() < 1e-6, "the rest as it was");
+}

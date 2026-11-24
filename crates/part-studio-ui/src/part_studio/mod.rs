@@ -921,6 +921,8 @@ impl PartStudioView {
                 this.context = Some(result.context.clone());
                 this.take_solved_draft(cx);
                 this.update_conflicts();
+                // The profile inspector follows a slow sketch's edits too (`regen_sync`).
+                this.update_profile_issues(cx);
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
                 this.note_open_display(!refine, result.display.regen_ms);
                 let display = Arc::new(result.display);
