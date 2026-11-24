@@ -2453,7 +2453,7 @@ per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 - [ ] **P1 SPEED-STANDOFFS (bool)**: c2-config-parts-standoffs 2701 (2619-2727) vs 176 (15.3x): Revolve 2 1152, Boolean 2 900, Boolean 1 621.
 - [ ] **P1 SPEED-WIRE-CLIP (bool)**: c2-wire-clip-imported 2054 (2042-2056) vs 297 (6.9x): Boolean 2 1489, Move face 1 413, Import 1 122.
 - [ ] **P1 SPEED-GAMMA (bool)**: c2-gamma-imported 1754 (1719-1796) vs 246 (7.1x): Boolean 2 1255, Move face 1 353, Import 1 102.
-- [ ] **P1 SPEED-PARTING-LINE (core)**: c2-parting-line-draft-parting-line 1637 (1526-1654) vs 743 (2.2x): Split 3 398, Rib 2 323, Rib 1 313.
+- [ ] **P1 SPEED-PARTING-LINE (core)** -> bool's Boolean speed (core 11-24 16:40, main + 2e8aac6db, vibex7: 2337 vs 738 ms; Split 3 631/31 = op_split's OCCT splitter; Draft 1/2 ~350/20 each = ~75% OCCT Boolean phases (face-face, section edges, edge splits) in op_draft_parting_curve's slab Booleans; Shell 1 215/11 = op_shell_solid; Rib 1/2 381/327, 409/282 under 2x): c2-parting-line-draft-parting-line 1637 (1526-1654) vs 743 (2.2x): Split 3 398, Rib 2 323, Rib 1 313.
 - [ ] **P1 SPEED-LOFT-PATHS (core)**: c2-loft-paths-guides 878 (865-879) vs 393 (2.2x): Loft 3 394, Mirror 1 304, Loft 4 54.
 - [ ] **P1 SPEED-NUTS (core)**: c2-config-parts-nuts 584 (579-594) vs 135 (4.3x): Sweep 1 556, Revolve 2 18, Revolve 1 9. core 11-24 (release, vibex7, NOSHAPE_KERNEL_PROFILE): Sweep 1 257-366 ms, op_boolean 297 of 366, pipe shell 13 ms; the time is our own Boolean (boolean.rust: sections_ahead, one_by_one); OCCT's is no way out (sprockets Circular pattern 1 582 ms, valve 184 ms and a face-count mismatch, nuts Sweep 1 1787 ms and fails) -> bool's Boolean speed.
 - [ ] **P1 SPEED-SPROCKETS (core)**: c2-config-parts-sprockets 222 (208-234) vs 83 (2.7x): Circular pattern 1 202, Extrude 2 9, Extrude 1 4. core 11-24 (release, vibex7, NOSHAPE_KERNEL_PROFILE): Circular pattern 1 225-237 ms; the time is our own Boolean (boolean.rust: sections_ahead, one_by_one); OCCT's is no way out (sprockets Circular pattern 1 582 ms, valve 184 ms and a face-count mismatch, nuts Sweep 1 1787 ms and fails) -> bool's Boolean speed.
@@ -4253,7 +4253,7 @@ neither build. knifehandle Fillet 2 shows a kernel message in place of Onshape's
   and OCCT's one cut (210 ms for the chamfers, 320 for the rounds); Fillet 1 366-413 ms. Left: the cut, i.e. building
   the blends directly.
 
-- [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
+- [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) -> bool (core 11-24 16:40, main + 2e8aac6db, vibex7: c2-rings-loft 2322 vs 1557 ms = 1.5x, under the bar; c2-impeller-loft 24.8 s vs 2.8 s: Shell Gehäuse 330-555 ms in by_quadrics (live 31), Chamfer Stevenrohr Halterung 568 ms in kernel rim_chamfer's 4 OCCT Booleans (live 20), Fillet 3 5.3 s on bool's feet-at-middle retry (live 107), the later fillets 3-4.6 s each) **c2-rings-loft opens in 5.1 s (live
   regenerates it in 1.6 s): Shell 1 takes 4.6 s; c2-impeller-loft 9.4 s (live 2.8): Shell Gehäuse 2.4 s, Fillet
   Ansaugflansch zum Gehaeuse 1.3 s, Fillet 4 1.2 s, Delete face 1 0.6 s.** Repro: /root/psui-scratch/open-slow/
   c2-rings-loft.noshape, c2-impeller-loft.noshape (+ -wal / -shm); per-feature times with NOSHAPE_PERF=1 (`regen[preview]`)

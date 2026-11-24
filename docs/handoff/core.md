@@ -4,15 +4,15 @@ Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-24 15:43 UTC)
-- **Landing (core-rf, this stack):** parity Intersect near-link (only one within 0.1 mm; loft-paths-guides 16 -> 29/29,
-  the other 6 Intersect docs as pm-1122; manualblend still 12/19: Sweep 2 / Split 1 drift upstream, Sketch 6 then fails
-  to solve, Boundary 1 fails -> left, upstream geometry); ERR-SEL-RED entry text (only blamed inputs red; Fillet blames
-  edges, Shell faces; psui 536 + model 628 pass, clippy clean); TICKETS notes (speed rows -> bool, EDGE-CENTRE-SEAM not
-  reproduced, APPEAR-SUBTRACT = panel swatch px).
-- Open: ERR-SEL-RED depth-0 region red outline (scene builder.rs ~1510 draws an err outline for ERROR regions; likely
-  draw order / psui). APPEAR-SUBTRACT: live check whether the panel keeps the used tool's row.
-- qa everyday-flow walk 11-24 (900905086): no core rows. Next: core rows from qa as they appear, else TICKETS P0/P1.
+## Now (11-24 16:40 UTC)
+- **Queued daf6387b** (carries 0598da9b = bfcad85c re-land; its 16:12 fail was only the flaky sm::a_tabs_merge):
+  parity Intersect near-link (loft-paths-guides 29/29), ERR-SEL-RED entry text, APPEAR-SUBTRACT panel row (live
+  core/appear-subtract-1124: a used-up tool's feature appearance has no row), TICKETS tidy (dup rows dropped).
+- OPEN-SLOW-SHELL-FILLET + SPEED-PARTING-LINE profiled: all Boolean / by_quadrics / splitter time -> bool (TICKETS
+  notes, lead told). rim chamfer before the section fallbacks saved nothing (reverted). Ruled surface (surf-intro x4)
+  skipped by the lead (niche).
+- Open: ERR-SEL-RED depth-0 red region outline (scene builder.rs ~1510; psui?). MANUALBLEND: upstream Sweep 2 drift.
+- Next: core rows from qa as they appear, else ask the lead.
 - Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
   5072.2167 mm2, ours a plate 5017.6. k::edges_on_faces (boolean.cpp: all edges copied once, each face's surface made
