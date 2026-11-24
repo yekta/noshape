@@ -2287,7 +2287,13 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     // 1e-8 of the volume: the change then only its edges', as 850efe's Extrude 5, coaxial cylinders of one radius in
     // pieces, 3e-9 of its volume; live one face each.)
     const double need  = change ? std::abs(*change) : 0;
-    const auto   roomy = [&] { return change && need <= 1e-8 * std::abs(volume0()) && (need == 0 || (merges_elementary(in, u) && pieces_within(in, u, Precision::Confusion()))); };
+    // (Or, on any surface, every merged piece on its merged face's within 1e-7 m and the volume within 1e-7: the change
+    // the integrals' error, below anything live shows (c2-config-parts-nuts' thread pieces merged back, 1.1e-8 of the
+    // nut: three tries and a pass without it, ~40 ms).)
+    const auto   roomy = [&] {
+      return change && ((need <= 1e-8 * std::abs(volume0()) && (need == 0 || (merges_elementary(in, u) && pieces_within(in, u, Precision::Confusion()))))
+                        || (need <= 1e-7 * std::abs(volume0()) && pieces_within(in, u, Precision::Confusion())));
+    };
     if ((!keeps_volume(change, u.Shape()) && !roomy()) || !new_faces_valid(in, u.Shape()))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
