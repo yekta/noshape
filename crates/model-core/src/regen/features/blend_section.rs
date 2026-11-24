@@ -2167,17 +2167,23 @@ fn ball_edge(c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> F
 fn into_face(f: &Shape, p: DVec3, tangent: DVec3, step: f64) -> FResult<Option<(DVec3, DVec3)>> {
     let m = -f.normal_at_point(p)?.normalize();
     let dir = m.cross(tangent).normalize();
-    let near = |v: DVec3| f.project_point(p + v * step).map(|q| q.distance).unwrap_or(f64::INFINITY);
-    let (a, b) = (near(dir), near(-dir));
-    // (On a face curving away within the step, its sag there: under a fifth of the step, where the side off the face
-    // projects back onto the edge, a step away; c2-impeller-loft's rib side, ~2 mm round at its lip.)
-    Ok(match (a < step * 1e-2, b < step * 1e-2) {
-        (true, false) => Some((dir, m)),
-        (false, true) => Some((-dir, m)),
-        _ if a < step * 0.2 && b > step * 0.8 => Some((dir, m)),
-        _ if b < step * 0.2 && a > step * 0.8 => Some((-dir, m)),
-        _ => None,
-    })
+    // (Both sides on the face: a step within the face's tolerance of its edge, which classifies it on (the scissor's
+    // Studio 9cbb0e Fillet 23, a 2 mm edge's 2 µm step): longer ones.)
+    for step in [step, step * 10.0, step * 100.0] {
+        let near = |v: DVec3| f.project_point(p + v * step).map(|q| q.distance).unwrap_or(f64::INFINITY);
+        let (a, b) = (near(dir), near(-dir));
+        // (On a face curving away within the step, its sag there: under a fifth of the step, where the side off the
+        // face projects back onto the edge, a step away; c2-impeller-loft's rib side, ~2 mm round at its lip.)
+        return Ok(match (a < step * 1e-2, b < step * 1e-2) {
+            (true, true) => continue,
+            (true, false) => Some((dir, m)),
+            (false, true) => Some((-dir, m)),
+            _ if a < step * 0.2 && b > step * 0.8 => Some((dir, m)),
+            _ if b < step * 0.2 && a > step * 0.8 => Some((-dir, m)),
+            _ => None,
+        });
+    }
+    Ok(None)
 }
 
 /// The ball where two chain edges meet whose faces other than a common one are tangent along an edge there (a line's
@@ -5242,7 +5248,7 @@ fn canal_corner(shape: &Shape, names: &[Name], r: f64, scale: f64) -> FResult<Op
 
 #[cfg(test)]
 mod tests {
-    use super::{Support, chain, plane_cylinder_contacts, rolling_ball};
+    use super::{Support, chain, into_face, plane_cylinder_contacts, rolling_ball};
     use glam::DVec3;
     use noshape_kernel::{self as k, Shape, ShapeType};
 
@@ -5299,6 +5305,20 @@ mod tests {
                 let (x, y) = (v.dot(e.major_dir), v.dot(e.normal.cross(e.major_dir)));
                 assert!(v.dot(e.normal).abs() < 1e-9 && ((x / e.major).powi(2) + (y / e.minor).powi(2) - 1.0).abs() < 1e-9, "a contact off its ellipse: {t:?}");
             }
+        }
+    }
+
+    /// A step off an edge within its face's tolerance lands on the face on both sides (the scissor's Studio 9cbb0e
+    /// Fillet 23, a 2 mm edge's 2 µm step): a longer one finds the side the face lies on.
+    #[test]
+    fn a_face_side_is_found_past_the_face_tolerance() {
+        let cube = k::make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
+        let top = cube.sub_shapes(ShapeType::Face).into_iter().find(|f| f.normal_at_point(DVec3::splat(0.005).with_z(0.01)).is_ok_and(|n| n.z > 0.99) && f.centroid().is_ok_and(|c| c.z > 0.0099)).unwrap();
+        let tol = top.max_edge_tolerance();
+        let (p, tangent) = (DVec3::new(0.005, 0.0, 0.01), DVec3::X);
+        for step in [tol * 0.1, tol, 1e-5] {
+            let (dir, _) = into_face(&top, p, tangent, step).unwrap().unwrap_or_else(|| panic!("no side at a {step} step"));
+            assert!(dir.y > 0.99, "{dir} at a {step} step");
         }
     }
 }
