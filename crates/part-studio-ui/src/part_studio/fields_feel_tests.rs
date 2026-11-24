@@ -271,7 +271,9 @@ fn the_fields_matrix_matches_live(cx: &mut TestAppContext) {
 #[gpui::test]
 fn feature_fields_reject_what_live_rejects(cx: &mut TestAppContext) {
     let edge = serde_json::json!(["edge through [20, 0, 20]"]);
-    let cases: Vec<(serde_json::Value, &str, &str, &[&str], &[&str])> = vec![
+    // (the feature, its field's path and label, values rejected, values accepted)
+    type Case<'a> = (serde_json::Value, &'a str, &'a str, &'a [&'a str], &'a [&'a str]);
+    let cases: Vec<Case> = vec![
         (serde_json::json!({ "type": "fillet", "name": "F", "params": { "entities": edge, "radius": "2 mm" } }), "radius", "Radius", &["0", "-2", "0.001", "5 deg"], &["2"]),
         (serde_json::json!({ "type": "chamfer", "name": "F", "params": { "entities": edge, "width": "2 mm" } }), "width", "Distance", &["0", "-2", "5 deg"], &["2"]),
         (serde_json::json!({ "type": "shell", "name": "F", "params": { "entities": ["face through [20, 15, 20]"], "thickness": "2 mm" } }), "thickness", "Shell thickness", &["0", "-2", "5 deg"], &["2", "20"]),
