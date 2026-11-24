@@ -33,17 +33,20 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     concave edge, both ends on a piece's ends, tangent to it): 8 pieces + 2 arcs + 2 smooth edges -> rolling balls fail
     at blend_section rolling_ball's det ~ 0 ("tangent"): the arc lies on the groove's own 0.5 mm round, the ball is
     0.5 mm too, so it sits in it (degenerate contact). Live needs a vertex blend / setback there; not rolling balls.
-- **NEXT: concave balls (20:55)** /root/core-scratch/run/f2-cball.patch (apply on main): blend's ZZ_CBALL (blend-cusp
-  5a299e6fc..429750f98, diff in /root/core-scratch/run/cusp.diff) ported minimal: BallEdge.convex, a thread-local
-  with_concave_balls (concave balls on flipped supports, tools fused), new detail.rs arm after rolling_ball_blend
-  (ZZ_NOCBALL=1 turns it off for A/B). NOT ported yet: the vanishing concave ends (cusp.diff hunk @@ -2257: stations
-  packed to the end + the end point as a vertex section; main's secs[lead..lead+n+1] slice needs adapting).
-  A/B same build (.sc1ab.sh): fixes 9cbb0e Fillet 2, 6 and 2d82a0 Fillet 7, 21, 31, 37; breaks 9cbb0e Fillet 25
-  (missing edges), Chamfer 6 -> warning, 2d82a0 Fillet 39 + its Sketch 24/25 cascade. 9cbb0e Fillet 2 vs live
-  (.scp.sh <tab> <F> <parts>; live studios/9cbb0e*.live.jsonl in vibex7 ~/parity/models/asm-scissor-lift): Lower
-  Linkage exact (18/46/28, 10295.869); Upper Linkage ours 27/67/40 14783.643 mm3 6220.18 mm2, live 24/60/36
-  14783.448 6210.83 -> 3 extra faces (likely the concave tools' abrupt ends): port the vanishing ends, recheck.
-  Scripts (core-rf, untracked): .scf.sh <tab> "<F>" [nobuild] (build + debug block), .sc1.sh, .sc1ab.sh, .scp.sh.
+- **NEXT: concave balls (23:40), uncommitted in core-rf, also /root/core-scratch/run/f2-cball2.patch (on 0a0a42e18).**
+  Port of blend's ZZ_CBALL (cusp.diff) + vanishing ends + 3 fixes of mine: concave edges never run on (rolls_on needs
+  e.convex), a concave straight tool's free end on oblique planes run on 4r and trimmed by them (concave_end_walls),
+  every concave tool trimmed by the planes its supports drop off at (ledge_walls + trim_by_walls: the scissor's
+  ledge narrower than r). 9cbb0e Fillet 2: Upper + Lower Linkage now EXACT vs live (24/60/36, 14783.448, 6210.83).
+  Tried + dropped: tori for cone supports (live has 4 tori, ours lofts: concave tori fuse invalid, convex gave 25
+  faces). Unit test added: a_concave_round_wider_than_its_ledge_is_trimmed_by_the_ledges_drop (NOT run yet).
+  A/B on the stored doc (.sc1ab.sh) still shows 9cbb0e Fillet 25 / 2d82a0 Fillet 39 cascade, but that doc's refs
+  are stale (written when Fillet 2 failed: M3 Clearance Links then renamed every face Offset(..)). Real measure =
+  fresh translation: .pm2.sh [sc9cbb|sc2d82] (parity_models on vibex7 ~/tmp/core/pm, A/B statuses diffed). sc9cbb:
+  B fixes Fillet 2 + Chamfer 6, nothing new fails. sc2d82 (derived/ dir added) run was in flight: rerun if gone.
+  Then: run the unit test + model-core/model tests + clippy, drop ZZ_NOCBALL (detail.rs) and keep the
+  NOSHAPE_BLEND_DEBUG prints minimal, land.
+  Scripts (core-rf, untracked): .scf.sh, .scp.sh, .scfa.sh (faces + ids), .scfe.sh, .scg.sh (feature_get), .pm2.sh.
 - Rocker P0 (lead 20:00): skasm's ab958b87b (Bend split-piece naming) broke the corpus c2-sm-rocker-enclosure-sm
   from Bend 2 on ("Select a planar sheet metal face."); reverted (d101fff85, in bad9c09e). Repro: .rk2.sh [build]
   (corpus doc vibex7 ~/qa/corpus, release CLI). Unused: /root/core-scratch/run/planar-fix.patch (drop_filtered_picks
