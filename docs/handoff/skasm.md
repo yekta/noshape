@@ -21,6 +21,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   lands; rebase drops nothing else): 7e9bedfb7 renderer LineSegment::dash_from (patterns run on along a polyline;
   construction circle dashed; psui told) + 35cf44304 TICKETS + f514ede02 handoff + Offset: picked curves show no badges
   (FEEL-OFFSET-PREVIEW-LOOK, test a_tool_hides_a_hovered_lines_glyphs) + TICKETS annotation.
+- LEAD 18:05 NEXT (do first): SKT-DASHDOT-GUIDES per live/skasm/dashdot-guides-1124: tool previews dash 30 / gap 6 /
+  dash 4 / gap 6 (46 px, screen px, from the start), colour #449CCD. Centre point arc: full circle + radius line after
+  the centre click, both gone after the start click. Inscribed polygon: circumscribing circle, no radius line. Text:
+  the box, pattern continuous round its corners (one polyline: dash_from), unchanged while the dialog is open.
+  Check our preview strokes (sketch_mode.rs push_polyline with LineSegment::CONSTRUCTION / DASH_DOT?) against it,
+  GPU-test one (count gaps as sk_a_construction_circle_is_dashed). 1391 numbers: REQUESTS row already filed 18:00.
 - Lead 17:40: next = remaining sketch TICKETS rows (feel/hover/inference first) + rest of the audit; live re-measures
   SKT-DASHDOT-GUIDES previews. REQUESTS skasm 11-24 ~18:00: Offset iso arrow direction / in-plane value / origin ring.
   Rows 51-71 (SKT-*) mostly fixed by the landed stack: check each against its live note before closing; row 590
