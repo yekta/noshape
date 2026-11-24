@@ -1093,8 +1093,8 @@ const XF_SCALE_BOX_FROM_POINTER: (f64, f64) = (45.5, -47.0);
 /// transform-2-after-drag: up and right of the arrow's head).
 const XF_MOVE_BOX_FROM_POINTER: (f64, f64) = (72.0, -48.0);
 const XF_SCALE_BOX_AFTER: (f64, f64) = (138.5, 46.0);
-/// A drawing preview's dash-dot guide (the text box, the polygon's and the centre point arc's circles): 30 px on,
-/// 6 off, 4 on, 6 off (live sketch-tools-1123 text.md; arcs.md ≈25 / 6 sampled on a circle).
+/// A drawing preview's dash-dot guide (the text box, the polygon's and the centre point arc's circles, that arc's radius): 30 px on,
+/// 6 off, 4 on, 6 off, #449CCD (live dashdot-guides-1124).
 const DASH_DOT_PERIOD_PX: f64 = 46.0;
 
 /// The dash and dot pieces of a dash-dot polyline with the given period,
@@ -6959,9 +6959,9 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::CenterArc => match anchors.len() {
-                    // Live sketch-tools-1123: a dash-dot circle through the pointer.
+                    // Live dashdot-guides-1124: a dash-dot circle through the pointer and a dash-dot radius to it.
                     1 => {
-                        poly(&[anchors[0], c], preview_color, true);
+                        dash_dot.push(vec![anchors[0], c]);
                         dash_dot.push(circle_pts(anchors[0], (c - anchors[0]).length(), 72));
                     }
                     2 => {
@@ -6972,9 +6972,8 @@ impl SketchEditor {
                         let ccw = noshape_sketch::geom::ccw_sweep(a0, (c - ctr).to_angle());
                         let sweep = if self.center_arc_sweep >= 0.0 { ccw } else { ccw - TAU };
                         let pts: Vec<DVec2> = (0..=48).map(|i| ctr + DVec2::from_angle(a0 + sweep * i as f64 / 48.0) * r).collect();
+                        // Only the arc once its start is clicked (live dashdot-guides-1124).
                         poly(&pts, preview_color, false);
-                        poly(&[ctr, anchors[1]], preview_color, true);
-                        poly(&[ctr, c], preview_color, true);
                     }
                     _ => {}
                 },
@@ -14608,6 +14607,32 @@ mod tests {
             assert!(points.points.iter().any(|p| p.color == PREVIEW_COLOR && (p.position[0] as f64 - c.x).abs() < 1e-6 && (p.position[1] as f64 - c.y).abs() < 1e-6), "corner {c}");
         }
     }
+    /// Live dashdot-guides-1124: after its centre click the Center point arc shows a dash-dot circle through the pointer
+    /// and a dash-dot radius to it (dash 30 px first); both go with the start click, leaving the solid arc.
+    #[test]
+    fn a_center_arc_shows_its_dash_dot_circle_and_radius_until_the_start_click() {
+        let units = UnitPrefs::default();
+        let (mut ed, mut d) = editor(Tool::CenterArc);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, v(0.02, 0.0), false, false);
+        let (lines, _) = ed.overlay(&d, &units);
+        let blue: Vec<_> = lines.segments.iter().filter(|s| s.color == PREVIEW_COLOR).collect();
+        assert!(blue.iter().all(|s| s.style & LineSegment::DASHED == 0), "no plain dashes");
+        let len = |s: &&&LineSegment| ((s.b[0] - s.a[0]).powi(2) + (s.b[1] - s.a[1]).powi(2)).sqrt() as f64;
+        let radius: Vec<_> = blue.iter().filter(|s| s.a[1].abs() < 1e-7 && s.b[1].abs() < 1e-7 && s.a[0] < 0.0199 && s.b[0] < 0.0199).collect();
+        let first = radius.iter().find(|s| s.a[0].abs() < 1e-7).expect("radius from the centre");
+        assert!((len(first) - 30.0 * PX).abs() < 1e-6, "first dash {} px", len(first) / PX);
+        assert!(radius.iter().any(|s| (len(s) - 4.0 * PX).abs() < 1e-6), "a 4 px dot on the radius");
+        let on_circle = |p: [f32; 3]| ((p[0].powi(2) + p[1].powi(2)).sqrt() - 0.02).abs() < 1e-6;
+        assert!(blue.iter().filter(|s| on_circle(s.a) && on_circle(s.b)).count() > 20, "dash-dot circle");
+        click(&mut ed, &mut d, v(0.02, 0.0));
+        ed.pointer_move(&mut d, v(0.0, 0.02), false, false);
+        let (lines, _) = ed.overlay(&d, &units);
+        let blue: Vec<_> = lines.segments.iter().filter(|s| s.color == PREVIEW_COLOR).collect();
+        assert!(!blue.is_empty(), "the arc");
+        assert!(blue.iter().all(|s| on_circle(s.a) && on_circle(s.b)), "only the arc stays");
+    }
+
     /// Live sketch-tools-1123 INDEX "Common rules", fillet.md, use-convert.md, text.md, slot.md: a light-blue dot follows
     /// the pointer while a drawing tool waits for its first click (Text too); none with Slot, Offset, Fillet, Chamfer,
     /// Use, or a Tangent arc with no end to start from.
