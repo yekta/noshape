@@ -33,10 +33,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (11-24 13:4x UTC; brief /root/lead-scratch/prompt-psui-1124.txt; lead 11-24 13:1x)
-- QUEUED 11-24: studios' stack 6aca9828 (landed), my stack edb7329e (checking 11:14), skasm's 30cba9c5; the feel batch
-  (this handoff's commit). Once landed: `git worktree remove` psui-skrebase / psui-strebase, rm ~/agents/psui-*rebase
-  on vibex7/8.
+## RESUME HERE (11-24 14:2x UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
+- FIRST (lead 14:2x): skasm's rebased stack 30cba9c5 FAILED again 11:40 on a rebase conflict (the user's Offset fix not
+  on main): re-land it before anything else (rebase worktree psui-skrebase on origin/main, resolve, land.sh).
+- QUEUED eaa20b28 (14:0x): the feel batch + Windows hardening (below). edb7329e landed as 63731676b. Local, not yet
+  landed (land after eaa20b28 is in): 0174defba (TICKETS: one row per psui ticket; FEEL-EDIT-BODY-SHADE numbers).
+  Uncommitted: TICKETS MEASURE-PANEL-POSITION closed (= live default, behaviours 11-22); interaction-feel chip rows'
+  stale ≠; list_feel_tests row "hover / a row clicked into a dialog's field keeps its tooltip" (FEEL-ROW-DEPENDENCY-
+  TIP-IN-DIALOG, P2): its first run was going on vibex8 (~/tmp/psui/lst.log, run-lst.sh) when compaction came; read
+  the log, fix ours if the tip is missing (row tooltip: mod.rs ~6625 with_lazy_side_tooltip, tooltip_after_press).
+- Tell the lead/qa: score-a910 pairs b3x-mc-radius (live crop ps-origin-selhover_f) and b1-midapp-sel-face (live
+  mid-paths/cp-angle90, no face selected) are mispaired, not defects.
+- Windows: the_pointer_lights_the_line_... log: release/v0.4.68 run 45375844269, job 138469739575 (was running 13:3x):
+  `gh api repos/{owner}/{repo}/actions/jobs/138469739575/logs`, grep the test. a_cleared_hover_...: read the next
+  Windows main run's message (frame_diff).
 - Feel batch (landing): FEEL-MC-LOOK (MC_RIM_PX 1, MC_Z_AXIS_PX 23), ERR-MATE-HOVER-GLYPH, FEEL-SKETCH-INF-END-DOT,
   ERR-CHROME-TIP-PLACEMENT (title tip -2), ERR-LIST-TOOLTIP-CHROME (tips > 386 px wrap), SKT-USE-HOVER (edge most across
   the screen, 5 px band + core). mc_hovered_other_selected: a lone blended pixel matched #ffa033 within 24; now measured

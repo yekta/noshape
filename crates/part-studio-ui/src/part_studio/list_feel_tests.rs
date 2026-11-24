@@ -1204,6 +1204,25 @@ fn rows() -> Vec<Row> {
             l.hover(cx, "feature:Extrude 1", 450);
             expect(crate::ui_script::shown_tooltip(), Some("Extrude 1 <- Sketch 1".to_string()), "tooltip")
         } },
+        Row { id: "hover / a row clicked into a dialog's field keeps its tooltip", live: "workflow 07 step 3 (qa FEEL-ROW-DEPENDENCY-TIP-IN-DIALOG): Linear pattern of features, a click on Extrude 2's row fills Features to pattern; the pointer left on it, 'Extrude 2 <- Sketch 2' beside the row 4 s later", gap: false, check: |l, cx| {
+            cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| {
+                v.selection.clear();
+                v.start_feature("linearPattern", w, cx);
+                let d = v.edit.as_ref().expect("the Linear pattern dialog").dialog.clone();
+                d.update(cx, |d, cx| d.set_value("patternType", noshape_model::ParamValue::Enum("FEATURE".into()), cx));
+            }))
+            .unwrap();
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            draw(cx, l.window);
+            l.click(cx, "feature:Extrude 1", NONE);
+            crate::ui_script::clear_tooltip();
+            l.wait(cx, 4500);
+            let picked = cx.update(|cx| l.view.read(cx).edit.as_ref().map(|e| format!("{:?}", e.dialog.read(cx).feature.params.get("instanceFunction"))));
+            let tip = crate::ui_script::shown_tooltip();
+            l.keys(cx, "escape");
+            wait_until(cx, l.window, |cx| l.view.read(cx).edit.is_none() && !l.view.read(cx).ui_busy());
+            expect(tip, Some("Extrude 1 <- Sketch 1".to_string()), &format!("tooltip (Features to pattern: {picked:?})"))
+        } },
         Row { id: "hover / a feature row's tooltip 3 px right of the row, level with it", live: "live err-tip-placement-1123: the row 40, 352, 200 × 26, its tip 243, 352, 26 high; it stays there as the pointer moves (qa ERR-CHROME-TIP-PLACEMENT: ours ~5 px right, 7 px lower)", gap: false, check: |l, cx| {
             l.hover(cx, "feature:Extrude 1", 450);
             let row = l.bounds(cx, "feature:Extrude 1").ok_or("no Extrude 1 row")?;
