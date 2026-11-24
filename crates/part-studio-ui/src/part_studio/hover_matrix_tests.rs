@@ -2456,3 +2456,22 @@ fn a_failing_flanges_joint_edge_is_red_through_the_wall(cx: &mut TestAppContext)
     let after = red(cx);
     assert!(after >= before + 40, "red px: {before} closed, {after} with the dialog open");
 }
+
+/// Qa SKETCH-MIRROR-LINE-LOOK (live sketch-tools-1123 mirror-pattern.md): Mirror's picked line is pale yellow-green
+/// (242,255,128) with (215,226,150) edges, 2 px, under the parked pointer; qa measured ours darker (189,199,100).
+#[gpui::test]
+fn the_picked_mirror_line_is_live_pale_yellow_green(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "hover-matrix-mirror-line");
+    m.edit_sketch(cx);
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.activate_tool(Tool::Mirror, w, cx))).unwrap();
+    let p = m.screen(cx, SK_LINE);
+    m.pointer.move_to(cx, &m.view, p);
+    m.pointer.click(cx, &m.view, p);
+    m.park(cx);
+    assert!(cx.update(|cx| m.view.read(cx).sketch.as_ref().and_then(|ed| ed.shown_mirror_line()).is_some()), "the line picked as the mirror line");
+    let c = m.crop(cx, p);
+    let column: Vec<[u8; 3]> = (30..51).map(|y| c[y * 80 + 40]).collect();
+    let lit = column.iter().filter(|px| px[1] > 180 && px[1] >= px[0] && (px[1] as i32 - px[2] as i32) > 60).count();
+    assert!(column.iter().any(|px| close(*px, 0xf2ff80, 16)) && (1..=3).contains(&lit), "rows 30..50 across the line: {column:?}");
+}
