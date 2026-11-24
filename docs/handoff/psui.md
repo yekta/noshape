@@ -33,21 +33,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (11-24 14:2x UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
-- Stack re-queued as 5175c04d, batch 1 as aeddb0f4, batch 2 as e4612e55 (22 commits, includes the stack).
-- Lead task 11-24 18:2x: Part Studio feel-coverage audit (docs/parity/ps-feel-audit.md; tests part_studio/
-  ps_audit_feel_tests.rs, audit::). Batch 1 (11 specs, no app bug) in aeddb0f4; batch 2 queued as e4612e55 (6 specs:
-  Show all effect, edge-menu 250 px, Camera menu rows, Zebra/Draft fields, panels under a new sketch, analysis panel
-  corner; fixed: analysis panels top 3 px, empty Dihedral 226 high). Counts: covered before 142 of 164, after 159.
-  Left (5): Hole icon rows, checkbox label widths, Delete part preview look (pixel / text-width look tests), DCLICK-HEAVY
-  (T2 latency on a heavy part), preview self-pick (pointer on a live preview resolving pre-feature).
+## RESUME HERE (11-24 20:17 UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
+- Stack re-queued as 5175c04d, batch 1 as aeddb0f4 (landed, edb5cd135 on main), batch 2 as e4612e55, batch 3 queued
+  now (f22bb2b4f before rebase).
+- PS feel-coverage audit (docs/parity/ps-feel-audit.md; tests ps_audit_feel_tests.rs `audit::` + hover_matrix):
+  covered before 142 of 164, after batch 1 153, batch 2 159, batch 3 162. Left 2: Hole icon rows (per-row crops vs
+  live, not cheap), DCLICK-HEAVY (lead 11-24: skip).
+  Batch 3 fixes: a feature's own preview (faces, edges, vertices it made) resolves hover and click to the nearest face
+  of `ui.preview_before` along the ray unless the dialog holds it (mod.rs before_face_under / preview_hides; face_hits
+  skips bodies whose box the ray misses); dialog checkbox labels mr 6 (cut at 174 px, was 180).
+  Tests: a_fillets_preview_band_picks_the_faces_it_was_built_on (sample x 32 mm: the radius arrow at x 20 eats clicks;
+  5° from the top tangent, 15° hits the picked edge's band), delete_parts_preview_outlines_only_the_silhouette,
+  checkbox_labels_start_20_px_in_and_cut_at_174_px (Derived is "importDerived"; label selector cbl-<path>).
+  a_failing_feature_patterns_direction_... flaked once on a loaded vibex8 (white frame), passed alone.
   Tests note: a field made active by user_focus_query alone is taken back by the focused field's tab stop on the next
-  render: focus `tab_stop_handle("q:<path>")` as a click does. build_start can't name regions inside arrays (pick them).
-  The viewport's context menu is `view.context_menu` (os_menu::open_labels is empty for it).
-  NEXT (told the lead): preview self-pick (behaviours 21819). Hover goes through the GPU pick buffer (pick_pending), so
-  the test is a pointer test like latency_tests.rs (move_to + Viewport::project); preview picks vs pre-feature:
-  mod.rs held_face_under / ui.preview_before. Fillet the block's top-front edge, radius 5, hover/click the band:
-  live hovers the original top face and adds chip "Face of Extrude 1" (not red, ✓ on).
+  render: focus `tab_stop_handle("q:<path>")` as a click does. The viewport's context menu is `view.context_menu`.
+  NEXT: ask the lead.
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
