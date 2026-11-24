@@ -4,7 +4,7 @@ Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-22 13:05 UTC)
+## Now (11-24 12:58 UTC)
 - **QUEUED P0 BOOLEAN-UNION-FIRST-TOOL-IDENTITY (1e05327f, 11-23):** display.rs face_colors also takes face colours of
   a part merged away (keyed by its old BodyId), so a union keeps both parts' face colours. Already as live: the union
   keeps the first tool's id and name (T1 features_b::union_of_imported_parts_is_its_first_tool, both orders). The
@@ -157,41 +157,27 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    (part pattern Add with NO_GEOMETRY_CHANGE -> error_shapes = the instances; regen tessellates them on Info; mod.rs
    draws an Info feature's error_mesh while open; T1 an_add_pattern_changing_nothing_draws_its_instances_red).
    Probes out of git: ~/core-keep/probes2.patch.
-0. QUEUED de552af9 (11-23 05:50, carries 7cc94a23 in one batch): APPEAR-SPLIT/PATTERN-COPY: Context.part_source
-   (split pieces -> target, keep its name; pattern/mirror/transform/copy-part/feature-pattern copies -> source) and
-   display.rs inherits part_properties colour along it; psui appearance.rs lineage(): face/feature appearances follow
-   Split parents and Role::Copy. 7cc94a23: FeatureState.error_refs (only blamed inputs red), hole destroying its part
-   -> body red, empty loft guide row "No selections", drop_filtered_picks (a pick its field refuses = missing).
-   318c67d5 / 0c582c74 (failed 05:04 on handoff conflicts) are already on main as 26657ac62 / 6f2f75e18.
-   After both land: tell qa (agent_status first, roster ids) to rescore errors-1123 core rows + APPEAR-SPLIT/PATTERN.
-0. QUEUED SUBTRACT-CUT-FACES (11-23 06:1x; model, model-data, ops green): ScopeRule 20 + PartStudio.legacy_cut_face_names (set on load when < 20 and any booleanBodies) -> Context;
-   basic.rs boolean: SUBTRACTION non-offset tools named helpers_a::rebrand (Face{boolean, Generated(n)}), so the tool's
-   face/feature appearances stop reaching the cut faces. T1 engine::subtract_cut_faces_are_the_booleans (both flags;
-   a legacy flag only counts on a fresh Regenerator: set before the first regen, as on load).
-0. SPLIT NAMES + ORDER: QUEUED 1a64b9cb (07:2x, carries all core commits; rebase fix: psui blamed = failing && !attempt, main's Fillet attempt rule). Names = "Part <list position>",
-   renamed parts count (ours already). Order (live split-order-1123): first piece = the one keeping the target's first
-   face in creation order (model-data naming::extrude_face_order, moved from custom query.rs creation_order) not every
-   piece keeps; only for one-Extrude bodies (else the old side sort). T1 features_a::split_pieces_take_… and
-   the_first_split_piece_keeps_…; kernel/model/custom suites green with it.
-0. HOSE JOINTS: QUEUED in 1a64b9cb: op_sweep records (profile, path, options + the frame
-   sweep_any_frame took) in CtxState.sweeps keyed by body SHAPE; op_shell Inside with both caps of a round sweep ->
-   ring_sweep = the sweep cut by the sweep of the circle r-t (a ring face's sweep lay 3.6e-6 off the disc's walls);
-   names: outer walls kept, inner Offset(wall) (|d-t| < 1e-5), ends Offset(rim edge). T1 custom_features::
-   a_shelled_round_sweep_meets_exactly_at_its_joints (edges within 1e-8). After landing: ask dx to rerun the hose x_t.
-0. P1 SPEED-ASM-OPEN-SCISSOR IN TEST (WIP parked: /root/core-scratch/slabs-wip.diff = features.cpp
-   offset_by_slabs + call in op_offset_faces + kernel/tests/core.rs probe; git apply it). Scissor doc vibex7
-   ~/agents/core-keep/sc/scissor.noshape PRIVATE (mode-600 copies ~/tmp/core/sc only); dumps ~/tmp/core/sc/d
-   (offsetfaces-N, NOSHAPE_DUMP_OPS) on vibex7 only; .od.sh (probe_offset_dumps, release) -> remote ~/tmp/core/sc/od.out.
-   offset_by_slabs: moved planes whose unmoved neighbours run along the normal (planes square, cylinders parallel;
-   moved neighbours: same offset, plane, edge convex for a cut / concave for a fuse) -> prism slab; whole cylinders
-   between 2 square end planes -> ring slab; Cut (d<0) / Fuse (d>0) + UnifySameDomain; guards: |dV| = fused slabs'
-   volume (slab wholly in/out), 1 valid solid, every result face one original face's image (moved face -> slab's far
-   face); face history AddModified. Results: #7 698 -> 72 ms, #21 1008 ms (OCCT result garbage, volume -6.6e12) ->
-   ~100 ms exact, #19/#22 (OCCT fails) valid; #8 (concave moved pair) falls back. BUG: dump #14 (1 plane +4 mm,
-   neighbours CPCCP, a fuse) returns a NULL shape (probe panics at r.shape.volume()); a SLABDBG fprintf in the WIP
-   prints the result type: 07:25 result: #14 never succeeded in the slab path (no SLABDBG) yet the OCCT fallback came back null: likely UnifySameDomain edits edges shared with the input solid (features.cpp ~6863 note) -> unify a BRepBuilderAPI_Copy (map history through it) or only after all guards; results are COMPOUNDs (fine). Fix, drop SLABDBG + probe, then a T1 kernel test
-   (block with a pocket/boss: move a top face -/+; a hole wall), model/custom/ops suites, land; then Delete face 2
-   (op_defeature 1.15 s). Many fillets/chamfers/Move face 2 there are Error in ours: maybe OCCT's broken offsets.
+0. QUEUED 35dceca0 (11-24, 19 commits = every core commit since 11-20): error_refs (only blamed inputs red; an error
+   without explicit refs reddens its err_at params' inputs, none when it has an error_mesh: psui's flange/pattern UI
+   tests), APPEAR-SPLIT/PATTERN-COPY part colours, SUBTRACT-CUT-FACES (ScopeRule 20, legacy_cut_face_names), Split
+   names + order (extrude_face_order), hose joints (ring_sweep). The 11-23 failed queues' base carried unlanded
+   psui/studios commits: rebased with --onto (only core's). Green on vibex7: model 628, model-core, model-data, scene,
+   custom, psui 526, ops e2e. After it lands: tell qa to rescore errors-1123 core rows + APPEAR-SPLIT/PATTERN; ask dx
+   to rerun the hose x_t.
+0. P1 SPEED-ASM-OPEN-SCISSOR (WIP, core-rmx branch core-slabs, commits 7a9c1af8 + cb5c5ec6; diff also
+   /root/core-scratch/slabs-wip2.diff is older). offset_by_slabs now unifies a COPY (the null OCCT fallback was unify
+   editing the input's shared edges), history = compose(inputs, h, copy+unify) with moved faces/edges/vertices ->
+   their slab copies' images (ReplaceModified) and solid -> solid. T1 kernel core::a_face_moved_between_square_
+   neighbours_is_the_part_and_its_slab passes. Temporary NOSHAPE_NO_SLABS switch in op_offset_faces (drop before
+   landing) for A/B. Scissor open (vibex7, load 13): 71 s slabs vs 75 s OCCT. BLOCKER: slab mode breaks downstream
+   refs: Studio 665cf3 features 0-7 same status, Extrude 1 (feature 8) "Select a face to terminate" (OCCT Ok); also
+   9cbb0e/56d3a6/fed22d Mirror/Fillet "Select ..." cascades; assembly 4 instances fail to resolve. Next: find which
+   offset differs before 665cf3's Extrude 1 (its Derived 1 source studio's Move faces?), compare decoded face names
+   (tn.py probe kit) slab vs OCCT. Tools on vibex7 ~/tmp/core/sc (pruned after 12 h): fd.py (per-studio feature/part
+   diff of both modes, raw fd-slabs/fd-occt.jsonl), b.jsonl, od.out; scripts .sc*.sh/.ab.sh/.fd.sh in core-rmx.
+   Unify can't merge a fuse slab's walls with rounded-corner cylinders / hole walls (unowned faces, slab path refuses,
+   OCCT fallback runs, gives a Shell there as main): not axis direction, not tolerance, DirectModification breaks the
+   solid; maybe u-range offset by the period. Then Delete face 2 (op_defeature 1.15 s).
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
