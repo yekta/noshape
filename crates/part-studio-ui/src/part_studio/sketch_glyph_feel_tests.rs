@@ -367,6 +367,17 @@ fn a_tool_hides_a_hovered_lines_glyphs(cx: &mut TestAppContext) {
             assert_eq!(shown, 0, "{tool:?}: no glyphs on the hovered line");
         }
     }
+    // Offset's picked line stays selected under its preview, with no badges (qa FEEL-OFFSET-PREVIEW-LOOK: live none).
+    let on = along_line(cx, &view, line);
+    pointer.click(cx, &view, on);
+    pointer.move_to(cx, &view, DVec2::new(600.0, 200.0));
+    cx.executor().advance_clock(GLYPH_LINGER + std::time::Duration::from_millis(50));
+    cx.run_until_parked();
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.offset_pending.is_some() && ed.selection.contains(&line))), "the line picked for an offset");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let shown: Vec<_> = selectors.iter().filter(|s| vcx.debug_bounds(s).is_some()).collect();
+    let state = cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| format!("hover {:?}, selection {:?}, show {}, glyph_entity {:?}", ed.hover, ed.selection, ed.show_constraints, ed.glyph_entity)));
+    assert!(shown.is_empty(), "no glyphs on Offset's picked line: {shown:?} of {selectors:?}; {state:?}");
 }
 
 /// 40 % along line `line` on screen, as the view is now (a rectangle's short side is ~38 px: clear of its corners'
