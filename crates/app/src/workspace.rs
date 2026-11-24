@@ -1351,47 +1351,9 @@ impl Workspace {
     /// (Part Studio plus the file in "CAD Imports"); other files, DXF / DWG
     /// too, a file tab (Onshape).
     fn import(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let ws = cx.entity();
         let handle = window.window_handle();
         let (doc, after) = (self.doc.clone(), self.active);
-        crate::files::request_open_paths("Import files", "All files", &["*"], window, cx, move |paths, cx| {
-            let is = |p: &std::path::PathBuf, exts: &[&str]| p.extension().is_some_and(|e| exts.contains(&e.to_string_lossy().to_lowercase().as_str()));
-            // A bare assembly file goes to the dialog too (its "Upload only" variant, live upload-only-1118).
-            let (cad, rest): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| is(p, IMPORT_EXTS) || is(p, noshape_ops::import::BARE_ASSEMBLIES));
-            let mut last = None;
-            for p in rest {
-                let Ok(bytes) = std::fs::read(&p) else { continue };
-                let (stem, file) = import_names(&p);
-                let _ = stem;
-                // Live (behaviours "Imported DWG/DXF drawings"): a DXF / DWG
-                // becomes a plain file tab; its menu's "Create Drawing of …"
-                // makes the drawing.
-                doc.update(cx, |d, cx| {
-                    d.edit_document(&format!("Import {file}"), cx, |d| {
-                        let f = crate::file_tab_view::add_file_tab(d, noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now()), None, after);
-                        last = Some((f, file.clone()));
-                    })
-                });
-            }
-            // Live doc-plus-import-png: the open tab stays, the file's tab goes after it, and the import's toast links to it.
-            if let Some((id, file)) = last.clone() {
-                doc.update(cx, |d, cx| {
-                    let me = cx.entity().downgrade();
-                    d.info_with_link(format!("{file} has been imported."), "Open document", 35, move |_, cx| {
-                        let _ = me.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(id))));
-                    }, cx);
-                });
-            }
-            let _ = ws;
-            cx.defer(move |cx| {
-                let _ = handle.update(cx, |_, window, cx| {
-                    if !cad.is_empty() {
-                        // Live: the view stays on the open tab (the new tabs go after it).
-                        crate::import_dialog::open(doc, cad, after, true, window, cx)
-                    }
-                });
-            });
-        });
+        crate::files::request_open_paths("Import files", "All files", &["*"], window, cx, move |paths, cx| import_picked(doc, after, handle, paths, cx));
     }
 
     /// DXF / DWG file tab › "Create Drawing of <file>…" (live, no dialog): a
@@ -3656,6 +3618,69 @@ fn folder_glyph(size: f32, color: impl Into<Hsla>) -> gpui_kit::component::Icon 
 }
 
 // Importing is shared with the agent API (crates/ops/src/import.rs).
+
+/// Import…'s picked files: CAD files go to the import dialog; any other file is read off the UI thread and becomes a
+/// file tab ([`add_imported_files`]).
+pub(crate) fn import_picked(doc: Entity<DocModel>, after: Option<TabId>, handle: AnyWindowHandle, paths: Vec<std::path::PathBuf>, cx: &mut App) {
+    let is = |p: &std::path::PathBuf, exts: &[&str]| p.extension().is_some_and(|e| exts.contains(&e.to_string_lossy().to_lowercase().as_str()));
+    // A bare assembly file goes to the dialog too (its "Upload only" variant, live upload-only-1118).
+    let (cad, rest): (Vec<_>, Vec<_>) = paths.into_iter().partition(|p| is(p, IMPORT_EXTS) || is(p, noshape_ops::import::BARE_ASSEMBLIES));
+    // The files are read off the UI thread (a slow or hung disk says so after its time).
+    if !rest.is_empty() {
+        let reads = cx.background_spawn(async move {
+            rest.iter().map(|p| {
+                let (_, file) = import_names(p);
+                let tab = std::fs::read(p).map(|bytes| noshape_model::file_tab::FileTab::new(&file, &bytes, noshape_model::file_tab::now()));
+                (file, tab)
+            }).collect::<Vec<_>>()
+        });
+        let reads = reads.with_timeout(IMPORT_READ_TIMEOUT, cx.background_executor());
+        let doc = doc.clone();
+        cx.spawn(async move |cx| {
+            let read = reads.await;
+            doc.update(cx, |d, cx| add_imported_files(d, read.ok(), after, cx));
+        })
+        .detach();
+    }
+    if cad.is_empty() {
+        return;
+    }
+    // Live: the view stays on the open tab (the new tabs go after it).
+    cx.defer(move |cx| {
+        let _ = handle.update(cx, |_, window, cx| crate::import_dialog::open(doc, cad, after, true, window, cx));
+    });
+}
+
+/// How long Import… waits for its files to be read before saying it couldn't.
+const IMPORT_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Import… of files that aren't CAD (images, PDFs, DXF / DWG …): each becomes a plain file tab after `after`
+/// (live behaviours "Imported DWG/DXF drawings": a DXF's menu then offers "Create Drawing of …"), and the last one's
+/// toast links to it (live doc-plus-import-png). `None`: the reads timed out.
+fn add_imported_files(d: &mut DocModel, read: Option<Vec<(String, std::io::Result<noshape_model::file_tab::FileTab>)>>, after: Option<TabId>, cx: &mut Context<DocModel>) {
+    let Some(read) = read else {
+        cx.emit(DocEvent::Error(format!("Import failed: the files could not be read in {} s.", IMPORT_READ_TIMEOUT.as_secs())));
+        return;
+    };
+    let mut last = None;
+    for (file, tab) in read {
+        let tab = match tab {
+            Ok(tab) => tab,
+            Err(e) => {
+                cx.emit(DocEvent::Error(format!("Import failed: {file} could not be read ({e}).")));
+                continue;
+            }
+        };
+        d.edit_document(&format!("Import {file}"), cx, |d| {
+            last = Some((crate::file_tab_view::add_file_tab(d, tab, None, after), file.clone()));
+        });
+    }
+    let Some((id, file)) = last else { return };
+    let me = cx.entity().downgrade();
+    d.info_with_link(format!("{file} has been imported."), "Open document", 35, move |_, cx| {
+        let _ = me.update(cx, |_, cx| cx.emit(DocEvent::Ui(noshape_ops::UiRequest::ActivateTab(id))));
+    }, cx);
+}
 pub(crate) use noshape_ops::import::{IMPORT_EXTS, import_names};
 
 /// Tab right-click menus (live menus/rmb-tab-*): they open upward, the

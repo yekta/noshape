@@ -573,3 +573,37 @@ fn ctrl_or_shift_click_on_a_tab_opens_it_in_a_new_window(cx: &mut TestAppContext
         assert_eq!(ws.read_with(cx, |ws, _| ws.active), Some(c), "{m:?}: this window stays on C");
     }
 }
+
+/// Import… of files that aren't CAD reads them off the UI thread: nothing changes in the pick's own frame, then each
+/// becomes a file tab right after the active one with the last one's toast (live doc-plus-import-png); a file that
+/// can't be read says so instead of being dropped silently.
+#[gpui::test]
+fn imported_plain_files_are_read_in_the_background_and_a_missing_one_says_so(cx: &mut TestAppContext) {
+    let (w, ws, [_, _, _, c]) = workspace(cx, "import-plain");
+    let dir = std::env::temp_dir().join(format!("noshape-workspace-import-plain-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let png = dir.join("photo.png");
+    std::fs::write(&png, b"\x89PNG\r\n\x1a\n").unwrap();
+    let missing = dir.join("gone.pdf");
+    let doc = cx.update(|cx| ws.read(cx).doc.clone());
+    let tabs = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.doc.ordered_tabs().iter().map(|t| t.name.clone()).collect::<Vec<_>>());
+    let before = tabs(cx);
+    let errors = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let seen = errors.clone();
+    let _sub = cx.update(|cx| cx.subscribe(&doc, move |_, e: &crate::doc_model::DocEvent, _| {
+        if let crate::doc_model::DocEvent::Error(m) = e {
+            seen.borrow_mut().push(m.clone());
+        }
+    }));
+    cx.update(|cx| crate::workspace::import_picked(doc.clone(), Some(c), w, vec![missing.clone(), png.clone()], cx));
+    assert_eq!(tabs(cx), before, "the files are read off the UI thread");
+    cx.run_until_parked();
+    let after = tabs(cx);
+    let at = after.iter().position(|n| n == "C").unwrap();
+    assert_eq!(after.get(at + 1).map(String::as_str), Some("photo.png"), "{after:?}");
+    assert_eq!(after.len(), before.len() + 1, "{after:?}");
+    assert!(doc.read_with(cx, |d, _| d.notice_link("photo.png has been imported.").is_some_and(|l| l.label == "Open document")));
+    let errors = errors.borrow();
+    assert!(errors.len() == 1 && errors[0].starts_with("Import failed: gone.pdf could not be read"), "{errors:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
