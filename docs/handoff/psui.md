@@ -61,12 +61,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   SKT-POSTCOMMIT-HOVER dropped.
 - skasm's 7e9bedfb7 (after its b99589dc) adds LineSegment::dash_from: new LineSegment literals need `dash_from: 0.0`.
   My vertex_band_piece literal (in 8e11c924) predates it: whichever lands second adds the field.
-- NEXT: FEEL-ROW-TIP-AFTER-DBLCLICK (P2, the one psui feel row really open; live behaviours.md "psui
-  FEEL-ROW-TIP-AFTER-DBLCLICK"): after a double-click on a feature row no tip until the pointer leaves, even on
-  1 px moves; a tip already up goes at the dialog's open. Two gpui-pre TooltipPressGate tries were reverted (one broke
-  wf10 step 1; the other still showed the tip 1.35 s later). Suspect: the dialog's open rebuilds the row, so the
-  per-element gate is fresh. Try app-side: the list remembers the double-clicked row and its tooltip builder gives
-  none until the pointer leaves it.
+- PARKED: FEEL-ROW-TIP-AFTER-DBLCLICK (P2): live records conflict (row-tip-dblclick-1123: no tip after a quick
+  double-click; wf10 s1: a name tip "Extrude 1" by the pointer). Capture asked in live/REQUESTS (psui 11-24 17:40).
+  Patch ready: /root/psui-scratch/row-tip-dblclick.patch (ui.row_tip_held / row_hover_since / row_early_press: a
+  double-click whose first press came before ROW_TIP_DELAY holds the row's tip till the pointer leaves; the list
+  matrix row ungapped, its second half moves off the row first). It fixes the quick case and keeps wf07's single
+  click, but breaks "edit / a double-click keeps the row's name tooltip" (wf10). Apply once live answers.
 - Other open rows checked 11-24 17:4x: all "fixed, to verify" (qa), sheet metal (parked), or skasm's.
 - Then: PARTLY rows in TICKETS (TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
