@@ -130,6 +130,8 @@ pub(super) struct SketchUi {
     dim_menu: Option<(noshape_sketch::ConstraintId, f32, f32)>,
     /// The dimension whose label (in the frame) the pointer is over.
     label_hover: Option<noshape_sketch::ConstraintId>,
+    /// The dimension whose dimension or extension line the pointer is on.
+    dim_line_hover: Option<noshape_sketch::ConstraintId>,
     /// Pattern instance-count label being typed into (`3x`).
     count_edit: Option<(crate::sketch_mode::PatternHandle, Entity<InputState>, Subscription)>,
     /// The dimension box's `#` variable autofill list (live, qa4
@@ -209,6 +211,8 @@ fn glyph_linger_redraw(cx: &mut Context<PartStudioView>) -> Task<()> {
 /// The line being drawn's length in the sketch plane: cap height (px) and colour (live sk/inference-*-at: small, the
 /// rubber band's light blue).
 const PREVIEW_TEXT_PX: f64 = 9.0;
+/// How near a dimension's line the pointer hovers it, in px.
+const DIM_LINE_REACH_PX: f64 = 4.0;
 const PREVIEW_TEXT_COLOR: u32 = 0x449ccd;
 /// A line's active on-the-fly box in the sketch plane: 24 px high, 5 px side padding, 1 px border and 14 px text in
 /// `#788188` on white at 80 % (live workflow 05: (235,241,245) over the face's (155,187,206)).
@@ -1356,14 +1360,27 @@ impl PartStudioView {
                     let (on_glyph, on_row) = self.glyph_under(*position);
                     // glyph_boxes can lag the drawn tiles: off the tile itself, the sketch's entity under it keeps the hover.
                     let margin_yields = self.ui.glyph_tile.is_none() && self.picks_own_sketch_entity(self.ui.sketch_gpu_hover.and_then(|(_, id)| id));
-                    let hov = if on_row { None } else { self.hovered_sketch_entity(cx) };
-                    if on_row {
+                    let mut hov = if on_row { None } else { self.hovered_sketch_entity(cx) };
+                    // A dimension's own lines hover it, with no tool on, unless the sketch's geometry is under the
+                    // pointer (live sk-hover-matrix-1123 DL / DE).
+                    let pressing = self.sketch.as_ref().is_some_and(|ed| ed.pressing());
+                    let on_dim = (on_glyph.is_none() && !on_row && hov.is_none() && self.ui_ref().is_none_or(|u| u.label_hover.is_none()))
+                        .then(|| self.sketch.as_ref().filter(|ed| ed.tool == Tool::Select && !pressing).zip(self.sketch_data(cx)))
+                        .flatten()
+                        .and_then(|(ed, data)| ed.dimension_line_at(&data, p, DIM_LINE_REACH_PX));
+                    let was_dim = if pressing { None } else { self.ui_mut().and_then(|u| std::mem::replace(&mut u.dim_line_hover, on_dim)) };
+                    if on_row || on_dim.is_some() {
                         self.hover = None;
+                        hov = None;
                     }
                     let mut left = None;
                     if let Some(ed) = &mut self.sketch {
                         if on_glyph.is_some() && !margin_yields {
                             ed.hover_constraint = on_glyph;
+                        } else if on_dim.is_some() {
+                            ed.hover_constraint = on_dim;
+                        } else if was_dim.is_some() && ed.hover_constraint == was_dim {
+                            ed.hover_constraint = None;
                         }
                         // (The row is placed where the hover starts and stays: live2 feel-1417 follow-up.)
                         if let Some(e) = hov.filter(|_| ed.hover != hov) {
@@ -1415,6 +1432,21 @@ impl PartStudioView {
                     }
                     cx.notify();
                     return true;
+                }
+                // A press on a dimension's line is one on its value (live sk-hover-matrix-1123 DL / DE).
+                if let Some(cid) = self.ui_ref().and_then(|u| u.dim_line_hover)
+                    && self.sketch.as_ref().is_some_and(|s| s.hover_constraint == Some(cid) && s.pressed_label.is_none())
+                {
+                    let additive = modifiers.shift || modifiers.control;
+                    let driving = self.sketch_data(cx).is_some_and(|d| d.sketch.constraints().any(|c| c.id == cid && c.driving));
+                    if *click_count >= 2 && driving {
+                        if let Some(ed) = &mut self.sketch {
+                            ed.pressed_label = Some((cid, additive, false));
+                        }
+                        self.open_dim_edit(cid, window, cx);
+                    } else if let Some(ed) = &mut self.sketch {
+                        ed.pressed_label = Some((cid, additive, true));
+                    }
                 }
                 let tool = self.sketch.as_ref().map(|s| s.tool);
                 let overlay_pressed = self.sketch.as_ref().is_some_and(|s| s.pressed_label.is_some() || s.pressed_glyph.is_some());
@@ -1669,7 +1701,8 @@ impl PartStudioView {
             }
             ViewportEvent::Click { .. } => true,
             ViewportEvent::ContextMenu { position, .. } => {
-                self.open_sketch_context_menu(*position, None, window, cx);
+                let dim = self.ui_ref().and_then(|u| u.dim_line_hover).filter(|c| self.sketch.as_ref().is_some_and(|s| s.hover_constraint == Some(*c)));
+                self.open_sketch_context_menu(*position, dim, window, cx);
                 true
             }
             _ => false,

@@ -2153,6 +2153,11 @@ impl SketchEditor {
         icons
     }
 
+    /// A press is held (a drag, a box or a click not yet released).
+    pub fn pressing(&self) -> bool {
+        self.drag.is_some()
+    }
+
     /// Geometry is being dragged (past the press): live hides the glyphs and the regions' fill until the release.
     pub fn geometry_dragging(&self) -> bool {
         matches!(self.drag, Some(DragState::Geometry { .. }))
@@ -6212,6 +6217,19 @@ impl SketchEditor {
         out
     }
 
+    /// The dimension whose dimension or extension line passes within `reach_px` of `p` on screen, the nearest (live
+    /// sk-hover-matrix-1123 DL / DE: they hover and take a press for the dimension, as its value does).
+    pub fn dimension_line_at(&self, data: &SketchData, p: DVec2, reach_px: f64) -> Option<ConstraintId> {
+        let metric = self.screen_metric().unwrap_or(noshape_sketch::ScreenMetric(glam::DMat2::IDENTITY));
+        self.dimension_graphics(data)
+            .into_iter()
+            .flat_map(|g| g.segments.into_iter().map(move |s| (g.constraint, s)))
+            .map(|(c, s)| (c, metric.len(p - metric.closest_on_segment(s[0], s[1], p))))
+            .filter(|(_, d)| *d <= reach_px * self.world_per_px)
+            .min_by(|a, b| a.1.total_cmp(&b.1))
+            .map(|(c, _)| c)
+    }
+
     /// Constraint glyph anchors for all geometric constraints.
     pub fn constraint_glyphs(&self, data: &SketchData) -> Vec<GlyphInfo> {
         let sk = &data.sketch;
@@ -7570,9 +7588,9 @@ impl SketchEditor {
             // dark (live dk-932, the dark --os-dimension-* tokens): white, #ccc, #fcda7f / #dba517.
             use crate::palette::{pick, rgb8, viewport as vc, viewport_dark as vd};
             let color = rgb8(if selected {
-                pick(0x6a4f06, 0xdba517)
+                pick(0x6f5610, 0xdba517)
             } else if hovered && g.driving {
-                pick(0x987107, 0xfcda7f)
+                pick(0x9c7611, 0xfcda7f)
             } else if hovered {
                 pick(vc::DIM_DRIVEN, vd::DIM_DRIVEN)
             } else if self.conflicting.contains(&g.constraint) {

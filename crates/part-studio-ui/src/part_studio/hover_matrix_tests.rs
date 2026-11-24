@@ -86,6 +86,8 @@ impl Matrix {
             v.selection.clear();
             if let Some(ed) = v.sketch.as_mut() {
                 ed.selection.clear();
+                ed.selected_regions.clear();
+                ed.selected_constraints.clear();
             }
             v.refresh_scene(false, cx);
         });
@@ -2619,4 +2621,156 @@ fn sk_select_other_on_a_line_between_two_regions_lists_both(cx: &mut TestAppCont
     });
     assert_eq!(rows.first().map(String::as_str), Some("Edge of Sketch 2"), "{rows:?}");
     assert_eq!(rows.iter().filter(|r| *r == "Face of Sketch 2").count(), 2, "a region each side: {rows:?}");
+}
+
+
+/// The darkest pixel within `r` px of the crop's centre (a 1 px line's core).
+fn darkest(crop: &[[u8; 3]], r: f64) -> [u8; 3] {
+    near_centre(crop, r).min_by_key(|c| c.iter().map(|&v| v as u32).sum::<u32>()).unwrap_or([255; 3])
+}
+
+// A dimension's line in sketch edit (live sk-hover-matrix-1123 DL-N / DL-SS, raw/mx): black, hovered #9c7611 at its core;
+// selected #6f5610, the same under the pointer (no hover tint).
+#[gpui::test]
+fn sk_a_dimension_line_is_lives_gold_hovered_and_selected(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "dimension-line-hover");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, SK_LINE);
+    m.pointer.move_to(cx, &m.view, p);
+    let line = cx.update(|cx| m.view.read(cx).sketch.as_ref().and_then(|ed| ed.hover)).expect("the line under the pointer");
+    m.park(cx);
+    cx.update_window(m.window, |_, w, cx| {
+        m.view.update(cx, |v, cx| {
+            v.with_sketch(cx, |_, data| {
+                crate::sketch_mode::add_dimension(data, noshape_sketch::ConstraintKind::Length { curve: line, value: 0.03 }, Some(glam::DVec2::new(0.075, -0.012)), None)
+            });
+            v.regen_sync(w, cx);
+        })
+    })
+    .unwrap();
+    m.pointer.frames(cx, &m.view);
+    // A quarter along the dimension line (its text sits in the middle; the extension lines run along y), in mm on the
+    // Top plane.
+    let segs = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let (Some(ed), Some(data)) = (v.sketch.as_ref(), v.sketch_data(cx)) else { return Vec::new() };
+        ed.dimension_graphics(&data).into_iter().flat_map(|g| g.segments).collect::<Vec<_>>()
+    });
+    let seg = segs.iter().filter(|s| (s[1] - s[0]).x.abs() > 4.0 * (s[1] - s[0]).y.abs()).max_by(|a, b| (a[1] - a[0]).length().total_cmp(&(b[1] - b[0]).length())).copied().unwrap_or_else(|| panic!("the dimension line: {segs:?}"));
+    let mid = (seg[0] + (seg[1] - seg[0]) * 0.25) * 1000.0;
+    let at = m.screen(cx, [mid.x, mid.y, 0.]);
+    let before = darkest(&m.crop(cx, at), 3.0);
+    approach(cx, &m, at);
+    let hovered = darkest(&m.crop(cx, at), 3.0);
+    assert!(cx.update(|cx| m.view.read(cx).sketch.as_ref().is_some_and(|ed| ed.hover_constraint.is_some())), "the dimension hovered");
+    m.pointer.click(cx, &m.view, at);
+    m.park(cx);
+    let selected = darkest(&m.crop(cx, at), 3.0);
+    approach(cx, &m, at);
+    let both = darkest(&m.crop(cx, at), 3.0);
+    // An extension line lights it too (live DE-N #aa8b38).
+    cx.update_window(m.window, |_, _, cx| {
+        m.view.update(cx, |v, cx| {
+            if let Some(ed) = &mut v.sketch {
+                ed.selected_constraints.clear();
+            }
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    m.park(cx);
+    let ext = segs.iter().filter(|s| (s[1] - s[0]).y.abs() > 4.0 * (s[1] - s[0]).x.abs()).max_by(|a, b| (a[1] - a[0]).length().total_cmp(&(b[1] - b[0]).length())).copied().expect("an extension line");
+    let e = (ext[0] + (ext[1] - ext[0]) * 0.6) * 1000.0;
+    let at_ext = m.screen(cx, [e.x, e.y, 0.]);
+    approach(cx, &m, at_ext);
+    let ext_lit = darkest(&m.crop(cx, at_ext), 3.0);
+    let ext_hovered = cx.update(|cx| m.view.read(cx).sketch.as_ref().and_then(|ed| ed.hover_constraint));
+    let got = [before, hovered, selected, both];
+    let want = [0x000000, 0x9c7611, 0x6f5610, 0x6f5610];
+    assert!(got.iter().zip(want).all(|(c, w)| close(*c, w, 8)), "line core before, hovered, selected, both: {got:02x?} at {mid:?} mm, {segs:?}");
+    assert!(ext_hovered.is_some() && ext_lit[0] > 0x80 && ext_lit[0] > ext_lit[1] && ext_lit[1] > ext_lit[2], "the extension line hovered: {ext_hovered:?} {ext_lit:02x?}");
+}
+
+/// Sketch 2's targets of live sk-hover-matrix-1124: its point, line end, line, arc, circle, circle region, circle centre
+/// and arc centre.
+const SK_1124: [(&str, [f64; 3]); 8] = [
+    ("P", [60., 25., 0.]),
+    ("LE", [90., 5., 0.]),
+    ("LN", [68., 5., 0.]),
+    ("AR", [75.5659, 22.98, 0.]),
+    ("CI", [100., 14., 0.]),
+    ("RG", [103., 22., 0.]),
+    ("CC", [100., 20., 0.]),
+    ("AC", [75., 15., 0.]),
+];
+
+fn sk_1124(name: &str) -> [f64; 3] {
+    SK_1124.iter().find(|t| t.0 == name).map(|t| t.1).expect("a target")
+}
+
+/// Pixels of two crops more than 8 apart in a channel.
+fn changed(a: &[[u8; 3]], b: &[[u8; 3]]) -> usize {
+    a.iter().zip(b).filter(|(x, y)| x.iter().zip(y.iter()).any(|(p, q)| (*p as i32 - *q as i32).abs() > 8)).count()
+}
+
+/// The crop round `target`, the pointer parked, then come onto it (after `select` was clicked, when given).
+fn rest_and_lit(cx: &mut TestAppContext, m: &Matrix, select: Option<[f64; 3]>, target: [f64; 3]) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
+    m.reset(cx);
+    if let Some(s) = select {
+        let q = m.screen(cx, s);
+        approach(cx, m, q);
+        m.pointer.click(cx, &m.view, q);
+        m.park(cx);
+    }
+    let p = m.screen(cx, target);
+    let rest = m.crop(cx, p);
+    approach(cx, m, p);
+    (rest, m.crop(cx, p))
+}
+
+// Live sk-hover-matrix-1124: what is selected doesn't change when the pointer comes onto it (P, LE, CI, RG, CC: 0 px
+// changed; LN, AC, AR: nothing on the target), in sketch edit and on the committed sketch in the Part Studio.
+#[gpui::test]
+fn sk_hovering_whats_selected_changes_nothing(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "selected-then-hovered");
+    let mut bad = Vec::new();
+    for edit in [false, true] {
+        if edit {
+            m.edit_sketch(cx);
+        }
+        for (name, t) in SK_1124 {
+            // (In the Part Studio a sketch's line, arc and arc centre aren't in live's cells.)
+            if !edit && matches!(name, "LN" | "AR" | "AC" | "LE") {
+                continue;
+            }
+            let (sel, lit) = rest_and_lit(cx, &m, Some(t), t);
+            let n = changed(&sel, &lit);
+            if n > 4 {
+                bad.push(format!("{}{name}: {n} px", if edit { "sketch edit " } else { "Part Studio " }));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "selected then hovered changed: {bad:?}");
+}
+
+// Live sk-hover-matrix-1124: a centre point lights as it does with nothing selected when its circle or arc is (CC-CS 108
+// = CC-N, AC-AS 286 = AC-N); a region lights as unselected with a line selected (RG-LS 422 = RG-N).
+#[gpui::test]
+fn sk_centres_and_regions_light_alike_whatever_else_is_selected(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "centre-with-curve-selected");
+    m.edit_sketch(cx);
+    let mut bad = Vec::new();
+    for (sel, target, r) in [("CI", "CC", 8.0), ("AR", "AC", 8.0), ("LN", "RG", 40.0)] {
+        let (_, alone) = rest_and_lit(cx, &m, None, sk_1124(target));
+        let (_, with) = rest_and_lit(cx, &m, Some(sk_1124(sel)), sk_1124(target));
+        let near = |c: &[[u8; 3]]| near_centre(c, r).collect::<Vec<_>>();
+        let n = changed(&near(&alone), &near(&with));
+        if n > 4 {
+            bad.push(format!("{target} with {sel} selected: {n} px differ"));
+        }
+    }
+    assert!(bad.is_empty(), "{bad:?}");
 }
