@@ -1,6 +1,6 @@
 # dx handoff: agent API + drawings + data exchange (current state)
 
-State as of 2026-11-24 10:40 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
+State as of 2026-11-24 13:13 UTC. Rewritten, not appended (DECISIONS.md 11-15); history in docs/handoff/archive/dx.md.
 
 Area (PLAN.md 2.3): crates/ops, crates/cli, docs/AGENT_API.md (generated), drawings and their export (crates/drawing,
 crates/model-data/src/drawing), import/export, configurations, Variable Studio, Derived, start window and document
@@ -44,8 +44,12 @@ build id)); steps 1-3 landed / queued (STATE). Step 4, B-reps for selection, onl
   "linked notice stays its time from the last input": DocModel keeps notice_links + notice_input); (2) Import… of
   non-CAD files reads them off the UI thread with a 30 s timeout, an unreadable file says "Import failed: …"
   (workspace::import_picked / add_imported_files, test imported_plain_files_are_read_in_the_background…).
-  Checking on vibe2 (dx-scratch/bin/toast-check.sh: clippy 4 crates, app-core toasts, part-studio-ui + assembly-ui
-  lib, app workspace_tests), then land.
+  QUEUED as b53bd63e (11-24; green on vibe2: app-core toasts, part-studio-ui 525, assembly-ui 191, app
+  workspace_tests 15, clippy clean; precheck passed). If it fails: fix forward from branch dx-toast (dx-open).
+- PARKED by the lead 11-24 (slot to live; user focus: individual users). Open dx rows are P3s the lead declined for now:
+  STL-SURFACE-EDGES (kernel, 11 C++ files take mesh faces: transforms, Booleans, x_t/STEP export, display mesh),
+  DRW-HATCH-CREATION-ORDER (needs a stored creation counter in model-data), DRW-DXF-DRAFT-EDGE-POLYLINE (live's rule
+  unknown), the DXF exchange rows (In flight 1).
 - Not done, from the toast stack: a stacked linked notice doesn't extend its time on input (only the slot's does).
 - After landing: tell qa IMP-NO-FEEDBACK + IMP-FACE-APPEARANCE-ROWS (API half) to recheck.
 - Waits on live (parked): IMP-COMPOSITE-GENERATED-COLOUR, the Appearance panel rows (REQUESTS "dx 11-23 06:57").
