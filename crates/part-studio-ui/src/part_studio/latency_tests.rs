@@ -308,3 +308,131 @@ fn a_face_lights_on_heavy_part_studios(cx: &mut TestAppContext) {
     let slower: Vec<_> = report.iter().filter(|r| r.1 > r.2 / 2.0).map(|r| r.0).collect();
     assert!(slower.is_empty(), "slower than half of live's time: {slower:?}");
 }
+
+/// Lead 11-24, sketch speed as a person feels it, on live's S300 (behaviours "Sketch S300 timings", 11-01): 80
+/// rectangles with their width and height dimensions (320 lines, ~800 constraints). Live (software GL): open for edit
+/// 1.2-1.9 s, a dimension edit to the redrawn sketch ~1.1 s, a drag at its renderer's ~4 fps (median 270 ms a frame),
+/// ✓ 0.24 s; qa sellat-1118 (one line): a dimension edit 584-743 ms. Ours: each to the frame that shows it, a drag
+/// step to the frame with the corner moved, and a value the sketch can't take (no stall, "Sketch could not be
+/// solved."). T2.
+#[gpui::test]
+#[ignore = "T2: wall-clock timing; a release build on a quiet machine (the Mac)"]
+fn a_300_line_sketch_keeps_up_with_the_hand(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = part_studio_with(cx, "s300", |path| crate::session::Session::create(path, crate::user_units::new_document()).unwrap());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Plane(DatumPlane::Top)];
+        v.start_feature("sketch", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    // 20 x 4 rectangles 10 x 6 mm on a 15 mm grid, each with its width and height, and one more line whose length
+    // the sketch can't take other than 30 mm (its horizontal distance fixes it).
+    let (corner, width, len) = cx
+        .update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| {
+            use noshape_sketch::ConstraintKind;
+            let (mut corner, mut width) = (None, None);
+            for i in 0..80 {
+                let p0 = DVec2::new(-0.15 + 0.015 * (i % 20) as f64, -0.03 + 0.015 * (i / 20) as f64);
+                let s = data.sketch.corner_rectangle(p0, p0 + DVec2::new(0.01, 0.006));
+                corner.get_or_insert(s.points[0]);
+                let w = crate::sketch_mode::add_dimension(data, ConstraintKind::Length { curve: s.curves[0], value: 0.0 }, Some(p0 + DVec2::new(0.005, -0.003)), None);
+                width = width.or(w);
+                let _ = crate::sketch_mode::add_dimension(data, ConstraintKind::Length { curve: s.curves[3], value: 0.0 }, Some(p0 + DVec2::new(-0.003, 0.003)), None);
+            }
+            let a = data.sketch.add_point(DVec2::new(-0.015, 0.045));
+            let b = data.sketch.add_point(DVec2::new(0.015, 0.045));
+            let line = data.sketch.add_line_between(a, b).unwrap();
+            data.sketch.add_constraint(ConstraintKind::Horizontal { a: line, b: None }).unwrap();
+            data.sketch.add_constraint(ConstraintKind::HorizontalDistance { a, b, value: 0.03 }).unwrap();
+            let len = data.sketch.add_reference(ConstraintKind::Length { curve: line, value: 0.03 }).unwrap();
+            let _ = data.sketch.set_driving(len, true);
+            (corner.unwrap(), width.unwrap(), len)
+        })))
+        .unwrap();
+    let sizes = cx.update(|cx| view.read(cx).sketch_data(cx).map(|d| (d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count(), d.sketch.constraint_count())).unwrap());
+    let seq = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display_seq);
+    let s0 = seq(cx);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { let _ = v.finish_sketch(w, cx); })).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id);
+
+    let mut ms: [Vec<f64>; 7] = Default::default();
+    let pointer = Pointer::new(cx, window, &view);
+    for run in 0..3 {
+        ms[0].push(timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+        }, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy()));
+        if run == 0 {
+            // Zoomed to the first rectangle, as anyone dragging its corner would (the whole sketch is ~2.6 px/mm).
+            let vp = cx.update(|cx| view.read(cx).viewport.clone());
+            vp.update(cx, |vp, cx| vp.zoom_to_bounds(glam::DVec3::new(-0.165, -0.045, 0.0), glam::DVec3::new(-0.125, -0.01, 0.0), cx));
+            pump(cx, window, &view, Duration::from_millis(1500));
+        }
+        // A drag of the first rectangle's lower left corner, 2 px a step.
+        let at = |cx: &mut TestAppContext| cx.update(|cx| {
+            let p = view.read(cx).sketch_data(cx).unwrap().sketch.point(corner).unwrap();
+            (p, view.read(cx).viewport.read(cx).project(glam::DVec3::new(p.x, p.y, 0.0)).unwrap())
+        });
+        let (p0, s0px) = at(cx);
+        move_to(cx, window, &pointer, s0px);
+        pump(cx, window, &view, Duration::from_millis(300));
+        let hovered = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|e| e.hover));
+        assert_eq!(hovered, Some(corner), "the corner lit under the pointer at {s0px:?}");
+        let left = gpui_kit::MouseButton::Left;
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(pointer.window_point(cx, s0px), left, Modifiers::default());
+        for k in 1..=20 {
+            let to = pointer.window_point(cx, s0px + DVec2::new(2.0 * k as f64, -(k as f64)));
+            let mut handled = 0.0;
+            ms[1].push(timed(cx, window, &view, |cx| {
+                let t0 = Instant::now();
+                gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(to, Some(left), Modifiers::default());
+                handled = t0.elapsed().as_secs_f64() * 1e3;
+            }, |_| true));
+            ms[2].push(handled);
+        }
+        let up = pointer.window_point(cx, s0px + DVec2::new(40.0, -20.0));
+        ms[3].push(timed(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(up, left, Modifiers::default()), |cx| !view.read(cx).ui_busy()));
+        let (p1, _) = at(cx);
+        assert!((p1 - p0).length() > 1e-4, "the corner followed the drag: {p0:?} → {p1:?}");
+        // A width typed, to the redrawn sketch.
+        let text = if run % 2 == 0 { "12 mm" } else { "10 mm" };
+        ms[4].push(timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.commit_dimension(width, text, w, cx))).unwrap();
+        }, |cx| !view.read(cx).ui_busy()));
+        // A length the sketch can't take: no stall, live's warning, the value back after.
+        ms[5].push(timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.commit_dimension(len, "10 mm", w, cx))).unwrap();
+        }, |cx| !view.read(cx).ui_busy()));
+        let warned = cx.update(|cx| view.read(cx).message.as_ref().map(|(_, m)| m.clone()));
+        assert_eq!(warned.as_deref(), Some(crate::sketch_mode::SKETCH_NOT_SOLVED), "the warning");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.commit_dimension(len, "30 mm", w, cx))).unwrap();
+        pump(cx, window, &view, Duration::from_millis(100));
+        let s0 = seq(cx);
+        ms[6].push(timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { let _ = v.finish_sketch(w, cx); })).unwrap();
+        }, |cx| view.read(cx).sketch.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy()));
+    }
+    let rows = [
+        ("open for edit", "1.2-1.9 s"),
+        // (Its worst is a hover pick's GPU readback: slow on a software renderer, off the UI thread.)
+        ("drag: a step to its frame", "~270 ms a frame (renderer)"),
+        ("drag: the move handled (UI thread)", "-"),
+        ("drag: release, regenerated", "-"),
+        ("dimension edit, redrawn", "~1.1 s (one line 584-743 ms)"),
+        ("a value it can't take, warned", "-"),
+        ("✓, the part studio redrawn", "0.24 s"),
+    ];
+    let mut report = vec![format!("S300: {} lines, {} constraints", sizes.0, sizes.1), format!("{:<34} {:>9} {:>9}  live", "", "median", "worst")];
+    for ((what, live), runs) in rows.iter().zip(&ms) {
+        let worst = runs.iter().cloned().fold(0.0, f64::max);
+        report.push(format!("{what:<34} {:>6.1} ms {:>6.1} ms  {live}", median(runs.clone()), worst));
+    }
+    eprintln!("{}", report.join("\n"));
+    let slow: Vec<&str> = rows.iter().zip(&ms).filter(|(_, runs)| median((*runs).clone()) >= 100.0).map(|((w, _), _)| *w).collect();
+    assert!(slow.is_empty(), "100 ms or more: {slow:?}");
+    let stall = ms[2].iter().cloned().fold(0.0, f64::max);
+    assert!(stall < 100.0, "a drag step held the UI thread {stall:.0} ms");
+}
