@@ -208,3 +208,6 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   No direct "import into this Part Studio" beyond what live offers.
 - 11-23 (lead) Sketch Use of an already-used edge and Mirror of an already-mirrored entity make duplicates, as live's
   (skasm): this is behaviour, not a failure, so we match it rather than refuse.
+- 11-24 (user) Focus on what individual people using CAD need: UI interactions and feel, sketching, Booleans and core
+  modelling, import/export, QA and live captures. Sheet metal (and other niche areas) is parked: no new sheet metal
+  work until the lead reopens it; open sheet metal tickets wait.
