@@ -1031,8 +1031,10 @@ fn is_direction(k: InferenceKind) -> bool {
     matches!(k, InferenceKind::Horizontal | InferenceKind::Vertical | InferenceKind::Perpendicular | InferenceKind::Parallel)
 }
 /// Onshape's hollow arrow manipulator in a sketch (live sketch/303, offset):
-/// an 18 px stem, a 31 x 23 px head; outline #989fa3 (3 px) around a white core.
-const OFFSET_ARROW_STEM_PX: f64 = 18.0;
+/// a 31 x 23 px head; outline #989fa3 (3 px) around a white core. The offset's is 60 px in all (offset-iso-1124).
+const OFFSET_ARROW_STEM_PX: f64 = 29.0;
+/// Live offset-iso-1124: the offset's value text shows at gaps of 7-19 px, none at 33-37 px (only the arrowheads).
+const OFFSET_LABEL_HIDDEN_PX: f64 = 26.0;
 /// The offset preview's dimension (live offset-look-1121): its label in the gap from this gap on (in at ~18 px, on
 /// the picked curve at ~9 px), its two filled arrowheads ~5 px.
 const OFFSET_LABEL_IN_GAP_PX: f64 = 13.5;
@@ -1166,9 +1168,16 @@ fn push_hollow(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, pts: Vec<DVec2>) {
 /// [`push_hollow_arrow`] in other colours (a circular pattern's handle, live sketch-gaps4: light blue; a hovered
 /// offset arrow, live offset-look-1121: #4674af around #9bb2cc).
 fn push_hollow_arrow_in(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, dir: DVec2, px: f64, stem_px: f64, outline: [u8; 4], core: [u8; 4]) {
-    let base = start + dir * px * stem_px;
-    let apex = base + dir * px * OFFSET_ARROW_HEAD_PX;
-    let half = dir.perp() * px * OFFSET_ARROW_HEAD_W_PX * 0.5;
+    push_hollow_arrow_across(wide, start, dir * px, stem_px, dir.perp() * px, outline, core);
+}
+
+/// [`push_hollow_arrow_in`] along `step` (one pixel's worth of the arrow's direction) with the head's width along
+/// `across` (one pixel's worth): live offset-iso-1124 keeps the head 23 px wide in iso while the arrow's length
+/// foreshortens with the plane.
+fn push_hollow_arrow_across(wide: &mut Vec<(Vec<DVec2>, [u8; 4], f32)>, start: DVec2, step: DVec2, stem_px: f64, across: DVec2, outline: [u8; 4], core: [u8; 4]) {
+    let base = start + step * stem_px;
+    let apex = base + step * OFFSET_ARROW_HEAD_PX;
+    let half = across * OFFSET_ARROW_HEAD_W_PX * 0.5;
     for (color, width) in [(outline, 3.0), (core, 1.2)] {
         wide.push((vec![start, base], color, width));
         wide.push((vec![base + half, apex, base - half, base + half], color, width));
@@ -3486,6 +3495,19 @@ impl SketchEditor {
         m.inverse() * (p - o)
     }
 
+    /// A sketch vector's length on screen in pixels (`v / world_per_px` without a screen map).
+    fn screen_len(&self, v: DVec2) -> f64 {
+        let m = self.screen_map.map(|(_, ex, ey)| glam::DMat2::from_cols(ex, ey)).filter(|m| m.determinant().abs() > 1e-30);
+        m.map_or(v.length() / self.world_per_px.max(1e-30), |m| (m.inverse() * v).length())
+    }
+
+    /// The sketch vector one screen pixel long, square to `dir` on screen (`dir.perp()` pixels without a screen map).
+    fn screen_across(&self, dir: DVec2) -> DVec2 {
+        let m = self.screen_map.map(|(_, ex, ey)| glam::DMat2::from_cols(ex, ey)).filter(|m| m.determinant().abs() > 1e-30);
+        let Some(m) = m else { return dir.perp() * self.world_per_px };
+        m * (m.inverse() * dir).perp().normalize_or_zero()
+    }
+
     #[cfg(test)]
     fn screen_to_plane(&self, s: DVec2) -> DVec2 {
         let Some((o, ex, ey)) = self.screen_map else { return s };
@@ -3530,9 +3552,12 @@ impl SketchEditor {
 
     /// The pending offset's distance label; clicking it opens the distance box (Onshape's offset tool opens its
     /// in-place edit view from the preview dimension; the manipulator has none). Live offset-look-1121: in the gap
-    /// at ~18 px, on the picked curve at ~9 px and less (drawn at any gap).
+    /// at ~18 px, on the picked curve at ~9 px and less; none past [`OFFSET_LABEL_HIDDEN_PX`] (offset-iso-1124).
     pub fn offset_value_label(&self, sk: &Sketch) -> Option<(DVec2, f64)> {
         let (mid, dir) = self.offset_dimension(sk)?;
+        if self.screen_len(dir * self.offset_distance) > OFFSET_LABEL_HIDDEN_PX {
+            return None;
+        }
         let into_gap = if self.offset_distance >= self.world_per_px * OFFSET_LABEL_IN_GAP_PX { 0.5 } else { 0.0 };
         Some((mid + dir * self.offset_distance * into_gap, self.offset_distance))
     }
@@ -7115,13 +7140,17 @@ impl SketchEditor {
                 let d = (apex - start).try_normalize().unwrap_or(DVec2::X);
                 let hovered = self.cursor.is_some_and(|c| dist_to_segment(c, start, apex) <= self.world_per_px * 10.0);
                 let (outline, core) = if hovered { MANIPULATOR_HOVER } else { (MANIPULATOR_OUTLINE, [0xff, 0xff, 0xff, 0xff]) };
-                push_hollow_arrow_in(&mut wide, self.snap_to_pixel(start), d, self.world_per_px, OFFSET_ARROW_STEM_PX, outline, core);
+                push_hollow_arrow_across(&mut wide, self.snap_to_pixel(start), d * self.world_per_px, OFFSET_ARROW_STEM_PX, self.screen_across(d), outline, core);
             }
             // Its dimension: a black line across the gap, a small filled arrowhead on each curve, run on past the
-            // picked curve to a label there.
-            if let (Some((mid, dir)), Some((label, _))) = (self.offset_dimension(&data.sketch), self.offset_value_label(&data.sketch)) {
+            // picked curve to a label there (with no label, wide gaps: 4 px past it, live offset-iso-1124).
+            if let Some((mid, dir)) = self.offset_dimension(&data.sketch) {
                 let (px, far) = (self.world_per_px, mid + dir * self.offset_distance);
-                let back = if label.distance(mid) < px { mid - dir * px * 8.0 } else { mid };
+                let back = match self.offset_value_label(&data.sketch) {
+                    Some((label, _)) if label.distance(mid) < px => mid - dir * px * 8.0,
+                    Some(_) => mid,
+                    None => mid - dir * px * 4.0,
+                };
                 wide.push((vec![back, far], [0, 0, 0, 255], 1.0));
                 for (tip, d) in [(mid, -dir), (far, dir)].into_iter().filter(|_| !self.offset_label_hovered) {
                     let base = tip - d * px * OFFSET_DIM_ARROW_PX;
@@ -12791,6 +12820,27 @@ mod tests {
         d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
         click(&mut ed, &mut d, v(0.08, 0.08));
         assert_eq!(count(&d, EntityKind::Line), 1);
+    }
+
+    /// Live offset-iso-1124: the offset's arrow is 60 px long in the normal view; in a foreshortened view its head
+    /// keeps its width on screen; the value text shows at a 7-19 px gap, none at 33 px (only the arrowheads).
+    #[test]
+    fn offset_arrow_and_label_as_live_in_any_view() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
+        click(&mut ed, &mut d, v(0.02, 0.01));
+        let (base, tip) = ed.offset_arrow(&d.sketch).unwrap();
+        assert!(((tip - base).length() / PX - 60.0).abs() < 1e-6, "{} px", (tip - base).length() / PX);
+        ed.offset_distance = 15.0 * PX;
+        assert!(ed.offset_value_label(&d.sketch).is_some(), "a 15 px gap has its text");
+        ed.offset_distance = 33.0 * PX;
+        assert!(ed.offset_value_label(&d.sketch).is_none(), "a 33 px gap has none");
+        let (ex, ey) = (v(PX * 0.7, -PX * 0.4), v(-PX * 0.3, -PX * 0.9));
+        ed.screen_map = Some((DVec2::ZERO, ex, ey));
+        let (dir, to_screen) = ((tip - base).normalize(), glam::DMat2::from_cols(ex, ey).inverse());
+        let across = ed.screen_across(dir);
+        assert!(((to_screen * across).length() - 1.0).abs() < 1e-9, "one screen pixel across");
+        assert!((to_screen * across).dot(to_screen * dir).abs() < 1e-9, "square to the arrow on screen");
     }
 
     #[test]
