@@ -4497,6 +4497,35 @@ fn face_appearances_sit_under_their_parts(cx: &mut TestAppContext) {
     assert!(order.iter().all(Option::is_some) && order.windows(2).all(|w| w[0] < w[1]), "Part 1, its face appearance, Part 2, Extrude 2's: {order:?}");
 }
 
+/// Live core/appear-subtract-1124: a Subtract uses up the tool body whose Extrude has a feature appearance; the panel
+/// lists only Part 1, no row for the appearance (its faces are gone; the cut faces are the Boolean's).
+#[gpui::test]
+fn a_used_up_tools_feature_appearance_has_no_row(cx: &mut TestAppContext) {
+    use noshape_model::partstudio::{AppearanceTarget, FaceAppearance};
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "corner_rectangle": [[30, 10], [60, 30]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } },
+        { "type": "booleanBodies", "name": "Boolean 1", "params": { "operationType": "SUBTRACTION", "targets": ["part 0"], "tools": ["part 1"] } }
+    ] });
+    let (window, view) = part_studio_from(cx, "fa-used-up", Some(start));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 1);
+    let extrude2 = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 2").unwrap().id);
+    view.update(cx, |v, cx| {
+        let tab = v.tab;
+        v.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Add appearance", cx, |ps| ps.appearances.push(FaceAppearance::new(AppearanceTarget::Feature(extrude2), [0.37, 0.65, 0.24, 1.0])))
+        });
+        v.right_panel = Some(super::super::config_panel::RightPanel::Appearance);
+        cx.notify();
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let row = |cx: &mut TestAppContext, label: &str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("ap-row:{label}").into_boxed_str())).is_some();
+    assert_eq!((row(cx, "Part 1"), row(cx, "Face appearance 1")), (true, false));
+}
+
 /// Live2 nav-feel-1119: "Where used for Part 1…" carries its icon (a part with a ?) in the face, edge and vertex menus.
 #[gpui::test]
 fn where_used_has_its_icon(cx: &mut TestAppContext) {

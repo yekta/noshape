@@ -1150,6 +1150,11 @@ impl PartStudioView {
                 AppearanceTarget::Feature(f) if !is_sketch => self.feature_geometry(*f).into_iter().filter(|r| matches!(r, Reference::Face(_))).collect(),
                 AppearanceTarget::Feature(_) => Vec::new(),
             };
+            // A feature's appearance none of whose faces are left (its tool body used up by a Subtract) has no row
+            // (live core/appear-subtract-1124: only "Part 1").
+            if !is_sketch && faces.is_empty() && matches!(a.target, AppearanceTarget::Feature(_)) {
+                continue;
+            }
             let owner = faces.iter().find_map(|r| self.owning_body(r));
             let count = faces.len();
             let view = cx.entity();
