@@ -1531,11 +1531,45 @@ bool by_regions(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remo
 // Bumped by each Shell: normal_at's projectors of the one before dropped.
 std::atomic<unsigned> projectors_gen{0};
 
+// The foot of `p` on `S` by Newton's steps from (u, v), kept within the bounds where not periodic: false unless they
+// settle on a point within 1 um of `p` (a point off the surface, or a start too far, left to the full search).
+static bool foot_near(const occ::handle<Geom_Surface>& S, const gp_Pnt& p, double& u, double& v)
+{
+  double u0, u1, v0, v1;
+  S->Bounds(u0, u1, v0, v1);
+  for (int it = 0; it < 8; ++it)
+  {
+    gp_Pnt q;
+    gp_Vec su, sv;
+    S->D1(u, v, q, su, sv);
+    const gp_Vec r(q, p);
+    const double a = su.Dot(su), b = su.Dot(sv), c = sv.Dot(sv), det = a * c - b * b;
+    if (!(det > 1e-12 * a * c))
+      return false;
+    const double ru = su.Dot(r), rv = sv.Dot(r), du = (c * ru - b * rv) / det, dv = (a * rv - b * ru) / det;
+    u += du, v += dv;
+    if (!S->IsUPeriodic())
+      u = std::clamp(u, u0, u1);
+    if (!S->IsVPeriodic())
+      v = std::clamp(v, v0, v1);
+    if (du * du * a + dv * dv * c < 1e-24)
+      return S->Value(u, v).SquareDistance(p) <= 1e-12;
+  }
+  return false;
+}
+
 // Outward normal of `f` at the projection of `p` (a thread's projector of a surface made once in a Shell: its search
-// grid, as GeomAPI_ProjectPointOnSurf's constructor builds it each time).
+// grid, as GeomAPI_ProjectPointOnSurf's constructor builds it each time; a point on the surface near the last one's
+// foot found from there: each full search measures the whole grid, 52 ms of c2-impeller-loft's Shell Gehäuse, now 10).
 gp_Dir normal_at(const TopoDS_Face& f, const gp_Pnt& p)
 {
-  using Projector = std::pair<occ::handle<Geom_Surface>, std::unique_ptr<GeomAPI_ProjectPointOnSurf>>;
+  struct Projector
+  {
+    occ::handle<Geom_Surface>                   surface;
+    std::unique_ptr<GeomAPI_ProjectPointOnSurf> full;
+    bool                                        last = false;
+    double                                      u = 0, v = 0;
+  };
   thread_local std::vector<Projector> projectors;
   thread_local unsigned               gen = 0;
   if (gen != projectors_gen.load(std::memory_order_relaxed))
@@ -1544,10 +1578,10 @@ gp_Dir normal_at(const TopoDS_Face& f, const gp_Pnt& p)
     gen = projectors_gen.load(std::memory_order_relaxed);
   }
   const occ::handle<Geom_Surface> S  = BRep_Tool::Surface(f);
-  GeomAPI_ProjectPointOnSurf*     pr = nullptr;
-  for (const Projector& q : projectors)
-    if (q.first == S)
-      pr = q.second.get();
+  Projector*                      pr = nullptr;
+  for (Projector& q : projectors)
+    if (q.surface == S)
+      pr = &q;
   if (pr == nullptr)
   {
     if (projectors.size() >= 64)
@@ -1556,13 +1590,18 @@ gp_Dir normal_at(const TopoDS_Face& f, const gp_Pnt& p)
     S->Bounds(u0, u1, v0, v1);
     auto made = std::make_unique<GeomAPI_ProjectPointOnSurf>();
     made->Init(S, u0, u1, v0, v1, Precision::Confusion());
-    pr = made.get();
-    projectors.emplace_back(S, std::move(made));
+    projectors.push_back({S, std::move(made)});
+    pr = &projectors.back();
   }
-  pr->Perform(p);
-  double u = 0, v = 0;
-  if (pr->NbPoints() > 0)
-    pr->LowerDistanceParameters(u, v);
+  double u = pr->u, v = pr->v;
+  if (!pr->last || !foot_near(S, p, u, v))
+  {
+    pr->full->Perform(p);
+    u = v = 0;
+    if (pr->full->NbPoints() > 0)
+      pr->full->LowerDistanceParameters(u, v);
+  }
+  pr->last = true, pr->u = u, pr->v = v;
   BRepAdaptor_Surface s(f);
   BRepLProp_SLProps   lp(s, u, v, 1, 1e-9);
   gp_Dir              n = lp.IsNormalDefined() ? lp.Normal() : gp_Dir(0, 0, 1);
