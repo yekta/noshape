@@ -121,6 +121,20 @@ fn rows() -> Vec<Row> {
             let header_icon = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("feature-errors").is_some();
             expect((status, crate::part_studio::row_reads_red(status, message.as_deref()), header_icon), (noshape_model::display::FeatureStatus::Warning, false, false), "(status, name red, header's failures icon)")
         } },
+        Row { id: "error / a pick its field refuses", live: "the boss's cylinder as Part mirror's plane: the row's tooltip 'Mirror 1 did not regenerate properly: Select a mirror plane.' then '1 missing selection'; in the dialog the plane's entry a red 'Missing Face of Extrude 2' (live errors-1123 mi-cylplane)", gap: false, check: |cx| {
+            let mut json = starts()["boss-block"].clone();
+            json["features"].as_array_mut().unwrap().push(serde_json::json!({ "type": "mirror", "name": "Mirror 1", "params": { "patternType": "PART", "entities": ["part 0"], "mirrorPlane": ["face through [14, 0, 15]"] } }));
+            let (window, view) = start(cx, "fb-refused-pick", json);
+            let tip = row_tooltip(cx, window, "Mirror 1").ok_or("no tooltip")?;
+            let id = feature_id(cx, &view, "Mirror 1");
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            draw(cx, window);
+            let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+            let plane = state["dialog"]["fields"].as_array().and_then(|f| f.iter().find(|f| f["label"] == "Mirror plane")).cloned().ok_or("no Mirror plane field")?;
+            let items: Vec<String> = plane["items"].as_array().into_iter().flatten().filter_map(|i| i.as_str().map(str::to_string)).collect();
+            expect((tip.as_str(), items, plane["state"].as_str()), ("Mirror 1 did not regenerate properly: Select a mirror plane.\n1 missing selection", vec!["Missing Face of Extrude 2".to_string()], Some("error")), "(tooltip, the plane's entries, its state)")
+        } },
         Row { id: "warning / its dialog", live: "the title stays black with no message, no bubble or toast; the lost selection a grey italic 'Edge of Chamfer 1', the kept one normal", gap: false, check: |cx| {
             let (window, view) = start(cx, "fb-warning-dialog", warning_start());
             let id = feature_id(cx, &view, "Fillet 1");
