@@ -16,6 +16,25 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   9cbb0e: 7 failing, 2d82a0: 6; live builds all; Fillet 23 first). Blend's notes: docs/handoff/blend.md "SCISSOR"
   (doc vibex7 ~/agents/blend-keep/scissor.noshape; blend's probe branch blend-cusp 429750f98 = WIP never land).
   Status run: .sc1.sh (release CLI batch feature_list) -> /root/core-scratch/run/sc1.log. Then TICKETS fillet/chamfer P0/P1.
+  Now on main+: 9cbb0e fails Fillet 2, 6, 18, 19, 23, Chamfer 6, 11 (+ Move face 2, Boolean 4); 2d82a0 Chamfer 2, 6,
+  Fillet 5, 7, 13, 21, 25, 28, 30, 31, 37 (+ Draft 1, Move face 1). One feature with debug: .sc2.sh <tab> "<F>"
+  (ZZ_ORIENT=1, NOSHAPE_BLEND_DEBUG, kernel profile -> vibex7 ~/tmp/core/sc/err-<tab>.txt); params: .sc3.sh.
+  - F23 (0.5 mm, 6 picked -> 12-edge chain, two mirrored ends y=+-22 mm): a V notch (walls 30/31, concave groove
+    117/288 4.2 mm) cut through the end's existing 0.5 mm B-spline round (face 52) beside cylinder 51; chain = groove +
+    wall/end-face rims (116/118) + wall/round-face B-spline rims (114/115) + a smooth wall/cylinder edge (111). Found:
+    (1) ball_edge's into_face steps 2 µm (edge length 1e-3) and both sides classify ON within the face's tolerance ->
+    "could not orient"; retrying 10x/100x steps fixes that, then rolling balls stop at "a concave edge's rolling ball".
+    (2) A kernel fallback rounding concave edges then convex (and the reverse) on the result: OCCT fails the 8 convex
+    rims even alone (first pass convex-first fails). So the blocker is OCCT on the rims along the B-spline round face.
+    WIP (unlanded, unproven): /root/core-scratch/run/f23-wip.patch (into_face steps, frame_at shallow probes,
+    fillet_concave_first, ZZ prints).
+  - F23 WIP 2 (18:50, /root/core-scratch/run/f23-wip2.patch, Rust only, apply on main): into_face's longer steps +
+    blend_section::convex_edge (convexity from into_face's sides; select::edge_convexity is WRONG here: point_into
+    steps towards the notched end face's centroid, across the notch) + detail.rs concave_then_balls (fallback after
+    rolling_ball_blend): OCCT rounds the 2 grooves (OK), then the convex pieces (8, matched geometrically) + the groove
+    rounds' rim arcs go to rolling_ball_blend. State: without the arcs "faces at the edge are tangent"/"no rolling
+    ball fits"; the arc finder (`made`: centroid on no old face) is too loose (54 pieces) -> next: take the arcs as
+    the edges shared by a piece's end vertex and a face the fillet generated (grooved.history), then rerun .sc2.sh.
 - Also (lead 11-24): c2-impeller-loft "Fillet Stevenrohr zum Halter" fails "Adjoining edge not filleted." (live OK,
   39 faces; failed in 0.4.67 too); Move face 1/2 + Delete face 2 fail after it (qa TICKETS bfe98e10e).
 - Then: core rows from qa as they appear.
