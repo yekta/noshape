@@ -10924,7 +10924,8 @@ mod tests {
     #[test]
     fn extend_picks_the_nearer_end_which_follows_the_pointer_and_stops_on_a_crossing_curve() {
         // Live 11-18 sketch-tools (t4-ext, t7), mc-reach-1122 R6: a click picks the line's nearer end (the line lit,
-        // selected); the end follows the pointer along the line, and a click past a crossing curve stops it there.
+        // selected); the end follows the pointer along the line, and a click past a crossing curve stops it there (live
+        // sk-leftovers-1124: 0.5–4 mm off the line too; no limit).
         let (mut ed, mut data) = editor(Tool::Extend);
         let l = data.sketch.add_line(v(0.01, 0.06), v(0.03, 0.06));
         let x = data.sketch.add_line(v(0.05, 0.03), v(0.05, 0.09));

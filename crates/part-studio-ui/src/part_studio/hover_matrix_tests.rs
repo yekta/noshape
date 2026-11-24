@@ -2502,3 +2502,121 @@ fn a_mate_connector_along_an_edge_goes_to_its_nearer_end_past_half_way(cx: &mut 
     let want = |f: f64| if f < 0.5 { DVec3::new(20., 0., 20.) } else { DVec3::new(40., 0., 20.) };
     assert!(got.iter().all(|(f, at)| *at == Some(want(*f))), "fraction of the half, glyph at (mm): {got:?}; {:.1} px half", mid.distance(corner));
 }
+
+/// Along the line through the crop's centre in direction `d`, 34 px either way: the steps with `rgb` within 2 px across
+/// it, and the bare steps (no orange and no blue within 2 px: a dash's gap).
+fn dashes(crop: &[[u8; 3]], d: DVec2, rgb: u32) -> (usize, usize) {
+    let d = d.normalize();
+    let n = DVec2::new(-d.y, d.x);
+    let across = |k: i32| {
+        (-2..=2).filter_map(move |j| {
+            let q = DVec2::new(40.0, 40.0) + d * k as f64 + n * j as f64;
+            let (x, y) = (q.x.round() as i32, q.y.round() as i32);
+            ((0..80).contains(&x) && (0..80).contains(&y)).then(|| crop[(y * 80 + x) as usize])
+        })
+    };
+    let lit = (-34..=34).filter(|&k| across(k).any(|c| close(c, rgb, 24))).count();
+    let bare = (-34..=34).filter(|&k| across(k).all(|c| !(c[0] >= 0xd0 && c[2] <= 0xb0) && !sketch_blue(c))).count();
+    (lit, bare)
+}
+
+// A construction line in sketch edit (live sk-hover-matrix-1123 CL-N / CL-SS, raw/mx): hovered, its dashes take the
+// #ffc685 band and its gaps stay bare; selected, the dashes are #ffa90a and stay so under the pointer (no hover tint).
+#[gpui::test]
+fn sk_a_construction_lines_dashes_take_the_hover_and_selected_bands(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "construction-hover");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, SK_LINE);
+    m.pointer.move_to(cx, &m.view, p);
+    m.pointer.click(cx, &m.view, p);
+    cx.update_window(m.window, |_, w, cx| {
+        m.view.update(cx, |v, cx| {
+            v.toggle_construction(w, cx);
+            if let Some(ed) = &mut v.sketch {
+                ed.selection.clear();
+            }
+            v.refresh_scene(false, cx);
+        })
+    })
+    .unwrap();
+    m.park(cx);
+    let d = screen_dir(cx, &m, SK_LINE, [1., 0., 0.]);
+    approach(cx, &m, p);
+    let (lit, bare) = dashes(&m.crop(cx, p), d, 0xffc685);
+    assert!(lit >= 20 && bare >= 3, "hovered: {lit} lit, {bare} bare steps of 69");
+    m.pointer.click(cx, &m.view, p);
+    m.park(cx);
+    let selected = m.crop(cx, p);
+    let (lit, bare) = dashes(&selected, d, 0xffa90a);
+    assert!(lit >= 20 && bare >= 3, "selected: {lit} lit, {bare} bare steps of 69");
+    approach(cx, &m, p);
+    let both = m.crop(cx, p);
+    // Within 3 px of the line, 34 px either way: no pixel changes under the pointer.
+    let n = DVec2::new(-d.y, d.x).normalize();
+    let changed: Vec<(i32, [u8; 3], [u8; 3])> = (-34..=34)
+        .flat_map(|k| (-3..=3).map(move |j| (k, j)))
+        .filter_map(|(k, j)| {
+            let q = DVec2::new(40.0, 40.0) + d.normalize() * k as f64 + n * j as f64;
+            let i = (q.y.round() as usize) * 80 + q.x.round() as usize;
+            selected[i].iter().zip(both[i]).any(|(a, b)| a.abs_diff(b) > 8).then_some((k, selected[i], both[i]))
+        })
+        .collect();
+    assert!(changed.is_empty(), "selected, then hovered too: {} px changed, {:02x?}", changed.len(), &changed[..changed.len().min(4)]);
+}
+
+// A feature-list row hovered while a sketch is open (live sk-hover-matrix-1123, "Sketch 2" / "Block" rows): nothing is
+// drawn in the graphics area (outside the sketch, Extrude 1's row outlines its part).
+#[gpui::test]
+fn sk_a_feature_rows_hover_draws_nothing_while_a_sketch_is_open(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "row-hover-in-sketch");
+    m.edit_sketch(cx);
+    m.park(cx);
+    let ids: Vec<(String, noshape_model::reference::FeatureId)> = cx.update(|cx| m.view.read(cx).studio(cx).map(|st| st.features.iter().filter(|f| f.name != "Sketch 2").map(|f| (f.name.clone(), f.id)).collect()).unwrap_or_default());
+    assert!(!ids.is_empty(), "Sketch 1 and Extrude 1");
+    m.pointer.frames(cx, &m.view);
+    let still = m.frame(cx);
+    for (name, f) in ids {
+        m.view.update(cx, |v, cx| {
+            v.ui.list_hover = Some(f);
+            v.refresh_scene(false, cx);
+        });
+        m.pointer.frames(cx, &m.view);
+        let now = m.frame(cx);
+        let changed = still.2.iter().zip(&now.2).filter(|(p, q)| p.iter().zip(q.iter()).any(|(x, y)| x.abs_diff(*y) > 8)).count();
+        assert_eq!(changed, 0, "{name}'s row hovered changed {changed} px");
+        m.view.update(cx, |v, cx| {
+            v.ui.list_hover = None;
+            v.refresh_scene(false, cx);
+        });
+        m.pointer.frames(cx, &m.view);
+    }
+}
+
+// Select other (`) on a sketch line between two regions (live sk-leftovers-1124): Edge, then a Face row for the region on
+// each side of it.
+#[gpui::test]
+fn sk_select_other_on_a_line_between_two_regions_lists_both(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [
+            { "corner_rectangle": [[60, 0], [100, 20]] },
+            { "line": [[80, 0], [80, 20]] }
+        ] }
+    ] });
+    let m = matrix_studio_from(cx, "select-other-two-regions", start);
+    m.edit_sketch(cx);
+    let p = m.screen(cx, [80., 10., 0.]);
+    approach(cx, &m, p);
+    cx.update_window(m.window, |_, _, cx| m.view.update(cx, |v, cx| v.select_other(false, cx))).unwrap();
+    let rows: Vec<String> = cx.update(|cx| {
+        let v = m.view.read(cx);
+        let label = v.labeler(cx);
+        v.ui.select_other.as_ref().map(|s| s.hits.iter().map(|r| label(r)).collect()).unwrap_or_default()
+    });
+    assert_eq!(rows.first().map(String::as_str), Some("Edge of Sketch 2"), "{rows:?}");
+    assert_eq!(rows.iter().filter(|r| *r == "Face of Sketch 2").count(), 2, "a region each side: {rows:?}");
+}

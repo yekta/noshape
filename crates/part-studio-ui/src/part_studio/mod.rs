@@ -1383,7 +1383,7 @@ impl PartStudioView {
         }
         o.display_only = self.ui.transform_ghost.clone();
         o.through_sketches = self.dblclick_sketches();
-        o.lit_through = self.ui.list_hover.filter(|f| self.display.sketches.iter().any(|s| s.hidden && s.feature == *f));
+        o.lit_through = self.ui.list_hover.filter(|f| self.sketch.is_none() && self.display.sketches.iter().any(|s| s.hidden && s.feature == *f));
         // Isolate (live ui/iso-901): the planes fade to faint outlines; Make transparent below 10 %: solid
         // washed-out ghosts.
         // Show dimensions: the parts' shadowed faces come up a little (live).

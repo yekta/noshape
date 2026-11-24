@@ -6,8 +6,8 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 ## NOW (11-24) — read first
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
-- psui's re-land of my old stack (30cba9c5) FAILED again on a rebase conflict (lead 11-24); psui redoes it. My branch sits on psui's rebase (1c8e8b45e); old tip kept as
-  branch skasm-pre-rebase-1124. When it lands: rebase on main, run my tests, land.sh my commits on top.
+- LEAD 11-24 14:00: psui re-queued my old stack as a2341555 (DON'T re-land it). After a2341555 lands: rebase on main (drop dups,
+  diff --stat), rerun t6/tuse/tmc/tmc2/tst/tdim/tcl.sh, land.sh my newer commits. Old tip kept as branch skasm-pre-rebase-1124.
 - LEAD 11-24 decisions: land the 2 SM commits with the rest, then no more SM; Select other keeps the current ` row-2 bold
   (behaviours 19904; lead puts the recheck on live's list).
 - Local commits (not landed; fbb6d4a6a = glyph order + Arc3 dash + tangent-arc-origin test, all green, clippy clean): 043f530ce failing picked edges red through the part (ERR-SM-BAD-SELECTION-RED, done,
@@ -23,11 +23,25 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   tuse.sh + tmir.sh + tst.sh in skasm-scratch/bin). 5c804077e MC along an edge: nearer end past half-way (live
   mc-reach-1124; shared chooser crates/assembly inference.rs; tmc.sh/tmc2.sh green: assembly 3, ps-ui 15, asm-ui 51).
   Open on FEEL-MC-PS-MARKER-REACH: live's blank vertex step at 6 px (entry rule vs glyph reach, unsettled).
-- Live sk-hover-matrix-1123 (lead P0 hover×state; live/skasm/sk-hover-matrix-1123/index.md): checked = glyph selected
-  #fab601 wins / hover #fcda7f, dimension label tints (d9a566 / d9bfa0 ≈ live). Fixed (WIP commit; tdim.sh run br5lt990y log ~/tmp/skasm/tdim.log on this host: check it first): dimension labels take no hit with a drawing tool or Dimension on (sketch.rs label build, l.hit = None); test
-  a_dimension_label_takes_no_hover_with_line_or_dimension_on. NEXT from that matrix: construction line / spline hover =
-  solid #ffc685 band, selected #ffa90a with no hover change; dimension line/extension hover #9c7611 / #aa8b38 and
-  selected #705610 / #857037; feature-list row hover while editing draws nothing. Write GPU cells for each.
+- Live sk-hover-matrix-1123 (lead P0 hover×state). Committed 4e2995a8d (dimension labels take no hit with a drawing tool /
+  Dimension on). COMMITTED (green: render 85, sketch UI 480, clippy; was tcommit.sh: render tests + sketch::ui_tests:: + clippy render/scene/ps-ui, log
+  ~/tmp/skasm/tcommit.log, task bria5869u): construction band opaque (shaders.wgsl own_edge && style 8 → alpha 1; live CL
+  dashed band core #fda80b), row hover draws nothing in sketch edit (behaviors.rs row_hovered_feature +
+  sketches_shown_for_now, mod.rs lit_through), SM a_corner_breaks… #[ignore = "T2: flaky under load"] (lead), tests
+  hover_matrix::sk_a_construction_lines…, sk_a_feature_rows_hover…, sk_select_other_on_a_line_between_two_regions_lists_both
+  (live sk-leftovers-1124), extend unit test comment. If green: commit "skasm: sketch hover × state as live: construction
+  bands opaque, no row hover in sketch edit; Select other two regions test; flaky SM disc test T2".
+- NEXT (gap found): a dimension's LINES take no hover/press (only the label: LabelHover/LabelDown, sketch.rs ~1267/1287;
+  overlay segs pick_id 0, sketch_mode.rs ~7548). Live DL/DE: hovering the dimension or extension line lights the whole
+  dimension (#9c7611 hovered core, #6f5610 selected; ours colours 0x987107 / 0x6a4f06 in that overlay: set live's). Plan:
+  SketchUi.dim_line_hover; in PointerMove (sketch.rs ~1315) with tool Select, pointer within ~4 px of
+  ed.dimension_graphics(data) segs (sketch m, ed.world_per_px) → ed.hover_constraint = Some(cid), self.hover = None; left →
+  clear if still ours; PointerDown with it → ed.pressed_label = Some((cid, additive, true)) as LabelDown. Pending GPU tests
+  in /root/skasm-scratch/pending-tests.rs (dimension line colours: sample a quarter along the horizontal seg; construction
+  circle dashed: our test saw 120/120 rim samples with no blue — diagnose (sampling? colour?) before blaming the
+  per-segment dash restart in fs_line (along = t*len per segment; previews use dash_dot_pieces). A renderer fix = new
+  LineSegment field (55 literals, psui's area) → decision for the lead).
+- Live answers 11-24: construction dash = 46 px 4/6/30/6 from the line's start (= ours); Extend: no offset limit (= ours).
 - Sketch audit notes: /root/skasm-scratch/audit-1124.md ("11-24 later"). Left: Extend B threshold (live), value-box
   caret/selection/palette looks, Select other's doubled "Face of Sketch 3" row (needs qa's scene), wf13 up-left glyph
   row (live moves it only off stale glyphs; order unmeasured).

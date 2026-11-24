@@ -1283,8 +1283,12 @@ impl PartStudioView {
     }
 
     /// The feature whose row (or menu, or Instance inspector row) is hovered: never the one open in the dialog (live
-    /// workflow 10: Extrude 1 double-clicked, the pointer still on its row, lights only its picked region).
+    /// workflow 10: Extrude 1 double-clicked, the pointer still on its row, lights only its picked region), and none while a
+    /// sketch is open (live sk-hover-matrix-1123: "Sketch 2" or "Block" hovered draws nothing).
     pub(super) fn row_hovered_feature(&self, cx: &App) -> Option<FeatureId> {
+        if self.sketch.is_some() {
+            return None;
+        }
         let editing = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
         self.ui.list_hover.or(self.ui.list_menu).or(self.ui.insp.hover_feature).filter(|f| Some(*f) != editing)
     }
@@ -1375,10 +1379,11 @@ impl PartStudioView {
 
     /// Hidden sketches drawn for now: a part face double-clicked shows its feature's sketch while that selection
     /// stands (live feel/3d.json "double_click_face": Sketch 1 drawn in blue, feel/3d/dblclick-face.png), and a
-    /// hidden sketch's list row hovered shows it in place, lit (live2 11-17 sel-feel 4: Sketch 1 light orange).
+    /// hidden sketch's list row hovered shows it in place, lit (live2 11-17 sel-feel 4: Sketch 1 light orange), though not
+    /// while a sketch is open (live sk-hover-matrix-1123).
     pub(super) fn sketches_shown_for_now(&self) -> Vec<FeatureId> {
         let mut out = self.dblclick_sketches();
-        out.extend(self.ui.list_hover);
+        out.extend(self.ui.list_hover.filter(|_| self.sketch.is_none()));
         out.retain(|f| self.display.sketches.iter().any(|s| s.hidden && s.feature == *f));
         out.sort();
         out.dedup();

@@ -1154,6 +1154,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     var base: vec3<f32>;
     var alpha: f32;
     if ((inst.params.x & 1u) != 0u) { base = srgb_to_linear(l.color.rgb); alpha = l.color.a; } else { base = inst.color.rgb; alpha = inst.color.a; }
+    // A construction line's band is opaque, as a solid line's (live sk-hover-matrix-1123 CL: core #fda80b selected).
+    if (own_edge && (l.style & 8u) != 0u) { alpha = 1.0; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
     // A selected part's edges are a darker amber, so the part reads as one
     // amber body: half the part amber in sRGB, 806026 where a 2× edge covers
