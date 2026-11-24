@@ -422,6 +422,13 @@ impl Sketch {
                 done = Some(sub);
             }
         }
+        // Holding units only adds equations: a component that fails with none held fails with any (fuzz fz211:
+        // an over-defined piece's 40 failed trials, 250 ms on every edit).
+        // (A line collapsing doesn't count: a held unit may keep it.)
+        let converges = SolveOptions { allow_collapse: true, ..opts.clone() };
+        if held.is_empty() && !self.sub_sketch(comp, cons, &|_| true, &held).is_some_and(|mut sub| sub.solve_trial(&converges)) {
+            return false;
+        }
         let base: Vec<EntityId> = base.into_iter().filter(|u| !held.contains(u)).collect();
         for u in base {
             let mut with = held.clone();

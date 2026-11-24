@@ -1041,21 +1041,30 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
         // (live fuzz s7: a radius dimensioned twice, both 13.096 mm: "Sketch
         // could not be solved."), where a redundant relation (a second
         // Perpendicular, an Equal twice) doesn't.
-        let analysis = (opts.analyze && !is_drag).then(|| analyze(sk, &mut sys, &out, &conflicting));
+        // A trial's failure (no exclusion: `solve_trial`, `solve_inner`'s first try) is thrown away: no analysis for it.
+        let analyse = opts.analyze && (allow_exclusion || (out.all_converged && out.max_residual <= opts.tolerance));
+        let analysis = (analyse && !is_drag).then(|| analyze(sk, &mut sys, &out, &conflicting));
         let mut conflicting = conflicting;
         // A conflict's driving dimensions include the ones the sketch solves without (live errors-1118 / recheck 11-19:
-        // a rectangle's 50 typed on the side opposite its 40, both red, not the 30).
-        if analysis.is_some()
-            && !conflicting.is_empty()
-            && let Some(dims) = conflict_dims(sk, &conflicting)
-        {
-            conflicting = dedup_sorted(conflicting.into_iter().chain(dims).collect());
-        }
+        // a rectangle's 50 typed on the side opposite its 40, both red, not the 30); and the redundant ones still fixed
+        // nearby. Both are probe solves of the whole sketch, tried side by side.
         if let Some(a) = &analysis {
-            let dims: Vec<ConstraintId> = a.redundant.iter().copied().filter(|c| sk.constraint(*c).is_some_and(|c| c.driving && c.kind.is_dimension())).collect();
-            let dims = if dims.is_empty() { dims } else { redundant_nearby(sk, dims) };
-            if !dims.is_empty() {
-                conflicting = dedup_sorted(conflicting.into_iter().chain(dims).collect());
+            let sketch: &Sketch = sk;
+            let redundant: Vec<ConstraintId> = a.redundant.iter().copied().filter(|c| sketch.constraint(*c).is_some_and(|c| c.driving && c.kind.is_dimension())).collect();
+            let freeing = || if conflicting.is_empty() { None } else { conflict_dims(sketch, &conflicting) };
+            let (freeing, nearby) = if redundant.is_empty() {
+                (freeing(), redundant)
+            } else if conflicting.is_empty() {
+                (None, redundant_nearby(sketch, redundant))
+            } else {
+                std::thread::scope(|s| {
+                    let other = s.spawn(freeing);
+                    let nearby = redundant_nearby(sketch, redundant);
+                    (other.join().unwrap_or_else(|e| std::panic::resume_unwind(e)), nearby)
+                })
+            };
+            if freeing.is_some() || !nearby.is_empty() {
+                conflicting = dedup_sorted(conflicting.iter().copied().chain(freeing.into_iter().flatten()).chain(nearby).collect());
             }
         }
         let status = if !out.all_converged || out.max_residual > opts.tolerance {
@@ -1079,7 +1088,7 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
             max_residual: out.max_residual,
             drag_solved: drag_ok,
         };
-        if opts.analyze {
+        if analyse {
             let a = match analysis {
                 Some(a) if conflicting.is_empty() => a,
                 _ => analyze(sk, &mut sys, &out, &conflicting),
@@ -1110,24 +1119,22 @@ fn redundant_nearby(sk: &Sketch, dims: Vec<ConstraintId>) -> Vec<ConstraintId> {
     }
     INSIDE.with(|c| c.set(true));
     let size = sk.bbox().size().max_element().max(1e-3);
-    let kept = dims
-        .into_iter()
-        .filter(|&c| {
-            let mut probe = sk.clone();
-            if probe.set_driving(c, false).is_err() {
-                return true;
-            }
-            let points: Vec<(EntityId, DVec2)> = probe.entities().filter(|e| !e.external && e.kind() == EntityKind::Point).filter_map(|e| Some((e.id, probe.point(e.id)?))).collect();
-            for (k, (id, p)) in points.into_iter().enumerate() {
-                let t = (k as f64 + 1.0) * 0.618_033_988_75;
-                let _ = probe.set_point(id, p + DVec2::new(t.fract() - 0.5, (t * 1.7).fract() - 0.5) * size * 1e-3);
-            }
-            if !probe.solve_with(&SolveOptions { analyze: false, ..Default::default() }).is_solved() || probe.set_driving(c, true).is_err() {
-                return true;
-            }
-            probe.solve_with(&SolveOptions::default()).redundant.contains(&c)
-        })
-        .collect();
+    let kept = par_keep(dims, |c| {
+        INSIDE.with(|f| f.set(true));
+        let mut probe = sk.clone();
+        if probe.set_driving(c, false).is_err() {
+            return true;
+        }
+        let points: Vec<(EntityId, DVec2)> = probe.entities().filter(|e| !e.external && e.kind() == EntityKind::Point).filter_map(|e| Some((e.id, probe.point(e.id)?))).collect();
+        for (k, (id, p)) in points.into_iter().enumerate() {
+            let t = (k as f64 + 1.0) * 0.618_033_988_75;
+            let _ = probe.set_point(id, p + DVec2::new(t.fract() - 0.5, (t * 1.7).fract() - 0.5) * size * 1e-3);
+        }
+        if !probe.solve_with(&SolveOptions { analyze: false, ..Default::default() }).is_solved() || probe.set_driving(c, true).is_err() {
+            return true;
+        }
+        probe.solve_with(&SolveOptions::default()).redundant.contains(&c)
+    });
     INSIDE.with(|c| c.set(false));
     kept
 }
@@ -1145,14 +1152,26 @@ fn conflict_dims(sk: &Sketch, conflicting: &[ConstraintId]) -> Option<Vec<Constr
         .map(|c| c.id)
         .take(12)
         .collect();
-    let freeing: Vec<ConstraintId> = dims
-        .into_iter()
-        .filter(|&c| {
-            let mut probe = sk.clone();
-            probe.set_driving(c, false).is_ok() && probe.solve_with(&SolveOptions { analyze: false, ..Default::default() }).is_solved()
-        })
-        .collect();
+    let freeing = par_keep(dims, |c| {
+        let mut probe = sk.clone();
+        probe.set_driving(c, false).is_ok() && probe.solve_with(&SolveOptions { analyze: false, ..Default::default() }).is_solved()
+    });
     (!freeing.is_empty()).then_some(freeing)
+}
+
+/// The items `keep` keeps, in order, tried side by side on the machine's cores (each a whole-sketch probe solve: a
+/// broken sketch's conflict colours took ~250 ms on one).
+fn par_keep<T: Copy + Send + Sync>(items: Vec<T>, keep: impl Fn(T) -> bool + Sync) -> Vec<T> {
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(items.len());
+    if threads <= 1 {
+        return items.into_iter().filter(|&x| keep(x)).collect();
+    }
+    let keep = &keep;
+    let chunk = items.len().div_ceil(threads);
+    std::thread::scope(|s| {
+        let parts: Vec<_> = items.chunks(chunk).map(|part| s.spawn(move || part.iter().copied().filter(|&x| keep(x)).collect::<Vec<T>>())).collect();
+        parts.into_iter().flat_map(|h| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e))).collect()
+    })
 }
 
 /// The driving dimension equation `eq` comes from, if any.
@@ -1586,12 +1605,22 @@ impl Sketch {
         let rep = if !unheld.is_empty() {
             let left: HashSet<EntityId> = self.place_constructively(&unheld).into_iter().collect();
             let at = self.clone();
-            let rep = self.solve_inner(opts);
-            let moved = || self.entities().filter(|e| !left.contains(&e.id)).any(|e| at.entity(e.id).is_none_or(|a| match (&a.geometry, &e.geometry) {
+            // Tried without the DOF analysis first (it only adds conflicts, never moves anything): a placement the solve
+            // moves or can't hold (an over-defined sketch's, on every edit) costs no analysis.
+            let quick = SolveOptions { analyze: false, ..opts.clone() };
+            let rep = self.solve_inner(&quick);
+            let moved = self.entities().filter(|e| !left.contains(&e.id)).any(|e| at.entity(e.id).is_none_or(|a| match (&a.geometry, &e.geometry) {
                 (Geometry::Point { pos: p }, Geometry::Point { pos: q }) => (*p - *q).length() > 1e-9,
                 _ => false,
             }));
-            if rep.is_solved() && !moved() && self.collapsed_lines(&snapshot).is_empty() {
+            let kept = rep.is_solved() && !moved && self.collapsed_lines(&snapshot).is_empty();
+            let rep = if kept && opts.analyze {
+                *self = at;
+                self.solve_inner(opts)
+            } else {
+                rep
+            };
+            if kept && rep.is_solved() {
                 rep
             } else {
                 *self = snapshot.clone();
