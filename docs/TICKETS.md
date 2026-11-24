@@ -1056,7 +1056,7 @@ Timing: ours is faster than live at every step of 01, 03, 04, 06, 07, 09 and 10 
   row, face / edge / vertex, empty canvas, view cube, sketch line, Part Studio and Assembly tabs, the tab bar's empty end (no menu),
   instance and root rows, the drawing view. Not tickets: live's Add comment / Create task… (cloud). Runner gaps: "Parts (1)" header
   (step 10) not found by our runner; step 4's plane target hit the plane in graphics (variant 40v-plane-row at live's px: the Front row's menu = live, Rename … Show dependencies…).
-- [ ] P2 **EXPR-AUTOCOMPLETE-LOOK (psui)** (workflow 37 steps 25 / 42, vs-vars, green d0df2d56b): typing "#w * 2 + 5 mm" in a
+- [ ] fixed, to verify (psui 11-24 15:1x: icons and "max(x,y)" were fixed in 298f438c2 after this build; the sketch dimension box's list now hangs from its 100 px value field with the right edges lined up and its top on the underline's bottom, as live wf37 s25 (field 963-1062, list 909-1062), as Extrude's Depth already did; test dimension_box_lists_variables_by_their_word_prefixes. The origin glyph over the new block not looked at.) P2 **EXPR-AUTOCOMPLETE-LOOK (psui)** (workflow 37 steps 25 / 42, vs-vars, green d0df2d56b): typing "#w * 2 + 5 mm" in a
   sketch dimension or "#w + 3 mm" in Extrude's Depth opens the suggestion list: live's rows are "mm" with a ruler icon, "(f) max(x,y)",
   "(f) min(x,y)", the list's left edge left of the field; ours shows "mm" with a different icon, "f max( x , y )" / "f min( x , y )"
   (spaced arguments, bare f), the list starting at the field's left and wider (tickets/wf37-dims.png row 1, wf37-depth.png row 1).

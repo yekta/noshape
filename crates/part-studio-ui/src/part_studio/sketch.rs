@@ -4295,6 +4295,12 @@ impl PartStudioView {
                 let allowed = data.sketch.constraint(cid).is_some_and(|c| crate::sketch_mode::tolerance_allowed(&c.kind));
                 let dim_invalid = self.ui.dim_invalid;
                 let box_focused = st.read(cx).focus_handle(cx).is_focused(window);
+                // The `#` autofill list under the value field, right edges lined up (live wf37 step 25: the 154 px list
+                // ends at the 100 px field's right, its top on the underline's).
+                let completion = self.ui_ref().and_then(|u| u.dim_completion.as_ref()).map(|c| {
+                    let view = cx.entity();
+                    c.render_end(&self.sketch_variables(cx), &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_dim_completion(cid, Some(i), window, cx)))
+                });
                 // The Create variable popup for an unknown `#name`, level with
                 // the box and right of it (left of it when the graphics area
                 // ends first). It is drawn 107 px right of its anchor (as next
@@ -4445,9 +4451,10 @@ impl PartStudioView {
                                 .border_color(gpui_kit::rgb_static(0xcccccc))
                                 .shadow_md()
                                 .child(div().w(px(20.)).flex().justify_center().child(crate::ui::glyph("ui-chevron-right", 12., rgb(0xd7d7d7))))
-                                .child(gpui_kit::base::input::input_frame(crate::quantity_field::invalid_field(
+                                .child(div().relative().child(gpui_kit::base::input::input_frame(crate::quantity_field::invalid_field(
                                     div()
                                         .id("sk-dim-field")
+                                        .debug_selector(|| "sk-dim-field".into())
                                         .w(px(100.))
                                         .h(px(24.))
                                         .border_b_1()
@@ -4472,7 +4479,7 @@ impl PartStudioView {
                                         // Live sketch/141: right-aligned, ~13.33 px, ending 7 px from the field's edge.
                                         .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).h(px(24.))),
                                     dim_invalid,
-                                )))
+                                ))).children(completion))
                                 .child(
                                     div()
                                         .id("sk-dim-tol")
@@ -4542,11 +4549,6 @@ impl PartStudioView {
                                         })),
                                 ),
                         )
-                        // The `#` autofill list, under the value field.
-                        .when_some(self.ui_ref().and_then(|u| u.dim_completion.as_ref()), |d, c| {
-                            let view = cx.entity();
-                            d.child(crate::ui::popup_anchor().left(px(20.)).child(c.render(&self.sketch_variables(cx), &units, move |i, window, cx| view.update(cx, |this, cx| this.accept_dim_completion(cid, Some(i), window, cx)))))
-                        })
                         .into_any_element(),
                 );
                 if let Some(panel) = tol_panel.take() {

@@ -720,6 +720,11 @@ fn dimension_box_lists_variables_by_their_word_prefixes(cx: &mut TestAppContext)
     keys(cx, window, &["f", "a", "n", "c", "o", "n", "t", "r", "o", "l"]);
     let rows = cx.update(|cx| view.read(cx).ui_ref().and_then(|u| u.dim_completion.as_ref()).map(|c| c.ui_state(None)["rows"].clone()));
     assert_eq!(rows, Some(serde_json::json!(["#fan_control_board_depth", "#fan_control_board_wall_length"])));
+    // Live wf37 step 25: the list hangs from the 100 px value field, right edges lined up, so it reaches left of it.
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let (f, l) = (vcx.debug_bounds("sk-dim-field").expect("the value field"), vcx.debug_bounds("var-complete").expect("the list"));
+    assert_eq!((l.top() - f.bottom(), l.right() - f.right(), l.left() < f.left()), (px(0.), px(0.), true), "(list top − field bottom, right − right, starts left of the field): field {f:?}, list {l:?}");
     keys(cx, window, &["down", "down", "up", "enter"]);
     let box_text = cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
     assert_eq!(box_text.as_deref(), Some("#fan_control_board_depth"), "↑ / ↓ don't wrap; the typed word replaced");
