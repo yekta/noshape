@@ -21,7 +21,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   sketch keys ignored), pending (live's overlay past 0.9 s); regen_sync of a slow sketch -> schedule_regen (the
   async completion now also runs update_profile_issues). T1 latency_tests
   a_slow_sketch_solves_a_dimension_off_the_ui_thread. fz211 UI probe (skasm-scratch/probes/zz_probe_fz211_ui.rs):
-  commit_dimension on the UI thread 627-742 ms -> 3-5 ms, done 0.54-0.65 s later, same warning. Suites running.
+  commit_dimension on the UI thread 627-742 ms -> 3-5 ms, done 0.54-0.65 s later, same warning. Suites were running at 23:32 (~/tmp/skasm/toff3.log on this host: TOFF3DONE marks the end); land once green.
   Not covered: drags (median 16 ms, worst ~205 ms on fz211), other tools' own solves (sync, regen async).
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
 
