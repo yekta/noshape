@@ -547,7 +547,19 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         let ws = CurrentWorkspace;
         let sleep = async |cx: &mut AsyncWindowContext, ms: u64| cx.background_executor().timer(Duration::from_millis(ms)).await;
         let studio = |cx: &mut AsyncWindowContext| -> Studio { ws.update(cx, |w, _| w.active_part_studio()).ok().flatten() };
-        // Settled: the regeneration done, and a few frames for picks and menus.
+        // The Part Studio's frame of its current scene on screen (at most 5 s): on a loaded host a pick's preview frame
+        // came back after the shot (qa 04-shell step 2, 11-24: the frame 60 ms after it).
+        let frame_shown = async |cx: &mut AsyncWindowContext| {
+            let t = Instant::now();
+            while t.elapsed() < Duration::from_secs(5) {
+                let Some(ps) = studio(cx) else { return };
+                if !cx.update(|_, cx| ps.read(cx).ui_frame_pending(cx)).unwrap_or(false) {
+                    return;
+                }
+                sleep(cx, 10).await;
+            }
+        };
+        // Settled: the regeneration done, its frame shown, and a few frames for picks and menus.
         let settle = async |cx: &mut AsyncWindowContext| -> Instant {
             let t = Instant::now();
             let idle;
@@ -564,6 +576,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     break;
                 }
             }
+            frame_shown(cx).await;
             sleep(cx, 400).await;
             idle
         };
@@ -869,7 +882,10 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 }
                 "wait" => {
                     match step["until"].as_str() {
-                        Some("ms") => sleep(cx, step["ms"].as_u64().unwrap_or(500)).await,
+                        Some("ms") => {
+                            sleep(cx, step["ms"].as_u64().unwrap_or(500)).await;
+                            Ok(())
+                        }
                         Some("dialog") => {
                             for _ in 0..50 {
                                 let open = cx.update(|window, cx| studio_has_dialog(&ps, window, cx)).unwrap_or(false);
@@ -878,10 +894,29 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 }
                                 sleep(cx, 100).await;
                             }
+                            Ok(())
                         }
-                        _ => {}
+                        // "regenerated" (live's runner: any other wait is quiet for 1.5 s, at most `ms`, 20 s). Ours sees
+                        // the work: no regeneration, preview or frame pending for 300 ms.
+                        _ => {
+                            let t = Instant::now();
+                            let limit = Duration::from_millis(step["ms"].as_u64().unwrap_or(20_000));
+                            let mut quiet = Instant::now();
+                            while t.elapsed() < limit {
+                                let busy = match studio(cx) {
+                                    Some(ps) => cx.update(|_, cx| ps.read(cx).ui_busy() || ps.read(cx).ui_frame_pending(cx)).unwrap_or(false),
+                                    None => false,
+                                };
+                                if busy {
+                                    quiet = Instant::now();
+                                } else if quiet.elapsed() >= Duration::from_millis(300) {
+                                    break;
+                                }
+                                sleep(cx, 20).await;
+                            }
+                            Ok(())
+                        }
                     }
-                    Ok(())
                 }
                 // A screenshot of live's runner (live2's takes): nothing to do here.
                 "shot" => Ok(()),

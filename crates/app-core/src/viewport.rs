@@ -998,6 +998,11 @@ impl Viewport {
         !self.in_flight.is_empty()
     }
 
+    /// The scene changed and its frame isn't presented yet (waiting to be submitted or in flight).
+    pub fn frame_pending(&self) -> bool {
+        self.dirty || !self.in_flight.is_empty()
+    }
+
     /// A pick asked of the GPU hasn't come back yet (a click's or a menu's, after the pick buffer was redrawn).
     pub fn pick_pending(&self) -> bool {
         !self.pick_requests.is_empty()

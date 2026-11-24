@@ -762,6 +762,12 @@ impl PartStudioView {
         self.viewport.read(cx).hover_pending()
     }
 
+    /// The viewport's frame of the current scene isn't on screen yet (a preview after a pick: the driver's shot waits
+    /// for it, as a hand waits to see it).
+    pub fn ui_frame_pending(&self, cx: &App) -> bool {
+        self.viewport.read(cx).frame_pending()
+    }
+
     /// Redraw the studio and its dialog, so every named control records where it is now.
     pub fn ui_redraw(&self, cx: &mut Context<Self>) {
         if let Some(e) = &self.edit {

@@ -143,8 +143,10 @@ take's placement) carries the same control by name for ours, which runs `ours_on
   an import's "… has been imported" toast isn't compared at the pick step itself (live's shows in the next wait).
   A save dialog (Export, Download) doesn't show while a scenario runs: ours saves at once into the run's documents
   folder, as live's browser downloads.
-- `{"do": "wait", "until": "regenerated" | "dialog" | "ms", "ms": 500}`. Each side also waits, after every step,
-  until its regeneration is idle (at most 30 s), so timing never decides a result.
+- `{"do": "wait", "until": "regenerated" | "dialog" | "ms", "ms": 500}`. "regenerated" (or any until but "ms" and
+  "dialog") waits for quiet: live's 1.5 s without change, ours 300 ms with no regeneration, preview or viewport frame
+  pending; at most `ms` (default 20 s). Each side also waits, after every step, until its regeneration is idle (at
+  most 30 s) and ours until the viewport shows its frame (at most 5 s), so timing never decides a result.
 
 ### TARGET (by name, never by pixel)
 - `{"tool": "Extrude"}`: a toolbar tool by its tooltip name; `{"tool": "Fillet", "menu": "Chamfer"}` in a dropdown.
