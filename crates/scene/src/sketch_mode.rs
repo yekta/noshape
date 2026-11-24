@@ -4505,16 +4505,24 @@ impl SketchEditor {
                     d(i).total_cmp(&d(j))
                 });
                 let first = self.text_clicks.first().and_then(|c| nearest(c.pos));
+                // The first corner and the points it was put on: the second corner aligned with them would fold the box
+                // flat (a second click straight above a first one on the Origin).
+                let mut under_first: Vec<EntityId> = first.map(|i| corners[i]).into_iter().collect();
+                under_first.extend(self.text_clicks.first().into_iter().flat_map(|c| c.inference.iter().flat_map(|i| &i.constraints)).filter_map(|a| match *a {
+                    AutoConstraint::CoincidentPoint(q) => Some(q),
+                    _ => None,
+                }));
                 for (k, c) in std::mem::take(&mut self.text_clicks).into_iter().enumerate() {
                     let Some(i) = first else { break };
                     let pt = corners[if k == 0 { i } else { (i + 2) % corners.len() }];
+                    let folds = |q: EntityId| k > 0 && under_first.contains(&q);
                     // An alignment the corner was inferred to is kept too (live sketch-tools-1123 text.md: `VERTICAL
                     // (secondSnap0)`, the second corner vertical to a line's end).
                     for a in c.inference.iter().flat_map(|i| &i.constraints) {
                         let kind = match *a {
                             AutoConstraint::CoincidentPoint(q) if q != pt => ConstraintKind::Coincident { a: pt, b: q },
-                            AutoConstraint::HorizontalWith(q) if q != pt => ConstraintKind::Horizontal { a: pt, b: Some(q) },
-                            AutoConstraint::VerticalWith(q) if q != pt => ConstraintKind::Vertical { a: pt, b: Some(q) },
+                            AutoConstraint::HorizontalWith(q) if q != pt && !folds(q) => ConstraintKind::Horizontal { a: pt, b: Some(q) },
+                            AutoConstraint::VerticalWith(q) if q != pt && !folds(q) => ConstraintKind::Vertical { a: pt, b: Some(q) },
                             _ => continue,
                         };
                         let _ = data.sketch.add_constraint(kind);
@@ -10119,6 +10127,22 @@ mod tests {
         ed.text_string = "Ab".into();
         assert!(ed.accept_text(&mut d).changed);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { b: Some(b), .. } if b == end)), "VERTICAL to the line's end");
+    }
+
+    /// A text box started on the Origin, its second click straight above: no VERTICAL folds the box onto the Origin's
+    /// line (ops parity filter_inner_loops_leaves_out_a_letters_counter: "Sketch could not be solved").
+    #[test]
+    fn a_text_box_from_the_origin_drawn_straight_up_solves() {
+        let (mut ed, mut d) = editor(Tool::Text);
+        let o = d.sketch.add_point(v(0.0, 0.0));
+        let on = Inference { kind: InferenceKind::Endpoint, position: v(0.0, 0.0), entity: Some(o), reference: None, constraints: vec![AutoConstraint::CoincidentPoint(o)], distance: 0.0, priority: 0 };
+        ed.place(&mut d, Click { pos: v(0.0, 0.0), inference: Some(on) }, false);
+        let up = Inference { kind: InferenceKind::AlignVertical, position: v(0.0, 0.01), entity: None, reference: Some(v(0.0, 0.0)), constraints: vec![AutoConstraint::VerticalWith(o)], distance: 0.0, priority: 1 };
+        ed.place(&mut d, Click { pos: v(0.0, 0.01), inference: Some(up) }, false);
+        ed.text_string = "o".into();
+        assert!(ed.accept_text(&mut d).changed);
+        assert!(d.sketch.solve().is_solved(), "the box solves");
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { b: Some(b), .. } if b == o)), "no VERTICAL to the Origin");
     }
 
     /// Live sketch-tools-1123 arcs.md (SKT-INFER-STORED): a 3 point arc from a line's end, its bend where the arc is
