@@ -1786,7 +1786,7 @@ impl<'a> Translator<'a> {
         // An Intersection's ends are where a face's edges cross the plane: live's and ours part by up to 0.2 µm there
         // (c2-surf-intro-boundary's tail fin profile).
         let tol = if u.intersect { 1e-6 } else { 1e-7 };
-        let near = |c: &Value, key: &str, q: [f64; 2]| {
+        let near = |c: &Value, key: &str, q: [f64; 2], tol: f64| {
             let q = map.local(q);
             // A spline's ends are its first and last points (control points of a B-spline).
             let poles = c["points"].as_array().or(c["control_points"].as_array());
@@ -1828,20 +1828,28 @@ impl<'a> Translator<'a> {
             Some(LiveUse::Point(p)) => local(p).map(|p| (Some(p), None)),
             None => None,
         };
-        let at = |c: &Value, point: Option<[f64; 2]>, ends: Option<[[f64; 2]; 2]>| match (point, ends) {
-            (Some(p), _) => near(c, "at", p),
-            (None, Some([a, b])) => (near(c, "start", a) && near(c, "end", b)) || (near(c, "start", b) && near(c, "end", a)),
+        let at = |c: &Value, point: Option<[f64; 2]>, ends: Option<[[f64; 2]; 2]>, tol: f64| match (point, ends) {
+            (Some(p), _) => near(c, "at", p, tol),
+            (None, Some([a, b])) => (near(c, "start", a, tol) && near(c, "end", b, tol)) || (near(c, "start", b, tol) && near(c, "end", a, tol)),
             (None, None) => true,
         };
         // Where live's sketch stored it, or where live's model had it before the sketch (the stored entity stale).
-        let landed = |c: &Value| at(c, u.point, u.ends) || live.is_some_and(|(p, e)| at(c, p, e));
+        let landed = |c: &Value, tol: f64| at(c, u.point, u.ends, tol) || live.is_some_and(|(p, e)| at(c, p, e, tol));
         let created: Vec<Value> = made.as_ref().and_then(|r| r["created"].as_array().cloned()).unwrap_or_default();
         let kind: Vec<&Value> = created.iter().filter(|c| (c["type"] == "point") == point).collect();
         // A curved face's Use makes each of its silhouettes: the one live's curve is (live keeps only that one,
         // c2-fan-blade-sweep's Sketch 4).
-        let ours = kind.iter().find(|c| landed(c)).or(kind.first()).map(|c| (*c).clone());
-        let lands = ours.as_ref().is_some_and(landed);
-        let stale = lands && ours.as_ref().is_some_and(|c| !at(c, u.point, u.ends));
+        let exact = kind.iter().find(|c| landed(c, tol));
+        // An Intersection our model's drift moved off live's (manualblend's Sketch 6: 0.054 mm, Loft 1's interior
+        // OCCT's): the one within 0.1 mm; the sketch's solve is taken back as without the link.
+        let near_one = || {
+            let close: Vec<&&Value> = kind.iter().filter(|c| landed(c, 1e-4)).collect();
+            (u.intersect && close.len() == 1).then(|| close[0])
+        };
+        let found = exact.or_else(near_one);
+        let ours = found.or(kind.first()).map(|c| (*c).clone());
+        let lands = found.is_some();
+        let stale = exact.is_some() && ours.as_ref().is_some_and(|c| !at(c, u.point, u.ends, tol));
         if lands
             && kind.len() > 1
             && self.silhouettes.contains(&(oid.to_string(), u.eid.clone()))
