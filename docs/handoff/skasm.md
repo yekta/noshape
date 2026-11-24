@@ -3,7 +3,14 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 18:45) — read first
+## NOW (11-24 19:30) — read first
+- LEAD 19:00 TASK (in progress): sketch feel audit like psui's → docs/parity/sketch-feel-audit.md (written: method,
+  counts 148 sections / 2518 items, 88 covered by citation, hand-checked list, Open list). Scripts /root/skasm-scratch/sfa/
+  (scan.py → classify.py → mapped.py; kw.py = keyword check of a section against the tests, one regex per line).
+  New test a_third_redundant_dimension_is_created_driven (scene; run tsc.sh on vibex6). NEXT: work the Open list
+  most-used first (unsolvable dim colours 26111, least-change probes 4, midpoint rule 33588/34103/34117, line value box
+  33862, Use preselected 23644, sketch-equal no badges 33657, Sketch mode 116 per item), add tests, fix what fails,
+  update the doc's Added list and counts; commit; land.sh.
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
 - b99589dc LANDED as d337d0a8 (18:18): inference acquisition, dimension-line hover, hover x state, Use, MC fixes.
