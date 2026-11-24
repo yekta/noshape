@@ -13,8 +13,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   drag step worst 452 ms, all on the UI thread. Probe (reverted; skasm-scratch/bin/tprobe.sh): a dim edit's
   place_constructively (constructive.rs least change) ~440 ms; analysed solves: conflict_dims 135-200 ms (up to 12
   whole-sketch re-solves, each 6-8 retry attempts) + redundant_nearby 130-190 ms; analyze itself 11 ms.
-  NEXT: decision from the lead: speed these (conflict_dims probes in parallel; constructive profile) or move the
-  dimension-edit solve off the UI thread. Queued: 8f1f3c71 (audit), 62e8911d (offset-iso); 47ca9b2fa + the T2 test
+  LEAD DECISION 11-24 21:0x: speed up the three stages first (place_constructively, conflict_dims re-solves,
+  redundant_nearby), which helps every sketch; if fz211-type edits still take >100 ms after, move those solves off
+  the UI thread with a visible "solving" state. Land the T2 timing test (ace97f2e5) with it. Ideas: conflict_dims'
+  probes are independent (rayon, analyze:false so no recursion); redundant_nearby's thread_local INSIDE guard breaks
+  under rayon (pass a flag instead); profile constructive.rs with the probe (tprobe.sh, regions.rs zz_probe_fz211). Queued: 8f1f3c71 (audit), 62e8911d (offset-iso); 47ca9b2fa + the T2 test
   commit unqueued.
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
 
