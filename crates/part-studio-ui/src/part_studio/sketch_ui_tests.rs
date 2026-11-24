@@ -8994,3 +8994,28 @@ fn an_empty_lofts_title_tooltip_names_its_error(cx: &mut TestAppContext) {
     }
     assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Loft 1 did not regenerate properly: Select profiles in order from start to finish."));
 }
+
+/// Live errors-1123 loft empty, edited: a failing Loft with no profiles reopened hovers its title to its error too.
+#[gpui::test]
+fn an_edited_empty_lofts_title_tooltip_names_its_error(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [{ "type": "loft", "name": "Loft 1", "params": {} }] });
+    let (window, view) = part_studio_from(cx, "edited-empty-loft-tip", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).expect("the studio").features.iter().find(|f| f.name == "Loft 1").map(|f| f.id)).expect("Loft 1");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Loft dialog").dialog.clone());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+    }
+    assert!(cx.update(|cx| dialog.read(cx).title_status()).is_some(), "the title red");
+    let title = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("dialog-title").expect("the title");
+    crate::ui_script::clear_tooltip();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(title.origin.x + px(20.), title.center().y), None, Modifiers::default());
+    for _ in 0..50 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(10));
+        draw(cx, window);
+    }
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Loft 1 did not regenerate properly: Select profiles in order from start to finish."));
+}
