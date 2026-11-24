@@ -23,18 +23,19 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 /// The point halfway along edge `x` by length (not its middle parameter: two kernels' section curves of one edge are
-/// parametrised otherwise, their middle parameters' points apart by more than the records' 2 µm).
+/// parametrised otherwise, their middle parameters' points apart by more than the records' 2 µm), on the edge (a chord's
+/// point is off a knurl's helix by more than that).
 fn halfway(x: &Shape) -> Option<DVec3> {
     let i = x.edge_info().ok()?;
-    let n = 128;
-    let at = |k: usize| x.point_at(i.first_param + (i.last_param - i.first_param) * k as f64 / n as f64).ok();
-    let ps: Vec<DVec3> = (0..=n).map(at).collect::<Option<_>>()?;
+    let n = 512;
+    let t = |k: f64| i.first_param + (i.last_param - i.first_param) * k / n as f64;
+    let ps: Vec<DVec3> = (0..=n).map(|k| x.point_at(t(k as f64)).ok()).collect::<Option<_>>()?;
     let total: f64 = ps.windows(2).map(|w| w[0].distance(w[1])).sum();
     let mut run = 0.0;
-    for w in ps.windows(2) {
+    for (k, w) in ps.windows(2).enumerate() {
         let l = w[0].distance(w[1]);
         if run + l >= 0.5 * total && l > 0.0 {
-            return Some(w[0].lerp(w[1], (0.5 * total - run) / l));
+            return x.point_at(t(k as f64 + (0.5 * total - run) / l)).ok();
         }
         run += l;
     }

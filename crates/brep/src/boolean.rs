@@ -410,7 +410,7 @@ impl GFace {
             // (A seed next to one tried (the rows' nearest samples of one turn, side by side) is that one's again.)
             let mut tried: Vec<usize> = at.into_iter().collect();
             let beside = |a: usize, b: usize| (a / nv).abs_diff(b / nv) <= 1 && (a % nv).abs_diff(b % nv) <= 1;
-            for along_u in [false, true] {
+            'turns: for along_u in [false, true] {
                 // (Each row's nearest sample: a row one value of v (along u) or of u.)
                 let mut rows: Vec<(usize, f64)> = vec![(usize::MAX, f64::INFINITY); if along_u { nv } else { grid.len().div_ceil(nv) }];
                 for (k, x) in grid.iter().enumerate() {
@@ -428,6 +428,10 @@ impl GFace {
                     let (q, dq) = ns.param_of(p, grid[k].0, self.uvbox);
                     if dq < far {
                         (best, far) = (q, dq);
+                    }
+                    // (On the surface: no nearer point to find.)
+                    if far <= self.t {
+                        break 'turns;
                     }
                 }
             }
@@ -2433,20 +2437,11 @@ impl Ctx<'_> {
         let gap = GREY * self.pool.pair(self.edges[e].t, self.faces[f].t);
         const N: usize = 256;
         let ts: Vec<f64> = (0..=N).map(|k| t0 + (t1 - t0) * k as f64 / N as f64).collect();
-        // (A point's distance from the surface changes by no more than the point moves: off by more than `gap`
-        // from there on until it has moved that much farther, unasked.)
-        let (mut on, mut least, mut last) = (Vec::with_capacity(N + 1), 0.0f64, None);
-        for &t in &ts {
-            let p = point(t);
-            least -= last.map_or(0.0, |q: DVec3| (p - q).length());
-            last = Some(p);
-            if least > gap {
-                on.push(false);
-                continue;
-            }
-            least = free::surface_distance(&self.faces[f], p);
-            on.push(least <= gap);
-        }
+        // (On all threads: a circle round a thread's crest, most of its points between the turns, each found off
+        // only after trying the other turns ([`GFace::uv_of`]): 4 ms a rim on one thread, c2-config-parts-nuts' Sweep 1.)
+        let ps: Vec<DVec3> = ts.iter().map(|&t| point(t)).collect();
+        let g = &self.faces[f];
+        let on = par_map(N + 1, &|k| !free::clearly_off(g, ps[k], gap) && free::surface_distance(g, ps[k]) <= gap)?;
         if on.iter().all(|&x| x) {
             return Ok(Some(vec![(t0, e0, t1, e1)]));
         }
