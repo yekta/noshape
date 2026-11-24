@@ -174,6 +174,7 @@ of our medians (live 41.1 s), and the user documents' cold open (median of 3; th
 | 2026-11-21 | v0.4.63 (v0.4.62 alternating: 52.7 -> 53.8 s, 1 docs > 1.25x slower); live: 84 of 84 fresh-copy | 3.1–14.2 | **56** | 53.8 s | 8.41 s | 5.45 s | 5.97 s | 9.85 s | 1.14 s |
 | 2026-11-22 | v0.4.65 (v0.4.64 alternating: 49.9 -> 50.7 s, 0 docs > 1.25x slower); live: 84 of 84 fresh-copy | 2.2–4.9 | **59** | 50.7 s | 4.88 s | 5.00 s | 5.01 s | 6.53 s | 0.62 s |
 | 2026-11-23 | v0.4.67 (v0.4.66 alternating: 60.6 -> 62.1 s, 2 docs > 1.25x slower); live: 84 of 84 fresh-copy | 4.1–9.7 | **50** | 62.1 s | 10.34 s | 6.91 s | 6.64 s | 8.23 s | 0.86 s |
+| 2026-11-24 | v0.4.67 (v0.4.66 alternating: 47.3 -> 48.0 s, 2 docs > 1.25x slower); live: 84 of 84 fresh-copy | 1.8–4.0 | **60** | 48.0 s | 4.75 s | 4.79 s | 4.82 s | 6.12 s | 0.59 s |
 
 2026-11-13, vibe7 load 0.1–1.9, nothing else running; v0.4.46 (e06b09c83) and main's head (91a90caf) built there, run back to back.
 
