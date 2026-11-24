@@ -1381,6 +1381,14 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
             let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
             let names = on.into_iter().map(|g| if g { generated.clone() } else { blend.clone() }).collect();
+            let fs = &ef[chain[ci].index];
+            if CONCAVE_BALLS.with(|c| c.get())
+                && fs.len() == 2
+                && ball_edge(&chain[ci], [fs[0] as usize, fs[1] as usize], [&faces[fs[0] as usize], &faces[fs[1] as usize]], scale).is_ok_and(|b| !b.convex)
+            {
+                adds.push(NamedShape::new(tool, names));
+                continue;
+            }
             cuts.push(NamedShape::new(tool, names));
             cut_edges.push(chain[ci].index);
         }
@@ -2121,11 +2129,106 @@ struct BallEdge {
     sup: [Support; 2],
     inward: DVec3,
     straight: bool,
+    convex: bool,
+}
+
+thread_local! {
+    static CONCAVE_BALLS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The planes a concave edge's free end runs into (a point on each, its outward normal): none where its faces meet a
+/// face it ends square on or one curved.
+fn concave_end_walls(c: &ChainEdge, e: &BallEdge, ends: &[Option<(DVec3, [DVec3; 2])>; 2], outs: &[DVec3; 2], supports: &[u32], faces: &[Shape], tol: f64) -> [Vec<(DVec3, DVec3)>; 2] {
+    let mut walls = [Vec::new(), Vec::new()];
+    if e.convex {
+        return walls;
+    }
+    for end in 0..2 {
+        if ends[end].is_some() {
+            continue;
+        }
+        let q = if end == 0 { c.start } else { c.end };
+        let at: Vec<(DVec3, DVec3)> = faces
+            .iter()
+            .enumerate()
+            .filter(|(i, f)| !supports.contains(&(*i as u32)) && f.vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| (p - q).length() < tol)))
+            .map(|(_, f)| match f.face_surface() {
+                Ok(k::Surface::Plane(_)) => f.normal_at_point(q).ok().map(|n| (q, n)),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .unwrap_or_default();
+        // (Square to the edge the tool's own end lies on it already.)
+        if at.iter().any(|(_, n)| n.dot(outs[end]) < 0.05) || at.iter().all(|(_, n)| n.dot(outs[end]) > 0.999) {
+            continue;
+        }
+        walls[end] = at;
+    }
+    walls
+}
+
+/// The planar faces a concave edge's supports drop off at (convex edges) whose plane `tool` crosses near them: a point
+/// on each, its outward normal.
+fn ledge_walls(shape: &Shape, ef: &[Vec<u32>], e: &BallEdge, faces: &[Shape], tool: &Shape, scale: f64) -> FResult<Vec<(DVec3, DVec3)>> {
+    let tb = tool.bounding_box(false)?;
+    let tol = scale * 1e-7;
+    let corners: Vec<DVec3> = (0..8).map(|i| DVec3::new([tb.min.x, tb.max.x][i & 1], [tb.min.y, tb.max.y][(i >> 1) & 1], [tb.min.z, tb.max.z][i >> 2])).collect();
+    let edges = shape.edges();
+    let mut walls: Vec<(DVec3, DVec3)> = Vec::new();
+    for (j, fs) in ef.iter().enumerate() {
+        let [a, b] = fs[..] else { continue };
+        let (s, w) = match (e.faces.contains(&(a as usize)), e.faces.contains(&(b as usize))) {
+            (true, false) => (a as usize, b as usize),
+            (false, true) => (b as usize, a as usize),
+            _ => continue,
+        };
+        let wall = &faces[w];
+        if !matches!(wall.face_surface()?, k::Surface::Plane(_)) {
+            continue;
+        }
+        let wb = wall.bounding_box(false)?;
+        if !((wb.min - DVec3::splat(tol)).cmple(tb.max).all() && tb.min.cmple(wb.max + DVec3::splat(tol)).all()) {
+            continue;
+        }
+        let info = edges[j].edge_info()?;
+        let mid = (info.first_param + info.last_param) / 2.0;
+        let m = edges[j].point_at(mid)?;
+        let n = wall.normal_at_point(m)?.normalize();
+        if !corners.iter().any(|&q| n.dot(q - m) > tol) || walls.iter().any(|(q, o)| o.dot(n) > 1.0 - 1e-9 && o.dot(m - *q).abs() < tol) {
+            continue;
+        }
+        let Some((u, _)) = into_face(&faces[s], m, edges[j].tangent_at(mid)?.normalize(), scale * 1e-5)? else { continue };
+        if u.dot(n) < -0.05 {
+            walls.push((m, n));
+        }
+    }
+    Ok(walls)
+}
+
+/// `tool` less what lies outside each wall (a point on it, its outward normal).
+fn trim_by_walls<'a>(mut tool: Shape, walls: impl Iterator<Item = &'a (DVec3, DVec3)>, r: f64) -> FResult<Shape> {
+    for &(q, n) in walls {
+        let x = n.any_orthonormal_vector();
+        let y = n.cross(x);
+        let l = 40.0 * r;
+        let beyond = k::make_box(&k::Plane::new(q - x * (l / 2.0) - y * (l / 2.0), n, x), l, l, l)?;
+        tool = k::cut(&tool, &beyond)?.shape;
+    }
+    Ok(tool)
+}
+
+/// `f` with concave edges' balls rolled too (in the air, each support's side flipped), their tools added to the part:
+/// a chain turning from convex to concave OCCT can't round (the scissor's Studio 9cbb0e Fillet 2).
+pub fn with_concave_balls<T>(f: impl FnOnce() -> T) -> T {
+    let was = CONCAVE_BALLS.with(|c| c.replace(true));
+    let out = f();
+    CONCAVE_BALLS.with(|c| c.set(was));
+    out
 }
 
 impl BallEdge {
     fn forked(&self) -> BallEdge {
-        BallEdge { faces: self.faces, sup: [self.sup[0].forked(), self.sup[1].forked()], inward: self.inward, straight: self.straight }
+        BallEdge { faces: self.faces, sup: [self.sup[0].forked(), self.sup[1].forked()], inward: self.inward, straight: self.straight, convex: self.convex }
     }
 }
 
@@ -2154,12 +2257,14 @@ fn ball_edge(c: &ChainEdge, faces: [usize; 2], ff: [&Shape; 2], scale: f64) -> F
         };
         (u[k], m[k]) = (uk, mk);
     }
-    if u[0].dot(m[1]) <= 0.0 {
+    let convex = u[0].dot(m[1]) > 0.0;
+    if !convex && !CONCAVE_BALLS.with(|c| c.get()) {
         return Err(fail("a concave edge's rolling ball"));
     }
+    let m = if convex { m } else { [-m[0], -m[1]] };
     let sup = [Support::of(ff[0], p, m[0])?, Support::of(ff[1], p, m[1])?];
     let straight = matches!(info.curve, k::Curve::Line { .. }) && sup.iter().all(|s| matches!(s, Support::Plane { .. }));
-    Ok(BallEdge { faces, sup, inward: (m[0] + m[1]).normalize(), straight })
+    Ok(BallEdge { faces, sup, inward: (m[0] + m[1]).normalize(), straight, convex })
 }
 
 /// The direction into face `f` from a point `p` of its edge across `tangent`, and the face's normal into the material;
@@ -2290,8 +2395,11 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
         halt()?;
         let ends = [junction(own, c.start)?, junction(own, c.end)?];
         let outs = [-tangent_dir(c, true)?, tangent_dir(c, false)?];
-        let rolls_on = |end: usize| ends[end].is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
+        let rolls_on = |end: usize| e.convex && ends[end].is_none() && !tangent_continues(shape, if end == 0 { c.start } else { c.end }, outs[end], c.index);
         let rolls_on_free = |q: DVec3| (near(q, c.start) && ends[0].is_none()) || (near(q, c.end) && ends[1].is_none());
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("ball edge {}: convex {} straight {} {:?} -> {:?} junctions {} {} rolls on {} {}", c.index, e.convex, e.straight, c.start * 1e3, c.end * 1e3, ends[0].is_some(), ends[1].is_some(), rolls_on(0), rolls_on(1));
+        }
         if e.straight {
             let d = (c.end - c.start).normalize();
             let ball = |q: DVec3| rolling_ball(q, d, &e.sup, r, q + e.inward * r);
@@ -2313,6 +2421,14 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                     }
                 }
             }
+            // A concave edge's free end on planes it runs into: run on and trimmed by them (live's round ends on the
+            // asm-scissor-lift's chamfer, not square to its edge sticking out past it).
+            let walls = concave_end_walls(c, e, &ends, &outs, &ef[c.index], faces, scale * 1e-9);
+            for (end, w) in walls.iter().enumerate() {
+                if !w.is_empty() {
+                    ext[end] = 4.0 * r;
+                }
+            }
             // From the ball at its start to the one at its end (a junction's ball off the vertex's plane).
             let s0 = match &ends[0] {
                 Some(j) => (j.0 - c.start).dot(d),
@@ -2326,7 +2442,8 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 Some(j) => ball_section_as(j, ball(c.start + d * s0)?.1, &e.sup, r, kind)?,
                 None => section(c.start + d * s0)?,
             };
-            return Ok(Ball::Tool(k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape));
+            let tool = k::extrude(&k::make_face_from_wire(&first, true)?, d * (s1 - s0))?.shape;
+            return Ok(Ball::Tool(trim_by_walls(tool, walls.iter().flatten(), r)?));
         }
         let info = c.shape.edge_info()?;
         // An arc between a plane square to its axis and a cylinder about it: the balls' centres run round that axis, the
@@ -2444,7 +2561,33 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
                 Some(n) => if n.dot(t) < 0.0 { -n } else { n },
                 None => t,
             };
-            let (centre, mut touch) = rolling_ball(p, t, &e.sup, r, guess)?;
+            // (A concave edge's free end where its faces turn tangent: the ball vanishes there, the loft packs its
+            // stations toward the end and ends on the end point (asm-scissor-lift's tab ends at the plate).)
+            let vanishing = !e.convex && !closed && ((k == 0 && ends[0].is_none()) || (k == n && ends[1].is_none()));
+            let rolled = rolling_ball(p, t, &e.sup, r, guess);
+            if vanishing && rolled.as_ref().map_or(true, |(_, touch)| (touch[0] - touch[1]).length() < r * 1e-3) {
+                let fracs: &[f64] = if k == 0 { &[0.02, 0.1, 0.3, 0.6] } else { &[0.6, 0.3, 0.1, 0.02] };
+                for &d in fracs {
+                    let (q, tq) = at(if k == 0 { d / n as f64 } else { 1.0 - d / n as f64 })?;
+                    // (A ball touching both faces almost at one point makes a loft that crosses itself at its end.)
+                    if let Ok((cq, touch)) = rolling_ball(q, tq, &e.sup, r, guess)
+                        && (touch[0] - touch[1]).length() >= r * 0.05
+                        && let Ok((face, start)) = ball_section(cq, touch, &e.sup, r, kind)
+                    {
+                        guess = cq;
+                        secs.push(face);
+                        starts.push(start);
+                    }
+                }
+                let at_end = if k == 0 { 0 } else { secs.len() };
+                secs.insert(at_end, k::make_vertex(p)?);
+                starts.insert(at_end, p);
+                if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                    eprintln!("ball concave: vanishing end at {:?} ({})", p, if rolled.is_ok() { "tiny" } else { "no ball" });
+                }
+                continue;
+            }
+            let (centre, mut touch) = rolled?;
             guess = centre;
             // (Its contacts there moved into the plane along the faces: the section lies on it, the plane trimmed along
             // it; their feet a few um off the plane left a wedge face, the blade end at x 15.4.)
@@ -2555,9 +2698,11 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             return Err(fail("the rolling balls jump along the edge"));
         }
         // (The edge's own sections: a run-on's shrink to nothing where its ball leaves the faces.)
-        let areas: Vec<f64> = secs[lead..lead + if closed { n } else { n + 1 }].iter().map(|f| f.area().unwrap_or(0.0)).collect();
+        let own = if e.convex { &secs[lead..lead + if closed { n } else { n + 1 }] } else { &secs[..] };
+        let areas: Vec<f64> = own.iter().filter(|f| f.shape_type() != ShapeType::Vertex).map(|f| f.area().unwrap_or(0.0)).collect();
         let size = median(areas.clone());
-        if areas.iter().any(|&a| a > 8.0 * size || a < size / 8.0) {
+        // (A concave edge's sections shrink toward an end where its faces turn tangent.)
+        if areas.iter().any(|&a| a > 8.0 * size || (e.convex && a < size / 8.0)) {
             return Err(fail("a rolling ball's section far off the others' size"));
         }
         Ok(Ball::Loft(secs, closed, starts, n, turn))
@@ -2588,6 +2733,8 @@ fn ball_tools(shape: &Shape, chain: &[ChainEdge], ef: &[Vec<u32>], faces: &[Shap
             }),
         })
         .collect::<FResult<Vec<_>>>()?;
+    // (A concave round wider than a ledge its face is: trimmed by the wall the ledge drops off at, as live's.)
+    let tools = tools.into_iter().zip(edges.iter()).map(|(t, e)| if e.convex { Ok(t) } else { trim_by_walls(t.clone(), ledge_walls(shape, ef, e, faces, &t, scale)?.iter(), r) }).collect::<FResult<Vec<_>>>()?;
     let conics = edges.iter().flat_map(|e| plane_cylinder_contacts(&e.sup, r)).collect();
     Ok((tools, conics))
 }
@@ -5248,9 +5395,34 @@ fn canal_corner(shape: &Shape, names: &[Name], r: f64, scale: f64) -> FResult<Op
 
 #[cfg(test)]
 mod tests {
-    use super::{Support, chain, into_face, plane_cylinder_contacts, rolling_ball};
+    use super::{Section, Support, ball_tools, chain, chain_ordered, into_face, plane_cylinder_contacts, rolling_ball, with_concave_balls};
     use glam::DVec3;
     use noshape_kernel::{self as k, Shape, ShapeType};
+
+    /// A concave round wider than the ledge it rests on (the scissor's Studio 9cbb0e Fillet 2, live's): its tool trimmed
+    /// by the face the ledge drops off at, and not run on past its free ends: a wall x 0..3 to y 5 on a ledge to x 4 at
+    /// y 2, 10 long, rounded 1.5 at the wall's foot (its ball's centre at x 4.5, past the ledge).
+    #[test]
+    fn a_concave_round_wider_than_its_ledge_is_trimmed_by_the_ledges_drop() {
+        let p = |x: f64, y: f64| DVec3::new(x, y, 0.0);
+        let outline = [p(0.0, 0.0), p(4.0, 0.0), p(4.0, 2.0), p(3.0, 2.0), p(3.0, 5.0), p(0.0, 5.0), p(0.0, 0.0)];
+        let lines: Vec<Shape> = outline.windows(2).map(|w| k::make_line(w[0], w[1]).unwrap()).collect();
+        let face = k::make_face_from_wire(&k::make_wire(&lines).unwrap(), true).unwrap();
+        let body = k::extrude(&face, DVec3::Z * 10.0).unwrap().shape;
+        let foot = (0..body.count(ShapeType::Edge))
+            .find(|&i| body.sub_shape(ShapeType::Edge, i).unwrap().edge_info().is_ok_and(|f| [f.start, f.end].iter().all(|q| (q.x - 3.0).abs() < 1e-9 && (q.y - 2.0).abs() < 1e-9)))
+            .unwrap();
+        let chain = chain_ordered(&body, &[foot], true).unwrap();
+        let scale = body.bounding_box(false).unwrap().diagonal();
+        let (tools, _) = with_concave_balls(|| ball_tools(&body, &chain, &body.edge_faces().unwrap(), &body.faces(), (1.5, Section::Circular, false), scale, None)).unwrap();
+        let b = tools[0].bounding_box(false).unwrap();
+        assert!(b.max.x < 4.0 + 1e-6 && b.min.z > -1e-6 && b.max.z < 10.0 + 1e-6, "{b:?}");
+        // Between the ledge, the wall and the ball's arc, x 3..4.
+        let n = 2000;
+        let area: f64 = (0..n).map(|i| 3.0 + (i as f64 + 0.5) / n as f64).map(|x| 3.5 - (1.5f64.powi(2) - (x - 4.5).powi(2)).sqrt() - 2.0).sum::<f64>() / n as f64;
+        let v = tools[0].volume().unwrap();
+        assert!((v - area * 10.0).abs() < 1e-4, "{v} vs {}", area * 10.0);
+    }
 
     /// Two walls' outlines picked whole (asm-scissor-lift's Fillet 13): the second outline's edges listed from a corner
     /// in its middle still run as one piece from its free end, each edge in its own direction.

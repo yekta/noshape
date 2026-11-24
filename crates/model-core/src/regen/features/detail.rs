@@ -807,6 +807,9 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
             // they meet there (asm-welding-config's Fillet 5: a plate's outline whose ends run under a tube's rim). (The
             // tools made beside OCCT's try were given up when it failed.)
             Err(_) if !width && super::blend_section::rolling_ball_blend(ev, bi, &edges, radius, None).is_ok() => continue,
+            // A chain turning from convex to concave: the concave edges' balls too, their tools added (asm-scissor-lift's
+            // Studio 9cbb0e Fillet 2).
+            Err(_) if !width && super::blend_section::with_concave_balls(|| super::blend_section::rolling_ball_blend(ev, bi, &edges, radius, None)).is_ok() => continue,
             Err(_) if k::fillet_deferred_overflows() => return Err(fillet_failed(k::KernelError::OperationFailed("fillet failed: unfilleted edge overlapped by fillet".into()))),
             Err(e) => return Err(fillet_failed(e)),
         };
