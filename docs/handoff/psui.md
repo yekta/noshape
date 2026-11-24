@@ -34,41 +34,32 @@ docs/DECISIONS.md (read first; it wins over anything here).
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
 ## RESUME HERE (11-24 14:2x UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
-- FIRST (lead 14:2x): skasm's rebased stack 30cba9c5 FAILED again 11:40 on a rebase conflict (the user's Offset fix not
-  on main): re-land it before anything else (rebase worktree psui-skrebase on origin/main, resolve, land.sh).
-- QUEUED eaa20b28 (14:0x): the feel batch + Windows hardening (below). edb7329e landed as 63731676b. Local, not yet
-  landed (land after eaa20b28 is in): 0174defba (TICKETS: one row per psui ticket; FEEL-EDIT-BODY-SHADE numbers).
-  Uncommitted: TICKETS MEASURE-PANEL-POSITION closed (= live default, behaviours 11-22); interaction-feel chip rows'
-  stale ≠; list_feel_tests row "hover / a row clicked into a dialog's field keeps its tooltip" (FEEL-ROW-DEPENDENCY-
-  TIP-IN-DIALOG, P2): its first run was going on vibex8 (~/tmp/psui/lst.log, run-lst.sh) when compaction came; read
-  the log, fix ours if the tip is missing (row tooltip: mod.rs ~6625 with_lazy_side_tooltip, tooltip_after_press).
-- Tell the lead/qa: score-a910 pairs b3x-mc-radius (live crop ps-origin-selhover_f) and b1-midapp-sel-face (live
-  mid-paths/cp-angle90, no face selected) are mispaired, not defects.
-- Windows: the_pointer_lights_the_line_... log: release/v0.4.68 run 45375844269, job 138469739575 (was running 13:3x):
-  `gh api repos/{owner}/{repo}/actions/jobs/138469739575/logs`, grep the test. a_cleared_hover_...: read the next
-  Windows main run's message (frame_diff).
-- Feel batch (landing): FEEL-MC-LOOK (MC_RIM_PX 1, MC_Z_AXIS_PX 23), ERR-MATE-HOVER-GLYPH, FEEL-SKETCH-INF-END-DOT,
-  ERR-CHROME-TIP-PLACEMENT (title tip -2), ERR-LIST-TOOLTIP-CHROME (tips > 386 px wrap), SKT-USE-HOVER (edge most across
-  the screen, 5 px band + core). mc_hovered_other_selected: a lone blended pixel matched #ffa033 within 24; now measured
-  as the silhouette test does (tol 12, >= 2 px). The wrap test needed the front layer (mated_blocks_fixed_on).
-- Windows CI hardening (same batch): a_hover_after_a_rest_...: the viewport's layout_count (last_layout was also
-  stamped by present-only frames, and the frozen clock hid real layouts); the pick wait delivers picks only
-  (Gpu::deliver_picks), since GPUI's test mode draws any dirty window after each update and an earlier frame's present
-  redrew it (traced). The triad test takes the ball's spot before the release (drag_with). a_cleared_hover_...: fails
-  on Windows only (after != before with reuse > 0): message now says what differs (frame_diff); read the next Windows
-  run. the_pointer_lights_the_line_...: no Windows log of it yet (release/v0.4.68 run 45375844269 still running 13:3x).
-- FEEL-EDIT-BODY-SHADE region (live 2nd capture psui/edit-body-shade-1124): test held in
-  /root/psui-scratch/region-test.rs (paste before "A selected edge of a selected face" in hover_matrix_tests.rs). Ours:
-  the front matches; the right face is (3,7,10) darker missed and through the region; TICKETS row has the 230 fit and
-  why a light change alone doesn't close it. Next step: ours at slider 1 and 0 vs a live capture at slider 1 (request).
-- qa's newest hover-matrix score: /root/qa-scratch/hm2/score-a910/sc8.txt (11-24 10:37, green a9107b3a9); ascii maps
-  with score-a910/bin/ascii.py; inf.py for the end dot. ps-arc/linemid-hovered and b1-mid-hovered are single-jump cells
-  (not scored); b4-as-*-selhover blue = asm's FEEL-ASM-MOVE-RING-RIMS.
-- Next: ERR-SM-BAD-SELECTION-RED (repro in a gpui test), ERR-MISSING-SELECTION (core's flag; core parked),
-  PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue (PS-PARTS-ROW-TOOLTIP-PITCH,
-  CUSTOM-FEATURE-ROW-ICON).
+- QUEUED a2341555 (13:5x): skasm's stack (user's Offset fix) rebased again on main (kept both sides: sketch_ui_tests, mod.rs
+  ghost_outline_only(.., &selection), eval.rs refused + error_refs), 11 doubled TICKETS rows dropped. Worktree
+  psui-skrebase; after it lands: `git worktree remove` psui-skrebase and psui-strebase, rm ~/agents/psui-*rebase on
+  vibex7/8. eaa20b28 LANDED as 9d6b9fc61.
+- Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
+  keeps its tooltip" (passes: FEEL-ROW-DEPENDENCY-TIP-IN-DIALOG to verify); FEEL-EDIT-BODY-SHADE fix: an edited
+  feature's (EditSession !is_new) preview bodies keep their color and rest shade (Instance::preview_lit: preview
+  layering, part lighting; SceneOptions.preview_lit; preview_keeps_part_look), the end cap #595959 at 0.5 drawn in
+  both frame and "with" layer (= over the mix). Test an_edited_extrudes_region_shows_through_its_sides_as_live (plain
+  block, live edit-body-slider-1124 points). Left P2 in the TICKETS row: y=30 region edge outline through the right face
+  (live none), datum planes darker at slider 0, region tint B -9 on the right.
+- Windows CI: a_hover_after_a_rest_ + triad hardened (landed 9d6b9fc61). a_cleared_hover_...: read the next Windows
+  main run's frame_diff message (run after 9d6b9fc61). the_pointer_lights_...: never failed on main CI; release run
+  45375844269 job 138469739575 still in progress 13:5x (`gh api --allow-escape-sequences .../jobs/<id>/logs`).
+  asm's the_second_pick_outlines_... failed once on Windows (told the lead).
+- Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
+- QUEUED dae14f97 (14:3x): TICKETS cleanup + list-tooltip row + FEEL-EDIT-BODY-SHADE fix (above).
+- IN PROGRESS: FEEL-PREVIEW-BODY-BLUE (P1 regression, workflow 04 s2 Shell top removed / 38 s16 Intersect: ours the
+  plain rest top (152,194,218), live (172,184,172)). A gpui repro (block, Shell, top clicked) does NOT reproduce: ours
+  floor (151,161,139) at 0.7, (143,151,127) at 1, (169,186,166) at 0, the picked top tinted in both. So the workflow
+  shot likely caught no pick / no preview yet: read qa's out-wf* step 2 (frame + state) and the workflow script next.
+- Next: PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
+  (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
 - USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape
   (700), delete it and /root/psui-scratch/Mac-mini-2024.step after.
+- qa's hover-matrix score: /root/qa-scratch/hm2/score-a910/sc8.txt; ascii maps score-a910/bin/ascii.py.
 
 ## Agents
 
