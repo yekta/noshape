@@ -51,6 +51,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   asm's the_second_pick_outlines_... failed once on Windows (told the lead).
 - Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
 - QUEUED dae14f97 (14:3x): TICKETS cleanup + list-tooltip row + FEEL-EDIT-BODY-SHADE fix (above).
+- LOCAL, land after dae14f97 lands (don't queue the stack twice): 1190cd482 (FEEL-PREVIEW-BODY-BLUE closed), 84648f9bf
+  (feedback matrix row "error / a pick its field refuses", ERR-MISSING-SELECTION = live on main, to verify), 2e211e1ba
+  (lead 14:4x: replay `"until": "regenerated"` waits; every step's settle waits for the viewport frame, ≤5 s;
+  Viewport::frame_pending, PartStudioView::ui_frame_pending; README). A/B pinned to one core (taskset -c 0, qa's
+  wf/run.sh, XD :497): green wf04 s2 8042 px rest blue, ours 0 (floor 3827); wf15 (regenerated) 32 vs 33 s, 0 errors.
 - FEEL-PREVIEW-BODY-BLUE closed (14:25): not a regression; qa's 13:27 run was on a loaded host (frames 200-600 ms), the
   shot came before the preview. Quiet vibex8 replay of green 35dceca06 (~/tmp/psui/wfa, qa's wf/run.sh, XD :497): wf04 s2
   and wf38 s16 show the preview. Told the lead: the replay should settle on the preview's display.
