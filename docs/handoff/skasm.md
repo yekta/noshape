@@ -8,12 +8,15 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
 - psui re-landed my old stack: QUEUED 30cba9c5 (11-24). My branch sits on psui's rebase (1c8e8b45e); old tip kept as
   branch skasm-pre-rebase-1124. When it lands: rebase on main, run my tests, land.sh my commits on top.
-- Local commits (not landed): 043f530ce failing picked edges red through the part (ERR-SM-BAD-SELECTION-RED, done,
+- LEAD 11-24 decisions: land the 2 SM commits with the rest, then no more SM; Select other keeps the current ` row-2 bold
+  (behaviours 19904; lead puts the recheck on live's list).
+- Local commits (not landed; fbb6d4a6a = glyph order + Arc3 dash + tangent-arc-origin test, all green, clippy clean): 043f530ce failing picked edges red through the part (ERR-SM-BAD-SELECTION-RED, done,
   tested); 8afc4b0f5 feel audit (value box look, H/V dash colour, 12 matrix rows, sm tests).
-- Uncommitted (tests: /root/skasm-scratch/bin/t6.sh on vibex6): corner glyph row Coincident first, then Fix
+- Committed fbb6d4a6a (tests: /root/skasm-scratch/bin/t6.sh on vibex6, scene 204 + sketch UI 475 green): corner glyph row Coincident first, then Fix
   (SKETCH-SELECTED-GLYPH-OFFSET, test extended); Arc3 chord level with its first click = yellow direction dash, no guide;
   GPU test tangent arc from a line end on the Origin (passes WITHOUT a fix: qa's failure not reproduced, asked in the
-  row); TICKETS: 6 bare duplicate SKT rows dropped, 2 rows annotated. NEXT: commit, then more sketch audit.
+  row); TICKETS: 6 bare duplicate SKT rows dropped, 2 rows annotated. NEXT: when 30cba9c5 lands, rebase on main,
+  rerun t6.sh, land.sh (NOSHAPE_LAND_QUEUE_HOST=vibe2) all 3 commits; then more sketch audit (gaps below).
 - Sketch audit notes: /root/skasm-scratch/audit-1124.md (bottom section). Left: Use on a face stores no COINCIDENTs
   between loop lines (live 12 constraints; check the solver with coincident external points first);
   SKETCH-MIRROR-LINE-LOOK band (needs a pixel test); FEEL-SK-SELECT-OTHER: ` bolds row 2 (spec behaviours 19904)
