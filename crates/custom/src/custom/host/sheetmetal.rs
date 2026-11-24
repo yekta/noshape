@@ -2934,11 +2934,6 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                         *n = named;
                     }
                 }
-                if let Some(Some(b)) = before.get(k)
-                    && let Some(db) = ev.ctx.bodies.iter().find(|b| b.id == def.body)
-                {
-                    name_split_pieces(p, &topo, &db.faces, &b.faces, studio_feature, ev.feature);
-                }
                 taken.extend(p.names.iter().cloned());
                 let part_faces = p.solid.faces();
                 for &fi in &p.members {
@@ -3421,52 +3416,6 @@ fn wall_faces(topo: &Topo, fi: usize, part_faces: &[Shape], named: &[(usize, cra
         if fnormal.dot(n) < 0.0 { seen.push(name.clone()) } else { back.push(name.clone()) }
     }
     (seen, back)
-}
-
-/// The part faces of walls this feature split (std Bend's imprint): on each side, when one of them keeps the name a
-/// face had before, all become its pieces, so the old name finds every one (live bd-twice: a Bend on Bend 1's face,
-/// "Select a planar sheet metal face.").
-fn name_split_pieces(p: &mut PartOf, topo: &Topo, def_faces: &[crate::naming::Name], before: &[crate::naming::Name], studio: FeatureId, op: FeatureId) {
-    use crate::reference::TopoName;
-    let root = |n: &crate::naming::Name| {
-        let mut n = n;
-        while let TopoName::Split { parent, by, .. } = &**n
-            && *by == studio
-        {
-            n = parent;
-        }
-        n.clone()
-    };
-    let mut groups: Vec<(crate::naming::Name, Vec<usize>)> = Vec::new();
-    for &fi in &p.members {
-        let Some(n) = def_faces.get(fi).filter(|n| matches!(&***n, TopoName::Split { by, .. } if *by == studio)) else { continue };
-        let r = root(n);
-        match groups.iter_mut().find(|g| g.0 == r) {
-            Some(g) => g.1.push(fi),
-            None => groups.push((r, vec![fi])),
-        }
-    }
-    let part_faces = p.solid.faces();
-    for (_, fis) in groups.iter().filter(|g| g.1.len() > 1) {
-        let (mut seen, mut back) = (Vec::new(), Vec::new());
-        for &fi in fis {
-            let (s, b) = wall_faces(topo, fi, &part_faces, &p.named(Def::Face(fi)));
-            seen.extend(s);
-            back.extend(b);
-        }
-        for side in [seen, back] {
-            let old: Vec<&crate::naming::Name> = side.iter().filter(|n| before.contains(n)).collect();
-            let [kept] = old[..] else { continue };
-            if side.len() < 2 {
-                continue;
-            }
-            let kept = kept.clone();
-            for (ordinal, n) in side.iter().enumerate() {
-                let piece = std::sync::Arc::new(TopoName::Split { parent: kept.clone(), by: op, ordinal: ordinal as u16 });
-                p.names.iter_mut().filter(|x| *x == n).for_each(|x| *x = piece.clone());
-            }
-        }
-    }
 }
 
 /// The flat pattern of a built part (live's placement: the first wall's
