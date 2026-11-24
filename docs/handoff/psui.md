@@ -59,6 +59,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   end gets a 6 px piece of the edge's band over its disc (behaviors vertex_band_piece, layer 21 after the disc; the ON_TOP
   disc writes near depth, so a depth-tested redraw can't cover it); TICKETS dup rows of SKT-USE-HOVER /
   SKT-POSTCOMMIT-HOVER dropped.
+- skasm's 7e9bedfb7 (after its b99589dc) adds LineSegment::dash_from: new LineSegment literals need `dash_from: 0.0`.
+  My vertex_band_piece literal (in 8e11c924) predates it: whichever lands second adds the field.
+- NEXT: FEEL-ROW-TIP-AFTER-DBLCLICK (P2, the one psui feel row really open; live behaviours.md "psui
+  FEEL-ROW-TIP-AFTER-DBLCLICK"): after a double-click on a feature row no tip until the pointer leaves, even on
+  1 px moves; a tip already up goes at the dialog's open. Two gpui-pre TooltipPressGate tries were reverted (one broke
+  wf10 step 1; the other still showed the tip 1.35 s later). Suspect: the dialog's open rebuilds the row, so the
+  per-element gate is fresh. Try app-side: the list remembers the double-clicked row and its tooltip builder gives
+  none until the pointer leaves it.
+- Other open rows checked 11-24 17:4x: all "fixed, to verify" (qa), sheet metal (parked), or skasm's.
 - Then: PARTLY rows in TICKETS (TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
 - USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape
