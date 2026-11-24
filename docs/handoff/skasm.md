@@ -113,6 +113,8 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 - Form speed P0 binaries /root/skasm-scratch/apps: delete (done).
 
 ## Waiting on live (REQUESTS)
+- skasm 11-24 20:15: sketch dimension text in iso, in the plane or upright (the Offset's "5" is in-plane; ours all upright).
+- REQUESTS 6628 (glyph row moved off a taken spot, wf13 s14): live tried 3 runs, no clean boxes yet.
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources
   (c2-surf-intro-*/derived/<id>/, live.jsonl by rollback): rerun wave-washer and the surf-intro docs.
 

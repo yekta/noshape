@@ -91,8 +91,9 @@ ui-parity coverage scenarios replay it).
   done for cancel / Restore and the tool shortcut toggles (Added); spline Esc, Line mid-chain drag and Esc with a menu
   open were tested (sketch_mode first_escape_commits_a_spline_and_the_second_exits,
   press_drag_from_the_chain_end_places_nothing; sketchtools_feel row "Esc with the mid-chain menu open"); the camera
-  at sketch start added (`a_new_sketch_keeps_the_view_and_n_turns_it_normal`). Left: the colour table and each
-  tool's clicks against the sketch/NN shots.
+  at sketch start added (`a_new_sketch_keeps_the_view_and_n_turns_it_normal`). The colour table is screenshot samples;
+  later per-state captures (hover_matrix, psui's feel suites) set our colours and supersede it (e.g. selected #ffa90a,
+  fully defined #000000). Each tool's clicks: sketchtools_feel rows. Section closed.
 
 **Settled without a test:**
 - Tool hints (23116): live shows none, and we show none.
