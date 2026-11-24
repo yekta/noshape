@@ -420,9 +420,7 @@ impl PartStudioView {
     /// A blended Extrude preview's end cap (live 10-27, psui-prv-05a/b): the
     /// picked regions and faces moved to where the extrude ends, a flat
     /// grey (89,89,89) at 50 % in live's sRGB blend ((172,172,172) over
-    /// white, (117,135,146) over the part's top; 0.46 here gives
-    /// (172,172,172) and (116,137,150)), drawn over the mix like the other
-    /// highlights, at either end of the slider.
+    /// white), over the preview mix at either end of the slider.
     pub(super) fn extrude_end_cap(&self, cx: &App) -> Option<noshape_render::Instance> {
         self.built_base.as_ref()?;
         let arrow = self.current_arrow(cx).filter(|a| a.param == "depth" && a.length > 0.0)?;
@@ -462,12 +460,11 @@ impl PartStudioView {
         if mesh.indices.is_empty() {
             return None;
         }
-        // A blue grey: over the preview mix the top reads live's flat (132,147,155) (qa FEEL-EDIT-BODY-SHADE: #595959 read
-        // (138,148,154)).
-        let grey = crate::theme::lin(0x4c575b);
-        let mut cap = noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.46]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
-        // Once, over the mix (qa FEEL-EDIT-BODY-SHADE: drawn with the frame too, the top read (118,127,133), live (132,146,155)).
-        cap.compare = noshape_render::scene::compare::POST_ONLY;
+        // Live's #595959 at 50 %, in both the frame and the model with the feature: the same as once over their mix, so
+        // the cap stays at either end of the slider (live edit-body-slider-1124: the top (121,141,153) at 1, (160,163,166)
+        // at 0, (132,147,156) at 0.7).
+        let grey = crate::theme::lin(0x595959);
+        let cap = noshape_render::Instance::new(noshape_render::Drawable::Mesh(self.gpu.uploader().upload_mesh(&mesh))).with_color([grey[0], grey[1], grey[2], 0.5]).unlit().unpickable().ignore_clip().layer(crate::scene_builder::HIGHLIGHT_FILL_LAYER);
         Some(cap)
     }
 

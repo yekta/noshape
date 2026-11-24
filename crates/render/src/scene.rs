@@ -303,6 +303,8 @@ pub struct Instance {
     pub unlit: bool,
     /// Lit like Onshape's feature previews (see [`Instance::preview`]).
     pub preview: bool,
+    /// A preview keeping the part lighting (see [`Instance::preview_lit`]).
+    pub preview_lit: bool,
     /// Onshape's Isolate ghost: after shading, the color is mixed toward
     /// white by this much in sRGB, as a see-through layer over a white page
     /// looks, while still hiding what is behind (0: off).
@@ -468,6 +470,7 @@ impl Instance {
             unlit: false,
             back_silhouette: false,
             preview: false,
+            preview_lit: false,
             ghost: 0.0,
             ambient: 0.0,
             selected_only: false,
@@ -669,6 +672,15 @@ impl Instance {
     /// the right side), instead of the part lighting.
     pub fn preview(mut self) -> Self {
         self.preview = true;
+        self
+    }
+
+    /// Layered as a feature preview, lit as a part: an edited feature's bodies show their own color and rest
+    /// shading in the preview blend's model with the feature (live edit-body-slider-1124: at slider 1 the faces
+    /// are the rest shade).
+    pub fn preview_lit(mut self) -> Self {
+        self.preview = true;
+        self.preview_lit = true;
         self
     }
 
@@ -1119,6 +1131,7 @@ impl Scene {
                     && a.ignore_clip == b.ignore_clip
                     && a.unlit == b.unlit
                     && a.preview == b.preview
+                    && a.preview_lit == b.preview_lit
                     && a.line_scale == b.line_scale
                     && a.hidden_only == b.hidden_only
                     && a.see_through_self == b.see_through_self
@@ -1232,7 +1245,7 @@ impl Scene {
             f(&mut h, &[i.ghost, i.ambient, i.line_scale, i.pixel_scale.unwrap_or(0.0)]);
             f(&mut h, &i.pick_plane.map_or([0.0; 3], |n| n.to_array()));
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
-            (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);
+            (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.preview_lit, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);
             (i.hidden_only, i.over_transparent, i.over_lines, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self, i.outline_through).hash(&mut h);
         }

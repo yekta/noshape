@@ -2083,6 +2083,51 @@ fn an_edited_extrudes_end_cap_greys_its_top_once(cx: &mut TestAppContext) {
     assert!(at.iter().all(|c| close(*c, 0x84929b, 9)), "the top under the end cap {at:?}, live (132,146,155)");
 }
 
+/// Extrude 1 edited, no drag (live psui/edit-body-slider-1124, 5x5 medians, qa FEEL-EDIT-BODY-SHADE): the preview's sides
+/// where the sight line misses the picked region, the region seen through them and the top under the end cap. Live's preview is 0.7 x the block
+/// in its own color at its rest shade (the region's tint over it) + 0.3 x the model before (edit-body-slider-1124).
+#[gpui::test]
+fn an_edited_extrudes_region_shows_through_its_sides_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    // Live's document: the block alone.
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } }
+    ] });
+    let m = matrix_studio_from(cx, "edit-body-region", block);
+    let id = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").map(|f| f.id)).expect("Extrude 1");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    // (Not on the region's far edge y = 30 seen through the right face, (40, 15, 10) or (40, 25, 3): live draws no
+    // outline there, ours does; nor the right face's y = 5 column, over the datum planes, darker in ours at slider 0:
+    // FEEL-EDIT-BODY-SHADE. The region through the right face: live's 9-point median.)
+    let live: [([f64; 3], u32); 12] = [
+        ([5., 0., 10.], 0x8da0ab),
+        ([5., 0., 18.], 0x8da0ab),
+        ([20., 0., 3.], 0xa3a085),
+        ([35., 0., 10.], 0xa3a085),
+        ([40., 12., 4.], 0xb9baa3),
+        ([40., 20., 5.], 0xb9baa3),
+        ([40., 15., 18.], 0xabc5d5),
+        ([40., 25., 10.], 0xabc5d5),
+        ([40., 5., 18.], 0xa1bed0),
+        ([30., 8., 20.], 0x84939c),
+        ([5., 5., 20.], 0x84939c),
+        ([35., 25., 20.], 0x84939c),
+    ];
+    let (w, _, px) = m.frame(cx);
+    let mut wrong = Vec::new();
+    for (p, rgb) in live {
+        let s = m.screen(cx, p);
+        let c = px[(s.y as u32 * w + s.x as u32) as usize];
+        if !close(c, rgb, 6) {
+            wrong.push(format!("{p:?}: ours {c:?}, live #{rgb:06x}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("; "));
+}
+
 /// A selected edge of a selected face is one solid #ffa90a band (live sel-gestures-1122 ps-box-crossing-result: the
 /// face's boundary covers the band's core); alone it keeps its darker core (live hover-matrix-1121 edge-selected
 /// (207,141,18)).

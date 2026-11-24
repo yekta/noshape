@@ -485,6 +485,8 @@ pub struct SceneOptions {
     pub section_skip: Vec<noshape_model::BodyId>,
     /// Feature preview bodies: shaded with the preview lighting.
     pub preview_bodies: Vec<noshape_model::BodyId>,
+    /// The preview bodies keep the part lighting (an edited feature's: `Instance::preview_lit`).
+    pub preview_lit: bool,
     /// The compare layer of every body and decal instance
     /// ([`noshape_render::scene::compare`]; 0 none): a feature preview's
     /// two models ([`Scene::preview_mix`]).
@@ -707,7 +709,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 };
                 // (The renderer draws a preview's back faces under the datum
                 // planes and picked regions and its front faces over them.)
-                let mesh = if opts.preview_bodies.contains(&b.id) { mesh.preview() } else { mesh.pick_solid(!opts.pick_through_bodies.contains(&b.id)) };
+                let mesh = if opts.preview_bodies.contains(&b.id) { if opts.preview_lit { mesh.preview_lit() } else { mesh.preview() } } else { mesh.pick_solid(!opts.pick_through_bodies.contains(&b.id)) };
                 let mesh = if opts.ghost_bodies.contains(&b.id) { mesh.ghost(opts.ghost_mix.unwrap_or(ISOLATE_GHOST)) } else { mesh };
                 // The cap hatch's id: live's Part Studio parts read 230, 234,
                 // 238, … (occurrence id + mesh group hash; live ui (10-26),

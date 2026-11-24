@@ -1376,6 +1376,7 @@ impl PartStudioView {
         let mut o = self.opts.clone();
         o.replaced_meshes = self.thickness_meshes(cx);
         o.preview_bodies = self.preview_body_ids();
+        o.preview_lit = self.preview_keeps_part_look();
         // The preview blend's model with the feature (`preview_mix_base`).
         if self.preview_mix_base(cx).is_some() {
             o.body_layer = noshape_render::scene::compare::TARGET;

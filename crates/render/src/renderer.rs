@@ -3268,7 +3268,7 @@ impl Renderer {
                 model: model.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | ((inst.decal_selected as u32) << 3) | (((inst.on_top && matches!(inst.drawable, Drawable::Lines(_))) as u32) << 4) | ((inst.over_lines as u32) << 5) | ((inst.unlit_only as u32) << 7) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32 | (u32::from(inst.depth_rank) << 8), inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | ((inst.decal_selected as u32) << 3) | (((inst.on_top && matches!(inst.drawable, Drawable::Lines(_))) as u32) << 4) | ((inst.over_lines as u32) << 5) | ((inst.unlit_only as u32) << 7) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | (((inst.preview && !inst.preview_lit) as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32 | (u32::from(inst.depth_rank) << 8), inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, lock_eye.is_some_and(|_| r.lock.is_some()) as u32 as f32],
                     None => [inst.line_scale, inst.ghost, inst.ambient, 0.0],

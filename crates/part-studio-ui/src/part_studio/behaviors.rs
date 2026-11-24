@@ -3095,6 +3095,12 @@ impl PartStudioView {
 
     /// Bodies the open dialog's feature creates, shown in the preview lighting
     /// (not while a Remove / Intersect tool or the preview slider is shown).
+    /// An edited feature's bodies keep their part's color and lighting in the preview (live edit-body-slider-1124: at
+    /// slider 1 an edited Extrude's block is its rest shade; a new feature's are blue-gray, part-studio/230).
+    pub(super) fn preview_keeps_part_look(&self) -> bool {
+        self.edit.as_ref().is_some_and(|e| !e.is_new) && self.ui.preview_tool.is_none()
+    }
+
     pub(super) fn preview_body_ids(&self) -> Vec<noshape_model::BodyId> {
         let (Some(_), Some(before)) = (&self.edit, &self.ui.preview_before) else { return Vec::new() };
         let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
@@ -3229,6 +3235,7 @@ impl PartStudioView {
         // regions show under them.
         if self.edit.is_some()
             && self.ui.preview_tone
+            && !self.preview_keeps_part_look()
             && let Some(before) = &self.ui.preview_before
         {
             let old: std::collections::HashSet<&noshape_model::BodyId> = before.bodies.iter().map(|b| &b.id).collect();
