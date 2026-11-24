@@ -2099,9 +2099,8 @@ fn an_edited_extrudes_region_shows_through_its_sides_as_live(cx: &mut TestAppCon
     cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
     wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
     m.park(cx);
-    // (Not on the region's far edge y = 30 seen through the right face, (40, 15, 10) or (40, 25, 3): live draws no
-    // outline there, ours does; nor the right face's y = 5 column, over the datum planes, darker in ours at slider 0:
-    // FEEL-EDIT-BODY-SHADE. The region through the right face: live's 9-point median.)
+    // (Not the right face's y = 5 column, over the datum planes, darker in ours at slider 0: FEEL-EDIT-BODY-SHADE. The
+    // region through the right face: live's 9-point median, off its outline.)
     let live: [([f64; 3], u32); 12] = [
         ([5., 0., 10.], 0x8da0ab),
         ([5., 0., 18.], 0x8da0ab),
@@ -2123,6 +2122,15 @@ fn an_edited_extrudes_region_shows_through_its_sides_as_live(cx: &mut TestAppCon
         let c = px[(s.y as u32 * w + s.x as u32) as usize];
         if !close(c, rgb, 6) {
             wrong.push(format!("{p:?}: ours {c:?}, live #{rgb:06x}"));
+        }
+    }
+    // The region's outline through the body, its hidden far edges included: live #ffa90a about 3 px wide.
+    let hidden = (1..10).map(|k| [4. * k as f64, 30., 0.]).chain((1..8).map(|k| [0., 4. * k as f64, 0.]));
+    for p in hidden {
+        let s = m.screen(cx, p);
+        let near = (-1..=1).flat_map(|i| (-1..=1).map(move |j| (i, j))).any(|(i, j)| close(px[((s.y as i32 + j) as u32 * w + (s.x as i32 + i) as u32) as usize], 0xffa90a, 6));
+        if !near {
+            wrong.push(format!("{p:?}: no #ffa90a outline within 1 px"));
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("; "));
