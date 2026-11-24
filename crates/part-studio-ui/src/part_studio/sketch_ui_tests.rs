@@ -6181,6 +6181,37 @@ fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// Live psui 2160 (sketch-dim-rclick-menu): a right-click on a dimension's label gives Change to driven dimension, then
+/// the sketch's rows (Confirm, Copy sketch, Show all, analysis, Select, Select other…, Zoom to fit, View normal) and
+/// Delete dimension last (Add comment, a cloud item, left out).
+#[gpui::test]
+fn a_dimensions_menu_as_lives(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sketch-dim-menu", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.activate_tool(Tool::Select, w, cx);
+            let cid = v
+                .with_sketch(cx, |_, data| {
+                    let l = data.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+                    crate::sketch_mode::add_dimension(data, noshape_sketch::ConstraintKind::Length { curve: l, value: 0.0 }, Some(DVec2::new(0.0, 0.01)), None)
+                })
+                .flatten()
+                .expect("a dimension");
+            v.hover = None;
+            v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), Some(cid), w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+    let got: Vec<String> = labels.into_iter().filter(|l| l != "———").collect();
+    let want = ["Change to driven dimension", "Confirm Sketch 1", "Copy sketch", "Show all", "Curve/surface analysis…", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane", "Delete dimension"];
+    assert_eq!(got, want.map(String::from).to_vec());
+}
+
 /// Lead 11-06, the display cache: a regenerated display comes back from the cache as it was; shown in its place the
 /// view is view-only (a dialog asked for waits, the user told at once, "Regenerating…" in the list), and the real
 /// regeneration replaces it with the same meshes and opens the dialog.
@@ -9020,4 +9051,85 @@ fn an_edited_empty_lofts_title_tooltip_names_its_error(cx: &mut TestAppContext) 
         draw(cx, window);
     }
     assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Loft 1 did not regenerate properly: Select profiles in order from start to finish."));
+}
+
+/// Live 1571 (qa sketch Use with a preselection): an edge of the model selected in the sketch, then u: it is projected
+/// at once (a line), the selection clears and the Use tool doesn't stay on.
+#[gpui::test]
+fn use_with_a_preselected_edge_projects_it_at_once(cx: &mut TestAppContext) {
+    let (window, view, edge, _, _, _) = sketch_on_top_face(cx, "use-presel", Tool::Select);
+    cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().model_selection = vec![edge.clone()]));
+    keys(cx, window, &["u"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (lines, selected, tool) = cx.update(|cx| {
+        let v = view.read(cx);
+        let n = v.sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count());
+        let ed = v.sketch.as_ref().unwrap();
+        (n, ed.model_selection.len(), ed.tool)
+    });
+    assert_eq!((lines, selected, tool), (1, 0, Tool::Select), "(lines, model selection, tool) after u");
+}
+
+/// Live qa5 sketch refs (4): a new one-region sketch closed with ✓ leaves nothing selected, so Extrude straight after
+/// opens with its regions field empty (and red), its ✓ disabled.
+#[gpui::test]
+fn extrude_after_closing_a_sketch_starts_empty(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "extrude-after-close", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (600., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    assert!(cx.update(|cx| view.read(cx).selection.is_empty()), "nothing selected after ✓");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert!(cx.update(|cx| dialog.read(cx).field_error("entities").is_some() && !dialog.read(cx).can_submit()), "the regions field empty, ✓ disabled");
+}
+
+/// Live sketch mode (sketch/68): ✕ on a new sketch drops it and says "Sketch 1 has been canceled." with Restore;
+/// Restore reopens it with what was drawn.
+#[gpui::test]
+fn a_canceled_new_sketch_says_so_and_restore_reopens_it(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sketch-cancel-restore", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (600., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    let (features, message) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.studio(cx).map_or(0, |s| s.features.len()), v.message.as_ref().map(|(_, t)| t.clone()))
+    });
+    assert_eq!(message.as_deref(), Some("Sketch 1 has been canceled."));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.restore_canceled_edit(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    let (lines, after) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count()), v.message.clone())
+    });
+    assert_eq!((lines, after.is_none()), (4, true), "Restore reopens the rectangle, the toast gone ({features} features while canceled)");
+}
+
+/// Live sketch/200-233: a tool's shortcut while that tool is on turns it off (L, L, L: Line, none, Line); with a line
+/// selected, L clears the selection.
+#[gpui::test]
+fn a_tools_shortcut_again_turns_it_off_and_clears_the_selection(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "tool-toggle", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (600., 400.));
+    let tool = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().tool);
+    keys(cx, window, &["escape"]);
+    assert_eq!(tool(cx), Tool::Select);
+    let line = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id);
+    cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().selection = vec![line]));
+    keys(cx, window, &["l"]);
+    let selected = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.len());
+    assert_eq!((tool(cx), selected), (Tool::Line, 0), "L with a line selected: Line on, nothing selected");
+    keys(cx, window, &["l"]);
+    assert_eq!(tool(cx), Tool::Select, "L again turns Line off");
+    keys(cx, window, &["l"]);
+    assert_eq!(tool(cx), Tool::Line, "and on");
+    keys(cx, window, &["enter"]);
+    assert_eq!(tool(cx), Tool::Line, "Enter with no pending segment does nothing");
+    keys(cx, window, &["escape"]);
+    assert_eq!(tool(cx), Tool::Select, "Esc exits the tool");
 }

@@ -335,3 +335,13 @@ fn a_linked_notice_stays_while_the_user_works(cx: &mut TestAppContext) {
     wait(cx, 2);
     assert!(!shown(cx), "left alone: gone at 36 s");
 }
+
+/// Live 11-12 "sketch snapping and hover" (state rows): an under-defined sketch's row tooltip is "Sketch 1 is not fully
+/// defined".
+#[gpui::test]
+fn an_under_defined_sketchs_row_says_so(cx: &mut TestAppContext) {
+    let (window, _view) = start(cx, "fb-underdefined", serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+    ] }));
+    assert_eq!(row_tooltip(cx, window, "Sketch 1").as_deref(), Some("Sketch 1 is not fully defined"));
+}
