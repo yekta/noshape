@@ -14513,6 +14513,23 @@ mod tests {
         }
     }
 
+    /// Live qa sketch.md 7.14 (request 1511): on a free line (0,0)→(40,30) a horizontal 40 and a vertical 30 between its
+    /// ends drive; the line's aligned length added after them is created driven (50, grey), and nothing moves.
+    #[test]
+    fn a_third_redundant_dimension_is_created_driven() {
+        let (_ed, mut data) = editor(Tool::Select);
+        let line = data.sketch.add_line(v(0.0, 0.0), v(0.04, 0.03));
+        let (a, b) = data.sketch.endpoints(line).unwrap();
+        let h = add_dimension(&mut data, ConstraintKind::HorizontalDistance { a, b, value: 0.04 }, Some(v(0.02, 0.04)), None).unwrap();
+        let w = add_dimension(&mut data, ConstraintKind::VerticalDistance { a, b, value: 0.03 }, Some(v(0.05, 0.015)), None).unwrap();
+        let l = add_dimension(&mut data, ConstraintKind::Length { curve: line, value: 0.05 }, Some(v(0.01, 0.03)), None).unwrap();
+        let driving = |c| data.sketch.constraint(c).unwrap().driving;
+        assert!(driving(h) && driving(w), "40 and 30 drive");
+        assert!(!driving(l), "the aligned 50 is driven");
+        let Some(Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!() };
+        assert!(a.distance(v(0.0, 0.0)) < 1e-9 && b.distance(v(0.04, 0.03)) < 1e-9, "{a} {b}");
+    }
+
     /// Live walk3-1121 (2): a Line chain through the Origin keeps every segment: (-30, 0) → Origin → (0, 20) → (-30, 20)
     /// makes 3 lines (qa FEEL-CHAIN-ORIGIN-DROP).
     #[test]
