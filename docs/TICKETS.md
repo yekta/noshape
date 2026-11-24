@@ -303,7 +303,7 @@ and opt-mirror-pattern-ops rerun after a script error (results to follow).
 - [ ] P2 **FILLET-FAIL-SLOW (blend)**: cli-draft-hang2 (qa fuzz document, no live copy) Fillet 2 fails after 14.1 s. A
   failing fillet should give up fast.
 - [ ] P1 **SPEED-VALVE-CONFIG (core)**: c2-valve-config 443 ms vs live 175 (2.5x); Circular pattern 1 takes 201 ms. It was at 1.9x
-  (308 vs 164) in an older run (row "Near the bar"); now over the bar.
+  (308 vs 164) in an older run (row "Near the bar"); now over the bar. core 11-24 (release, vibex7, NOSHAPE_KERNEL_PROFILE): Circular pattern 1 356 ms, op_boolean 322 of 344; the time is our own Boolean (boolean.rust: sections_ahead, one_by_one); OCCT's is no way out (sprockets Circular pattern 1 582 ms, valve 184 ms and a face-count mismatch, nuts Sweep 1 1787 ms and fails) -> bool's Boolean speed.
 - [ ] P1 **SPEED-ASM-OPEN (asm)**: opening asm-scissor-lift takes 30.5-31.5 s to solved (live's server finishes at 8.3-10.7 s, 3x)
   and asm-infento-subs 42.1-42.6 s (live 8.9-11.3 s, 4x). Nearly all of it is the first assembly_list (document_open 0.05 s).
   The other three are as fast as live or faster: robot-relations 4.6-5.3 s (live 9.4-11.2), isaac-ball 13.9 (8.3-13.1),
@@ -2454,8 +2454,8 @@ per-feature rows below are owners' leads, not gaps (superseded 18:2x).**
 - [ ] **P1 SPEED-GAMMA (bool)**: c2-gamma-imported 1754 (1719-1796) vs 246 (7.1x): Boolean 2 1255, Move face 1 353, Import 1 102.
 - [ ] **P1 SPEED-PARTING-LINE (core)**: c2-parting-line-draft-parting-line 1637 (1526-1654) vs 743 (2.2x): Split 3 398, Rib 2 323, Rib 1 313.
 - [ ] **P1 SPEED-LOFT-PATHS (core)**: c2-loft-paths-guides 878 (865-879) vs 393 (2.2x): Loft 3 394, Mirror 1 304, Loft 4 54.
-- [ ] **P1 SPEED-NUTS (core)**: c2-config-parts-nuts 584 (579-594) vs 135 (4.3x): Sweep 1 556, Revolve 2 18, Revolve 1 9.
-- [ ] **P1 SPEED-SPROCKETS (core)**: c2-config-parts-sprockets 222 (208-234) vs 83 (2.7x): Circular pattern 1 202, Extrude 2 9, Extrude 1 4.
+- [ ] **P1 SPEED-NUTS (core)**: c2-config-parts-nuts 584 (579-594) vs 135 (4.3x): Sweep 1 556, Revolve 2 18, Revolve 1 9. core 11-24 (release, vibex7, NOSHAPE_KERNEL_PROFILE): Sweep 1 257-366 ms, op_boolean 297 of 366, pipe shell 13 ms; the time is our own Boolean (boolean.rust: sections_ahead, one_by_one); OCCT's is no way out (sprockets Circular pattern 1 582 ms, valve 184 ms and a face-count mismatch, nuts Sweep 1 1787 ms and fails) -> bool's Boolean speed.
+- [ ] **P1 SPEED-SPROCKETS (core)**: c2-config-parts-sprockets 222 (208-234) vs 83 (2.7x): Circular pattern 1 202, Extrude 2 9, Extrude 1 4. core 11-24 (release, vibex7, NOSHAPE_KERNEL_PROFILE): Circular pattern 1 225-237 ms; the time is our own Boolean (boolean.rust: sections_ahead, one_by_one); OCCT's is no way out (sprockets Circular pattern 1 582 ms, valve 184 ms and a face-count mismatch, nuts Sweep 1 1787 ms and fails) -> bool's Boolean speed.
 Near the bar (not a gap): c2-valve-config 308 vs 164 (1.9x). The five vibe2 candidates (snap-hook, fan-blade, motor-mount, michael,
 spur-gear) are under the bar on the Mac. Data qa-scratch/speed/corpus-0.4.58.jsonl, live-all.json.
 - [ ] **P0 SPUR-GEAR-REGRESSION (bisecting)**: cf-spur-gear v0.4.58 -> v0.4.59 +23-28 %, same-host alternating A/B: the Mac 464 (458-480) ->

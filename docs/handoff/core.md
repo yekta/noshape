@@ -4,7 +4,7 @@ Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-24 13:50 UTC)
+## Now (11-24 14:31 UTC)
 - **35dceca0 LANDED** (lead 11-24): errors-1123 blamed inputs, part colours (split/pattern/mirror/copy), Subtract cut
   faces, Split names+order, hose joints. TODO: tell qa (roster id, agent_status first) to rescore errors-1123 core rows
   (ERR-SEL-RED-ALL-INPUTS, ERR-HOLE body, APPEAR-*) and the 11-24 "fixed, to verify" rows; ask dx to rerun the hose x_t.
@@ -24,8 +24,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   /root/core-scratch/run/check11.log: if green, commit ("core: a thin wire coiled on a routing curve sweeps ...") with
   TICKETS + handoff, then land.sh (stack 85f167b15 + this). Left gap: volume 0.0754 vs live 0.0799 (our routing curve's
   start direction ~12 deg off live's) -> next item.
-- Remaining open core P0/P1 everyday rows after these: ERR-LOFT-GUIDES-EMPTY tip order (one capture, no rule), then
-  speed rows (SPEED-NUTS Sweep 1 556 ms, SPEED-VALVE-CONFIG / SPROCKETS Circular pattern ~200 ms).
+- 14:31: qa asked to rescore (35dceca0 rows + fixed-to-verify). Speed rows profiled (TICKETS notes): SPEED-NUTS /
+  VALVE-CONFIG / SPROCKETS time is boolean.rust (bool's), OCCT slower or failing -> told the lead. nuts Sweep 1 face
+  types (live 3 cylinders, ours 2 + 1 B-spline): the thread crest line along the helix axis sweeps a cylinder, but a
+  multi-turn strip on an OCCT cylinder checks UnorientableShape (status 27) -> not doable in exact_helical_cylinders;
+  left. DRIVEN-PATTERN-SWEEP routing curve start: live capture has only bbox/volume, no rule found; left.
+  ERR-LOFT-GUIDES-EMPTY tip order: one capture, no rule.
 - Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
   5072.2167 mm2, ours a plate 5017.6. k::edges_on_faces (boolean.cpp: all edges copied once, each face's surface made
