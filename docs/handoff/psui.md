@@ -49,13 +49,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   asm's the_second_pick_outlines_... failed once on Windows (told the lead).
 - Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
 - LANDED 0923c1fd as ad784f89 (16:43): owner-selected hover cells, Fillet handle bisector step, sm tab test T2.
-- QUEUED (11-24, after compaction): depth-0 Extrude region outline red (live errors-1123; builder outline_corners:
+- RE-QUEUED 17:54 as 75404bb7 (whole stack; 8903d37f failed 17:45 on a SIGTERM of the part-studio-ui lib binary, no test failed: earlyoom-like, same second slot 1 finished): depth-0 Extrude region outline red (live errors-1123; builder outline_corners:
   corners = a sketch curve end or a turn > 60°; test a_depth_0_extrudes_circle_region_has_a_red_outline); field
   errors = live (test feature_fields_reject_what_live_rejects); flip buttons (hover 1 px #1651B0 bottom line, arrow
   cursor; test the_flip_button_flips_on_click_takes_the_keyboard_and_ignores_space).
 - Corner-break disc (FEEL-CORNER-BREAK-VERTEX-PICK): sheet metal, PARKED by the lead: test is T2, don't debug. Known:
   the scene holds the disc (layer 20 Points, POST, over_lines, mix 0.7); the renderer's preview-post pass drops it.
-- QUEUED 8e11c924 (17:3x, stacked on 8903d37f): FEEL-HOVER-OWNER-SELECTED (3): a hovered vertex at a selected edge's
+- IN 75404bb7 (was 8e11c924): FEEL-HOVER-OWNER-SELECTED (3): a hovered vertex at a selected edge's
   end gets a 6 px piece of the edge's band over its disc (behaviors vertex_band_piece, layer 21 after the disc; the ON_TOP
   disc writes near depth, so a depth-tested redraw can't cover it); TICKETS dup rows of SKT-USE-HOVER /
   SKT-POSTCOMMIT-HOVER dropped.
