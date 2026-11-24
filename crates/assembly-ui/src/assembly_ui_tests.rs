@@ -3618,7 +3618,8 @@ fn the_camera_menu_lists_lives_assembly_rows(cx: &mut TestAppContext) {
     );
 }
 
-/// Interaction-feel "Implicit, over an edge": a straight edge's preview connector is its midpoint, Z along the edge.
+/// Interaction-feel "Implicit, over an edge": a straight edge's preview connector under the pointer at its middle is its
+/// midpoint, Z along the edge.
 #[gpui::test]
 fn an_edges_connector_is_its_midpoint_with_z_along_it(cx: &mut TestAppContext) {
     use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
@@ -3634,6 +3635,9 @@ fn an_edges_connector_is_its_midpoint_with_z_along_it(cx: &mut TestAppContext) {
             let k = edges.iter().position(|e| e.endpoints().is_ok_and(|(a, b)| e.length().is_ok_and(|l| (l - a.distance(b)).abs() < 1e-9 && l > 1e-3))).expect("a straight edge");
             let (a, b) = edges[k].endpoints().unwrap();
             let reference = o.edge_refs[k].clone();
+            // The pointer on its middle (past half-way an end takes it: live mc-reach-1124).
+            let middle = o.transform.transform_point3((a + b) * 0.5);
+            v.pointer = v.viewport.read(cx).project(middle).expect("the edge's middle on screen");
             v.hover = Some(AsmPickTarget { path: vec![id], reference, kind: PickKind::Edge, occ, anchor: None });
             v.update_inference(cx);
             let (_, _, cands) = v.infer.clone().expect("the edge's points");

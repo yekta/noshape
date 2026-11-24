@@ -1045,7 +1045,7 @@ fn a_vertex_reached_from_its_face_keeps_the_connector_glyph(cx: &mut TestAppCont
 }
 
 /// Live mc-infer-1122 reach-asm-corner (qa FEEL-MC-EDGE-BEFORE-VERTEX-ASM): swept from the top face toward its corner,
-/// the edge lights at 10 px (the connector at its midpoint) and the vertex at 6, along the diagonal too (the pick
+/// the edge lights at 10 px (the connector at its nearer end: live mc-reach-1124) and the vertex at 6, along the diagonal too (the pick
 /// square's corner had the vertex 10 px off).
 #[gpui::test]
 fn a_corner_swept_from_its_face_lights_its_edge_before_its_vertex(cx: &mut TestAppContext) {

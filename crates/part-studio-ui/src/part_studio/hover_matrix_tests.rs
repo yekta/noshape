@@ -2475,3 +2475,30 @@ fn the_picked_mirror_line_is_live_pale_yellow_green(cx: &mut TestAppContext) {
     let lit = column.iter().filter(|px| px[1] > 180 && px[1] >= px[0] && (px[1] as i32 - px[2] as i32) > 60).count();
     assert!(column.iter().any(|px| close(*px, 0xf2ff80, 16)) && (1..=3).contains(&lit), "rows 30..50 across the line: {column:?}");
 }
+
+/// Live mc-reach-1124 (FEEL-MC-PS-MARKER-REACH (2)): the pointer on the block's top-front edge, from its midpoint toward
+/// the corner: the Mate connector stays at the midpoint to 26 px of the 56 px half, then goes to the corner end (Z along
+/// the edge) from 27 px.
+#[gpui::test]
+fn a_mate_connector_along_an_edge_goes_to_its_nearer_end_past_half_way(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } }
+    ] });
+    let m = matrix_studio_from(cx, "mc-edge-half", start);
+    wait_until(cx, m.window, |cx| !m.view.read(cx).display.bodies.is_empty() && !m.view.read(cx).ui_busy());
+    m.park(cx);
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("mateConnector", w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    let (mid, corner) = (m.exact(cx, [20., 0., 20.]), m.exact(cx, [40., 0., 20.]));
+    let mut got = Vec::new();
+    for f in [0.2, 0.4, 0.6, 0.8] {
+        m.pointer.move_to(cx, &m.view, (mid + (corner - mid) * f).round());
+        wait_until(cx, m.window, |cx| m.view.read(cx).inference_choice().is_some());
+        let at = cx.update(|cx| m.view.read(cx).inference_choice().map(|p| (p.frame.origin * 1e3).round()));
+        got.push((f, at));
+    }
+    let want = |f: f64| if f < 0.5 { DVec3::new(20., 0., 20.) } else { DVec3::new(40., 0., 20.) };
+    assert!(got.iter().all(|(f, at)| *at == Some(want(*f))), "fraction of the half, glyph at (mm): {got:?}; {:.1} px half", mid.distance(corner));
+}

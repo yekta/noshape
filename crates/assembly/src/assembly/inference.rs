@@ -20,8 +20,8 @@ pub struct OnScreen<'a> {
 /// The chosen point's index, as live (asm/feel-1117 reach-corner-strip, asm-feel3-1118, mc-infer-1122, mc-reach-1122):
 /// over a planar face the nearest point (the centroid too) of those within the square around the pointer, else the
 /// face's centroid (a cylinder's side at its axis
-/// midpoint at any height); over an edge its midpoint (a circle's centre) wherever the pointer is on it (mc-infer-1122
-/// reach-asm-corner d=10, qa FEEL-MC-EDGE-BEFORE-VERTEX-ASM: an end comes with its vertex's own pick). `entered`:
+/// midpoint at any height); over an edge its midpoint (a circle's centre) or the nearer of its ends, half-way between
+/// (live mc-reach-1124's 1.8 s steps; mc-infer-1122's d=10 midpoint was its laggy sweep). `entered`:
 /// the pointer has just come onto the entity, so the face's centroid (its points from the next move on: live2
 /// place-1118 21:05). Shift locks the entity, not the point: the same rule wherever the pointer is (mc-infer-1122
 /// shift.png). Other entities (a vertex): the nearest point.
@@ -33,6 +33,9 @@ pub fn choose(s: &OnScreen, pointer: DVec2, entered: bool) -> Option<usize> {
     }
     let best = match s.on {
         Reference::Face(_) if !entered => near.filter(|(.., d)| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
+        // Along an edge its midpoint or the nearer end, switching half-way (live mc-reach-1124: the corner end, Z along
+        // the edge, from 27 px of a 56 px half).
+        Reference::Edge(_) => near.filter(|(i, r, _)| *i == 0 || matches!(r, Reference::Implicit { inference: Inference::Vertex, .. })).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
         _ => None,
     };
     Some(best.map_or(0, |(i, ..)| i))
@@ -96,12 +99,14 @@ mod tests {
     }
 
     #[test]
-    fn an_edge_keeps_its_midpoint_near_an_end() {
+    fn an_edge_takes_its_nearer_end_past_half_way() {
         let edge = Reference::Edge(edge());
         let (m, e) = (implicit(&edge, Inference::Midpoint), implicit(&edge, Inference::Vertex));
-        let s = OnScreen { on: &edge, points: vec![(&m, Some(DVec2::ZERO)), (&e, Some(DVec2::new(50.0, 0.0)))] };
-        assert_eq!(choose(&s, DVec2::new(34.0, 0.0), false), Some(0), "16 px from the end: the midpoint");
-        assert_eq!(choose(&s, DVec2::new(40.0, 0.0), false), Some(0), "10 px from the end: the midpoint still (live d=10)");
+        // Live mc-reach-1124: the midpoint to 26 px, the corner end from 27 px of the 56.2 px half.
+        let s = OnScreen { on: &edge, points: vec![(&m, Some(DVec2::ZERO)), (&e, Some(DVec2::new(56.2, 0.0)))] };
+        assert_eq!(choose(&s, DVec2::new(26.0, 0.0), false), Some(0), "26 px along: the midpoint");
+        assert_eq!(choose(&s, DVec2::new(29.0, 0.0), false), Some(1), "29 px along: the corner end");
+        assert_eq!(choose(&s, DVec2::new(46.0, 0.0), false), Some(1), "10 px from the corner: its end");
     }
 
     #[test]
