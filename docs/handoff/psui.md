@@ -51,10 +51,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   asm's the_second_pick_outlines_... failed once on Windows (told the lead).
 - Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
 - QUEUED dae14f97 (14:3x): TICKETS cleanup + list-tooltip row + FEEL-EDIT-BODY-SHADE fix (above).
-- IN PROGRESS: FEEL-PREVIEW-BODY-BLUE (P1 regression, workflow 04 s2 Shell top removed / 38 s16 Intersect: ours the
-  plain rest top (152,194,218), live (172,184,172)). A gpui repro (block, Shell, top clicked) does NOT reproduce: ours
-  floor (151,161,139) at 0.7, (143,151,127) at 1, (169,186,166) at 0, the picked top tinted in both. So the workflow
-  shot likely caught no pick / no preview yet: read qa's out-wf* step 2 (frame + state) and the workflow script next.
+- FEEL-PREVIEW-BODY-BLUE closed (14:25): not a regression; qa's 13:27 run was on a loaded host (frames 200-600 ms), the
+  shot came before the preview. Quiet vibex8 replay of green 35dceca06 (~/tmp/psui/wfa, qa's wf/run.sh, XD :497): wf04 s2
+  and wf38 s16 show the preview. Told the lead: the replay should settle on the preview's display.
 - Next: PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
 - USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape
