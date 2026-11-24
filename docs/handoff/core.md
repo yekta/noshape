@@ -4,13 +4,29 @@ Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
-## Now (11-24 12:58 UTC)
-- **QUEUED P0 BOOLEAN-UNION-FIRST-TOOL-IDENTITY (1e05327f, 11-23):** display.rs face_colors also takes face colours of
-  a part merged away (keyed by its old BodyId), so a union keeps both parts' face colours. Already as live: the union
-  keeps the first tool's id and name (T1 features_b::union_of_imported_parts_is_its_first_tool, both orders). The
-  user's doc (/root/lead-scratch/user-docs/macmini-m6.noshape, PRIVATE: copies only in ~/tmp/core, mode 700) names
-  both parts "root" from the IMPORT (dx's naming; dx's STEP colour fix 70edeb41d); part_properties is empty in every
-  saved version: the user's renames never reached the file (told psui).
+## Now (11-24 13:50 UTC)
+- **35dceca0 LANDED** (lead 11-24): errors-1123 blamed inputs, part colours (split/pattern/mirror/copy), Subtract cut
+  faces, Split names+order, hose joints. TODO: tell qa (roster id, agent_status first) to rescore errors-1123 core rows
+  (ERR-SEL-RED-ALL-INPUTS, ERR-HOLE body, APPEAR-*) and the 11-24 "fixed, to verify" rows; ask dx to rerun the hose x_t.
+- **Lead 11-24: scissor slab Move-face work PARKED** (WIP core-rmx cb5c5ec61, branch core-slabs). Focus: open core
+  P0/P1 TICKETS for everyday features, wrong geometry/errors before speed, small land batches.
+- **Committed, NOT landed (core-rf):** 85f167b15 Loft: an error naming a list of selections (Profiles) adds no
+  " A parameter value is not valid."; an empty guide entry reads "No selections" (feature_dialog entry_label, ui_state);
+  TICKETS marks rows fixed-to-verify (Move face/Thicken/failed bodies landed 11-23 05:04 = 435354603, c276c745f,
+  26657ac62; union 1f317d4df; thread on revolved cylinder and surface loft guide OK on green CLI). psui full suite 532
+  passed + the new test, clippy clean.
+- **In worktree, uncommitted (core-rf): DRIVEN-PATTERN-SWEEP fix.** features.cpp sweep: MakePipeShell retried at
+  1e-7/1e-6/1e-5 m where the path-sized tolerance fails (c2-loft-guide-curves-driven-pattern Sweep 1: 0.001 in wire
+  coiled on the routing curve); solid_a.rs may_self_intersect: profile gap = 2x sagitta (was chord), path steps <= size/4
+  (Sweep 1 1316 -> 69 ms). T1 kernel core::a_thin_wire_coiled_on_a_routing_curve_sweeps + crates/kernel/tests/data/sweep/coiled-wire.brep (untracked: git add it).
+  Verified: kernel 592 + model 628 + sweep tests pass (before the pre-check change), 25 sweep corpus docs none worse than
+  nightly pm-1122. Final run .core-check11.sh (clippy kernel/model-core/psui, model-core, model, kernel) -> log
+  /root/core-scratch/run/check11.log: if green, commit ("core: a thin wire coiled on a routing curve sweeps ...") with
+  TICKETS + handoff, then land.sh (stack 85f167b15 + this). Left gap: volume 0.0754 vs live 0.0799 (our routing curve's
+  start direction ~12 deg off live's) -> next item.
+- Remaining open core P0/P1 everyday rows after these: ERR-LOFT-GUIDES-EMPTY tip order (one capture, no rule), then
+  speed rows (SPEED-NUTS Sweep 1 556 ms, SPEED-VALVE-CONFIG / SPROCKETS Circular pattern ~200 ms).
+- Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
   5072.2167 mm2, ours a plate 5017.6. k::edges_on_faces (boolean.cpp: all edges copied once, each face's surface made
   analytic by GeomConvert_SurfToAnaSurf, p-curve where within max(tol, edge tol)); curves.rs puts the two-sketch

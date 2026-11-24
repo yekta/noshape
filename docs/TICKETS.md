@@ -1766,7 +1766,7 @@ Top / Origin, Part 1 row (live's "Create task…" is cloud-only).
   **Timing heavy scenes: NOSHAPE_FRAME_LOG's "present" lines are the window's (UI) frames, not the 3D view's**: here they showed 2 fps
   / 513 ms frames while the screen's graphics didn't change for 40-70 s (the viewport frame is read back later). Time heavy scenes on
   the screen (crop diffs), as live does.
-- [ ] **P1 DRIVEN-PATTERN-SWEEP (core)**: c2-loft-guide-curves-driven-pattern's last feature Sweep 1 fails on ours ("Could not create
+- [ ] fixed, to verify (core 11-24: Sweep 1 builds, 1 solid, 11/11 compared features match, 69 ms (debug); OCCT's sweep retries looser tolerances (1e-7..1e-5 m) where the path-sized one fails, and the self-intersection pre-check samples at the profile's size (1.2 s of OCCT checks gone); T1 kernel core::a_thin_wire_coiled_on_a_routing_curve_sweeps. Left: volume 0.0754 mm³ vs live 0.0799: the profile sits 21.7° off square to our routing curve's start, live ~10°, so our Routing curve leaves its start in another direction (length 40.0385 vs live 40.0318 mm)) **P1 DRIVEN-PATTERN-SWEEP (core)**: c2-loft-guide-curves-driven-pattern's last feature Sweep 1 fails on ours ("Could not create
   valid swept body, check input."; green 80a64725's release build and v0.4.57 alike), live makes it OK (125 bodies after it, ours 124:
   122 surfaces + 2 curves). It is live's heavy-model feel reference (live 11-18), so the feel rows compare 124 vs 125 bodies.
 
