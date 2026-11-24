@@ -268,7 +268,7 @@ Ours is at or under live on every edit, undo and roll except c2-rings-loft (belo
   10.4 mm; after it 44 faces, 521.793 / 568.750 mm3 at 8.8 / 9.6, 36 faces, 732.479 mm3 at 10.4 (a second 6-face body of 1103.593
   mm3 throughout); the studio ~2.2 s per edit. Wanted: Shell 1 succeeding with those faces and volumes, in live's time or less.
   Probe: vibex6 ~/agents/dx-keep/sr/rlprobe.py <cli> <saved doc> "9.6 mm".
-- [ ] P2 **EDGE-CENTRE-SEAM (core)**: c2-rings-loft's ring round (34.93, 0) mm matches live per feature (after Extrude 7: 6 rim
+- [ ] not reproduced for core (core 11-24, green 63731676b, query_entities after Shell 2: the seam rims' midpoints (43.281, 0.0, 7.664) and (44.094, 0.0, 5.436), on their symmetry line; the drawing's 4-arc split stays: studios) P2 **EDGE-CENTRE-SEAM (core)**: c2-rings-loft's ring round (34.93, 0) mm matches live per feature (after Extrude 7: 6 rim
   ellipses of 24.31 mm, live 24.3; after Shell 2: 6 more of 26.68 mm, live 26.67; the curves pass through live's midPoints). But
   `noshape_kernel::linear_properties` (BRepGProp::LinearProperties, geom.cpp props_linear) puts the centre of the two rims that cross
   0 deg (the ellipse's seam) off their symmetry line: (40.07, +-8.88, 10.875) -> centre (43.28, 5.13, 7.66), y 0 expected (the inner
