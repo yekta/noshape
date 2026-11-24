@@ -1152,6 +1152,97 @@ fn an_extrudes_preview_face_lights_nothing(cx: &mut TestAppContext) {
     assert!(matches!(on_block, Some(Reference::Face(_))), "on the block's front face: {on_block:?}");
 }
 
+// A Fillet's own preview isn't pickable (live 10-27 PREVIEW-SELF-PICK, behaviours "qa (2026-10-27, P2)"): with the
+// top-front edge at 5 mm, the rounded band's upper half hovers the original top face, its lower half the original front
+// face, and a click adds "Face of Extrude 1": no "deleted feature" chip, the field and title not red, ✓ enabled.
+#[gpui::test]
+fn a_fillets_preview_band_picks_the_faces_it_was_built_on(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "preview-self-pick");
+    draw(cx, m.window);
+    let hover_at = |cx: &mut TestAppContext, mm: [f64; 3]| {
+        m.park(cx);
+        let q = m.screen(cx, mm);
+        approach(cx, &m, q);
+        cx.update(|cx| m.view.read(cx).hover.clone())
+    };
+    let top = hover_at(cx, FACE).expect("the top face");
+    let front = hover_at(cx, [20., 0., 8.]).expect("the front face");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    draw(cx, m.window);
+    let p = m.exact(cx, EDGE);
+    approach(cx, &m, p);
+    m.pointer.click(cx, &m.view, p);
+    let d = cx.update(|cx| m.view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Fillet dialog");
+    cx.update(|cx| d.update(cx, |d, cx| d.set_value("radius", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("5 mm")), cx)));
+    wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+    // The band: centre (y 5, z 15), radius 5; 5° and 80° down from its top tangent line (clear of the picked edge drawn
+    // through its middle) and of the radius arrow at the edge's midpoint (x 20).
+    let (a, b) = (5f64.to_radians(), 80f64.to_radians());
+    let upper = [32., 5. - 5. * a.sin(), 15. + 5. * a.cos()];
+    let lower = [32., 5. - 5. * b.sin(), 15. + 5. * b.cos()];
+    assert_eq!(hover_at(cx, upper).as_ref(), Some(&top), "the band's upper half");
+    assert_eq!(hover_at(cx, lower).as_ref(), Some(&front), "the band's lower half");
+    let q = m.screen(cx, upper);
+    approach(cx, &m, q);
+    m.pointer.click(cx, &m.view, q);
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    draw(cx, m.window);
+    let s = cx.update_window(m.window, |_, w, cx| m.view.read(cx).ui_state(w, cx)).unwrap();
+    let field = &s["dialog"]["fields"].as_array().expect("fields")[0];
+    let items: Vec<&str> = field["items"].as_array().expect("chips").iter().filter_map(|i| i.as_str()).collect();
+    assert_eq!(items.len(), 2, "{items:?}");
+    assert_eq!(items[1], "Face of Extrude 1", "{items:?}");
+    assert_eq!((field["state"].as_str(), s["dialog"]["titleState"].as_str(), s["dialog"]["ok"].as_str()), (Some("ok"), Some("ok"), Some("enabled")));
+}
+
+// Delete part's preview (live 10-27 delete-preview, behaviours "psui (10-27) Delete part preview"): at the slider's
+// rest, 0 and 1 the only orange (255,192,76) is the part's silhouette; its inner edges never are. The fill is a pale
+// ghost at rest (top (198,208,230)), the normal part at 0 and gone at 1.
+#[gpui::test]
+fn delete_parts_preview_outlines_only_the_silhouette(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "delete-preview-look");
+    draw(cx, m.window);
+    m.park(cx);
+    let (outline, inner, top) = (m.exact(cx, [20., 0., 0.]).round(), m.exact(cx, [20., 0., 20.]).round(), m.exact(cx, [20., 15., 20.]).round());
+    let at = |f: &(u32, u32, Vec<[u8; 3]>), p: DVec2| f.2[(p.y as u32 * f.0 + p.x as u32) as usize];
+    let orange = |f: &(u32, u32, Vec<[u8; 3]>), p: DVec2, r: i32| {
+        (-r..=r).flat_map(|y| (-r..=r).map(move |x| p + DVec2::new(f64::from(x), f64::from(y)))).filter(|&q| close(at(f, q), 0xffc04c, 24)).count()
+    };
+    let part_top = at(&m.frame(cx), top);
+    let body = cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.name == "Part 1").map(|b| b.id.clone()).expect("Part 1"));
+    m.view.update(cx, |v, _| v.selection = vec![Reference::Body(body.clone())]);
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("deleteBodies", w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| {
+        let v = m.view.read(cx);
+        !v.ui_busy() && v.ui.preview_before.is_some() && v.ui.removed_outline.as_ref().is_some_and(|(_, o)| o.is_some())
+    });
+    let mut wrong = Vec::new();
+    for (name, t) in [("rest", None), ("0", Some(0.0)), ("1", Some(1.0))] {
+        if let Some(t) = t {
+            m.view.update(cx, |v, cx| {
+                v.ui.preview_opacity = t;
+                v.refresh_scene(false, cx);
+            });
+        }
+        let f = m.frame(cx);
+        let (o, i, fill) = (orange(&f, outline, 4), orange(&f, inner, 3), at(&f, top));
+        if o < 3 || i > 0 {
+            wrong.push(format!("{name}: {o} orange px on the silhouette (want ≥ 3), {i} on the front top edge (want 0)"));
+        }
+        let want = match name {
+            "rest" => close(fill, 0xc6d0e6, 24),
+            "0" => fill.iter().zip(part_top).all(|(a, b)| a.abs_diff(b) <= 12),
+            _ => fill.iter().zip(part_top).any(|(a, b)| a.abs_diff(b) > 40),
+        };
+        if !want {
+            wrong.push(format!("{name}: the top reads {fill:?} (the part's own {part_top:?})"));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 // Shell 1 with the block's top face in Faces to remove, its centre clicked again (live walk6-3 shell-reclick, qa
 // FEEL-SHELL-RECLICK-REMOVED-FACE): resting there lights nothing new, the click takes the face out of the field.
 #[gpui::test]

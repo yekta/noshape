@@ -3098,8 +3098,12 @@ impl FeatureDialog {
                         let cb = crate::ui::os_checkbox_focused(SharedString::from(format!("cb-{path}")), "", on, focus.is_focused(window))
                             // Live (psb 10-20 l, part-studio/402): a long label stays
                             // on one line, clipped with an ellipsis ("Preserve active
-                            // sheet meta…"), no tooltip.
-                            .child(div().flex_1().min_w_0().ml(px(-4.)).truncate().child(crate::ui::spec_text(s.label)))
+                            // sheet meta…"), no tooltip; cut 26 px short of the dialog's
+                            // right edge (p1dlg-checkbox-label-widths: 174 px from x 266).
+                            .child(div().debug_selector({
+                                let sel = format!("cbl-{path}");
+                                move || sel
+                            }).flex_1().min_w_0().ml(px(-4.)).mr(px(6.)).truncate().child(crate::ui::spec_text(s.label)))
                             .rounded(px(2.))
                             .flex_shrink(1.)
                             .min_w_0()

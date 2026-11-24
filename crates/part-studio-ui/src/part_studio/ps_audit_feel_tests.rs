@@ -453,3 +453,39 @@ fn a_new_sketch_keeps_the_isolate_panel_and_closes_tool_panels(cx: &mut TestAppC
     }
     assert_eq!(got, [("Isolate", true, true, true), ("Mass properties", true, false, false), ("Named views", true, false, false)], "(panel, open before, during the new sketch, after its cancel)");
 }
+
+// A dialog checkbox row (live 10-27 p1dlg-checkbox-label-widths): the label starts 20 px in from the dialog's left
+// edge (x 266 against Entities to fillet's list at 250..462 of a 246..466 dialog), a group header's (after its 20 px
+// expander column) 20 px further, and a label too long for the row (Derived's "Preserve active sheet metal models",
+// 209 px of text) is cut at 174 px: up to 26 px short of the dialog's right edge.
+#[gpui::test]
+fn checkbox_labels_start_20_px_in_and_cut_at_174_px(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "audit-cb-labels");
+    let mut got = Vec::new();
+    for (feature, rows) in [
+        ("fillet", &[("Tangent propagation", "cbl-tangentPropagation"), ("Partial fillet", "cbl-isPartial"), ("Allow edge overflow", "cbl-allowEdgeOverflow"), ("Smooth fillet corners", "cbl-smoothCorners")][..]),
+        ("importDerived", &[("Preserve active sheet metal models", "cbl-preserveActiveSheetMetal")][..]),
+    ] {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(feature, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let dialog = vcx.debug_bounds("feature-dialog").map(|b| f32::from(b.left())).expect("the dialog");
+        for &(name, sel) in rows {
+            let b = vcx.debug_bounds(sel).unwrap_or_else(|| panic!("{name} not drawn"));
+            let half = |x: f32| (x * 2.).round() / 2.;
+            let width = (feature == "importDerived").then(|| half(f32::from(b.size.width)));
+            got.push((name, half(f32::from(b.left()) - dialog), width));
+        }
+        keys(cx, window, &["escape"]);
+        wait_until(cx, window, |cx| view.read(cx).edit.is_none());
+    }
+    let want = [
+        ("Tangent propagation", 20., None),
+        ("Partial fillet", 40., None),
+        ("Allow edge overflow", 40., None),
+        ("Smooth fillet corners", 40., None),
+        ("Preserve active sheet metal models", 20., Some(174.)),
+    ];
+    assert_eq!(got, want, "(label, px in from the dialog's left, the cut label's width)");
+}

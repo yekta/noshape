@@ -15,14 +15,17 @@ Scripts and per-section verdicts: psui's scratch `audit/` (scan.py, triage.tsv).
 | **covered before** | **142** |
 | added in batch 1 | 11 |
 | added in batch 2 | 6 |
-| **covered after** | **159** |
-| still without a test | 5 |
+| added in batch 3 | 3 |
+| **covered after** | **162** |
+| still without a test | 2 |
 
 New tests: `part-studio-ui/src/part_studio/ps_audit_feel_tests.rs` (`audit::`), one row in the navigation matrix and
 one in the feature-list matrix. The audit found no behaviour of ours off live: every new test passed once its fixture
 was right (the app only gained debug selectors for the tests: the list title, the dialog ✕, the view cube, a Loft entry's ›).
 Batch 2 found the analysis panels 3 px above the feature dialogs' corner (y 36, live 39 like the dialogs) and the empty
 Dihedral panel 288 px high (live 226: its rows touch, the ? sits beside the slider); both fixed.
+Batch 3 found a feature's own preview unpickable (a Fillet's band lit nothing; live hovers and picks the face the model
+before the feature has there, "Face of Extrude 1") and dialog checkbox labels cut 6 px late (180 px, live 174); both fixed.
 
 ## Added in this audit
 
@@ -45,6 +48,9 @@ Dihedral panel 288 px high (live 226: its rows touch, the ? sits beside the slid
 | 21717 | psui (2026-10-27, P3) MENU-TRUNCATE: long feature names in context menus (request 1509) | audit::a_long_feature_name_keeps_its_menu_250_px_wide_with_one_line_rows (batch 2) |
 | 23319 | qa (2026-10-28) Part Studio empty-space right-click › Show all / Show all parts (request 1562) | audit::show_all_shows_sketches_planes_and_parts_show_all_parts_only_the_parts (batch 2) |
 | 37222 | psui (2212): Camera menu's disabled rows, the start tab rule, and Ruled surface's cubic interpolation default | audit::the_camera_menu_greys_no_row_not_even_previous_view_at_a_start (batch 2) |
+| 19497 | spec: psui p1-dialogs.md long checkbox labels: live text widths and truncation | audit::checkbox_labels_start_20_px_in_and_cut_at_174_px (batch 3; fixed: cut at 174, was 180) |
+| 19949 | psui (10-27) Delete part preview: outline and ghost at slider rest, 0 and 1 | hover_matrix::delete_parts_preview_outlines_only_the_silhouette (batch 3) |
+| 21819 | qa (2026-10-27, P2) PREVIEW-SELF-PICK: hovering / clicking a feature's own preview geometry (request 1510) | hover_matrix::a_fillets_preview_band_picks_the_faces_it_was_built_on (batch 3; fixed) |
 
 ## Still without a test (next batches)
 
@@ -52,6 +58,3 @@ Dihedral panel 288 px high (live 226: its rows touch, the ? sits beside the slid
 |---|---|---|
 | 6364 | Hole dialog: Counterbore / Countersink icon rows (qa5 ADV4, 10-21) | Hole icon rows look |
 | 18606 | spec: psui DCLICK-HEAVY double-click on a feature row of a heavy part (live 10-27; TICKETS P1 DCLICK-HEAVY) | DCLICK-HEAVY latency on a heavy part |
-| 19497 | spec: psui p1-dialogs.md long checkbox labels: live text widths and truncation | checkbox label widths: look spec |
-| 19949 | psui (10-27) Delete part preview: outline and ghost at slider rest, 0 and 1 | Delete part preview look (silhouette only) |
-| 21819 | qa (2026-10-27, P2) PREVIEW-SELF-PICK: hovering / clicking a feature's own preview geometry (request 1510) | preview self-pick (hover resolves pre-feature) |

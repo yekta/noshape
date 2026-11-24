@@ -2083,7 +2083,10 @@ impl PartStudioView {
         let id = id.filter(|&i| !vp.read(cx).box_drag() || vp.read(cx).box_plane() == Some(i));
         // Versions and history › Compare lights nothing under the pointer (live fc-1120 (10)).
         let id = id.filter(|_| crate::part_studio_hooks::compare_blend(&self.doc, cx).is_none());
-        let id = id.filter(|id| !self.preview_hides(*id, vp, cx));
+        let id = match id {
+            Some(i) if self.preview_hides(i, vp, cx) => self.before_face_under(vp.read(cx).pointer_position(), cx).and_then(|t| self.built.as_ref()?.picks.ids_for(&t.reference).first().copied()),
+            id => id,
+        };
         // Held after a dialog's Enter until the pointer moves.
         let id = id.filter(|_| self.ui.hover_held_at.is_none());
         let gpu = id;
@@ -2103,14 +2106,18 @@ impl PartStudioView {
     }
 
     /// While a feature previews the pointer lights what the model before it has there (live walk6-2, qa
-    /// FEEL-PREVIEW-HOVER-LIT): not a face the preview made, nor a face it changed where that face wasn't, nor (nothing
-    /// new) a changed face the dialog holds (walk6-3: Shell's removed face).
+    /// FEEL-PREVIEW-HOVER-LIT): not a face, edge or vertex the preview made (live PREVIEW-SELF-PICK: a Fillet's tangent
+    /// edges), nor a face it changed where that face wasn't, nor (nothing new) a changed face the dialog holds (walk6-3:
+    /// Shell's removed face).
     fn preview_hides(&self, id: u32, vp: &Entity<Viewport>, cx: &App) -> bool {
         let (Some(e), Some(_)) = (&self.edit, &self.ui.preview_before) else { return false };
-        let Some(r) = self.built.as_ref().and_then(|b| b.picks.get(id)).map(|t| t.reference.clone()).filter(|r| matches!(r, Reference::Face(_))) else { return false };
+        let Some(r) = self.built.as_ref().and_then(|b| b.picks.get(id)).map(|t| t.reference.clone()) else { return false };
         let dialog = e.dialog.read(cx);
         if behaviors::made_by(&r, dialog.feature.id) {
             return true;
+        }
+        if !matches!(r, Reference::Face(_)) {
+            return false;
         }
         if self.changed_picks(std::slice::from_ref(&r)).is_empty() {
             return false;
@@ -2136,6 +2143,23 @@ impl PartStudioView {
         let before = self.ui.preview_before.as_ref()?;
         let now = face_depths(&self.display, None, o, d);
         let r = changed.into_iter().find(|r| face_depths(before, Some(r), o, d).iter().any(|t| !now.iter().any(|n| *n < t + 5e-5)))?;
+        Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
+    }
+
+    /// Where the pointer is on the open feature's own preview: the face the model before it has there, nearest first
+    /// (live 10-27 PREVIEW-SELF-PICK: a Fillet's band hovers and picks the original top or front face), unless the
+    /// dialog holds it already (live walk6-2: nothing new lights on the picked face inside an Extrude's preview).
+    fn before_face_under(&self, position: glam::DVec2, cx: &App) -> Option<scene_builder::PickTarget> {
+        let dialog = self.edit.as_ref()?.dialog.read(cx);
+        let before = self.ui.preview_before.as_ref()?;
+        let (o, d) = self.viewport.read(cx).ray(position);
+        let mut nearest: Option<(f64, &Reference)> = None;
+        face_hits(before, None, o, d, |r, t| {
+            if nearest.is_none_or(|(n, _)| t < n) {
+                nearest = Some((t, r));
+            }
+        });
+        let r = nearest.map(|(_, r)| r.clone()).filter(|r| !behaviors::made_by(r, dialog.feature.id) && !dialog.selected_refs().contains(r))?;
         Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
     }
 
@@ -2674,7 +2698,7 @@ impl PartStudioView {
                 let own = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
                 let target = match target {
                     Some(t) if !own.is_some_and(|f| behaviors::made_by(&t.reference, f)) => Some(t),
-                    t => self.held_face_under(*position, cx).or(t),
+                    t => self.held_face_under(*position, cx).or_else(|| self.before_face_under(*position, cx)).or(t),
                 };
                 let (now, os_double) = self.viewport.update(cx, |vp, _| (vp.now(), vp.take_click_count() >= 2));
                 let dbl = target.as_ref().is_some_and(|t| self.edit.is_none() && self.is_double_click(&t.reference, now, os_double));
@@ -8844,6 +8868,14 @@ const ROW_DRAG_PX: f32 = 5.8;
 
 /// Where along the ray from `o` along `d` it meets face `r` (any face with `None`) as `display` draws it.
 fn face_depths(display: &noshape_model::display::StudioDisplay, r: Option<&Reference>, o: glam::DVec3, d: glam::DVec3) -> Vec<f64> {
+    let mut depths = Vec::new();
+    face_hits(display, r, o, d, |_, t| depths.push(t));
+    depths
+}
+
+/// Each place the ray from `o` along `d` meets face `r` (any face with `None`) as `display` draws it: the face and the
+/// depth.
+fn face_hits<'a>(display: &'a noshape_model::display::StudioDisplay, r: Option<&Reference>, o: glam::DVec3, d: glam::DVec3, mut found: impl FnMut(&'a Reference, f64)) {
     let hit = |a: glam::DVec3, b: glam::DVec3, c: glam::DVec3| {
         let (e1, e2) = (b - a, c - a);
         let p = d.cross(e2);
@@ -8858,19 +8890,37 @@ fn face_depths(display: &noshape_model::display::StudioDisplay, r: Option<&Refer
         let depth = e2.dot(q) / det;
         (u >= 0.0 && w >= 0.0 && u + w <= 1.0 && depth > 0.0).then_some(depth)
     };
-    let mut depths = Vec::new();
-    for b in display.bodies.iter().filter(|b| !b.hidden) {
+    // (A body whose box the ray misses is skipped: a heavy part's triangles only when the pointer is over it.)
+    let misses = |(lo, hi): (glam::DVec3, glam::DVec3)| {
+        let (lo, hi) = (lo - glam::DVec3::splat(1e-6), hi + glam::DVec3::splat(1e-6));
+        let (mut near, mut far) = (f64::NEG_INFINITY, f64::INFINITY);
+        for k in 0..3 {
+            if d[k].abs() < 1e-18 {
+                if o[k] < lo[k] || o[k] > hi[k] {
+                    return true;
+                }
+                continue;
+            }
+            let (a, b) = ((lo[k] - o[k]) / d[k], (hi[k] - o[k]) / d[k]);
+            near = near.max(a.min(b));
+            far = far.min(a.max(b));
+        }
+        near > far || far < 0.0
+    };
+    for b in display.bodies.iter().filter(|b| !b.hidden && !b.bounds.is_some_and(misses)) {
         let p = |i: u32| b.mesh.positions.get(i as usize).map(|p| glam::Vec3::from(*p).as_dvec3());
         for (fi, f) in b.face_refs.iter().enumerate() {
             if r.is_some_and(|r| r != f) {
                 continue;
             }
             let Some(idx) = b.mesh.face_ranges.get(fi).and_then(|&(first, n)| b.mesh.indices.get(first as usize..(first + n) as usize)) else { continue };
-            depths.extend(idx.as_chunks::<3>().0.iter().filter_map(|t| match (p(t[0]), p(t[1]), p(t[2])) {
-                (Some(a), Some(b), Some(c)) => hit(a, b, c),
-                _ => None,
-            }));
+            for t in idx.as_chunks::<3>().0 {
+                if let (Some(a), Some(b), Some(c)) = (p(t[0]), p(t[1]), p(t[2]))
+                    && let Some(depth) = hit(a, b, c)
+                {
+                    found(f, depth);
+                }
+            }
         }
     }
-    depths
 }
