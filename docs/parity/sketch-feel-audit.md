@@ -88,8 +88,11 @@ ui-parity coverage scenarios replay it).
 
 - **Sketch mode (116, 80 items)**: the base spec (entering / leaving, colours, each tool's clicks). Most items have
   tests under other names (colours: hover_matrix, the preview blue; tools: sketchtools_feel). Per-item pass under way:
-  done for cancel / Restore and the tool shortcut toggles (Added); left: spline Esc, Line mid-chain drag, Esc with a
-  menu open, the camera at sketch start.
+  done for cancel / Restore and the tool shortcut toggles (Added); spline Esc, Line mid-chain drag and Esc with a menu
+  open were tested (sketch_mode first_escape_commits_a_spline_and_the_second_exits,
+  press_drag_from_the_chain_end_places_nothing; sketchtools_feel row "Esc with the mid-chain menu open"); the camera
+  at sketch start added (`a_new_sketch_keeps_the_view_and_n_turns_it_normal`). Left: the colour table and each
+  tool's clicks against the sketch/NN shots.
 
 **Settled without a test:**
 - Tool hints (23116): live shows none, and we show none.
