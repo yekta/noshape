@@ -12,7 +12,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   notes, lead told). rim chamfer before the section fallbacks saved nothing (reverted). Ruled surface (surf-intro x4)
   skipped by the lead (niche).
 - Open: ERR-SEL-RED depth-0 red region outline (scene builder.rs ~1510; psui?). MANUALBLEND: upstream Sweep 2 drift.
-- Next: core rows from qa as they appear, else ask the lead.
+- **Lead 11-24 ~17:00: take blend's open fillet/chamfer rows (blend parked).** First the scissor studios (asm-scissor-lift
+  9cbb0e: 7 failing, 2d82a0: 6; live builds all; Fillet 23 first). Blend's notes: docs/handoff/blend.md "SCISSOR"
+  (doc vibex7 ~/agents/blend-keep/scissor.noshape; blend's probe branch blend-cusp 429750f98 = WIP never land).
+  Status run: .sc1.sh (release CLI batch feature_list) -> /root/core-scratch/run/sc1.log. Then TICKETS fillet/chamfer P0/P1.
+- Then: core rows from qa as they appear.
 - Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
   5072.2167 mm2, ours a plate 5017.6. k::edges_on_faces (boolean.cpp: all edges copied once, each face's surface made
