@@ -20,7 +20,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Local commits since (all tested on vibex6): 12ce9e058 Use on a face: one COINCIDENT per loop corner (ops e2e 8/8,
   ui Use 7/7, clippy ops clean) + TICKETS Select other bold = live (live 11-24 13:20); c1420311b GPU test picked mirror
   line = live 1123 2 px (242,255,128); 20d9bc03a matrix row Use Enter/Esc (5/5). Land them with the stack (t6.sh +
-  tuse.sh + tmir.sh + tst.sh in skasm-scratch/bin).
+  tuse.sh + tmir.sh + tst.sh in skasm-scratch/bin). 5c804077e MC along an edge: nearer end past half-way (live
+  mc-reach-1124; shared chooser crates/assembly inference.rs; tmc.sh/tmc2.sh green: assembly 3, ps-ui 15, asm-ui 51).
+  Open on FEEL-MC-PS-MARKER-REACH: live's blank vertex step at 6 px (entry rule vs glyph reach, unsettled).
 - Sketch audit notes: /root/skasm-scratch/audit-1124.md ("11-24 later"). Left: Extend B threshold (live), value-box
   caret/selection/palette looks, Select other's doubled "Face of Sketch 3" row (needs qa's scene), wf13 up-left glyph
   row (live moves it only off stale glyphs; order unmeasured).
