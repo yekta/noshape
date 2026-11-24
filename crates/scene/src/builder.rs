@@ -1522,7 +1522,8 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
             // Live part-studio/2028: a picked region shows its corners as
             // small grey dots.
             if !hovered {
-                for p in outline_corners(&outline) {
+                let ends: Vec<glam::Vec3> = sk.points.iter().filter(|q| !q.standalone && !q.center && !q.handle && !q.tip && !q.external).map(|q| glam::Vec3::from(q.position)).collect();
+                for p in outline_corners(&outline, &ends) {
                     overlay_pts.points.push(PointSprite { position: flat(p), color: [155, 155, 155, 255], pick_id: 0, size: 3.5, style: LineSegment::ON_TOP, _pad: 0 });
                 }
             }
@@ -2463,7 +2464,9 @@ type EdgeKey = ([i64; 3], [i64; 3]);
 /// The boundary of a triangulated region: the triangle edges used once
 /// (vertices matched by position, so split meshes work too).
 /// Points of an outline where it turns (not along a straight run).
-fn outline_corners(segs: &[([f32; 3], [f32; 3])]) -> Vec<[f32; 3]> {
+/// The outline's corners: a sketch curve's end on it, or a turn of more than 60° (a tessellated circle's vertices,
+/// turning a few degrees each, are none: live errors-1123's depth-0 circle keeps its red outline whole).
+fn outline_corners(segs: &[([f32; 3], [f32; 3])], ends: &[glam::Vec3]) -> Vec<[f32; 3]> {
     let key = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
     let mut dirs: HashMap<[i64; 3], ([f32; 3], Vec<glam::Vec3>)> = HashMap::new();
     for (a, b) in segs {
@@ -2471,7 +2474,8 @@ fn outline_corners(segs: &[([f32; 3], [f32; 3])]) -> Vec<[f32; 3]> {
         dirs.entry(key(a)).or_insert((*a, Vec::new())).1.push(d);
         dirs.entry(key(b)).or_insert((*b, Vec::new())).1.push(-d);
     }
-    dirs.into_values().filter(|(_, ds)| ds.len() == 2 && ds[0].dot(-ds[1]) < 0.999).map(|(p, _)| p).collect()
+    let at_end = |p: &[f32; 3]| ends.iter().any(|e| e.distance(glam::Vec3::from(*p)) < 1e-5);
+    dirs.into_values().filter(|(p, ds)| ds.len() == 2 && (ds[0].dot(-ds[1]) < 0.5 || at_end(p))).map(|(p, _)| p).collect()
 }
 
 fn region_outline(positions: &[[f32; 3]], indices: &[u32]) -> Vec<([f32; 3], [f32; 3])> {

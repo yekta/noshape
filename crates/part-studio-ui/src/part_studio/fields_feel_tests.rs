@@ -265,3 +265,60 @@ fn the_fields_matrix_matches_live(cx: &mut TestAppContext) {
     eprintln!("fields matrix: {matched} / {} rows match live\n{}", report.len(), report.join("\n"));
     assert!(moved.is_empty(), "rows whose status moved (update interaction-feel.md and the row's gap): {moved:?}");
 }
+
+/// Live field-errors-1124: which typed values each feature's number field rejects (pink field, red title, ✓ off, as
+/// Extrude's "abc") and which it accepts, on a 40×30×20 block; a rejected field stays so while the next value is typed.
+#[gpui::test]
+fn feature_fields_reject_what_live_rejects(cx: &mut TestAppContext) {
+    let edge = serde_json::json!(["edge through [20, 0, 20]"]);
+    let cases: Vec<(serde_json::Value, &str, &str, &[&str], &[&str])> = vec![
+        (serde_json::json!({ "type": "fillet", "name": "F", "params": { "entities": edge, "radius": "2 mm" } }), "radius", "Radius", &["0", "-2", "0.001", "5 deg"], &["2"]),
+        (serde_json::json!({ "type": "chamfer", "name": "F", "params": { "entities": edge, "width": "2 mm" } }), "width", "Distance", &["0", "-2", "5 deg"], &["2"]),
+        (serde_json::json!({ "type": "shell", "name": "F", "params": { "entities": ["face through [20, 15, 20]"], "thickness": "2 mm" } }), "thickness", "Shell thickness", &["0", "-2", "5 deg"], &["2", "20"]),
+        (serde_json::json!({ "type": "linearPattern", "name": "F", "params": { "patternType": "PART", "entities": ["part 0"], "directionOne": edge, "distance": "60 mm", "instanceCount": "2", "operationType": "NEW" } }), "distance", "Distance", &["-3", "5 deg"], &["0", "1", "2.5", "60"]),
+        (serde_json::json!({ "type": "linearPattern", "name": "F", "params": { "patternType": "PART", "entities": ["part 0"], "directionOne": edge, "distance": "60 mm", "instanceCount": "2", "operationType": "NEW" } }), "instanceCount", "Instance count", &["0", "-3", "2.5", "5 deg"], &["1", "60"]),
+        (serde_json::json!({ "type": "circularPattern", "name": "F", "params": { "patternType": "PART", "entities": ["part 0"], "axis": ["edge through [40, 0, 10]"], "angle": "360 deg", "instanceCount": "4", "operationType": "NEW" } }), "angle", "Angle", &[], &["0", "-90", "400", "360", "1", "2.5"]),
+        (serde_json::json!({ "type": "circularPattern", "name": "F", "params": { "patternType": "PART", "entities": ["part 0"], "axis": ["edge through [40, 0, 10]"], "angle": "360 deg", "instanceCount": "4", "operationType": "NEW" } }), "instanceCount", "Instance count", &["0", "-90", "2.5", "5 mm"], &["1", "360", "400", "90"]),
+    ];
+    let mut wrong = Vec::new();
+    for (n, (feature, path, label, rejected, accepted)) in cases.into_iter().enumerate() {
+        let start = serde_json::json!({ "units": "mm", "features": [
+            { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+            feature
+        ] });
+        let (window, view) = part_studio_from(cx, &format!("fe-{n}"), Some(start));
+        cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+        let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "F").unwrap().id);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+        draw(cx, window);
+        let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+        let look = |cx: &mut TestAppContext| {
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+            let f = field(cx, window, &view, label).map(|f| f.1).unwrap_or_else(|| "missing".into());
+            let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+            let d = &state["dialog"];
+            (f, d["titleState"].as_str().unwrap_or("").to_string(), d["ok"].as_str().unwrap_or("").to_string())
+        };
+        for (typed, rejects) in rejected.iter().map(|t| (*t, true)).chain(accepted.iter().map(|t| (*t, false))) {
+            type_in(cx, window, &dialog, path, typed, &["enter"]);
+            let (f, title, ok) = look(cx);
+            // An accepted value may still fail the feature (Shell 20 mm on the block: the title red, ✓ enabled).
+            let got = (f == "error", title == "error" && rejects, ok == "disabled");
+            if got != (rejects, rejects, rejects) {
+                wrong.push(format!("{label} {typed:?}: ours field {f} title {title} ✓ {ok}, live {}", if rejects { "rejected" } else { "accepted" }));
+            }
+        }
+        // Rejected, then a good value typed without Enter: still rejected until the Enter.
+        if let (Some(bad), Some(good)) = (rejected.first(), accepted.first()) {
+            type_in(cx, window, &dialog, path, bad, &["enter"]);
+            type_in(cx, window, &dialog, path, good, &[]);
+            let (f, title, _) = look(cx);
+            if (f.as_str(), title.as_str()) != ("error", "error") {
+                wrong.push(format!("{label} {bad:?} then {good:?} typed: ours field {f} title {title}, live still rejected"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "fields unlike live field-errors-1124:\n{}", wrong.join("\n"));
+}

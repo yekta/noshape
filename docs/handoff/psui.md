@@ -48,20 +48,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   45375844269 job 138469739575 still in progress 13:5x (`gh api --allow-escape-sequences .../jobs/<id>/logs`).
   asm's the_second_pick_outlines_... failed once on Windows (told the lead).
 - Told the lead (13:5x): qa score-a910 b3x-mc-radius / b1-midapp-sel-face mispaired.
-- QUEUED dae14f97 (14:3x): TICKETS cleanup + list-tooltip row + FEEL-EDIT-BODY-SHADE fix (above).
-- LOCAL, land after dae14f97 lands (dae14f97 in the queue's run 16:xx; don't queue the stack twice):
-  1190cd482 (FEEL-PREVIEW-BODY-BLUE closed), 84648f9bf (feedback row "error / a pick its field refuses": ERR-MISSING-
-  SELECTION = live on main, to verify), 2e211e1ba (lead 14:4x: replay `"until": "regenerated"` waits, every step's settle
-  waits for the viewport frame ≤5 s; Viewport::frame_pending, PartStudioView::ui_frame_pending; README; A/B on one core:
-  green wf04 s2 8042 px rest blue, ours 0), 9ccf81f4e (edit-body test: region outline along hidden edges = live),
-  45fc5e007 + 748eae502 (TICKETS: the slider-0 plane leftover is a plane border's colour, at rest too; the region tint
-  needs a weaker tint through the body than over the background: #ecb03a 0.27 fits slider 1 but breaks 0.70),
-  9200e8394 (EXPR-AUTOCOMPLETE-LOOK: the sketch dimension's list right-aligned under its field). Clippy clean (app,
-  app-core, part-studio-ui).
-- FEEL-PREVIEW-BODY-BLUE closed (14:25): not a regression; qa's 13:27 run was on a loaded host (frames 200-600 ms), the
-  shot came before the preview. Quiet vibex8 replay of green 35dceca06 (~/tmp/psui/wfa, qa's wf/run.sh, XD :497): wf04 s2
-  and wf38 s16 show the preview. Told the lead: the replay should settle on the preview's display.
-- Next (lead 16:xx, from core bfcad85c): an Extrude with depth 0 draws its region outline red (live errors-1123); ours misses it (scene draw order).
+- QUEUED 0923c1fd (16:xx): dae14f97 + its stack (owner-selected hover cells, Fillet handle steps its bisector
+  offset (manip-drag-1124), sm tab test T2). Fix forward if it fails.
+- LOCAL (17:xx): depth-0 Extrude region outline red (live errors-1123): grey corner dots were drawn at every vertex of
+  the tessellated circle over the red line; corners now = a sketch curve end or a turn > 60° (builder outline_corners);
+  test a_depth_0_extrudes_circle_region_has_a_red_outline. Field errors (live field-errors-1124): ours = live on every
+  value (no code change); test feature_fields_reject_what_live_rejects, interaction-feel row. Land after 0923c1fd.
+- FEEL-HOVER-OWNER-SELECTED case (3) open: vertex hovered with its edge selected (live: the band over ~1/4 of the disc;
+  ours draws the disc after every line).
 - Then: PARTLY rows in TICKETS (CORNER-BREAK-VERTEX-PICK, TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
 - USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape

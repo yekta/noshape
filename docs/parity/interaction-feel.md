@@ -801,6 +801,7 @@ live2's fields.json "numericFields" (11-13 10:07, Extrude 1's Depth and Draft an
 | Refocused | the typed expression again | the same | = |
 | Invalid ("abc" + Enter) | pink, the text kept, the title red, ✓ disabled | the same | = |
 | Negative length | "-5" → "-5 mm", accepted | the same | = |
+| Rejected values per feature (live field-errors-1124) | as "abc": Fillet Radius 0, −2, 0.001 mm, "5 deg"; Chamfer Distance and Shell thickness 0, −2, "5 deg" (Shell 20 mm: field fine, the feature fails, ✓ enabled); Linear pattern Distance −3, "5 deg" (0 accepted), count 0, −3, 2.5, "5 deg" (1 accepted); Circular pattern Angle none of 0, −90, 400 deg, count 0, −90, 2.5, "5 mm"; a rejected field stays so while the next value is typed, until its Enter | the same (feature_fields_reject_what_live_rejects) | = |
 | Angle | "5" → "5 deg"; "-5" → "-5 deg", pink | "-5" stayed bare (an out-of-range value was left as typed whole); now the unit too | = (fixed) |
 | Arrow keys | Up +1 unit, Down −1, Shift+Up +10, Alt+Up as Up | Alt+Up did nothing (the text field's own Alt move); now a step | = (fixed) |
 | Autocomplete | "1 m": m, max( x , y ), min( x , y ), mm; "1 i": in, isInteger( x ) | the same (its rows as drawn) | = |

@@ -2812,3 +2812,43 @@ fn sk_the_line_tool_keeps_an_acquired_point_lit_along_its_levels(cx: &mut TestAp
     }
     assert!(got.iter().all(|g| !g.ends_with('✗')), "{got:#?}");
 }
+
+/// Live errors-1123: an Extrude of depth 0 draws its circle region pale red with a whole red (189, 48, 57) outline,
+/// edited or created; no grey corner dot along the circle (a tessellated circle has no corners).
+#[gpui::test]
+fn a_depth_0_extrudes_circle_region_has_a_red_outline(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    for creating in [false, true] {
+        let mut feats = vec![
+            serde_json::json!({ "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] }),
+            serde_json::json!({ "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }),
+            serde_json::json!({ "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[70, 15], [78, 15]] }] }),
+        ];
+        if !creating {
+            feats.push(serde_json::json!({ "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "0 mm", "operationType": "NEW" } }));
+        }
+        let m = matrix_studio_from(cx, if creating { "depth0-new" } else { "depth0-edit" }, serde_json::json!({ "units": "mm", "features": feats }));
+        if creating {
+            cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+            let c = m.screen(cx, [70., 15., 0.]);
+            m.pointer.move_to(cx, &m.view, c);
+            m.pointer.click(cx, &m.view, c);
+            wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+            cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| {
+                if let Some(e) = &v.edit {
+                    e.dialog.update(cx, |d, cx| d.set_expr_text("depth", "0 mm", w, cx));
+                }
+            })).unwrap();
+        } else {
+            let id = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 2").map(|f| f.id)).expect("Extrude 2");
+            cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+        }
+        wait_until(cx, m.window, |cx| m.view.read(cx).edit.is_some() && !m.view.read(cx).ui_busy());
+        m.park(cx);
+        let (w, _, px) = m.frame(cx);
+        let (a, b) = (m.screen(cx, [76., 15., 0.]), m.screen(cx, [80., 15., 0.]));
+        let row: Vec<[u8; 3]> = (a.x as u32..=b.x as u32).map(|x| px[(a.y as u32 * w + x) as usize]).collect();
+        let pale = px.iter().filter(|c| close(**c, 0xd3b4ba, 16)).count();
+        assert!(pale > 100 && row.iter().any(|p| close(*p, 0xbd3039, 16)) && !row.iter().any(|p| p[0] == p[1] && p[1] == p[2] && p[0] < 0xc0), "creating {creating}: pale {pale}, across the outline {row:02x?}");
+    }
+}
