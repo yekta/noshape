@@ -557,6 +557,17 @@ fn rows() -> Vec<Row> {
             click(cx, window, &view, (325., 300.));
             expect(lines(cx, &view), 3, "lines after the next click")
         } },
+        Row { id: "use / Enter does nothing, one Esc turns it off", live: "Enter leaves the tool on with the sketch as it was; one Esc turns it off and keeps everything (sketch-tools-1123)", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-use-enter", Tool::Line);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (450., 300.));
+            keys(cx, window, &["escape"]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Use, w, cx))).unwrap();
+            keys(cx, window, &["enter"]);
+            expect((tool(cx, &view), lines(cx, &view)), (Some(Tool::Use), 1), "after Enter: tool, lines")?;
+            keys(cx, window, &["escape"]);
+            expect((tool(cx, &view), lines(cx, &view)), (Some(Tool::Select), 1), "after one Esc: tool, lines")
+        } },
         Row { id: "pattern / Enter with a seed", live: "commits nothing; the tool stays", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-pattern-enter", Tool::Line);
             click(cx, window, &view, (400., 300.));
