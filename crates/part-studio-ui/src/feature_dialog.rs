@@ -2890,8 +2890,8 @@ impl FeatureDialog {
                     (false, false) => "flip-direction-opposite",
                     (false, true) => "flip-direction",
                 };
-                // A Tab stop like Onshape's `os-param-icon-button` (Space /
-                // Enter press it; focused: the 2 px blue bottom line).
+                // A Tab stop like Onshape's `os-param-icon-button` (focused by a click or Tab: the 2 px blue bottom line;
+                // Space does nothing, Enter commits the dialog: live flip-buttons-1124).
                 let focus = self.tab_stop(&format!("flip:{fpath}"), cx);
                 let p1 = fpath.clone();
                 let toggle = move |this: &mut Self, path: &str, cx: &mut Context<Self>| {
@@ -2911,8 +2911,8 @@ impl FeatureDialog {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .cursor_pointer()
-                    .hover(|d| d.bg(p().panel_hover))
+                    // Live flip-buttons-1124: hovered, a #EAEAEA fill and a 1 px blue bottom line; the arrow cursor.
+                    .hover(|d| d.bg(p().panel_hover).shadow(vec![BoxShadow { color: gpui_kit::rgb(0x1651b0).into(), offset: point(px(0.), px(-1.)), blur_radius: px(0.), spread_radius: px(0.), inset: true }]))
                     // Live (dom dialog-*.txt): flip icons are 20 x 19 svgs, the sprite at 19 px.
                     .child(crate::assets::icon(icon, 19., cx))
                     .tooltip(crate::ui::tooltip(f.label))

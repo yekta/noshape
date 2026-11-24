@@ -2090,3 +2090,32 @@ fn the_query_variable_dialog_shows_no_count(cx: &mut TestAppContext) {
     assert_eq!(texts.iter().filter(|t| counted(t)).collect::<Vec<_>>(), Vec::<&String>::new(), "no count in the dialog: {texts:?}");
     assert!(state.get("count").is_none(), "no count in the dialog's state");
 }
+
+/// Live flip-buttons-1124: Extrude's flip button is 26 × 26; a click flips the direction at once (Depth unchanged) and
+/// gives the button the keyboard; Space then does nothing; Enter commits the dialog as it is.
+#[gpui::test]
+fn the_flip_button_flips_on_click_takes_the_keyboard_and_ignores_space(cx: &mut TestAppContext) {
+    let (window, view, dialog) = edit_extrude(cx, "dlg-flip");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("flip-oppositeDirection").expect("the flip button");
+    assert_eq!((b.size.width, b.size.height), (px(26.), px(26.)), "the button's size");
+    let flipped = |cx: &mut TestAppContext| cx.update(|cx| matches!(dialog.read(cx).feature.params.get("oppositeDirection"), Some(noshape_model::params::ParamValue::Bool(true))));
+    let depth = |cx: &mut TestAppContext| cx.update(|cx| dialog.read(cx).input_text("depth", cx)).map(|t| t.0);
+    let (before, depth_before) = (flipped(cx), depth(cx));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let at = b.center();
+    vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1 });
+    draw(cx, window);
+    let focused = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
+    assert_eq!((flipped(cx) != before, depth(cx) == depth_before, focused.as_deref()), (true, true, Some("flip:oppositeDirection")), "after the click: flipped, Depth kept, the keyboard");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("space");
+    draw(cx, window);
+    assert_eq!((flipped(cx) != before, cx.update(|cx| view.read(cx).edit.is_some())), (true, true), "Space does nothing");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("enter");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let kept = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").map(|f| matches!(f.params.get("oppositeDirection"), Some(noshape_model::params::ParamValue::Bool(true)))));
+    assert_eq!((cx.update(|cx| view.read(cx).edit.is_none()), kept), (true, Some(!before)), "Enter commits the dialog, flipped");
+}
