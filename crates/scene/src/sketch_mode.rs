@@ -996,6 +996,9 @@ const INFERENCE_COLOR: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 const PREVIEW_COLOR: [u8; 4] = [0x44, 0x9c, 0xcd, 255];
 /// The Use tool's hovered edges: the hover's light orange (live sketch-tools-1123 use-convert (254,199,136)).
 const USE_HOVER_COLOR: [u8; 4] = [0xff, 0xc6, 0x85, 255];
+/// The hovered edge itself through the Use tool's band (qa SKT-USE-HOVER, live sk23 use-0-hover-edge / -vertex: across the
+/// edge 1 px (254,199,136), 2-3 px (213,182,138), 1 px (254,199,136)).
+const USE_HOVER_EDGE_COLOR: [u8; 4] = [0xd5, 0xb6, 0x8a, 255];
 /// The dash along a rubber band whose direction is inferred (live sketch/51).
 const INFERRED_DASH_COLOR: [u8; 4] = [0xe2, 0xbc, 0x2c, 255];
 
@@ -6524,13 +6527,16 @@ impl SketchEditor {
             && self.inference.as_ref().is_some_and(|i| (i.entity.is_some() && !is_direction(i.kind) && i.kind != InferenceKind::Tangent) || i.constraints.iter().any(|c| matches!(c, AutoConstraint::OnCurve(_))))
     }
 
-    /// The Line tool's end dot when it lands on the lit target: drawn under the target's highlight, not over it (live
+    /// The Line tool's end dot when it lands on the lit target: seen through the target's highlight, not over it (live
     /// hover-matrix-recheck-1123: the dot shows through the hovered point's disc, #C3B89C, and under the line's band).
     pub fn end_dot_under_target(&self, data: &SketchData) -> PointData {
         let mut points = PointData::default();
         let Some(c) = self.snapped().map(|s| s.0).filter(|_| !self.pointer_rests && self.end_on_lit_target() && self.anchor_pos(&data.sketch).is_some()) else { return points };
         let v = self.frame.to_world(c) + self.frame.normal * 1e-6;
-        points.points.push(PointSprite { position: [v.x as f32, v.y as f32, v.z as f32], color: PREVIEW_COLOR, pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
+        // A third of it through the lit disc or band, drawn over them (live: #C3B89C is #449CCD at 32 % over the hover's
+        // #FFC686, in sRGB; drawn under them it was hidden).
+        let [r, g, b, _] = PREVIEW_COLOR;
+        points.points.push(PointSprite { position: [v.x as f32, v.y as f32, v.z as f32], color: [r, g, b, 82], pick_id: 0, size: 6.0, style: LineSegment::ON_TOP, _pad: 0 });
         points
     }
 
@@ -6823,12 +6829,13 @@ impl SketchEditor {
                 points.points.push(PointSprite { position: w(p), color: preview_color, pick_id: 0, size: 6.0, style: on_top, _pad: 0 });
             }
         }
-        // Use: the hovered edges (a face's whole loop) drawn as hovered, light orange ~4 px, with small light-blue dots
-        // on their ends (live sketch-tools-1123 use-convert: edge (254,199,136) ≈4 px, ends (68,156,205); qa
-        // SKT-USE-HOVER: ours a light-blue line).
+        // Use: the hovered edges (a face's whole loop) drawn as hovered, a light orange band ~5 px with the edge's
+        // darker core along it, small light-blue dots on their ends (live sketch-tools-1123 use-convert: ends
+        // (68,156,205); qa SKT-USE-HOVER: ours a light-blue line, then a solid 4 px band 2.3x live's orange).
         if self.tool == Tool::Use {
             for pl in &self.use_preview {
-                wide.push((pl.clone(), USE_HOVER_COLOR, 4.0));
+                wide.push((pl.clone(), USE_HOVER_COLOR, 5.0));
+                wide.push((pl.clone(), USE_HOVER_EDGE_COLOR, 2.5));
                 let (Some(&a), Some(&b)) = (pl.first(), pl.last()) else { continue };
                 if a.distance(b) > self.world_per_px {
                     for q in [a, b] {
@@ -11788,15 +11795,18 @@ mod tests {
         }
     }
 
-    /// Qa SKT-USE-HOVER (live sketch-tools-1123 use-convert): Use draws the hovered edge light orange ~4 px with small
-    /// light-blue dots on its ends, not a light-blue line; a closed loop has no end dots.
+    /// Qa SKT-USE-HOVER (live sketch-tools-1123 use-convert, sk23 use-0-hover-edge): Use draws the hovered edge as a light
+    /// orange band ~5 px with the edge's darker core along it and small light-blue dots on its ends, not a light-blue
+    /// line; a closed loop has no end dots.
     #[test]
     fn use_draws_the_hovered_edge_as_hovered() {
         let (mut ed, d) = editor(Tool::Use);
         let units = noshape_units::UnitPrefs::default();
         ed.use_preview = vec![vec![v(0.0, 0.0), v(100.0 * PX, 0.0)]];
         let (lines, points) = ed.overlay(&d, &units);
-        assert!(lines.segments.iter().any(|s| s.color == USE_HOVER_COLOR && s.width == 4.0) && !lines.segments.iter().any(|s| s.color == PREVIEW_COLOR), "the edge light orange, no light-blue line");
+        let band = |c: [u8; 4], w: f32| lines.segments.iter().position(|s| s.color == c && s.width == w);
+        assert!(band(USE_HOVER_COLOR, 5.0).is_some() && !lines.segments.iter().any(|s| s.color == PREVIEW_COLOR), "the edge light orange, no light-blue line");
+        assert!(band(USE_HOVER_EDGE_COLOR, 2.5) > band(USE_HOVER_COLOR, 5.0), "the edge's darker core over the band's middle");
         assert_eq!(points.points.iter().filter(|p| p.color == PREVIEW_COLOR).count(), 2, "its two end dots");
         ed.use_preview = vec![(0..=16).map(|k| DVec2::from_angle(f64::from(k) / 16.0 * std::f64::consts::TAU) * (50.0 * PX)).collect()];
         assert!(ed.overlay(&d, &units).1.points.is_empty(), "a circle: no end dots");
@@ -11814,7 +11824,7 @@ mod tests {
             ed.pointer_move(&mut d, at, false, false);
             // The rubber band's end: where the snap puts it.
             let end = ed.frame.to_world(ed.snapped().map_or(at, |s| s.0));
-            let at_end = |p: &PointSprite| p.size == 6.0 && p.color == PREVIEW_COLOR && glam::DVec3::new(f64::from(p.position[0]), f64::from(p.position[1]), f64::from(p.position[2])).distance(end) < 1e-5;
+            let at_end = |p: &PointSprite| p.size == 6.0 && p.color[..3] == PREVIEW_COLOR[..3] && glam::DVec3::new(f64::from(p.position[0]), f64::from(p.position[1]), f64::from(p.position[2])).distance(end) < 1e-5;
             let (over, below) = (ed.overlay(&d, &units).1.points.iter().filter(|p| at_end(p)).count(), ed.end_dot_under_target(&d).points.iter().filter(|p| at_end(p)).count());
             // (In free space the Line's end dot and the cursor dot coincide.)
             assert!(if under { (over, below) == (0, 1) } else { over >= 1 && below == 0 }, "at {at:?} ({:?}): end dots over {over}, under {below}", ed.inference.as_ref().map(|i| i.kind));

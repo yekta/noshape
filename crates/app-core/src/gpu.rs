@@ -120,6 +120,17 @@ impl Gpu {
         }
     }
 
+    /// [`Self::deliver_frames`] for the picks only: finished frames stay held (tests: nothing presents meanwhile).
+    pub fn deliver_picks(&self) {
+        let Some(held) = &self.held else { return };
+        let (picks, frames): (Vec<Completed>, Vec<Completed>) = std::mem::take(&mut *held.lock()).into_iter().partition(|c| matches!(c, Completed::Pick { .. }));
+        held.lock().splice(0..0, frames);
+        let route = route_frames(self.routes.clone());
+        for c in picks {
+            route(c);
+        }
+    }
+
     /// The renderer draws on a software rasteriser (known once it is up): frames take [`noshape_render::Style::software`].
     pub fn is_software(&self) -> bool {
         self.worker.get().and_then(|w| w.as_ref().ok()).is_some_and(|w| w.0.is_software())

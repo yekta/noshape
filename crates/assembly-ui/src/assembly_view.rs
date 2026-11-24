@@ -1489,7 +1489,11 @@ impl AssemblyView {
         // A relation dialog's mates as shown ones: their instances lit, their triads (live wf25 step 28, Gear 1).
         let relation_mates = self.relation.as_ref().map(|r| [r.a, r.b]).unwrap_or_default();
         for mid in [shown_mate, self.list_hover_mate].into_iter().chain(relation_mates).flatten() {
-            if selected_mate.as_ref().is_none_or(|m| m.id != mid) {
+            // A hovered mate row outlines its parts, as an instance row (live errors-1123 mates *-vp: faces plain, edges
+            // #ffc685; behaviours "Hovering a mate row also outlines its mated parts orange").
+            if Some(mid) == self.list_hover_mate && shown_mate != Some(mid) && !relation_mates.contains(&Some(mid)) {
+                h.hover_tops.extend(self.mate_instances(mid, cx));
+            } else if selected_mate.as_ref().is_none_or(|m| m.id != mid) {
                 h.accent_tops.extend(self.mate_instances(mid, cx));
             }
             if let Some(ms) = self.result.mates.iter().find(|m| m.id == mid) {

@@ -291,7 +291,9 @@ cells! {
         assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0x85a3d0, 24)));
     }
     mc_hovered_other_selected: MC, State::HoveredOtherSelected => |c| {
-        assert!(shows(&c, 0xffe79f, 14.0) && !shows(&c, 0xffa033, 40.0));
+        // No selected instance's #ffa033 band (as the silhouette test measures it: a blended pixel where the
+        // other's #ffa90a meets the disc is no band).
+        assert!(shows(&c, 0xffe79f, 14.0) && between(&c, 0.0, 40.0).filter(|p| close(*p, 0xffa033, 12)).count() < 2);
     }
 }
 

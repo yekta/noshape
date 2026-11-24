@@ -6980,6 +6980,30 @@ mod sketch_gesture;
 #[path = "export_feel_tests.rs"]
 mod export_feel;
 
+/// Qa SKT-USE-HOVER (live sketch-tools-1123 use-convert, sk23 use-0-hover-vertex): seen from above, the Use tool on a
+/// top corner of the block offers an edge of the top face running across the screen, never the upright edge seen end on
+/// (it projects to a point: nothing lit).
+#[gpui::test]
+fn use_on_a_corner_from_above_offers_an_edge_across_the_screen(cx: &mut TestAppContext) {
+    let (window, view, _, _, a, _) = sketch_on_top_face(cx, "use-corner-edge", Tool::Use);
+    cx.update(|cx| view.update(cx, |v, cx| v.viewport.update(cx, |vp, cx| {
+        vp.camera.set_view(noshape_render::StandardView::Top);
+        vp.request_frame(cx);
+    })));
+    draw(cx, window);
+    let (edge, span) = cx.update(|cx| {
+        let v = view.read(cx);
+        let vp = v.viewport.read(cx);
+        let corner = vp.project(v.sketch.as_ref().unwrap().frame.to_world(a)).expect("the corner on screen");
+        let edge = v.model_edge_at(corner, cx).expect("an edge offered at the corner");
+        let body = v.display.bodies.iter().find(|b| b.edge_refs.contains(&edge)).unwrap();
+        let pl = &body.mesh.edges[body.edge_refs.iter().position(|e| *e == edge).unwrap()];
+        let ends = [pl[0], *pl.last().unwrap()].map(|p| vp.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64)).unwrap());
+        (edge, (ends[1] - ends[0]).abs())
+    });
+    assert!(span.max_element() > 20.0 && span.x >= span.y, "{edge:?}: on screen {span:?}, an edge running across it (live: the edge along x)");
+}
+
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
 fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, u32, DVec2, DVec2) {

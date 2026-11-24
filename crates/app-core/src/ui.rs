@@ -139,7 +139,18 @@ pub fn text_width(window: &Window, text: &str, size: f32) -> f32 {
 
 pub fn tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let text: SharedString = text.into();
-    move |window, cx| styled_tooltip(Tooltip::new(html_spaces(&text)), text.clone(), window, cx)
+    move |window, cx| {
+        let t = html_spaces(&text);
+        styled_tooltip(Tooltip::element(move |w, _| tip_text(w, &t, t.clone())), text.clone(), window, cx)
+    }
+}
+
+/// A plain tooltip's text: a text longer than live's 400 px `.tooltip-inner` less its 7 px sides gets that width and wraps
+/// (the box's `max_w` alone cut the line at its right edge, qa ERR-LIST-TOOLTIP-CHROME; live's mate slider-limits title
+/// tip on 2 lines).
+fn tip_text(window: &Window, text: &str, el: impl IntoElement) -> Div {
+    let max = RICH_TOOLTIP_W - 14.;
+    div().debug_selector(|| "tip-text".into()).when(text_width(window, text, 12.) > max, |d| d.w(px(max))).child(el)
 }
 
 /// A tip's text as live's HTML draws it: a run of spaces as one ("…properly:  A parameter…", "…500000.  Current…";
@@ -161,7 +172,10 @@ fn html_spaces(text: &SharedString) -> SharedString {
 pub fn bold_tooltip(text: &'static str, bold: &'static [std::ops::Range<usize>]) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     move |window, cx| {
         let words = move |_: &mut Window, _: &mut App| StyledText::new(text).with_highlights(bold.iter().map(|r| (r.clone(), FontWeight::BOLD.into())));
-        styled_tooltip(Tooltip::element(words), text.into(), window, cx)
+        styled_tooltip(Tooltip::element(move |w, cx| {
+            let el = words(w, cx);
+            tip_text(w, text, el)
+        }), text.into(), window, cx)
     }
 }
 
@@ -171,7 +185,7 @@ pub fn user_tooltip(text: impl Into<SharedString>) -> impl Fn(&mut Window, &mut 
     let text: SharedString = text.into();
     move |window, cx| {
         let t = text.clone();
-        styled_tooltip(Tooltip::element(move |_, _| user_text(t.clone())), text.clone(), window, cx)
+        styled_tooltip(Tooltip::element(move |w, _| tip_text(w, &t, user_text(t.clone()))), text.clone(), window, cx)
     }
 }
 
@@ -678,13 +692,14 @@ pub fn with_dialog_field_tooltip(el: Stateful<Div>, text: impl Into<SharedString
 }
 
 /// A feature dialog's red title's tooltip, fixed where live puts it whatever the pointer does (live
-/// err-tip-placement-1123: the title at 246, 79, 164 wide, its tip at 385, 80: 25 px in from the title's right, 1 px down).
+/// err-tip-placement-1123: the title at 246, 79, 164 wide, its tip at 385, 80: 25 px in from the title's right, 1 px down;
+/// live's title box is 28 px high, ours 22 with the text on the same rows, so the tip is 2 px above ours).
 pub fn with_dialog_title_tooltip(el: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
     let text: SharedString = text.into();
     let anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
     let a2 = anchor.clone();
     el.relative()
-        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top(px(1.)).left_0().right(px(28.)).h(px(26.)))
+        .child(canvas(move |b, _, _| a2.set(b), |_, _, _, _| {}).absolute().top(px(-2.)).left_0().right(px(28.)).h(px(26.)))
         .tooltip(move |_, cx| {
             let (text, anchor) = (text.clone(), anchor.get());
             cx.new(|_| PlacedTooltip { text, side: TipSide::Right, anchor, width: Default::default(), pressed: Default::default(), expanded: None, user: false, fade: Some((TOOLTIP_FADE_IN, 0.)), upright: false }).into()

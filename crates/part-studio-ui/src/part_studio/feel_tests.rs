@@ -1171,19 +1171,20 @@ fn a_hover_after_a_rest_submits_its_frame_without_a_window_redraw(cx: &mut TestA
     let c = clock.clone();
     cx.update(|cx| pointer.vp.update(cx, |vp, _| vp.set_clock(move || c.get())));
     cx.executor().advance_clock(std::time::Duration::from_secs(2));
-    let laid_out = cx.update(|cx| pointer.vp.read(cx).last_layout());
+    let laid_out = cx.update(|cx| pointer.vp.read(cx).layout_count());
     let win = pointer.window_point(cx, part);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default());
-    // Picks answered with no window drawn meanwhile.
+    // Picks answered with no window drawn meanwhile; frames stay held (one presented would redraw the window, a slow
+    // runner's earlier frame finishing then).
     let t = std::time::Instant::now();
     while cx.update(|cx| pointer.vp.read(cx).pick_pending()) && t.elapsed() < std::time::Duration::from_secs(15) {
-        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        cx.update(|cx| view.read(cx).gpu.deliver_picks());
         cx.run_until_parked();
     }
     let lit = cx.update(|cx| view.read(cx).hover.clone());
     assert!(lit.is_some() && lit != lit_before, "the part lit under the pointer: {lit_before:?} -> {lit:?}");
     assert!(cx.update(|cx| pointer.vp.read(cx).frame_in_flight()), "the lit part's frame on its way");
-    assert_eq!(cx.update(|cx| pointer.vp.read(cx).last_layout()), laid_out, "no window redraw before the frame");
+    assert_eq!(cx.update(|cx| pointer.vp.read(cx).layout_count()), laid_out, "no window redraw before the frame");
 }
 
 /// Live 3d.json (interaction-feel "Click", "Ctrl+click") and sel-gestures-1122: in 3D with no tool a click adds what is

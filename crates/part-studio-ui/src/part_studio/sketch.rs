@@ -1684,7 +1684,7 @@ impl PartStudioView {
         }
         let under = ed.end_dot_under_target(&data);
         if !under.points.is_empty() {
-            out.push(Instance::new(Drawable::Points(up.upload_points(&under))).per_primitive_color().unpickable().ignore_clip().layer(noshape_scene::builder::HIGHLIGHT_LINES_LAYER - 1));
+            out.push(Instance::new(Drawable::Points(up.upload_points(&under))).per_primitive_color().unpickable().ignore_clip().over_lines().layer(31));
         }
         out.extend(self.preview_length_in_plane(ed, &data, &units, cx));
         out.extend(self.otf_box_in_plane(ed, &data, &units, cx));
@@ -2429,7 +2429,21 @@ impl PartStudioView {
         let tol = vp.camera.world_per_pixel(vp.size().y) * 6.0;
         let hits = noshape_model::interaction::entities_along_ray(&self.display, o, d, tol, &|_| false, 8);
         let first = hits.first()?.depth;
-        hits.into_iter().filter(|h| h.depth <= first + tol * 2.0).find(|h| matches!(h.reference, Reference::Edge(_))).map(|h| h.reference)
+        // Of the edges meeting there, the one running most nearly across the screen (live sketch-tools-1123 use-convert:
+        // on the origin's corner the edge along x; the upright edge, seen end on, drew nothing: qa SKT-USE-HOVER).
+        let across = |r: &Reference| -> f64 {
+            let Some(pl) = self.display.bodies.iter().find_map(|b| b.edge_refs.iter().position(|e| e == r).and_then(|i| b.mesh.edges.get(i))) else { return 0.0 };
+            let pts: Vec<DVec2> = pl.iter().filter_map(|q| vp.project(DVec3::new(f64::from(q[0]), f64::from(q[1]), f64::from(q[2])))).collect();
+            let (Some(lo), Some(hi)) = (pts.iter().copied().reduce(DVec2::min), pts.iter().copied().reduce(DVec2::max)) else { return 0.0 };
+            let d = hi - lo;
+            if d.length() < 2.0 { 0.0 } else { d.x / (d.x + d.y) }
+        };
+        hits.into_iter()
+            .filter(|h| h.depth <= first + tol * 2.0 && matches!(h.reference, Reference::Edge(_)))
+            .map(|h| (across(&h.reference), h.reference))
+            .filter(|(a, _)| *a > 0.0)
+            .reduce(|best, c| if c.0 > best.0 { c } else { best })
+            .map(|(_, r)| r)
     }
 
     /// Show an input for the active on-the-fly box: `first` replaces the

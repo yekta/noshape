@@ -2116,7 +2116,11 @@ impl ConnectorGlyphs {
 // Onshape's MATE_CONNECTOR_DIAMETER_PX 36 and RING_WIDTH_PX 4 (behaviours "psui (2026-10-27, P2) interaction 3.4").
 const MC_R_IN_PX: f64 = 14.0;
 const MC_R_OUT_PX: f64 = 18.0;
-const MC_RIM_PX: f32 = 1.3;
+/// The blue z-axis from the centre (live b3/ps-mc-* and b4: its top 20 px above the centre in the iso view, 4 px above
+/// ours at 18; the zoom limits' +23 px).
+const MC_Z_AXIS_PX: f64 = 23.0;
+/// Live hover-matrix-1121 b3/ps-mc-*: 41 navy rim px (ours 77 at 1.3 px), two soft 1 px lines.
+const MC_RIM_PX: f32 = 1.0;
 /// Fill (sRGB) and opacity, each over what is behind the disc (live over a face (142,187,214): rest (232,241,247),
 /// hover (187,190,134), selected (220,204,90)): MATE_CONNECTOR_COLOR rgba(255,255,255,0.8), PRE_SELECTED
 /// rgba(255,194,14,0.4) and SELECTED rgba(255,194,14,0.5) instead of the white.
@@ -2141,7 +2145,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
         let mut out = Vec::new();
         for &(o, x, y, z, _) in &self.items {
             let Some(px) = view.world_per_px(o) else { continue };
-            out.extend([o - x * (MC_R_OUT_PX * px), o - y * (MC_R_OUT_PX * px), o + x * (33.0 * px), o + y * (33.0 * px), o + z * (23.0 * px)]);
+            out.extend([o - x * (MC_R_OUT_PX * px), o - y * (MC_R_OUT_PX * px), o + x * (33.0 * px), o + y * (33.0 * px), o + z * (MC_Z_AXIS_PX * px)]);
         }
         out
     }
@@ -2200,7 +2204,7 @@ impl noshape_render::camera_geometry::CameraGeometry for ConnectorGlyphs {
             // rim's centre (live b3/ps-mc-hover: the blue axis whole down to the centre).
             let axis = |hex: u32| fade(theme::rgb8(hex));
             let mut a = LineData::default();
-            a.push_polyline(&[f(o), f(o + z * (18.0 * px))], axis(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)), 0, 3.0, LineSegment::ON_TOP);
+            a.push_polyline(&[f(o), f(o + z * (MC_Z_AXIS_PX * px))], axis(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)), 0, 3.0, LineSegment::ON_TOP);
             a.push_polyline(&[f(o + x * (19.5 * px)), f(o + x * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_X, theme::viewport_dark::AXIS_X)), 0, 2.5, LineSegment::ON_TOP);
             a.push_polyline(&[f(o + y * (19.5 * px)), f(o + y * (29.0 * px))], axis(theme::pick(theme::viewport::AXIS_Y, theme::viewport_dark::AXIS_Y)), 0, 2.5, LineSegment::ON_TOP);
             out.push(Instance::new(Drawable::Lines(up.upload_lines(&a))).per_primitive_color().unpickable().ignore_clip().over_lines().layer(31));

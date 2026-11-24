@@ -113,14 +113,28 @@ fn open_from_top_on(cx: &mut TestAppContext, path: &std::path::Path, front: bool
 /// A 40 × 20 × 10 block (Part 1 <1>) and a 60 × 20 × 10 one (Part 2 <1>) side by side, Part 2 fastened by its top
 /// face's centre to Part 1's (so its top face carries Fastened 1's glyph, shown), seen from the top.
 fn mated_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    mated_blocks_fixed(cx, name, false)
+}
+
+/// Two blocks fastened 70 mm apart, the mate shown; `both_fixed`: both instances fixed (the mate fails "Mate is between
+/// fixed instances.").
+fn mated_blocks_fixed(cx: &mut TestAppContext, name: &str, both_fixed: bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    mated_blocks_fixed_on(cx, name, both_fixed, false)
+}
+
+/// [`mated_blocks_fixed`], with the front layer drawn when `front`.
+fn mated_blocks_fixed_on(cx: &mut TestAppContext, name: &str, both_fixed: bool, front: bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
     let path = document(cx, name, |ctx| {
         call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
         call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
         let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
         let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
         call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b }, "offset": { "x": "70 mm" } }));
+        if both_fixed {
+            call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": true }));
+        }
     });
-    let (window, view) = open_from_top(cx, &path, 2);
+    let (window, view) = open_from_top_on(cx, &path, front, |v| v.result.occurrences.len() == 2 && v.result.mates.iter().all(|m| m.frame_b.is_some()));
     // A new mate is hidden (live): Show mates on it.
     cx.update_window(window, |_, _, cx| {
         view.update(cx, |v, cx| {
@@ -672,7 +686,21 @@ fn a_relation_dialogs_mates_light_their_parts(cx: &mut TestAppContext) {
 /// arrives; off the row both go (the flyout's rows: `a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set`).
 #[gpui::test]
 fn a_hovered_mate_row_lights_both_parts_and_its_glyph(cx: &mut TestAppContext) {
-    let (window, view) = mated_blocks(cx, "mate-row-hover");
+    hovered_mate_row(cx, "mate-row-hover", false);
+}
+
+// Live errors-1123 mates (*-fixed-vp): a failing mate's row hovered draws its glyph (red) and outlines its parts.
+#[gpui::test]
+fn a_hovered_failing_mate_row_draws_its_glyph(cx: &mut TestAppContext) {
+    hovered_mate_row(cx, "mate-row-hover-fixed", true);
+}
+
+/// A mate row hovered: both parts outlined, not tinted (live: faces plain, edges #ffc685), and the mate's glyph.
+fn hovered_mate_row(cx: &mut TestAppContext, name: &str, both_fixed: bool) {
+    let (window, view) = mated_blocks_fixed(cx, name, both_fixed);
+    if both_fixed {
+        assert!(cx.update(|cx| !view.read(cx).result.mates[0].ok), "a mate between fixed instances fails");
+    }
     cx.update(|cx| view.update(cx, |v, cx| {
         v.show_mates = false;
         v.refresh_scene(false, cx);
@@ -683,7 +711,9 @@ fn a_hovered_mate_row_lights_both_parts_and_its_glyph(cx: &mut TestAppContext) {
         let v = view.read(cx);
         let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
         let a = v.assembly(cx).unwrap();
-        let mut names: Vec<String> = a.instances.iter().filter(|i| built.picks.faces_of(i.id).iter().any(|f| scene.states[*f as usize] & noshape_render::state::ACCENT != 0)).map(|i| i.name.clone()).collect();
+        let tinted = a.instances.iter().any(|i| built.picks.faces_of(i.id).iter().any(|f| scene.states[*f as usize] & noshape_render::state::ACCENT != 0));
+        assert!(!tinted, "a mate row's parts are outlined, never tinted");
+        let mut names: Vec<String> = a.instances.iter().filter(|i| built.picks.faces_of(i.id).iter().any(|f| scene.states[*f as usize] & noshape_render::state::OUTLINE != 0)).map(|i| i.name.clone()).collect();
         names.sort();
         (names, v.ui.overlay_mates.contains(&id))
     });
@@ -1238,6 +1268,38 @@ fn a_mate_with_a_suppressed_instance_says_so_on_its_title(cx: &mut TestAppContex
     assert_eq!(tip.as_deref(), Some("Fastened 1 is inactive: one or more instances is suppressed."));
 }
 
+/// Live errors-1123 mates (c--m-slider-limits step 7): a failing mate's title tooltip longer than 400 px wraps onto a
+/// second line within 400 px (qa ERR-LIST-TOOLTIP-CHROME: ours one 400 px line, the text cut at its right edge).
+#[gpui::test]
+fn a_long_mate_title_tip_wraps_within_400_px(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks_fixed_on(cx, "mate-long-title-tip", true, true);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let id = v.result.mates[0].id;
+        v.edit_mate(id, w, cx);
+    }))
+    .unwrap();
+    settle(cx, window, &view);
+    cx.update(|cx| view.read(cx).mate.as_ref().expect("the mate's dialog").dialog.clone()).update(cx, |d, cx| {
+        d.name = "Fastened between the two fixed blocks of the base plate".into();
+        cx.notify();
+    });
+    settle(cx, window, &view);
+    let title = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("mate-title").expect("the mate's title");
+    crate::ui_script::clear_tooltip();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(title.center(), None, gpui_kit::Modifiers::default());
+    for _ in 0..40 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+        cx.run_until_parked();
+    }
+    let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
+    assert!(tip.contains("did not regenerate properly: Mate is between fixed instances."), "the title's tip: {tip:?}");
+    let text = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("tip-text").expect("the tip's text");
+    let (w, h) = (f32::from(text.size.width), f32::from(text.size.height));
+    assert!(w <= 386.5 && h >= 28., "the tip's text {w} x {h}: within 400 px less its sides, on two lines (live)");
+}
+
 /// Live asm/mate-edit-look-1122 a4: an edited mate's moving part takes the selected look (no preview edges), the other
 /// part the picks' band.
 #[gpui::test]
@@ -1779,12 +1841,15 @@ fn a_short_press_selects_the_face_and_the_triads_ball_moves_only_the_triad(cx: &
     // Live triad-snap-1121: the release leaves the triad where the ball is: at the pointer, or on the inference point
     // it snapped to over a face.
     let to = at + DVec2::new(60.0, 0.0);
-    drag(cx, window, &view, at, to);
-    let moved = triad(cx);
-    let ball = cx.update(|cx| {
-        let v = view.read(cx);
-        v.triad_snap(to, cx).map_or(to, |s| v.viewport.read(cx).project(s.marks[s.chosen].origin).unwrap())
+    // Where the ball is as the button comes up (a slow runner's view may answer differently after the release).
+    let ball = std::cell::Cell::new(to);
+    drag_with(cx, window, &view, at, to, Modifiers::default(), |cx| {
+        ball.set(cx.update(|cx| {
+            let v = view.read(cx);
+            v.triad_snap(to, cx).map_or(to, |s| v.viewport.read(cx).project(s.marks[s.chosen].origin).unwrap())
+        }));
     });
+    let (moved, ball) = (triad(cx), ball.get());
     assert!((moved - ball).length() < 2.0, "the triad followed the ball: {moved:?} for {ball:?} (pointer {to:?})");
     let after = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
     assert!((after.0 - before.0).length() < 1e-9 && (after.1 - before.1).length() < 1e-9, "the part stayed");

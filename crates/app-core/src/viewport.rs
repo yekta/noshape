@@ -378,6 +378,8 @@ pub struct Viewport {
     /// When the viewport was last laid out in a window frame: frames are only
     /// submitted ahead of GPUI's render pass while it is on screen.
     last_layout: Option<Instant>,
+    /// Window frames that laid the viewport out (a present-only frame doesn't count).
+    layouts: u64,
     /// Last time the pick buffer was invalidated, and whether a settle
     /// timer for the hover refresh is running.
     pick_changed_at: Instant,
@@ -768,6 +770,7 @@ impl Viewport {
             retry_scheduled: false,
             last_submitted_view: None,
             last_layout: None,
+            layouts: 0,
             pick_changed_at: Instant::now(),
             hover_refresh_pending: false,
             bounds: Bounds::default(),
@@ -2024,9 +2027,9 @@ impl Viewport {
         self.frames_reused
     }
 
-    /// When a window frame last laid the viewport out, on its clock (tests: no window redraw meanwhile).
-    pub fn last_layout(&self) -> Option<Instant> {
-        self.last_layout
+    /// Window frames that have laid the viewport out so far (tests: no window redraw meanwhile).
+    pub fn layout_count(&self) -> u64 {
+        self.layouts
     }
 
     /// Frames presented and frames failed so far (smoke test).
@@ -3547,6 +3550,7 @@ impl Render for Viewport {
                     move |bounds, window, cx| {
                         entity.update(cx, |this, cx| {
                             this.last_layout = Some(this.now());
+                            this.layouts += 1;
                             if let Some(t) = this.presented_at.take() {
                                 noshape_render::perf::record("v.present_to_paint", t.elapsed());
                             }

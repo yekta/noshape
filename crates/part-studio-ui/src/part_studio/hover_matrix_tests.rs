@@ -771,6 +771,18 @@ fn crisp_navy(crop: &[[u8; 3]]) -> usize {
     crop.iter().filter(|c| close(**c, 0x002847, 12)).count()
 }
 
+/// Dark navy pixels as qa's hover-matrix score classes them (hue 185..240, saturation >= 0.45, value 0.12..0.45): live's
+/// soft connector rim has 41 (b3/ps-mc-hover), ours had 77 at 1.3 px.
+fn navy_class(crop: &[[u8; 3]]) -> usize {
+    crop.iter().filter(|&&[r, g, b]| {
+        let (mx, mn) = (r.max(g).max(b), r.min(g).min(b));
+        let (v, d) = (f32::from(mx) / 255.0, f32::from(mx - mn));
+        if mx == 0 || d == 0.0 || mx != b { return false; }
+        let h = 60.0 * ((f32::from(r) - f32::from(g)) / d + 4.0);
+        (185.0..=240.0).contains(&h) && d / f32::from(mx) >= 0.45 && (0.12..0.45).contains(&v)
+    }).count()
+}
+
 // Mate connector 1 (live b3/ps-mc-*): hovered, the disc's wedge #f4df99 over the background and its ring #c2c187 over
 // the face, a soft navy rim, the owner's edges yellow-green #e1ec87; selected #f6da83 / #ccc173 and the owner's faces
 // as they are.
@@ -788,6 +800,10 @@ fn b3_connector_hovered(cx: &mut TestAppContext) {
     // 11 under the disc).
     let blue: Vec<usize> = (0..=42).filter(|y| (34..=46).any(|x| close(c[y * 80 + x], 0x0000d0, 60))).collect();
     assert!(blue.len() >= 15 && blue.last().is_some_and(|&y| y >= 38), "z-axis rows {blue:?} (live 17, down to the centre)");
+    // Its top 20 px above the centre (live; ours 16 at 18 px long), the rim soft (live 41 navy px).
+    assert!(blue.first().is_some_and(|&y| y <= 21), "z-axis rows {blue:?} (live from row 20)");
+    let navy = navy_class(&c);
+    assert!((25..=60).contains(&navy), "{navy} navy rim px (live 41)");
 }
 
 #[gpui::test]
@@ -1171,6 +1187,28 @@ fn the_line_a_snap_lands_on_is_lit_as_hovered(cx: &mut TestAppContext) {
         opaque += col.filter(|c| close(*c, 0xecb78a, 12)).count();
     }
     assert!(through >= 8 && opaque == 0, "{through} of 13 samples blue through, {opaque} px #ecb78a");
+}
+
+// Live hover-matrix-recheck-1123 cells 1-3: the Line tool's end snapped onto a point, a midpoint or a line lies under the
+// lit target (the point's disc #C3B89C, the band #D6BD95 at the pointer); no solid #449CCD dot on top.
+#[gpui::test]
+fn the_line_end_dot_lies_under_the_lit_target(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    for (name, target) in [("point", SK_POINT), ("midpoint", SK_LINEMID), ("line", SK_LINE)] {
+        let m = matrix_studio(cx, &format!("inference-end-dot-{name}"));
+        m.edit_sketch(cx);
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+        let start = m.screen(cx, [45., -10., 0.]);
+        m.pointer.move_to(cx, &m.view, start);
+        m.pointer.click(cx, &m.view, start);
+        let p = m.screen(cx, target);
+        approach(cx, &m, p);
+        let c = m.crop(cx, p);
+        dump(&format!("cell-inference_end_dot_{name}"), &c);
+        let blue = near_centre(&c, 2.0).filter(|q| close(*q, 0x449ccd, 30)).count();
+        let under = near_centre(&c, 1.0).filter(|q| close(*q, if name == "point" { 0xc3b89c } else { 0xd6bd95 }, 30)).count();
+        assert!(blue == 0 && under >= 1, "{name}: {blue} #449ccd px on top, {under} px of the dot under the lit target");
+    }
 }
 
 const SK_LINESTART: [f64; 3] = [60., 5., 0.];

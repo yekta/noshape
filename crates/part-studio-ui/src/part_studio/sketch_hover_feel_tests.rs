@@ -343,10 +343,10 @@ fn a_cleared_hover_shows_the_frame_drawn_before_without_drawing(cx: &mut TestApp
     assert!(lit != before, "the lit line drawn");
     pointer.move_to(cx, &view, off);
     assert_eq!(hovered(cx, &view), None, "nothing lit off the line");
-    let (after, _) = settled_frame(cx, window, &view);
+    let (after, w) = settled_frame(cx, window, &view);
     let reused = cx.update(|cx| vp.read(cx).frames_reused()) - reused;
     assert!(reused > 0, "the cleared frame shown again (none reused)");
-    assert!(after == before, "the frame shown again is the one drawn before the hover");
+    assert!(after == before, "the frame shown again is the one drawn before the hover: {}, lit {:?}", frame_diff(&before, &after, w), hovered(cx, &view));
     pointer.move_to(cx, &view, on);
     assert!(matches!(hovered(cx, &view), Some(Reference::SketchEntity { .. })), "back on the line, it lights again");
 }
@@ -457,6 +457,23 @@ fn the_pointer_lights_the_line_under_it_whatever_the_window_and_list(cx: &mut Te
         }
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+/// How two frames of width `w` (BGRA) differ: pixels, their bounds and the largest channel step.
+fn frame_diff(a: &[u8], b: &[u8], w: usize) -> String {
+    if a.len() != b.len() {
+        return format!("sizes {} and {}", a.len(), b.len());
+    }
+    let (mut n, mut max, mut lo, mut hi) = (0, 0, (usize::MAX, usize::MAX), (0, 0));
+    for (i, (p, q)) in a.chunks(4).zip(b.chunks(4)).enumerate() {
+        let d = p.iter().zip(q).map(|(x, y)| x.abs_diff(*y)).max().unwrap_or(0);
+        if d == 0 {
+            continue;
+        }
+        let (x, y) = (i % w.max(1), i / w.max(1));
+        (n, max, lo, hi) = (n + 1, max.max(d), (lo.0.min(x), lo.1.min(y)), (hi.0.max(x), hi.1.max(y)));
+    }
+    format!("{n} px differ (up to {max}) in {lo:?}..{hi:?}")
 }
 
 /// The presented frame's sRGB pixels (device px, BGRA in the image) and its width, after the scene settles.

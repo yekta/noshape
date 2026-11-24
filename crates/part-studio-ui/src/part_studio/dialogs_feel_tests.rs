@@ -1380,12 +1380,13 @@ fn a_hole_without_points_says_only_that(cx: &mut TestAppContext) {
     let tip = crate::ui_script::shown_tooltip().unwrap_or_default();
     assert!(tip.ends_with("did not regenerate properly: No hole points selected."), "the title's tooltip: {tip:?}");
     // Where live puts it, wherever the pointer is on the title (live err-tip-placement-1123: the title 246, 79, 164 wide,
-    // its tip 385, 80; qa ERR-CHROME-TIP-PLACEMENT: ours under the pointer).
+    // its tip 385, 80, the title's text on the same rows as ours, in a box 3 px taller; qa ERR-CHROME-TIP-PLACEMENT:
+    // ours under the pointer, then 3 px low).
     let placed = |cx: &mut TestAppContext| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("placed-tooltip").map(|b| (f32::from(b.left() - title.right()), f32::from(b.top() - title.top())));
     let first = placed(cx);
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(gpui_kit::point(title.origin.x + px(80.), title.center().y), None, Modifiers::default());
     draw(cx, window);
-    assert!(first.is_some_and(|(dx, dy)| (dx + 25.).abs() <= 1. && (dy - 1.).abs() <= 1.) && placed(cx) == first, "the tip from the title's right / top: {first:?}, after a move {:?} (live -25, 1)", placed(cx));
+    assert!(first.is_some_and(|(dx, dy)| (dx + 25.).abs() <= 1. && (dy + 2.).abs() <= 1.) && placed(cx) == first, "the tip from the title's right / top: {first:?}, after a move {:?} (live -25, -2 from ours)", placed(cx));
 }
 
 /// Routing curve's Point edit type Multiple (std routingCurve.fs addMultiPointsManipulator / multiTriadManipulator,

@@ -1195,6 +1195,7 @@ impl Render for MateDialog {
                     .child(
                         div()
                             .id("mate-title")
+                            .debug_selector(|| "mate-title".into())
                             .flex_1()
                             .pl(px(6.))
                             .text_size(px(13.))

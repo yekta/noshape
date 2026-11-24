@@ -302,6 +302,9 @@ pub struct Prepared {
     relations: Vec<PreparedRelation>,
     /// Mates that could not be resolved, with messages.
     pub failed_mates: Vec<(MateId, String)>,
+    /// Failed mates whose connectors resolved (body a, its local frame, body b, its local frame): their glyph's frames
+    /// (live errors-1123 mates: a hovered row draws the red glyph).
+    failed_frames: Vec<(MateId, usize, Frame, usize, Frame)>,
     pub inactive_mates: HashSet<MateId>,
     /// Suppressed instances (and copies of a suppressed pattern or seed).
     pub inactive_instances: HashSet<InstanceId>,
@@ -906,6 +909,9 @@ impl Prepared {
             if let Some(d) = out.instance_dof.get_mut(&key[0]) {
                 *d += r.body_dof.get(*b).copied().unwrap_or(0);
             }
+        }
+        for (id, a, a_local, b, b_local) in &self.failed_frames {
+            out.mate_frames.insert(*id, (poses[*a].mul(a_local), poses[*b].mul(b_local)));
         }
         for (i, (id, _, m)) in self.mates.iter().enumerate() {
             let ok = match solved_ix(i) {
@@ -3380,16 +3386,19 @@ impl AssemblyEvaluator {
             // Live errors-1123 mates (Ball, cone −10°): a cone angle outside 0–180°.
             if cone_out_of_range(m, &units) {
                 prepared.failed_mates.push((m.id, "Error regenerating.".into()));
+                prepared.failed_frames.push((m.id, sm.a, sm.a_local, sm.b, sm.b_local));
                 continue;
             }
             // Live (E11, errors-1123 mates: committed, no "A parameter value is not valid."): a minimum limit above its maximum.
             if limits_crossed(m, &units) {
                 prepared.failed_mates.push((m.id, "Minimum mate limit should be smaller than maximum limit.".into()));
+                prepared.failed_frames.push((m.id, sm.a, sm.a_local, sm.b, sm.b_local));
                 continue;
             }
             // Live (E3): a mate between two fixed instances fails.
             if sm.a != sm.b && prepared.fixed[sm.a] && prepared.fixed[sm.b] && m.connectors().all(|c| c.instance != InstanceId::ORIGIN) {
                 prepared.failed_mates.push((m.id, "Mate is between fixed instances.".into()));
+                prepared.failed_frames.push((m.id, sm.a, sm.a_local, sm.b, sm.b_local));
                 continue;
             }
             fill_solver_mate(m, &mut sm, &units);
