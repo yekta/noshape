@@ -3,22 +3,22 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 21:00) — read first
-- LEAD 11-24 20:2x TASK (in progress): sketch speed + robustness as a person feels them; short table when done.
-  Done: T2 latency_tests a_300_line_sketch_keeps_up_with_the_hand (S300: 321 lines, 483 constraints; vibex6 dev-opt,
-  real frames): open 29 ms (live 1.2-1.9 s), drag step to frame 15 ms (UI thread 13, worst 26; the 110 ms worst is a
-  hover pick's GPU readback on the software renderer), release 23, dimension edit 51 (live ~1.1 s), unsolvable value
-  warned 83, ✓ 14 (live 0.24 s). Corpus (ops sketch_open_perf T2): model sketches <= 5 ms; sk211 26-34 ms.
-  FOUND: fz211-final (qa fuzz, 438 ents, 76 CircularPatternLinks, over-defined): open 457 ms, dim edit 0.5-0.9 s,
-  drag step worst 452 ms, all on the UI thread. Probe (reverted; skasm-scratch/bin/tprobe.sh): a dim edit's
-  place_constructively (constructive.rs least change) ~440 ms; analysed solves: conflict_dims 135-200 ms (up to 12
-  whole-sketch re-solves, each 6-8 retry attempts) + redundant_nearby 130-190 ms; analyze itself 11 ms.
-  LEAD DECISION 11-24 21:0x: speed up the three stages first (place_constructively, conflict_dims re-solves,
-  redundant_nearby), which helps every sketch; if fz211-type edits still take >100 ms after, move those solves off
-  the UI thread with a visible "solving" state. Land the T2 timing test (ace97f2e5) with it. Ideas: conflict_dims'
-  probes are independent (rayon, analyze:false so no recursion); redundant_nearby's thread_local INSIDE guard breaks
-  under rayon (pass a flag instead); profile constructive.rs with the probe (tprobe.sh, regions.rs zz_probe_fz211). Queued: 8f1f3c71 (audit), 62e8911d (offset-iso); 47ca9b2fa + the T2 test
-  commit unqueued.
+## NOW (11-24 22:40) — read first
+- LEAD 11-24 TASK: sketch speed + robustness as felt. S300 T2 (latency_tests a_300_line_sketch_keeps_up_with_the_hand,
+  321 lines, 483 constraints): open 33 ms (live 1.2-1.9 s), drag step to frame 15 (UI 13), release 23, dim edit 55
+  (live ~1.1 s), unsolvable value warned 67, ✓ 16 (live 0.24 s). Model sketches <= 5 ms.
+- Solver speed-up (commit "a broken sketch's edits 2-4x quicker", landing with the T2 test): failed trial solves
+  (no exclusion) skip the DOF analysis; the post-placement solve runs without analysis first (analysed again only
+  when kept); hold_the_base returns at once when the piece fails with nothing held; conflict_dims + redundant_nearby
+  probes run side by side (par_keep, std::thread::scope; INSIDE set in each thread). Fuzz probes 1-20 identical to
+  base; sketch crate, scene lib, part-studio sketch suites green. fz211 (qa fuzz, 438 ents, over-defined), probe
+  (tprobe.sh + skasm-scratch/probes/speed-instrumented.diff): edit 1146 -> 225 ms / 431 -> 153 ms; ops T2: open
+  457 -> 211 ms, change a dim 0.5-0.9 s -> 253 ms, drag step median 16, worst 452 -> 205 ms.
+- NEXT (lead decision 21:0x): fz211 edits still > 100 ms -> off the UI thread with a visible "solving" state. The
+  UI path: sketch.rs commit_dimension -> ed.apply_dimension (scene sketch_mode.rs ~6212 solve_with) -> regen_sync
+  (sketch feature regen re-solves: analysis_current -> analyze:false constructive solve, ~50 ms on fz211) ->
+  apply_display. Precedent: the entering regen_task / pending state. Remaining fz211 cost per analysed solve:
+  8 exclusion attempts x 5 ms + analyses 25 + probes 74.
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
 
 ## In flight (11-22 17:45 UTC)
