@@ -3,38 +3,22 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-24 18:00) — read first
+## NOW (11-24 18:45) — read first
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it (tools, constraints, dimensions,
   inference/snapping, hover/select feel): sketch feel-coverage audit, then sketch rows in TICKETS.
-- LEAD 15:30: I took over psui's re-land. a2341555 FAILED ops parity::filter_inner_loops_leaves_out_a_letters_counter
-  (the Text tool put the 2nd click's VERTICAL-to-Origin on the far corner: box flat, unsolvable). Fix 087761eb8 (skip a
-  2nd-click alignment to the first corner's point; scene test a_text_box_from_the_origin_drawn_straight_up_solves; parity
-  136 / scene 205 / sketch green) cherry-picked in /root/projects/noshape-wt/psui-skrebase → QUEUED 5a4491f4 (15:50).
-  When it lands: rebase agent/skasm on main (drop dups: the old stack + 087761eb8), read diff --stat, rerun tdl/tcl,
-  land.sh 4e2995a8d, 1e2d84e5a, 101d238c1 (dimension lines hover/press as the label, gold as live; selected+hovered
-  no change; centres alike). If 5a4491f4 fails: fix forward in psui-skrebase.
-- Live sk-hover-matrix-1124 (37 cells): selected+hovered = 0 change; centres light alike; Arc tool preselect 1459 ms =
-  live slowness. Line tool linger = inference acquisition (live line-linger-1124): DONE 5a3fb7c71 (scene track_acquired,
-  ACQUIRED_KEEP_PX 6 / REACH 215; drawn as the single hover in mod.rs; test sk_the_line_tool_keeps_an_acquired_point_lit_
-  along_its_levels; part-studio sketch:: 486 + scene 205 green). Land it with the stack above.
-- 18:00: stack (16 commits) QUEUED b99589dc 17:01 (checking 17:45). On top, NOT yet landed (land.sh once b99589dc
-  lands; rebase drops nothing else): 7e9bedfb7 renderer LineSegment::dash_from (patterns run on along a polyline;
-  construction circle dashed; psui told) + 35cf44304 TICKETS + f514ede02 handoff + Offset: picked curves show no badges
-  (FEEL-OFFSET-PREVIEW-LOOK, test a_tool_hides_a_hovered_lines_glyphs) + TICKETS annotation.
-- LEAD 18:05 NEXT (do first): SKT-DASHDOT-GUIDES per live/skasm/dashdot-guides-1124: tool previews dash 30 / gap 6 /
-  dash 4 / gap 6 (46 px, screen px, from the start), colour #449CCD. Centre point arc: full circle + radius line after
-  the centre click, both gone after the start click. Inscribed polygon: circumscribing circle, no radius line. Text:
-  the box, pattern continuous round its corners (one polyline: dash_from), unchanged while the dialog is open.
-  Check our preview strokes (sketch_mode.rs push_polyline with LineSegment::CONSTRUCTION / DASH_DOT?) against it,
-  GPU-test one (count gaps as sk_a_construction_circle_is_dashed). 1391 numbers: REQUESTS row already filed 18:00.
-- Lead 17:40: next = remaining sketch TICKETS rows (feel/hover/inference first) + rest of the audit; live re-measures
-  SKT-DASHDOT-GUIDES previews. REQUESTS skasm 11-24 ~18:00: Offset iso arrow direction / in-plane value / origin ring.
-  Rows 51-71 (SKT-*) mostly fixed by the landed stack: check each against its live note before closing; row 590
-  (perpendicular) fixed, waits on qa.
-- Live answers 11-24: construction dash = 46 px 4/6/30/6 from the line's start (= ours); Extend: no offset limit (= ours);
-  Select other two Face rows = live (TICKETS row annotated).
-- Sketch audit notes: /root/skasm-scratch/audit-1124.md. Left: Extend B threshold (live), value-box caret/selection/palette
-  looks, wf13 up-left glyph row (live moves it only off stale glyphs; order unmeasured).
+- b99589dc LANDED as d337d0a8 (18:18): inference acquisition, dimension-line hover, hover x state, Use, MC fixes.
+- QUEUED a2d2798d (18:4x, 8 commits): renderer LineSegment::dash_from (construction circles dashed; psui told), Offset
+  picked curves without badges (FEEL-OFFSET-PREVIEW-LOOK), centre point arc preview per live dashdot-guides-1124
+  (dash-dot radius + circle after the centre click, both gone at the start click; test a_center_arc_shows_its_dash_dot_
+  circle_and_radius_until_the_start_click), TICKETS, handoff. If it fails: fix forward, land.sh again.
+- SKT-DASHDOT-GUIDES: 30/6/4/6 px (DASH_DOT_PERIOD_PX, dash_dot_pieces), #449CCD (PREVIEW_COLOR), polygon circle no
+  radius, text box one closed polyline: all = live now.
+- Waiting on live: REQUESTS skasm 11-24 ~18:00 (Offset iso arrow / in-plane value / origin ring, FEEL-OFFSET-PREVIEW-LOOK
+  row ~1391); glyph row search order (wf13 up-left row, SKETCH-SELECTED-GLYPH-OFFSET row ~870: live moves the row only
+  off stale glyphs).
+- Sketch TICKETS rows: every open skasm SKT/SKETCH/FEEL-SK row is fixed-to-verify (qa) or waits on live; row 590 waits
+  on qa. Audit notes /root/skasm-scratch/audit-1124.md (closed except the live-side items above).
+
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
   Chamfer / ChamferAngle / FilletWidth / Conic(first, second, rho): asymmetric = ellipse quadrant w = sin θ/2, conic w =
