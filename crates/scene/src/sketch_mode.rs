@@ -10243,6 +10243,21 @@ mod tests {
         assert_eq!((ed.tool, ed.chain_end), (Tool::Line, Some(e)));
     }
 
+    /// Live 1952 (c, d): after the Line tool's first click there is no box, so typing does nothing; (b) after the second,
+    /// with the pointer moved on, the box is still the committed line's: 50 + Enter dimensions it, no new segment.
+    #[test]
+    fn a_lines_value_box_waits_for_its_second_click() {
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.0));
+        ed.pointer_move(&mut d, v(0.02, 0.006), false, false);
+        assert!(ed.otf.is_none(), "no box after one click");
+        click(&mut ed, &mut d, v(0.03, 0.0));
+        ed.pointer_move(&mut d, v(0.034, 0.004), false, false);
+        ed.commit_otf(&mut d, "50", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        assert_eq!(count(&d, EntityKind::Line), 1, "no new segment");
+        assert!(d.sketch.constraints().any(|c| c.driving && c.kind.value().is_some_and(|x| (x - 0.05).abs() < 1e-12)), "the line dimensioned 50");
+    }
+
     /// Live 2025 (b): an ellipse's boxes after its 3rd click, the major active; Enter dimensions the active box at
     /// its value and moves to the other; once a box is a dimension, Enter on the other, untouched one does nothing.
     #[test]
@@ -14528,6 +14543,87 @@ mod tests {
         assert!(!driving(l), "the aligned 50 is driven");
         let Some(Curve2::Line { a, b }) = data.sketch.curve(line) else { panic!() };
         assert!(a.distance(v(0.0, 0.0)) < 1e-9 && b.distance(v(0.04, 0.03)) < 1e-9, "{a} {b}");
+    }
+
+    /// Live 1632 (b): two horizontal lines 10 apart and a circle Tangent to both; live's Dimension tool makes its Ø
+    /// driving and the sketch unsolvable at once, though the 10 it measures is what the rest fixes: a failure, not a
+    /// target (parity rule). Ours creates it driven, as live does a second Ø or a free line's third dimension (above).
+    #[test]
+    fn a_diameter_fixed_through_tangents_is_created_driven() {
+        let (_ed, mut data) = editor(Tool::Select);
+        let sk = &mut data.sketch;
+        let l1 = sk.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        let l2 = sk.add_line(v(0.0, 0.01), v(0.04, 0.01));
+        let c = sk.add_circle(v(0.02, 0.005), 0.005);
+        for k in [
+            ConstraintKind::Horizontal { a: l1, b: None },
+            ConstraintKind::Horizontal { a: l2, b: None },
+            ConstraintKind::Tangent { a: l1, b: c },
+            ConstraintKind::Tangent { a: l2, b: c },
+        ] {
+            sk.add_constraint(k).unwrap();
+        }
+        add_dimension(&mut data, ConstraintKind::Distance { a: l1, b: l2, value: 0.01, mode: DistanceMode::Center }, Some(v(0.05, 0.005)), None).unwrap();
+        assert!(data.sketch.solve().is_solved());
+        let d = add_dimension(&mut data, ConstraintKind::Diameter { curve: c, value: 0.01 }, Some(v(0.03, 0.02)), None).unwrap();
+        assert!(!data.sketch.constraint(d).unwrap().driving, "the Ø is driven");
+        assert!(data.sketch.solve().is_solved(), "the sketch still solves");
+    }
+
+    /// Live 1964 / 1965 (15 runs): with no tool, a 2 s rest on a sketch line's midpoint lights the whole line and shows
+    /// no midpoint marker; the click then selects the line (a part edge's midpoint gives its point instead).
+    #[test]
+    fn a_click_resting_on_a_lines_midpoint_selects_the_line() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let line = d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        let mid = v(0.015, 0.0);
+        for _ in 0..5 {
+            ed.pointer_move(&mut d, mid, false, false);
+        }
+        ed.hover = d.sketch.pick(mid, PX * 4.0);
+        assert_eq!(ed.hover, Some(line), "the line lit");
+        let (_, points) = ed.overlay(&d, &UnitPrefs::default());
+        let near = |p: &&noshape_render::PointSprite| (DVec2::new(p.position[0] as f64, p.position[1] as f64) - mid).length() < 3.0 * PX;
+        assert!(!points.points.iter().any(|p| near(&p)) && ed.inference.is_none(), "no midpoint marker: {:?}", ed.inference);
+        click(&mut ed, &mut d, mid);
+        assert_eq!(ed.selection, vec![line]);
+    }
+
+    /// Live 1632 (b): a 20 × 10 rectangle whose top-right corner is a Tangent R6 arc; R6 typed as 20 solves by flipping
+    /// the arc below the base, no error (ours said "can't solve" 10-31).
+    #[test]
+    fn a_corner_arcs_radius_past_the_rectangle_solves_by_flipping() {
+        let (mut ed, mut data) = editor(Tool::Select);
+        let sk = &mut data.sketch;
+        let bottom = sk.add_line(v(0.0, 0.0), v(0.02, 0.0));
+        let right = sk.add_line(v(0.02, 0.0), v(0.02, 0.004));
+        let arc = sk.add_arc(v(0.014, 0.004), v(0.02, 0.004), v(0.014, 0.01));
+        let top = sk.add_line(v(0.014, 0.01), v(0.0, 0.01));
+        let left = sk.add_line(v(0.0, 0.01), v(0.0, 0.0));
+        let chain = [bottom, right, arc, top, left];
+        for (i, &e) in chain.iter().enumerate() {
+            let n = chain[(i + 1) % chain.len()];
+            let (end, start) = (sk.endpoints(e).unwrap().1, sk.endpoints(n).unwrap().0);
+            sk.add_constraint(ConstraintKind::Coincident { a: end, b: start }).unwrap();
+        }
+        for k in [
+            ConstraintKind::Horizontal { a: bottom, b: None },
+            ConstraintKind::Horizontal { a: top, b: None },
+            ConstraintKind::Vertical { a: left, b: None },
+            ConstraintKind::Vertical { a: right, b: None },
+            ConstraintKind::Tangent { a: right, b: arc },
+            ConstraintKind::Tangent { a: arc, b: top },
+        ] {
+            sk.add_constraint(k).unwrap();
+        }
+        add_dimension(&mut data, ConstraintKind::Length { curve: bottom, value: 0.02 }, Some(v(0.01, -0.005)), None).unwrap();
+        add_dimension(&mut data, ConstraintKind::Distance { a: bottom, b: top, value: 0.01, mode: DistanceMode::Center }, Some(v(-0.005, 0.005)), None).unwrap();
+        let r = add_dimension(&mut data, ConstraintKind::Radius { curve: arc, value: 0.006 }, Some(v(0.025, 0.012)), None).unwrap();
+        assert!(data.sketch.solve().is_solved(), "R6 solves");
+        let res = ed.apply_dimension(&mut data, r, "20", &UnitPrefs::default(), &noshape_units::EmptyScope);
+        let rep = data.sketch.solve();
+        let Some(Curve2::Arc { radius, .. }) = data.sketch.curve(arc) else { panic!() };
+        assert!(res.is_ok() && rep.is_solved() && (radius - 0.02).abs() < 1e-9, "{res:?} {:?} radius {radius}", rep.status);
     }
 
     /// Live walk3-1121 (2): a Line chain through the Origin keeps every segment: (-30, 0) → Origin → (0, 20) → (-30, 20)
