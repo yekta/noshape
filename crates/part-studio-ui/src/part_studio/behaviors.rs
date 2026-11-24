@@ -4149,7 +4149,7 @@ impl PartStudioView {
         let pick_id = *self.built.as_ref()?.picks.ids_for(edge).first()?;
         let vp = self.viewport.read(cx);
         let b = p + dir * (vp.camera.world_per_pixel(vp.size().y) * 6.0) as f32;
-        let band = LineSegment { a: p.into(), b: b.into(), color: [0, 0, 0, 255], pick_id, width: 5.0, style: LineSegment::ON_TOP };
+        let band = LineSegment { a: p.into(), b: b.into(), color: [0, 0, 0, 255], pick_id, width: 5.0, style: LineSegment::ON_TOP, dash_from: 0.0 };
         // After the disc (layer 20).
         Some(Instance::new(Drawable::Lines(self.gpu.uploader().upload_lines(&LineData { segments: vec![band] }))).per_primitive_color().unpickable().ignore_clip().no_bounds().over_lines().layer(21))
     }
