@@ -864,3 +864,49 @@ fn a_tabs_merge_click_on_the_walls_top_edge_takes_the_wall(cx: &mut TestAppConte
     assert_eq!(chips, ["Face of Sheet metal model 1", "Face of Flange 1"], "Flange to merge after the click");
     assert_eq!(cx.update(|cx| dialog.read(cx).feature.params.query("booleanUnionScope").get(1).cloned()), Some(outer), "the wall's outer face");
 }
+
+/// Live sm-feel2-1118 c1 and smflip-1118: editing Sheet metal model 1 (a thickened plate) shows std's flip arrow at the
+/// plate's middle on its top, (30, 20, 2), pointing up, not flipped (std addFlipDirectionUpManipulator on the definition
+/// sheet, the internal extrude's start cap).
+#[gpui::test]
+fn the_sheet_metal_models_arrow_sits_on_the_plates_middle_pointing_up(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "sm-model-arrow", Some(starts["sm-box"].clone()));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Sheet metal model 1").map(|f| f.id))).expect("Sheet metal model 1");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).status.is_some()));
+    let flips: Vec<(glam::DVec3, glam::DVec3, bool)> = cx.update(|cx| view.read(cx).feature_manipulators(cx).into_iter().filter_map(|(_, m)| match m {
+        noshape_model::display::FeatureManipulator::Flip { base, direction, flipped, .. } => Some((base, direction, flipped)),
+        _ => None,
+    }).collect());
+    let [(base, dir, flipped)] = flips[..] else { panic!("one flip arrow: {flips:?}") };
+    assert!((base - glam::DVec3::new(0.03, 0.02, 0.002)).length() < 1e-6 && (dir - glam::DVec3::Z).length() < 1e-9 && !flipped, "{flips:?}");
+}
+
+/// Live sm-form-1118: in Form, a click on a sketch point puts it in Location(s) and fills Target face(s) by itself with
+/// the sheet metal face under it ("Face of Sheet metal model 1"; std's editing logic).
+#[gpui::test]
+fn a_forms_location_click_fills_its_target_face(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let mut start = starts["sm-box"].clone();
+    start["features"].as_array_mut().unwrap().push(serde_json::json!({ "type": "newSketch", "name": "Sketch 4", "plane": "Top", "shapes": [{ "point": [[30, 20]] }] }));
+    let (window, view) = part_studio_from(cx, "sm-form-target", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sheetMetalFormed", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Form dialog").dialog.clone());
+    let pick = cx.update(|cx| view.read(cx).built.as_ref().and_then(|b| b.picks.ids_where(|t| t.kind == noshape_scene::builder::PickKind::SketchPoint).next())).expect("a sketch point pick");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(pick), position: glam::DVec2::new(500., 300.), modifiers: Modifiers::default() }, w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let counts = cx.update(|cx| {
+        let p = &dialog.read(cx).feature.params;
+        (p.query("locations").len(), p.query("targetFaces").len())
+    });
+    assert_eq!(counts, (1, 1), "(Location(s), Target face(s)) after the point's click");
+}

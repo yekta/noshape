@@ -102,8 +102,9 @@ fn group_face(group: &[Tool]) -> Tool {
 pub(super) struct SketchUi {
     /// Input of the active on-the-fly dimension box (while typing).
     otf_input: Option<(Entity<InputState>, Subscription)>,
-    /// Its text didn't evaluate on Enter: drawn as live's invalid box until edited.
-    otf_invalid: bool,
+    /// Its text was refused on Enter: live's hover text for why; the box drawn invalid until the next Enter (live
+    /// value-box-look-1123).
+    otf_error: Option<String>,
     opts: HashMap<&'static str, Entity<InputState>>,
     opt_subs: Vec<Subscription>,
     /// The Text dialog's field: a textarea, Enter types a new line (live sketch-tools-1123 text.md).
@@ -2474,18 +2475,9 @@ impl PartStudioView {
         let init = first.clone().unwrap_or(suggested);
         let state = cx.new(|cx| InputState::new(window, cx).default_value(init.clone()));
         let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
-            match ev {
-                InputEvent::PressEnter { .. } => {
-                    let text = st.read(cx).value().to_string();
-                    this.commit_otf_input(&text, window, cx);
-                }
-                InputEvent::Change => {
-                    if let Some(ui) = this.ui_mut().filter(|u| u.otf_invalid) {
-                        ui.otf_invalid = false;
-                        cx.notify();
-                    }
-                }
-                _ => {}
+            if let InputEvent::PressEnter { .. } = ev {
+                let text = st.read(cx).value().to_string();
+                this.commit_otf_input(&text, window, cx);
             }
         });
         state.update(cx, |s, cx| {
@@ -2561,7 +2553,7 @@ impl PartStudioView {
     fn close_otf_input(&mut self) {
         if let Some(ui) = self.ui_mut() {
             ui.otf_input = None;
-            ui.otf_invalid = false;
+            ui.otf_error = None;
         }
         if let Some(ed) = &mut self.sketch {
             ed.otf_typing = false;
@@ -2573,10 +2565,15 @@ impl PartStudioView {
         let vars = self.sketch_variables(cx);
         let res = self.with_sketch(cx, |ed, data| ed.commit_otf(data, text, &units, &vars));
         match res {
-            // Live2 11-17 value-box ("1abc" Enter): the box stays open with its text, drawn invalid, no message.
+            // Live value-box-look-1123 ("abc", "5+", "-3" Enter): the box stays open with its text all selected, drawn
+            // invalid until the next Enter, no message; its hover says why.
             Some(Err(_)) if self.sketch.as_ref().is_some_and(|ed| ed.otf.is_some()) => {
+                let tip = self.sketch.as_ref().and_then(|ed| ed.otf_active_dim()).map(|dim| otf_error_tip(text, dim, &units, &vars));
                 if let Some(ui) = self.ui_mut() {
-                    ui.otf_invalid = true;
+                    ui.otf_error = Some(tip.unwrap_or_else(|| crate::quantity_field::INVALID_TIP.to_string()));
+                    if let Some((st, _)) = &ui.otf_input {
+                        st.update(cx, |s, cx| s.select_all(window, cx));
+                    }
                 }
                 cx.notify();
                 return;
@@ -3283,7 +3280,7 @@ impl PartStudioView {
     /// User sketch shortcuts run before the default key bindings: a
     /// keystroke interceptor for the sketch session (only when the user
     /// defined some).
-    fn accept_sketch_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn accept_sketch_text(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(out) = self.with_sketch(cx, |ed, data| ed.accept_text(data)) {
             self.apply_outcome(out, window, cx);
         }
@@ -5051,7 +5048,7 @@ impl PartStudioView {
 
         // ---- on-the-fly dimension boxes of the geometry just created
         let otf_input = self.ui_ref().and_then(|u| u.otf_input.as_ref().map(|(st, _)| st.clone()));
-        let otf_invalid = self.ui_ref().is_some_and(|u| u.otf_invalid);
+        let otf_error = self.ui_ref().and_then(|u| u.otf_error.clone());
         let otf_labels = ed.otf_labels(&data, &units);
         // A line's length box lies in the sketch plane (`otf_box_in_plane`).
         let in_plane_box = ed.otf_active_in_plane(&data);
@@ -5059,29 +5056,43 @@ impl PartStudioView {
             let value = otf_labels.get(i).cloned().unwrap_or(value);
             let Some((x, y)) = project(pos) else { continue };
             if active && let Some(st) = &otf_input {
-                out.push(
-                    div()
-                        .absolute()
-                        .left(px(x - 50.0))
-                        .top(px(y - 12.0))
-                        .w(px(100.))
-                        .occlude()
-                        .key_context("SketchEntry")
-                        .on_action(cx.listener(|this, _: &SketchEntryTab, window, cx| this.otf_tab(1, window, cx)))
-                        .on_action(cx.listener(|this, _: &SketchEntryBackTab, window, cx| this.otf_tab(-1, window, cx)))
-                        .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| this.cancel_otf(window, cx)))
-                        // Live (inputs/6_on-the-fly_dimension_box): 13.33 px right-aligned, pl/pr 3,
-                        // a blue bottom border on a transparent box.
-                        // Invalid (live2 11-17 value-box: os-invalid-textbox): bg rgb(249,235,236), the border grey.
-                        .child(
-                            div()
-                                .border_b_1()
-                                .border_color(if otf_invalid { rgb(0xd7d7d7) } else { p().accent })
-                                .when(otf_invalid, |d| d.bg(rgb(0xf9ebec)))
-                                .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.))),
-                        )
-                        .into_any_element(),
-                );
+                // Live value-box-look-1123 "Bare box": a 102 × 28 white frame, 1 px #1651B0 all round, shadow 0 1px 3px
+                // rgba(0,0,0,.2); inside, the 100 × 26 transparent input, 13.33 px right-aligned, padding 3 at the sides,
+                // underlined 2 px blue while focused (1 px grey once blurred). Invalid after an Enter: pink, a 1 px red
+                // row over the grey bottom border, its hover saying why (right of the frame) until the next Enter.
+                let focused = st.read(cx).focus_handle(cx).is_focused(window);
+                let invalid = otf_error.is_some();
+                let line = if invalid { rgb(0xbd3039) } else { rgb(0x1651b0) };
+                let field = div()
+                    .relative()
+                    .w(px(100.))
+                    .h(px(26.))
+                    .border_b_1()
+                    .border_color(if focused && !invalid { line } else { rgb(0xd7d7d7) })
+                    .when(invalid, |d| d.bg(rgb(0xf9ebec)))
+                    .child(Input::new(st).xsmall().appearance(false).text_size(px(13.33)).text_align(TextAlign::Right).px(px(3.)).h(px(25.)))
+                    .when(focused || invalid, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(line)));
+                let frame = div()
+                    .id("sketch-otf-box")
+                    .absolute()
+                    .left(px(x - 51.0))
+                    .top(px(y - 13.0))
+                    .w(px(102.))
+                    .h(px(28.))
+                    .bg(rgb(0xffffff))
+                    .border_1()
+                    .border_color(rgb(0x1651b0))
+                    .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(1.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }])
+                    .occlude()
+                    .key_context("SketchEntry")
+                    .on_action(cx.listener(|this, _: &SketchEntryTab, window, cx| this.otf_tab(1, window, cx)))
+                    .on_action(cx.listener(|this, _: &SketchEntryBackTab, window, cx| this.otf_tab(-1, window, cx)))
+                    .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| this.cancel_otf(window, cx)))
+                    .child(field);
+                out.push(match otf_error.clone() {
+                    Some(tip) => crate::ui::with_tip(frame, tip, crate::ui::TipSide::Right).into_any_element(),
+                    None => frame.into_any_element(),
+                });
                 continue;
             }
             // Live (sketch/06): the other values stay plain like the rubber
@@ -6476,6 +6487,21 @@ fn sketch_screen_map(vp: &crate::viewport::Viewport, ed: &crate::sketch_mode::Sk
     };
     let o = at(0.0, 0.0)?;
     Some((o, at(1.0, 0.0)? - o, at(0.0, 1.0)? - o))
+}
+
+/// Live's hover text for a value box's refused text (value-box-look-1123): why the text doesn't evaluate ("Enter a valid
+/// expression.", "Syntax error in expression."), else the range with the value in the workspace units ("Enter a value
+/// between 0 and 1000000. Current value is -3.").
+fn otf_error_tip(text: &str, dim: noshape_units::Dim, units: &noshape_units::UnitPrefs, vars: &dyn noshape_units::VariableScope) -> String {
+    let text = noshape_model::quantity_text::commit_text(text.trim().trim_start_matches('=').trim(), dim, units, vars);
+    match noshape_units::evaluate_as(&text, dim, units, vars) {
+        Err(e) => crate::quantity_field::eval_message(&e),
+        Ok(q) => {
+            let f = units.si_factor(dim);
+            let max = if dim == noshape_units::Dim::LENGTH { 1000.0 } else { std::f64::consts::TAU };
+            format!("Enter a value between 0 and {}. Current value is {}.", noshape_units::format_number(max / f, 6), noshape_units::format_number(q.value / f, 6))
+        }
+    }
 }
 
 #[cfg(test)]

@@ -46,6 +46,39 @@ fn pointer(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartS
     draw(cx, window);
 }
 
+/// Every entity of the sketch (points included).
+fn entities(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> usize {
+    cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().count()))
+}
+
+fn kinds(cx: &mut TestAppContext, view: &Entity<PartStudioView>, kind: noshape_sketch::EntityKind) -> usize {
+    cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.kind() == kind).count()))
+}
+
+/// A line drawn and ended, then `t` on: the entities there are.
+fn line_then(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, t: Tool) -> usize {
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    click(cx, window, view, (300., 300.));
+    click(cx, window, view, (400., 300.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(t, w, cx))).unwrap();
+    click(cx, window, view, (400., 300.));
+    entities(cx, view)
+}
+
+/// A double-click at `at`: a click, then a second press with click count 2.
+fn dclick(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, at: (f64, f64)) {
+    click(cx, window, view, at);
+    let p = glam::DVec2::new(at.0, at.1);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: p, modifiers: Modifiers::default(), click_count: 2 }, w, cx);
+        v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: p, modifiers: Modifiers::default() }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+}
+
 /// The lengths of the sketch's solid lines (metres).
 fn line_lengths(data: &noshape_model::sketch_feature::SketchData) -> Vec<f64> {
     let sk = &data.sketch;
@@ -117,15 +150,15 @@ fn rows() -> Vec<Row> {
             let first: Vec<&str> = labels.iter().filter(|l| *l != "———").take(2).map(|s| s.as_str()).collect();
             expect((first, tool(cx, &view)), (vec!["Escape line", "Confirm Sketch 1"], Some(Tool::Line)), "first rows, tool")
         } },
-        Row { id: "arc / fillet / chamfer / use: the menu's head", live: "'Escape arc', 'Escape fillet', 'Escape chamfer', 'Escape use' (sketch-tools-1123)", gap: false, check: |cx| {
-            let heads: Vec<String> = [Tool::Arc3, Tool::Fillet, Tool::Chamfer, Tool::Use].into_iter().map(|t| {
+        Row { id: "arc / fillet / chamfer / use / mirror: the menu's head", live: "'Escape arc', 'Escape tangent arc', 'Escape center point arc', 'Escape fillet', 'Escape chamfer', 'Escape use', 'Escape mirror' (sketch-tools-1123)", gap: false, check: |cx| {
+            let heads: Vec<String> = [Tool::Arc3, Tool::TangentArc, Tool::CenterArc, Tool::Fillet, Tool::Chamfer, Tool::Use, Tool::Mirror].into_iter().map(|t| {
                 let (window, view) = sketch_with(cx, "st-menu-head", t);
                 cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), None, w, cx))).unwrap();
                 draw(cx, window);
                 let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
                 labels.into_iter().find(|l| l != "———").unwrap_or_default()
             }).collect();
-            expect(heads, ["Escape arc", "Escape fillet", "Escape chamfer", "Escape use"].map(String::from).to_vec(), "heads")
+            expect(heads, ["Escape arc", "Escape tangent arc", "Escape center point arc", "Escape fillet", "Escape chamfer", "Escape use", "Escape mirror"].map(String::from).to_vec(), "heads")
         } },
         Row { id: "line / Enter mid-chain dimensions the segment just drawn", live: "the on-canvas length box becomes a driving dimension on it; the chain continues", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-enter", Tool::Line);
@@ -405,6 +438,153 @@ fn rows() -> Vec<Row> {
             let (window, view) = sketch_with(cx, "st-fillet", Tool::Select);
             keys(cx, window, &["shift-f"]);
             expect(tool(cx, &view), Some(Tool::Fillet), "tool")
+        } },
+        // Live sketch-tools-1123 (arcs.md, ellipse.md, polygon.md, slot.md, spline.md, fillet.md, mirror-pattern.md,
+        // text.md, INDEX.md "Endings").
+        Row { id: "arcs / ellipse / polygon: one Esc discards the pending shape and exits", live: "nothing kept, the tool off", gap: false, check: |cx| {
+            for (t, n) in [(Tool::Arc3, 2), (Tool::CenterArc, 2), (Tool::TangentArc, 0), (Tool::Ellipse, 2), (Tool::Polygon, 2), (Tool::Conic, 2)] {
+                let (window, view) = sketch_with(cx, "st-esc-pending", t);
+                let start = if t == Tool::TangentArc { line_then(cx, window, &view, t) } else { 0 };
+                for k in 0..n {
+                    click(cx, window, &view, (400. + 60. * k as f64, 300. - 30. * k as f64));
+                }
+                if t == Tool::TangentArc {
+                    pointer(cx, window, &view, (560., 240.));
+                }
+                keys(cx, window, &["escape"]);
+                expect((entities(cx, &view) - start, tool(cx, &view)), (0, Some(Tool::Select)), &format!("{t:?}: new entities, tool"))?;
+            }
+            Ok(())
+        } },
+        Row { id: "arcs / Enter does nothing", live: "the pending arc and the tool stay; the next click commits it", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-arc-enter", Tool::Arc3);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (500., 300.));
+            keys(cx, window, &["enter"]);
+            expect((kinds(cx, &view, noshape_sketch::EntityKind::Arc), tool(cx, &view)), (0, Some(Tool::Arc3)), "after Enter: arcs, tool")?;
+            click(cx, window, &view, (450., 260.));
+            expect(kinds(cx, &view, noshape_sketch::EntityKind::Arc), 1, "arcs after the third click")
+        } },
+        Row { id: "3 point arc / a double-click is the last click", live: "the arc committed, the tool stays", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-arc-dbl", Tool::Arc3);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (500., 300.));
+            dclick(cx, window, &view, (450., 260.));
+            expect((kinds(cx, &view, noshape_sketch::EntityKind::Arc), tool(cx, &view)), (1, Some(Tool::Arc3)), "arcs, tool")
+        } },
+        Row { id: "tangent arc / a click in free space does nothing", live: "it needs an existing end", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-tarc-free", Tool::TangentArc);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (480., 260.));
+            expect((entities(cx, &view), tool(cx, &view)), (0, Some(Tool::TangentArc)), "entities, tool")
+        } },
+        Row { id: "arcs / ellipse / polygon / conic: the tool stays after a commit", live: "no chaining (only Line chains), the tool stays on (the polygon commits on Enter)", gap: false, check: |cx| {
+            for (t, n) in [(Tool::Arc3, 3), (Tool::CenterArc, 3), (Tool::Ellipse, 3), (Tool::Polygon, 2), (Tool::Conic, 3)] {
+                let (window, view) = sketch_with(cx, "st-stays", t);
+                for at in [(400., 300.), (500., 300.), (450., 250.)].into_iter().take(n) {
+                    click(cx, window, &view, at);
+                }
+                if t == Tool::Polygon {
+                    keys(cx, window, &["enter"]);
+                }
+                let made = entities(cx, &view);
+                if made == 0 {
+                    return Err(format!("{t:?}: nothing committed"));
+                }
+                pointer(cx, window, &view, (600., 400.));
+                expect((tool(cx, &view), entities(cx, &view)), (Some(t), made), &format!("{t:?}: tool, nothing pending added"))?;
+            }
+            Ok(())
+        } },
+        Row { id: "spline / the tool button or another tool mid-draw", live: "nothing kept", gap: false, check: |cx| {
+            for again in [true, false] {
+                let (window, view) = sketch_with(cx, "st-spline-switch", Tool::Spline);
+                click(cx, window, &view, (400., 300.));
+                click(cx, window, &view, (460., 260.));
+                click(cx, window, &view, (520., 300.));
+                if again {
+                    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Spline, w, cx))).unwrap();
+                } else {
+                    keys(cx, window, &["l"]);
+                }
+                draw(cx, window);
+                expect(kinds(cx, &view, noshape_sketch::EntityKind::FitSpline) + kinds(cx, &view, noshape_sketch::EntityKind::BSpline), 0, if again { "splines after the tool button" } else { "splines after l" })?;
+            }
+            Ok(())
+        } },
+        Row { id: "fillet / a double-click on a corner", live: "commits nothing", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-fillet-dbl", Tool::Line);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (500., 300.));
+            click(cx, window, &view, (500., 200.));
+            keys(cx, window, &["escape"]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Fillet, w, cx))).unwrap();
+            dclick(cx, window, &view, (500., 300.));
+            expect(kinds(cx, &view, noshape_sketch::EntityKind::Arc), 0, "arcs")
+        } },
+        Row { id: "fillet / the tool button or l with a corner pending", live: "nothing kept", gap: false, check: |cx| {
+            for again in [true, false] {
+                let (window, view) = sketch_with(cx, "st-fillet-switch", Tool::Line);
+                click(cx, window, &view, (400., 300.));
+                click(cx, window, &view, (500., 300.));
+                click(cx, window, &view, (500., 200.));
+                keys(cx, window, &["escape"]);
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Fillet, w, cx))).unwrap();
+                click(cx, window, &view, (500., 300.));
+                if again {
+                    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Fillet, w, cx))).unwrap();
+                } else {
+                    keys(cx, window, &["l"]);
+                }
+                draw(cx, window);
+                expect(kinds(cx, &view, noshape_sketch::EntityKind::Arc), 0, if again { "arcs after the tool button" } else { "arcs after l" })?;
+            }
+            Ok(())
+        } },
+        Row { id: "mirror / Enter does nothing", live: "the tool and its line stay; the next click still mirrors", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-mirror-enter", Tool::Line);
+            click(cx, window, &view, (400., 200.));
+            click(cx, window, &view, (400., 400.));
+            keys(cx, window, &["escape"]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+            click(cx, window, &view, (300., 250.));
+            click(cx, window, &view, (350., 350.));
+            keys(cx, window, &["escape"]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Mirror, w, cx))).unwrap();
+            click(cx, window, &view, (400., 330.));
+            keys(cx, window, &["enter"]);
+            expect((tool(cx, &view), lines(cx, &view)), (Some(Tool::Mirror), 2), "after Enter: tool, lines")?;
+            click(cx, window, &view, (325., 300.));
+            expect(lines(cx, &view), 3, "lines after the next click")
+        } },
+        Row { id: "pattern / Enter with a seed", live: "commits nothing; the tool stays", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-pattern-enter", Tool::Line);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (450., 300.));
+            keys(cx, window, &["escape", "escape"]);
+            click(cx, window, &view, (425., 300.));
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::LinearPattern, w, cx))).unwrap();
+            draw(cx, window);
+            keys(cx, window, &["enter"]);
+            expect((lines(cx, &view), tool(cx, &view)), (1, Some(Tool::LinearPattern)), "lines, tool")
+        } },
+        Row { id: "text / ✓", live: "commits the text and turns the Text tool off", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-text-ok", Tool::Text);
+            click(cx, window, &view, (400., 300.));
+            click(cx, window, &view, (500., 340.));
+            keys(cx, window, &["a", "b"]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_sketch_text(w, cx))).unwrap();
+            draw(cx, window);
+            let texts = cx.update(|cx| view.read(cx).sketch_data(cx).map_or(0, |d| d.texts.len()));
+            expect((texts, tool(cx, &view)), (1, Some(Tool::Select)), "texts, tool")
+        } },
+        Row { id: "arcs / a digit mid-draw", live: "opens no value box", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-arc-digit", Tool::Arc3);
+            click(cx, window, &view, (400., 300.));
+            pointer(cx, window, &view, (480., 300.));
+            keys(cx, window, &["5"]);
+            let boxed = cx.update(|cx| view.read(cx).dim_input.is_some() || view.read(cx).sketch.as_ref().is_some_and(|ed| ed.otf_typing));
+            expect(boxed, false, "a box open")
         } },
     ]
 }

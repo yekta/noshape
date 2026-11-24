@@ -273,8 +273,20 @@ fn value_boxes_mid_chain_as_lives(cx: &mut TestAppContext) {
     assert_eq!((open(cx), lengths(cx).len(), lines(cx).len()), (false, 1, n + 1), "a canvas click drops the value and places the next point (box, lengths, lines)");
     keys(cx, window, &["8"]);
     keys(cx, window, &["a", "b", "c", "enter"]);
-    let invalid = cx.update(|cx| (view.read(cx).ui_ref().is_some_and(|u| u.otf_invalid), view.read(cx).message.is_none()));
-    assert!(open(cx) && lengths(cx).len() == 1 && invalid == (true, true), "\"8abc\" Enter: the box stays, drawn invalid, no dimension, no message: {invalid:?}");
+    let tip = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui_ref().and_then(|u| u.otf_error.clone()));
+    let quiet = cx.update(|cx| view.read(cx).message.is_none());
+    assert!(open(cx) && lengths(cx).len() == 1 && quiet, "\"8abc\" Enter: the box stays, no dimension, no message");
+    assert!(tip(cx).is_some(), "drawn invalid");
+    // Live value-box-look-1123: all selected again after the Enter (the keys replace it); typing leaves it invalid, only
+    // the next Enter decides again; the hover says why.
+    keys(cx, window, &["a", "b", "c", "enter"]);
+    assert_eq!(tip(cx).as_deref(), Some("Enter a valid expression."), "\"abc\" Enter");
+    keys(cx, window, &["5", "+"]);
+    assert_eq!(tip(cx).as_deref(), Some("Enter a valid expression."), "still invalid while typing");
+    keys(cx, window, &["enter"]);
+    assert_eq!(tip(cx).as_deref(), Some("Syntax error in expression."), "\"5+\" Enter");
+    keys(cx, window, &["-", "3", "enter"]);
+    assert_eq!(tip(cx).as_deref(), Some("Enter a value between 0 and 1000000. Current value is -3."), "\"-3\" Enter: the line length box refuses");
 }
 
 /// SKETCH-UNDO-REDO-STATE (live 11-02, qa's t-skundo): the sketch toolbar's

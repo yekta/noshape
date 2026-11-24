@@ -3,26 +3,24 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (08:4x UTC 11-23) — read first (Yekta account at 97% weekly: keep this current after every step)
-- QUEUED 24ca4c6e (07:4x; 5 commits: 57a1e066e, c9f825c58, 7d1dfe56d, b0079f2c4 rings/SKT batch, TICKETS dup-row
-  drop). Lead reports land results; never poll.
-- LANDING (08:4x) two commits on top: (1) bend-twice ERR-SM-BEND-WORDS: custom/host/sheetmetal.rs `name_split_pieces`
-  (part rebuild names both pieces of a definition face this feature split as Split pieces of the one old name kept ->
-  std getSMDefinitionEntities size 2 -> "Select a planar sheet metal face."), case "bend twice" in sheetmetal_std
-  failures test, sm_feel_tests bend row click checks HOVER|FILLED (SM-TABLE-BEND-LIT-LOOK). (2) ERR-SM-FILTER-FACE
-  filter-at-evaluation (lead's ruling): ParamKindFs::Query.accept (Filter Ann), custom/host/accept.rs (EntityType +
-  SheetMetalDefinitionEntityType decided, others accept; def type = entity on the non-solid definition body sharing the
-  SMAssociationAttribute), run.rs definition() puts refused refs in EvalCtx.refused -> regen/mod.rs state.missing.
-  ops e2e a_selection_a_std_filter_refuses_is_missing. tm32 (vibex6) green: bend twice, 3 e2e, matrix 23/23,
-  sheetmetal_std 87/87. Both TICKETS rows "fixed, to verify". Tell dx when queued (FS host is theirs).
-- TICKETS: BEND-LIT / JOINT-LIT / CELL-EDIT annotated (fixes in queued 24ca4c6e, qa tested ed11f7c48); superseded dup
-  rows dropped (old SM-TABLE-* x4, SKETCH-USE-VERTEX-OTHER-SKETCH, SM-TAB-MERGE-PICK x2, MC-PS-ORIGIN-CORNER-MARKER,
-  SK-LONGPRESS).
-- Next: remaining SM P0s (ERR-SM-HEM-LONG awaits qa; ERR-SM-BAD-SELECTION-RED is psui's; SM-TABLE-* await 24ca4c6e).
-- c2-constrained-surface: done on my side (the fit is core's; SUITE-NEW-INDEX-1120-CORE annotated).
-- SKT-VB-PLACE-LENGTH / SKT-INFER-STORED: every sub-item fixed in 24ca4c6e; waiting on qa verify.
-- MARKER-REACH: fine sweep agrees with ours; REQUESTS skasm 07:22 asks live for the back-midpoint / edge-to-corner
-  sweeps (TICKETS row annotated). Nothing to change until answered.
+## NOW (11-24, restart after the 11-23 pause) — read first
+- Branch agent/skasm reset onto psui's rebase of my stack (psui-skrebase 1c8e8b45e; psui re-lands it; old tip kept as
+  branch skasm-pre-rebase-1124). When psui's land lands: verify my tests on main, then land my work on top.
+- Uncommitted (tests on vibex6 via /root/skasm-scratch/bin/tm33.sh, rb.sh bash -c "$(cat …)"):
+  (1) ERR-SM-BAD-SELECTION-RED: failing picks' edges join the selected edges' see-through copy (scene builder.rs
+  lit_edge, shaders.wgsl selected_only keeps ERROR lines); GPU T1 a_failing_flanges_joint_edge_is_red_through_the_wall.
+  Evidence: live errors-1123 fl-joint2-vp: red line inside the wall's face (78,104,118) 3 px above its outline. TICKETS row
+  deduped (3 → 1), "fixed, to verify".
+  (2) feel audit (/root/skasm-scratch/audit-1124.md, 103 items, 70 → 83 covered): sketch tools matrix +12 rows; scene
+  pointer dot, tangent arc on a circle COINCIDENT, H/V dash colour fecb33 (DIRECTION_DASH_COLOR; guides stay e2bc2c) + 3
+  point arc chord dashes; value box: bare box look (white 102x28, #1651B0 border, shadow), invalid until the next Enter,
+  hover texts (otf_error_tip), "-3" refused; sm: SM model flip arrow test, Form point fills Target face(s) test.
+- 11:2x state: all tests green on vibex6 (part-studio-ui 124, scene sketch_mode 203); clippy fixed one match→if let,
+  re-check running (rb.sh clippy -p noshape-part-studio-ui). NEXT: commit as 2 commits (BAD-SELECTION-RED: builder.rs,
+  shaders.wgsl, hover_matrix_tests.rs, TICKETS; audit: the rest + interaction-feel.md rows), wait for psui's land of the
+  stack, rebase on main, land.sh, report lead ≤5 lines (audit counts in /root/skasm-scratch/audit-1124.md).
+- Open audit gaps: Extend B (2 mm off past the boundary drops the pick: needs a live threshold), Use tool flow rows,
+  value-box caret/selection/palette, sm-form location buttons / drag, Tab → page button (browser focus: ask lead).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::

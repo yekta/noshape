@@ -1012,8 +1012,11 @@ const USE_HOVER_COLOR: [u8; 4] = [0xff, 0xc6, 0x85, 255];
 /// The hovered edge itself through the Use tool's band (qa SKT-USE-HOVER, live sk23 use-0-hover-edge / -vertex: across the
 /// edge 1 px (254,199,136), 2-3 px (213,182,138), 1 px (254,199,136)).
 const USE_HOVER_EDGE_COLOR: [u8; 4] = [0xd5, 0xb6, 0x8a, 255];
-/// The dash along a rubber band whose direction is inferred (live sketch/51).
+/// The dashed guide from an acquired point (live sketch-tools-1123: (226,188,44), 4 on / 4 off).
 const INFERRED_DASH_COLOR: [u8; 4] = [0xe2, 0xbc, 0x2c, 255];
+/// A rubber band whose direction is inferred horizontal or vertical: drawn as yellow dashes (live sketch/51,
+/// sketch-tools-1123: (254,203,51), 4 on / 4 off).
+const DIRECTION_DASH_COLOR: [u8; 4] = [0xfe, 0xcb, 0x33, 255];
 
 /// The inference sets the direction of the line being drawn (not a point to
 /// snap to): shown on the rubber band as its dash (live sketch/51–53).
@@ -6877,8 +6880,14 @@ impl SketchEditor {
                     _ => {}
                 },
                 Tool::Arc3 => match anchors.len() {
-                    // Live sketch-tools-1123: a solid chord to the pointer.
-                    1 => poly(&[anchors[0], c], preview_color, false),
+                    // Live sketch-tools-1123: a solid chord to the pointer; inferred horizontal or vertical, it takes the
+                    // yellow dashes (arcs.md).
+                    1 => {
+                        poly(&[anchors[0], c], preview_color, false);
+                        if self.inference.as_ref().is_some_and(|i| is_direction(i.kind)) {
+                            inferred_dash = Some((anchors[0], c));
+                        }
+                    }
                     2 => {
                         let c = self.arc3_semicircle(anchors[0], anchors[1], c).unwrap_or(c);
                         if let Some((ctr, r)) = noshape_sketch::shapes::circle_through(anchors[0], c, anchors[1]) {
@@ -7584,7 +7593,7 @@ impl SketchEditor {
             lines.push_polyline(&pts3, color, 0, width, style);
         }
         if let Some((a, c)) = inferred_dash {
-            lines.push_polyline(&[w(a), w(c)], INFERRED_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
+            lines.push_polyline(&[w(a), w(c)], DIRECTION_DASH_COLOR, 0, 1.0, on_top | LineSegment::INFERRED);
         }
         // Dash-dot laid out along the whole curve here: the line shader's
         // pattern restarts on every segment, so a circle's short segments
@@ -14539,6 +14548,56 @@ mod tests {
         assert!(blue.iter().all(|s| on_box(s.a) && on_box(s.b) && s.style & LineSegment::DASHED == 0), "text strokes drawn");
         for c in [v(-0.02, 0.0), v(0.02, 0.0), v(0.02, 0.01), v(-0.02, 0.01)] {
             assert!(points.points.iter().any(|p| p.color == PREVIEW_COLOR && (p.position[0] as f64 - c.x).abs() < 1e-6 && (p.position[1] as f64 - c.y).abs() < 1e-6), "corner {c}");
+        }
+    }
+    /// Live sketch-tools-1123 INDEX "Common rules", fillet.md, use-convert.md, text.md, slot.md: a light-blue dot follows
+    /// the pointer while a drawing tool waits for its first click (Text too); none with Slot, Offset, Fillet, Chamfer,
+    /// Use, or a Tangent arc with no end to start from.
+    #[test]
+    fn a_pointer_dot_waits_for_a_drawing_tools_first_click() {
+        let units = UnitPrefs::default();
+        let p = v(0.03, 0.017);
+        let dotted = [Tool::Line, Tool::Arc3, Tool::CenterArc, Tool::Circle, Tool::Spline, Tool::Polygon, Tool::Ellipse, Tool::Conic, Tool::Text, Tool::CornerRect];
+        let plain = [Tool::Slot, Tool::Offset, Tool::Fillet, Tool::Chamfer, Tool::Use, Tool::TangentArc];
+        for (tool, want) in dotted.iter().map(|t| (*t, 1)).chain(plain.iter().map(|t| (*t, 0))) {
+            let (mut ed, mut d) = editor(tool);
+            ed.pointer_move(&mut d, p, false, false);
+            let at = ed.frame.to_world(p);
+            let dots = ed.overlay(&d, &units).1.points.iter()
+                .filter(|s| s.size == 6.0 && s.color == PREVIEW_COLOR && (DVec3::new(s.position[0] as f64, s.position[1] as f64, s.position[2] as f64) - at).length() < 1e-5)
+                .count();
+            assert_eq!(dots, want, "{tool:?}");
+        }
+    }
+
+    /// Live sketch-tools-1123 arcs.md: a tangent arc from a line's end, ended on a circle, takes COINCIDENT (endSnap0).
+    #[test]
+    fn a_tangent_arc_ended_on_a_circle_is_coincident_with_it() {
+        let (mut ed, mut d) = editor(Tool::TangentArc);
+        d.sketch.add_line(v(0.0, 0.0), v(0.02, 0.0));
+        let circle = d.sketch.add_circle(v(0.04, 0.03), 0.01);
+        click(&mut ed, &mut d, v(0.02, 0.0));
+        for k in 1..=4 {
+            ed.pointer_move(&mut d, v(0.02, 0.0).lerp(v(0.04, 0.02), k as f64 / 4.0), false, false);
+        }
+        click(&mut ed, &mut d, v(0.04, 0.02));
+        let arc = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).map(|e| e.id).expect("an arc");
+        let ends = d.sketch.endpoints(arc).expect("ends");
+        let on_circle = d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if [a, b].contains(&circle) && ([a, b].contains(&ends.0) || [a, b].contains(&ends.1))));
+        assert!(on_circle, "{:?}", d.sketch.constraints().map(|c| c.kind.clone()).collect::<Vec<_>>());
+    }
+
+    /// Live sketch-tools-1123 INDEX "Common rules", arcs.md: a Line's rubber band or a 3 point arc's chord inferred
+    /// horizontal turns into yellow (254,203,51) dashes; the guide from an acquired point stays (226,188,44).
+    #[test]
+    fn an_inferred_horizontal_rubber_band_is_yellow_dashes() {
+        let units = UnitPrefs::default();
+        for tool in [Tool::Line, Tool::Arc3] {
+            let (mut ed, mut d) = editor(tool);
+            click(&mut ed, &mut d, v(0.0, 0.0));
+            ed.pointer_move(&mut d, v(0.03, 0.2 * PX), false, false);
+            let dashed: Vec<[u8; 4]> = ed.overlay(&d, &units).0.segments.iter().filter(|s| s.style & LineSegment::INFERRED != 0).map(|s| s.color).collect();
+            assert!(!dashed.is_empty() && dashed.iter().all(|c| *c == [0xfe, 0xcb, 0x33, 255]), "{tool:?}: {dashed:?} ({:?})", ed.inference.as_ref().map(|i| i.kind));
         }
     }
 }
