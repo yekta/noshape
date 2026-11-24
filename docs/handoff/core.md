@@ -16,6 +16,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   9cbb0e: 7 failing, 2d82a0: 6; live builds all; Fillet 23 first). Blend's notes: docs/handoff/blend.md "SCISSOR"
   (doc vibex7 ~/agents/blend-keep/scissor.noshape; blend's probe branch blend-cusp 429750f98 = WIP never land).
   Status run: .sc1.sh (release CLI batch feature_list) -> /root/core-scratch/run/sc1.log. Then TICKETS fillet/chamfer P0/P1.
+- Also (lead 11-24): c2-impeller-loft "Fillet Stevenrohr zum Halter" fails "Adjoining edge not filleted." (live OK,
+  39 faces; failed in 0.4.67 too); Move face 1/2 + Delete face 2 fail after it (qa TICKETS bfe98e10e).
 - Then: core rows from qa as they appear.
 - Probe kit: /root/core-scratch/bin/mcp.py (MCP client), mf/th.py, mf/sl.py, mf/st.py, dp/fl.py (green CLI checks).
 - **PARKED projected-curve-enclose Fill 1 (branch core-fill1-wip f4f3d55d, on core-rf):** live one cylinder face
