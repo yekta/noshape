@@ -57,6 +57,7 @@ pub mod tab_thumbnail;
 pub mod theme;
 pub mod tool_synonyms;
 pub mod tool_text;
+pub mod toasts;
 pub mod toolbar_customize;
 pub mod touch;
 pub mod ui;

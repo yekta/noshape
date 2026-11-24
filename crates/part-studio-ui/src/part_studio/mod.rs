@@ -152,6 +152,16 @@ static ADD_CUSTOM: [&str; 1] = ["addCustomFeatures"];
 /// `toolbar_faces` keys of the collapsed groups (apart from the full ones).
 const COLLAPSED_KEY: [&str; 9] = ["~0", "~1", "~2", "~3", "~4", "~5", "~6", "~7", "~8"];
 
+/// A message's bubble: info / warning / error colours, `Ok` (`flash_success`) Onshape's green ✓ toast.
+fn bubble_kind(st: &FeatureStatus) -> crate::os_ui::BubbleKind {
+    match st {
+        FeatureStatus::Error => crate::os_ui::BubbleKind::Error,
+        FeatureStatus::Warning => crate::os_ui::BubbleKind::Warning,
+        FeatureStatus::Ok => crate::os_ui::BubbleKind::Success,
+        _ => crate::os_ui::BubbleKind::Info,
+    }
+}
+
 /// Every tool of toolbar group `gi`, in order (a collapsed group's dropdown).
 fn collapsed_group(gi: usize) -> &'static [&'static str] {
     static LISTS: std::sync::OnceLock<Vec<Vec<&'static str>>> = std::sync::OnceLock::new();
@@ -465,6 +475,8 @@ pub struct PartStudioView {
     part_row_cache: std::collections::HashMap<BodyId, (u64, Entity<crate::cached_slice::Slice<PartStudioView>>)>,
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
+    /// Notices `message` showed before the newest, still open (live: toasts stack).
+    toasts: crate::toasts::ToastStack<FeatureStatus>,
     /// A sketch cancelled with ✕: its draft, index and whether it was new,
     /// for the toast's Restore link (live sketch/68), with the toast text.
     canceled_edit: Option<(Feature, usize, bool, String)>,
@@ -592,13 +604,10 @@ impl PartStudioView {
                     this.pin_draft_units(old, cx);
                     this.schedule_regen(window, cx)
                 }
-                DocEvent::Error(msg) => {
-                    this.message = Some((FeatureStatus::Error, msg.clone()));
-                    cx.notify();
-                }
+                DocEvent::Error(msg) => crate::toasts::notice(this, Self::toast_parts, (FeatureStatus::Error, msg.clone()), None, cx),
                 DocEvent::Info(msg) => {
-                    this.message = Some((FeatureStatus::Info, msg.clone()));
-                    cx.notify();
+                    let stays = this.doc.read(cx).notice_link(msg).map_or(Duration::from_secs(5), |l| l.stays);
+                    crate::toasts::notice(this, Self::toast_parts, (FeatureStatus::Info, msg.clone()), Some(stays), cx)
                 }
                 _ => {}
             }
@@ -646,6 +655,7 @@ impl PartStudioView {
             part_row_cache: Default::default(),
             fitted_once: false,
             message: None,
+            toasts: Default::default(),
             canceled_edit: None,
             sketch: None,
             sketch_fillet_radius: None,
@@ -7026,6 +7036,7 @@ impl PartStudioView {
             out.push(div().absolute().top(px(3.)).left(px(0.)).child(panel).into_any_element());
         }
         // Message toast.
+        let mut top = None;
         // The tool-miss toast belongs to the open Remove / Intersect dialog.
         if let Some((st, msg)) = self.message.clone().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION) {
             // Info messages close by themselves after 5 s however they were
@@ -7062,13 +7073,7 @@ impl PartStudioView {
                 .detach();
             }
             // Onshape alert: top-center of the viewport, info/warn/error colors (§4.9).
-            let kind = match st {
-                FeatureStatus::Error => crate::os_ui::BubbleKind::Error,
-                FeatureStatus::Warning => crate::os_ui::BubbleKind::Warning,
-                // `flash_success`: Onshape's green ✓ toast.
-                FeatureStatus::Ok => crate::os_ui::BubbleKind::Success,
-                _ => crate::os_ui::BubbleKind::Info,
-            };
+            let kind = bubble_kind(&st);
             // Onshape's message bubble (os_ui; live dom/toast-*.txt), with the
             // "Restore" link after a canceled edit.
             let view = cx.entity();
@@ -7087,18 +7092,25 @@ impl PartStudioView {
             } else {
                 crate::doc_model::notice_bubble("toast", kind, msg.to_string(), &self.doc, close, cx)
             };
-            // Live (document/01; behaviours "F19", configure toast: 814,85
-            // and 769,85 at 1920): at y 85 of the window, centered on the
-            // window, not the graphics area, and over a right panel (qa5 C5).
+            top = Some(bubble.into_any_element());
+        }
+        // Live (document/01; behaviours "F19", configure toast: 814,85
+        // and 769,85 at 1920): at y 85 of the window, centered on the
+        // window, not the graphics area, and over a right panel (qa5 C5).
+        if let Some(toasts) = crate::toasts::column(top, &self.toasts, &cx.entity(), Self::toast_parts, bubble_kind, &self.doc, cx) {
             let w = window.viewport_size().width;
             out.push(
-                deferred(anchored().position_mode(gpui_kit::AnchoredPositionMode::Window).position(point(px(0.), px(85.))).child(div().w(w).flex().justify_center().child(bubble)))
+                deferred(anchored().position_mode(gpui_kit::AnchoredPositionMode::Window).position(point(px(0.), px(85.))).child(div().w(w).flex().justify_center().child(toasts)))
                     // Over modal dialogs (drawn at 10 + their layer; live workflows-1123 19 s8: the Merge toast over them), under menus (100).
                     .with_priority(50)
                     .into_any_element(),
             );
         }
         out
+    }
+
+    fn toast_parts(&mut self) -> (&mut crate::toasts::ToastStack<FeatureStatus>, &mut Option<(FeatureStatus, String)>) {
+        (&mut self.toasts, &mut self.message)
     }
 
     /// Onshape's split toggle at the viewport's left edge, vertically

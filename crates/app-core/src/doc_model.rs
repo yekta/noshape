@@ -55,8 +55,8 @@ pub struct DocModel {
     pub undo_held: bool,
     /// Versions and history › Compare is on: Undo and Redo are off (live ver-compare-moved-feature, fs-compare).
     pub comparing: bool,
-    /// The link of the notice shown last ([`DocModel::info_with_link`]).
-    notice_link: Option<NoticeLink>,
+    /// The links of the last notices shown, newest last ([`DocModel::info_with_link`]; stacked toasts keep theirs).
+    notice_links: Vec<NoticeLink>,
     /// The last input in the window while a notice with a link was set.
     pub notice_input: Option<std::time::Instant>,
     /// Commits the pending edit when the app quits (Quit, logout, shutdown, SIGTERM): Drop alone misses it while
@@ -126,40 +126,48 @@ impl DocModel {
         session.forget_undo();
         let studio_cache = crate::derived::StudioCache::default();
         let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator_with_store(studio_cache.clone(), crate::result_store::store())));
-        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None, notice_input: None, quit_commit: None }
+        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_links: Vec::new(), notice_input: None, quit_commit: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice), gone after
     /// `stays_secs`.
     pub fn info_with_link(&mut self, notice: String, label: &str, stays_secs: u64, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
-        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::from_secs(stays_secs), kind: None });
+        self.keep_link(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::from_secs(stays_secs), kind: None });
         cx.emit(DocEvent::Info(notice));
     }
 
     /// As [`Self::info_with_link`], drawn as the green success bubble (live import-toast-1122: "<file> has been imported.").
     pub fn success_with_link(&mut self, notice: String, label: &str, stays_secs: u64, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
         self.info_with_link(notice, label, stays_secs, run, cx);
-        if let Some(l) = &mut self.notice_link {
+        if let Some(l) = self.notice_links.last_mut() {
             l.kind = Some(crate::os_ui::BubbleKind::Success);
         }
     }
 
     /// An error notice (red, stays until ×) with a link after it.
     pub fn error_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
-        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::MAX, kind: None });
+        self.keep_link(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run), stays: std::time::Duration::MAX, kind: None });
         cx.emit(DocEvent::Error(notice));
     }
 
     /// An input in the document's window (a linked notice stays its time from the last one).
     pub fn note_input(&mut self, now: std::time::Instant) {
-        if self.notice_link.is_some() {
+        if !self.notice_links.is_empty() {
             self.notice_input = Some(now);
         }
     }
 
+    fn keep_link(&mut self, link: NoticeLink) {
+        self.notice_links.retain(|l| l.notice != link.notice);
+        if self.notice_links.len() >= 8 {
+            self.notice_links.remove(0);
+        }
+        self.notice_links.push(link);
+    }
+
     /// The link of the notice `notice`, if it has one.
     pub fn notice_link(&self, notice: &str) -> Option<NoticeLink> {
-        self.notice_link.clone().filter(|l| l.notice == notice)
+        self.notice_links.iter().rev().find(|l| l.notice == notice).cloned()
     }
 
     /// Provider giving Derived features access to the other Part Studios.

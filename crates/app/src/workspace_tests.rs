@@ -287,6 +287,19 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     let at = after.iter().position(|n| n == "C").unwrap();
     assert_eq!(after[at + 1..at + 4], ["plate", "block (1)", "block"], "{after:?}");
     assert!(doc.read_with(cx, |d, _| d.notice_link("plate.step has been imported.").is_some()));
+    // Live: toasts stack and each × closes one. block's bubble, still green with its link, stays under plate's.
+    assert_eq!(cx.update(|cx| ws.read(cx).stacked_toasts().iter().map(|m| m.to_string()).collect::<Vec<_>>()), ["block.step has been imported."]);
+    assert!(doc.read_with(cx, |d, _| d.notice_link("block.step has been imported.").is_some_and(|l| l.kind == Some(crate::os_ui::BubbleKind::Success))));
+    draw(cx, w);
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    let under = vcx.debug_bounds("toast-stacked-0").expect("block's bubble under plate's");
+    let top = vcx.debug_bounds("toast-top").expect("plate's bubble");
+    assert!(under.top() > top.bottom(), "the earlier bubble under the newer: {under:?} {top:?}");
+    vcx.simulate_click(Point { x: under.right() - px(11.), y: under.center().y }, Modifiers::default());
+    draw(cx, w);
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    assert!(vcx.debug_bounds("toast-stacked-0").is_none(), "its × closed it");
+    assert!(vcx.debug_bounds("toast-top").is_some(), "plate's bubble stays");
     cx.update(|cx| crate::import_dialog::import(&doc, std::slice::from_ref(&broken), Default::default(), Some(c), true, cx));
     cx.run_until_parked();
     assert!(kept(cx, "broken.step"), "a file that didn't translate is kept too");

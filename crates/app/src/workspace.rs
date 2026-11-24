@@ -111,6 +111,8 @@ pub struct Workspace {
     /// The last document message, shown for tabs that have no message bubble
     /// of their own (Variable / Feature Studio, Material Library, file tabs).
     toast: Option<(crate::ui::AlertKind, String)>,
+    /// Notices `toast` showed before the newest, still open (live: toasts stack).
+    toasts: noshape_app_core::toasts::ToastStack<crate::ui::AlertKind>,
     _subs: Vec<Subscription>,
 }
 
@@ -143,12 +145,12 @@ impl Workspace {
             DocEvent::Error(msg) | DocEvent::Info(msg) => {
                 let info = matches!(ev, DocEvent::Info(_));
                 let kind = if info { crate::ui::AlertKind::Info } else { crate::ui::AlertKind::Error };
-                this.toast = Some((kind, msg.clone()));
                 // An info bubble hides by itself after ≈4.4 s (live TOAST-AUTOHIDE); an error stays until ×.
+                // A notice with a link stays as long as it says (live 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
+                let stays = this.doc.read(cx).notice_link(msg).map_or(std::time::Duration::from_millis(4400), |l| l.stays);
+                noshape_app_core::toasts::notice(this, Self::toast_parts, (kind, msg.clone()), info.then_some(stays), cx);
                 if info {
                     let msg = msg.clone();
-                    // A notice with a link stays as long as it says (live 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
-                    let stays = this.doc.read(cx).notice_link(&msg).map_or(std::time::Duration::from_millis(4400), |l| l.stays);
                     cx.spawn(async move |this, cx| {
                         cx.background_executor().timer(stays).await;
                         let _ = this.update(cx, |this, cx| {
@@ -186,7 +188,7 @@ impl Workspace {
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
         noshape_render::perf::milestone("workspace: thumbnailers");
-        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, fs_errors: None, fs_errors_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, shortcut_sheet: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, fs_errors: None, fs_errors_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, shortcut_sheet: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, toasts: Default::default(), _subs: subs };
         this._subs.push(focus_lost);
         // Another document may have a new version when the window comes back.
         this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -2849,12 +2851,22 @@ impl Workspace {
 
     /// Onshape's message bubble (top center) for tabs without their own.
     fn render_toast(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (kind, msg) = self.toast.clone()?;
         if matches!(self.active.and_then(|a| self.views.get(&a)), Some(TabView::PartStudio(_) | TabView::Assembly(_) | TabView::Drawing(_)) | None) {
             return None;
         }
         let ws = cx.entity();
-        let said = crate::doc_model::notice_text(&self.doc, msg.clone(), cx);
+        let top = self.toast.clone().map(|(kind, msg)| {
+            let ws = ws.clone();
+            crate::doc_model::notice_bubble("ws-toast", kind, msg, &self.doc, move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                ws.update(cx, |this, cx| {
+                    this.toast = None;
+                    cx.notify();
+                })
+            }, cx)
+            .into_any_element()
+        });
+        let said = self.toast.as_ref().map(|(_, msg)| crate::doc_model::notice_text(&self.doc, msg.clone(), cx));
+        let toasts = noshape_app_core::toasts::column(top, &self.toasts, &ws, Self::toast_parts, |k| (*k).into(), &self.doc, cx)?;
         Some(
             div()
                 .absolute()
@@ -2863,15 +2875,23 @@ impl Workspace {
                 .right_0()
                 .flex()
                 .justify_center()
-                .map(|d| noshape_app_core::ui_script::mark_message(d, || said))
-                .child(crate::doc_model::notice_bubble("ws-toast", kind, msg, &self.doc, move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
-                    ws.update(cx, |this, cx| {
-                        this.toast = None;
-                        cx.notify();
-                    })
-                }, cx))
+                .map(|d| match said {
+                    Some(said) => noshape_app_core::ui_script::mark_message(d, || said),
+                    None => d,
+                })
+                .child(toasts)
                 .into_any_element(),
         )
+    }
+
+    fn toast_parts(&mut self) -> (&mut noshape_app_core::toasts::ToastStack<crate::ui::AlertKind>, &mut Option<(crate::ui::AlertKind, String)>) {
+        (&mut self.toasts, &mut self.toast)
+    }
+
+    /// The stacked notices under the toast, newest first.
+    #[cfg(test)]
+    pub(crate) fn stacked_toasts(&self) -> Vec<&str> {
+        self.toasts.messages()
     }
 
     /// Whether a Feature Studio's committed source has compile errors: the last answer, compiled again in the

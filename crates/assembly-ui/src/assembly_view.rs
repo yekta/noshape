@@ -573,6 +573,8 @@ pub struct AssemblyView {
     print: Option<crate::print_setup::PrintPanel>,
     expanded: HashSet<Vec<InstanceId>>,
     message: Option<(bool, String)>,
+    /// Notices `message` showed before the newest, still open (live: toasts stack).
+    toasts: crate::toasts::ToastStack<bool>,
     /// Assembly mate connector dialog.
     mc: Option<McSession>,
     /// Pattern / mirror / replicate dialog.
@@ -656,7 +658,16 @@ impl Focusable for AssemblyView {
 
 use noshape_ops::assembly::contains_assembly;
 
+/// The message slot's bubble: red for an error, else blue.
+fn asm_bubble_kind(err: &bool) -> crate::os_ui::BubbleKind {
+    if *err { crate::ui::AlertKind::Error.into() } else { crate::ui::AlertKind::Info.into() }
+}
+
 impl AssemblyView {
+    fn toast_parts(&mut self) -> (&mut crate::toasts::ToastStack<bool>, &mut Option<(bool, String)>) {
+        (&mut self.toasts, &mut self.message)
+    }
+
     /// Create Drawing… of this assembly: the Insert view panel starts with the
     /// last applied named position and the chosen display state (live
     /// drawing/1106; asb).
@@ -751,14 +762,8 @@ impl AssemblyView {
                 cx.notify();
                 this.schedule_eval(window, cx)
             }
-            DocEvent::Error(msg) => {
-                this.message = Some((true, msg.clone()));
-                cx.notify();
-            }
-            DocEvent::Info(msg) => {
-                this.message = Some((false, msg.clone()));
-                cx.notify();
-            }
+            DocEvent::Error(msg) => crate::toasts::notice(this, Self::toast_parts, (true, msg.clone()), None, cx),
+            DocEvent::Info(msg) => crate::toasts::notice(this, Self::toast_parts, (false, msg.clone()), Some(Duration::from_secs(5)), cx),
             _ => {}
         }));
         let mut this = Self {
@@ -815,6 +820,7 @@ impl AssemblyView {
             print: None,
             expanded: HashSet::new(),
             message: None,
+            toasts: Default::default(),
             mc: None,
             pattern: None,
             snap: None,
@@ -7103,6 +7109,7 @@ impl AssemblyView {
         if self.explode.is_some() && !self.explode_edit {
             out.push(div().absolute().bottom_3().right_3().px_2().py_1().rounded_md().bg(with_alpha(pal.accent, 0.25)).text_xs().child("Exploded view").into_any_element());
         }
+        let mut top = None;
         if let Some((err, msg)) = self.message.clone() {
             // Info notices fade after 5 s like the Part Studio's (errors stay until dismissed; qa4: a notice must not
             // linger; live asm-export-1150: the export's bubble 4.9 s).
@@ -7123,7 +7130,18 @@ impl AssemblyView {
                 .detach();
             }
             // Onshape's message bubble, top center of the viewport.
-            let kind = if err { crate::ui::AlertKind::Error } else { crate::ui::AlertKind::Info };
+            let view = cx.entity();
+            top = Some(
+                crate::doc_model::notice_bubble("asm-toast", asm_bubble_kind(&err), msg.to_string(), &self.doc, move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                    view.update(cx, |this, cx| {
+                        this.message = None;
+                        cx.notify();
+                    })
+                }, cx)
+                .into_any_element(),
+            );
+        }
+        if let Some(toasts) = crate::toasts::column(top, &self.toasts, &cx.entity(), Self::toast_parts, asm_bubble_kind, &self.doc, cx) {
             out.push(
                 div()
                     .absolute()
@@ -7134,15 +7152,7 @@ impl AssemblyView {
                     .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w(self.tab) }))
                     .flex()
                     .justify_center()
-                    .child({
-                        let view = cx.entity();
-                        crate::doc_model::notice_bubble("asm-toast", kind, msg.to_string(), &self.doc, move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
-                            view.update(cx, |this, cx| {
-                                this.message = None;
-                                cx.notify();
-                            })
-                        }, cx)
-                    })
+                    .child(toasts)
                     .into_any_element(),
             );
         }
