@@ -4782,10 +4782,13 @@ impl PartStudioView {
         // Hover badges with no tool only; a tool active leaves the band alone (live sketch/11, behaviours "qa walk 3" 9).
         let recent = if ed.tool == Tool::Select { recent } else { Vec::new() };
         let hovered = ed.hover.filter(|_| ed.tool == Tool::Select);
+        // (Offset's picked curves stay selected but show no badges: live none under the picked line, qa
+        // FEEL-OFFSET-PREVIEW-LOOK.)
+        let badged: &[noshape_sketch::EntityId] = if ed.offset_pending.is_some() { &[] } else { &ed.selection };
         let all = if show_all {
             all
         } else {
-            let focus: Vec<noshape_sketch::EntityId> = hovered.into_iter().chain(recent.iter().copied()).chain(ed.selection.iter().copied()).collect();
+            let focus: Vec<noshape_sketch::EntityId> = hovered.into_iter().chain(recent.iter().copied()).chain(badged.iter().copied()).collect();
             ed.focus_glyphs(&data, all, &focus)
         };
         // None while geometry is dragged, Show constraints on or not (live fc-1120 (2): back on release).
@@ -4797,7 +4800,7 @@ impl PartStudioView {
                 show_all
                     || hovered == Some(g.entity)
                     || recent.contains(&g.entity)
-                    || ed.selection.contains(&g.entity)
+                    || badged.contains(&g.entity)
                     || ed.selected_constraints.contains(&g.constraint)
                     || ed.hover_constraint == Some(g.constraint)
             })
