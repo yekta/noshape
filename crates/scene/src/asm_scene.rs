@@ -901,7 +901,7 @@ struct GlyphPen<'a> {
 
 impl GlyphPen<'_> {
     fn seg(&mut self, a: (f64, f64), b: (f64, f64), color: [u8; 4], width: f32) {
-        self.lines.segments.push(LineSegment { a: (self.at)(a.0, a.1), b: (self.at)(b.0, b.1), color, pick_id: 0, width, style: LineSegment::ON_TOP });
+        self.lines.segments.push(LineSegment { a: (self.at)(a.0, a.1), b: (self.at)(b.0, b.1), color, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
     }
     fn poly(&mut self, pts: &[(f64, f64)], color: [u8; 4], width: f32) {
         for w in pts.windows(2) {
@@ -1117,7 +1117,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
     for (k, axis) in [f.x(), f.y(), f.z()].into_iter().enumerate() {
         let tip: [f32; 3] = (f.origin + axis * size).as_vec3().into();
         let c = if highlight { HANDLE_HL } else { axis_colors()[k] };
-        lines.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: pick, width, style: LineSegment::ON_TOP });
+        lines.segments.push(LineSegment { a: o, b: tip, color: c, pick_id: pick, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
     }
 }
 
@@ -1277,7 +1277,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         pts.points.push(PointSprite { position: t.frame.origin.as_vec3().into(), color: DARK, pick_id: 0, size: if t.strong { 7.0 } else { 5.0 }, style: LineSegment::ON_TOP, _pad: 0 });
     }
     for (a, b, strong) in &h.mate_lines {
-        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: theme::rgb8(theme::viewport::SELECTION), pick_id: 0, width: if *strong { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP });
+        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: theme::rgb8(theme::viewport::SELECTION), pick_id: 0, width: if *strong { 2.0 } else { 1.2 }, style: LineSegment::ON_TOP, dash_from: 0.0 });
     }
     for arc in &h.value_arcs {
         let (f, r) = (&arc.frame, arc.radius);
@@ -1290,7 +1290,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             if in_gap(a0) || in_gap(a1) {
                 continue;
             }
-            lines.segments.push(LineSegment { a: at(a0).as_vec3().into(), b: at(a1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: at(a0).as_vec3().into(), b: at(a1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP, dash_from: 0.0 });
         }
         // Arrowheads at both ends, pointing away from the arc.
         if arc.sweep > 1e-6 {
@@ -1301,14 +1301,14 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
                 let len = r * 0.18;
                 for side in [1.0, -1.0] {
                     let base = tip - tangent * len + radial * (side * len * 0.4);
-                    lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                    lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
         }
     }
     if let Some(dim) = h.drag_dim {
         let blue = [26, 53, 184, 255];
-        let seg = |lines: &mut LineData, a: DVec3, b: DVec3| lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+        let seg = |lines: &mut LineData, a: DVec3, b: DVec3| lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
         match dim {
             DragDim::Line { start, end, tick } => {
                 seg(&mut lines, start, end);
@@ -1332,7 +1332,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             None => vec![(0.0, 1.0)],
         };
         for (t0, t1) in pieces.into_iter().filter(|(t0, t1)| t1 > t0) {
-            lines.segments.push(LineSegment { a: at(t0).as_vec3().into(), b: at(t1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: at(t0).as_vec3().into(), b: at(t1).as_vec3().into(), color: blue, pick_id: 0, width: 1.5, style: LineSegment::DASHED | LineSegment::ON_TOP, dash_from: 0.0 });
         }
         let dir = (l.b - l.a).normalize_or_zero();
         if dir != DVec3::ZERO {
@@ -1340,7 +1340,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             for (tip, out) in [(l.a, -dir), (l.b, dir)] {
                 for s in [1.0, -1.0] {
                     let base = tip - out * l.head + side * (s * l.head * 0.4);
-                    lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                    lines.segments.push(LineSegment { a: tip.as_vec3().into(), b: base.as_vec3().into(), color: blue, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
         }
@@ -1350,11 +1350,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
     for (lo, hi) in &h.boxes {
         let c = |k: usize| DVec3::new(if k & 1 == 0 { lo.x } else { hi.x }, if k & 2 == 0 { lo.y } else { hi.y }, if k & 4 == 0 { lo.z } else { hi.z });
         for (a, b) in [(0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7), (0, 4), (1, 5), (2, 6), (3, 7)] {
-            lines.segments.push(LineSegment { a: c(a).as_vec3().into(), b: c(b).as_vec3().into(), color: [242, 255, 128, 255], pick_id: 0, width: 6.0, style: LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: c(a).as_vec3().into(), b: c(b).as_vec3().into(), color: [242, 255, 128, 255], pick_id: 0, width: 6.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
         }
     }
     for (a, b) in &h.trails {
-        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::EXPLODE_LINE | LineSegment::ON_TOP });
+        lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color: DARK, pick_id: 0, width: 1.5, style: LineSegment::EXPLODE_LINE | LineSegment::ON_TOP, dash_from: 0.0 });
     }
     if !lines.segments.is_empty() {
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().ignore_clip().layer(20));
@@ -1419,7 +1419,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let (hover_edge, hover_core) = if h.explode_triad { EXPLODE_HOVER } else { (HOVER, HOVER) };
             for (w, c) in [(4.0, if hl { hover_edge } else { edge }), (core_w, if hl { hover_core } else { core })] {
                 for i in 0..segs {
-                    ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: id, width: w, style: LineSegment::ON_TOP });
+                    ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: id, width: w, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
         };
@@ -1464,7 +1464,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let fill = if phl { [HOVER[0], HOVER[1], HOVER[2], 70] } else if h.manip_dragging { [0xf7, 0xf7, 0xf8, 15] } else { [0xf7, 0xf7, 0xf8, 40] };
             for i in 1..6 {
                 let y = a0 + (a1 - a0) * i as f64 / 6.0;
-                ol.segments.push(LineSegment { a: p3(q(a0, y)), b: p3(q(a1, y)), color: fill, pick_id: pid, width: 4.0, style: LineSegment::ON_TOP });
+                ol.segments.push(LineSegment { a: p3(q(a0, y)), b: p3(q(a1, y)), color: fill, pick_id: pid, width: 4.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
             scene.set_state(pid, 0);
         }
@@ -1496,7 +1496,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let segs = if closed { n } else { n.saturating_sub(1) };
             for (w, c) in [(4.0, EDGE), (2.0, CORE)] {
                 for i in 0..segs {
-                    ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: 0, width: w, style: LineSegment::ON_TOP });
+                    ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: 0, width: w, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
         };
@@ -1575,7 +1575,7 @@ pub fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
     let arc = |lines: &mut LineData, rad: f64, color: [u8; 4], width: f32| {
         for i in 0..steps {
             let (a0, a1) = (gap1 + sweep * i as f64 / steps as f64, gap1 + sweep * (i + 1) as f64 / steps as f64);
-            lines.segments.push(LineSegment { a: at(rad, a0), b: at(rad, a1), color, pick_id: 0, width, style: LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: at(rad, a0), b: at(rad, a1), color, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
         }
     };
     // Filled with concentric strokes (meshes can't draw over the parts).
@@ -1585,10 +1585,10 @@ pub fn push_connector_glyph(lines: &mut LineData, f: &Frame, r: f64) {
     }
     arc(lines, r, RIM, 1.5);
     for a in [gap0, gap1] {
-        lines.segments.push(LineSegment { a: at(0.0, a), b: at(r, a), color: RIM, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+        lines.segments.push(LineSegment { a: at(0.0, a), b: at(r, a), color: RIM, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP, dash_from: 0.0 });
     }
     let o = f.origin;
-    let seg = |lines: &mut LineData, a: DVec3, b: DVec3, color: [u8; 4]| lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color, pick_id: 0, width: 2.5, style: LineSegment::ON_TOP });
+    let seg = |lines: &mut LineData, a: DVec3, b: DVec3, color: [u8; 4]| lines.segments.push(LineSegment { a: a.as_vec3().into(), b: b.as_vec3().into(), color, pick_id: 0, width: 2.5, style: LineSegment::ON_TOP, dash_from: 0.0 });
     seg(lines, o, o + n * (r * 1.3), [0, 0, 208, 255]);
     seg(lines, o + u * (r * 1.25), o + u * (r * 1.9), [208, 24, 24, 255]);
     seg(lines, o + v * (r * 1.25), o + v * (r * 1.9), [24, 168, 24, 255]);
@@ -1621,7 +1621,7 @@ fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: 
         };
         for (c, wd) in styles {
             for i in 0..segs {
-                ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: *c, pick_id, width: *wd, style: LineSegment::ON_TOP });
+                ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: *c, pick_id, width: *wd, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
     };
@@ -1650,7 +1650,7 @@ fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: 
     // The drag's start: "⊥" at the start base with a leader to the base
     // now; "⊢" the start direction from the base.
     if let Some((s, rotation)) = g.start {
-        let mut mark = |a: DVec3, b: DVec3| ol.segments.push(LineSegment { a: p3(a), b: p3(b), color: DRAG, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+        let mut mark = |a: DVec3, b: DVec3| ol.segments.push(LineSegment { a: p3(a), b: p3(b), color: DRAG, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP, dash_from: 0.0 });
         if rotation {
             let e = g.base + s * SECTION_HEAD_PX * w;
             let t = s.cross(g.view).try_normalize().unwrap_or(side) * 10.0 * w;

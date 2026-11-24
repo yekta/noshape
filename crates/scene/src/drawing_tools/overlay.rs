@@ -76,12 +76,13 @@ impl Overlay {
                     pick_id: 0,
                     width: 1.5,
                     style: LineSegment::ON_TOP | if *dashed { LineSegment::DASHED } else { 0 },
+                    dash_from: 0.0,
                 });
             }
         }
         for (pts, color, width) in &self.tinted {
             for w in pts.windows(2) {
-                l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: *color, pick_id: 0, width: *width, style: LineSegment::ON_TOP });
+                l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: *color, pick_id: 0, width: *width, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         for (a, b) in &self.infer {
@@ -94,11 +95,11 @@ impl Overlay {
             } else {
                 (*a, *b)
             };
-            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.5], b: [b[0] as f32, b[1] as f32, 0.5], color: [255, 198, 255, 255], pick_id: 0, width: 2.0, style: LineSegment::ON_TOP | LineSegment::DASHED });
+            l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.5], b: [b[0] as f32, b[1] as f32, 0.5], color: [255, 198, 255, 255], pick_id: 0, width: 2.0, style: LineSegment::ON_TOP | LineSegment::DASHED, dash_from: 0.0 });
         }
         for &(c, h) in &self.crosses {
             for (p, q) in [([c[0] - h, c[1] - h], [c[0] + h, c[1] + h]), ([c[0] - h, c[1] + h], [c[0] + h, c[1] - h])] {
-                l.segments.push(LineSegment { a: [p[0] as f32, p[1] as f32, 0.5], b: [q[0] as f32, q[1] as f32, 0.5], color: [255, 0, 0, 255], pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+                l.segments.push(LineSegment { a: [p[0] as f32, p[1] as f32, 0.5], b: [q[0] as f32, q[1] as f32, 0.5], color: [255, 0, 0, 255], pick_id: 0, width: 1.5, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         const ORANGE: [u8; 4] = [255, 140, 0, 255];
@@ -118,14 +119,14 @@ impl Overlay {
                 SnapMark::Hourglass => {
                     let g = [[c[0] - h, c[1] + h], [c[0] + h, c[1] + h], [c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] - h, c[1] + h]];
                     for w in g.windows(2) {
-                        l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: HOURGLASS_RGB, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP });
+                        l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: HOURGLASS_RGB, pick_id: 0, width: 1.5, style: LineSegment::ON_TOP, dash_from: 0.0 });
                     }
                     continue;
                 }
                 SnapMark::Box => {
                     let sq = [[c[0] - h, c[1] - h], [c[0] + h, c[1] - h], [c[0] + h, c[1] + h], [c[0] - h, c[1] + h], [c[0] - h, c[1] - h]];
                     for w in sq.windows(2) {
-                        l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: NOTE_BOX_RGB, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                        l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: NOTE_BOX_RGB, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
                     }
                     continue;
                 }
@@ -138,7 +139,7 @@ impl Overlay {
                 }).collect(),
             };
             for w in pts.windows(2) {
-                l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: ORANGE, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP });
+                l.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.5], b: [w[1][0] as f32, w[1][1] as f32, 0.5], color: ORANGE, pick_id: 0, width: 2.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         let mut p = PointData::default();

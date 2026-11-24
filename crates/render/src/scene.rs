@@ -45,6 +45,9 @@ pub struct LineSegment {
     pub width: f32,
     /// Bit 0: dashed. Bit 1: always on top (ignore depth).
     pub style: u32,
+    /// How much of its polyline (in the line's own units) comes before it: a dash pattern runs on along a curve
+    /// instead of starting again on each of its segments (live construction-dash-1124: laid out from the curve's start).
+    pub dash_from: f32,
 }
 
 /// A part's edges, logical px (live feel/look.json: DEFAULT_LINE_WIDTH 1, ~0.84 px of ink at a pixel ratio of 1;
@@ -93,8 +96,10 @@ impl LineSegment {
 impl LineData {
     /// Append a polyline as consecutive segments.
     pub fn push_polyline(&mut self, pts: &[[f32; 3]], color: [u8; 4], pick_id: u32, width: f32, style: u32) {
+        let mut dash_from = 0.0;
         for w in pts.windows(2) {
-            self.segments.push(LineSegment { a: w[0], b: w[1], color, pick_id, width, style });
+            self.segments.push(LineSegment { a: w[0], b: w[1], color, pick_id, width, style, dash_from });
+            dash_from += Vec3::from(w[1]).distance(Vec3::from(w[0]));
         }
     }
     pub fn bounds(&self) -> Option<(Vec3, Vec3)> {

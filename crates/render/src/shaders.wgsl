@@ -813,6 +813,7 @@ struct LineIn {
     @location(3) pick: u32,
     @location(4) width: f32,
     @location(5) style: u32,
+    @location(6) dash_from: f32,
 };
 
 struct LineOut {
@@ -1166,7 +1167,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let keep_selected = (own_edge || face_band) && (st & SELECTED) != 0u;
     o.color = vec4(select(highlight_stroke(base, st), g.select.rgb, keep_selected), alpha);
     o.pick = pick;
-    o.along = t * len;
+    // Patterns run on from the polyline's earlier segments (`dash_from`, at this segment's scale on screen).
+    let seg = length(l.b - l.a);
+    o.along = (t + select(0.0, l.dash_from / seg, seg > 0.0)) * len;
     o.world = mix(wa, wb, t);
     o.style = l.style;
     o.across = side * half;

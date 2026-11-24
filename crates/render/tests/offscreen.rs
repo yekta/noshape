@@ -1865,7 +1865,7 @@ fn edges_behind_faces_stay_hidden_at_close_zoom() {
         let far = glam::Vec3::new(lo[0], hi[1], lo[2]);
         for to in [glam::Vec3::new(hi[0], hi[1], lo[2]), glam::Vec3::new(lo[0], lo[1], lo[2]), glam::Vec3::new(lo[0], hi[1], hi[2])] {
             let t = (mm / (to - far).length()).min(0.25);
-            lines.segments.push(LineSegment { a: far.lerp(to, t).into(), b: to.lerp(far, t).into(), color: [255, 0, 0, 255], pick_id: 0, width: 1.0, style: 0 });
+            lines.segments.push(LineSegment { a: far.lerp(to, t).into(), b: to.lerp(far, t).into(), color: [255, 0, 0, 255], pick_id: 0, width: 1.0, style: 0, dash_from: 0.0 });
         }
     }
     let probes = scene.instances.len();

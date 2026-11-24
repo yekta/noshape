@@ -1928,7 +1928,7 @@ impl DrawingEditor {
             let (a, c) = noshape_scene::drawing_tools::view_frame_box(pl.min, pl.max);
             let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
             for w in q.windows(2) {
-                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         let up = self.gpu.uploader();
@@ -1970,7 +1970,7 @@ impl DrawingEditor {
         let q = [[a[0], a[1]], [c[0], a[1]], [c[0], c[1]], [a[0], c[1]], [a[0], a[1]]];
         let mut lines = LineData::default();
         for w in q.windows(2) {
-            lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: drawing_scene::GHOST_FRAME, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP });
+            lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: drawing_scene::GHOST_FRAME, pick_id: 0, width: 1.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
         }
         let up = self.gpu.uploader();
         scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
@@ -2262,7 +2262,7 @@ impl DrawingEditor {
             let (lo, hi) = (l.min(), l.max());
             let q = [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]], [lo[0], lo[1]]];
             for w in q.windows(2) {
-                frame.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP });
+                frame.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         let up = self.gpu.uploader();
@@ -2314,7 +2314,7 @@ impl DrawingEditor {
         for (style, piece) in self.tinted_pieces(built, picks, colour) {
             let width = drawing_scene::px_width(style, self.zoom).max(LIT_LINE_PX);
             for w in piece.windows(2) {
-                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: ink, pick_id: 0, width, style: LineSegment::ON_TOP });
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.4], b: [w[1][0] as f32, w[1][1] as f32, 0.4], color: ink, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         // Label boxes (behind the text, above the paper) and diamond grips.

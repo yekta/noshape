@@ -170,7 +170,7 @@ impl DrawingEditor {
         let mut lines = LineData::default();
         for l in b.geometry.lines.iter().filter(|l| circles.contains(&l.pick)) {
             for w in l.points.windows(2) {
-                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP });
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         if !lines.segments.is_empty() {
@@ -204,7 +204,7 @@ impl DrawingEditor {
         let mut lines = LineData::default();
         for l in b.geometry.lines.iter().filter(|l| picks.contains(&l.pick)) {
             for w in l.points.windows(2) {
-                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP });
+                lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width: LIT_LINE_PX, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         if !lines.segments.is_empty() {
@@ -238,7 +238,7 @@ impl DrawingEditor {
         for (style, piece) in self.tinted_pieces(b, &picks, 0x90cef1) {
             let width = drawing_scene::px_width(style, self.zoom).max(LIT_LINE_PX);
             for w in piece.windows(2) {
-                data.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
+                data.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
         }
         if !data.segments.is_empty() {
@@ -293,7 +293,7 @@ impl DrawingEditor {
             for (color, width) in [(HALO, 6.0), (CORE, 2.0)] {
                 for l in &outlines {
                     for w in l.windows(2) {
-                        lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP });
+                        lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
                     }
                 }
             }
@@ -306,7 +306,7 @@ impl DrawingEditor {
             let mut lines = LineData::default();
             let width = drawing_scene::px_width(noshape_model::drawing::sheet::LineStyle::Visible, self.zoom).max(LIT_LINE_PX);
             for (a, c) in aux {
-                lines.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [c[0] as f32, c[1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
+                lines.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [c[0] as f32, c[1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
             }
             let up = self.gpu.uploader();
             scene.instances.push(Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().unpickable().layer(18));
@@ -333,7 +333,7 @@ impl DrawingEditor {
             for l in b.geometry.lines.iter().filter(|l| row_geometry.contains(&l.pick)) {
                 let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
                 for w in l.points.windows(2) {
-                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP });
+                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: TAN, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
             if !lines.segments.is_empty() {
@@ -346,7 +346,7 @@ impl DrawingEditor {
             for l in b.geometry.lines.iter().filter(|l| edges.contains(&l.pick)) {
                 let width = drawing_scene::px_width(l.style, self.zoom).max(LIT_LINE_PX);
                 for w in l.points.windows(2) {
-                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP });
+                    lines.segments.push(LineSegment { a: [w[0][0] as f32, w[0][1] as f32, 0.6], b: [w[1][0] as f32, w[1][1] as f32, 0.6], color: REFERENCE_BLUE, pick_id: 0, width, style: LineSegment::ON_TOP, dash_from: 0.0 });
                 }
             }
             if !lines.segments.is_empty() {

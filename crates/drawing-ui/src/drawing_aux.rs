@@ -511,7 +511,7 @@ impl DrawingEditor {
         let mut points = PointData::default();
         let mut blue = MeshData::default();
         let width = crate::drawing_scene::px_width(noshape_model::drawing::sheet::LineStyle::Visible, self.zoom).max(2.0);
-        let mut seg = |l: &mut LineData, a: [f64; 2], c: [f64; 2], color: [u8; 4], w: f32| l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [c[0] as f32, c[1] as f32, 0.6], color, pick_id: 0, width: w, style: LineSegment::ON_TOP });
+        let mut seg = |l: &mut LineData, a: [f64; 2], c: [f64; 2], color: [u8; 4], w: f32| l.segments.push(LineSegment { a: [a[0] as f32, a[1] as f32, 0.6], b: [c[0] as f32, c[1] as f32, 0.6], color, pick_id: 0, width: w, style: LineSegment::ON_TOP, dash_from: 0.0 });
         let dot = |pts: &mut PointData, p: [f64; 2], color: [u8; 4]| pts.points.push(PointSprite { position: [p[0] as f32, p[1] as f32, 0.7], color, pick_id: 0, size: 8.0, style: LineSegment::ON_TOP, _pad: 0 });
         let tri = |m: &mut MeshData, pts: &[[f64; 2]], idx: &[u32]| {
             let base = m.positions.len() as u32;
