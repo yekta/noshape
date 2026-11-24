@@ -407,6 +407,9 @@ impl GFace {
             let (mut best, mut far) = (uv, d);
             // (The samples go u by u, each a run of the v values: [`free::samples`].)
             let nv = grid.iter().take_while(|x| x.0.x == grid[0].0.x).count().max(1);
+            // (A seed next to one tried (the rows' nearest samples of one turn, side by side) is that one's again.)
+            let mut tried: Vec<usize> = at.into_iter().collect();
+            let beside = |a: usize, b: usize| (a / nv).abs_diff(b / nv) <= 1 && (a % nv).abs_diff(b % nv) <= 1;
             for along_u in [false, true] {
                 // (Each row's nearest sample: a row one value of v (along u) or of u.)
                 let mut rows: Vec<(usize, f64)> = vec![(usize::MAX, f64::INFINITY); if along_u { nv } else { grid.len().div_ceil(nv) }];
@@ -418,6 +421,10 @@ impl GFace {
                 }
                 rows.sort_by(|a, b| a.1.total_cmp(&b.1));
                 for &(k, _) in rows.iter().take(8).filter(|r| r.0 != usize::MAX) {
+                    if tried.iter().any(|&t| beside(t, k)) {
+                        continue;
+                    }
+                    tried.push(k);
                     let (q, dq) = ns.param_of(p, grid[k].0, self.uvbox);
                     if dq < far {
                         (best, far) = (q, dq);

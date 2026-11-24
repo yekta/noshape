@@ -2676,6 +2676,26 @@ fn a_sprockets_tooth_gaps_cut_through_its_rounded_rim_as_occt() {
     assert!((v - vo).abs() <= 1e-7 * r.area().unwrap(), "volume {v} against OCCT's {vo}");
 }
 
+/// c2-config-parts-nuts' Sweep 1: the thread cut out of the nut, its 7-turn B-spline faces against the nut's chamfer
+/// cones and rounds (40 pairs with no section, each ~7 ms of OCCT's marching before, now proved apart by their hulls'
+/// pieces in the cones' and tori's axis frames): ours, as recorded before (OCCT's own differs from live).
+#[test]
+fn a_nuts_thread_cut_keeps_its_result_with_its_chamfers_proved_apart() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "2c326fc9abc73f28").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let counts = |s: &k::Shape| (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge), s.count(k::ShapeType::Vertex));
+    assert_eq!(counts(&r.shape), (c.summary.faces, c.summary.edges, c.summary.vertices));
+    let v = r.shape.volume().unwrap();
+    assert!((v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against {}", c.summary.volume);
+}
+
 /// Parts of one torus fused (as a private document's rib ends): a half ring and a quarter of it, their torus faces one
 /// surface whose faces' own parameters hold different parts of it ("a piece's point on another solid's face" before),
 /// the quarter's end circle lying on the half's torus face across that face's seam ("an edge on another argument's

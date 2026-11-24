@@ -5686,6 +5686,41 @@ static std::optional<Hull> face_hull(const TopoDS_Face& f)
   return h;
 }
 
+// A patch halved across its longer direction (its control polygon's longest column or row: a closed row's ends meet).
+static std::array<Hull, 2> hull_halves(const Hull& h)
+{
+  const int nu = h.s->NbUPoles(), nv = h.s->NbVPoles();
+  double    lu = 0, lv = 0;
+  for (int j = 0; j < nv; ++j)
+  {
+    double l = 0;
+    for (int i = 1; i < nu; ++i)
+      l += (h.p[static_cast<size_t>(i * nv + j)] - h.p[static_cast<size_t>((i - 1) * nv + j)]).Modulus();
+    lu = std::max(lu, l);
+  }
+  for (int i = 0; i < nu; ++i)
+  {
+    double l = 0;
+    for (int j = 1; j < nv; ++j)
+      l += (h.p[static_cast<size_t>(i * nv + j)] - h.p[static_cast<size_t>(i * nv + j - 1)]).Modulus();
+    lv = std::max(lv, l);
+  }
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  h.s->Bounds(u0, u1, v0, v1);
+  std::array<Hull, 2> out;
+  for (int k = 0; k < 2; ++k)
+  {
+    out[k].s     = occ::down_cast<Geom_BSplineSurface>(h.s->Copy());
+    out[k].depth = h.depth + 1;
+    if (lu >= lv)
+      out[k].s->Segment(k == 0 ? u0 : (u0 + u1) / 2, k == 0 ? (u0 + u1) / 2 : u1, v0, v1);
+    else
+      out[k].s->Segment(u0, u1, k == 0 ? v0 : (v0 + v1) / 2, k == 0 ? (v0 + v1) / 2 : v1);
+    hull_poles(out[k]);
+  }
+  return out;
+}
+
 // Faces apart by more than twice their tolerances where neither their boxes nor a slab shows it (c2-hunting-knife's
 // Chamfer 1: a blade face and the chamfer's B-spline 21 um apart across a slanted gap, 55 ms of OCCT's marching for no
 // curve): two patches (face_hull) are apart when their poles are, along an axis, either patch's normal at its middle,
@@ -5749,40 +5784,6 @@ static bool hulls_apart(const TopoDS_Face& fa, const TopoDS_Face& fb)
     for (const gp_XYZ& q : h.p)
       box.Add(gp_Pnt(q));
     return box.SquareExtent();
-  };
-  // A patch halved across its longer direction (its control polygon's longest column or row: a closed row's ends
-  // meet).
-  const auto halves = [](const Hull& h) {
-    const int nu = h.s->NbUPoles(), nv = h.s->NbVPoles();
-    double    lu = 0, lv = 0;
-    for (int j = 0; j < nv; ++j)
-    {
-      double l = 0;
-      for (int i = 1; i < nu; ++i)
-        l += (h.p[static_cast<size_t>(i * nv + j)] - h.p[static_cast<size_t>((i - 1) * nv + j)]).Modulus();
-      lu = std::max(lu, l);
-    }
-    for (int i = 0; i < nu; ++i)
-    {
-      double l = 0;
-      for (int j = 1; j < nv; ++j)
-        l += (h.p[static_cast<size_t>(i * nv + j)] - h.p[static_cast<size_t>(i * nv + j - 1)]).Modulus();
-      lv = std::max(lv, l);
-    }
-    double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
-    h.s->Bounds(u0, u1, v0, v1);
-    std::array<Hull, 2> out;
-    for (int k = 0; k < 2; ++k)
-    {
-      out[k].s     = occ::down_cast<Geom_BSplineSurface>(h.s->Copy());
-      out[k].depth = h.depth + 1;
-      if (lu >= lv)
-        out[k].s->Segment(k == 0 ? u0 : (u0 + u1) / 2, k == 0 ? (u0 + u1) / 2 : u1, v0, v1);
-      else
-        out[k].s->Segment(u0, u1, k == 0 ? v0 : (v0 + v1) / 2, k == 0 ? (v0 + v1) / 2 : v1);
-      hull_poles(out[k]);
-    }
-    return out;
   };
   // A patch's corners (its corner poles: a B-spline's own points there) and middle.
   const auto points = [](const Hull& h) {
@@ -5853,10 +5854,10 @@ static bool hulls_apart(const TopoDS_Face& fa, const TopoDS_Face& fb)
       if (--left < 0 || crossing(x.a, x.b) || close_by(x.a, x.b) || (sa <= 16 * margin * margin && sb <= 16 * margin * margin) || std::max(x.a.depth, x.b.depth) >= 30 || narrow(x.a) || narrow(x.b))
         return false;
       if (sa >= sb)
-        for (Hull& h : halves(x.a))
+        for (Hull& h : hull_halves(x.a))
           push(std::move(h), Hull(x.b));
       else
-        for (Hull& h : halves(x.b))
+        for (Hull& h : hull_halves(x.b))
           push(Hull(x.a), std::move(h));
     }
   }
@@ -5865,6 +5866,201 @@ static bool hulls_apart(const TopoDS_Face& fa, const TopoDS_Face& fb)
     return false;
   }
   return true;
+}
+
+// A face of revolution and a face its revolved curve passes by (c2-valve-config's body, a B-spline revolved, against its
+// pattern's drafted holes: 4-16 ms of OCCT's marching a pair for no curve): seen round the axis, (distance from it,
+// height along it), the other face's box clear of every piece's box of the curve over the face's v range, by more than
+// hulls_apart's margin (boxes in the axis's frame: a box's square there holds the shape, so this only proves "apart").
+static bool apart_round_axis(const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  const double margin = 2 * (BRep_Tool::Tolerance(fa) + BRep_Tool::Tolerance(fb)) + Precision::Confusion();
+  for (const bool a_round : {true, false})
+  {
+    const BRepAdaptor_Surface s(a_round ? fa : fb, true);
+    if (s.GetType() != GeomAbs_SurfaceOfRevolution)
+      continue;
+    const gp_Ax3  frame(s.AxeOfRevolution().Location(), s.AxeOfRevolution().Direction());
+    gp_Trsf       to;
+    to.SetTransformation(frame);
+    // (Distance from the axis and height ranges of a box's square in the axis's frame.)
+    struct Shadow
+    {
+      double r0, r1, z0, z1;
+    };
+    auto shadow = [&](const Bnd_Box& b) {
+      double x0 = 0, y0 = 0, z0 = 0, x1 = 0, y1 = 0, z1 = 0;
+      b.Get(x0, y0, z0, x1, y1, z1);
+      Bnd_Box l;
+      for (int k = 0; k < 8; ++k)
+        l.Add(gp_Pnt(k & 1 ? x1 : x0, k & 2 ? y1 : y0, k & 4 ? z1 : z0).Transformed(to));
+      l.Get(x0, y0, z0, x1, y1, z1);
+      const double dx = x0 > 0 ? x0 : x1 < 0 ? -x1 : 0, dy = y0 > 0 ? y0 : y1 < 0 ? -y1 : 0;
+      return Shadow{std::hypot(dx, dy), std::hypot(std::max(-x0, x1), std::max(-y0, y1)), z0, z1};
+    };
+    Bnd_Box other;
+    BRepBndLib::AddOptimal(a_round ? fb : fa, other, false, false);
+    if (other.IsVoid())
+      return false;
+    const Shadow o = shadow(other);
+    const occ::handle<Adaptor3d_Curve> c = s.BasisCurve();
+    const double v0 = s.FirstVParameter(), v1 = s.LastVParameter();
+    if (c.IsNull() || !(v1 > v0) || Precision::IsInfinite(v0) || Precision::IsInfinite(v1))
+      return false;
+    const int n = 32;
+    for (int k = 0; k < n; ++k)
+    {
+      Bnd_Box piece;
+      BndLib_Add3dCurve::AddOptimal(*c, v0 + (v1 - v0) * k / n, v0 + (v1 - v0) * (k + 1) / n, 0, piece);
+      const Shadow p = shadow(piece);
+      if (p.r0 <= o.r1 + margin && o.r0 <= p.r1 + margin && p.z0 <= o.z1 + margin && o.z0 <= p.z1 + margin)
+        return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+// A cylinder, cone, sphere or torus face and a free-form one (face_hull) apart where every piece of the latter's hull,
+// halved as hulls_apart's, is in the former's axis frame off its face's heights, distances from the axis or angles,
+// or farther from its surface than the margin (c2-config-parts-nuts' thread against its nut's chamfers and rounds: 40
+// of OCCT's marchings, ~7 ms each, for no curve). Only "apart" is proved: anything else is OCCT's.
+static bool apart_from_round(const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  const double margin = 2 * (BRep_Tool::Tolerance(fa) + BRep_Tool::Tolerance(fb)) + Precision::Confusion();
+  for (const bool a_round : {true, false})
+  {
+    const TopoDS_Face&        rf = a_round ? fa : fb;
+    const BRepAdaptor_Surface s(rf, false);
+    const GeomAbs_SurfaceType t = s.GetType();
+    if (t != GeomAbs_Cylinder && t != GeomAbs_Cone && t != GeomAbs_Sphere && t != GeomAbs_Torus)
+      continue;
+    std::optional<Hull> hull = face_hull(a_round ? fb : fa);
+    if (!hull)
+      return false;
+    const gp_Ax3 pos = t == GeomAbs_Cylinder ? s.Cylinder().Position() : t == GeomAbs_Cone ? s.Cone().Position() : t == GeomAbs_Sphere ? s.Sphere().Position() : s.Torus().Position();
+    double       u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+    BRepTools::UVBounds(rf, u0, u1, v0, v1);
+    // (Cos and sin of the angles over [a, b]: their ends and the quarter turns between.)
+    const auto trig = [](double a, double b, double& clo, double& chi, double& slo, double& shi) {
+      clo = std::min(std::cos(a), std::cos(b)), chi = std::max(std::cos(a), std::cos(b));
+      slo = std::min(std::sin(a), std::sin(b)), shi = std::max(std::sin(a), std::sin(b));
+      for (double q = std::ceil(a / (M_PI / 2)) * (M_PI / 2); q <= b; q += M_PI / 2)
+      {
+        const long k = std::lround(q / (M_PI / 2)) % 4;
+        const int  m = static_cast<int>(k < 0 ? k + 4 : k);
+        if (m == 0)
+          chi = 1;
+        else if (m == 1)
+          shi = 1;
+        else if (m == 2)
+          clo = -1;
+        else
+          slo = -1;
+      }
+    };
+    // (The face's distances from the axis and heights; the surface's big and small radius, its slope.)
+    double rlo = 0, rhi = 0, zlo = 0, zhi = 0, big = 0, small = 0, slope = 0, cos_a = 1;
+    if (t == GeomAbs_Cylinder)
+      big = s.Cylinder().Radius(), rlo = rhi = big, zlo = v0, zhi = v1;
+    else if (t == GeomAbs_Cone)
+    {
+      big = s.Cone().RefRadius(), slope = std::tan(s.Cone().SemiAngle()), cos_a = std::cos(s.Cone().SemiAngle());
+      zlo = v0 * cos_a, zhi = v1 * cos_a;
+      rlo = std::min(big + zlo * slope, big + zhi * slope), rhi = std::max(big + zlo * slope, big + zhi * slope);
+      if (!(rlo >= 0))
+        return false;
+    }
+    else
+    {
+      double clo = 0, chi = 0, slo = 0, shi = 0;
+      trig(v0, v1, clo, chi, slo, shi);
+      big = t == GeomAbs_Sphere ? 0 : s.Torus().MajorRadius(), small = t == GeomAbs_Sphere ? s.Sphere().Radius() : s.Torus().MinorRadius();
+      if (t == GeomAbs_Torus && !(big > small))
+        return false;
+      rlo = big + small * clo, rhi = big + small * chi, zlo = small * slo, zhi = small * shi;
+    }
+    if (!(u1 > u0) || !(v1 > v0) || Precision::IsInfinite(zlo) || Precision::IsInfinite(zhi))
+      return false;
+    gp_Trsf to;
+    to.SetTransformation(pos);
+    const bool turns = pos.Direct() && u1 - u0 < 2 * M_PI;
+    // (A piece apart: its poles' box in the axis frame, its distances from the axis and heights against the face's,
+    // its angles against the face's, its distance from the surface's section through the axis.)
+    const auto apart = [&](const Hull& h) {
+      double x0 = 1e300, y0 = 1e300, z0 = 1e300, x1 = -1e300, y1 = -1e300, z1 = -1e300;
+      for (const gp_XYZ& q : h.p)
+      {
+        gp_XYZ l = q;
+        to.Transforms(l);
+        x0 = std::min(x0, l.X()), y0 = std::min(y0, l.Y()), z0 = std::min(z0, l.Z());
+        x1 = std::max(x1, l.X()), y1 = std::max(y1, l.Y()), z1 = std::max(z1, l.Z());
+      }
+      const double dx = x0 > 0 ? x0 : x1 < 0 ? -x1 : 0, dy = y0 > 0 ? y0 : y1 < 0 ? -y1 : 0;
+      const double r0 = std::hypot(dx, dy), r1 = std::hypot(std::max(-x0, x1), std::max(-y0, y1));
+      if (r0 > rhi + margin || r1 < rlo - margin || z0 > zhi + margin || z1 < zlo - margin)
+        return true;
+      if (turns && r0 > margin)
+      {
+        const double mid = std::atan2(0.5 * (y0 + y1), 0.5 * (x0 + x1));
+        double       a0 = 1e300, a1 = -1e300;
+        for (int k = 0; k < 4; ++k)
+        {
+          const double a = std::remainder(std::atan2(k & 2 ? y1 : y0, k & 1 ? x1 : x0) - mid, 2 * M_PI);
+          a0 = std::min(a0, a), a1 = std::max(a1, a);
+        }
+        const double widen = std::asin(std::min(1.0, margin / r0)) + 1e-12;
+        const double f0 = u0 - widen, f1 = u1 + widen, shift = 2 * M_PI * std::floor((mid + a0 - f0) / (2 * M_PI));
+        if (f1 - f0 < 2 * M_PI && mid + a0 > f1 + shift && mid + a1 < f0 + shift + 2 * M_PI)
+          return true;
+      }
+      const auto off0 = [](double lo, double hi) { return lo > 0 ? lo : hi < 0 ? -hi : 0.0; };
+      double     lo = 0, hi = 0;
+      if (t == GeomAbs_Cylinder)
+        lo = r0 - big, hi = r1 - big;
+      else if (t == GeomAbs_Cone)
+      {
+        const double a = big + z0 * slope, b = big + z1 * slope;
+        lo = (r0 - std::max(a, b)) * cos_a, hi = (r1 - std::min(a, b)) * cos_a;
+      }
+      else
+      {
+        const double q0 = r0 - big, q1 = r1 - big;
+        lo = std::hypot(off0(q0, q1), off0(z0, z1)) - small;
+        hi = std::hypot(std::max(std::abs(q0), std::abs(q1)), std::max(std::abs(z0), std::abs(z1))) - small;
+      }
+      return lo > margin || hi < -margin;
+    };
+    const auto size = [](const Hull& h) {
+      Bnd_Box box;
+      for (const gp_XYZ& q : h.p)
+        box.Add(gp_Pnt(q));
+      return box.SquareExtent();
+    };
+    std::vector<Hull> todo;
+    todo.push_back(std::move(*hull));
+    int left = 1000;
+    try
+    {
+      while (!todo.empty())
+      {
+        Hull h = std::move(todo.back());
+        todo.pop_back();
+        if (apart(h))
+          continue;
+        if (--left < 0 || h.depth >= 30 || size(h) <= 16 * margin * margin)
+          return false;
+        for (Hull& half : hull_halves(h))
+          todo.push_back(std::move(half));
+      }
+    }
+    catch (const Standard_Failure&)
+    {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 // Our Boolean's own sections: own_sections, else a face resting on a plane, faces meeting only in a slab or apart by
@@ -5880,7 +6076,7 @@ static bool boolean_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::
   // (Only with a free-form face: OCCT's sections of planes, cylinders, cones and spheres are analytic and quick (a plate's
   // holes paid the exact boxes for nothing).)
   const auto free_form = [](const TopoDS_Face& f) { return BRepAdaptor_Surface(f, false).GetType() > GeomAbs_Sphere; };
-  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out, exact) || apart_across_slab(fa, fb, exact) || hulls_apart(fa, fb));
+  return (free_form(fa) || free_form(fb)) && (resting_on_plane(fa, fb, out, exact) || apart_across_slab(fa, fb, exact) || apart_round_axis(fa, fb) || apart_from_round(fa, fb) || hulls_apart(fa, fb));
 }
 
 // The point of `s` nearest `p` from `uv` by Newton's steps, on a bound where the step passes one that isn't a period's
