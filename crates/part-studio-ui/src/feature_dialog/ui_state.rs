@@ -288,14 +288,10 @@ impl FeatureDialog {
                         fields.extend(entries);
                         continue;
                     }
-                    let q = specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. }));
                     let picked = s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS);
                     let mut text = vec![crate::i18n::spec(s.label).to_string()];
                     for (k, it) in values.array(s.id).iter().enumerate() {
-                        text.push(match s.item_template {
-                            Some(t) => self.item_label(t, it, specs, s.id, k),
-                            None => q.and_then(|q| it.query(q.id).first()).map(|r| (self.labeler)(r)).unwrap_or_default(),
-                        });
+                        text.push(self.entry_label(s, specs, it, k));
                         // A picked list's rows each end in their × (live ui-parity loft-new-edit-reedit).
                         if picked {
                             text.push("×".into());

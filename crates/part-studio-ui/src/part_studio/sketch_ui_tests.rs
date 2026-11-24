@@ -7982,6 +7982,37 @@ fn an_error_naming_a_checkbox_adds_no_value_suffix(cx: &mut TestAppContext) {
     assert_eq!(title(cx, "distance"), Some(format!("{msg} A parameter value is not valid.")), "a value field: the suffix");
 }
 
+/// Live errors-1123 loft empty: an error naming a list of selections (Loft's Profiles) reads as it is.
+#[gpui::test]
+fn an_error_naming_a_list_of_selections_adds_no_value_suffix(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "array-error");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("loft", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Loft dialog").dialog.clone());
+    let msg = "Select profiles in order from start to finish.";
+    let title = dialog.update(cx, |d, cx| {
+        d.set_status(Some((noshape_model::display::FeatureStatus::Error, msg.to_string())), cx);
+        d.set_faulty(vec!["sheetProfilesArray".to_string()], false, cx);
+        d.title_status().map(|s| s.1)
+    });
+    assert_eq!(title.as_deref(), Some(msg));
+}
+
+/// Live errors-1123 loft guides-empty: a guide entry without its pick reads "No selections".
+#[gpui::test]
+fn an_empty_guide_entry_reads_no_selections(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "empty-guide");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("loft", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Loft dialog").dialog.clone());
+    dialog.update(cx, |d, _| {
+        d.feature.params.set("addGuides", noshape_model::ParamValue::Bool(true));
+        d.feature.params.set("guidesArray", noshape_model::ParamValue::Array(vec![Default::default()]));
+    });
+    let state = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap().to_string();
+    assert!(state.contains("Guides No selections"), "{state}");
+}
+
 /// Live errors-1123 fl-joint2: an error naming a selection field draws its entry red ("Edge of Flange 1"); one naming
 /// another field leaves it dark.
 #[gpui::test]

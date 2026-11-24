@@ -1402,6 +1402,16 @@ impl FeatureDialog {
         }
     }
 
+    /// A picked list's row: its template's text, else its pick; "No selections" without one (live errors-1123 loft
+    /// guides-empty).
+    fn entry_label(&self, arr: &ParamSpec, specs: &[ParamSpec], item: &ParamValues, index: usize) -> String {
+        let label = match arr.item_template {
+            Some(t) => self.item_label(t, item, specs, arr.id, index),
+            None => specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. })).and_then(|q| item.query(q.id).first()).map(|r| (self.labeler)(r)).unwrap_or_default(),
+        };
+        if label.is_empty() { "No selections".to_string() } else { label }
+    }
+
     /// An array item's label from its template (FeatureScript "Item label
     /// template"): `#param` = the item's value of that parameter (a pick's
     /// name, an option's label, a value as typed), `#index` = its position.
@@ -2402,7 +2412,14 @@ impl FeatureDialog {
         // parameter value is not valid."; Revolute limits, Linear pattern distance); one naming only selection
         // fields doesn't (Hole's "No hole points selected.", live2 pattern-hole-1118 y), nor one naming a checkbox
         // (live errors-1123 lp-feat-off: Reapply features, "Could not create all instances…").
-        if let Some((FeatureStatus::Error, msg)) = self.status.as_ref().filter(|s| self.faulty.iter().any(|f| !self.spec_for_path(f).is_some_and(|p| matches!(p.kind, ParamKind::Query { .. } | ParamKind::Bool { .. }))) && !s.1.ends_with(VALUE_NOT_VALID)) {
+        // A list of selections counts as a selection field (live errors-1123 loft empty: "Select profiles in order from
+        // start to finish." alone).
+        let pick = |p: &ParamSpec| match &p.kind {
+            ParamKind::Query { .. } | ParamKind::Bool { .. } => true,
+            ParamKind::Array { item, .. } => item.iter().any(|i| matches!(i.kind, ParamKind::Query { .. })),
+            _ => false,
+        };
+        if let Some((FeatureStatus::Error, msg)) = self.status.as_ref().filter(|s| self.faulty.iter().any(|f| !self.spec_for_path(f).is_some_and(pick)) && !s.1.ends_with(VALUE_NOT_VALID)) {
             return Some((FeatureStatus::Error, format!("{msg} {VALUE_NOT_VALID}")));
         }
         self.status.clone()
@@ -3740,12 +3757,7 @@ impl FeatureDialog {
                     // a click on its title or chevron folds it (live2 11-14, Fill's Edges: feel/fill-rows.png).
                     let rows = !collapse && !focus_only;
                     for k in 0..items {
-                        let r = q.and_then(|q| values.array(arr_id).get(k).and_then(|it| it.query(q.id).first().cloned()));
-                        let label = match (s.item_template, values.array(arr_id).get(k)) {
-                            (Some(t), Some(it)) => self.item_label(t, it, item_specs, arr_id, k),
-                            // Live errors-1123 loft guides-empty: an entry without its pick.
-                            _ => r.as_ref().map_or_else(|| "No selections".to_string(), |r| (self.labeler)(r)),
-                        };
+                        let label = values.array(arr_id).get(k).map_or_else(|| "No selections".to_string(), |it| self.entry_label(s, item_specs, it, k));
                         let item_key = format!("{arr_id}.{k}");
                         let open = if rows { !self.closed_items.contains(&item_key) } else { collapse && self.open_items.contains(&item_key) };
                         let toggle_key = item_key.clone();
