@@ -1052,10 +1052,11 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let pick = global_pick(l.pick);
     let st = (state_of(pick) | state_add) & state_mask;
     // params.x bit 2 (Instance::selected_only): only its selected, query-lit or hovered lines; bit 4 too (on top):
-    // only the selected. Bit 7 (Instance::unlit_only): only the others (all in the pick pass, which has no lit copy).
+    // only the selected; a failing feature's red picks with either. Bit 7 (Instance::unlit_only): only the others (all
+    // in the pick pass, which has no lit copy).
     let on_top = (inst.params.x & 16u) != 0u;
     let lit_line = (st & select(SELECTED | QUERY | HOVER, SELECTED, on_top)) != 0u;
-    if (((inst.params.x & 4u) != 0u && !lit_line) || ((inst.params.x & 128u) != 0u && lit_line && g.viewport.w <= 0.0)) {
+    if (((inst.params.x & 4u) != 0u && !lit_line && (st & ERROR) == 0u) || ((inst.params.x & 128u) != 0u && lit_line && g.viewport.w <= 0.0)) {
         var gone: LineOut;
         gone.pos = vec4(0.0, 0.0, -2.0, 1.0);
         return gone;

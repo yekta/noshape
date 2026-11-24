@@ -2431,3 +2431,28 @@ fn a_selected_edge_on_its_hovered_face_is_a_flat_band(cx: &mut TestAppContext) {
     let col = across(&c, m.screen(cx, EDGE) - m.screen(cx, FACE) + DVec2::new(40.0, 40.0));
     assert!(col.iter().any(|p| close(*p, 0xf8a820, 8)) && !col.iter().any(|p| p[0] < 0xe8 && p[2] < 0x30), "across the band {col:02x?}");
 }
+
+/// qa ERR-SM-BAD-SELECTION-RED (live errors-1123 sheet-metal fl-joint2 vp): from the default view, where Flange 1's
+/// wall hides the joint edge, live draws it red over the wall (its red line inside the wall's face, a few px above the
+/// wall's bottom outline), as a picked edge is drawn through the part.
+#[gpui::test]
+fn a_failing_flanges_joint_edge_is_red_through_the_wall(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "sheetMetalStart", "name": "Sheet metal model 1", "params": { "process": "THICKEN", "regions": ["Sketch 1 region 0"], "thickness": "2 mm", "radius": "2 mm" } },
+        { "type": "sheetMetalFlange", "name": "Flange 1", "params": { "edges": ["edge through [20, 0, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 2", "params": { "edges": ["edge through [60, 25, 2]"] } },
+        { "type": "sheetMetalFlange", "name": "Flange 3", "params": { "edges": ["edge through [29, 2, 2]"] } },
+    ] });
+    let m = matrix_studio_from(cx, "sm-flange-joint-red-wall", start);
+    m.park(cx);
+    let red = |cx: &mut TestAppContext| m.frame(cx).2.iter().filter(|c| close(**c, 0xbd3039, 40)).count();
+    let before = red(cx);
+    let flange = cx.update(|cx| m.view.read(cx).studio(cx).and_then(|st| st.features.iter().find(|f| f.name == "Flange 3").map(|f| f.id))).expect("Flange 3");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(flange, w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy() && m.view.read(cx).edit.as_ref().is_some_and(|e| e.dialog.read(cx).status.is_some()));
+    m.park(cx);
+    let after = red(cx);
+    assert!(after >= before + 40, "red px: {before} closed, {after} with the dialog open");
+}

@@ -1813,7 +1813,9 @@ pub fn with_highlights(built: &BuiltScene, display: &StudioDisplay, selection: &
     // Fills never show through, but a selected face's boundary and a selected edge are drawn over everything: a hidden
     // selected face shows as its outline through the part (live sel-see-through-1122). The part edges drawn again where
     // hidden, only their selected lines (where seen, the band stays as drawn).
-    let selected_edge = (1..scene.states.len() as u32).any(|id| scene.states[id as usize] & (state::SELECTED | state::BODY) == state::SELECTED && built.picks.get(id).is_some_and(|t| t.kind == PickKind::Edge));
+    // A failing feature's picked edge too, red (live errors-1123 fl-joint2: the joint edge red over Flange 1's wall).
+    let lit_edge = |s: u32| s & (state::SELECTED | state::BODY) == state::SELECTED || s & state::ERROR != 0;
+    let selected_edge = (1..scene.states.len() as u32).any(|id| lit_edge(scene.states[id as usize]) && built.picks.get(id).is_some_and(|t| t.kind == PickKind::Edge));
     if selected_edge {
         let edges: Vec<Instance> = scene.instances[..built.static_instances]
             .iter()
