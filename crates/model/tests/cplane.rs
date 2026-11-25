@@ -531,3 +531,96 @@ fn mid_plane_of_an_edge_and_a_point_says_what_it_needs() {
     let st = r.display.feature_state(two).unwrap();
     assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Mid plane requires 2 points, 2 planes or 1 open edge.")));
 }
+
+/// Live's block (skasm plane-use-1125): 40 x 30 on Top, 20 high.
+fn block(s: &mut Studio) {
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(DVec2::ZERO, DVec2::new(mm(40.0), mm(30.0)));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = s.regen();
+    let key = r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions[0].key.clone();
+    s.add("extrude", move |p| {
+        p.set("entities", qs(vec![Reference::SketchRegion { sketch: sid, key }]));
+        p.set("depth", expr("20 mm"));
+    });
+}
+
+fn edge_between(r: &RegenResult, a: DVec3, b: DVec3) -> Reference {
+    let body = &r.context.bodies[0];
+    let i = body
+        .shape
+        .edges()
+        .iter()
+        .position(|e| e.endpoints().is_ok_and(|(p, q)| (near3(p, a) && near3(q, b)) || (near3(p, b) && near3(q, a))))
+        .expect("edge");
+    Reference::Edge((*body.edges[i]).clone())
+}
+
+fn vertex_at(r: &RegenResult, at: DVec3) -> Reference {
+    let body = &r.context.bodies[0];
+    let i = body.shape.vertices().iter().position(|v| v.vertex_point().is_ok_and(|p| near3(p, at))).expect("vertex");
+    Reference::Vertex((*body.vertices[i]).clone())
+}
+
+fn face_normal_to(r: &RegenResult, n: DVec3, at: f64) -> Reference {
+    let body = &r.context.bodies[0];
+    let i = body
+        .shape
+        .faces()
+        .iter()
+        .position(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Plane(p) if near(p.normal.dot(n).abs(), 1.0, 1e-9) && near(p.origin.dot(n), at, 1e-9)))
+        .expect("face");
+    Reference::Face((*body.faces[i]).clone())
+}
+
+/// Live (skasm plane-use-1125 A3-A5, FS evPlane on its 40 x 30 x 20 block): Line angle on the top front edge alone turns
+/// about the edge from the front face's plane (0 deg normal +y, 30 deg (0, 0.866, 0.5)); Mid plane of the front and back
+/// faces, of two vertices (their bisector) and of one edge (normal along it); Point normal of the edge and its end
+/// vertex, at the vertex.
+#[test]
+fn planes_on_a_block_lie_as_live() {
+    let mut s = Studio::new();
+    block(&mut s);
+    let r = s.ok();
+    let v = |x: f64, y: f64, z: f64| DVec3::new(mm(x), mm(y), mm(z));
+    let edge = edge_between(&r, v(0.0, 0.0, 20.0), v(40.0, 0.0, 20.0));
+    let mut add = |ty: &str, refs: Vec<Reference>, angle: Option<&str>| {
+        let ty = ty.to_string();
+        let angle = angle.map(str::to_string);
+        s.plane(move |p| {
+            p.set("cplaneType", en(&ty));
+            p.set("entities", qs(refs));
+            if let Some(a) = angle {
+                p.set("angle", expr(&a));
+            }
+        })
+    };
+    let la0 = add("LINE_ANGLE", vec![edge.clone()], Some("0 deg"));
+    let la30 = add("LINE_ANGLE", vec![edge.clone()], Some("30 deg"));
+    let la90 = add("LINE_ANGLE", vec![edge.clone()], Some("90 deg"));
+    let faces = add("MID_PLANE", vec![face_normal_to(&r, DVec3::Y, 0.0), face_normal_to(&r, DVec3::Y, mm(30.0))], None);
+    let verts = add("MID_PLANE", vec![vertex_at(&r, v(0.0, 0.0, 0.0)), vertex_at(&r, v(40.0, 30.0, 20.0))], None);
+    let one = add("MID_PLANE", vec![edge.clone()], None);
+    let pn = add("LINE_POINT", vec![edge, vertex_at(&r, v(40.0, 0.0, 20.0))], None);
+    let r = s.regen();
+    let got = |id: FeatureId| {
+        let (f, ..) = Studio::frame(&r, id);
+        (f.origin / 1e-3, f.normal)
+    };
+    let mut bad = Vec::new();
+    for (name, id, o, n) in [
+        ("line angle 0", la0, (20.0, 0.0, 20.0), DVec3::Y),
+        ("line angle 30", la30, (20.0, 0.0, 20.0), DVec3::new(0.0, 0.75f64.sqrt(), 0.5)),
+        ("line angle 90", la90, (20.0, 0.0, 20.0), DVec3::Z),
+        ("mid faces", faces, (20.0, 15.0, 10.0), -DVec3::Y),
+        ("mid vertices", verts, (20.0, 15.0, 10.0), DVec3::new(40.0, 30.0, 20.0).normalize()),
+        ("mid edge", one, (20.0, 0.0, 20.0), DVec3::X),
+        ("point normal", pn, (40.0, 0.0, 20.0), DVec3::X),
+    ] {
+        let (go, gn) = got(id);
+        if !(near3(go * 1e-3, DVec3::new(o.0, o.1, o.2) * 1e-3) && near3(gn, n)) {
+            bad.push(format!("{name}: origin {go:.3} normal {gn:.3}, live ({o:?}) {n:.3}"));
+        }
+    }
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

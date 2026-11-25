@@ -1602,6 +1602,42 @@ fn a_variables_value_out_of_range_is_out_of_range() {
     }
 }
 
+/// Live (skasm variables-1125 (3)): a length Variable valued `5 deg` fails naming its value, the sketch dimensioned by
+/// it warns "Some dimension expressions could not be evaluated." and the Extrude by it can't find it.
+#[test]
+fn a_length_variable_valued_in_degrees_fails_as_live() {
+    let mut s = Studio::new();
+    let var = s.add("assignVariable", |p| {
+        p.set("name", ParamValue::Text("a".into()));
+        p.set("variableType", en("LENGTH"));
+        p.set("lengthValue", expr("5 deg"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let c = sk.add_circle(DVec2::ZERO, mm(4.0));
+    let cid = sk.add_constraint(noshape_sketch::ConstraintKind::Radius { curve: c, value: mm(4.0) }).unwrap();
+    let mut data = SketchData { sketch: sk, ..Default::default() };
+    data.dimension_exprs.insert(cid.0, ExprValue::new("#a"));
+    let sketch = s.add("sketch", |p| {
+        p.set("sketchPlane", q(Reference::Plane(DatumPlane::Top)));
+        p.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
+    });
+    let rc = s.region(sketch);
+    s.add("extrude", move |p| {
+        p.set("entities", q(rc));
+        p.set("depth", expr("#a"));
+    });
+    let r = s.regen();
+    let status = |id: FeatureId| {
+        let i = s.ps.features.iter().position(|f| f.id == id).unwrap();
+        let f = &r.display.features[i];
+        (f.status, f.message.clone().unwrap_or_default())
+    };
+    assert_eq!(status(var), (FeatureStatus::Error, "Cannot use 5 deg (angle) as length.".to_string()));
+    assert_eq!(status(sketch), (FeatureStatus::Warning, "Some dimension expressions could not be evaluated.".to_string()));
+    let last = r.display.features.last().unwrap();
+    assert_eq!((last.status, last.message.clone().unwrap_or_default()), (FeatureStatus::Error, "Variable not found, is suppressed, or has not been set.".to_string()));
+}
+
 /// Live (live2 feature-dialogs-1119): a Linear pattern's Instance count of 2.5 is refused ("Enter a valid expression.",
 /// the field marked); 1 + 2 is 3.
 #[test]

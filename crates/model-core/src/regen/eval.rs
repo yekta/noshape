@@ -522,6 +522,21 @@ impl<'a> EvalCtx<'a> {
     }
 
     pub fn eval_num_in(&self, vals: &ParamValues, id: &str, kind: NumKind) -> FResult<f64> {
+        self.eval_num_with(vals, id, kind, |text, x| FeatureError::new(format!("{text}: {x}")))
+    }
+
+    /// A Variable's value: live names the expression ("Cannot use 5 deg (angle) as length.", variables-1125).
+    pub fn variable_value(&self, id: &str, kind: NumKind) -> FResult<f64> {
+        self.eval_num_with(self.params, id, kind, |text, x| match x {
+            noshape_units::EvalError::WrongDimension { expected, found } => {
+                let word = |d: Dim| if d == Dim::UNITLESS { "number".to_string() } else { d.name() };
+                FeatureError::new(format!("Cannot use {} ({}) as {}.", text.trim(), word(found), word(expected)))
+            }
+            x => FeatureError::new(format!("{text}: {x}")),
+        })
+    }
+
+    fn eval_num_with(&self, vals: &ParamValues, id: &str, kind: NumKind, other: impl Fn(&str, noshape_units::EvalError) -> FeatureError) -> FResult<f64> {
         let e = match vals.get(id) {
             Some(ParamValue::Expr(e)) => e,
             _ => return err(format!("Missing value for {id}")),
@@ -534,7 +549,7 @@ impl<'a> EvalCtx<'a> {
             // Onshape's message (live qa5 pass 8: a Variable moved below the
             // feature using it).
             noshape_units::EvalError::UndefinedVariable(_) => FeatureError::new("Variable not found, is suppressed, or has not been set."),
-            x => FeatureError::new(format!("{}: {x}", e.text)),
+            x => other(&e.text, x),
         })?;
         Ok(q.value)
     }

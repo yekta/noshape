@@ -2,6 +2,7 @@
 
 use crate::regen::eval::{EvalCtx, FResult, NamedShape, err, err_at};
 use noshape_kernel as k;
+use crate::params::NumKind;
 use noshape_units::Dim;
 
 /// Onshape's note for a Boolean that changes nothing (live qa5 BOOL1).
@@ -271,9 +272,9 @@ pub fn variable(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::custom_features::evaluate_std(ev, "variable.fs", "assignVariable");
     }
     let q = match ev.enum_("variableType") {
-        "LENGTH" => noshape_units::Quantity::new(ev.length("lengthValue")?, Dim::LENGTH),
-        "ANGLE" => noshape_units::Quantity::new(ev.angle("angleValue")?, Dim::ANGLE),
-        "NUMBER" => noshape_units::Quantity::new(ev.real("numberValue")?, Dim::UNITLESS),
+        "LENGTH" => noshape_units::Quantity::new(ev.variable_value("lengthValue", NumKind::Length)?, Dim::LENGTH),
+        "ANGLE" => noshape_units::Quantity::new(ev.variable_value("angleValue", NumKind::Angle)?, Dim::ANGLE),
+        "NUMBER" => noshape_units::Quantity::new(ev.variable_value("numberValue", NumKind::Real)?, Dim::UNITLESS),
         _ => {
             let text = ev.params.text("anyValue").to_string();
             // A string (c2-config-parts' configured part names, `"mm MGN9 Linear Rail"`) is a FeatureScript value, not

@@ -188,6 +188,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             let _ = sk.set_dimension_value(id, v);
         }
     };
+    let mut unevaluated = false;
     for (cid, expr) in &data.dimension_exprs {
         let id = ConstraintId(*cid);
         let Some(c) = sk.constraint(id) else { continue };
@@ -203,7 +204,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         let scale = c.kind.display_scale();
         match ev.eval_text(&expr.text, dim) {
             Ok(q) => set_value(&mut sk, id, q.value / scale),
-            Err(e) => problems.push(e.message),
+            Err(_) => unevaluated = true,
         }
     }
     // Configured dimensions ("Configure dimension"): the configuration's
@@ -221,8 +222,12 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         let scale = c.kind.display_scale();
         match ev.eval_text(&expr.text, dim) {
             Ok(q) => set_value(&mut sk, id, q.value / scale),
-            Err(e) => problems.push(e.message),
+            Err(_) => unevaluated = true,
         }
+    }
+    // Live (variables-1125: a Variable that fails): one warning for every dimension whose expression fails.
+    if unevaluated {
+        problems.push("Some dimension expressions could not be evaluated.".into());
     }
     // Text expressions (Convert to expression): evaluate, and size the box
     // to the evaluated text before solving.

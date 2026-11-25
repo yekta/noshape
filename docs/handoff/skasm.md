@@ -3,18 +3,15 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 11:30) — read first
-- QUEUED 2e5a9eaf (11-25 11:20): Use own face/edge midpoint (FLOW-USE-OWN-FACE-REFUSED: qa's rim click took the outer
-  edge's Implicit Midpoint; Use on it now uses the edge), Use on a face = outer loop, end-on edge = point, lost Use
-  source free, spline/image menus + op sketch_edit_image. Reported to lead.
-- QUEUED cf95fef7 (11-25 11:30): variables-1125 (1): Variable dialog "Update all references" (FeatureDialog.var_rename,
-  render_update_references, accept_edit rename_refs) + Variable table rename toast; UI test renaming_a_variable_*.
-- OPEN from variables-1125:
-  - (2) sketch dim box refusal already as live (pink, no message; length + bare number = DimensionMismatch). Esc: ours
-    two-step (behaviours ~6471), live 11-25 says one Esc closes: REQUESTS skasm 11-25 11:24 asks live which.
-  - (3) value `5 deg` on a Length variable: check our Variable row error text "Cannot use 5 deg (angle) as length."
-    (live: accepted, Variable 1 ERROR with that message; downstream Sketch WARNING, Extrude ERROR). Not checked yet.
-- NEXT: remaining planes/Use rows from live/skasm/plane-use-1125.
+## NOW (11-25 11:37) — read first
+- QUEUED 2e5a9eaf (Use own face / edge midpoint, spline/image menus), cf95fef7 (Variable rename "Update all references").
+- LANDING variables-1125 (3): a Variable's wrong-kind value fails "Cannot use 5 deg (angle) as length."
+  (EvalCtx::variable_value), a sketch whose dimension expressions fail warns once "Some dimension expressions could not
+  be evaluated."; T1 features_c::a_length_variable_valued_in_degrees_fails_as_live. Plus cplane
+  planes_on_a_block_lie_as_live (plane-use-1125 A3-A5 frames: all already as live).
+- OPEN: (2) dim box Esc, one or two (REQUESTS skasm 11-25 11:24, awaiting live).
+- plane-use-1125 status: A1-A7 model rows as live (A6 messages, A7 150 mm stored exist); (8)(9)(10)(11)(12) as live.
+  Left: preview/manipulator looks (A1-A3 pixels, A7 hover prehighlight) are psui's display area.
 - QUEUED 5657c008 (spline/image drags) — see git log.
 - QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
   plane resize after ✓ is already in behaviours "icons2 plane resize rules".
