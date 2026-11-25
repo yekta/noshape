@@ -1957,3 +1957,29 @@ fn a_straight_section_turned_off_a_line_joins_it_on_the_lines_extension() {
     let Curve::Line { origin, direction } = long.curve else { panic!("{:?}", long.curve) };
     assert!(origin.y.abs() < 1e-12 && direction.y.abs() < 1e-12, "on the line's extension: {origin} {direction}");
 }
+
+/// A chamfer on a counterbore's floor edge wider than its step (asm-scissor-lift Studio 2d82a0's Chamfer 2: 2 mm on an
+/// R3 counterbore over an R1.7 hole, its step 1.3 mm wide; live OK, OCCT fails): the ring the chamfer fills, turned
+/// about the axis, cut back to the through hole's wall, which runs up to meet the cone; no step left.
+#[test]
+fn a_chamfer_wider_than_a_counterbores_step_meets_the_through_hole() {
+    setup();
+    let block = bx([-10.0, -10.0, 0.0], [10.0, 10.0, 20.0]);
+    let at = |z: f64| Plane { origin: DVec3::new(0.0, 0.0, z) * MM, x_dir: DVec3::X, normal: DVec3::Z };
+    let bore = make_cylinder(&at(4.0), 3.0 * MM, 17.0 * MM, std::f64::consts::TAU).unwrap();
+    let hole = make_cylinder(&at(-1.0), 1.7 * MM, 22.0 * MM, std::f64::consts::TAU).unwrap();
+    let b = cut(&cut(&block, &bore).unwrap().shape, &hole).unwrap().shape;
+    let floor = edges_where(&b, |i| matches!(i.curve, Curve::Circle { radius, .. } if (radius / MM - 3.0).abs() < 1e-9) && (i.start.z / MM - 4.0).abs() < 1e-9);
+    assert_eq!(floor.len(), 1);
+    let r = chamfer_checked(&b, &floor, ChamferSpec::Equal(2.0 * MM), &[]).unwrap();
+    let s = &r.shape;
+    assert!(s.is_valid() && s.count(ShapeType::Solid) == 1);
+    // Pappus: the 2 x 2 triangle about the axis (centroid at r 7/3) less its 0.7 x 0.7 corner inside the hole (4.4/3).
+    let tau = std::f64::consts::TAU;
+    let added = tau * 7.0 / 3.0 * 2.0 - tau * 4.4 / 3.0 * 0.245;
+    let grown = vol_mm3(s) - vol_mm3(&b);
+    assert!((grown - added).abs() < 1e-6 * added, "{grown} mm³, want {added}");
+    let steps = s.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Plane(p)) if (p.origin.z / MM - 4.0).abs() < 1e-9 && p.normal.x.abs() < 1e-9 && p.normal.y.abs() < 1e-9)).count();
+    assert_eq!(steps, 0, "the step is chamfered away");
+    assert!(r.history.records.iter().any(|h| h.relation == Relation::Generated && h.input_kind == ShapeType::Edge && h.output_kind == ShapeType::Face), "the cone from its edge");
+}

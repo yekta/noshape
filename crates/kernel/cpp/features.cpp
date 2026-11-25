@@ -11237,6 +11237,197 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_as_cut(const TopoDS
   return std::make_pair(cut_out, h);
 }
 
+// A chamfer on a concave circle where a cylinder meets a plane square to its axis (a counterbore's floor, a boss's
+// foot), wider than a face it runs over, which OCCT can't build (scissor-lift Studio 2d82a0's Chamfer 2: 2 mm on a
+// counterbore's step 1.3 mm wide; live OK). The part fused with the ring the chamfer fills: the triangle between the
+// edge and its offsets on the two faces, turned about the axis, less what lies past the faces' other neighbours within
+// its reach (their outer side: the through hole under the step). Null when it doesn't apply.
+static std::optional<std::pair<TopoDS_Shape, HHist>> chamfer_ring_fill(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                                                       const std::vector<TopoDS_Face>& fs, uint8_t mode, double d1, double d2)
+{
+  ShapeAncMap e2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+  // A face's outward normal at `p` (on it).
+  auto normal_at = [](const TopoDS_Face& f, const gp_Pnt& p, gp_Vec& n) {
+    BRepAdaptor_Surface a(f, false);
+    GeomAPI_ProjectPointOnSurf pr(p, BRep_Tool::Surface(f));
+    if (pr.NbPoints() == 0)
+      return false;
+    double u, v;
+    pr.LowerDistanceParameters(u, v);
+    gp_Pnt q;
+    gp_Vec du, dv;
+    a.D1(u, v, q, du, dv);
+    n = du.Crossed(dv);
+    if (n.Magnitude() < 1e-12)
+      return false;
+    n.Normalize();
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    return true;
+  };
+  auto on_face = [](const TopoDS_Face& f, const gp_Pnt& p) {
+    BRepClass_FaceClassifier fc(f, p, 1e-7);
+    return fc.State() == TopAbs_IN;
+  };
+  BRepClass3d_SolidClassifier inside(input);
+  ShapeList fills;
+  std::vector<gp_Ax1> axes;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const TopoDS_Edge& E = es[i];
+    BRepAdaptor_Curve  c(E);
+    const ShapeList*   fl = e2f.Seek(E);
+    if (c.GetType() != GeomAbs_Circle || !BRep_Tool::IsClosed(E) || fl == nullptr)
+      return std::nullopt;
+    TopoDS_Face plane, cyl;
+    for (ShapeList::Iterator it(*fl); it.More(); it.Next())
+    {
+      const TopoDS_Face   f = TopoDS::Face(it.Value());
+      BRepAdaptor_Surface a(f, false);
+      if (a.GetType() == GeomAbs_Plane && plane.IsNull())
+        plane = f;
+      else if (a.GetType() == GeomAbs_Cylinder && cyl.IsNull())
+        cyl = f;
+      else
+        return std::nullopt;
+    }
+    if (plane.IsNull() || cyl.IsNull())
+      return std::nullopt;
+    const gp_Circ  circ = c.Circle();
+    const gp_Cylinder cy = BRepAdaptor_Surface(cyl, false).Cylinder();
+    const gp_Dir   ax   = cy.Axis().Direction();
+    const double   r    = circ.Radius();
+    if (!ax.IsParallel(BRepAdaptor_Surface(plane, false).Plane().Axis().Direction(), 1e-9) || !ax.IsParallel(circ.Axis().Direction(), 1e-9) ||
+        std::abs(cy.Radius() - r) > 1e-7 || gp_Lin(cy.Axis()).Distance(circ.Location()) > 1e-7)
+      return std::nullopt;
+    const gp_Pnt p  = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+    const gp_Vec ur = gp_Vec(circ.Location(), p).Normalized();
+    const gp_Vec ua(ax);
+    // Each face's direction away from the edge, and the edge concave (the corner between them empty).
+    const double eps = 0.02 * std::min(r, d1);
+    const gp_Vec uf = on_face(plane, p.Translated(ur * eps)) ? ur : -ur;
+    const gp_Vec uw = on_face(cyl, p.Translated(ua * eps)) ? ua : -ua;
+    if (!on_face(plane, p.Translated(uf * eps)) || !on_face(cyl, p.Translated(uw * eps)))
+      return std::nullopt;
+    inside.Perform(p.Translated((uf + uw) * eps), 1e-9);
+    if (inside.State() != TopAbs_OUT)
+      return std::nullopt;
+    // Face 1 (the reference face) carries the first distance; the faces are square.
+    const bool  plane_first = mode == 0 || fs[i].IsNull() || fs[i].IsSame(plane);
+    const double s1 = d1, s2 = mode == 1 ? d2 : mode == 2 ? d1 * std::tan(d2) : d1;
+    const double sf = plane_first ? s1 : s2, sw = plane_first ? s2 : s1;
+    if (uf.Dot(ur) < 0 && sf >= r * (1 - 1e-9))
+      return std::nullopt;
+    BRepBuilderAPI_MakePolygon tri(p, p.Translated(uw * sw), p.Translated(uf * sf), true);
+    if (!tri.IsDone())
+      return std::nullopt;
+    const gp_Ax1 axis(circ.Location(), ax);
+    BRepPrimAPI_MakeRevol ring(BRepBuilderAPI_MakeFace(tri.Wire(), true).Face(), axis, 2 * M_PI);
+    if (!ring.IsDone())
+      return std::nullopt;
+    // What lies past the two faces' other neighbours that the ring reaches: a plane's outer half (a box), a coaxial
+    // hole's inside (a cylinder).
+    const double L = 4 * (r + sf + sw);
+    ShapeList    clips;
+    for (const TopoDS_Face& F : {plane, cyl})
+      for (TopExp_Explorer x(F, TopAbs_EDGE); x.More(); x.Next())
+      {
+        const ShapeList* nb = x.Current().IsSame(E) ? nullptr : e2f.Seek(x.Current());
+        if (nb == nullptr)
+          continue;
+        for (ShapeList::Iterator it(*nb); it.More(); it.Next())
+        {
+          const TopoDS_Face N = TopoDS::Face(it.Value());
+          if (N.IsSame(plane) || N.IsSame(cyl))
+            continue;
+          BRepExtrema_DistShapeShape dist(ring.Shape(), N);
+          if (!dist.IsDone() || dist.Value() > 1e-7)
+            continue;
+          BRepAdaptor_Surface a(N, false);
+          gp_Vec n;
+          if (!normal_at(N, dist.PointOnShape2(1), n))
+            return std::nullopt;
+          if (a.GetType() == GeomAbs_Plane)
+          {
+            // The box on the plane's outer side, centred on the axis's foot on it.
+            const gp_Dir zd(n);
+            const gp_Pnt cl = circ.Location();
+            const gp_Pnt q  = cl.Translated(gp_Vec(zd) * -gp_Vec(a.Plane().Location(), cl).Dot(gp_Vec(zd)));
+            const gp_Ax2 frame(q, zd);
+            const gp_Pnt o = q.Translated((gp_Vec(frame.XDirection()) + gp_Vec(frame.YDirection())) * (-L / 2));
+            clips.Append(BRepPrimAPI_MakeBox(gp_Ax2(o, zd, frame.XDirection()), L, L, L).Shape());
+          }
+          else if (a.GetType() == GeomAbs_Cylinder && a.Cylinder().Axis().Direction().IsParallel(ax, 1e-9) &&
+                   gp_Lin(a.Cylinder().Axis()).Distance(circ.Location()) < 1e-7)
+          {
+            // Only a hole: its outer side is its inside (the normal toward the axis).
+            const gp_Pnt o    = a.Cylinder().Location();
+            const gp_Pnt pt   = dist.PointOnShape2(1);
+            const gp_Vec toward(pt, o.Translated(gp_Vec(ax) * gp_Vec(o, pt).Dot(gp_Vec(ax))));
+            if (toward.Magnitude() < 1e-12 || n.Dot(toward) <= 0)
+              return std::nullopt;
+            const gp_Pnt base = o.Translated(gp_Vec(ax) * (gp_Vec(o, circ.Location()).Dot(gp_Vec(ax)) - L / 2));
+            clips.Append(BRepPrimAPI_MakeCylinder(gp_Ax2(base, ax), a.Cylinder().Radius(), L).Shape());
+          }
+          else
+            return std::nullopt;
+        }
+      }
+    TopoDS_Shape fill = ring.Shape();
+    if (!clips.IsEmpty())
+    {
+      ShapeList one;
+      one.Append(fill);
+      HHist ch;
+      if (!quick_boolean(1, one, clips, false, fill, ch))
+        return std::nullopt;
+    }
+    fills.Append(fill);
+    axes.push_back(axis);
+  }
+  ShapeList    args;
+  TopoDS_Shape fused;
+  HHist        h;
+  args.Append(input);
+  if (!quick_boolean(0, args, fills, false, fused, h) || !valid_shape(fused))
+    return std::nullopt;
+  HHist              uh;
+  const TopoDS_Shape out = unify_shape(fused, uh);
+  if (!uh.IsNull())
+    h = compose(input, h, uh);
+  int solids = 0;
+  for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+    ++solids;
+  GProp_GProps before, after;
+  BRepGProp::VolumeProperties(input, before);
+  BRepGProp::VolumeProperties(out, after);
+  if (solids != 1 || !valid_shape(out) || after.Mass() <= before.Mass())
+    return std::nullopt;
+  // The cones the fill made: generated by their edge (the chamfer's face).
+  ShapeIMap old;
+  for (TopExp_Explorer f(input, TopAbs_FACE); f.More(); f.Next())
+  {
+    const ShapeList& m = h->Modified(f.Current());
+    for (ShapeList::Iterator it(m); it.More(); it.Next())
+      old.Add(it.Value());
+    if (m.IsEmpty() && !h->IsRemoved(f.Current()))
+      old.Add(f.Current());
+  }
+  for (TopExp_Explorer f(out, TopAbs_FACE); f.More(); f.Next())
+  {
+    if (old.Contains(f.Current()))
+      continue;
+    BRepAdaptor_Surface a(TopoDS::Face(f.Current()), false);
+    if (a.GetType() != GeomAbs_Cone)
+      continue;
+    for (size_t i = 0; i < axes.size(); ++i)
+      if (a.Cone().Axis().IsParallel(axes[i], 1e-9) && gp_Lin(a.Cone().Axis()).Distance(axes[i].Location()) < 1e-7)
+        h->AddGenerated(es[i], f.Current());
+  }
+  return std::make_pair(out, h);
+}
+
 static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, const OcShapeList& faces,
                  uint8_t mode, double d1, double d2, bool checked)
 {
@@ -11387,6 +11578,9 @@ static OpOut op_chamfer_unbudgeted(const OcShape& s, const OcShapeList& edges, c
     if (checked)
       if (auto past = chamfer_as_cut(in, es, fs, mode, d1, d2))
         return make_result({in}, past->first, past->second.get());
+    if (checked)
+      if (auto fill = chamfer_ring_fill(in, es, fs, mode, d1, d2))
+        return make_result({in}, fill->first, fill->second.get());
     // Onshape reports a chamfer wider than a face it runs over (or than the
     // radius of an arc it follows) separately.
     // Also a chamfer wider than a fillet its edge ends on (live G46: 5 mm on
