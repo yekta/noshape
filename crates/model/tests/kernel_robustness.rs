@@ -4529,3 +4529,44 @@ fn a_filleted_obrounds_shell_without_its_bottom_works() {
     let v = volume(&r);
     assert!((2000.0..2400.0).contains(&v), "{v} mm³");
 }
+
+/// qa FLOW-EXTRUDE-UP-TO-FACE-BESIDE (live: a planar Up to face ends on its plane): a Ø6 circle sketched on a shelled
+/// box's floor (z 2), Extrude Add up to the 2 mm lip's top face (z 32), a rim the circle doesn't lie under: a Ø6 post
+/// from the floor to z 32.
+#[test]
+fn an_add_up_to_a_rim_face_beside_the_profile_ends_on_its_plane() {
+    let mut t = T::new();
+    t.block(60.0, 40.0, 30.0);
+    let corners = t.edges_where(|i| (i.start.x - i.end.x).abs() < 1e-9 && (i.start.y - i.end.y).abs() < 1e-9);
+    assert_eq!(corners.len(), 4);
+    t.fillet(corners, "5 mm");
+    let top = t.faces_where(|c| c.z > 29.999);
+    t.shell(top, "2 mm");
+    let rim = t.faces_where(|c| c.z > 29.999);
+    assert_eq!(rim.len(), 1);
+    // The lip as qa drew it: the rim's outline (Use) on the rim, its ring extruded 2 mm.
+    let mut sk = noshape_sketch::Sketch::new();
+    for (a, b, r) in [((0.0, 0.0), (0.060, 0.040), 0.005), ((0.002, 0.002), (0.058, 0.038), 0.003)] {
+        let ids = sk.corner_rectangle(DVec2::new(a.0, a.1), DVec2::new(b.0, b.1));
+        for p in ids.points.iter().take(4) {
+            sk.fillet_corner(*p, r).unwrap();
+        }
+    }
+    let s = t.add("sketch", &[("sketchPlane", q(rim)), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let ring: Vec<Reference> = t.regen().display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| (g.area * 1e6 - 370.27).abs() < 0.1).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(ring.len(), 1, "the rim's ring");
+    let lip = t.add("extrude", &[("entities", q(ring)), ("depth", e("2 mm")), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let before = volume(&t.ok(lip));
+    let lip_top = t.faces_where(|c| c.z > 31.999);
+    let floor = t.faces_where(|c| (c.z - 2.0).abs() < 1e-6);
+    assert_eq!((lip_top.len(), floor.len()), (1, 1));
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.010, 0.010), 0.003);
+    let s = t.add("sketch", &[("sketchPlane", q(floor)), ("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let regions: Vec<Reference> = t.regen().display.sketches.iter().find(|x| x.feature == s).unwrap().regions.iter().filter(|g| (g.area * 1e6 - std::f64::consts::PI * 9.0).abs() < 1e-3).map(|g| Reference::SketchRegion { sketch: s, key: g.key.clone() }).collect();
+    assert_eq!(regions.len(), 1, "the circle's region");
+    let x = t.add("extrude", &[("entities", q(regions)), ("endBound", en("UP_TO_SURFACE")), ("endBoundEntityFace", q(lip_top)), ("operationType", en("ADD")), ("defaultScope", ParamValue::Bool(true))]);
+    let r = t.ok(x);
+    let v = volume(&r) - before;
+    assert!((v - std::f64::consts::PI * 9.0 * 30.0).abs() < 1e-3, "the post: {v} mm³");
+}
