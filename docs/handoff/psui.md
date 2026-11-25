@@ -33,21 +33,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## RESUME HERE (11-25 19:30 UTC) — land blocked, fix forward first
-- Land: 5a6910ab FAILED tests 19:18 (vibe2 ~/land/results/psui.log): a_circles_rim_lights_... dropped its click: the
-  view's test sends ToolDown without a viewport press, press_at was the viewport's creation, so >520 ms later on a
-  loaded server = long press. Fixed in 208f56723 (Viewport.press_at: Option; test sets the clock 1 s on). 4af032c9 /
-  bb965793 superseded: re-run land.sh once the blocker below is fixed (all 21 commits).
-- BLOCKER: move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between (mine, 6b69cb2a1, unlanded) fails
-  whenever another test ran before it on the same thread (--test-threads=1 with any of a_circles_rim / ring_grabs /
-  axis_field: values "0, 0, 5 deg" then stuck at the first value; alone 3/3 green). Not the camera (pinned iso: same).
-  Script /root/psui-scratch/region/t22.sh (pairs). Next: check out 5a6910ab (before ring position 3c8a9d671, ring look,
-  press_at) and run t22's grabs-less pair (e.g. dialogs::move_faces_arrow + snaps) to see whether the order dependence
-  is new; suspects: manip_follows_camera re-sync in render_viewport_underlay during a drag, a thread-local, focus.
-- Done since: ring look (ec1aab7d3), FEEL-MOVEFACE-PICKED-FACE-COLOUR = not a difference (active field rule), T1
-  move_faces_axis_field_active_lights_the_edge_not_the_face. Report to the lead after the land (lead was >200k at 19:0x,
-  not messaged: tell them ring look + this).
-
+## RESUME HERE (11-25 19:35 UTC) — re-landing the stack
+- 5a6910ab FAILED 19:18: a_circles_rim_... long-press flake (stale press_at), fixed 208f56723 (press_at Option, test
+  clock 1 s on). Blocker found: 208f56723 also added a wait_until after each move in
+  move_faces_rotate_ring_snaps_...; wait_until advances the executor clock 20 ms a step while a preview builds (only
+  after another test on the thread), which stuck the held drag. Removed (463c22e0d); bisect 5a6910ab / b0d54bb83 /
+  HEAD-without-wait all green in pairs (/root/psui-scratch/region/t23.sh). Lesson: never wait_until inside a drag.
+- Done: ring look (b0d54bb83), FEEL-MOVEFACE-PICKED-FACE-COLOUR = not a difference (active field rule), T1
+  move_faces_axis_field_active_lights_the_edge_not_the_face. Lead to be told after land.sh (ring look + these).
 ## RESUME HERE (11-24 20:17 UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
 - Stack re-queued as 5175c04d, batch 1 as aeddb0f4 (landed, edb5cd135 on main), batch 2 as e4612e55, batch 3 queued
   now (f22bb2b4f before rebase).
