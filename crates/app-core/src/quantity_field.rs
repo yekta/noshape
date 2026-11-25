@@ -292,6 +292,8 @@ pub struct QuantityInput {
     committed: String,
     /// It has the keyboard (from its input's focus events: for a dialog's state).
     focused: bool,
+    /// A control beside it (a pattern count's flip icon): while that has the keyboard, the underline is blue.
+    companion: Option<gpui_kit::FocusHandle>,
     _subs: Vec<gpui_kit::Subscription>,
 }
 
@@ -321,7 +323,7 @@ impl QuantityInput {
                 cx.notify();
             }
         });
-        let mut this = Self { state, spec, units, variables: Default::default(), committed: String::new(), focused: false, _subs: vec![sub] };
+        let mut this = Self { state, spec, units, variables: Default::default(), committed: String::new(), focused: false, companion: None, _subs: vec![sub] };
         this.committed = this.rewrite(&text);
         if this.committed != text {
             let c = this.committed.clone();
@@ -340,6 +342,17 @@ impl QuantityInput {
     /// The field has the keyboard.
     pub fn is_focused(&self) -> bool {
         self.focused
+    }
+
+    /// The control beside the field whose keyboard focus turns its underline blue (live: Tab from a pattern's
+    /// Instance count to its flip leaves a 1 px blue line under the count).
+    pub fn set_companion_focus(&mut self, h: gpui_kit::FocusHandle) {
+        self.companion = Some(h);
+    }
+
+    /// Its underline blue for the companion's focus.
+    pub fn companion_focused(&self, window: &gpui_kit::Window) -> bool {
+        self.companion.as_ref().is_some_and(|h| h.is_focused(window))
     }
 
     pub fn text(&self) -> &str {
@@ -478,6 +491,7 @@ impl gpui_kit::Render for QuantityInput {
             .border_b_1()
             .border_color(if invalid { pal.error } else { pal.border })
             .hover(|d| d.border_color(pal.accent))
+            .when(!invalid && self.companion_focused(window), |d| d.border_color(pal.accent))
             // Live: the focused field has a 2 px blue underline (a 1 px
             // border plus a 1 px line above it).
             .when(focused && !invalid && !self.spec.canvas, |d| d.border_color(pal.accent).child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(pal.accent)))

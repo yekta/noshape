@@ -1799,7 +1799,7 @@ fn a_zero_pattern_distance_is_marked_invalid(cx: &mut TestAppContext) {
 }
 
 /// FEEL-TAB-TO-FLIP-FOCUS (live workflows-1123 04 s9, 05 s18): Tab from a linear / circular pattern's Instance count
-/// puts the keyboard on the flip icon beside it (its 2 px #1651b0 underline).
+/// puts the keyboard on the flip icon beside it (its 2 px #1651b0 underline, the count's 1 px line blue).
 #[gpui::test]
 fn tab_from_a_patterns_instance_count_focuses_its_flip(cx: &mut TestAppContext) {
     use gpui_kit::Focusable as _;
@@ -1825,6 +1825,8 @@ fn tab_from_a_patterns_instance_count_focuses_its_flip(cx: &mut TestAppContext) 
         vcx.simulate_keystrokes("tab");
         let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus.is_focused(w));
         assert!(flip, "{kind:?}: Tab from Instance count puts the keyboard on the flip");
+        let line = vcx.update(|w, cx| view.read(cx).pattern.as_ref().unwrap().count.read(cx).companion_focused(w));
+        assert!(line, "{kind:?}: the count's underline blue while its flip has the keyboard");
     }
 }
 

@@ -1290,7 +1290,12 @@ impl AssemblyView {
             // Live: the dialog opens with Instances focused.
             active: None,
             distance: mk(d, first, window, cx),
-            count: mk(n, count(), window, cx),
+            count: {
+                let q = mk(n, count(), window, cx);
+                let flip = self.pattern_flip_focus.clone();
+                q.update(cx, |q, _| q.set_companion_focus(flip));
+                q
+            },
             // Live 2204: the further directions default as the first (distance and count).
             distance2: mk(noshape_ops::assembly::pattern_defaults(false).0, QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
             count2: mk("2", count(), window, cx),
