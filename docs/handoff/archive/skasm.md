@@ -2695,3 +2695,50 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
 ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
 Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
 
+## NOW (11-25 20:33) — read first
+- QUEUED 69415bd6 (32 commits, rebased after 1db32be0's conflict with psui 5a6910ab; SKT timers dropped). A failure = fix forward.
+- P0 scissor 97ad5f (528c169ba) ANSWERED to lead, no regions change: the studio differs from live from Delete face 1 (ours
+  Error both ways; live 1606.6 -> 1704.7 mm3), so Sketch 2 lands on another face. Old tolerances: Sketch 2 = one bogus
+  zero-area region, Extrude 2 "Ok" by extruding the strip ~34.6 mm the wrong way (+2875 mm3; live: bridges a 4 mm gap,
+  +592 mm3). New: correct regions (148 mm2 strip + 838 mm2 face region, 6 holes); Extrude 2 up to a face behind it fails.
+  Evidence vibex6 ~/tmp/skasm/sc (save/ new, save-old/ old, a0.log / a-old.log). Waiting on the lead (Delete face 1 owner).
+- Speed (now): pt0 (vibex6 ~/tmp/skasm/pt0/run.log) sketch case >=100 ms & >=2x: "Profile for Tail Fin" 195-285 ms vs live
+  19-24 in c2-surf-intro-{ruled,fill,mutualtrim,boundary}. FOUND (11-25 20:30): ~all of it is sketch.rs section_face ->
+  kernel section_plane (BRepAlgoAPI_Section of 3 intersected faces: 122 + 44 + 26 ms; solve/imprint/update are us-level).
+  Tried, NO gain: Approximation(false); a plane face bounded to the face's box. Next: profile the section (Mac sample,
+  skasm-scratch/bin sample_*.py) or intersect surface x plane directly (only 13 samples / exact line-arc are needed,
+  SECTION_SAMPLES); a cache by face (keep the Shape, is_same) helps only repeat regens (sketch edits). Timers + both
+  switches: /root/skasm-scratch/skt2.patch (git apply; uncommitted, never land; scripts skt.sh / skt2.sh).
+  The rest of pt0's >=2x list is fillets/Booleans/Derived (not mine).
+- Live user-action timings: live/qa/speed-1125/index.md (median of 5, SwiftShader; compare ratios on a similar host).
+  Ours not measured as user actions yet; regen proxies show none >=2x (rings-loft rollback 20->31 ~220 ms ours vs 1335).
+  To do: T2 timings in part-studio-ui latency_tests.rs (S50/S200 drag + dim edit, DXF ✓) and assembly-ui (scissor Drive
+  part drag, Fastened/Revolute ✓); fix only >=100 ms and >=2x live.
+- P2 after speed (lead, qa green b1a672244): HINGE-LIMITS-EDIT-KEEPS-ANGLE: Limits 0/110 + ✓ on the hinge Revolute keeps
+  -36.52 deg in ours; live goes back to 0 deg.
+- Later: GLYPH-CIRCLE (live gl5): a lone glyph ~38 px from its point at an angle set by screen position (~15 deg from up on
+  the left to ~84 deg on the right, flips left at the right edge); a taken spot moves round the same circle.
+
+## NOW (11-25 18:40) — read first
+- QUEUED 5af8d24a (27 commits: 1db32be0's 25 + handoff + first-week/mistakes-3): unresolved mate chips "Missing mate
+  connector of <instance>" (MateDialog.unresolved keeps the instance name); a face sketch's imprinted region left out
+  of the whole-sketch "Faces of" chip count (mod.rs region_counts); T1s a_text_sketchs_extrude_on_a_part_adds_into_it,
+  a_new_plane_opens_offset_25_mm_then_on_the_last_type, e2e first_hour_assembly_mistakes_as_live,
+  an_unresolved_mates_chips_say_missing_mate_connector_of_their_instance.
+- Already as live (no change): Text dialog (32 fonts, Default text, 12/250, own ✓), Plane defaults, delete instance
+  takes its mate in one undo step, wrong-face Fastened OK moving the first pick.
+- Open (lead): live's stacked "insert twice" was a REST insert; ours (ops + dialog) offsets 1/8 box as live's dialog (A18).
+- Open: a reopened unresolved mate's chips turn red only once its evaluation returns (~one debounce).
+- Arc connector T1 + TICKETS dedupe in this land; tail fin still core's (3567.145 vs 3567.188, derived vertex 0.39 um).
+
+- Was: QUEUED 7ec8a1b3 (23 commits; replaces c9f9e1ac, failed on a feedback_feel_tests.rs conflict with psui 8a62f4834:
+  both tests kept). Carries: screws translator, API Warning, l.706 sketch feel, e2e same-part mate made in error,
+  SKETCH-DRAG-SOLVE (3 px start, grab offset kept; latency slow-drag test expects the offset), centre point arc
+  start/end VERTICAL/HORIZONTAL to its own centre (ARC_CENTRE placeholder, not offered when the centre is on a point),
+  glyph-taken (a later selected point's row whose spot is taken, 6 px margin, goes to (-40,-12)), pattern tiles in
+  live's colours (213,189,158 / 213,163,100), no Recently used in a sketch's Alt+C (row + T1).
+- Routed: lora f39 "Ribs" to core (translator checked: 26 profiles, sketch lines to 0.000 mm; 4 r1.1 circles).
+- Open: glyph-taken at 30+ px unmeasured (live 9/16/25 px moved); live's centre "woken" for the arc H/V (ours always).
+- Open note: labels stored absolute; live labelDistance/labelRatio; whether a label follows a dragged line unchecked.
+- NEXT: ask the lead.
+
