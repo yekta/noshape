@@ -4415,7 +4415,7 @@ impl PartStudioView {
                         .drag_over::<RollbackDrag>(|s, _, _, _| s.border_b_2().border_color(p().accent))
                         .on_drop(cx.listener(|this, _: &RollbackDrag, _, cx| this.set_rollback(Some(0), cx)))
                         // The clamped line keeps the hollow dot at its left end (qa FEEL-ROLLBACK-CLAMP-HOVER, live x~47).
-                        .when(cx.has_active_drag(), |d| d.child(rollback_drop_dot(pal.accent).bottom(px(-2.5)).group_drag_over::<RollbackDrag>("dg-rows", |s| s.visible())))
+                        .when(cx.has_active_drag(), |d| d.child(rollback_drop_dot(pal.accent).bottom(px(-2.)).group_drag_over::<RollbackDrag>("dg-rows", |s| s.visible())))
                         // Live: the line ends in a 9 px tick; drawn over the rows.
                         .child(div().absolute().left(px(9.)).top(px(2.)).bottom(px(1.)).w(px(1.)).bg(pal.border))
                         .child(div().absolute().left(px(5.)).bottom(px(1.)).w(px(9.)).h(px(1.)).bg(pal.border))
@@ -6339,7 +6339,7 @@ impl PartStudioView {
             // Rollback drop line (live part-studio/30): a small hollow blue
             // circle at its left end, shown while the bar is dragged over
             // (only built during a drag: its start redraws every row).
-            .when(cx.has_active_drag(), |d| d.child(rollback_drop_dot(pal.accent).top(px(-2.5)).group_drag_over::<RollbackDrag>("feature-row", |s| s.visible())))
+            .when(cx.has_active_drag(), |d| d.child(rollback_drop_dot(pal.accent).top(px(-2.)).group_drag_over::<RollbackDrag>("feature-row", |s| s.visible())))
             // The same dot on a feature drag's line, top or bottom edge (F33).
             .when(cx.has_active_drag(), |d| {
                 let after = self.ui.feature_drop.get() == Some((i, true));
@@ -6347,9 +6347,9 @@ impl PartStudioView {
                     div()
                         .absolute()
                         .left(px(0.))
-                        .when(after, |d| d.bottom(px(-3.5)))
-                        .when(!after, |d| d.top(px(-2.5)))
-                        .size(px(7.))
+                        .when(after, |d| d.bottom(px(-3.)))
+                        .when(!after, |d| d.top(px(-2.)))
+                        .size(px(6.))
                         .rounded_full()
                         .border_2()
                         .border_color(pal.accent)
@@ -7267,7 +7267,7 @@ impl Render for SeparatorDrag {
 
 /// The rollback drop line's hollow dot at its left end (live part-studio/30), hidden until its row is dragged over.
 fn rollback_drop_dot(accent: gpui_kit::Rgba) -> gpui_kit::Div {
-    div().absolute().left(px(0.)).size(px(7.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xffffff)).invisible()
+    div().absolute().left(px(0.)).size(px(6.)).rounded_full().border_2().border_color(accent).bg(gpui_kit::rgb(0xffffff)).invisible()
 }
 
 #[derive(Clone)]
@@ -7279,21 +7279,9 @@ struct RollbackDragPill(Point<Pixels>);
 
 impl Render for RollbackDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        // Onshape (live, part-studio/30): a dark-blue pill "Rollback bar", its corner 10 px right of and 5 px below
-        // the pointer (live reorder drag (+10, +5); qa FEEL-ROLLBACK-CLAMP-HOVER: 18 px lower than ours, level with it).
+        // Live (featurelist-1125): a 101 x 31 dark-blue pill, 14 px/500 white, its corner at the pointer + (10, 6).
         // (Margins on a drag preview's root are ignored; offset a child.)
-        div().child(div()
-            .relative()
-            .left(self.0.x + px(10.))
-            .top(self.0.y + px(5.))
-            .px(px(10.))
-            .py(px(3.))
-            .rounded_full()
-            .bg(p().accent)
-            .text_size(px(13.))
-            .font_weight(FontWeight::BOLD)
-            .text_color(gpui_kit::rgb_static(0xffffff))
-            .child("Rollback bar"))
+        div().child(drag_pill(self.0 + point(px(10.), px(6.))).child("Rollback bar"))
     }
 }
 
@@ -7312,20 +7300,24 @@ struct FeatureDragPill(Point<Pixels>, SharedString);
 
 impl Render for FeatureDragPill {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        // (At the pointer + (10, 5), as the rollback bar's.)
-        div().child(div()
-            .relative()
-            .left(self.0.x + px(10.))
-            .top(self.0.y + px(5.))
-            .px(px(10.))
-            .py(px(3.))
-            .rounded_full()
-            .bg(p().accent)
-            .text_size(px(13.))
-            .font_weight(FontWeight::BOLD)
-            .text_color(gpui_kit::rgb_static(0xffffff))
-            .child(crate::ui::user_text(self.1.clone())))
+        // Live (featurelist-1125): the rollback bar's pill with the name, at the pointer + (10, 5).
+        div().child(drag_pill(self.0 + point(px(10.), px(5.))).child(crate::ui::user_text(self.1.clone())))
     }
+}
+
+fn drag_pill(at: Point<Pixels>) -> gpui_kit::Div {
+    div()
+        .relative()
+        .left(at.x)
+        .top(at.y)
+        .px(px(10.))
+        .py(px(5.))
+        .rounded_full()
+        .bg(p().accent)
+        .text_size(px(14.))
+        .line_height(px(21.))
+        .font_weight(FontWeight::MEDIUM)
+        .text_color(gpui_kit::rgb_static(0xffffff))
 }
 
 // The feature that made an edge or vertex (shared with the agent API).
