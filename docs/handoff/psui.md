@@ -166,6 +166,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   note_face_click on a graphics face click, ray hit on the model before the preview), manipulators moveFace OFFSET /
   Translate base; T1 move_faces_arrow_starts_where_the_face_was_clicked. Not checked: live commits Extrude's dragged
   depth as the 1-decimal value ("30.3*mm"), Fillet's at full precision. Parts 3+ (ring, triad, asm drags) from live.
+  18:2x: arrow halo 3 -> 4 px (live wf23 03 s19 + manip-drag-1125 cross-sections), starting where the core does
+  (an_edited_extrudes_end_cap_greys_its_top_once caught the overhang); TICKETS FEEL-CORNER-BREAK-VERTEX-PICK to verify.
+  manip-drag part 3 (live 16:50-17:06) compared, no code change needed: Translate one arrow + Direction defaults to the
+  face (behaviors.rs moveFace logic), Rotate ring only, triad keeps the focus (dialogs test), dialog Ctrl+Z goes to
+  the draft history (resets dx), assembly drags start past 2.5 px (live 3). Untested: a T1 for the triad's dialog
+  Ctrl+Z resetting dx in one step; the Rotate ring's position vs live (1175/1185,435).
+  Other PARTLY rows checked: the rest are "fixed, to verify" / CAN'T TELL / [x] (FEEL-FS-COMMIT split button is studios').
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
