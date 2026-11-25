@@ -4,6 +4,33 @@ Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## NOW (11-24 22:40) — read first
+- NEXT (lead 11-25 ~02:00): match live's Insert DXF/DWG (live/skasm/dxf-insert-1125, behaviours.md "Insert DXF or
+  DWG"; live needed the ezdxf R2000 rewrites, our hand-written DXFs gave "Could not open file"):
+  ✓ inserts at once (no placement step); file origin unticked -> bbox centred on the origin, ticked -> file
+  coordinates (ours already); no layer option. Polyline -> 4 lines + an arc (ours). POINT and TEXT dropped, the rest
+  imports, bubble "The DXF/DWG imported with the following error: - Could not import unrecognized entity." (ours
+  KEEPS the POINT as a point: drop it; TEXT already dropped; add the bubble). 0 constraints, all blue (ours: ends
+  merged, no constraints: OK). NOTHING selected after and no "Inserted N entities" message (ours selects all +
+  message: remove both; sketch.rs insert_dxf_bytes). One Ctrl+Z removes it all (check ours). Grid 2000 on screen
+  2.4-4.9 s after ✓ (ours insert 51 ms). Our parser accepts malformed files Onshape rejects ("Could not open
+  file"): we may stay lenient, note it in the parity row. Fixture DXFs: /root/skasm-scratch/dxf/ + the live dir.
+- LEAD 11-25 TASK 3 (fz211 drag check + tool stalls), state 01:50:
+  - FIX (uncommitted at 01:50, suites ~/tmp/skasm/tfix.log marker TFIXDONE; green -> commit "skasm: free geometry
+    joined to a conflict drags" + land): `Sketch::drag` retries a Failed drag with `SolveOptions::unheld` = the
+    constraints the shape doesn't hold (`unheld_constraints(1e-9)`), not when the handle is FullyConstrained.
+    fz211 (probe skasm-scratch/probes/zz_probe_fz211_free.rs, append to sketch tests/misc.rs): free entities that
+    don't move 161 -> 3 (92, 95 lines, 215 fit spline: stuck even without the conflicts: open), black ones still 0.
+    T1 misc free_geometry_joined_to_a_conflict_drags.
+  - Tool stalls (probe skasm-scratch/probes/zz_probe_tools.rs, append inside sketch_mode.rs's last test module):
+    a solvable 400-line grid: every tool <= 3 ms. fz211 (23 conflicts): split 113-125, linear pattern 240-270,
+    circular 112-135, Line's 2nd click 112-120, delete 54-149, trim/offset up to 113/124 ms. Cause: a full
+    solve on fz211 = 114 ms, of it the analysis ~80 (no analysis 31, conflicts removed 3). Colours/messages
+    come from the regen (async for a slow sketch), so PROPOSAL: a slow sketch's editor `solve()`s skip the
+    analysis (a Sketch flag set by psui's with_sketch while slow), the sites that need it (add_dimension
+    7827, set driving 6580, solve_after_constraint) call solve_with(default) explicitly. Not started.
+  - ALSO FOUND (open): on a sketch with a conflict anywhere, solve_after_constraint reverts every new constraint
+    (`!report.is_solved()` is the whole sketch's), and a fillet radius edit (sketch_mode ~5056) the same: check
+    live (a constraint added beside a red conflict) before changing.
 - LEAD 11-25 TASK 1 (drags on big sketches under a frame) committed + queued (see land.sh --status): scene `drag_step` /
   `DragStep::solve` / `drag_stepped` (tool_drag = all three); psui `drag_off_thread` (a slow sketch's step solves
   off the UI thread, moves meanwhile coalesce in `ui.drag_next`, the release waits in `ui.drag_release`) and
