@@ -589,7 +589,7 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
         .iter()
         .filter_map(|(fid, name)| {
             let st = r.display.feature_state(*fid)?;
-            matches!(st.status, noshape_model::display::FeatureStatus::Error).then(|| json!({ "feature": fid.to_string(), "name": name, "message": st.message, "faulty_params": st.faulty }))
+            (crate::ops::api_status(st) == noshape_model::display::FeatureStatus::Error).then(|| json!({ "feature": fid.to_string(), "name": name, "message": st.message, "faulty_params": st.faulty }))
         })
         .collect();
     let mut v = json!({ "sketch": id.to_string(), "units": crate::ops::query::units_json(&units), "failed": failed });

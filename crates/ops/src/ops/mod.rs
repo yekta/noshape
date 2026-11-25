@@ -161,6 +161,16 @@ pub(crate) fn regen_report_all(od: &mut OpenDoc, tab: TabId) -> Result<Value, Op
     Ok(r)
 }
 
+/// A feature's status as live's REST gives it: a sketch that can't be solved is WARNING there (its last geometry
+/// kept, downstream builds: live overdefined-downstream-1125) though its row is red.
+pub(crate) fn api_status(s: &noshape_model::display::FeatureState) -> noshape_model::display::FeatureStatus {
+    use noshape_model::display::FeatureStatus;
+    match s.status {
+        FeatureStatus::Error if s.message.as_deref() == Some(noshape_scene::sketch_mode::SKETCH_NOT_SOLVED) => FeatureStatus::Warning,
+        st => st,
+    }
+}
+
 /// [`regen_report`], listing the `keep` features whatever their state (the
 /// feature a call made or edited).
 pub(crate) fn regen_report_with(od: &mut OpenDoc, tab: TabId, keep: &[noshape_model::reference::FeatureId]) -> Result<Value, OpError> {
@@ -172,7 +182,7 @@ pub(crate) fn regen_report_with(od: &mut OpenDoc, tab: TabId, keep: &[noshape_mo
     let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     for f in &ps.features {
         let st = r.display.feature_state(f.id);
-        let status = st.map(|s| format!("{:?}", s.status)).unwrap_or_else(|| "NotEvaluated".into());
+        let status = st.map(|s| format!("{:?}", api_status(s))).unwrap_or_else(|| "NotEvaluated".into());
         let mut v = json!({ "id": f.id.to_string(), "name": f.name, "type": f.type_id, "status": status });
         if let Some(s) = st {
             if let Some(m) = &s.message {
@@ -194,7 +204,7 @@ pub(crate) fn regen_report_with(od: &mut OpenDoc, tab: TabId, keep: &[noshape_mo
                 v["notices"] = o["notices"].clone();
                 v["output"] = o["output"].clone();
             }
-            if matches!(s.status, noshape_model::display::FeatureStatus::Error) {
+            if api_status(s) == noshape_model::display::FeatureStatus::Error {
                 let mut x = json!({ "feature": f.id.to_string(), "name": f.name, "message": s.message, "faulty_params": s.faulty });
                 if s.missing > 0 {
                     x["missing_selections"] = json!(s.missing);

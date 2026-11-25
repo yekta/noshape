@@ -11991,7 +11991,8 @@ export const clipBlock = defineFeature(function(context is Context, id is Id, de
 
 /// Live errors-1118 (through the API as in the dialog): a value given to a dimension the sketch can't take is kept,
 /// driving, the sketch red: a rectangle's third 40 (redundant), a 50 against its 40 (conflicting), a triangle's 30
-/// against two 10s.
+/// against two 10s. Its status is live REST's WARNING, not a failure (overdefined-downstream-1125: the last geometry
+/// kept, downstream builds).
 #[test]
 fn a_dimension_value_the_sketch_cant_take_is_kept_driving() {
     let mut ctx = Ctx::new();
@@ -12006,8 +12007,10 @@ fn a_dimension_value_the_sketch_cant_take_is_kept_driving() {
         let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
         let dims: Vec<(String, bool)> = g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Length").map(|c| (c["value"].as_str().unwrap_or("").to_string(), c["driving"] == true)).collect();
         assert_eq!(dims.last(), Some(&(third.trim_end_matches(" mm").to_string(), true)), "{case}: {dims:?}");
-        let st = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["id"] == sk.as_str()).cloned().unwrap();
-        assert_eq!((st["status"].as_str(), st["message"].as_str()), (Some("Error"), Some("Sketch could not be solved.")), "{case}: {st}");
+        let list = call(&mut ctx, "feature_list", json!({}));
+        let st = list["features"].as_array().unwrap().iter().find(|f| f["id"] == sk.as_str()).cloned().unwrap();
+        assert_eq!((st["status"].as_str(), st["message"].as_str()), (Some("Warning"), Some("Sketch could not be solved.")), "{case}: {st}");
+        assert_eq!(list["failed"], json!([]), "{case}: {list}");
     }
     let sk = new_sketch(&mut ctx, "dimerr-triangle.noshape", "plane:top");
     let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[100, 0], [110, 0], [105, 8], [100, 0]] }));
@@ -12017,7 +12020,7 @@ fn a_dimension_value_the_sketch_cant_take_is_kept_driving() {
     let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [l[2]], "value": "30 mm", "kind": "length" }));
     assert_eq!(d["warning"].as_str(), Some("Sketch could not be solved."), "{d}");
     let st = call(&mut ctx, "feature_list", json!({}))["features"].as_array().unwrap().iter().find(|f| f["id"] == sk.as_str()).cloned().unwrap();
-    assert_eq!(st["status"].as_str(), Some("Error"), "{st}");
+    assert_eq!(st["status"].as_str(), Some("Warning"), "{st}");
 }
 
 /// A copy of standard content (the parity translator's of live's Standard Library studios, `standard_content`): the

@@ -629,7 +629,7 @@ fn summary(d: &Document) -> Value {
             let mut v = json!({ "id": t.id.to_string(), "name": t.name, "kind": tab_kind(&t.content) });
             if let TabContent::PartStudio(ps) = &t.content {
                 let r = regen.regenerate(ps, &Default::default(), &d.settings.units, &Default::default());
-                v["features"] = json!(ps.features.iter().map(|f| json!({ "id": f.id.to_string(), "name": f.name, "type": f.type_id, "status": r.display.feature_state(f.id).map(|s| format!("{:?}", s.status)) })).collect::<Vec<_>>());
+                v["features"] = json!(ps.features.iter().map(|f| json!({ "id": f.id.to_string(), "name": f.name, "type": f.type_id, "status": r.display.feature_state(f.id).map(|s| format!("{:?}", crate::ops::api_status(s))) })).collect::<Vec<_>>());
                 v["parts"] = json!(r.display.bodies.iter().map(|b| json!({ "id": crate::refs::body_id(&b.id), "name": b.name })).collect::<Vec<_>>());
             }
             v
