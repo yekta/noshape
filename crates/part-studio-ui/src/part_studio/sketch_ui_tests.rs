@@ -312,6 +312,62 @@ fn sketch_undo_and_redo_follow_its_history(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (true, false));
 }
 
+/// Live everyday-1125 (behaviours "Everyday Part Studio"): after ✓ one Ctrl+Z removes the whole new sketch and a
+/// second does nothing (its in-sketch steps are gone); Ctrl+Y brings it back; a re-entered sketch starts with Undo and
+/// Redo off, and its session (a line, ✓) is one step.
+#[gpui::test]
+fn a_finished_sketch_is_one_undo_step(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sk-undo-scope", Tool::Line);
+    let line = |cx: &mut TestAppContext, a: (f64, f64), b: (f64, f64)| {
+        // (Choosing the active tool again turns it off.)
+        if cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.tool != Tool::Line)) {
+            sketch_in_tool(cx, window, view.clone(), Tool::Line);
+        }
+        click(cx, window, &view, a);
+        click(cx, window, &view, b);
+        keys(cx, window, &["escape"]);
+    };
+    let drawn = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_data(cx).map(|d| d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count()));
+    line(cx, (500., 400.), (640., 360.));
+    assert_eq!(drawn(cx), Some(1), "the first line");
+    line(cx, (450., 250.), (600., 250.));
+    assert_eq!(drawn(cx), Some(2), "the second line");
+    let finish = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    };
+    finish(cx);
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    // (the undo steps; the sketch's lines, if it is there)
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let lines = view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.name == "Sketch 1").cloned()).map(|f| match f.params.get("sketch") {
+            Some(noshape_model::ParamValue::Sketch(d)) => d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).count(),
+            _ => 0,
+        });
+        (doc.read(cx).session.undo_len(), lines)
+    });
+    let step = |cx: &mut TestAppContext, redo: bool| {
+        cx.update(|cx| doc.update(cx, |d, cx| if redo { d.redo(cx) } else { d.undo(cx) }));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    };
+    let (n, lines) = state(cx);
+    assert_eq!(lines, Some(2), "the sketch made");
+    step(cx, false);
+    assert_eq!(state(cx), (n - 1, None), "one Ctrl+Z removes the whole sketch");
+    assert!(!cx.update(|cx| doc.read(cx).can_undo()), "a second Ctrl+Z does nothing");
+    step(cx, true);
+    assert_eq!(state(cx), (n, Some(2)), "Ctrl+Y brings it back");
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_some());
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "re-entered: Undo and Redo off");
+    line(cx, (500., 200.), (640., 200.));
+    finish(cx);
+    assert_eq!(state(cx), (n + 1, Some(3)), "the re-edit session is one step");
+    step(cx, false);
+    assert_eq!(state(cx), (n, Some(2)), "its Ctrl+Z takes the whole session back");
+}
+
 /// Live 1853: a sketch started with no plane, Top then picked: picking the
 /// plane is an undo step (Undo on), and Undo past the line un-picks it (the
 /// plane field empty again, out of the sketch editor).
