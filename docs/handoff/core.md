@@ -11,20 +11,19 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
-- **Re-land (lead 10:5x, before the knife fix):** the 6 commits (fillet crash, tickets, ops arc fix, STL fin repair,
-  handoffs, fillet r50 test) rebased onto main 11:0x; the one conflict (sketch_ui_tests.rs, both sides appended a test)
-  kept both. QUEUED: see land.sh.
-- **Knife reference fix (P1, lead), IN TREE, uncommitted (patch /root/core-scratch/knife-fix.patch):** Extrude 1 2 ->
-  2.02 mm lost Sketch 8's vertex and Sketches 7/11's edges because Sketch 6 (Extrude 3's groove: R3 arc started on
-  Extrude 1's top edge, 0.1 mm / 0.5° to it, mirrored about Front by Symmetric constraints, 2 DOF) slid 2.3 mm along
-  the edge under the constructive (one-at-a-time) placement, so Extrude 3 + Fillet 3 cut away the spine/cap corner.
-  Repro without the mirror shifts correctly; the Symmetric half makes the placement hold the far end. Fix: model-core
-  regen/features/sketch.rs: a sketch that held all its constraints before re-projecting its used geometry, with no
-  value changed, solves by the plain least change (`[] if held`); sketch crate `Sketch::holds()`. Knife: 5 edits
-  (1-5 %), every row OK (was 1-4 not OK). T1 model-core
-  regen::features::sketch::...::a_mirrored_profile_follows_its_used_edge_by_the_least_change. In progress: corpus
-  A/B (vibex7 ~/tmp/core/ud/cli-fix vs cli-old, /root/core-scratch/ud/userdocs.py over ~/qa/corpus, 127 docs); live
-  REQUESTS core 11-25 09:50 also asks where live's Sketch 6 lands at 2.02 (unanswered). Then land.
+- **Re-land (lead 10:5x):** the 6 commits (fillet crash, tickets, ops arc fix, STL fin repair, handoffs, fillet r50
+  test) rebased onto main 11:0x (conflict in sketch_ui_tests.rs: both sides appended a test, both kept): QUEUED e6849a8b.
+- **Knife reference fix (P1, lead): QUEUED with this handoff.** Extrude 1 2 -> 2.02 mm lost Sketch 8's vertex and
+  Sketches 7/11's edges: Sketch 6 (Extrude 3's groove, mirrored by Symmetric constraints, 2 DOF) slid 2.3 mm along its
+  used edge under the constructive placement, and Extrude 3 + Fillet 3 cut the corner away. Live (knife-depth-1125):
+  all 52 rows OK at 2.02 / 2.06, Sketch 6 shifts plainly (x unchanged). Fix: a sketch that held before re-projecting,
+  no value changed, solves by plain least change (model-core regen/features/sketch.rs `[] if held`; sketch
+  `Sketch::holds`). Ours now (4, 2.02) / (75.0044, 1.3068): a 4 µm x drift at the far end (min norm), all rows OK over
+  1-5 %. qa corpus 127 docs SAME. T1 a_mirrored_profile_follows_its_used_edge_by_the_least_change.
+- **NOW: FLOW-EXTRUDE-UP-TO-FACE-BESIDE (P1, TICKETS):** doesn't reproduce in a model test (T1
+  kernel_robustness::an_add_up_to_a_rim_face_beside_the_profile_ends_on_its_plane: qa's R5 box, shell, lip, Ø6 post
+  Add up to the lip top: OK). Asked qa (11:1x) to keep flow 58's document after step 36 in ~/agents/qa-keep on vibex7.
+  Note FLOW-USE-OWN-FACE-REFUSED (skasm): Use on the rim projected nothing in that flow, so Sketch 2 was empty.
 - **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
   (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
 - **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
@@ -116,8 +115,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-00. P1 after the knife fix (lead 11-25): FLOW-EXTRUDE-UP-TO-FACE-BESIDE (TICKETS 8d93663a3, qa enclosure flow): Add Extrude
-   "Up to face" to the lip's top face, which lies beside (not over) the profile, fails; live extends the face's plane.
 0. QUEUED 318c67d5 (03:23; carries 0c582c74 + ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED,
    Move face (part offset to nothing fails; boss offset to its axis removed), and ERR-FACE-PATTERN-FAILED-PREVIEW +
    ERR-SWEEP-FAIL-BODY: failed face patterns/mirrors (off copies), holes off their part (tool at its Depth from the

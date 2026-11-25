@@ -36,6 +36,10 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // Re-project used ("Use") 3D geometry so it follows upstream changes:
     // vertices, edges (exact or sampled projections, pierce points), plane
     // traces and silhouettes of curved faces.
+    // A sketch that held before its used geometry moved (a feature above edited) follows it with the least change of
+    // the whole sketch: c2-hunting-knife's Extrude 1 0.02 mm deeper slid Sketch 6's mirrored groove 2.3 mm along the
+    // blade under the one-at-a-time placement, and Extrude 3 then cut away the corner Sketches 7, 8 and 11 use.
+    let held = !(data.external_refs.is_empty() && data.intersections.is_empty()) && sk.holds();
     let mut missing = 0;
     let mut silhouettes: BTreeMap<String, Vec<noshape_sketch::Curve2>> = BTreeMap::new();
     for (eid, r) in &data.external_refs {
@@ -226,6 +230,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     changed.dedup();
     let last_solved = sk.clone();
     let report = match changed.as_slice() {
+        [] if held => sk.solve_with(&noshape_sketch::SolveOptions { analyze: !sk.analysis_current(), ..Default::default() }),
         // One new value (a variable, a configuration): placed as live's
         // regeneration does (least change), not as an edit in the editor.
         [one] => {
@@ -1034,6 +1039,82 @@ mod text_expression_tests {
         assert!(res.report.conflicting().contains(&lb), "{:?}", res.report.status);
         let len = res.sketch.curve(b).unwrap().length();
         assert!((len - 0.032).abs() < 1e-12, "the last solved shape stays: {len}");
+    }
+
+    /// c2-hunting-knife's Sketch 6 (Extrude 3's groove, mirrored about a plane, its arc started on Extrude 1's top
+    /// edge): the used edge 0.02 mm higher moves the groove 0.02 mm, not 2.3 mm along the edge (live knife-depth-1125:
+    /// arc start (4, 2.02), line end (75, 1.3069), all 52 rows OK).
+    #[test]
+    fn a_mirrored_profile_follows_its_used_edge_by_the_least_change() {
+        use crate::configuration::ConfigValues;
+        use crate::partstudio::PartStudio;
+        use crate::reference::{DatumPlane, Reference};
+        use crate::regen::{RegenOptions, Regenerator};
+        use crate::sketch_feature::SketchData;
+        use noshape_sketch::{Curve2, DistanceMode, EntityId};
+        let units = noshape_units::UnitPrefs::default();
+        let m = |x: f64, y: f64| glam::DVec2::new(x * 1e-3, y * 1e-3);
+        let mut sk = noshape_sketch::Sketch::new();
+        let edge = *sk.use_external(&Curve2::Line { a: m(-5.0, 2.0), b: m(80.0, 2.0) }).unwrap().created.last().unwrap();
+        let axis = *sk.use_external(&Curve2::Line { a: m(-5.0, 0.0), b: m(80.0, 0.0) }).unwrap().created.last().unwrap();
+        let p0 = sk.add_point(m(4.742366115, 1.9));
+        let p1 = sk.add_point(m(75.0, 1.286870918));
+        let slope = sk.add_line_between(p0, p1).unwrap();
+        let c = sk.add_point(m(4.768545721, 4.899885769));
+        let p4 = sk.add_point(m(4.0, 2.0));
+        let arc = sk.add_arc_between(c, p4, p0).unwrap();
+        let p7 = sk.add_point(m(75.0, 2.0));
+        let top = sk.add_line_between(p4, p7).unwrap();
+        let end = sk.add_line_between(p7, p1).unwrap();
+        let q7 = sk.add_point(m(75.0, -2.0));
+        let q1 = sk.add_point(m(75.0, -1.286870918));
+        let end2 = sk.add_line_between(q7, q1).unwrap();
+        let qc = sk.add_point(m(4.768545721, -4.899885769));
+        let q0 = sk.add_point(m(4.742366115, -1.9));
+        let q4 = sk.add_point(m(4.0, -2.0));
+        let arc2 = sk.add_arc_between(qc, q0, q4).unwrap();
+        let slope2 = sk.add_line_between(q0, q1).unwrap();
+        let top2 = sk.add_line_between(q4, q7).unwrap();
+        for k in [
+            ConstraintKind::Horizontal { a: top, b: None },
+            ConstraintKind::Vertical { a: end2, b: None },
+            ConstraintKind::Tangent { a: arc, b: slope },
+            ConstraintKind::Coincident { a: edge, b: p4 },
+            ConstraintKind::Vertical { a: p7, b: Some(p1) },
+            ConstraintKind::Radius { curve: arc, value: 3e-3 },
+            ConstraintKind::Distance { a: edge, b: p0, value: 0.1e-3, mode: DistanceMode::Center },
+            ConstraintKind::Angle { a: edge, b: slope, value: 0.5f64.to_radians() },
+        ] {
+            sk.add_constraint(k).unwrap();
+        }
+        for (a, b) in [(end, end2), (p7, q7), (p1, q1), (arc, arc2), (p0, q0), (p4, q4), (slope, slope2), (top, top2)] {
+            sk.add_constraint(ConstraintKind::Symmetric { a, b, axis }).unwrap();
+        }
+        assert!(sk.solve().is_solved());
+        let mut ps = PartStudio::new();
+        let mut plane = ps.new_feature("cPlane", &units).unwrap();
+        plane.params.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        plane.params.set("cplaneType", ParamValue::Enum("OFFSET".into()));
+        plane.params.set("offset", ParamValue::Expr(noshape_units::ExprValue::new("2 mm")));
+        let plane_id = plane.id;
+        ps.features.push(plane);
+        let mut f = ps.new_feature("sketch", &units).unwrap();
+        f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Front)]));
+        let external_refs = [(edge, Reference::FeaturePlane(plane_id)), (axis, Reference::Plane(DatumPlane::Top))].map(|(e, r): (EntityId, _)| (e.0, r));
+        f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, external_refs: external_refs.into(), ..Default::default() })));
+        ps.features.push(f);
+        let at = |ps: &PartStudio| {
+            let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+            let res = &r.context.sketches[0];
+            assert!(res.report.is_solved(), "{:?}", res.report.status);
+            [p4, p1].map(|p| res.sketch.point(p).unwrap() * 1e3)
+        };
+        let before = at(&ps);
+        assert!((before[0] - glam::DVec2::new(4.0, 2.0)).length() < 1e-6, "{before:?}");
+        ps.features[0].params.set("offset", ParamValue::Expr(noshape_units::ExprValue::new("2.02 mm")));
+        let after = at(&ps);
+        assert!((after[0] - glam::DVec2::new(4.0, 2.02)).length() < 1e-3, "the arc's start slid: {after:?}");
+        assert!((after[1].y - 1.3069).abs() < 1e-3 && (after[1].x - 75.0).abs() < 0.01, "{after:?}");
     }
 
     /// Live errors-1118: a triangle with two 100 mm sides and the third typed 300 can't be solved: the row says so

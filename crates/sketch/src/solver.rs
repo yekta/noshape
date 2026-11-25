@@ -1404,6 +1404,11 @@ impl Sketch {
         !now.is_empty() && now.iter().all(|c| was.contains(c) && self.constraint(*c).is_some_and(|k| !k.kind.entities().iter().any(|e| near.contains(e))))
     }
 
+    /// Whether every driving constraint holds where the geometry is now.
+    pub fn holds(&self) -> bool {
+        self.unheld_constraints(1e-9).is_empty()
+    }
+
     pub(crate) fn unheld_constraints(&self, tol: f64) -> HashSet<ConstraintId> {
         let sys = System::build(self, &HashSet::new(), &[]);
         let mut out = HashSet::new();
