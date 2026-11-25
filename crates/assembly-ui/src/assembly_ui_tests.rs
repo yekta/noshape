@@ -243,6 +243,45 @@ fn a_mate_gets_its_heads_up_check_after_the_second_pick(cx: &mut TestAppContext)
     .unwrap();
 }
 
+/// Live asm-everyday-1125: one undo after a Fastened mate's ✓ takes the mate and the move it made (the part goes back
+/// where it was); redo brings both back.
+#[gpui::test]
+fn undoing_a_fastened_mate_takes_its_move_back_too(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mate-undo-move");
+    let placements = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let mut p: Vec<_> = v.assembly(cx).unwrap().instances.iter().map(|i| (i.id, i.placement)).collect();
+        p.sort_by_key(|(id, _)| *id);
+        p
+    });
+    let mates = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).map_or(0, |a| a.mates.len()));
+    let (before, n) = (placements(cx), mates(cx));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let (a, b) = (face_connector(v, "Part 1 <1>", false, cx), face_connector(v, "Part 2 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    draw(cx, window);
+    let after = placements(cx);
+    assert_eq!(mates(cx), n + 1);
+    assert_ne!(after, before, "the mate moved a part");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    doc.update(cx, |d, cx| d.undo(cx));
+    cx.run_until_parked();
+    draw(cx, window);
+    assert_eq!((mates(cx), placements(cx)), (n, before.clone()), "one undo: the mate and its move");
+    doc.update(cx, |d, cx| d.redo(cx));
+    cx.run_until_parked();
+    draw(cx, window);
+    assert_eq!((mates(cx), placements(cx)), (n + 1, after), "redo: both back");
+}
+
 /// A menu as its labels: "—" for a separator, "Label ▸" for a submenu;
 /// separators collapse as `fill_menu` draws them.
 fn labels(entries: &[super::MenuEntry]) -> Vec<String> {
@@ -2513,9 +2552,13 @@ fn a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release(cx: &mut TestA
     })
     .unwrap();
     assert_eq!(cursor(cx), None, "the default cursor at the release");
+    cx.run_until_parked();
     cx.update(|cx| {
         let v = view.read(cx);
         assert_eq!(v.result.solved.placement(instance(v, "Part 1 <1>", cx)), before, "nothing moved");
+        // Live asm-everyday-1125: no undo step either; the next Ctrl+Z undoes the Fix.
+        let d = v.doc.read(cx);
+        assert_eq!(d.session.store.history(d.session.branch).unwrap().first().map(|m| m.description.clone()).as_deref(), Some("Assembly 1 :: Fix"));
     });
 }
 
