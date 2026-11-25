@@ -166,7 +166,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   note_face_click on a graphics face click, ray hit on the model before the preview), manipulators moveFace OFFSET /
   Translate base; T1 move_faces_arrow_starts_where_the_face_was_clicked. Not checked: live commits Extrude's dragged
   depth as the 1-decimal value ("30.3*mm"), Fillet's at full precision. Parts 3+ (ring, triad, asm drags) from live.
-  18:2x: arrow halo 3 -> 4 px (live wf23 03 s19 + manip-drag-1125 cross-sections), starting where the core does
+  17:4x: arrow halo 3 -> 4 px (live wf23 03 s19 + manip-drag-1125 cross-sections), starting where the core does
   (an_edited_extrudes_end_cap_greys_its_top_once caught the overhang); TICKETS FEEL-CORNER-BREAK-VERTEX-PICK to verify.
   manip-drag part 3 (live 16:50-17:06) compared, no code change needed: Translate one arrow + Direction defaults to the
   face (behaviors.rs moveFace logic), Rotate ring only, triad keeps the focus (dialogs test), dialog Ctrl+Z goes to
