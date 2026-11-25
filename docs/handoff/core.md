@@ -43,6 +43,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   2d82a0 fails Chamfer 2, Draft 1, Move face 1/3/9, Replace face 2, Fillet 4, 5, 7, 13, 25, 28, 30 BUT its Derived 1 is
   "translation incomplete" (Left Plate 120044 vs live 105870 mm3: source sketches moved by our solve then taken back,
   source Fillet 13 / Delete face 1 unmapped) -> 2d82a0's blends run on other geometry than live's (translator issue).
+  **F18/F19 PARKED 07:19 (box used):** every chain edge bounds one plane (y=11 etc.) with walls at 90 deg, concave
+  (hub rising) or convex (plate side dropping); the flips (e1->e2, e4->e5) are at tangent vertices where the plate's
+  side runs tangent into the hub. OCCT propagates over tangent edges, so even one edge alone pulls in the flip and
+  fails (only e4, not tangent to its neighbours, rounds alone; convex-only / concave-only subsets fail too). Needs a
+  blend that ends both runs at the flip vertex (live's vertex blend there), not a fallback tweak. Probe patch
+  /root/core-scratch/run/f18-probe3.patch (detail.rs ZZ_F: per-chain, per-convexity, per-edge OCCT).
   F18 (= F19 mirrored?): 7 picks -> 44 edges, 4 closed 11-edge chains (outlines of the planes y=+-11, +-8.25/7.75)
   turning convex<->concave (a plate tangent into a taller hub); OCCT fails each chain alone. Concave balls failed on
   "arc through 3 points" in ball_section's side(): at a junction the shared ball's contact is off this edge's

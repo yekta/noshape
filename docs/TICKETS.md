@@ -15,6 +15,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   unify's USD then read `aPCurveSeq.Last()` of an empty sequence in UnionPCurves (unchecked in release OCCT). Fixed:
   sections() fails "the rounds' Booleans left the part open" (`Shape::open_edges`) before unifying; 0 of 203 parity
   models ever reach it. Still open below: P2 OCCT-USD-EMPTY-PCURVES.
+- [ ] P2 **SCISSOR-F18-F19-FLIP (core, parked 11-25)**: 9cbb0e Fillet 18/19 (0.8 mm, tangent chains on a plane's outline
+  whose walls flip concave<->convex at tangent vertices: a plate's side tangent into a taller hub) fail; OCCT
+  propagates over the flip, our rolling balls collapse at it. Needs a vertex blend at the flip. Notes: handoff core.md.
 - [ ] P2 **OCCT-USD-EMPTY-PCURVES (core, needs the lead: OCCT patch)**: ShapeUpgrade_UnifySameDomain::UnionPCurves
   dereferences an empty pcurve sequence when no edge of a chain has a pcurve on a (replaced) face; any unify of such a
   shape faults into the crash guard. A patch (`if (aPCurveSeq.IsEmpty()) continue;` and skip that face) would close it
