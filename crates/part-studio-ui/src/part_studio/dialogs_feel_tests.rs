@@ -2324,37 +2324,6 @@ fn an_arrow_drag_writes_its_field_and_undoes_in_one_step(cx: &mut TestAppContext
     assert!(committed != before && undone == before && redone == committed, "Depth: before {before}, committed {committed}, undone {undone}, redone {redone}");
 }
 
-/// Live manip-drag-1125 part 2: Move face opened on the block's top face clicked at (15, 15, 20) has its one arrow at
-/// the click point, along the normal, Offset 5 mm (ours sat on the face's anchor whatever the click).
-#[gpui::test]
-fn move_faces_arrow_starts_where_the_face_was_clicked(cx: &mut TestAppContext) {
-    let (window, view) = block(cx, "dlg-moveface-click");
-    let mm = 1e-3;
-    let (id, anchor) = cx.update(|cx| {
-        let v = view.read(cx);
-        let ctx = v.context.clone().expect("the studio's context");
-        let top = v.display.bodies.iter().flat_map(|b| b.face_refs.iter()).find(|r| v.face_anchor(&ctx, r).is_some_and(|(_, n)| n.z > 0.99)).cloned().expect("the top face");
-        (*v.built.as_ref().unwrap().picks.ids_for(&top).first().expect("its pick"), v.face_anchor(&ctx, &top).unwrap().0)
-    });
-    let clicked = glam::DVec3::new(10.0, 10.0, 10.0) * mm;
-    assert!(clicked.distance(anchor) > 5.0 * mm, "the click is away from the anchor {anchor:?}");
-    let at = cx.update(|cx| view.read(cx).viewport.read(cx).project(clicked)).expect("on screen");
-    cx.update_window(window, |_, w, cx| {
-        view.update(cx, |v, cx| {
-            let vp = v.viewport.clone();
-            v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(id), position: at, modifiers: Modifiers::default() }, w, cx);
-            v.start_feature("moveFace", w, cx);
-        })
-    })
-    .unwrap();
-    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
-    draw(cx, window);
-    let arrow = cx.update(|cx| view.read(cx).param_arrow(cx)).expect("Move face's arrow");
-    assert_eq!(arrow.param, "offsetDistance");
-    assert!(arrow.base.distance(clicked) < 0.05 * mm && arrow.dir.z > 0.99, "at the click, along the normal: {:?} {:?}", arrow.base, arrow.dir);
-    assert!((arrow.length - 5.0 * mm).abs() < 1e-9, "Offset 5 mm: {}", arrow.length);
-}
-
 /// Live manip-drag-1125 part 3 (Move face › Rotate about the block's front top edge, 0 deg): the ring's drag does
 /// nothing through 2.83 px, then turns the face in 5° snaps with the free angles between shown to 7 decimals, in the
 /// focused Rotation angle field with its whole text selected; Ctrl+Z in the dialog changes nothing; ✓ commits the angle
@@ -2557,4 +2526,25 @@ fn move_faces_rotate_ring_keeps_60_px_from_its_axis(cx: &mut TestAppContext) {
     draw(cx, window);
     let (mm_in, px_in) = ring(cx);
     assert!((mm_in - 15.0).abs() < 1e-6 && px_in > 60.0, "zoomed in: std's 15 mm ({mm_in} mm, {px_in} px)");
+}
+
+/// Live manip-ring-1125 (std getDirectEditManipulatorPlane) and manip-drag-1125 part 2's frame (the shaft at x 1160,
+/// 9 px right of the click at (15, 15, 20)): Move face's Offset arrow starts at the face's middle (20, 15, 20), not
+/// where the face was clicked; at 5 mm its tip is (20, 15, 25).
+#[gpui::test]
+fn move_faces_arrow_starts_at_the_faces_middle(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "moveFace", "name": "Move face 1", "params": { "moveFaces": ["face through [15, 15, 20]"], "moveFaceType": "OFFSET", "offsetDistance": "5 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "dlg-moveface-arrow-mid", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let tip = cx.update(|cx| view.read(cx).viewport.read(cx).manipulators.first().map(|m| m.0)).expect("the arrow");
+    assert!((tip * 1000.0 - glam::DVec3::new(20.0, 15.0, 25.0)).length() < 1e-6, "the tip at {:?} mm", tip * 1000.0);
 }

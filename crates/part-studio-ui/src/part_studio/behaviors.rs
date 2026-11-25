@@ -576,8 +576,6 @@ pub struct UiState {
     pub feature_names: std::collections::HashMap<FeatureId, String>,
     /// Faces' manipulator anchors (centroid on the face, normal) for one context (`face_anchor`).
     pub face_anchors: std::cell::RefCell<Option<FaceAnchors>>,
-    /// Where the newest graphics clicks met the faces they picked, newest last (`face_click_point`).
-    pub face_clicks: Vec<(Reference, glam::DVec3)>,
     /// The shown faces each feature made, for the display applied as `display_seq` (`feature_geometry`).
     pub feature_faces: std::cell::RefCell<Option<(u64, FeatureFaces)>>,
     /// The outline of a part the open feature removes, over its preview: for the model before it (by address) and
@@ -1057,7 +1055,6 @@ impl UiState {
             feature_names: Default::default(),
             feature_faces: Default::default(),
             face_anchors: Default::default(),
-            face_clicks: Vec::new(),
             removed_outline: None,
             before_context: None,
             decal_sized: None,
@@ -1242,11 +1239,6 @@ impl PartStudioView {
         }
         let map = &mut cache.as_mut().expect("just set").1;
         *map.entry(r.clone()).or_insert_with(|| noshape_model::select::face_anchor(ctx, r))
-    }
-
-    /// Where the newest graphics click on face `r` met it (live manip-drag-1125: Move face's arrow starts at the click).
-    pub(super) fn face_click_point(&self, r: &Reference) -> Option<glam::DVec3> {
-        self.ui.face_clicks.iter().rev().find(|(f, _)| f == r).map(|(_, p)| *p)
     }
 
     /// Faces standing for a whole part (parts list hover/selection).

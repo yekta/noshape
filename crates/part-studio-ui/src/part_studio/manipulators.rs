@@ -506,8 +506,7 @@ impl PartStudioView {
             // face's normal, Translate drives translationDistance along the
             // direction (Blind only); the base is the first face.
             "moveFace" if p.is("limitType", "BLIND") && !p.is("moveFaceType", "ROTATE") => {
-                // Live manip-drag-1125: the arrow starts where the face was clicked; a face from a list, at its anchor.
-                let (base, n) = p.query("moveFaces").iter().find_map(|r| self.face_anchor(ctx, r).map(|(a, n)| (self.face_click_point(r).unwrap_or(a), n)))?;
+                let (base, n) = p.query("moveFaces").iter().find_map(|r| self.face_anchor(ctx, r))?;
                 let sign = if p.bool("oppositeDirection") { -1.0 } else { 1.0 };
                 if p.is("moveFaceType", "OFFSET") {
                     return Some(Arrow { base, dir: n * sign, length: value("offsetDistance")?, param: "offsetDistance", flip: Some("oppositeDirection"), secondary: false, small: false, tangential: false, scale: 1.0 });
