@@ -50,8 +50,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   T1s feedback_feel_tests first_hour_mistakes_*, assembly_ui_tests an_edited_mate_down_to_one_connector_says_it_needs_two.
 - [ ] fixed, to verify (psui 17:0x) P0 **MANIP-DRAG-DEAD-ZONE (psui)**: every 3D arrow (length ones were 3 px) waits
   4 px, then takes the full 5 px; T1 an_arrow_drag_writes_its_field_and_undoes_in_one_step (field focused and
-  selected, dialog Ctrl+Z inert, one Part Studio undo). Open: live's Move face arrow sits at the click point, ours on
-  the face's anchor.
+  selected, dialog Ctrl+Z inert, one Part Studio undo). Move face's arrow starts at the face's click point (a face
+  from the list: its anchor); T1 move_faces_arrow_starts_where_the_face_was_clicked.
 
 ## psui 11-25 11:4x: display modes vs live display-modes-1125 (study hover_matrix print_display_mode_pixels, T2)
 
