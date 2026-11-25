@@ -173,6 +173,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
   the draft history (resets dx), assembly drags start past 2.5 px (live 3). Untested: a T1 for the triad's dialog
   Ctrl+Z resetting dx in one step; the Rotate ring's position vs live (1175/1185,435).
   Other PARTLY rows checked: the rest are "fixed, to verify" / CAN'T TELL / [x] (FEEL-FS-COMMIT split button is studios').
+  18:0x (lead 17:5x queue): ASM-CHANGE-CONFIG-PANEL-LOOK (qa PARTLY): no rule under the doc row; the select overflowed
+  its row by 4 px (label flex_none): label now flex_1 truncate, select mr 14 (27 px from the right edge) and top -3;
+  test asserts the 27 px. Dead zone 4.1 px for arrows AND angle rings (live: Fillet moves at 4.47, ring at 4.24, not
+  2.83; arrows 4 none / 5 full); T1 move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between (edited
+  Move face ROTATE about edge [20,0,20]; field focused + selected, dialog Ctrl+Z no change, PS undo). Green: t14
+  (asm test), t15 (ui_tests::dialogs:: + snap_tests::, 26). Open: live's ring sits ~25 mm from the axis at 0 deg
+  (hits 1175/1185,435 = half the face box diagonal? std's on-axis branch), ours at the face anchor's radius (15 mm
+  here): needs a live probe of the ring at other clicks before changing. Live's "plain click on a part picks nothing
+  in Transform until hovered" is lost input (DECISIONS 11-07): not copied. Triad: no field focused + dialog Ctrl+Z
+  resets dx already ours (dialogs tests); asm drag 2.5 px (live 3: 2 none, 3 moves), no box, one undo (asm tests).
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
