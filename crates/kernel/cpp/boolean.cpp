@@ -6129,6 +6129,18 @@ bool wraps_past_a_turn(const TopoDS_Face& a, const TopoDS_Face& b)
   return (u1 - u0) + (w1 - w0) > 2 * M_PI + 1e-9;
 }
 
+// Two faces of one cylinder or cone on frames of opposite hands (a bore's two faces meeting along circles, one
+// reversed on a right-handed frame, one on a left-handed: c2-impeller-loft's Remove Bohrung Ansaugflansch, 3 tries,
+// 330 ms): USD merges neither way round, whatever the order.
+bool frames_differ(const TopoDS_Face& a, const TopoDS_Face& b)
+{
+  auto direct = [](const TopoDS_Face& f) {
+    BRepAdaptor_Surface s(f, false);
+    return s.GetType() == GeomAbs_Cylinder ? s.Cylinder().Direct() : s.GetType() == GeomAbs_Cone ? s.Cone().Direct() : true;
+  };
+  return direct(a) != direct(b);
+}
+
 bool cylinder_faces_apart(const TopoDS_Shape& s)
 {
   return !faces_apart(s, false).empty();
@@ -6287,11 +6299,11 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   // three more passes.)
   std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> apart = may && !r.IsSame(s0) ? faces_apart(r, true) : std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>();
   // (Not the pairs no order can merge: two faces meeting only along lines of their surface, whose turns about the axis
-  // add up past a full one: c2-helical-sweep's thread strips, a turn each, 77 ms of retries.)
+  // add up past a full one: c2-helical-sweep's thread strips, a turn each, 77 ms of retries; two on frames of opposite hands.)
   // (NOSHAPE_UNIFY_RETRY_ALL=1: every pair retried, as before, to compare.)
   static const bool retry_all = std::getenv("NOSHAPE_UNIFY_RETRY_ALL") != nullptr;
   if (!retry_all)
-    apart.erase(std::remove_if(apart.begin(), apart.end(), [](const std::pair<TopoDS_Shape, TopoDS_Shape>& p) { return wraps_past_a_turn(TopoDS::Face(p.first), TopoDS::Face(p.second)); }), apart.end());
+    apart.erase(std::remove_if(apart.begin(), apart.end(), [](const std::pair<TopoDS_Shape, TopoDS_Shape>& p) { return wraps_past_a_turn(TopoDS::Face(p.first), TopoDS::Face(p.second)) || frames_differ(TopoDS::Face(p.first), TopoDS::Face(p.second)); }), apart.end());
   if (!apart.empty() && order_moot)
     stuck_pairs().add(apart);
   else if (!apart.empty() && !stuck_pairs().all_known(apart) && BRepCheck_Analyzer(s0).IsValid())
