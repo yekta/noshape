@@ -4388,6 +4388,7 @@ impl PartStudioView {
         let asc = LABEL_ASC_PX * wpp;
         let fill = |contours: Vec<Vec<DVec3>>, c: Rgba| noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] };
         let rect = |c: DVec3, hw: f64, hh: f64| vec![c - x * hw - y * hh, c + x * hw - y * hh, c + x * hw + y * hh, c - x * hw + y * hh];
+        let glyphs = |t: &super::PlaneText, at: DVec3| t.polylines.iter().filter(|c| c.len() >= 3).map(|c| c.iter().map(|q| at + x * (q.x * asc) + y * (q.y * asc)).collect()).collect::<Vec<_>>();
         let mut out = Vec::new();
         for PlacedDimension { cid, anchor, text, driving, configured, .. } in self.placed_dimension_labels(&data, cx) {
             if editing == Some(cid) {
@@ -4406,12 +4407,26 @@ impl PartStudioView {
                 out.push(fill(vec![rect(anchor, hw - if configured { wpp } else { 0.0 }, hh - if configured { wpp } else { 0.0 })], bg));
             }
             let mut origin = anchor - x * (hw - 4.0 * wpp) - y * (0.5 * DIGIT_H * asc);
-            let glyphs = |t: &super::PlaneText, at: DVec3| t.polylines.iter().filter(|c| c.len() >= 3).map(|c| c.iter().map(|q| at + x * (q.x * asc) + y * (q.y * asc)).collect()).collect::<Vec<_>>();
             if let Some((t, color)) = &marker {
                 out.push(fill(glyphs(t, origin), *color));
                 origin += x * marker_w;
             }
             out.push(fill(glyphs(&rest, origin), fg));
+        }
+        // Offset's distance between the curve and its copy (live offset-iso-1124: the "5" in the plane), hovered on its
+        // tan box.
+        if self.ui_ref().is_none_or(|u| u.offset_input.is_none())
+            && let Some((at, d)) = ed.offset_value_label(&data.sketch)
+        {
+            let units = self.doc.read(cx).session.doc.settings.units;
+            let full = noshape_units::format_quantity(Quantity::new(d, Dim::LENGTH), &units);
+            let t = super::plane_text(full.split(' ').next().unwrap_or_default());
+            let (anchor, hw, hh) = (ed.frame.to_world(at), 0.5 * t.width * asc + 2.0 * wpp, 11.0 * wpp);
+            if ed.offset_label_hovered {
+                out.push(fill(vec![rect(anchor, hw, hh), rect(anchor, hw - wpp, hh - wpp).into_iter().rev().collect()], rgb(0xd99c3e)));
+                out.push(fill(vec![rect(anchor, hw - wpp, hh - wpp)], rgb(0xccb396)));
+            }
+            out.push(fill(glyphs(&t, anchor - x * (hw - 2.0 * wpp) - y * (0.5 * DIGIT_H * asc)), rgb(0x000000)));
         }
         out
     }
@@ -5567,6 +5582,7 @@ impl PartStudioView {
         // to type), then the box in its place
         let offset_box = self.ui_ref().and_then(|u| u.offset_input.as_ref().map(|(st, _)| st.clone()));
         let offset_invalid = self.ui_ref().is_some_and(|u| u.offset_invalid);
+        let in_plane = self.sketch_dims_in_plane(cx);
         if offset_box.is_none()
             && let Some((at, d)) = ed.offset_value_label(&data.sketch)
             && let Some((x, y)) = project(at)
@@ -5584,9 +5600,10 @@ impl PartStudioView {
                     .px(px(1.))
                     .border_1()
                     .border_color(gpui::transparent_black())
-                    .hover(|s| s.bg(rgb(0xccb396)).border_color(rgb(0xd99c3e)))
+                    .when(!in_plane, |d| d.hover(|s| s.bg(rgb(0xccb396)).border_color(rgb(0xd99c3e))))
                     .text_size(px(16.))
-                    .text_color(rgb(0x000000))
+                    // In an oblique view drawn in the plane (`sketch_dimension_fills`); this box stays to hover and click.
+                    .text_color(if in_plane { gpui::transparent_black() } else { rgb(0x000000).into() })
                     .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()
