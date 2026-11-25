@@ -3,24 +3,23 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 12:25) — read first
-- QUEUED 1f00e732 (8 commits, 12:1x): the whole stack re-landed after the 12:04 conflicts. It is rebased on main with
-  core's knife fix 4ab5258b (= e9227e42): in model-core regen/features/sketch.rs both are kept (core's `held` solve +
-  my `lost_ids`; my inner set renamed `kept`). Also in it: the spline/image drag fixes for the two psui failures
-  (a model edge beats the origin level snap: set_drag_external / drop_onto_external accept a Level drag_snap;
-  latency test drags upward); variables-1125 (3); ERR-MATE-CREATING-REV-RED (SolveOptions::new_mate, assembly_view
-  sets it for a new mate before Solve; T1 a_new_mate_previews_alone_but_a_new_tangent_checks_every_mate).
-  If 1f00e732 fails: fix forward, rebase on main, land.sh again.
-- UNCOMMITTED: tests.rs adds two cases to that T1 (the plate free, each part held); they pass. Commit with the next change.
-- IN FLIGHT (lead 11-25: asm's mate P0/P1 rows; psui left the two solver rows to me): ERR-MATE-OVERDEF-BOTH residual
-  = "while creating a planes Tangent, Revolute 1 stays OK" (qa err/c m-tan-planes-c, 11-23 dump: both rows "ok"
-  while creating). My eval test makes both red, and so does the ops create on qa's doc (~/tmp/skasm/tp). Next step:
-  replay qa's cells m-tan-planes-c and m-slider-lim-c (prepared in ~/tmp/skasm/errc: cells, starts.json, run.sh on
-  :493) on vibex8 with ~/tmp/skasm/noshape-skasm (built 12:20, copy to vibex8 was running):
-  `ssh vibex8 'cd ~/tmp/skasm/errc && GLOB="m-tan-planes-c m-slider-lim-c" timeout 900 nice $HOME/bin/slot bash run.sh ~/tmp/skasm/noshape-skasm ~/tmp/skasm/errc/cells ~/tmp/skasm/errc/out'`,
-  then read the Revolute 1 / Tangent 1 row "state" in each out/<cell>/state.json at steps 6-7.
-  Then ERR-MATE-TANGENT-WORDS left: one entity picked: ✓ green, state disabled (live: enabled); face-gone chips
-  "Missing entity of" (ops-built). psui did the reopened pale ✓ and the "Face of" chips.
+## NOW (11-25 12:55) — read first
+- QUEUED 1f00e732 (8 commits, 12:1x; rebased on core's knife fix 4ab5258b, both kept in model-core sketch.rs). If it fails:
+  fix forward, rebase, land.sh again.
+- TO LAND after 1f00e732: 4bdffff40 (+ handoff): ERR-MATE-OVERDEF-BOTH: eval's only_mate full check also reverts and
+  solves every mate when the full solve fails the new mate (`only_fails`; qa's pin top on block top: the preview
+  couldn't move the pin, so held_back-moved never fired). UI T1 a_new_tangent_fighting_a_revolute_is_red_while_created
+  (pin_block_document = qa's build.py) fails without it. Also: render_param's #[allow] (initial import, unowned)
+  replaced by `ParamRow` (lead 11-25).
+- OPEN residual (in TICKETS row): a Tangent on faces already flush with the same normal (two_parts_document tops +
+  Revolute on tops) leaves the Revolute OK even solving every mate: the solver blames only the Tangent; live red both.
+- NEXT ERR-MATE-TANGENT-WORDS: (a) reopened face-gone ops-built Tangent (qa err/c936 m_tan_missing; replay cell staged
+  vibex8 ~/tmp/skasm/errc/cells/m-tan-missing.json): the dialog preview shows NO error (committed: "Selection is
+  invalid."), so chips stay "Mate connector of" (field_text needs `unresolved`, set only from that message). Find why
+  the editing preview (only_mate, editing) resolves the gone face. (b) one entity ✓ enabled: lead has live answer asm's
+  REQUESTS 11-23 08:12 after the hinge reference.
+- App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
+  vibex8:tmp/skasm/` (vibex6 can't ssh vibex8). Probe-on-a-doc pattern: a temp gpui test opening a copied .noshape.
 - OPEN: (2) dim box Esc, one or two (REQUESTS skasm 11-25 11:24, awaiting live).
 - QUEUED 5657c008 (spline/image drags) — see git log.
 - QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
