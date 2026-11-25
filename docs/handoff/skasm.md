@@ -13,11 +13,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   end_carried; the chain's last line stretches). If it fails: fix forward.
 - Replays (vibex8 errc, 13:13 binary): m-tan-planes-c both red once complete, m-slider-lim-c Revolute OK, as live.
   (A new mate's row/title red before both picks is live's, not a bug.)
-- NEXT (lead 11-25 14:1x) dim box Esc as live/skasm/dimbox-esc-1125: Esc #1 empties the box to an unfocused "0 mm"
-  (pink cleared, nothing committed), Esc #2 closes it; with the unit autocomplete open a third Esc is needed (first
-  closes the list). REQUESTS skasm 11-25 11:24 answered.
-- Then: the remaining asm mate rows (TICKETS, most-used first); OPS-TANGENT-MATE P2 needs a lead call (REST accepts
-  a same-instance Tangent, the dialog doesn't).
+- 11-25 15:0x in this land: dim box Esc as live dimbox-esc-1125 (dim_box_escape; capture_action on the input's Escape,
+  which put the committed text back first; ui.dim_box_typed), OPS-TANGENT-MATE A (ops make a same-instance mate, flagged
+  by the evaluation), UIS-MATE-PATTERN-ROW (pattern row marked `mate:<name>`).
+- NEXT (lead 11-25 15:1x) iso dimension text as live/skasm/dim-iso-1125: in iso the text and arrowheads lie in the
+  sketch plane (baseline along the projected x; glyphs 12 -> 6-7 px tall, arrowheads 7-8 -> 4.1-4.5 px wide), constant
+  screen size; after the sketch's check mark no dims are drawn.
 - Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
   "Everyday Part Studio" (sketch undo scope, paste on the pointer).
 - App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
