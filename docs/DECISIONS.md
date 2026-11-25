@@ -216,3 +216,7 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   within live's tolerance band (~1e-6 relative), not OCCT's last digits; no live capture needed below that band.
 - 11-25 (lead) A mate between two entities of one instance (e.g. a Tangent of two faces of one part) is accepted by
   the agent API as live's REST accepts it; the dialog takes it only where live's dialog does (skasm, OPS-TANGENT-MATE).
+- 11-25 (lead) A pattern of fewer than 16 Boolean tools fuses at once rather than through the trimmed fuse (bool,
+  impeller seat Extrude 0.9-1.3 s -> 0.22-0.38 s). A corpus case whose raw fuse differs only before the feature's unify
+  is a gate exception when a T1 pins the feature's final result (faces, volume) as recorded (bool-corpus 58c61d: 65 raw,
+  56 after unify, as recorded); the model suite vs live and parity56 stay at 0 differences.
