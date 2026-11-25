@@ -9462,3 +9462,45 @@ fn a_spline_arm_clicked_reads_its_length_as_live(cx: &mut TestAppContext) {
     let readout = cx.update(|cx| { let v = view.read(cx); v.sketch.as_ref().unwrap().selection_readout(&v.sketch_data(cx).unwrap(), &units) });
     assert_eq!(readout, vec![("Length".to_string(), format!("{:.3} mm", arm.2 * 1e3))], "the arm's readout, as live's");
 }
+
+/// qa FLOW-HOLE-ON-FACE-SKETCH-NO-SCOPE (live hole-1125): a Hole at a point sketched on the part's top face fills
+/// Merge scope with the part at the first pick, as one on the Top plane does.
+#[gpui::test]
+fn a_hole_at_a_point_sketched_on_a_face_merges_into_its_part(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "hole-face-sketch");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![top.clone()];
+        v.start_feature("sketch", w, cx);
+    }))
+    .unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some());
+    sketch_in_tool(cx, window, view.clone(), Tool::Point);
+    // The middle of the top face, in the sketch's plane (it sits on the face, its axes the Top plane's).
+    let middle = cx.update(|cx| {
+        let b = view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let (lo, hi) = b.mesh.positions.iter().fold((DVec2::MAX, DVec2::MIN), |(lo, hi), p| (lo.min(DVec2::new(p[0] as f64, p[1] as f64)), hi.max(DVec2::new(p[0] as f64, p[1] as f64))));
+        (lo + hi) / 2.0
+    });
+    let at = on_screen(cx, &view, middle);
+    click(cx, window, &view, (at.x, at.y));
+    keys(cx, window, &["escape"]);
+    let (sketch, point) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        (v.sketch.as_ref().unwrap().feature, d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).last().expect("the point").id)
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Hole dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.active_query = Some("locations".into());
+        d.add_pick(Reference::SketchEntity { sketch, entity: point.0 }, cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let scope = cx.update(|cx| dialog.read(cx).feature.params.get("scope").cloned());
+    assert!(matches!(&scope, Some(noshape_model::ParamValue::Query(q)) if !q.is_empty()), "Merge scope: {scope:?}");
+}

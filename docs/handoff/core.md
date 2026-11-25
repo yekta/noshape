@@ -4,6 +4,18 @@ Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
+## Now (11-25)
+- **P0 FLOW-HOLE-ON-FACE-SKETCH-NO-SCOPE: not a Hole bug.** qa's start "bracket-link" draws its R10 ends with ops
+  `sketch_draw center_point_arc [[30,10],[30,0],[30,20]]`: scripted clicks went straight from start to end, a 180° turn
+  the tool's sweep reads as clockwise, so both ends bulged in (region 885.8 mm² = 1200 − 100π, x ±30) and the point at
+  (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
+  click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
+  GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
+- **Then STL/3MF (lead 11-25):** impeller Medium STL Part 1 has a duplicated opposite-wound triangle pair at z=0 near
+  (23.6, 0) mm (1 non-manifold, 2 misoriented edges: core-scratch/bin/stlcheck.py); housing-draft Coarse 337 vs live
+  460 vertices to check; REQUESTS row for live impeller STL Coarse/Medium/Fine + 3MF counts/time; stale doc comment
+  above export.rs CustomResolution. Speed fine (10 parts 148/190/321 ms, 3MF 196 ms).
+
 ## Now (11-24 16:40 UTC)
 - **Queued daf6387b** (carries 0598da9b = bfcad85c re-land; its 16:12 fail was only the flaky sm::a_tabs_merge):
   parity Intersect near-link (loft-paths-guides 29/29), ERR-SEL-RED entry text, APPEAR-SUBTRACT panel row (live

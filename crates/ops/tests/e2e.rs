@@ -12351,3 +12351,30 @@ fn a_seam_crossing_edge_is_centred_on_all_its_pieces() {
         assert!(num(&m[1]).abs() < 1e-6 && (num(&m[0]) - centroid).abs() < 1e-4, "{a}");
     }
 }
+
+/// qa FLOW-HOLE-ON-FACE-SKETCH-NO-SCOPE: a centre point arc's half circle goes counter-clockwise from its start, as the
+/// op says (scripted clicks went straight from start to end, a turn of exactly 180° read as clockwise: qa's obround
+/// link had its R10 ends bitten in, so a Hole sketched near an end found no part). The Hole at a point sketched on the
+/// link's top face then merges into it (live hole-1125: Merge scope "Part 1").
+#[test]
+fn a_hole_at_a_point_on_an_obround_links_top_face() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "hole-obround-face.noshape", "plane:top");
+    for (tool, pts) in [("line", json!([[-30, 0], [30, 0]])), ("center_point_arc", json!([[30, 10], [30, 0], [30, 20]])), ("line", json!([[30, 20], [-30, 20]])), ("center_point_arc", json!([[-30, 10], [-30, 20], [-30, 0]]))] {
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": tool, "points": pts }));
+    }
+    let regions = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"].clone();
+    let link = &regions[0];
+    assert_eq!(regions.as_array().map(Vec::len), Some(1));
+    assert!((num(&link["area"]) - (1200.0 + 100.0 * std::f64::consts::PI)).abs() < 1e-3, "{link}");
+    assert!((num(&link["bounds"]["min"][0]) + 40.0).abs() < 1e-6 && (num(&link["bounds"]["max"][0]) - 40.0).abs() < 1e-6, "{link}");
+    let region = link["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": { "query": { "kind": "faces", "normal": [0, 0, 1] } } }))["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[30.003, 10.2176, 5]] }));
+    let pt: Vec<Value> = p["created"].as_array().unwrap().iter().filter(|x| x["type"] == "point").map(|x| x["id"].clone()).collect();
+    let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pt, "endStyleV2": "THROUGH" } }));
+    assert_eq!(h["feature_status"]["status"], "Ok", "{h}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": h["feature"] }));
+    assert_eq!(g["params"]["scope"].as_array().map(Vec::len), Some(1), "Merge scope: {}", g["params"]["scope"]);
+}

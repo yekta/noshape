@@ -902,6 +902,13 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
             ed.toggle_tangent_arc();
         }
         ed.no_point_snap = apart.contains(&k);
+        // A centre point arc sweeps as the cursor went round the centre: on its way to the end, the pointer passes the
+        // counter-clockwise arc's middle (straight there, a half circle's turn of exactly 180° read as clockwise).
+        if tool == Tool::CenterArc && k == 2 {
+            let (ctr, from) = (points[0], points[1]);
+            let half = noshape_sketch::geom::ccw_sweep((from - ctr).to_angle(), (*c - ctr).to_angle()) / 2.0;
+            ed.pointer_move(&mut t.data, ctr + (from - ctr).rotate(DVec2::from_angle(half)), false, false);
+        }
         click(&mut ed, &mut t.data, *c);
     }
     // Commit what the tool still holds (spline, slot, polygon), then leave it.
