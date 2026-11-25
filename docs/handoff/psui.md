@@ -80,6 +80,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - DONE 11-25 10:xx (lead): featurelist-1125 vs ours: all as live (no delete warning, reorder above a dependency moves
   then fails red, F2 nothing, empty name -> lowest free default (ops rename_feature), rolled-back/suppressed rows #999 =
   #333 at 0.5). New list matrix rows: undo/redo of a reorder, a rollback move, a menu Delete with dependents.
+- LANDING: 26251e31 failed on a rebase conflict (09:24); already re-queued, rebased clean, as 7d45e0f0 (10 commits:
+  readout #666, drag pills, Use glyph, rim test, shortcuts matrix, featurelist rows + handoffs). Await the lead.
 - NEXT: display modes + named views vs live: asked live (REQUESTS 11-25 09:25, block + hole + fillets, pixels per mode,
   menu rows, persistence, named views panel). Ours: camera_menu.rs, view_tools.rs named views, render translucent 25 %.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
