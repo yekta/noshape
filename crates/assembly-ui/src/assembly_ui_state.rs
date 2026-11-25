@@ -193,7 +193,9 @@ impl AssemblyView {
         // Live: related (with the folder) once a connector is picked.
         let picked = new_mate.is_some_and(|d| d.a.is_some() || d.b.is_some());
         if let Some(d) = new_mate {
-            items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
+            // Red as the list draws it (its regeneration error too: live errors-1123 mates, a Tangent that fights).
+            let ok = d.a.is_some() && d.b.is_some() && !d.same_instance() && d.regen_error(cx).is_none();
+            items.push((d.id, row(&d.name, if ok { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
         }
         // A new relation, mate connector or group: its row while its dialog is open (live: selected, red until it has
         // what it needs; a group hidden as the mates are).
@@ -366,7 +368,7 @@ impl AssemblyView {
                 let d = s.dialog.read(cx);
                 let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
                 json!({
-                    "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
+                    "title": d.name, "titleState": if d.regen_error(cx).is_none() { "ok" } else { "error" }, "kind": "feature", "tabs": [],
                     "fields": d.ui_fields(cx),
                     "error": null, "ok": if complete || d.touched { "enabled" } else { "disabled" }
                 })

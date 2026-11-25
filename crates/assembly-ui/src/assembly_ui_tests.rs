@@ -2842,6 +2842,11 @@ fn a_new_tangent_fighting_a_revolute_is_red_while_created(cx: &mut TestAppContex
         let ok: Vec<_> = v.result.mates.iter().map(|m| (m.ok, m.message.clone())).collect();
         assert_eq!(ok.iter().map(|m| m.0).collect::<Vec<_>>(), vec![false, false], "both red while created: {ok:?}");
         assert_eq!(d.status.as_deref(), Some("Mate overdefines the assembly."), "the dialog names it: {ok:?}");
+        // The UI state as drawn (qa's cells read it): the new row and the dialog's title red.
+        let state = v.ui_state(cx);
+        let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Tangent 1").cloned();
+        assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "the new Tangent's row red in the state");
+        assert_eq!(state["dialog"]["titleState"], json!("error"), "its title red in the state");
     });
 }
 

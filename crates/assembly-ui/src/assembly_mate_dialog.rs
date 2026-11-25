@@ -433,9 +433,11 @@ impl MateDialog {
             fields.push(json!({ "label": null, "kind": "enum", "text": t.name(), "state": "ok" }));
         }
         for (label, slots) in boxes {
-            let items: Vec<String> = slots.iter().filter_map(|f| self.slot(*f).as_ref()).map(|c| (self.labeler)(c)).collect();
+            // The chips as drawn ("Face of …", a lost one red "Missing entity of …", live errors-1123 mates).
+            let items: Vec<String> = slots.iter().filter_map(|f| self.slot(*f).as_ref().map(|c| self.field_text(*f, c).to_string())).collect();
+            let missing = slots.iter().any(|f| self.slot(*f).is_some() && (self.lost.contains_key(f) || self.unresolved.contains(f)));
             let active = self.box_active(slots);
-            fields.push(json!({ "label": label, "kind": "query", "items": items, "active": active, "state": "ok" }));
+            fields.push(json!({ "label": label, "kind": "query", "items": items, "active": active, "state": if missing { "error" } else { "ok" } }));
         }
         let check = |label: &str, on: bool| json!({ "label": label, "kind": "boolean", "checked": on, "state": "ok" });
         if t == MateType::Tangent {
