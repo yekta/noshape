@@ -3,8 +3,14 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 18:0x) — read first
-- QUEUED 7ec8a1b3 (23 commits; replaces c9f9e1ac, failed on a feedback_feel_tests.rs conflict with psui 8a62f4834:
+## NOW (11-25 18:16) — read first
+- QUEUED 1db32be0 (25 commits: 7ec8a1b3's 23 + its handoff + the FEEL-MC-ARC-PICK-VERTEX-ASM app T1
+  an_arc_edges_connector_is_its_centre_near_its_end: a 270 deg arc hovered 3 mm from its end in a Fastened mate,
+  preview and click at its centre; the fix itself is 8a9122de2 on main). TICKETS' open duplicate row dropped.
+- SUITE-INTRO-TAILFIN-INTERSECTED (pm 11-25 18:0x): still the first difference in boundary/fill/mutualtrim/ruled,
+  Tail fin surface 3567.145 vs live 3567.188 mm2 (12 ppm): the derived car body vertex 0.39 um off (core's
+  Fillet 1/loft), routed to core.
+- Was: QUEUED 7ec8a1b3 (23 commits; replaces c9f9e1ac, failed on a feedback_feel_tests.rs conflict with psui 8a62f4834:
   both tests kept). Carries: screws translator, API Warning, l.706 sketch feel, e2e same-part mate made in error,
   SKETCH-DRAG-SOLVE (3 px start, grab offset kept; latency slow-drag test expects the offset), centre point arc
   start/end VERTICAL/HORIZONTAL to its own centre (ARC_CENTRE placeholder, not offered when the centre is on a point),
