@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-23 07:11 UTC. All lands through 96180a1c are on main (1d414cce). Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 10:54 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -11,20 +11,37 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
-- **Re-landed 09:0x: QUEUED 86e2d541** (fillet crash fix, docs, ops arc fix, STL fin repair, handoff). The 08:44
-  failure (psui a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach, a 1374 s loaded run) passes
-  3/3 on the rebased branch: flaky under load, not ours.
+- **Re-land (lead 10:5x, before the knife fix):** the 6 commits (fillet crash, tickets, ops arc fix, STL fin repair,
+  handoffs, fillet r50 test) rebased onto main 11:0x; the one conflict (sketch_ui_tests.rs, both sides appended a test)
+  kept both. QUEUED: see land.sh.
+- **Knife reference fix (P1, lead), IN TREE, uncommitted (patch /root/core-scratch/knife-fix.patch):** Extrude 1 2 ->
+  2.02 mm lost Sketch 8's vertex and Sketches 7/11's edges because Sketch 6 (Extrude 3's groove: R3 arc started on
+  Extrude 1's top edge, 0.1 mm / 0.5° to it, mirrored about Front by Symmetric constraints, 2 DOF) slid 2.3 mm along
+  the edge under the constructive (one-at-a-time) placement, so Extrude 3 + Fillet 3 cut away the spine/cap corner.
+  Repro without the mirror shifts correctly; the Symmetric half makes the placement hold the far end. Fix: model-core
+  regen/features/sketch.rs: a sketch that held all its constraints before re-projecting its used geometry, with no
+  value changed, solves by the plain least change (`[] if held`); sketch crate `Sketch::holds()`. Knife: 5 edits
+  (1-5 %), every row OK (was 1-4 not OK). T1 model-core
+  regen::features::sketch::...::a_mirrored_profile_follows_its_used_edge_by_the_least_change. In progress: corpus
+  A/B (vibex7 ~/tmp/core/ud/cli-fix vs cli-old, /root/core-scratch/ud/userdocs.py over ~/qa/corpus, 127 docs); live
+  REQUESTS core 11-25 09:50 also asks where live's Sketch 6 lands at 2.02 (unanswered). Then land.
+- **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
+  (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
 - **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
   core-scratch/bin/stlz.py rings): ours 678 / 1348 / 5428 / Custom 5514 triangles vs live 924 / 1772 / 6644 / 6612,
   all watertight, ~140 ms each. Every circle has live's segment count exactly except two: R13 at z 1.5 and R12.5 at
   z 1.8 (the narrow drafted strip between them), where live has twice ours at every resolution (59/115/285 vs
   29/58/143), unevenly spaced. Our sag there 0.076 mm < 0.24. REQUESTS core 11-25 08:28 (10) asks live that face's
-  surface / edge curve types; if SPLINE, mesh spline faces as Parasolid does. Impeller Medium: 0 defects after the
-  fin repair.
+  surface / edge curve types. Live (11-25 10:5x): the strip is a CONE (59.0°) bounded by ~350° ARCs plus two 0.6 mm
+  OTHER edges (no full circles), the likely source of its doubled rings; ours is within tolerance, so P3. Impeller
+  Medium: 0 defects after the fin repair. Live's impeller STL/3MF: live/core/stl-impeller-1125/index.md (the
+  Impellergehaeuse tab, 1 part: Coarse 16 292 / Medium 49 570 / Fine 316 872 / Custom 492 184 tris; presets Coarse
+  0.24/12.5/0.635, Medium 0.12/6.25/0.254, Fine 0.06/2.5/0.0254; 3MF in metres, no Units field): next, compare ours
+  per tab.
 - **live dialogs-1125:** Fillet r50 (test kernel_robustness::fillet_wider_than_its_faces_overflows_like_onshape, T1:
   y 10-30, z to sqrt(2100)-30, 7458.616 mm³), Chamfer 25 (T2 chamfer_wider_than_its_face_overflows_like_onshape),
   Shell 20 / Extrude 0 messages, Union disjoint Info, Part Studio Circular angle 0 OK: all as live. Open: 0° pattern
-  makes 4 coincident parts (REQUESTS (9) live's count). Count 0: the app's field says live's "A parameter value is not
+  makes 4 coincident parts, as live (REQUESTS (9) answered). Count 0: the app's field says live's "A parameter value is not
   valid." (feature_dialog VALUE_NOT_VALID); ops names the range. behaviours E13 "angle 0 → must be positive" is the
   assembly pattern.
 - **LANDED 18:41 771be348 (core-rf, target moved to vibex8 core-rp): c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
@@ -99,6 +116,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
+00. P1 after the knife fix (lead 11-25): FLOW-EXTRUDE-UP-TO-FACE-BESIDE (TICKETS 8d93663a3, qa enclosure flow): Add Extrude
+   "Up to face" to the lip's top face, which lies beside (not over) the profile, fails; live extends the face's plane.
 0. QUEUED 318c67d5 (03:23; carries 0c582c74 + ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED,
    Move face (part offset to nothing fails; boss offset to its axis removed), and ERR-FACE-PATTERN-FAILED-PREVIEW +
    ERR-SWEEP-FAIL-BODY: failed face patterns/mirrors (off copies), holes off their part (tool at its Depth from the
