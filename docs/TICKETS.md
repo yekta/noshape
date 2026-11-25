@@ -36,7 +36,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   visible / phantom / removed = live (ink ~1.0 px, live's core #181d20), hidden edges in Translucent and Hidden edges
   visible within AA noise. The part's outline is heavier: the bottom front edge's vertical column reads 333f45, 000000
   (~1.5 px of ink, on the face side) where live has 546872, 383a3c, c9ced3 (~0.8 px, centred); not the backface band
-  (same without it). Look at the edge line's depth offset / AA where a line borders the background.
+  (same without it, and silhouette_edges adds none on planes). Ours: a vertical edge 1.0 px of ink, this 30° one ~1.5
+  (a 1 px line: ~1.15): suspect the line shader's AA footprint on slanted lines. Needs live's profile across a slanted
+  interior edge to confirm (REQUESTS) before changing the shader.
 
 ## qa 11-25 10:3x: hobbyist enclosure flow (lead 11-25) on green 2d91090e7 / bd448e76c: hm2/wf/57-62-encl-*.json (start encl-shell in wf/starts.json), hm2/out-flow5-1125 (vibex7)
 
