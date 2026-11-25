@@ -7386,7 +7386,7 @@ static bool slab_too_tolerant(const std::vector<TopoDS_Shape>& args)
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy, bool touching_only, bool scaled_inputs)
+                  double fuzzy, bool touching_only, bool scaled_inputs, bool or_plain)
 {
   if (slab_too_tolerant(args))
     return decline("a Shell slab of 50 um tolerance or more");
@@ -7754,7 +7754,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   {
     const KernelTimer     timer("boolean.rust.brep");
     const RustMemoryWatch watch;
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), rust::Slice<const uint32_t>(shared.data(), shared.size()), tol, fuzzy, static_cast<uint8_t>((touching_only ? 1 : 0) | (scaled_inputs ? 2 : 0) | (t_slab || brep_slab() ? 4 : 0)), r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), rust::Slice<const uint32_t>(shared.data(), shared.size()), tol, fuzzy, static_cast<uint8_t>((touching_only ? 1 : 0) | (scaled_inputs ? 2 : 0) | (t_slab || brep_slab() ? 4 : 0) | (or_plain ? 8 : 0)), r))
     {
       // (Declined "cancelled": stopped, not handed to OCCT; so past the memory budget, with OCCT's error.)
       stop();

@@ -62,6 +62,21 @@ pub(crate) fn one_band() -> bool {
     ONE_BAND.with(|f| f.get())
 }
 
+std::thread_local!(static PLAIN_IF_OVERLAPPING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
+
+/// Runs `run` with its touching-only Booleans going on as the plain Boolean where the arguments overlap, rather than
+/// declining (a pattern's checked fuse whose caller would run the plain one next: its sections made once).
+pub fn with_plain_if_overlapping<T>(on: bool, run: impl FnOnce() -> T) -> T {
+    let before = PLAIN_IF_OVERLAPPING.with(|f| f.replace(on));
+    let r = run();
+    PLAIN_IF_OVERLAPPING.with(|f| f.set(before));
+    r
+}
+
+pub(crate) fn plain_if_overlapping() -> bool {
+    PLAIN_IF_OVERLAPPING.with(|f| f.get())
+}
+
 std::thread_local!(static SCALED_INPUTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
 
 /// Runs `run` as a Boolean whose OCCT path would cut scaled copies of the inputs (op_boolean's ScaledInputs, asked

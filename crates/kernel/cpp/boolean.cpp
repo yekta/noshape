@@ -10169,8 +10169,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       if (checked)
       {
         {
+          // (Too few for the plain fuse to be slow: where they overlap, the same run goes on as the plain fuse (below),
+          // its sections made once (c2-impeller-loft's Bohrungssitz seats: two runs, 0.2 s).)
           const RustLenient lenient;
-          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true);
+          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true, false, t.size() < plain_fuse_tools);
         }
         reach_in = !done && rust_last_decline() == "pattern instances overlapping";
         // (Too few for the plain fuse to be slow: the plain fuse at once, as OCCT's below (plain_at_once), apart or

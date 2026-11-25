@@ -4997,15 +4997,20 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     // (Done again with the groups of vertices found on the way merged from the start, as OCCT merges them before
     // anything else; at most 4 times.)
     let mut groups: Vec<(DVec3, f64)> = Vec::new();
+    // (Asked to go on as the plain Boolean where the instances overlap (crate::with_plain_if_overlapping): set once it
+    // does; a decline after it is that one's, the caller's plain Boolean's to tell.)
+    let plain = std::cell::Cell::new(false);
+    let or_plain = touching_only && crate::plain_if_overlapping();
+    let overlapping = |out: R<Output>| if plain.get() && out.is_err() { Err(Decline("pattern instances overlapping")) } else { out };
     for round in 0.. {
         let regroup = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        let out = boolean_in(op, args, tol, touching_only, src, &groups, regroup.clone());
+        let out = boolean_in(op, args, tol, Touching { only: touching_only && !plain.get(), or_plain: or_plain.then_some(&plain) }, src, &groups, regroup.clone());
         let found = std::mem::take(&mut *regroup.lock().expect("a group"));
         if found.is_empty() {
-            return out;
+            return overlapping(out);
         }
         if round == 3 {
-            return Err(Decline("a point near two vertices"));
+            return overlapping(Err(Decline("a point near two vertices")));
         }
         for mut g in found {
             // (One overlapping another: the two one.)
@@ -5018,7 +5023,14 @@ pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: 
     unreachable!()
 }
 
-fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>, groups: &[(DVec3, f64)], regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>) -> R<Output> {
+/// A pattern's instances that must only touch (`only`), and where they overlap whether to go on as the plain Boolean
+/// (set once it does).
+struct Touching<'a> {
+    only: bool,
+    or_plain: Option<&'a std::cell::Cell<bool>>,
+}
+
+fn boolean_in(op: Op, args: &[&Body], tol: f64, touching: Touching, src: Option<&dyn SectionSource>, groups: &[(DVec3, f64)], regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>) -> R<Output> {
     if args.len() < 2 {
         return Err(Decline("a Boolean needs an object and a tool"));
     }
@@ -5556,8 +5568,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     cx.seg_edge_tol = vec![Vec::new(); cx.faces.len()];
     // A pattern's instances that must only touch: one with a vertex inside another argument's solid overlaps it,
     // told before any section (the classification would tell it at the end).
+    let (mut touching_only, or_plain) = (touching.only, touching.or_plain);
     if touching_only {
-        for s in 0..cx.solids.len() {
+        'early: for s in 0..cx.solids.len() {
             for t in 0..cx.solids.len() {
                 if s == t || cx.solids[s].arg == cx.solids[t].arg || cx.solids[t].sheet || !boxes_meet(cx.solids[s].lo, cx.solids[s].hi, cx.solids[t].lo, cx.solids[t].hi, 0.0) {
                     continue;
@@ -5579,7 +5592,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 for w in ws {
                     // (A ray that can't tell: not this way.)
                     if cx.pool.inputs[w as usize].len() == 1 && clear(cx.p(w)) && matches!(cx.ray_state(cx.p(w), t, band), Ok(State::In)) {
-                        return Err(Decline("pattern instances overlapping"));
+                        let Some(plain) = or_plain else { return Err(Decline("pattern instances overlapping")) };
+                        plain.set(true);
+                        touching_only = false;
+                        break 'early;
                     }
                 }
             }
@@ -7514,7 +7530,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
         let in_any = states.iter().any(|x| x.1 == State::In);
         if touching_only && in_any {
-            return Err(Decline("pattern instances overlapping"));
+            // (The plain Boolean's from here where its sections were too: no free-form pair taken as touching along an
+            // edge.)
+            match or_plain {
+                Some(plain) if cx.edge_only.is_empty() => {
+                    plain.set(true);
+                    touching_only = false;
+                }
+                _ => return Err(Decline("pattern instances overlapping")),
+            }
         }
         let in_obj = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg == 0);
         let in_tool = states.iter().any(|x| x.1 == State::In && cx.solids[x.0].arg != 0);

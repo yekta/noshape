@@ -437,7 +437,7 @@ fn kernel_should_break() -> bool {
 }
 
 pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], shared: &[u32], tol: f64, fuzzy: f64, flags: u8, out: &mut BrepResult) -> bool {
-    let (touching_only, scaled_inputs, one_band) = (flags & 1 != 0, flags & 2 != 0, flags & 4 != 0);
+    let (touching_only, scaled_inputs, one_band, or_plain) = (flags & 1 != 0, flags & 2 != 0, flags & 4 != 0, flags & 8 != 0);
     noshape_brep::set_stop_hook(kernel_should_break);
     noshape_brep::set_thread_hooks(noshape_brep::ThreadHooks { capture: pool_capture, enter: pool_enter, leave: pool_leave });
     let op = match op {
@@ -449,7 +449,7 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], shared: &[u32], tol: f64, 
     let refs: Vec<&Body> = bodies.iter().collect();
     // (A panic here crossed into the C++ call and aborted the process, qa RUST-BOOL-CLAMP-ABORT / CRASH-1036: a
     // decline instead, so OCCT's Boolean builds it.)
-    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| noshape_brep::with_shared(shared_of(shared), || noshape_brep::with_fuzzy(fuzzy, || noshape_brep::with_scaled_inputs(scaled_inputs, || noshape_brep::with_one_band(one_band, || noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&Occt)))))))).unwrap_or(Err(Decline("noshape's Boolean panicked")));
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| noshape_brep::with_shared(shared_of(shared), || noshape_brep::with_fuzzy(fuzzy, || noshape_brep::with_scaled_inputs(scaled_inputs, || noshape_brep::with_one_band(one_band, || noshape_brep::with_plain_if_overlapping(or_plain, || noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&Occt))))))))).unwrap_or(Err(Decline("noshape's Boolean panicked")));
     let r = match r {
         Ok(r) => r,
         Err(d) => {

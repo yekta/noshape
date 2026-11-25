@@ -254,7 +254,7 @@ std::optional<SpindleTorus> spindle_torus(const TopoDS_Face& F);
 occ::handle<Geom2d_Curve>   spindle_pcurve(const SpindleTorus& sp, const occ::handle<Geom2d_Curve>& c);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy = 0, bool touching_only = false, bool scaled_inputs = false);
+                  double fuzzy = 0, bool touching_only = false, bool scaled_inputs = false, bool or_plain = false);
 // While one lives, this thread's noshape Booleans take their first argument as already checked (a cut one tool at a
 // time, past its first step: the step before's result): only the faces they make or take from the others are.
 struct RustTargetChecked
