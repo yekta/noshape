@@ -114,7 +114,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   user_select_field_flat_focusable; ConfigSession.collapsed; Generate only with a non-list input). Queued 301da71f. 12:1x
   ASM-INSERT-THUMB-CONFIG fixed: the thumb cache keys (studio, configuration, part); the Insert dialog asks for its
   chosen configuration (insert_dialog_thumb, stale_insert_thumbs); the Change configuration panel still shows the
-  default pictures. NEXT: LOOK-OUTLINE-WEIGHT when live answers REQUESTS 11:5x.
+  default pictures. 12:2x 17670d52/16f8487c had failed on a handoff rebase conflict: rebased clean, the whole
+  stack re-queued as QUEUED f9cd315a (12 commits; lead at 898k, not told). Keep handoff edits in their own last commit.
+  NEXT: LOOK-OUTLINE-WEIGHT when live answers REQUESTS 11:5x.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
