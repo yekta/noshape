@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 12:21 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 13:01 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -123,22 +123,15 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. P1 SPEED-ASM-OPEN-SCISSOR (WIP, lead 11-25 11:50: time-box ~2 h, land only if nothing downstream breaks; core-rmx
-   branch core-slabs, 7a9c1af8 + cb5c5ec6 + uncommitted naming fix). offset_by_slabs (features.cpp) unifies a copy,
-   history = compose(inputs, h, copy+unify), moved faces -> slab copies' images. 12:1x NAMING FIX: OCCT's offset reports
-   every face of the part GENERATED from the one it was (names "Offset of" each face, all 67 faces of 665cf3's moved
-   part); the slab path reported Modified (plain names) -> now ReplaceGenerated for each face's images; T1
-   core::a_face_moved_between_square_neighbours_is_the_part_and_its_slab asserts it. 665cf3's Extrude 1 cascade fixed.
-   Left in the saved doc (~/agents/core-keep/sc/scissor.noshape): 9cbb0e Fillet 6 now Ok (live Ok, OCCT failed) and
-   then Sketch 13 / Extrude 16 / Draft 5 / Mirror 3,6,9 lose refs (Sketch 13's plane is a vertex-blend face named on
-   the OCCT-mode model: the saved doc's refs were mapped while Fillet 6 failed); fed22d mostly better (Extrude 18,
-   Fillet 18/22, Sketch 24/26 Ok), Move face 8 fails. Verdict needs a FRESH import: .pa.sh (parity_assemblies on
-   asm-scissor-lift, both modes, vibex7 ~/tmp/core/sc/pa-*.out). Then corpus A/B: ~/tmp/core/ud/cli-slab vs
-   cli-occt (wrapper, NOSHAPE_NO_SLABS=1). Probes: core-scratch/sc fn.py/fn2.py (refs + faces above a feature, both
-   modes), dec.py (decode face ids: urlsafe-b64 raw deflate JSON). Drop NOSHAPE_NO_SLABS before landing.
-   Unify can't merge a fuse slab's walls with rounded-corner cylinders / hole walls (unowned faces, slab path refuses,
-   OCCT fallback runs, gives a Shell there as main): not axis direction, not tolerance, DirectModification breaks the
-   solid; maybe u-range offset by the period. Then Delete face 2 (op_defeature 1.15 s).
+0. SPEED-ASM-OPEN-SCISSOR: QUEUED 7d11bf0e 11-25 13:0x (core-rmx branch core-slabs, squashed; NOSHAPE_NO_SLABS switch
+   dropped). offset_by_slabs (features.cpp): a moved face between square neighbours = part cut/fused with its slab,
+   unify on a copy, every face's images GENERATED from it (as OCCT's offset: "Offset of" names; 665cf3 Extrude 1 ends
+   on one). Fresh-import parity_assemblies asm-scissor-lift (vibex7 ~/tmp/core/sc/pa-{slabs,occt}.out): 13 feature
+   differences fixed (56d3a6 Delete faces/Fillets/Chamfer 2/Extrudes, 9cbb0e Fillet 6), mates 16 -> 21/38, none new.
+   Corpus A/B 127 docs ALL-SAME (~/tmp/core/ud/ab-slab.out). Left: 9cbb0e Boolean 4 / 404ddb Boolean 2 "union lost
+   one of its parts" (both modes); unify can't merge a fuse slab's walls with rounded-corner cylinders / hole walls
+   (slab path refuses, OCCT fallback runs); Delete face 2 (op_defeature 1.15 s). Probes: core-scratch/sc fn.py/fn2.py,
+   dec.py (face ids: urlsafe-b64 raw deflate JSON).
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
 00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
