@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 19:44 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 20:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -13,11 +13,13 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   ops appearance::face_appearances_of. (3) Derived (c): op import_update + Blob Update…; part-picked Derived picks
   remapped by name (Import body index = file part × 64 + solid); e2e a_file_update_reimports_in_place_and_its_derived_
   follow_as_live green. (a)+(b) were already as live.
-- **4. lora f39 Ribs (skasm)**: ours 191/474/277 F/E/V vs live 177/444/265, +212 mm², -3.46 mm³. Doc copied to vibex7
-  ~/tmp/core/lora (700; lora.noshape + lr.py: Base after Ribs, faces near the 4 r1.1 circles at (±35,±15)). Run
-  `.t4.sh` (release cli + lr.py). rib.fs on a circle: surface extrude + thicken ±0.8 = tube r0.3..1.9, then excess
-  removal (findExcess: pieces not touching the profile; the piece at the extrude's far end); ours: solid_a.rs rib ->
-  rib_sheet for a 1-edge closed wire. Profiles: 22 lines + 4 circles (26 ids), thickness 1.6, normal, opposite, merge.
+- **4. lora f39 Ribs: DONE (landing 11-25 ~20:30)**: c2-lora-enclosure-ribs 46/46 to the end (Base 177/444/265, every
+  face = live's by type + area, 14081.69872 vs live 14081.69873 mm³). Rib's endNeedsExtension as std (no exception for
+  an end on a part edge: ribs on the bosses' top rims run into them) and an end within 1 um of a face counts (its x 35
+  rib ends 0.61 um short of the wall). T1 features_a::a_rib_ending_on_a_rim_or_just_short_of_a_wall_runs_into_it.
+  c2-rib-wrap 18/18; c2-parting-line-draft-parting-line Rib 1 73/213/143 vs live 73/214/144 is the same before (open).
+- **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
+  (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
 - **5. SCISSOR follow-up (lead 11-25 19:4x, from skasm)**: 528c169ba is right; the old build was a false pass (Extrude 2
   went ~34.6 mm the wrong way). Real first diff: 97ad5f Delete face 1 errors in ours both ways; live 1606.6 -> 1704.7
   mm³, so Sketch 2 lands on another face. Evidence vibex6 ~/tmp/skasm/sc (a0.log / a-old.log, save/ vs save-old/).

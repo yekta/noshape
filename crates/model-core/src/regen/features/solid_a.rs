@@ -2223,25 +2223,12 @@ fn rib_sheet(base: &Shape, wire: &Shape, dir: DVec3, plane: Option<DVec3>, t: f6
     let len = (bb.max.max(pb.max) - bb.min.min(pb.min)).length();
     let tol = 1e-7 * (1.0 + len);
     let near = |s: &Shape, p: DVec3| k::make_vertex(p).and_then(|v| k::distance(s, &v)).is_ok_and(|d| d.distance < tol);
-    // (A seam isn't an edge between faces: live R1's profile ends on the boss
-    // cylinder's seam and is extended into it.)
-    let ef = base.edge_faces()?;
-    let part_edges: Vec<Shape> = base
-        .edges()
-        .into_iter()
-        .enumerate()
-        .filter(|(i, _)| {
-            let mut fs = ef.get(*i).cloned().unwrap_or_default();
-            fs.sort_unstable();
-            fs.dedup();
-            fs.len() > 1
-        })
-        .map(|(_, e)| e)
-        .collect();
     let faces = base.faces();
-    // rib.fs endNeedsExtension. An end on an edge of the part (live's rim
-    // line, L24's L) isn't extended.
-    let needs = |p: DVec3, d: DVec3| !part_edges.iter().any(|pe| near(pe, p)) && faces.iter().any(|f| near(f, p) && f.normal_at_point(p).is_ok_and(|n| d.dot(n) < -1e-9));
+    // rib.fs endNeedsExtension (V536): an end on a face it points into, an edge's faces too (c2-lora-enclosure-ribs:
+    // ribs ending on a boss's top edge run into the boss).
+    // Within a micron (its x 35 rib ends 0.61 um short of the wall, which live runs it into).
+    let touches = |f: &Shape, p: DVec3| k::make_vertex(p).and_then(|v| k::distance(f, &v)).is_ok_and(|d| d.distance < tol.max(1e-6));
+    let needs = |p: DVec3, d: DVec3| faces.iter().any(|f| touches(f, p) && f.normal_at_point(p).is_ok_and(|n| d.dot(n) < -1e-9));
     let mut curves = vec![e.clone()];
     let mut tips = Vec::new();
     for (p, d) in ends {

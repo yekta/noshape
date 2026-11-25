@@ -2538,6 +2538,44 @@ fn rib_extend_profiles_as_live() {
     assert_eq!(run((0.002, 0.015), (0.038, 0.015), true), Err("Failed to create a rib from a selected profile.".into()));
 }
 
+/// std rib.fs endNeedsExtension (live c2-lora-enclosure-ribs' Ribs: 177 faces as live): a profile end on a face it
+/// points into runs into that part, an end on an edge too (a boss's top rim) and one a micron short of the face (its
+/// x 35 rib, 0.61 um short of the wall). An open box 40 x 20 x 10 (walls 2), a boss R3 at (20, 10) on its floor, a 1 mm
+/// rib from the wall to the boss on the top plane: the same part as a profile drawn into both.
+#[test]
+fn a_rib_ending_on_a_rim_or_just_short_of_a_wall_runs_into_it() {
+    let run = |x0: f64, x1: f64| -> (f64, usize) {
+        let mut t = T::new();
+        let (_, x) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+        let plane = |t: &mut T, mm: &str| t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e(mm))]);
+        let top = plane(&mut t, "10 mm");
+        let ps = t.sketch(Reference::FeaturePlane(top), rect(0.002, 0.002, 0.038, 0.018));
+        let r = t.regions(ps)[0].clone();
+        let cut = t.extrude(r, "8 mm", "REMOVE");
+        t.set(cut, "oppositeDirection", b(true));
+        let floor = plane(&mut t, "2 mm");
+        let bs = t.sketch(Reference::FeaturePlane(floor), circle(DVec2::new(0.02, 0.01), 0.003));
+        let r = t.regions(bs)[0].clone();
+        t.extrude(r, "8 mm", "ADD");
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(x0, 0.01), DVec2::new(x1, 0.01));
+        let s = t.sketch(Reference::FeaturePlane(top), sk);
+        t.add("rib", &[("profiles", q(vec![Reference::SketchEntity { sketch: s, entity: l.0 }])), ("parts", q(vec![Reference::Body(BodyId { feature: x, index: 0 })])), ("thickness", e("1 mm")), ("ribExtrusionDirection", en("NORMAL_TO_SKETCH_PLANE")), ("oppositeDirection", b(true))]);
+        let res = t.ok();
+        assert_eq!(res.context.bodies.len(), 1);
+        let b = &res.context.bodies[0];
+        (b.shape.volume().unwrap() * 1e9, b.shape.count(noshape_kernel::ShapeType::Face))
+    };
+    let (v, faces) = run(0.001, 0.02);
+    // The box 3392, the boss 72 pi, the rib 8 high over y 9.5..10.5 from the wall (x 2) to the boss (x 20 - sqrt(9 - u²)).
+    let rib = 8.0 * (18.0 - (0.5 * 8.75f64.sqrt() + 9.0 * (1.0f64 / 6.0).asin()));
+    assert!((v - (3392.0 + 72.0 * std::f64::consts::PI + rib)).abs() < 0.05, "{v}");
+    for (x0, x1) in [(0.002, 0.017), (0.002 + 0.61e-6, 0.017)] {
+        let (w, f) = run(x0, x1);
+        assert!((w - v).abs() < 1e-6 && f == faces, "{x0} -> {x1}: {w} mm3, {f} faces; drawn into both: {v}, {faces}");
+    }
+}
+
 /// Live L24 (request 1620): an L of two lines (one along the rim) normal to
 /// the mid plane: only the leg that spans the pocket becomes a rib (x 19..21,
 /// y 10..18, z 2..10 at 2 mm); the rim leg goes as excess (qa RIB-CHAIN-NORMAL).
