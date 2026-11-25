@@ -151,7 +151,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         let kept: std::collections::HashSet<_> = sk.entities().filter(|e| e.external && !lost.contains(&e.id)).flat_map(|e| e.point_refs()).collect();
         for id in lost_ids {
             let points = sk.entity(id).map(|e| e.point_refs()).unwrap_or_default();
-            for p in points.into_iter().filter(|p| !held.contains(p)).chain([id]) {
+            for p in points.into_iter().filter(|p| !kept.contains(p)).chain([id]) {
                 if let Some(e) = sk.entity_mut(p) {
                     e.external = false;
                 }
