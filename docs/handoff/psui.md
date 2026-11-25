@@ -53,11 +53,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   everyday_interactions_on_a_corpus_part, NOSHAPE_LATENCY_DOC; timed_applied). Extrude evCollision slowness → core.
   Mac numbers: impeller hover 8.5 / click 3.8 / dialog 17 / field preview regen 215 / ✓ 6.7 s (core regen) / undo 9.
   Corpus doc: vibex8 ~/tmp/psui/impeller.noshape, Mac ~/noshape-host/psui-keep/impeller.noshape.
-- TRIAD-LOOK (qa 87ccb60fc, TICKETS row 94): fixed 11-25 01:0x, queued (LineSegment::SMOOTH on the triad's strokes:
-  a stroke antialiased across its width; MSAA alone stepped the 1.5 px core along a slanted shaft). Test
-  a_hovered_triad_arrow_is_solid_blue_over_the_part checks the default (slanted) view too. Awaits qa's re-shot
-  (also the XY square, FEEL-TRANSFORM-ARROW-DASHED). section_manip.rs's arrows (3 / 1.5 px) are drawn the same way:
-  give them SMOOTH too if qa sees steps there.
+- 11-25 01:0x-01:3x, all awaiting qa: TRIAD-LOOK queued ec758926 (LineSegment::SMOOTH, render: a line antialiased
+  across its width; the triad's strokes); FEEL-ASM-FIXED-GLYPH-AA + FEEL-ASM-MOVE-RING-RIMS queued together (asm parked;
+  lead 11-25: take parked agents' Part Studio/assembly viewport feel rows of the same renderer class first). Ring:
+  STROKE_RING|SOFT_CORE now 20 px, hole 0.58, #3a6ba8 rims, #99b2da core. section_manip.rs's arrows (3 / 1.5 px) are
+  drawn like the old triad: give them SMOOTH if qa sees steps. Next candidate: FEEL-MC-MARKER-LOOK-ASM (TICKETS ~162,
+  cap-centre markers 6x3 white vs live ~12x6 discs with a grey ring).
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
@@ -94,8 +95,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Other open rows checked 11-24 17:4x: all "fixed, to verify" (qa), sheet metal (parked), or skasm's.
 - Then: PARTLY rows in TICKETS (TRANSFORM-*, PS-BOX-DRAG-HOVER), P2 queue
   (PS-PARTS-ROW-TOOLTIP-PITCH, CUSTOM-FEATURE-ROW-ICON). Sheet metal parked (ERR-SM-BAD-SELECTION-RED waits).
-- USER P0 Mac mini: APPEARANCE-PART-UNDER-FACE-COLOURS once dx lands; user's doc only as ~/tmp/psui/macmini-m6.noshape
-  (700), delete it and /root/psui-scratch/Mac-mini-2024.step after.
 - qa's hover-matrix score: /root/qa-scratch/hm2/score-a910/sc8.txt; ascii maps score-a910/bin/ascii.py.
 
 ## Agents
