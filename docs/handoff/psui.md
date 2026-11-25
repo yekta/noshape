@@ -62,28 +62,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
   .github/release/check_install_linux.sh from release.yml: the lead's workflow_dispatch dry run pending).
   FEEL-TAB-TO-FLIP-FOCUS QUEUED 6a116778 + the count line (pattern_flip_focus handle on "pat-opp", Tab focuses it; the 1 px blue
   count line via QuantityInput companion focus), count line QUEUED 3126085b.
-- NOW latency pass (lead 11-25 06:1x: start, open from the start page (small + impeller), Part Studio tab switch, save;
-  vs live; fix >=100 ms / >=2x gaps and UI stalls; short table to the lead). Live: open toolbar 3.8 s / interactive
-  15.4 s, tab switch settled 1.7-3.0 s (qa-scratch/lat/score-lat.md). Ours (local Xvfb :396, llvmpipe, debug builds):
-  - start page first frame 0.45-0.49 s; small doc from the command line shown 0.78-0.94 s; impeller warm 0.57-0.68 s,
-    cold 58-60 s (regen: Boolean Flansch+Gehäuse 21 s, Delete face 1 31 s: kernel SPEED-IMPELLER, tell the lead).
-  - tab switch (impeller PS1 <-> empty PS2, Assembly, revisit of the copy): click -> first frame 50-75 ms, idle 11-14
-    ms; first visit of a never-regenerated copy = its full regen (30-60 s). Rename part + Enter 56 ms, undo/redo
-    48-52 ms (dispatch 11-12 ms). No stalls after open.
-  - open from the documents page (small): BEFORE dispatch 163-192 ms (window +161-191 ms = GPUI builds all its
-    pipelines per window, WgpuRendererCore::new), AFTER pipeline cache: dispatch 13-16 ms, window +11-14 ms, full
-    display +558-627 (was +700-810). Remaining stalls 100-126 ms with low ui cpu = llvmpipe present/pipeline compile.
-  - impeller from the page: thumbnailer gave up waiting (MAX_WAIT 60 s) and regenerated the same studio, running on
-    59 s after the view finished: fix = ThumbnailJobs keeps the tab; regen_done stops it (stop_for_view, unit test ok).
-  - IN TREE, uncommitted (also /root/psui-scratch/lat3/latency-wip.patch): vendor/gpui-pre-wgpu cached_pipelines
-    (NOSHAPE PATCH), start_thumbnail stop_for_view + test, ui_script page start `"file"` key. REMOVE the TMPCOMMIT
-    log in crates/ops/src/session.rs (commit_tabs) before committing (it is only for the save timing: run
-    lat3/run.sh noshape-new uip/tabs.json tabs :396 and grep TMPCOMMIT). Binaries lat3/noshape-lat (before),
-    noshape-new (pipeline cache only); scripts lat3/{run.sh,ab.sh,prof.sh,uip/*.json}; Xvfb :396 running (pid in
-    lat3/xvfb.pid: kill it when done).
-  - Next: save timing (TMPCOMMIT), confirm the thumbnail fix on page-impeller, commit both fixes, land, send the
-    lead the short table. Then qa's partly rows: PARTS-ROW-TOOLTIP, CONFIG-FILTER-HELP (mine); SKT-USE-HOVER band
-    sizes (check owner: skasm?).
+- 11-25 07:5x latency pass DONE (lead 06:1x), landing with the qa fixes below. Ours (local Xvfb :396, llvmpipe, debug):
+  start page 0.45-0.49 s; small doc shown 0.78-0.94 s; impeller warm 0.57-0.68 s, cold 58-77 s (kernel SPEED-IMPELLER:
+  Boolean Flansch+Gehäuse 21 s, Delete face 1 31 s); tab switch 50-75 ms to first frame (live 1.7-3.0 s settled);
+  rename/undo/redo frame 54-70 ms; save (commit_tabs, impeller) 7.5 ms (serialise 2.0, write 5.5). Fixed: page open
+  dispatch 163-192 -> 13-16 ms (GPUI pipelines cached per device, vendor/gpui-pre-wgpu cached_pipelines); thumbnail
+  double regen (confirmed: regen at 60 s stopped 8 s later when the view showed). bc3f3f817.
+- qa partly rows: PARTS-ROW-TOOLTIP (with_list_row_tooltip stays + tooltip_after_press; matrix row "parts / a row
+  clicked into Boolean's field") and CONFIG-FILTER-HELP (help title at once, expanded at 1.97 s as live) b8d36439f.
+- IN PROGRESS SKT-USE-HOVER (mine): live lights a used edge's USE GLYPH (11x11 light orange), not the edge, also the
+  iso cell (all top edges used by then). WIP /root/psui-scratch/use/use-glyph-wip.patch (Use hover: glyph under the
+  pointer -> hover_constraint, r = None; test use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge FAILS: no
+  glyph_boxes, our use glyphs draw only with Show constraints on or hovered; live draws a black use glyph at the
+  edge's middle after Use). Next: draw use glyphs always (check live), then the hover.
+- Live batches waiting: psui/appearance-1125, measure-1125, section-1125 (behaviours.md).
+- Cleanup: Xvfb :396 (lat3/xvfb.pid), lat3 binaries noshape-lat/new/fix.
 - 11-25 07:1x P0 (lead): as-mc-selhover regression from ae3a5f96a fixed: PointSprite::FLAT_RING (2048) keeps the
   old flat 18 px #6087bd ring on a selected mate connector; test mc_selected_hovered (60/0/58 px). QUEUED 3e10a3a2
   (with the count line 3126085b and two handoffs), reported to the lead.
