@@ -1507,6 +1507,11 @@ fn a_routing_curves_previous_and_next_step_the_active_point(cx: &mut TestAppCont
         steps.push(active(cx)[0]);
     }
     assert_eq!(steps, vec![1, 2, 0, 2], "Next twice, Next wraps to the first, Previous wraps to the last");
+    // Live's states never list the pair (ui-parity routing-curve-*: Curve reference, then Points).
+    let state = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap();
+    let texts: Vec<String> = state["fields"].as_array().unwrap().iter().map(|f| f["label"].as_str().or(f["text"].as_str()).unwrap_or("").to_string()).collect();
+    let at_ref = texts.iter().position(|t| t == "Curve reference").expect("Curve reference");
+    assert_eq!(texts.get(at_ref + 1).map(String::as_str), Some("Points"), "{texts:?}");
     // Segments' Orthogonal path shares the row the same way (std orthoPrevious / orthoNext).
     cx.update(|cx| dialog.update(cx, |d, cx| {
         d.set_value("step", ParamValue::Enum("SEGMENTS".into()), cx);

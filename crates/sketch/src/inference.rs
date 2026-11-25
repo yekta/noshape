@@ -466,7 +466,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                         return true;
                     }
                     let to_line = la + t * (a - la).dot(t) - a;
-                    to_line.length() > on && (seen(to_line) / px <= PERPENDICULAR_LINE_REACH_PX || seen(mid) / px <= PERPENDICULAR_MID_REACH_PX)
+                    // To the segment: started 5 mm past its end, square to it, a line is Vertical (live
+                    // sketch-coincident-constraint, 12 px off the line, 25 px off its end).
+                    let to_segment = la + t * (a - la).dot(t).clamp(0.0, (lb - la).length()) - a;
+                    to_line.length() > on && (seen(to_segment) / px <= PERPENDICULAR_LINE_REACH_PX || seen(mid) / px <= PERPENDICULAR_MID_REACH_PX)
                 })
             };
             let line_kind = |horizontal: bool| match square_near(horizontal) {
@@ -674,6 +677,9 @@ mod tests {
             ("x9-s12 24.2/42.8", 24.7, -24.2, InferenceKind::Vertical),
             ("x15-s13 26.2/31.2", 43.1, -26.2, InferenceKind::Vertical),
             ("mid-e5 40.3/48", 60.0, -40.3, InferenceKind::Vertical),
+            // Live sketch-coincident-constraint: 12 px off the line but 25 px past its end.
+            ("past-end 12/23.3", 140.0, -12.0, InferenceKind::Vertical),
+            ("past-end 12/19.2", 135.0, -12.0, InferenceKind::Perpendicular),
         ] {
             assert_eq!(up(x, y), kind, "{take}");
         }

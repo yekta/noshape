@@ -6687,8 +6687,12 @@ impl SketchEditor {
         if self.construction {
             return true;
         }
+        // (A lone sketch point counts as a solid entity: live sketch-constraint-refusals, a point and a circle's centre
+        // selected, nothing shown.)
         let centre = |id: EntityId| is_point(sk, id) && sk.entities().any(|e| e.center() == Some(id));
-        let mut shown = self.selection.iter().copied().chain(self.picks.iter().map(|p| p.0)).filter(|id| centre(*id) || (!is_point(sk, *id) && sk.entity(*id).is_some_and(|e| !e.external))).peekable();
+        let lone = |id: EntityId| is_point(sk, id) && sk.entity(id).is_some_and(|e| !e.external) && !sk.entities().any(|e| !is_point(sk, e.id) && e.point_refs().contains(&id));
+        let counted = |id: EntityId| centre(id) || lone(id) || (!is_point(sk, id) && sk.entity(id).is_some_and(|e| !e.external));
+        let mut shown = self.selection.iter().copied().chain(self.picks.iter().map(|p| p.0)).filter(|id| counted(*id)).peekable();
         shown.peek().is_some() && shown.all(|id| centre(id) || sk.entity(id).is_some_and(|e| e.construction))
     }
 
@@ -11059,6 +11063,20 @@ mod tests {
             ed.tool_up(&mut d, p);
             assert_eq!((ed.picks.len(), ed.construction_shown(&d.sketch)), (1, centre));
         }
+    }
+
+    /// Live sketch-constraint-refusals (step 48): a lone point and a circle's centre selected show no Construction;
+    /// the centre alone does.
+    #[test]
+    fn a_lone_point_with_a_circle_centre_shows_no_construction() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let circle = d.sketch.add_circle(v(0.05, 0.0), 0.005);
+        let centre = d.sketch.entity(circle).unwrap().center().unwrap();
+        let point = d.sketch.add_point(v(0.06, 0.02));
+        ed.selection = vec![centre];
+        assert!(ed.construction_shown(&d.sketch));
+        ed.selection = vec![point, centre];
+        assert!(!ed.construction_shown(&d.sketch));
     }
 
     #[test]

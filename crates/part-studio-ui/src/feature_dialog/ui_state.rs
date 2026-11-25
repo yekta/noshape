@@ -170,7 +170,10 @@ impl FeatureDialog {
                     let (focused, text) = self.input_of(s.id, window, cx).map(|(f, t, _)| (f, t)).unwrap_or((false, expr));
                     fields.push(json!({ "label": label, "kind": "number", "text": text, "focused": focused, "state": if self.field_error(s.id).is_some() { "error" } else { "ok" } }));
                 }
-                // A button (Routing curve's Reset triad): live reads it as a control with its text.
+                // A button (Routing curve's Reset triad): live reads it as a control with its text. A short pair in a
+                // row of its own (Previous / Next, live routing-btns-1121) isn't read: live's states never list one
+                // (ui-parity routing-curve-*: field 6 is Points, with 3 points too).
+                ParamKind::Bool { .. } if s.hints.has(Hints::BUTTON) && s.hints.has(Hints::DISPLAY_SHORT) => {}
                 ParamKind::Bool { .. } if s.hints.has(Hints::BUTTON) => {
                     fields.push(json!({ "label": null, "kind": "other", "text": crate::i18n::spec(s.label), "state": "ok" }));
                 }
