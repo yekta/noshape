@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-24 11:5x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-25 08:3x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -71,20 +71,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
   double regen (confirmed: regen at 60 s stopped 8 s later when the view showed). bc3f3f817.
 - qa partly rows: PARTS-ROW-TOOLTIP (with_list_row_tooltip stays + tooltip_after_press; matrix row "parts / a row
   clicked into Boolean's field") and CONFIG-FILTER-HELP (help title at once, expanded at 1.97 s as live) b8d36439f.
-- IN PROGRESS SKT-USE-HOVER (mine): live lights a used edge's USE GLYPH (11x11 light orange), not the edge, also the
-  iso cell (all top edges used by then). WIP /root/psui-scratch/use/use-glyph-wip.patch (Use hover: glyph under the
-  pointer -> hover_constraint, r = None; test use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge FAILS: no
-  glyph_boxes, our use glyphs draw only with Show constraints on or hovered; live draws a black use glyph at the
-  edge's middle after Use). The patch now also draws a used entity's own use glyph always (sketch.rs glyph filter:
-  `use_glyph_entity(g.constraint) == Some(g.entity)`; end glyphs only with Show constraints; live use-convert: one at
-  the middle, none at the ends). A full `--lib sketch::` run on vibex8 was started with it (~/tmp/psui/use.log there):
-  read it, fix other tests that count glyphs, then land with TICKETS row 62 "fixed, to verify".
-- Live pages for me (live resent 07:5x): live/psui/appearance-1125 (Appearance panel/dialog: preview <=0.25 s,
-  ✕ reverts, "Add appearance to face…" = Face appearance feature, material never changes colour), measure-1125
-  (status readouts: 14 px/600 #666, 187-224 ms after mouse-down, ~12 px of an edge's middle picks the midpoint, "["
-  panel units), section-1125 (chip "Section plane 1 (Front/Right)", Shift+X toggles/reopens, no flip button, 180 deg
-  in the rotation field flips, cap/cut edges never pick, area readout uncut). Index.md + behaviours.md sections each.
-- Cleanup: Xvfb :396 (lat3/xvfb.pid), lat3 binaries noshape-lat/new/fix.
+- Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
+  rows, handoffs). Result from the lead.
+- SKT-USE-HOVER fixed (bb472f3b1): a used curve's own use glyph always drawn, centred on its middle (Show constraints
+  off; live use-convert: 10x8 on the edge at y 69.5 of an edge at 69-70); Use over it: glyph under the pointer ->
+  hover_constraint, edge hover None. Test use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge. TICKETS row
+  "fixed, to verify".
+- Live pages 11-25 checked: featurelist-1125 (drag pills 14 px/500 31 tall at +10,+6 rollback / +10,+5 feature, drop
+  dot 6 px: 1fd0df44d; bar colours, rename, empty name, delete without warning already as live), measure-1125 (value
+  #666 not #333: 0d6298e21; assembly_view.rs:3097 has the same #333, asm's crate, left), section-1125 and
+  appearance-1125 (already as live). core/dialogs-1125 (08:4x): fields per option/checkbox/tab of Extrude, Revolve,
+  Fillet, Chamfer, Shell, Linear/Circular pattern, Mirror, Boolean all as live (schema probe, two levels deep:
+  /root/psui-scratch/dlg/probe_tmp.rs, run by copying into model-data with `#[cfg(test)] mod probe_tmp;`, then
+  removing); Fillet's "Edges to keep" folded under Allow edge overflow as live; empty-dialog texts and Mirror's auto
+  Add + merge scope already there (a_mirror_across_a_side_face_adds_into_its_seed). Live's Fillet 3 mm / Chamfer 1 mm
+  are that account's remembered values.
 - 11-25 07:1x P0 (lead): as-mc-selhover regression from ae3a5f96a fixed: PointSprite::FLAT_RING (2048) keeps the
   old flat 18 px #6087bd ring on a selected mate connector; test mc_selected_hovered (60/0/58 px). QUEUED 3e10a3a2
   (with the count line 3126085b and two handoffs), reported to the lead.
