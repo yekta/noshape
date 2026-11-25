@@ -133,15 +133,18 @@ pub(super) struct Nearest {
     order: Vec<u32>,
     /// Each range's axis by its middle's place in `order`.
     axis: Vec<u8>,
+    /// Each range's box (its points' least and greatest coordinates) by its middle's place in `order`.
+    boxes: Vec<(DVec3, DVec3)>,
 }
 
 impl Nearest {
     pub(super) fn new(pts: Vec<DVec3>) -> Self {
         let mut order: Vec<u32> = (0..pts.len() as u32).collect();
         let mut axis = vec![0u8; pts.len()];
+        let mut boxes = vec![(DVec3::ZERO, DVec3::ZERO); pts.len()];
         let mut todo = vec![(0usize, pts.len())];
         while let Some((lo, hi)) = todo.pop() {
-            if hi - lo < 2 {
+            if hi <= lo {
                 continue;
             }
             let (mut a, mut b) = (DVec3::INFINITY, DVec3::NEG_INFINITY);
@@ -154,55 +157,70 @@ impl Nearest {
             let mid = (lo + hi) / 2;
             order[lo..hi].select_nth_unstable_by(mid - lo, |&i, &j| pts[i as usize][k].total_cmp(&pts[j as usize][k]));
             axis[mid] = k as u8;
+            boxes[mid] = (a, b);
             todo.push((lo, mid));
             todo.push((mid + 1, hi));
         }
-        Self { pts, order, axis }
+        Self { pts, order, axis, boxes }
     }
 
     /// The nearest point's index (none of none).
     pub(super) fn of(&self, p: DVec3) -> Option<usize> {
         let mut best: Option<(f64, usize)> = None;
-        // (Each range with the least its points' distance can be: a coordinate's square never exceeds the distance's.)
-        let mut todo = vec![(0usize, self.pts.len(), 0.0f64)];
-        while let Some((lo, hi, least)) = todo.pop() {
-            if lo >= hi || best.is_some_and(|(bd, _)| least > bd) {
+        // (A range passed over where the least its points' distance can be, `p`'s to its box, is past the best's: each
+        // coordinate's offset to the box never exceeds a point's, nor so their squares' sum, added as
+        // `length_squared` adds them. A scan of a flank's samples from a point off its sheet otherwise: one split
+        // axis at a time never sees how far off it is (cf-spur-gear's fuse: 2550 of 2941 samples a point).)
+        // (Ranges to look at: one more each level down, so no more than 64.)
+        let mut todo = [(0usize, 0usize); 64];
+        todo[0] = (0, self.pts.len());
+        let mut n = 1;
+        while n > 0 {
+            n -= 1;
+            let (lo, hi) = todo[n];
+            if lo >= hi {
                 continue;
             }
             let mid = (lo + hi) / 2;
+            let (a, b) = self.boxes[mid];
+            let least = (a - p).max(DVec3::ZERO).max(p - b).length_squared();
+            if best.is_some_and(|(bd, _)| least > bd) {
+                continue;
+            }
             let i = self.order[mid] as usize;
             let d = (self.pts[i] - p).length_squared();
             if best.is_none_or(|(bd, bi)| d.total_cmp(&bd).then(i.cmp(&bi)).is_lt()) {
                 best = Some((d, i));
             }
             let k = self.axis[mid] as usize;
-            let off = p[k] - self.pts[i][k];
-            let (near, far) = if off < 0.0 { ((lo, mid), (mid + 1, hi)) } else { ((mid + 1, hi), (lo, mid)) };
-            todo.push((far.0, far.1, least.max(off * off)));
-            todo.push((near.0, near.1, least));
+            let (near, far) = if p[k] < self.pts[i][k] { ((lo, mid), (mid + 1, hi)) } else { ((mid + 1, hi), (lo, mid)) };
+            todo[n] = far;
+            todo[n + 1] = near;
+            n += 2;
         }
         best.map(|b| b.1)
     }
 
     /// The points within `r` of `p` (squared distances), in no order; `todo` the tree's parts still to look at (kept
     /// from call to call: a surface's thousands of samples each asked once, [`folds`]).
-    fn within(&self, p: DVec3, r2: f64, out: &mut Vec<usize>, todo: &mut Vec<(usize, usize, f64)>) {
+    fn within(&self, p: DVec3, r2: f64, out: &mut Vec<usize>, todo: &mut Vec<(usize, usize)>) {
         todo.clear();
-        todo.push((0usize, self.pts.len(), 0.0f64));
-        while let Some((lo, hi, least)) = todo.pop() {
-            if lo >= hi || least > r2 {
+        todo.push((0usize, self.pts.len()));
+        while let Some((lo, hi)) = todo.pop() {
+            if lo >= hi {
                 continue;
             }
             let mid = (lo + hi) / 2;
+            let (a, b) = self.boxes[mid];
+            if (a - p).max(DVec3::ZERO).max(p - b).length_squared() > r2 {
+                continue;
+            }
             let i = self.order[mid] as usize;
             if (self.pts[i] - p).length_squared() <= r2 {
                 out.push(i);
             }
-            let k = self.axis[mid] as usize;
-            let off = p[k] - self.pts[i][k];
-            let (near, far) = if off < 0.0 { ((lo, mid), (mid + 1, hi)) } else { ((mid + 1, hi), (lo, mid)) };
-            todo.push((far.0, far.1, least.max(off * off)));
-            todo.push((near.0, near.1, least));
+            todo.push((lo, mid));
+            todo.push((mid + 1, hi));
         }
     }
 }
@@ -349,7 +367,7 @@ pub(super) fn cached_grid(ns: &FreeSurface, uv: [f64; 4]) -> std::sync::Arc<Grid
     let near = Nearest::new(pts.iter().map(|x| x.1).collect());
     let g = std::sync::Arc::new(Grid { pts, near, folds: std::sync::OnceLock::new() });
     if let Ok(mut c) = GRID_CACHE.lock() {
-        let bytes = std::mem::size_of::<Grid>() + g.pts.len() * (40 + 24 + 4 + 1);
+        let bytes = std::mem::size_of::<Grid>() + g.pts.len() * (40 + 24 + 4 + 1 + 48);
         c.put(key, g.clone(), bytes);
     }
     g
@@ -1406,7 +1424,8 @@ mod tests {
 
     /// The k-d tree's nearest point is the scan's, the first of equals included: a 41 x 23 grid on a wavy sheet with
     /// its first row collapsed to one point (a pole) and every point of its last row twice, against 2000 points near
-    /// it, the grid's own points and points halfway between two.
+    /// it, 500 far off it, the grid's own points and points halfway between two; and the points within a distance are
+    /// the scan's.
     #[test]
     fn nearest_samples_are_the_scans() {
         let mut pts = Vec::new();
@@ -1428,10 +1447,18 @@ mod tests {
             (seed >> 11) as f64 / (1u64 << 53) as f64
         };
         let mut qs: Vec<DVec3> = (0..2000).map(|_| DVec3::new(rnd() * 12.0 - 1.0, rnd() * 13.0 - 1.0, rnd() * 4.0 - 2.0)).collect();
+        qs.extend((0..500).map(|_| DVec3::new(rnd() * 60.0 - 25.0, rnd() * 60.0 - 25.0, rnd() * 80.0 - 40.0)));
         qs.extend(pts.iter().copied());
         qs.extend(pts.windows(2).map(|w| (w[0] + w[1]) * 0.5));
+        let (mut out, mut todo) = (Vec::new(), Vec::new());
         for q in qs {
             assert_eq!(near.of(q), scan(q), "at {q}");
+            let r2 = 0.6 * (q.z.abs() + 0.5);
+            out.clear();
+            near.within(q, r2, &mut out, &mut todo);
+            out.sort_unstable();
+            let all: Vec<usize> = (0..pts.len()).filter(|&i| (pts[i] - q).length_squared() <= r2).collect();
+            assert_eq!(out, all, "within {r2} of {q}");
         }
         assert_eq!(Nearest::new(Vec::new()).of(DVec3::ZERO), None);
     }
