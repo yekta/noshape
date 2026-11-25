@@ -5921,6 +5921,13 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
         const quad::Surf* s3[3] = {&sf[(size_t)fs[0]], &sf[(size_t)fs[1]], &sf[(size_t)fs[2]]};
         const gp_XYZ      x0 = V.XYZ() - (n_at(fs[0]) * (kept[(size_t)fs[0]] ? t : 0.0) + n_at(fs[1]) * (kept[(size_t)fs[1]] ? t : 0.0) + n_at(fs[2]) * (kept[(size_t)fs[2]] ? t : 0.0));
         x = x0;
+        // (Each start's feet found afresh, not from the last corner's: a foot from there landed on the far side of
+        // c2-impeller-loft's Gehäuse loft on macOS 26, and the solve circled.)
+        auto fresh = [&] {
+          for (const quad::Surf* q : s3)
+            q->has_hint = false;
+        };
+        fresh();
         if (!quad::solve3(s3, x, size))
         {
           // (A start on a removed face's line of tangency is a saddle: start again a wall's thickness along each of
@@ -5939,6 +5946,7 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
             for (double sg : {1.0, -1.0})
             {
               gp_XYZ y = x0 + d0.Normalized().XYZ() * (sg * t);
+              fresh();
               if (!quad::solve3(s3, y, size))
                 continue;
               // On a removed face: within its patch (the other root of a removed cylinder lies off it).
