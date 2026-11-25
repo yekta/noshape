@@ -168,7 +168,8 @@ pub fn ctrl_cmd(key: &str, mac: bool) -> Vec<String> {
     keys
 }
 
-fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
+/// The default bindings of a Mac (`mac`) or of Windows and Linux (`secondary-` keys still follow this build's OS).
+pub fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
     // Bare-letter bindings must not fire while typing in an input.
     let ps = Some("PartStudio && !Input");
     let sk = Some("Sketch && !Input");
