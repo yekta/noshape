@@ -2439,18 +2439,35 @@ fn a_hovered_triad_arrow_is_solid_blue_over_the_part(cx: &mut TestAppContext) {
         m.pointer.move_to(cx, &m.view, sa.lerp(sb, 0.4).round());
         assert_eq!(cx.update(|cx| m.view.read(cx).ui.triad_hover), Some(0), "the X arrow hovered (edge view {edge_view})");
         let (w, _, px) = m.frame(cx);
-        // Along the stroke's centre line, every pixel mostly the light core #97B1D9 over the #3F6FAC outline (live's
+        // At every step along the stroke, across it a pixel mostly the light core #97B1D9 over the #3F6FAC outline (live's
         // shaft is antialiased across its width); qa r6-r10 saw the core in steps, the outline between them, 13 gaps
         // in 56 px.
         let (outline, core) = (DVec3::new(63., 111., 172.), DVec3::new(151., 177., 217.));
         let n = (sb - sa).length().floor() as usize;
+        let across = (sb - sa).normalize().perp();
+        let rgb = |p: DVec2| {
+            let c = px[(p.y as u32 * w + p.x as u32) as usize];
+            DVec3::new(c[0] as f64, c[1] as f64, c[2] as f64)
+        };
         let share: Vec<(DVec2, f64)> = (n / 10..n / 2).map(|k| sa.lerp(sb, k as f64 / n as f64)).map(|q| {
-            let c = px[(q.y as u32 * w + q.x as u32) as usize];
-            let c = DVec3::new(c[0] as f64, c[1] as f64, c[2] as f64);
-            (q, (c - outline).dot(core - outline) / (core - outline).length_squared())
+            // Only pixels on the outline-core blend (not the light part or background beside the stroke).
+            let best = (-2..=2).map(|k| {
+                let c = rgb(q + across * (k as f64 * 0.5)) - outline;
+                let t = c.dot(core - outline) / (core - outline).length_squared();
+                if (c - (core - outline) * t).length() < 20.0 { t } else { 0.0 }
+            }).fold(0.0, f64::max);
+            (q, best)
         }).collect();
         let gaps = share.iter().filter(|s| s.1 < 0.6).count();
         assert!(gaps == 0, "edge view {edge_view}: {gaps} of {} centre-line pixels not the core: {share:?}", share.len());
+        // At every step along the shaft, beside the core a pixel of the full outline (live's rims ~1.3 px; qa 8641c8b2a:
+        // ours were 0.75 px, never a full outline pixel and lighter every ~7 columns).
+        let rim: Vec<(f64, f64)> = share.iter().map(|&(q, _)| {
+            let side = |sign: f64| (3..=9).map(|k| rgb(q + across * sign * (k as f64 * 0.25)).distance(outline)).fold(f64::MAX, f64::min);
+            (side(1.0), side(-1.0))
+        }).collect();
+        let faint = rim.iter().filter(|r| r.0.min(r.1) > 24.0).count();
+        assert!(faint == 0, "edge view {edge_view}: {faint} of {} steps without a full outline pixel: {rim:?}", rim.len());
     }
 }
 

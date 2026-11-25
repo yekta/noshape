@@ -774,11 +774,12 @@ pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, turn:
     // Transform's: like the extrude arrow, white strokes over a light grey outline; a hovered handle blue, outline
     // rgb(63,111,172) and inner rgb(151,177,217) (live part-studio/444). The full triad (live2 routing-multi): light grey
     // hollow strokes, edge ≈ rgb(152,158,164), core rgb(215,217,219), ~4 px; the hovered handle solid rgb(107,144,195)
-    // edged rgb(85,128,180).
+    // edged rgb(85,128,180). Transform's strokes 4.5 px with a 1.4 px core (live psui/manip-feel-1122 transform-x-hover
+    // ~4 / 1.45 px, its outline darker): a rim of ~1.5 px each side, so along a slanted shaft the outline stays as dark.
     let (gray, white, blue, blue_inner, edge_px, core_px) = if t.full {
         (crate::theme::rgb8(0x989ea4), crate::theme::rgb8(0xd7d9db), crate::theme::rgb8(0x5580b4), crate::theme::rgb8(0x6b90c3), 4.0, 2.0)
     } else {
-        (crate::theme::rgb8(0xa8adb2), crate::theme::rgb8(0xffffff), crate::theme::rgb8(0x3f6fac), crate::theme::rgb8(0x97b1d9), 3.0, 1.5)
+        (crate::theme::rgb8(0xa8adb2), crate::theme::rgb8(0xffffff), crate::theme::rgb8(0x3f6fac), crate::theme::rgb8(0x97b1d9), 4.5, 1.4)
     };
     // While dragging, the other handles go translucent (part-studio/445).
     let fade = |c: [u8; 4], on: bool| if dragging && !on { [c[0], c[1], c[2], 70] } else { c };
