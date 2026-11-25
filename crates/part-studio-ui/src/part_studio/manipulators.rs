@@ -923,10 +923,15 @@ impl PartStudioView {
                 let tau = std::f64::consts::TAU;
                 let a0 = angle_at(self, *position, cx).map_or(h.angle, |raw| h.angle + (raw - h.angle + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI);
                 self.manip_drag = Some(ManipDrag { grab_offset: a0, which, delta: a0 - h.angle, typed: false });
+                self.ui.arrow_press = Some(*position);
                 true
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(m) = self.manip_drag else { return false };
+                if self.ui.arrow_press.is_some_and(|q| q.distance(*position) < ARROW_DEAD_PX) {
+                    return true;
+                }
+                self.ui.arrow_press = None;
                 let Some(raw) = angle_at(self, *position, cx) else { return true };
                 // Unwrapped next to the last angle, within a whole turn.
                 let tau = std::f64::consts::TAU;
@@ -1343,9 +1348,10 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
 /// A handle's stroke colours and widths (outline, core): idle a white core
 /// in a grey halo, hovered the halo blue, dragged one solid blue stroke
 /// (live psb 10-24: arrows and arcs alike).
-/// An arrow's drag does nothing until the pointer is this far from the press, then takes the full distance (live
-/// manip-drag-1125: Extrude's depth, Move face's offset and Fillet's arrows unchanged through 4 px, the full 5 px at 5).
-const ARROW_DEAD_PX: f64 = 5.0;
+/// An arrow's or arc's drag does nothing until the pointer is this far from the press, then takes the full distance
+/// (live manip-drag-1125: Extrude's depth and Move face's arrows unchanged at 4 px, the full 5 px at 5; Fillet's arrow
+/// moves at 4.47 px, Move face's Rotate ring at 4.24 px, not at 2.83).
+const ARROW_DEAD_PX: f64 = 4.1;
 
 fn handle_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
     // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo

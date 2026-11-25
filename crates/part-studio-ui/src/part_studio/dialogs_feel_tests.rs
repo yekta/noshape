@@ -2348,3 +2348,83 @@ fn move_faces_arrow_starts_where_the_face_was_clicked(cx: &mut TestAppContext) {
     assert!(arrow.base.distance(clicked) < 0.05 * mm && arrow.dir.z > 0.99, "at the click, along the normal: {:?} {:?}", arrow.base, arrow.dir);
     assert!((arrow.length - 5.0 * mm).abs() < 1e-9, "Offset 5 mm: {}", arrow.length);
 }
+
+/// Live manip-drag-1125 part 3 (Move face › Rotate about the block's front top edge, 0 deg): the ring's drag does
+/// nothing through 2.83 px, then turns the face in 5° snaps with the free angles between shown to 7 decimals, in the
+/// focused Rotation angle field with its whole text selected; Ctrl+Z in the dialog changes nothing; ✓ commits the angle
+/// and one Part Studio undo takes it back.
+#[gpui::test]
+fn move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "moveFace", "name": "Move face 1", "params": { "moveFaces": ["face through [20, 15, 20]"], "moveFaceType": "ROTATE", "axis": ["edge through [20, 0, 20]"], "angle": "0 deg" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "dlg-moveface-ring", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Move face dialog").dialog.clone());
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    // The ring's head: past the arc's end along its tangent on screen.
+    let (at, along) = cx
+        .update(|cx| {
+            let vp = vp.read(cx);
+            let &(a, b, reach) = vp.manipulators.first()?;
+            let (pa, pb) = (vp.project(a)?, vp.project(b)?);
+            let dir = (pb - pa).normalize_or_zero();
+            let head = pa + dir * (reach - 8.);
+            let o = vp.origin();
+            Some((gpui_kit::point(o.x + px(head.x as f32), o.y + px(head.y as f32)), dir))
+        })
+        .expect("the ring");
+    let to = |d: f64| gpui_kit::point(at.x + px((along.x * d) as f32), at.y + px((along.y * d) as f32));
+    let angle_param = |cx: &mut TestAppContext| cx.update(|cx| format!("{:?}", view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().params.get("angle")));
+    let before = angle_param(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    let mut texts = Vec::new();
+    let mut unfocused = Vec::new();
+    let mut d = 2.0f64.sqrt() * 2.0;
+    while d < 90.0 {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: to(d), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+        draw(cx, window);
+        let (text, selected) = cx.update(|cx| dialog.read(cx).input_text("angle", cx)).unwrap_or_default();
+        let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        let focused = st["dialog"]["fields"].as_array().into_iter().flatten().any(|f| f["label"] == "Rotation angle" && f["focused"] == true);
+        if d > 4.1 && !(focused && text == selected) {
+            unfocused.push(format!("{d:.1} px: {text:?} selected {selected:?} focused {focused}"));
+        }
+        texts.push((d, text));
+        d += if d < 6.0 { 1.0 } else { 3.0 };
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: to(d), modifiers: Modifiers::default(), click_count: 1 });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let dragged = cx.update(|cx| dialog.read(cx).input_text("angle", cx)).map(|t| t.0);
+    keys(cx, window, &["secondary-z"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let after_undo_key = cx.update(|cx| dialog.read(cx).input_text("angle", cx)).map(|t| t.0);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let committed = angle_param(cx);
+    cx.update(|cx| view.update(cx, |v, cx| v.doc.update(cx, |d, cx| d.undo(cx))));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let undone = angle_param(cx);
+    let degrees = |t: &str| t.strip_suffix(" deg").and_then(|n| n.parse::<f64>().ok());
+    assert_eq!(texts[0].1, "0 deg", "nothing at 2.83 px: {texts:?}");
+    let values: Vec<f64> = texts.iter().filter(|(d, _)| *d > 4.1).filter_map(|(_, t)| degrees(t)).collect();
+    let snapped = values.iter().filter(|v| **v > 0.0 && (*v / 5.0).fract() == 0.0).count();
+    let free: Vec<&String> = texts.iter().map(|(_, t)| t).filter(|t| degrees(t).is_some_and(|v| (v / 5.0).fract() != 0.0)).collect();
+    assert!(snapped >= 3 && !free.is_empty(), "5° snaps with free angles between: {texts:?}");
+    assert!(free.iter().all(|t| t.trim_end_matches(" deg").split('.').nth(1).is_some_and(|f| (1..=7).contains(&f.len()))) && free.iter().any(|t| t.trim_end_matches(" deg").split('.').nth(1).is_some_and(|f| f.len() >= 5)), "free angles to 7 decimals: {free:?}");
+    assert!(values.windows(2).all(|w| w[1] >= w[0]), "the angle grows with the drag: {texts:?}");
+    assert!(unfocused.is_empty(), "the Rotation angle field focused with its text selected: {unfocused:?}");
+    assert_eq!(after_undo_key, dragged, "Ctrl+Z in the dialog after the drag");
+    assert!(committed != before && undone == before, "angle: before {before}, committed {committed}, undone {undone}");
+}
