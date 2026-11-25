@@ -59,6 +59,7 @@ static BIND_ENTRY_KEYS: std::sync::Once = std::sync::Once::new();
 // The sketch toolbar's groups and their order (shared with the agent API's
 // ui_search_tools).
 use noshape_ops::tool_search::{SKETCH_CONSTRAINT_TOOLS as CONSTRAINT_TOOLS, SKETCH_DRAW_TOOLS as DRAW_TOOLS, SKETCH_EDIT_TOOLS as EDIT_TOOLS, SKETCH_INSERT_TOOLS as INSERT_TOOLS, SKETCH_USE_TOOLS as USE_TOOLS};
+
 pub(super) use noshape_ops::tool_search::all_sketch_tools;
 
 /// Live Onshape's default two-row S toolbar, in reading order.
@@ -67,6 +68,9 @@ pub(super) const SKETCH_SHORTCUT_TOOLS: [Tool; 10] = [Tool::Line, Tool::CornerRe
 thread_local! {
     /// Last tool used from each toolbar group (keyed by the group's first tool).
     static LAST_IN_GROUP: std::cell::RefCell<HashMap<String, Tool>> = std::cell::RefCell::new(HashMap::new());
+    /// Insert image's picture while its box is drawn: the pending bytes' address, the picture decoded on load and its
+    /// texture once uploaded.
+    static IMAGE_PREVIEW: std::cell::RefCell<Option<(usize, noshape_render::ImageData, Option<noshape_render::ImageHandle>)>> = Default::default();
 }
 
 fn remember_group_tool(tool: Tool) {
@@ -1804,6 +1808,24 @@ impl PartStudioView {
         }
         out.extend(self.preview_length_in_plane(ed, &data, &units, cx));
         out.extend(self.otf_box_in_plane(ed, &data, &units, cx));
+        // Insert image between its clicks: the picture in the box the second click would place (live G13).
+        match (ed.image_preview(), ed.pending_image.as_ref()) {
+            (Some(box_), Some((_, bytes, _))) => {
+                let key = bytes.as_ptr() as usize;
+                let handle = IMAGE_PREVIEW.with_borrow_mut(|p| {
+                    let (_, picture, handle) = p.as_mut().filter(|p| p.0 == key)?;
+                    Some(handle.get_or_insert_with(|| up.upload_image(picture)).clone())
+                });
+                if let Some(handle) = handle {
+                    let [ll, lr, _, ul] = box_.map(|p| ed.frame.to_world(p).as_vec3());
+                    let (x, y) = (lr - ll, ul - ll);
+                    let m = glam::Mat4::from_cols(x.extend(0.0), y.extend(0.0), x.cross(y).normalize_or_zero().extend(0.0), ll.extend(1.0));
+                    out.push(Instance::new(Drawable::Image(handle)).with_transform(m).unpickable().ignore_clip().layer(8));
+                }
+            }
+            (_, None) => IMAGE_PREVIEW.with_borrow_mut(|p| *p = None),
+            _ => {}
+        }
         out
     }
 
@@ -3862,8 +3884,11 @@ impl PartStudioView {
     }
 
     fn load_image_bytes(&mut self, name: String, bytes: Vec<u8>, cx: &mut Context<Self>) {
-        match image::load_from_memory(&bytes).map(|img| (img.width(), img.height())) {
-            Ok((w, h)) if w > 0 && h > 0 => {
+        match image::load_from_memory(&bytes).map(|img| img.to_rgba8()) {
+            Ok(img) if img.width() > 0 && img.height() > 0 => {
+                let (w, h) = (img.width(), img.height());
+                let picture = noshape_render::ImageData { corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], width: w, height: h, rgba: img.into_raw() };
+                IMAGE_PREVIEW.with_borrow_mut(|p| *p = Some((bytes.as_ptr() as usize, picture, None)));
                 if let Some(ed) = &mut self.sketch {
                     ed.pending_image = Some((name, bytes, w as f64 / h as f64));
                     ed.message = Some("Draw image rectangle.".into());

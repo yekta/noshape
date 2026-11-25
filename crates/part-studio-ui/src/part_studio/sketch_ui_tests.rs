@@ -9295,7 +9295,7 @@ fn a_bracket_drawn_step_by_step_as_live(cx: &mut TestAppContext) {
     let k4 = kinds(cx);
     let hole = curve_at(cx, mm(34., 20.)).expect("the hole");
     let tied = added(&k3, &k4);
-    assert!(tied == BTreeMap::from([("Coincident", 1)]) || tied == BTreeMap::from([("Concentric", 1)]), "the hole's centre on the arc's: {tied:?}");
+    assert_eq!(tied, BTreeMap::from([("Coincident", 1)]), "the hole's centre on the arc's (live circle-trim-cons-1125: never Concentric)");
     assert_eq!(solved(cx), (true, 2), "profile and hole");
     // 5. Dimensions typed in their boxes: the bottom LENGTH 50 (the first dimension scales the sketch onto it, live
     // 1785), the hole DIAMETER 8 (picked on its rim across from the centre: the view is iso, at 2.8 px/mm the centre
@@ -9352,4 +9352,32 @@ fn a_bracket_drawn_step_by_step_as_live(cx: &mut TestAppContext) {
     clicks(cx, &[p]);
     assert!(cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entity(left).is_none()), "the middle edge trimmed away");
     assert_eq!(solved(cx), (true, 3), "outline with two holes, and the holes");
+}
+
+/// Live 2187: a spline's end handle arm is one entity: a click on it selects the arm alone (not the spline) and the
+/// status bar reads its length ("Length: 14.229 mm" there).
+#[gpui::test]
+fn a_spline_arm_clicked_reads_its_length_as_live(cx: &mut TestAppContext) {
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let (window, view) = sketch_with(cx, "spline-arm", Tool::Spline);
+    for q in [mm(0.0, 0.0), mm(30.0, 20.0), mm(60.0, 0.0)] {
+        let p = on_screen(cx, &view, q);
+        click(cx, window, &view, (p.x, p.y));
+    }
+    keys(cx, window, &["escape", "escape"]);
+    draw(cx, window);
+    let arm = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let arm = d.sketch.entities().find(|e| e.handle_of.is_some() && d.sketch.endpoints(e.id).and_then(|(s, _)| d.sketch.point(s)).is_some_and(|s| s.length() < 1e-3)).map(|e| e.id).expect("the start arm");
+        let (s, e) = d.sketch.endpoints(arm).unwrap();
+        let (s, e) = (d.sketch.point(s).unwrap(), d.sketch.point(e).unwrap());
+        (arm, s.lerp(e, 0.75), (e - s).length())
+    });
+    let p = on_screen(cx, &view, arm.1);
+    click(cx, window, &view, (p.x, p.y));
+    let selected = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().selection.clone());
+    assert_eq!(selected, vec![arm.0], "the arm alone");
+    let units = cx.update(|cx| view.read(cx).doc.read(cx).session.doc.settings.units);
+    let readout = cx.update(|cx| { let v = view.read(cx); v.sketch.as_ref().unwrap().selection_readout(&v.sketch_data(cx).unwrap(), &units) });
+    assert_eq!(readout, vec![("Length".to_string(), format!("{:.3} mm", arm.2 * 1e3))], "the arm's readout, as live's");
 }

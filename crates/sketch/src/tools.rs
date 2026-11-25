@@ -123,6 +123,15 @@ impl Sketch {
                 });
                 out.push(Cut { t: x.t1, p: x.point, other, at_point });
             }
+            // Live (skasm circle-trim-cons-1125): a circle's or arc's centre lying on the curve is a boundary too.
+            let round = matches!(self.kind(other), Some(EntityKind::Circle | EntityKind::Arc));
+            if let Some(centre) = self.entity(other).filter(|_| round).and_then(|e| e.center())
+                && let Some(q) = self.point(centre) {
+                    let (t, p, d) = c.closest(q);
+                    if d <= 4.0 * tol {
+                        out.push(Cut { t, p, other, at_point: Some(centre) });
+                    }
+                }
         }
         if corner > 0.0 {
             // (curve, end) of every other curve; a corner is where two of them end, the curve passing within `corner`.

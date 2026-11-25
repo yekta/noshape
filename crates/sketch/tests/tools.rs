@@ -772,3 +772,23 @@ fn picked_crossing_lines_fillet_and_chamfer_in_the_picks_quadrant() {
     assert!(sk.fillet_picked((a, mm(5.0, 0.0)), (b, mm(5.0, 5.0)), 1e-3).is_err(), "parallel lines");
     assert_eq!(sk.entities().count(), n, "left as it was");
 }
+
+#[test]
+fn a_circles_centre_on_a_line_is_a_trim_boundary_as_live() {
+    // Live (skasm circle-trim-cons-1125): a click between the centre and the right crossing removes only that span; the
+    // left piece ends on the centre point.
+    let mut sk = Sketch::new();
+    let g = sk.add_line(v(0.0, 0.0), v(40.0, 0.0));
+    let c = sk.add_circle(v(20.0, 0.0), 5.0);
+    let centre = sk.entity(c).and_then(|e| e.center()).unwrap();
+    let (t0, t1) = sk.trim_span(g, v(22.0, 0.0)).unwrap();
+    let curve = sk.curve(g).unwrap();
+    let (a, b) = (curve.point(t0.min(t1)).x, curve.point(t0.max(t1)).x);
+    assert!((a - 20.0).abs() < 1e-6 && (b - 25.0).abs() < 1e-6, "hover span {a}..{b}");
+    sk.trim(g, v(22.0, 0.0)).unwrap();
+    let (_, end) = sk.endpoints(g).unwrap();
+    assert_eq!(end, centre, "the left piece ends on the circle's centre");
+    let rest: Vec<_> = sk.entities().filter(|e| e.kind() == EntityKind::Line && e.id != g).map(|e| e.id).collect();
+    let (s, _) = sk.endpoints(rest[0]).unwrap();
+    assert!((sk.point(s).unwrap().x - 25.0).abs() < 1e-6, "the right piece starts at the crossing");
+}

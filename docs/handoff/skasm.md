@@ -3,7 +3,23 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 07:41) — read first
+## NOW (11-25 08:30) — read first
+- DROPPED (lead 11-25): the ops center_point_arc P1; core fixed it in db2fd8e7 (my ops edits reverted).
+- LANDING Insert image as live G13: `image_box` fits INSIDE the dragged rect (min side, was max); preview
+  = dash-dot rect to the pointer + the picture inside (`SketchEditor::image_preview`, psui sketch_overlay draws it via
+  thread_local IMAGE_PREVIEW decoded once in load_image_bytes). Scene tests `an_image_fits_inside_its_dragged_rectangle_as_live`,
+  `a_spline_closed_on_its_first_point_is_one_periodic_curve_as_live` (both pass, scene 216 ok). psui test
+  `a_spline_arm_clicked_reads_its_length_as_live` (2187: arm alone selected, status "Length: x mm") NOT yet run.
+  All green (sketch 175, scene 217, psui arm + bracket + trim): LANDING with the trim fix below.
+- LANDING circle/trim vs live circle-trim-cons-1125: probe showed ours matches (end/middle trim, Length
+  dropped, offspring no H, Radius kept) but for one gap: a circle/arc centre on the curve is now a trim boundary (`cuts`,
+  sketch test `a_circles_centre_on_a_line_is_a_trim_boundary_as_live`, bin/ttrim2.sh -> ~/tmp/skasm/ttrim2.log). Circle
+  centre snap = Coincident passes (scene). Bracket test hole tie tightened to Coincident only (run with tarm). Not done:
+  circle->arc shares the line ends (live: point-point COINCIDENTs; same to the user); link_centre_snap on MODEL edges
+  still ConcentricTo (live answer covered sketch circles only).
+- NEXT splines/image (lead 11-25): REQUESTS skasm 11-25 07:55 filed (fit point / body / handle drags, curvature handle,
+  end onto start, Bezier edits; image look, drags, scale by dimension, right-click opacity/lock). Known live already
+  covered: 2175 closing, 2187 arm, G13 placement, Bezier Deg label, Esc commits.
 - QUEUED 1290c4f1 (11-25 07:50) bracket everyday check (lead 11-25): psui `a_bracket_drawn_step_by_step_as_live` draws lines, a
   tangent arc, a hole, 3 dimensions, a mirror and a trim step by step against live's tool specs (behaviours 18337-18403,
   15793); all as live but one: a tangent / 3 point arc ended level with its own start took a HORIZONTAL. Fixed in `infer`

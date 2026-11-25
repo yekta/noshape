@@ -7141,11 +7141,10 @@ impl SketchEditor {
                     }
                     _ => {}
                 },
+                // Live G13: a dash-dot rectangle to the pointer, the picture fitted inside it ([`Self::image_preview`]).
                 Tool::InsertImage => {
-                    if let (Some(a), Some((_, _, aspect))) = (anchors.first(), &self.pending_image) {
-                        let (o, h) = image_box(*a, c, *aspect);
-                        let wdt = h * aspect;
-                        poly(&[o, o + DVec2::X * wdt, o + DVec2::new(wdt, h), o + DVec2::Y * h, o], preview_color, true);
+                    if let (Some(a), Some(_)) = (anchors.first(), &self.pending_image) {
+                        dash_dot.push(vec![*a, DVec2::new(c.x, a.y), c, DVec2::new(a.x, c.y), *a]);
                     }
                 }
                 Tool::Text if self.pending_text.is_none() => {
@@ -7758,6 +7757,20 @@ impl SketchEditor {
 
     /// Entities highlighted as related (picks, mirror axis, entities of the
     /// selected / hovered constraints).
+    /// Insert image between its clicks: the picture's corners (lower-left, lower-right, upper-right, upper-left) fitted
+    /// inside the rectangle from the first click to the pointer, as the second click would place it (live G13).
+    pub fn image_preview(&self) -> Option<[DVec2; 4]> {
+        if self.tool != Tool::InsertImage {
+            return None;
+        }
+        let (_, _, aspect) = self.pending_image.as_ref()?;
+        let a = self.clicks.first()?.pos;
+        let c = self.snapped().map(|s| s.0).filter(|_| !self.pointer_rests)?;
+        let (o, h) = image_box(a, c, *aspect);
+        let w = h * aspect;
+        (h > 0.0).then(|| [o, o + DVec2::X * w, o + DVec2::new(w, h), o + DVec2::Y * h])
+    }
+
     /// Entities the active tool has picked so far (e.g. the Dimension
     /// tool's first entity).
     pub fn tool_picks(&self) -> Vec<EntityId> {
@@ -8436,11 +8449,12 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
     Some(line)
 }
 
-/// Lower-left corner and height of an image rectangle dragged from `a` to
-/// `b` with its aspect ratio (width / height) locked.
+/// Lower-left corner and height of an image rectangle dragged from `a` to `b` with its aspect ratio (width / height)
+/// locked: fitted inside the dragged rectangle by its limiting side, from `a` (live G13: a wide drag leaves blank space
+/// at the side, a tall one at the top or bottom).
 fn image_box(a: DVec2, b: DVec2, aspect: f64) -> (DVec2, f64) {
     let d = b - a;
-    let h = d.y.abs().max(d.x.abs() / aspect.max(1e-9));
+    let h = d.y.abs().min(d.x.abs() / aspect.max(1e-9));
     let w = h * aspect;
     let x = if d.x < 0.0 { a.x - w } else { a.x };
     let y = if d.y < 0.0 { a.y - h } else { a.y };
@@ -11627,6 +11641,98 @@ mod tests {
         assert!(ed.confirm_spline(&mut d).changed);
         assert_eq!(count(&d, EntityKind::FitSpline), 2);
         assert_eq!(ed.tool, Tool::Select, "Confirm spline turns the tool off");
+    }
+
+    /// Live 2175: the closing click makes one periodic spline with no closure constraint and no handles; the tool
+    /// stays on; the closure point drags with the rest still and the curve smooth through it. An open one has both.
+    #[test]
+    fn a_spline_closed_on_its_first_point_is_one_periodic_curve_as_live() {
+        let arms = |d: &SketchData| d.sketch.entities().filter(|e| e.handle_of.is_some()).count();
+        let (mut ed, mut d) = editor(Tool::Spline);
+        for p in [v(0.01, 0.0), v(0.03, 0.02), v(0.01, 0.04), v(-0.01, 0.02), v(0.01 + PX, 0.0)] {
+            click(&mut ed, &mut d, p);
+        }
+        let s = d.sketch.entities().find(|e| e.kind() == EntityKind::FitSpline).unwrap().clone();
+        let refs = s.point_refs();
+        assert_eq!((refs.len(), refs.first(), s.spline_handles()), (5, refs.last(), None), "4 points, closed, no handles");
+        assert_eq!(arms(&d), 0, "no handle arms");
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { .. } | ConstraintKind::Tangent { .. })), "no closure constraint");
+        assert_eq!(ed.tool, Tool::Spline, "the tool stays on");
+        let at = |d: &SketchData| refs[1..4].iter().map(|p| d.sketch.point(*p).unwrap()).collect::<Vec<_>>();
+        let (others, seam) = (at(&d), d.sketch.point(refs[0]).unwrap());
+        let h = DragHandle::Point(refs[0]);
+        d.sketch.begin_drag(&[(h, seam)]);
+        let r = d.sketch.drag(&[(h, seam + v(0.005, -0.004))]);
+        assert!(r.drag_solved, "{:?}", r.status);
+        assert!((d.sketch.point(refs[0]).unwrap() - seam).length() > 1e-3, "the closure point moves");
+        assert!(at(&d).iter().zip(&others).all(|(a, b)| (*a - *b).length() < 1e-9), "the rest stays");
+        let c = d.sketch.curve(s.id).unwrap();
+        let (t0, t1) = c.domain();
+        let (d0, d1) = (c.tangent(t0).normalize(), c.tangent(t1).normalize());
+        assert!(d0.dot(d1) > 1.0 - 1e-9, "smooth through the seam: {d0} {d1}");
+        // An open spline keeps its end handles and their arms.
+        let (mut ed, mut d) = editor(Tool::Spline);
+        for p in [v(0.0, 0.0), v(0.03, 0.02), v(0.06, 0.0)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert!(ed.confirm_spline(&mut d).changed);
+        let s = d.sketch.entities().find(|e| e.kind() == EntityKind::FitSpline).unwrap();
+        assert!(s.spline_handles().is_some() && arms(&d) == 2, "open: handles {:?}, arms {}", s.spline_handles(), arms(&d));
+    }
+
+    /// Live G13: Insert image's two clicks fit the picture inside the dragged rectangle by its limiting side (a wide
+    /// drag leaves blank space at the side, a tall one above), as the preview showed; one HORIZONTAL on the bottom;
+    /// the tool ends.
+    #[test]
+    fn an_image_fits_inside_its_dragged_rectangle_as_live() {
+        for (to, size) in [(v(0.06, 0.01), v(0.015, 0.01)), (v(0.015, 0.04), v(0.015, 0.01))] {
+            let (mut ed, mut d) = editor(Tool::InsertImage);
+            ed.pending_image = Some(("guide.png".into(), vec![1, 2, 3], 1.5));
+            click(&mut ed, &mut d, v(0.0, 0.0));
+            ed.pointer_move(&mut d, to, false, false);
+            let preview = ed.image_preview().expect("the picture shows between the clicks");
+            click(&mut ed, &mut d, to);
+            let img = d.images.first().expect("placed");
+            let ps: Vec<DVec2> = img.box_points.iter().map(|p| d.sketch.point(EntityId(*p)).unwrap()).collect();
+            assert!((ps[0] - DVec2::ZERO).length() < 1e-9 && (ps[2] - size).length() < 1e-9, "{to}: {ps:?}");
+            assert!(ps.iter().zip(&preview).all(|(a, b)| (*a - *b).length() < 1e-9), "placed where previewed: {preview:?}");
+            let kinds: Vec<&str> = d.sketch.constraints().filter(|c| !matches!(c.kind, ConstraintKind::LengthRatio { .. })).map(|c| c.kind.name()).collect();
+            assert!(kinds.contains(&"Horizontal"), "{kinds:?}");
+            assert_eq!((ed.tool, ed.pending_image.is_none(), ed.image_preview()), (Tool::Select, true, None));
+        }
+    }
+
+    /// Live circle-trim-cons-1125: a circle's centre clicked on a point, a line's end or another circle's centre is
+    /// COINCIDENT with it (never Concentric); on a line's midpoint MIDPOINT; on a line or a circle elsewhere, on that
+    /// curve. The radius click in free space adds nothing.
+    #[test]
+    fn a_circles_centre_snaps_as_live() {
+        let cases: [(&str, DVec2); 6] = [("point", v(0.01, 0.03)), ("line end", v(0.04, 0.0)), ("centre", v(0.07, 0.02)), ("midpoint", v(0.02, 0.0)), ("line", v(0.03, 0.0)), ("circle", v(0.07, 0.03))];
+        for (what, at) in cases {
+            let (mut ed, mut d) = editor(Tool::Circle);
+            let p = d.sketch.add_point(v(0.01, 0.03));
+            let line = d.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+            let other = d.sketch.add_circle(v(0.07, 0.02), 0.01);
+            let before: Vec<ConstraintId> = d.sketch.constraints().map(|c| c.id).collect();
+            click(&mut ed, &mut d, at);
+            click(&mut ed, &mut d, at + v(0.0, -0.025));
+            let circle = d.sketch.entities().filter(|e| e.kind() == EntityKind::Circle).map(|e| e.id).max_by_key(|e| e.0).unwrap();
+            assert_ne!(circle, other, "{what}: a circle made");
+            let centre = d.sketch.entity(circle).unwrap().point_refs()[0];
+            let added: Vec<ConstraintKind> = d.sketch.constraints().filter(|c| !before.contains(&c.id)).map(|c| c.kind.clone()).collect();
+            let (_, line_end) = d.sketch.endpoints(line).unwrap();
+            let other_centre = d.sketch.entity(other).unwrap().point_refs()[0];
+            let on = |q: EntityId| centre == q || added == [ConstraintKind::Coincident { a: centre, b: q }] || added == [ConstraintKind::Coincident { a: q, b: centre }];
+            let ok = match what {
+                "point" => on(p),
+                "line end" => on(line_end),
+                "centre" => on(other_centre),
+                "midpoint" => added == [ConstraintKind::Midpoint { point: centre, curve: line }],
+                "line" => added == [ConstraintKind::Coincident { a: centre, b: line }],
+                _ => added == [ConstraintKind::Coincident { a: centre, b: other }],
+            };
+            assert!(ok, "{what}: {added:?}");
+        }
     }
 
     #[test]
