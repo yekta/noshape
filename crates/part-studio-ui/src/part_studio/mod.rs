@@ -476,7 +476,7 @@ pub struct PartStudioView {
     fitted_once: bool,
     message: Option<(FeatureStatus, String)>,
     /// Notices `message` showed before the newest, still open (live: toasts stack).
-    toasts: crate::toasts::ToastStack<FeatureStatus>,
+    toasts: crate::toasts::ToastQueue<FeatureStatus>,
     /// A sketch cancelled with ✕: its draft, index and whether it was new,
     /// for the toast's Restore link (live sketch/68), with the toast text.
     canceled_edit: Option<(Feature, usize, bool, String)>,
@@ -606,11 +606,8 @@ impl PartStudioView {
                     this.pin_draft_units(old, cx);
                     this.schedule_regen(window, cx)
                 }
-                DocEvent::Error(msg) => crate::toasts::notice(this, Self::toast_parts, (FeatureStatus::Error, msg.clone()), None, cx),
-                DocEvent::Info(msg) => {
-                    let stays = this.doc.read(cx).notice_link(msg).map_or(Duration::from_secs(5), |l| l.stays);
-                    crate::toasts::notice(this, Self::toast_parts, (FeatureStatus::Info, msg.clone()), Some(stays), cx)
-                }
+                DocEvent::Error(msg) => crate::toasts::notice(this, Self::toast_parts, (FeatureStatus::Error, msg.clone()), cx),
+                DocEvent::Info(msg) => crate::toasts::notice(this, Self::toast_parts, (FeatureStatus::Info, msg.clone()), cx),
                 _ => {}
             }
         }));
@@ -2092,6 +2089,12 @@ impl PartStudioView {
             Some(i) if self.preview_hides(i, vp, cx) => self.before_face_under(vp.read(cx).pointer_position(), cx).and_then(|t| self.built.as_ref()?.picks.ids_for(&t.reference).first().copied()),
             id => id,
         };
+        let id = match id {
+            i if i.is_none_or(|i| self.built.as_ref().and_then(|b| b.picks.get(i)).is_some_and(|t| t.kind == PickKind::Face)) => {
+                self.preview_region_under(vp.read(cx).pointer_position(), cx).and_then(|t| self.built.as_ref()?.picks.ids_for(&t.reference).first().copied()).or(i)
+            }
+            i => i,
+        };
         // Held after a dialog's Enter until the pointer moves.
         let id = id.filter(|_| self.ui.hover_held_at.is_none());
         let gpu = id;
@@ -2175,6 +2178,25 @@ impl PartStudioView {
             return None;
         }
         Some(scene_builder::PickTarget { reference, kind, anchor: None })
+    }
+
+    /// Under a feature's preview, the shown sketch region at the pointer when no face of the model before the feature is
+    /// in front of it: it wins over an empty pick (the preview covers it) or a face only within the pick's reach (qa
+    /// FLOW-REGION-UNDER-FACE-PICK: the ring beside the box, live "Face of Sketch 2").
+    fn preview_region_under(&self, position: glam::DVec2, cx: &App) -> Option<scene_builder::PickTarget> {
+        let e = self.edit.as_ref()?;
+        let before = self.ui.preview_before.as_ref()?;
+        if !self.opts.show_sketches || self.active_field_filter(cx).is_some_and(|f| !f.intersects(noshape_model::params::QueryFilter::SKETCH_REGION)) {
+            return None;
+        }
+        let (o, d) = self.viewport.read(cx).ray(position);
+        let (t, reference) = nearest_region_hit(&self.display, o, d)?;
+        let mut hidden = false;
+        face_hits(before, None, o, d, |_, n| hidden |= n + 5e-5 < t);
+        if hidden || behaviors::made_by(&reference, e.dialog.read(cx).feature.id) {
+            return None;
+        }
+        Some(scene_builder::PickTarget { reference, kind: PickKind::SketchRegion, anchor: None })
     }
 
     /// Whether the ray from `o` along `d` meets face `r` as the model before the previewed feature has it.
@@ -2708,6 +2730,10 @@ impl PartStudioView {
                         Some(scene_builder::PickTarget { reference: r.clone(), kind: PickKind::Vertex, anchor: self.edge_midpoint(on) })
                     }
                     _ => target,
+                };
+                let target = match target {
+                    t if t.as_ref().is_none_or(|t| t.kind == PickKind::Face) => self.preview_region_under(*position, cx).or(t),
+                    t => t,
                 };
                 let own = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
                 let target = match target {
@@ -5269,10 +5295,13 @@ impl PartStudioView {
                 let mut m = menu
                     .item(item("Rename", Box::new(move |this, w, cx| this.start_part_rename(b1.clone(), w, cx))))
                     .item(item("Properties…", Box::new(move |this, w, cx| this.open_part_meta(b2.clone(), w, cx))))
-                    .item(item(if has_material { "Edit material…" } else { "Assign material…" }, Box::new(move |this, w, cx| {
-                        let t = targets(this, &b3);
-                        this.open_material_panel(t, w, cx);
-                    })))
+                    .item({
+                        let open: ViewAction = Box::new(move |this, w, cx| {
+                            let t = targets(this, &b3);
+                            this.open_material_panel(t, w, cx);
+                        });
+                        if has_material { item("Edit material…", open) } else { item("Assign material…", open) }
+                    })
                     .item(item("Edit appearance…", Box::new(move |this, w, cx| {
                         let t = targets(this, &b4);
                         // Live (ui-parity parts-row-edit-appearance): the parts edited are selected.
@@ -7140,7 +7169,8 @@ impl PartStudioView {
             let panel = crate::print_setup::panel(state, &cx.entity(), Self::on_print_action);
             out.push(div().absolute().top(px(3.)).left(px(0.)).child(panel).into_any_element());
         }
-        // Message toast.
+        // Message toast: the next waiting notice once the slot is empty (live dx/toast-stack-1125).
+        self.toasts.pump(&mut self.message);
         let mut top = None;
         // The tool-miss toast belongs to the open Remove / Intersect dialog.
         if let Some((st, msg)) = self.message.clone().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION) {
@@ -7202,7 +7232,7 @@ impl PartStudioView {
         // Live (document/01; behaviours "F19", configure toast: 814,85
         // and 769,85 at 1920): at y 85 of the window, centered on the
         // window, not the graphics area, and over a right panel (qa5 C5).
-        if let Some(toasts) = crate::toasts::column(top, &self.toasts, &cx.entity(), Self::toast_parts, bubble_kind, &self.doc, cx) {
+        if let Some(toasts) = crate::toasts::column(top) {
             let w = window.viewport_size().width;
             out.push(
                 deferred(anchored().position_mode(gpui_kit::AnchoredPositionMode::Window).position(point(px(0.), px(85.))).child(div().w(w).flex().justify_center().child(toasts)))
@@ -7214,7 +7244,7 @@ impl PartStudioView {
         out
     }
 
-    fn toast_parts(&mut self) -> (&mut crate::toasts::ToastStack<FeatureStatus>, &mut Option<(FeatureStatus, String)>) {
+    fn toast_parts(&mut self) -> (&mut crate::toasts::ToastQueue<FeatureStatus>, &mut Option<(FeatureStatus, String)>) {
         (&mut self.toasts, &mut self.message)
     }
 

@@ -1,134 +1,99 @@
-//! Toasts that stack: a notice that comes while another shows doesn't replace it; each ✕ closes one (live
-//! behaviours "Toasts stack; each ✕ closes one", import-into-doc-1123: one toast per imported file).
+//! One toast at a time (live dx/toast-stack-1125): a document notice that comes while another shows waits in a queue
+//! and takes the same slot when that one ends (its ≈5 s, timed by the view from when it shows, or its ✕).
 //!
 //! A view keeps its one toast slot (`Option<(kind, message)>`, set and cleared as before); [`notice`] puts a
-//! document notice there and moves the notice it replaces into the view's [`ToastStack`], drawn under the slot's
-//! bubble by [`column`].
+//! document notice there or queues it, and [`ToastQueue::pump`] (from the view's render) brings the next one up once
+//! the slot is empty. A view's own message in the slot (a hint) is replaced by a notice, not waited for.
 
-use crate::doc_model::DocModel;
-use crate::os_ui::BubbleKind;
 use gpui_kit::*;
-use std::time::{Duration, Instant};
+use std::collections::VecDeque;
 
-/// A view's stack and toast slot.
-pub type Parts<V, K> = fn(&mut V) -> (&mut ToastStack<K>, &mut Option<(K, String)>);
+/// A view's queue and toast slot.
+pub type Parts<V, K> = fn(&mut V) -> (&mut ToastQueue<K>, &mut Option<(K, String)>);
 
-/// The notices a view still shows besides its slot's, newest last.
-pub struct ToastStack<K> {
-    earlier: Vec<(u64, K, String)>,
-    /// The notice [`notice`] put in the slot, when, and how long an info notice stays (`None`: until ✕).
-    shown: Option<((K, String), Instant, Option<Duration>)>,
-    next: u64,
+/// The notices waiting for a view's slot, first in first out.
+pub struct ToastQueue<K> {
+    waiting: VecDeque<(K, String)>,
+    /// The notice the queue last put in the slot.
+    shown: Option<(K, String)>,
 }
 
-impl<K> Default for ToastStack<K> {
+impl<K> Default for ToastQueue<K> {
     fn default() -> Self {
-        Self { earlier: Vec::new(), shown: None, next: 0 }
+        Self { waiting: VecDeque::new(), shown: None }
     }
 }
 
-impl<K: Clone + PartialEq> ToastStack<K> {
-    /// The stacked notices' messages, newest first (as drawn under the slot).
+impl<K: Clone + PartialEq> ToastQueue<K> {
+    /// The waiting notices' messages, next first.
     pub fn messages(&self) -> Vec<&str> {
-        self.earlier.iter().rev().map(|(_, _, m)| m.as_str()).collect()
+        self.waiting.iter().map(|(_, m)| m.as_str()).collect()
     }
 
-    pub fn close(&mut self, id: u64) {
-        self.earlier.retain(|(i, ..)| *i != id);
-    }
-
-    /// Puts `new` in `slot`; the notice the slot showed moves into the stack. Returns the moved notice's id and how
-    /// long it has left, when it closes by itself.
-    fn push(&mut self, slot: &mut Option<(K, String)>, new: (K, String), stays: Option<Duration>, now: Instant) -> Option<(u64, Duration)> {
-        self.earlier.retain(|(_, _, m)| *m != new.1);
-        let shown = self.shown.take().filter(|(n, ..)| slot.as_ref() == Some(n) && n.1 != new.1);
-        self.shown = Some((new.clone(), now, stays));
+    /// Puts `new` in `slot`, or behind the notice the slot shows; a repeat of one shown or waiting adds nothing.
+    fn push(&mut self, slot: &mut Option<(K, String)>, new: (K, String)) {
+        if slot.as_ref() == Some(&new) || self.waiting.contains(&new) {
+            return;
+        }
+        if slot.is_some() && *slot == self.shown {
+            self.waiting.push_back(new);
+            return;
+        }
+        self.shown = Some(new.clone());
         *slot = Some(new);
-        let ((kind, msg), at, stays) = shown?;
-        let id = self.next;
-        self.next += 1;
-        self.earlier.push((id, kind, msg));
-        stays.map(|s| (id, (at + s).saturating_duration_since(now)))
+    }
+
+    /// The next waiting notice into the empty slot; whether one came up.
+    pub fn pump(&mut self, slot: &mut Option<(K, String)>) -> bool {
+        if slot.is_some() {
+            return false;
+        }
+        let Some(next) = self.waiting.pop_front() else { return false };
+        self.shown = Some(next.clone());
+        *slot = Some(next);
+        true
     }
 }
 
-/// A document notice for `view`'s toast slot (`parts` gives the stack and the slot): the notice it replaces stays,
-/// stacked, and still closes by itself when its time is up.
-pub fn notice<V: 'static, K: Clone + PartialEq + 'static>(view: &mut V, parts: Parts<V, K>, new: (K, String), stays: Option<Duration>, cx: &mut Context<V>) {
-    let (stack, slot) = parts(view);
-    let Some((id, left)) = stack.push(slot, new, stays, Instant::now()) else {
-        cx.notify();
-        return;
-    };
-    cx.spawn(async move |this, cx| {
-        cx.background_executor().timer(left).await;
-        let _ = this.update(cx, |v, cx| {
-            parts(v).0.close(id);
-            cx.notify();
-        });
-    })
-    .detach();
+/// A document notice for `view`'s toast slot (`parts` gives the queue and the slot).
+pub fn notice<V: 'static, K: Clone + PartialEq + 'static>(view: &mut V, parts: Parts<V, K>, new: (K, String), cx: &mut Context<V>) {
+    let (queue, slot) = parts(view);
+    queue.push(slot, new);
     cx.notify();
 }
 
-/// The slot's bubble with the stacked ones under it, newest first, 4 px apart; `None` when neither shows.
-pub fn column<V: 'static, K: Clone + PartialEq + 'static>(
-    top: Option<AnyElement>,
-    stack: &ToastStack<K>,
-    view: &Entity<V>,
-    parts: Parts<V, K>,
-    kind: impl Fn(&K) -> BubbleKind,
-    doc: &Entity<DocModel>,
-    cx: &App,
-) -> Option<Div> {
-    if top.is_none() && stack.earlier.is_empty() {
-        return None;
-    }
-    let earlier = stack.earlier.iter().rev().map(|(id, k, msg)| {
-        let (view, id) = (view.clone(), *id);
-        let close = move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
-            view.update(cx, |v, cx| {
-                parts(v).0.close(id);
-                cx.notify();
-            })
-        };
-        div().debug_selector(move || format!("toast-stacked-{id}")).child(crate::doc_model::notice_bubble(("toast-stacked", id as usize), kind(k), msg.clone(), doc, close, cx))
-    });
-    let top = top.map(|t| div().debug_selector(|| "toast-top".into()).child(t));
-    Some(div().flex().flex_col().items_center().gap(px(4.)).children(top).children(earlier))
+/// The slot's bubble, centred; `None` when it shows nothing.
+pub fn column(top: Option<AnyElement>) -> Option<Div> {
+    let top = top?;
+    Some(div().flex().flex_col().items_center().child(div().debug_selector(|| "toast-top".into()).child(top)))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ToastStack;
-    use std::time::{Duration, Instant};
+    use super::ToastQueue;
 
-    /// Live: a second notice stacks under the first, each keeps its own time, a repeat doesn't add a bubble, and a
-    /// slot cleared or reused by its view (a hint, ✕) has nothing to stack.
+    /// Live dx/toast-stack-1125: a second notice waits for the first to end and then takes its place; a repeat adds
+    /// nothing; a view's own message in the slot is replaced, not waited for.
     #[test]
-    fn notices_stack_and_keep_their_time() {
-        let t0 = Instant::now();
-        let mut stack = ToastStack::default();
+    fn notices_wait_their_turn_in_one_slot() {
+        let mut queue = ToastQueue::default();
         let mut slot = None;
-        assert_eq!(stack.push(&mut slot, (0, "a".into()), Some(Duration::from_secs(5)), t0), None);
-        let moved = stack.push(&mut slot, (0, "b".into()), Some(Duration::from_secs(5)), t0 + Duration::from_secs(2));
-        assert_eq!(moved.map(|m| m.1), Some(Duration::from_secs(3)));
-        assert_eq!((slot.clone().unwrap().1.as_str(), stack.messages()), ("b", vec!["a"]));
-        // An error stays until ✕.
-        assert_eq!(stack.push(&mut slot, (1, "c".into()), None, t0), Some((1, Duration::from_secs(7))));
-        assert_eq!(stack.push(&mut slot, (0, "d".into()), None, t0), None);
-        assert_eq!(stack.messages(), ["c", "b", "a"]);
-        stack.close(1);
-        assert_eq!(stack.messages(), ["c", "a"]);
-        // The same message again comes up to the slot once.
-        assert_eq!(stack.push(&mut slot, (0, "a".into()), None, t0), None);
-        assert_eq!(stack.messages(), ["d", "c"]);
-        // The view put its own message in the slot (or closed it): nothing moves.
-        slot = Some((0, "hint".into()));
-        assert_eq!(stack.push(&mut slot, (0, "e".into()), None, t0), None);
-        assert_eq!(stack.messages(), ["d", "c"]);
+        queue.push(&mut slot, (0, "a".to_string()));
+        queue.push(&mut slot, (0, "b".into()));
+        queue.push(&mut slot, (1, "c".into()));
+        queue.push(&mut slot, (0, "b".into()));
+        queue.push(&mut slot, (0, "a".into()));
+        assert_eq!((slot.clone().unwrap().1.as_str(), queue.messages()), ("a", vec!["b", "c"]));
+        assert!(!queue.pump(&mut slot), "nothing comes up while a shows");
         slot = None;
-        assert_eq!(stack.push(&mut slot, (0, "f".into()), None, t0), None);
-        assert_eq!(stack.messages(), ["d", "c"]);
+        assert!(queue.pump(&mut slot));
+        assert_eq!((slot.clone().unwrap().1.as_str(), queue.messages()), ("b", vec!["c"]));
+        slot = Some((0, "hint".into()));
+        queue.push(&mut slot, (0, "d".into()));
+        assert_eq!((slot.clone().unwrap().1.as_str(), queue.messages()), ("d", vec!["c"]));
+        slot = None;
+        assert!(queue.pump(&mut slot));
+        assert!(!queue.pump(&mut slot));
+        assert_eq!((slot.unwrap().1.as_str(), queue.messages()), ("c", Vec::<&str>::new()));
     }
 }

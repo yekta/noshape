@@ -312,6 +312,55 @@ fn sketch_undo_and_redo_follow_its_history(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (true, false));
 }
 
+/// Live psui/everyday-1125 undo scope: after ✓ one Ctrl+Z takes the whole sketch and a second does nothing (its own steps
+/// aren't on the stack), Ctrl+Y brings it back once; a re-entered sketch starts with nothing to undo, and that whole edit
+/// is one step.
+#[gpui::test]
+fn a_finished_sketch_is_one_undo_step_and_a_reentered_one_starts_empty(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sk-undo-scope", Tool::Line);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let curves = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.sketches.iter().map(|s| s.curves.len()).sum::<usize>());
+    let features = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).map_or(0, |s| s.features.len()));
+    let (n, lines) = (features(cx), curves(cx));
+    assert_eq!(lines, 1);
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    let settle = |cx: &mut TestAppContext| {
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+    };
+    let history = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.store.history(d.session.branch).unwrap().iter().take(4).map(|m| m.description.clone()).collect::<Vec<_>>());
+    let undo = |cx: &mut TestAppContext| {
+        doc.update(cx, |d, cx| d.undo(cx));
+        settle(cx);
+    };
+    let steps = history(cx);
+    undo(cx);
+    assert_eq!(features(cx), n - 1, "one undo takes the whole sketch: {steps:?}");
+    undo(cx);
+    assert_eq!(features(cx), n - 1, "its own steps aren't on the stack");
+    doc.update(cx, |d, cx| d.redo(cx));
+    settle(cx);
+    assert_eq!((features(cx), curves(cx)), (n, 1));
+    assert!(!cx.update(|cx| doc.read(cx).can_redo()), "a second redo has nothing");
+    let sketch = cx.update(|cx| view.read(cx).display.sketches[0].feature);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+    settle(cx);
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "a re-entered sketch has nothing to undo");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Line, w, cx))).unwrap();
+    click(cx, window, &view, (700., 400.));
+    click(cx, window, &view, (760., 330.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    settle(cx);
+    assert_eq!(curves(cx), 2);
+    undo(cx);
+    assert_eq!((features(cx), curves(cx)), (n, 1), "the whole edit is one step");
+}
+
 /// Live 1853: a sketch started with no plane, Top then picked: picking the
 /// plane is an undo step (Undo on), and Undo past the line un-picks it (the
 /// plane field empty again, out of the sketch editor).
@@ -4585,6 +4634,53 @@ fn a_used_up_tools_feature_appearance_has_no_row(cx: &mut TestAppContext) {
     draw(cx, window);
     let row = |cx: &mut TestAppContext, label: &str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("ap-row:{label}").into_boxed_str())).is_some();
     assert_eq!((row(cx, "Part 1"), row(cx, "Face appearance 1")), (true, false));
+}
+
+/// Live dx/face-appearance-1125: an imported STEP's face colour is a row of its own under its part, "Face of Import 1",
+/// 1 selection and its swatch; a click selects the face, a double click opens no editor, and its menu is only "Disable
+/// imported appearances", which takes the colour and the row away.
+#[gpui::test]
+fn an_imported_face_colour_has_its_row_and_only_disable_in_its_menu(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_with(cx, "import-face-row", |path| {
+        let mut ctx = noshape_ops::Ctx::new();
+        let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/face-colour.step");
+        for (tool, args) in [("document_create", serde_json::json!({ "path": path })), ("import_files", serde_json::json!({ "files": [file] }))] {
+            noshape_ops::registry::run(&mut ctx, noshape_ops::registry::by_tool_name(tool).unwrap(), &args).unwrap();
+        }
+        drop(ctx);
+        let mut s = crate::session::Session::open(path).unwrap();
+        s.doc.tabs.retain(|t| t.name != "Part Studio 1");
+        s
+    });
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().any(|b| !b.face_colors.is_empty()));
+    view.update(cx, |v, cx| {
+        v.right_panel = Some(super::super::config_panel::RightPanel::Appearance);
+        cx.notify();
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let bounds = |cx: &mut TestAppContext, sel: &str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(sel.to_string().into_boxed_str()));
+    let row = bounds(cx, "ap-row:Face of Import 1").expect("the imported face's row");
+    let red = cx.update(|cx| view.read(cx).display.bodies.iter().flat_map(|b| b.face_refs.iter().zip(&b.face_colors)).filter(|(_, c)| c.is_some()).map(|(r, _)| r.clone()).collect::<Vec<_>>());
+    assert_eq!(red.len(), 1);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(row.center(), Modifiers::default());
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).selection.clone()), red, "a click selects the face");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: row.center(), modifiers: Modifiers::default(), click_count: 2, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: row.center(), modifiers: Modifiers::default(), click_count: 2 });
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).appearance_dialog_state(cx)).is_none(), "a double click opens no editor");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Right, position: row.center(), modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Right, position: row.center(), modifiers: Modifiers::default(), click_count: 1 });
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| crate::os_menu::open_labels(cx)), vec!["Disable imported appearances".to_string()]);
+    let item = bounds(cx, "menu:Disable imported appearances").expect("the menu item");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(item.center(), Modifiers::default());
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().all(|b| b.face_colors.is_empty()));
+    draw(cx, window);
+    assert!(bounds(cx, "ap-row:Face of Import 1").is_none(), "the row goes with the colour");
 }
 
 /// Live2 nav-feel-1119: "Where used for Part 1…" carries its icon (a part with a ?) in the face, edge and vertex menus.

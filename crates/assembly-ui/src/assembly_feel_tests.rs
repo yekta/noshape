@@ -546,6 +546,42 @@ fn press(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<Assembl
     frames(cx, window, view);
 }
 
+/// live everyday-1125: a part copied in a Part Studio ("Copy Part 1") and Ctrl+V in an assembly inserts it at once,
+/// no dialog, unfixed, under the pointer; one undo removes it.
+#[gpui::test]
+fn a_copied_part_pastes_under_the_pointer(cx: &mut TestAppContext) {
+    use crate::actions::*;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = mated_blocks(cx, "paste-part-1125");
+    let (lo, hi) = screen_box(cx, &view, "Part 1 <1>");
+    let names: Vec<String> = cx.update(|cx| view.read(cx).assembly(cx).map(|a| a.instances.iter().map(|i| i.name.clone()).collect()).unwrap_or_default());
+    let left = names.iter().map(|n| screen_box(cx, &view, n).0.x).fold(lo.x, f64::min);
+    let at = DVec2::new((left - 120.0).max(40.0), (lo.y + hi.y) * 0.5);
+    move_to(cx, window, &view, at);
+    let clip = cx.update(|cx| {
+        let v = view.read(cx);
+        let s = v.catalog.studios.iter().find(|s| !s.parts.is_empty()).expect("a Part Studio with parts");
+        serde_json::json!({ "noshape_part": { "tab": s.tab.to_string(), "body": s.parts[0].0 } }).to_string()
+    });
+    cx.update(|cx| cx.write_to_clipboard(gpui_kit::ClipboardItem::new_string(clip)));
+    let count = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).map_or(0, |a| a.instances.len()));
+    let before = count(cx);
+    press(cx, window, &view, Paste);
+    assert_eq!(count(cx), before + 1, "the part is in");
+    let (name, fixed) = cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.placing.is_none(), "dropped at once");
+        let i = v.assembly(cx).and_then(|a| a.instances.last()).unwrap();
+        (i.name.clone(), i.fixed)
+    });
+    assert!(!fixed, "not fixed");
+    let (clo, chi) = screen_box(cx, &view, &name);
+    assert!(clo.x <= at.x && at.x <= chi.x && clo.y <= at.y && at.y <= chi.y, "under the pointer: {clo:?}..{chi:?} around {at:?}");
+    cx.update(|cx| view.read(cx).doc.clone().update(cx, |d, cx| d.undo(cx)));
+    frames(cx, window, &view);
+    assert_eq!(count(cx), before, "one undo removes it");
+}
+
 /// live2 shortcuts-1118 (keys pressed in live and ours): Shift+R's bar, W's prompt (Esc ends both mode and prompt),
 /// N normal to the selected face, Shift+P hides the origin (and keeps it hidden), Ctrl+C without a toast, Ctrl+V's copy
 /// at the pointer, unselected and staying there (live2 paste-1119; one undo removes it), Shift+S keeps the selection with

@@ -112,7 +112,7 @@ pub struct Workspace {
     /// of their own (Variable / Feature Studio, Material Library, file tabs).
     toast: Option<(crate::ui::AlertKind, String)>,
     /// Notices `toast` showed before the newest, still open (live: toasts stack).
-    toasts: noshape_app_core::toasts::ToastStack<crate::ui::AlertKind>,
+    toasts: noshape_app_core::toasts::ToastQueue<crate::ui::AlertKind>,
     _subs: Vec<Subscription>,
 }
 
@@ -145,22 +145,9 @@ impl Workspace {
             DocEvent::Error(msg) | DocEvent::Info(msg) => {
                 let info = matches!(ev, DocEvent::Info(_));
                 let kind = if info { crate::ui::AlertKind::Info } else { crate::ui::AlertKind::Error };
-                // An info bubble hides by itself after ≈4.4 s (live TOAST-AUTOHIDE); an error stays until ×.
-                // A notice with a link stays as long as it says (live 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
-                let stays = this.doc.read(cx).notice_link(msg).map_or(std::time::Duration::from_millis(4400), |l| l.stays);
-                noshape_app_core::toasts::notice(this, Self::toast_parts, (kind, msg.clone()), info.then_some(stays), cx);
-                if info {
-                    let msg = msg.clone();
-                    cx.spawn(async move |this, cx| {
-                        cx.background_executor().timer(stays).await;
-                        let _ = this.update(cx, |this, cx| {
-                            if this.toast.as_ref().is_some_and(|(_, m)| *m == msg) {
-                                this.toast = None;
-                                cx.notify();
-                            }
-                        });
-                    })
-                    .detach();
+                noshape_app_core::toasts::notice(this, Self::toast_parts, (kind, msg.clone()), cx);
+                if this.toast.as_ref() == Some(&(kind, msg.clone())) {
+                    this.time_toast(cx);
                 }
                 cx.notify();
             }
@@ -2436,6 +2423,10 @@ impl Workspace {
 
 impl Render for Workspace {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The next waiting notice once the toast is gone (live dx/toast-stack-1125).
+        if self.toasts.pump(&mut self.toast) {
+            self.time_toast(cx);
+        }
         // The window has drawn: the viewport's shaders compile now.
         static FIRST: std::sync::Once = std::sync::Once::new();
         FIRST.call_once(|| {
@@ -2828,7 +2819,7 @@ impl Workspace {
             .into_any_element()
         });
         let said = self.toast.as_ref().map(|(_, msg)| crate::doc_model::notice_text(&self.doc, msg.clone(), cx));
-        let toasts = noshape_app_core::toasts::column(top, &self.toasts, &ws, Self::toast_parts, |k| (*k).into(), &self.doc, cx)?;
+        let toasts = noshape_app_core::toasts::column(top)?;
         Some(
             div()
                 .absolute()
@@ -2846,14 +2837,37 @@ impl Workspace {
         )
     }
 
-    fn toast_parts(&mut self) -> (&mut noshape_app_core::toasts::ToastStack<crate::ui::AlertKind>, &mut Option<(crate::ui::AlertKind, String)>) {
+    fn toast_parts(&mut self) -> (&mut noshape_app_core::toasts::ToastQueue<crate::ui::AlertKind>, &mut Option<(crate::ui::AlertKind, String)>) {
         (&mut self.toasts, &mut self.toast)
     }
 
-    /// The stacked notices under the toast, newest first.
+    /// The notices waiting for the toast, next first.
     #[cfg(test)]
-    pub(crate) fn stacked_toasts(&self) -> Vec<&str> {
+    pub(crate) fn waiting_toasts(&self) -> Vec<&str> {
         self.toasts.messages()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shown_toast(&self) -> Option<&str> {
+        self.toast.as_ref().map(|(_, m)| m.as_str())
+    }
+
+    /// An info bubble hides by itself ≈4.4 s after it shows (live TOAST-AUTOHIDE; a waiting one's time starts when it
+    /// comes up, live dx/toast-stack-1125); an error stays until ×. A notice with a link stays as long as it says (live
+    /// 2351: Merge ≈ 35 s; ws-1118: Deleted workspace ≈ 30 s).
+    fn time_toast(&mut self, cx: &mut Context<Self>) {
+        let Some((crate::ui::AlertKind::Info, msg)) = self.toast.clone() else { return };
+        let stays = self.doc.read(cx).notice_link(&msg).map_or(std::time::Duration::from_millis(4400), |l| l.stays);
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(stays).await;
+            let _ = this.update(cx, |this, cx| {
+                if this.toast.as_ref().is_some_and(|(_, m)| *m == msg) {
+                    this.toast = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     /// Whether a Feature Studio's committed source has compile errors: the last answer, compiled again in the

@@ -1294,15 +1294,25 @@ impl AssemblyView {
             distance: mk(d, first, window, cx),
             count: {
                 let q = mk(n, count(), window, cx);
-                let flip = self.pattern_flip_focus.clone();
+                let flip = self.pattern_flip_focus[0].clone();
                 q.update(cx, |q, _| q.set_companion_focus(flip));
                 q
             },
             // Live 2204: the further directions default as the first (distance and count).
             distance2: mk(noshape_ops::assembly::pattern_defaults(false).0, QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
-            count2: mk("2", count(), window, cx),
+            count2: {
+                let q = mk("2", count(), window, cx);
+                let flip = self.pattern_flip_focus[1].clone();
+                q.update(cx, |q, _| q.set_companion_focus(flip));
+                q
+            },
             distance3: mk(noshape_ops::assembly::pattern_defaults(false).0, QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
-            count3: mk("2", count(), window, cx),
+            count3: {
+                let q = mk("2", count(), window, cx);
+                let flip = self.pattern_flip_focus[2].clone();
+                q.update(cx, |q, _| q.set_companion_focus(flip));
+                q
+            },
             _field_subs: subs,
             opposite: false,
             opposite2: false,
@@ -1827,8 +1837,8 @@ impl AssemblyView {
             div()
                 .id(id)
                 // Tabbed to from Instance count: a 2 px #1651b0 underline (live wf23 04 s9 / 05 s18), as Part Studio's flips.
-                .when(id == "pat-opp", |d| {
-                    d.track_focus(&flip_focus).focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(-2.)), blur_radius: px(0.), spread_radius: px(0.), inset: true }]))
+                .when_some(["pat-opp", "pat-opp2", "pat-opp3"].iter().position(|f| *f == id), |d, n| {
+                    d.track_focus(&flip_focus[n]).focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(-2.)), blur_radius: px(0.), spread_radius: px(0.), inset: true }]))
                 })
                 .flex_none()
                 .size(px(26.))
@@ -1903,10 +1913,20 @@ impl AssemblyView {
             };
             let icon = if opposite { "flip-direction" } else { "flip-direction-opposite" };
             let ids: [&'static str; 4] = if n == 1 { ["pat-axis2", "pat-opp2", "pat-eq2", "pat-centered2"] } else { ["pat-axis3", "pat-opp3", "pat-eq3", "pat-centered3"] };
+            // Tab from this direction's Instance count: the keyboard on its own flip (live wf23 05 s18).
+            let count_row = div()
+                .key_context("PatternCount")
+                .on_action(cx.listener(move |this, _: &PatternCountTab, window, cx| {
+                    this.ui.checkbox_focus = Some("");
+                    window.focus(&this.pattern_flip_focus[n], cx);
+                    cx.notify();
+                }))
+                .child(value_row("Instance count", count, n))
+                .into_any_element();
             body.child(div().px(px(3.)).pt(px(5.)).child(axis_box(this, ids[0], axis, "Direction", n, cx)))
                 .child(div().h(px(5.)))
                 .child(if n == 1 { configurable(this, "pat-cfg-distance2", distance, length_row("Distance", distance, n, cx).into_any_element(), noshape_model::assembly::config::param::DISTANCE_2, cx) } else { length_row("Distance", distance, n, cx).into_any_element() })
-                .child(h_flex().child(if n == 1 { configurable(this, "pat-cfg-count2", count, value_row("Instance count", count, n).into_any_element(), noshape_model::assembly::config::param::COUNT_2, cx) } else { value_row("Instance count", count, n).into_any_element() }).child(toggle(ids[1], icon, opposite, cx, flip)))
+                .child(h_flex().child(if n == 1 { configurable(this, "pat-cfg-count2", count, count_row, noshape_model::assembly::config::param::COUNT_2, cx) } else { count_row }).child(toggle(ids[1], icon, opposite, cx, flip)))
                 .child(os::checkbox(ids[2], "Equal spacing", equal).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         p.note_toggle();
@@ -1948,7 +1968,7 @@ impl AssemblyView {
                     .key_context("PatternCount")
                     .on_action(cx.listener(|this, _: &PatternCountTab, window, cx| {
                         this.ui.checkbox_focus = Some("");
-                        window.focus(&this.pattern_flip_focus, cx);
+                        window.focus(&this.pattern_flip_focus[0], cx);
                         cx.notify();
                     }))
                     .child(value_row("Instance count", &s.count, 0))

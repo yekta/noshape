@@ -702,7 +702,7 @@ fn a_small_circles_region_lights_in_a_region_field(cx: &mut TestAppContext) {
 
 /// qa FLOW-REGION-UNDER-FACE-PICK (enclosure flow cell 61; live behaviours.md: a sketch region on a part's face wins
 /// over the face under it): an open box's rim sketched over with a larger rectangle; in Extrude the rim's region
-/// lights and is picked, not the rim face under it.
+/// lights and is picked, not the rim face under it, and so is the ring beside the box once the preview covers it.
 #[gpui::test]
 fn a_sketch_region_on_a_rim_face_wins_over_the_face(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -723,7 +723,7 @@ fn a_sketch_region_on_a_rim_face_wins_over_the_face(cx: &mut TestAppContext) {
             call(ctx, "feature_add", serde_json::json!({ "type": "shell", "params": { "entities": { "query": { "kind": "faces", "at": [[30, 20, 30]] } }, "thickness": "2 mm" } }));
             let rim = call(ctx, "query_entities", serde_json::json!({ "kind": "faces", "at": [[1, 20, 30]] }))["faces"][0]["id"].clone();
             let s2 = call(ctx, "sketch_create", serde_json::json!({ "plane": rim }))["sketch"].clone();
-            call(ctx, "sketch_draw", serde_json::json!({ "sketch": s2, "tool": "corner_rectangle", "points": [[-2, -2, 30], [62, 42, 30]] }));
+            call(ctx, "sketch_draw", serde_json::json!({ "sketch": s2, "tool": "corner_rectangle", "points": [[-6, -6, 30], [66, 46, 30]] }));
         }
         crate::session::Session::open(path).unwrap()
     });
@@ -734,7 +734,7 @@ fn a_sketch_region_on_a_rim_face_wins_over_the_face(cx: &mut TestAppContext) {
     let pointer = Pointer::new(cx, window, &view);
     let mut wrong = Vec::new();
     let on_screen = |cx: &mut TestAppContext, p: [f64; 3]| cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::from_array(p) * 0.001)).expect("on screen");
-    for (what, p) in [("the rim", [1., 20., 30.]), ("the rim's far side", [59., 20., 30.]), ("the opening", [30., 20., 30.])] {
+    for (what, p) in [("the rim", [1., 20., 30.]), ("the rim's far side", [59., 20., 30.]), ("the opening", [30., 20., 30.]), ("the outer ring", [-1., 20., 30.])] {
         let at = on_screen(cx, p);
         pointer.move_to(cx, &view, at);
         let got = hovered(cx, &view);
@@ -742,9 +742,16 @@ fn a_sketch_region_on_a_rim_face_wins_over_the_face(cx: &mut TestAppContext) {
             wrong.push(format!("{what}: lit {got:?}, not a region of Sketch 2"));
         }
     }
-    // As qa's flow: the opening first, then the rim.
-    for p in [[30., 20., 30.], [1., 20., 30.]] {
+    // As qa's flow: the opening first, then the rim, then the ring beside the box (over the preview, no part face behind).
+    for p in [[30., 20., 30.], [1., 20., 30.], [-1., 20., 30.]] {
         let at = on_screen(cx, p);
+        pointer.move_to(cx, &view, at);
+        pointer.move_to(cx, &view, at + DVec2::new(1.0, 0.0));
+        pointer.move_to(cx, &view, at);
+        let got = hovered(cx, &view);
+        if !matches!(&got, Some(Reference::SketchRegion { sketch: s, .. }) if *s == sketch) {
+            wrong.push(format!("{p:?} in Extrude: lit {got:?}, not a region of Sketch 2"));
+        }
         pointer.click(cx, &view, at);
         wait_until(cx, window, |cx| !view.read(cx).ui_busy());
         let rim = on_screen(cx, [1., 20., 30.]);
@@ -755,8 +762,8 @@ fn a_sketch_region_on_a_rim_face_wins_over_the_face(cx: &mut TestAppContext) {
         Some(noshape_model::params::ParamValue::Query(refs)) => refs,
         _ => Vec::new(),
     });
-    if !(picked.len() == 2 && picked.iter().all(|r| matches!(r, Reference::SketchRegion { sketch: s, .. } if *s == sketch))) {
-        wrong.push(format!("the clicks on the opening and the rim put {picked:?} in the field, not two regions"));
+    if !(picked.len() == 3 && picked.iter().all(|r| matches!(r, Reference::SketchRegion { sketch: s, .. } if *s == sketch))) {
+        wrong.push(format!("the clicks on the opening, the rim and the outer ring put {picked:?} in the field, not three regions"));
     }
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

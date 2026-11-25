@@ -287,23 +287,29 @@ fn an_import_translates_off_the_ui_thread_and_bubbles_as_live(cx: &mut TestAppCo
     let at = after.iter().position(|n| n == "C").unwrap();
     assert_eq!(after[at + 1..at + 4], ["plate", "block (1)", "block"], "{after:?}");
     assert!(doc.read_with(cx, |d, _| d.notice_link("plate.step has been imported.").is_some()));
-    // Live: toasts stack and each × closes one. block's bubble, still green with its link, stays under plate's.
-    assert_eq!(cx.update(|cx| ws.read(cx).stacked_toasts().iter().map(|m| m.to_string()).collect::<Vec<_>>()), ["block.step has been imported."]);
+    // Live dx/toast-stack-1125: one toast at a time; plate's waits for block's and takes its place when it ends (its ×).
+    assert_eq!(cx.update(|cx| ws.read(cx).waiting_toasts().iter().map(|m| m.to_string()).collect::<Vec<_>>()), ["plate.step has been imported."]);
     assert!(doc.read_with(cx, |d, _| d.notice_link("block.step has been imported.").is_some_and(|l| l.kind == Some(crate::os_ui::BubbleKind::Success))));
     draw(cx, w);
     let mut vcx = VisualTestContext::from_window(w, cx);
-    let under = vcx.debug_bounds("toast-stacked-0").expect("block's bubble under plate's");
-    let top = vcx.debug_bounds("toast-top").expect("plate's bubble");
-    assert!(under.top() > top.bottom(), "the earlier bubble under the newer: {under:?} {top:?}");
-    vcx.simulate_click(Point { x: under.right() - px(11.), y: under.center().y }, Modifiers::default());
+    let top = vcx.debug_bounds("toast-top").expect("block's bubble");
+    assert_eq!(cx.update(|cx| ws.read(cx).shown_toast().map(str::to_string)).as_deref(), Some("block.step has been imported."));
+    let mut vcx = VisualTestContext::from_window(w, cx);
+    vcx.simulate_click(Point { x: top.right() - px(11.), y: top.center().y }, Modifiers::default());
     draw(cx, w);
     let mut vcx = VisualTestContext::from_window(w, cx);
-    assert!(vcx.debug_bounds("toast-stacked-0").is_none(), "its × closed it");
-    assert!(vcx.debug_bounds("toast-top").is_some(), "plate's bubble stays");
+    let now = vcx.debug_bounds("toast-top").expect("plate's bubble in its place");
+    assert_eq!((now.top(), cx.update(|cx| ws.read(cx).shown_toast().map(str::to_string)).as_deref()), (top.top(), Some("plate.step has been imported.")));
+    assert!(cx.update(|cx| ws.read(cx).waiting_toasts().is_empty()));
     cx.update(|cx| crate::import_dialog::import(&doc, std::slice::from_ref(&broken), Default::default(), Some(c), true, cx));
     cx.run_until_parked();
     assert!(kept(cx, "broken.step"), "a file that didn't translate is kept too");
     assert!(doc.read_with(cx, |d, _| d.notice_link("broken.step uploaded but failed to translate.").is_some_and(|l| l.label == "Open document")));
+    // It waits for plate's bubble to end (live dx/toast-stack-1125), then comes up in its place.
+    assert_eq!(cx.update(|cx| ws.read(cx).waiting_toasts().iter().map(|m| m.to_string()).collect::<Vec<_>>()), ["broken.step uploaded but failed to translate."]);
+    cx.executor().advance_clock(std::time::Duration::from_secs(60));
+    cx.run_until_parked();
+    draw(cx, w);
     let red = cx.update(|cx| ws.read(cx).toast().is_some_and(|(k, m)| *k == crate::ui::AlertKind::Error && m == "broken.step uploaded but failed to translate."));
     assert!(red, "live's red bubble (rr-import-1118), not the info one");
     let _ = std::fs::remove_dir_all(&dir);

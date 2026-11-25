@@ -580,7 +580,7 @@ pub struct AssemblyView {
     expanded: HashSet<Vec<InstanceId>>,
     message: Option<(bool, String)>,
     /// Notices `message` showed before the newest, still open (live: toasts stack).
-    toasts: crate::toasts::ToastStack<bool>,
+    toasts: crate::toasts::ToastQueue<bool>,
     /// Assembly mate connector dialog.
     mc: Option<McSession>,
     /// Pattern / mirror / replicate dialog.
@@ -622,7 +622,8 @@ pub struct AssemblyView {
     ext_checking: HashSet<String>,
     focus: FocusHandle,
     /// A linear / circular pattern's flip icon, Tab's stop after Instance count.
-    pattern_flip_focus: FocusHandle,
+    /// Each pattern direction's flip icon, tabbed to from its Instance count.
+    pattern_flip_focus: [FocusHandle; 3],
     fitted_once: bool,
     _subs: Vec<Subscription>,
 }
@@ -672,7 +673,7 @@ fn asm_bubble_kind(err: &bool) -> crate::os_ui::BubbleKind {
 }
 
 impl AssemblyView {
-    fn toast_parts(&mut self) -> (&mut crate::toasts::ToastStack<bool>, &mut Option<(bool, String)>) {
+    fn toast_parts(&mut self) -> (&mut crate::toasts::ToastQueue<bool>, &mut Option<(bool, String)>) {
         (&mut self.toasts, &mut self.message)
     }
 
@@ -770,8 +771,8 @@ impl AssemblyView {
                 cx.notify();
                 this.schedule_eval(window, cx)
             }
-            DocEvent::Error(msg) => crate::toasts::notice(this, Self::toast_parts, (true, msg.clone()), None, cx),
-            DocEvent::Info(msg) => crate::toasts::notice(this, Self::toast_parts, (false, msg.clone()), Some(Duration::from_secs(5)), cx),
+            DocEvent::Error(msg) => crate::toasts::notice(this, Self::toast_parts, (true, msg.clone()), cx),
+            DocEvent::Info(msg) => crate::toasts::notice(this, Self::toast_parts, (false, msg.clone()), cx),
             _ => {}
         }));
         let mut this = Self {
@@ -853,7 +854,7 @@ impl AssemblyView {
             ext_updates: HashMap::new(),
             ext_checking: HashSet::new(),
             focus: cx.focus_handle(),
-            pattern_flip_focus: cx.focus_handle(),
+            pattern_flip_focus: [cx.focus_handle(), cx.focus_handle(), cx.focus_handle()],
             fitted_once: false,
             _subs: subs,
         };
@@ -1161,6 +1162,9 @@ impl AssemblyView {
             // Re-apply display-only state (explode playback, cursor placement).
             self.update_placing(cx);
             self.apply_display(cx);
+            if std::mem::take(&mut self.ui.drop_on_result) {
+                self.drop_when_placed(cx);
+            }
         }
         self.update_pattern_preview(cx);
         // Only placements changed (a mate dialog's preview, a solve): the
@@ -2125,6 +2129,12 @@ impl AssemblyView {
             cx.notify();
             return;
         }
+        self.follow_pointer(ids, cx);
+    }
+
+    /// Instances following the cursor until a click; a paste places them under the pointer at once, into an empty
+    /// assembly too (live everyday-1125: "Part 1 <1>" at the pointer's projection).
+    pub(super) fn follow_pointer(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
         // Live Onshape: the instance following the cursor is selected (amber),
         // and deselected once it is placed (assembly/04, 06).
         self.selected = ids.clone();
@@ -2348,6 +2358,7 @@ impl AssemblyView {
     /// The instances being placed stay where they are now, unselected, their drop joining their insert's undo step
     /// (a paste: live2 paste-1119).
     pub(super) fn drop_placing(&mut self, cx: &mut Context<Self>) {
+        self.ui.drop_on_result = false;
         let Some(ids) = self.placing.take() else { return };
         self.placing_point = None;
         self.ui.place_snap = None;
@@ -2362,6 +2373,7 @@ impl AssemblyView {
     }
 
     fn finish_placing(&mut self, commit: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.ui.drop_on_result = false;
         let Some(ids) = self.placing.take() else { return };
         self.placing_point = None;
         self.message = None;
@@ -7129,6 +7141,8 @@ impl AssemblyView {
         if self.explode.is_some() && !self.explode_edit {
             out.push(div().absolute().bottom_3().right_3().px_2().py_1().rounded_md().bg(with_alpha(pal.accent, 0.25)).text_xs().child("Exploded view").into_any_element());
         }
+        // The next waiting notice once the slot is empty (live dx/toast-stack-1125).
+        self.toasts.pump(&mut self.message);
         let mut top = None;
         if let Some((err, msg)) = self.message.clone() {
             // Info notices fade after 5 s like the Part Studio's (errors stay until dismissed; qa4: a notice must not
@@ -7161,7 +7175,7 @@ impl AssemblyView {
                 .into_any_element(),
             );
         }
-        if let Some(toasts) = crate::toasts::column(top, &self.toasts, &cx.entity(), Self::toast_parts, asm_bubble_kind, &self.doc, cx) {
+        if let Some(toasts) = crate::toasts::column(top) {
             out.push(
                 div()
                     .absolute()

@@ -315,6 +315,22 @@ fn the_instance_and_top_row_menus_are_lives(cx: &mut TestAppContext) {
                     "Expand all", "Collapse all",
                 ]
             );
+            // A suppressed instance's row (live asm-everyday-1125, less "Create task…" and "Add comment"): Unsuppress, and
+            // no center of mass, Isolate, Make transparent, Edit in context, Replace, Export or Zoom to selection.
+            v.edit("Suppress", cx, |a| a.instances.iter_mut().filter(|i| i.id == p1).for_each(|i| i.suppressed = true));
+            assert_eq!(
+                labels(&v.instance_menu(p1, false, cx)),
+                [
+                    "Properties…", "Instance properties…", sep,
+                    "Hide", "Hide other instances", "Hide all instances", "Unsuppress", "Dynamic suppression ▸", "Fix", "Use best available tessellation", sep,
+                    "Add mate connector to instance origin…", "Switch to Part Studio 1", sep,
+                    "Copy Part 1 <1>", sep,
+                    "Move to new subassembly", "Change to version…", "Where used…", sep,
+                    "Create Drawing of Part 1…", sep,
+                    "Add selection to folder…", "Create empty subassembly", sep,
+                    "Delete",
+                ]
+            );
         })
     })
     .unwrap();
@@ -1845,7 +1861,8 @@ fn a_zero_pattern_distance_is_marked_invalid(cx: &mut TestAppContext) {
 }
 
 /// FEEL-TAB-TO-FLIP-FOCUS (live workflows-1123 04 s9, 05 s18): Tab from a linear / circular pattern's Instance count
-/// puts the keyboard on the flip icon beside it (its 2 px #1651b0 underline, the count's 1 px line blue).
+/// puts the keyboard on the flip icon beside it (its 2 px #1651b0 underline, the count's 1 px line blue); the second
+/// direction's count on its own flip.
 #[gpui::test]
 fn tab_from_a_patterns_instance_count_focuses_its_flip(cx: &mut TestAppContext) {
     use gpui_kit::Focusable as _;
@@ -1866,14 +1883,34 @@ fn tab_from_a_patterns_instance_count_focuses_its_flip(cx: &mut TestAppContext) 
         .unwrap();
         draw(cx, window);
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
-        let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus.is_focused(w));
+        let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus[0].is_focused(w));
         assert!(!flip, "{kind:?}: the count has the keyboard first");
         vcx.simulate_keystrokes("tab");
-        let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus.is_focused(w));
+        let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus[0].is_focused(w));
         assert!(flip, "{kind:?}: Tab from Instance count puts the keyboard on the flip");
         let line = vcx.update(|w, cx| view.read(cx).pattern.as_ref().unwrap().count.read(cx).companion_focused(w));
         assert!(line, "{kind:?}: the count's underline blue while its flip has the keyboard");
     }
+    // The second direction's count tabs to its own flip (live wf23 05 s18), not the first's.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.open_pattern(super::PatternDialogKind::Linear, w, cx);
+            v.pattern.as_mut().unwrap().second = true;
+            cx.notify();
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        let count = view.read(cx).pattern.as_ref().unwrap().count2.read(cx).state().read(cx).focus_handle(cx);
+        w.focus(&count, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("tab");
+    let (first, second) = vcx.update(|w, cx| (view.read(cx).pattern_flip_focus[0].is_focused(w), view.read(cx).pattern_flip_focus[1].is_focused(w)));
+    assert!(second && !first, "Tab from the second direction's count puts the keyboard on its flip (first {first}, second {second})");
 }
 
 /// Live snapmode-1118 / snap-diag-1118: Esc during a snap-mode drag doesn't cancel it; off every part the connector

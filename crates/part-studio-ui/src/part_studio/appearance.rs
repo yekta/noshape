@@ -1232,6 +1232,7 @@ impl PartStudioView {
                 let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut face_rows).into_iter().partition(|(o, _)| o.as_ref() == Some(&body.id));
                 face_rows = rest;
                 rows.extend(mine.into_iter().map(|(_, e)| e));
+                rows.extend(self.imported_face_rows(body, &face_row, &names, cx));
             }
         }
         rows.extend(face_rows.into_iter().map(|(_, e)| e));
@@ -1293,6 +1294,55 @@ impl PartStudioView {
     }
 
     /// The "Add face appearance" button at the right of the Appearances title.
+    /// An import's face colours under their part, one row per import and colour (live dx/face-appearance-1125: "Face of
+    /// Import 1", 1 selection, its swatch): a click selects the faces, a double click opens nothing, and the only menu
+    /// item is "Disable imported appearances".
+    fn imported_face_rows(&self, body: &noshape_model::display::BodyDisplay, face_row: &impl Fn(SharedString, [f32; 4], String, usize, bool) -> Stateful<Div>, names: &crate::feature_dialog::RefLabeler, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let mut groups: Vec<(FeatureId, [f32; 4], Vec<Reference>)> = Vec::new();
+        for (r, c) in body.face_refs.iter().zip(&body.face_colors) {
+            let (Some(c), Reference::Face(n)) = (c, r) else { continue };
+            let Some(f) = n.creator() else { continue };
+            match groups.iter_mut().find(|g| g.0 == f && g.1 == *c) {
+                Some(g) => g.2.push(r.clone()),
+                None => groups.push((f, *c, vec![r.clone()])),
+            }
+        }
+        groups
+            .into_iter()
+            .enumerate()
+            .map(|(k, (f, color, faces))| {
+                let (hover, pick, view) = (faces.clone(), faces.clone(), cx.entity());
+                face_row(SharedString::from(format!("ap-import-{}-{k}", body.id)), color, format!("Face of {}", names(&Reference::Feature(f))), faces.len(), false)
+                    .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        this.ui.appearance_hover = if *h { hover.clone() } else { Vec::new() };
+                        this.refresh_scene(false, cx);
+                    }))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        this.selection = pick.clone();
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    }))
+                    .os_context_menu(move |m, _, _| {
+                        let v = view.clone();
+                        m.item(crate::os_menu::OsMenuItem::new("Disable imported appearances").on_click(move |_, _, cx| v.update(cx, |this, cx| this.disable_imported_appearances(f, cx))))
+                    })
+                    .into_any_element()
+            })
+            .collect()
+    }
+
+    /// Sets the import's Import appearances off: its faces and parts lose the file's colours (a part coloured in the
+    /// Part Studio keeps its own, live dx/face-appearance-1125).
+    fn disable_imported_appearances(&mut self, f: FeatureId, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, "Disable imported appearances", cx, |ps| {
+                if let Some(feature) = ps.features.iter_mut().find(|x| x.id == f) {
+                    feature.params.set("importAppearances", noshape_model::params::ParamValue::Bool(false));
+                }
+            });
+        });
+    }
+
     pub(super) fn render_add_face_appearance(&mut self, cx: &mut Context<Self>) -> AnyElement {
         div()
             .id("ap-add-face")

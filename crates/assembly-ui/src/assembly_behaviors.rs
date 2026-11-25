@@ -458,6 +458,8 @@ pub struct AsmUi {
     pub place_snap: Option<(MateConnectorRef, MateConnectorRef)>,
     /// The pointer moved over the graphics area since placing started.
     pub place_moved: bool,
+    /// A pasted part waits for its solve to drop under the pointer (its bounds aren't known before).
+    pub drop_on_result: bool,
     /// The instances being placed: their rotations when placing started (a free placement keeps them; a snap's
     /// orientation doesn't outlast the snap, live asm-standard-content-edit-instance).
     pub place_rotations: Vec<(InstanceId, [f64; 4])>,
@@ -1016,19 +1018,19 @@ impl AssemblyView {
     pub(super) fn paste_instances(&mut self, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
         let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return };
-        // A part copied in a Part Studio (Ctrl+C or "Copy Part N"): inserted
-        // at once, no dialog, where Insert puts it (live, behaviours "skasm
-        // (2026-10-31, P3 workflow-derived rows 29 / 30)" b-8).
+        // A part copied in a Part Studio (Ctrl+C or "Copy Part N"): inserted at once, no dialog, unfixed, under the
+        // pointer, one undo step (live everyday-1125, behaviours "skasm (2026-10-31, P3 workflow-derived rows 29 / 30)"
+        // b-8).
         if let Some(p) = v.get("noshape_part") {
             let studio = p.get("tab").and_then(|t| t.as_str()).and_then(|t| u64::from_str_radix(t, 16).ok()).map(TabId);
             let body = p.get("body").and_then(|b| serde_json::from_value::<BodyId>(b.clone()).ok());
             let part = studio.zip(body).and_then(|(t, b)| Some((t, self.catalog.studios.iter().find(|s| s.tab == t)?.parts.iter().find(|p| p.0 == b)?.clone())));
             if let Some((studio, part)) = part
-                && self.insert_part(studio, Some(part), cx).is_some()
+                && let Some(id) = self.insert_part(studio, Some(part), cx)
             {
-                self.end_insert_step(cx);
-                self.refresh_scene(false, cx);
-                cx.notify();
+                self.follow_pointer(vec![id], cx);
+                self.place_at_pointer(cx);
+                self.drop_when_placed(cx);
             }
             return;
         }
@@ -1053,6 +1055,16 @@ impl AssemblyView {
         self.start_placing(ids, cx);
         self.place_at_pointer(cx);
         self.drop_placing(cx);
+    }
+
+    /// Drops what is being placed once it is under the pointer: at once, or when its first solve gives its bounds.
+    pub(super) fn drop_when_placed(&mut self, cx: &mut Context<Self>) {
+        let solved = self.placing.as_ref().is_some_and(|ids| ids.iter().all(|id| self.result.instance_bounds(*id).is_some()));
+        if solved || !self.ui.place_moved {
+            self.drop_placing(cx);
+        } else {
+            self.ui.drop_on_result = true;
+        }
     }
 
     // ------------------------------------------------------------ rename
@@ -1601,13 +1613,14 @@ impl AssemblyView {
             InstanceSource::Part { studio, body, .. } if !multi => Some((*studio, body.clone())),
             _ => None,
         };
+        // A suppressed one keeps Where used… (live asm-everyday-1125).
         if !suppressed {
             m.push(export);
-            if let Some((studio, body)) = part.clone() {
-                where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, body.clone()))));
-            }
-            m.extend(where_used);
         }
+        if let Some((studio, body)) = part.clone() {
+            where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, body.clone()))));
+        }
+        m.extend(where_used);
         if let Some((studio, body)) = part.filter(|_| noshape_ops::release_settings::managed_workflows()) {
             m.push(item("Revision history…", move |t, w, cx| crate::assembly_hooks::open_part_revision_history(t.doc.clone(), studio, body.clone(), w, cx)));
         }
