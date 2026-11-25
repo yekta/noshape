@@ -7695,21 +7695,21 @@ Examples:
 
 Save or delete a named view of a Part Studio or an Assembly (edits the document (one undoable history entry)).
 
-The Named views dialog's "+" (save the view: the window's camera with `view: "window"`, else a standard orientation zoomed to fit; with an optional section like render_image's) or its remove button (`delete`). An empty name gives "View 1", "View 2"... Not undo steps, as in the app. render_image and view_camera (`view`) take named views; drawing_insert_view a Part Studio's.
+The Named views dialog's "+" (save the view: the window's camera with `view: "window"`, else a standard orientation zoomed to fit; with an optional section like render_image's) or its remove button (`delete`). An empty name or a used one saves nothing, as in the app. Not undo steps, as in the app. render_image and view_camera (`view`) take named views; drawing_insert_view a Part Studio's.
 
 Examples:
 
 ```json
 {"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}
 {"name": "Section A", "delete": true}
-{"tab": "Assembly 1", "name": "", "view": "window"}
+{"tab": "Assembly 1", "name": "Top", "view": "window"}
 ```
 
 | field | type | | description |
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
-| `name` | string | required | View name (empty: the next "View n"). |
+| `name` | string | required | View name: not empty, not one the tab has already. |
 | `view` | string |  | What to save: "window" (the window's camera, view_camera) or a standard orientation zoomed to fit (default isometric). |
 | `section` | array of object |  | Section planes saved with the view (as render_image). |
 | `delete` | boolean |  | Delete the named view instead. |

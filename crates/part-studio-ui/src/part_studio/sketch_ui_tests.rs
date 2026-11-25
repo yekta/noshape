@@ -8465,7 +8465,7 @@ fn a_saved_named_view_is_the_picked_one(cx: &mut TestAppContext) {
     let (window, view) = part_studio_from(cx, "named-view-saved", None);
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     draw(cx, window);
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_named_views(w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_named_views(w, cx))).unwrap();
     draw(cx, window);
     assert!(cx.update(|cx| view.read(cx).named_views.is_some()), "Named views open");
     keys(cx, window, &["w", "7", "enter"]);
@@ -8474,6 +8474,37 @@ fn a_saved_named_view_is_the_picked_one(cx: &mut TestAppContext) {
         (v.named_view_picked.clone(), v.named_views.as_ref().map(|(st, _)| st.read(cx).value().to_string()))
     });
     assert_eq!((picked.as_deref(), typed.as_deref()), (Some("w7"), Some("")), "the select reads w7, the field empty");
+}
+
+/// Live display-modes-1125: Named views again (Shift+V) leaves it open; Enter on a blank name saves nothing, on a used one
+/// shows "Name is already in use. New view not saved." and keeps the text until the field is cleared; new views go
+/// last (not sorted).
+#[gpui::test]
+fn named_views_refuse_blank_and_used_names(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_from(cx, "named-view-names", None);
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    // (Shift+V's action, twice.)
+    for _ in 0..2 {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_named_views(w, cx))).unwrap();
+        draw(cx, window);
+    }
+    assert!(cx.update(|cx| view.read(cx).named_views.is_some()), "Shift+V twice: still open");
+    let state = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let names: Vec<String> = v.studio(cx).map(|s| s.named_views.iter().map(|n| n.name.clone()).collect()).unwrap_or_default();
+            (names.join(","), v.named_view_taken, v.named_views.as_ref().map(|(st, _)| st.read(cx).value().to_string()).unwrap_or_default())
+        })
+    };
+    keys(cx, window, &["space", "enter"]);
+    assert_eq!(state(cx), (String::new(), false, " ".into()), "a blank name saves nothing");
+    keys(cx, window, &["backspace", "z", "enter", "a", "enter"]);
+    assert_eq!(state(cx), ("z,a".into(), false, String::new()), "in the order saved");
+    keys(cx, window, &["z", "enter"]);
+    assert_eq!(state(cx), ("z,a".into(), true, "z".into()), "a used name: the alert, the text kept");
+    keys(cx, window, &["backspace"]);
+    assert_eq!(state(cx), ("z,a".into(), false, String::new()), "the alert goes with the text");
 }
 
 /// Live shortcuts-sk-1118 / sketch-readout-1119: Shift+C in a sketch with no tool on selects the analysed line in the

@@ -403,38 +403,57 @@ impl PartStudioView {
         }
     }
 
-    pub(super) fn toggle_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.named_views.take().is_some() {
-            window.focus(&self.focus, cx);
-        } else {
-            // Live (qa5 KB2): Esc in "New view name" closes the panel at
-            // once, with no revert step (the panel's Escape below).
-            let st = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
-            let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
-                if matches!(ev, InputEvent::Change) {
-                    cx.notify();
-                }
-                // The field keeps the keyboard for the next name (live ui-parity named-views-add).
-                if matches!(ev, InputEvent::PressEnter { .. }) {
-                    let name = st.read(cx).value().trim().to_string();
-                    this.save_named_view(name, cx);
-                    st.update(cx, |s, cx| s.set_value("", window, cx));
-                }
-            });
+    /// Shift+V or the view menu's "Named views…": opens the panel, its name field focused; open, it stays (live
+    /// display-modes-1125: Shift+V doesn't close it).
+    pub(super) fn open_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((st, _)) = &self.named_views {
             st.update(cx, |s, cx| s.focus(window, cx));
-            self.named_views = Some((st, sub));
+            return;
+        }
+        // Live (qa5 KB2): Esc in "New view name" closes the panel at
+        // once, with no revert step (the panel's Escape below).
+        let st = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
+        let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if matches!(ev, InputEvent::Change) {
+                // The "in use" alert goes once the field is cleared (live display-modes-1125).
+                if st.read(cx).value().is_empty() {
+                    this.named_view_taken = false;
+                }
+                cx.notify();
+            }
+            // The field keeps the keyboard for the next name (live ui-parity named-views-add).
+            if matches!(ev, InputEvent::PressEnter { .. }) {
+                this.add_named_view(window, cx);
+            }
+        });
+        st.update(cx, |s, cx| s.focus(window, cx));
+        self.named_views = Some((st, sub));
+        self.named_view_taken = false;
+        cx.notify();
+    }
+
+    /// "+" or Enter: a blank name does nothing, a used one shows "Name is already in use" and keeps the text, else the
+    /// view is saved and the field cleared (live display-modes-1125).
+    fn add_named_view(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((st, _)) = &self.named_views else { return };
+        let st = st.clone();
+        let typed = st.read(cx).value().to_string();
+        let names: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+        match crate::named_views_dialog::new_view_name(&typed, names.iter().map(String::as_str)) {
+            // (Enter on an emptied field: no alert either.)
+            Ok(None) => self.named_view_taken &= !typed.is_empty(),
+            Err(_) => self.named_view_taken = true,
+            Ok(Some(name)) => {
+                self.save_named_view(name, cx);
+                st.update(cx, |s, cx| s.set_value("", window, cx));
+                self.named_view_taken = false;
+            }
         }
         cx.notify();
     }
 
     fn save_named_view(&mut self, name: String, cx: &mut Context<Self>) {
         let cam = self.viewport.read(cx).camera;
-        let existing: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
-        let name = if name.is_empty() {
-            (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default()
-        } else {
-            name
-        };
         let view = noshape_model::partstudio::NamedView {
             name: name.clone(),
             target: cam.target.to_array(),
@@ -447,7 +466,6 @@ impl PartStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_tab_not_undoable(self.tab, &format!("Save view : {name}"), cx, |c| {
                 if let noshape_model::TabContent::PartStudio(ps) = c {
-                    ps.named_views.retain(|v| v.name != view.name);
                     ps.named_views.push(view);
                 }
             });
@@ -481,13 +499,12 @@ impl PartStudioView {
     pub(super) fn render_named_views(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (st, _) = self.named_views.as_ref()?;
         let st = st.clone();
-        let mut views: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
-        // Live ("psui (2026-10-28, P1) part-studio 9.14"): the list is sorted by name, whatever the save order.
-        views.sort_by_key(|v| v.to_lowercase());
+        // In the order saved, new ones last (live display-modes-1125).
+        let views: Vec<String> = self.studio(cx).map(|s| s.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
         if self.named_view_picked.as_ref().is_some_and(|n| !views.contains(n)) {
             self.named_view_picked = None;
         }
-        let props = crate::named_views_dialog::Props { views, picked: self.named_view_picked.clone() };
+        let props = crate::named_views_dialog::Props { views, picked: self.named_view_picked.clone(), taken: self.named_view_taken };
         let dialog = crate::named_views_dialog::render(props, &st, "ps-named-views", &cx.entity(), Self::on_named_views_action, cx);
         Some(div().absolute().top(px(3.)).left(px(0.)).child(dialog).into_any_element())
     }
@@ -497,13 +514,7 @@ impl PartStudioView {
         use crate::named_views_dialog::Action;
         match a {
             Action::Close => self.close_named_views(window, cx),
-            Action::Add => {
-                let Some((st, _)) = &self.named_views else { return };
-                let st = st.clone();
-                let name = st.read(cx).value().trim().to_string();
-                self.save_named_view(name, cx);
-                st.update(cx, |s, cx| s.set_value("", window, cx));
-            }
+            Action::Add => self.add_named_view(window, cx),
             Action::Pick(name) => {
                 if let Some(v) = self.studio(cx).and_then(|s| s.named_views.iter().find(|v| v.name == name).cloned()) {
                     self.apply_named_view(&v, window, cx);

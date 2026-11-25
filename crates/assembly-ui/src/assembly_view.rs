@@ -7354,25 +7354,31 @@ impl AssemblyView {
         }
     }
 
-    /// Shift+V / camera menu "Named views…": open or close the dialog.
-    fn toggle_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ui.named_views.take().is_some() {
-            window.focus(&self.focus, cx);
-        } else {
-            // Live (qa5 KB2): Esc in "New view name" closes the dialog at once.
-            let st = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
-            let sub = cx.subscribe_in(&st, window, |this: &mut Self, _, ev: &gpui_kit::component::input::InputEvent, window, cx| {
-                if matches!(ev, gpui_kit::component::input::InputEvent::Change) {
-                    cx.notify();
-                }
-                if matches!(ev, gpui_kit::component::input::InputEvent::PressEnter { .. }) {
-                    this.on_named_views_action(crate::named_views_dialog::Action::Add, window, cx);
-                    window.focus(&this.focus, cx);
-                }
-            });
+    /// Shift+V / camera menu "Named views…": opens the dialog, its name field focused; open, it stays (live
+    /// display-modes-1125: Shift+V doesn't close it).
+    fn open_named_views(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((st, _)) = &self.ui.named_views {
             st.update(cx, |s, cx| s.focus(window, cx));
-            self.ui.named_views = Some((st, sub));
+            return;
         }
+        // Live (qa5 KB2): Esc in "New view name" closes the dialog at once.
+        let st = cx.new(|cx| InputState::new(window, cx).revert_on_escape(false));
+        let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &gpui_kit::component::input::InputEvent, window, cx| {
+            if matches!(ev, gpui_kit::component::input::InputEvent::Change) {
+                // The "in use" alert goes once the field is cleared (live display-modes-1125).
+                if st.read(cx).value().is_empty() {
+                    this.ui.named_view_taken = false;
+                }
+                cx.notify();
+            }
+            // The field keeps the keyboard for the next name (live ui-parity named-views-add), as in a Part Studio.
+            if matches!(ev, gpui_kit::component::input::InputEvent::PressEnter { .. }) {
+                this.on_named_views_action(crate::named_views_dialog::Action::Add, window, cx);
+            }
+        });
+        st.update(cx, |s, cx| s.focus(window, cx));
+        self.ui.named_views = Some((st, sub));
+        self.ui.named_view_taken = false;
         cx.notify();
     }
 
@@ -7383,7 +7389,7 @@ impl AssemblyView {
         if self.ui.named_view_picked.as_ref().is_some_and(|n| !views.contains(n)) {
             self.ui.named_view_picked = None;
         }
-        let props = crate::named_views_dialog::Props { views, picked: self.ui.named_view_picked.clone() };
+        let props = crate::named_views_dialog::Props { views, picked: self.ui.named_view_picked.clone(), taken: self.ui.named_view_taken };
         Some(crate::named_views_dialog::render(props, &st, "asm-named-views", &cx.entity(), Self::on_named_views_action, cx))
     }
 
@@ -7406,7 +7412,7 @@ impl AssemblyView {
             to.rotation = glam::DQuat::from_array(v.rotation).normalize();
             to.distance = v.distance;
             to.projection = if v.perspective { noshape_render::Projection::Perspective } else { noshape_render::Projection::Orthographic };
-            vp.animate_to(to, cx);
+            vp.animate_to_named_view(to, cx);
         });
     }
 
@@ -7422,19 +7428,34 @@ impl AssemblyView {
             Action::Add => {
                 let Some((st, _)) = &self.ui.named_views else { return };
                 let st = st.clone();
-                let typed = st.read(cx).value().trim().to_string();
-                let existing: Vec<String> = self.assembly(cx).map(|a| a.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
-                let name = if typed.is_empty() { (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default() } else { typed };
+                let typed = st.read(cx).value().to_string();
+                let names: Vec<String> = self.assembly(cx).map(|a| a.named_views.iter().map(|v| v.name.clone()).collect()).unwrap_or_default();
+                // A blank name does nothing; a used one shows "Name is already in use" and keeps the text (live
+                // display-modes-1125).
+                let name = match crate::named_views_dialog::new_view_name(&typed, names.iter().map(String::as_str)) {
+                    Ok(Some(name)) => name,
+                    // (Enter on an emptied field: no alert either.)
+                    Ok(None) => {
+                        self.ui.named_view_taken &= !typed.is_empty();
+                        cx.notify();
+                        return;
+                    }
+                    Err(_) => {
+                        self.ui.named_view_taken = true;
+                        cx.notify();
+                        return;
+                    }
+                };
                 let cam = self.viewport.read(cx).camera;
                 let section = self.ui.section.as_ref().map(|s| s.planes.iter().map(|p| { let (n, d) = p.clip(); [n.x, n.y, n.z, d] }).collect()).unwrap_or_default();
                 let view = noshape_model::partstudio::NamedView { name: name.clone(), target: cam.target.to_array(), rotation: cam.rotation.to_array(), distance: cam.distance, perspective: cam.projection == noshape_render::Projection::Perspective, section };
                 // Not an undo step (live ui-parity named-views-add: Undo stays off after the view is saved).
                 self.edit_not_undoable(&format!("Save view : {name}"), cx, |asm| {
-                    asm.named_views.retain(|v| v.name != view.name);
                     asm.named_views.push(view);
                 });
                 // Live walk7 7-saved: the select then reads the saved view, its remove button on.
                 self.ui.named_view_picked = Some(name);
+                self.ui.named_view_taken = false;
                 st.update(cx, |s, cx| s.set_value("", window, cx));
             }
             Action::Pick(name) => {
@@ -7467,7 +7488,7 @@ impl AssemblyView {
                 self.ui.graphics_dialog = Some((dialog, sub));
                 cx.notify();
             }
-            Action::NamedViews => self.toggle_named_views(w, cx),
+            Action::NamedViews => self.open_named_views(w, cx),
             Action::PreviousView => {
                 if let Some(cam) = self.ui.cam_history.pop() {
                     self.viewport.update(cx, |vp, cx| vp.animate_to(cam, cx));
@@ -7965,7 +7986,7 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
             .on_action(cx.listener(|this, _: &MeasureTool, _, cx| this.toggle_measure(cx)))
             .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
-            .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.toggle_named_views(window, cx)))
+            .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.open_named_views(window, cx)))
             .on_action(cx.listener(|this, _: &ZoomWindow, window, cx| this.on_camera_action(crate::camera_menu::Action::ZoomWindow, window, cx)))
             .on_action(cx.listener(|this, _: &ViewNormal, _, cx| this.view_normal(cx)))
             .on_action(cx.listener(|this, _: &HideConstruction, _, cx| this.hide_construction(cx)))

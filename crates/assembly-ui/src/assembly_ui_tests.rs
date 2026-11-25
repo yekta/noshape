@@ -694,18 +694,31 @@ fn a_named_view_is_no_undo_step(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "named-view-undo");
     let doc = cx.update(|cx| view.read(cx).doc.clone());
     let undo_before = cx.update(|cx| doc.read(cx).can_undo());
-    cx.update_window(window, |_, w, cx| {
-        view.update(cx, |v, cx| {
-            v.toggle_named_views(w, cx);
-            v.on_named_views_action(Action::Add, w, cx);
+    // Live display-modes-1125: a blank name saves nothing; a used one shows "Name is already in use", keeping the text,
+    // until the field is cleared; new views go last.
+    let add = |cx: &mut TestAppContext, typed: &str| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.open_named_views(w, cx);
+                let st = v.ui.named_views.as_ref().unwrap().0.clone();
+                st.update(cx, |s, cx| s.set_value(typed.to_string(), w, cx));
+                v.on_named_views_action(Action::Add, w, cx);
+            })
         })
-    })
-    .unwrap();
-    draw(cx, window);
-    cx.update(|cx| {
-        assert_eq!(view.read(cx).assembly(cx).unwrap().named_views.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(), ["View 1"]);
-        assert_eq!(doc.read(cx).can_undo(), undo_before, "saving a view is no undo step");
-    });
+        .unwrap();
+        draw(cx, window);
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let names: Vec<String> = v.assembly(cx).unwrap().named_views.iter().map(|n| n.name.clone()).collect();
+            (names, v.ui.named_view_taken, v.ui.named_views.as_ref().unwrap().0.read(cx).value().to_string())
+        })
+    };
+    assert_eq!(add(cx, "  "), (vec![], false, "  ".to_string()), "a blank name saves nothing");
+    assert_eq!(add(cx, "View 1"), (vec!["View 1".to_string()], false, String::new()));
+    assert_eq!(add(cx, "B"), (vec!["View 1".to_string(), "B".to_string()], false, String::new()), "B last");
+    assert_eq!(add(cx, "View 1"), (vec!["View 1".to_string(), "B".to_string()], true, "View 1".to_string()), "a used name: the alert, the text kept");
+    assert_eq!(add(cx, ""), (vec!["View 1".to_string(), "B".to_string()], false, String::new()), "the alert goes with the text");
+    cx.update(|cx| assert_eq!(doc.read(cx).can_undo(), undo_before, "saving a view is no undo step"));
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             v.ui.named_view_picked = Some("View 1".into());
@@ -715,7 +728,7 @@ fn a_named_view_is_no_undo_step(cx: &mut TestAppContext) {
     .unwrap();
     draw(cx, window);
     cx.update(|cx| {
-        assert!(view.read(cx).assembly(cx).unwrap().named_views.is_empty());
+        assert_eq!(view.read(cx).assembly(cx).unwrap().named_views.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(), ["B"]);
         assert_eq!(doc.read(cx).can_undo(), undo_before, "deleting a view is no undo step");
     });
 }

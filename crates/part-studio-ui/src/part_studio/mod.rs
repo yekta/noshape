@@ -524,6 +524,8 @@ pub struct PartStudioView {
     print: Option<crate::print_setup::PrintPanel>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
     named_view_picked: Option<String>,
+    /// The typed name is used: the dialog's red "Name is already in use" until the field is cleared.
+    named_view_taken: bool,
     flat_cache: Option<fab_panel::FlatCache>,
     flat_task: Option<(usize, Task<()>)>,
     /// The Sheet metal table and flat view panel's graphics area.
@@ -686,6 +688,7 @@ impl PartStudioView {
             named_views: None,
             print: None,
             named_view_picked: None,
+            named_view_taken: false,
             flat_cache: None,
             flat_task: None,
             flat_view: None,
@@ -8119,7 +8122,7 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_palette(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &SectionView, window, cx| this.toggle_section(window, cx)))
-            .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.toggle_named_views(window, cx)))
+            .on_action(cx.listener(|this, _: &NamedViews, window, cx| this.open_named_views(window, cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| {
                 if let Some(id) = this.selected_features.first().copied() {
                     this.start_rename(id, window, cx);

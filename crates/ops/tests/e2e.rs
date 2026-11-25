@@ -9109,8 +9109,12 @@ fn view_display_isolate_dialog_controls() {
 fn assembly_named_views() {
     let mut ctx = Ctx::new();
     two_part_assembly(&mut ctx, "asm_named_views.noshape");
-    let v = call(&mut ctx, "render_named_view", json!({ "tab": "Assembly 1", "name": "", "view": "front", "section": [{ "plane": "plane:top" }] }));
+    let e = try_call(&mut ctx, "render_named_view", json!({ "tab": "Assembly 1", "name": " ", "view": "front" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "a blank name saves nothing: {e:?}");
+    let v = call(&mut ctx, "render_named_view", json!({ "tab": "Assembly 1", "name": "View 1", "view": "front", "section": [{ "plane": "plane:top" }] }));
     assert_eq!((v["saved"].clone(), v["named_views"].clone()), (json!("View 1"), json!(["View 1"])), "{v}");
+    let e = try_call(&mut ctx, "render_named_view", json!({ "tab": "Assembly 1", "name": "View 1", "view": "top" })).unwrap_err();
+    assert_eq!((e.param.as_deref(), e.message.as_str()), (Some("name"), "Name is already in use. New view not saved."), "{e:?}");
     let e = try_call(&mut ctx, "render_named_view", json!({ "tab": "Assembly 1", "name": "Top", "view": "window" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("view"), "no camera yet: {e:?}");
     call(&mut ctx, "view_camera", json!({ "tab": "Assembly 1", "action": "view", "view": "top" }));

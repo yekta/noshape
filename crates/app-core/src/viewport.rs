@@ -1278,10 +1278,10 @@ impl Viewport {
         self.animate_to(to, cx);
     }
 
-    /// A named view restored: 250 ms, animated at any frame rate (live2 view-tools ours-1118: three frames over ~240 ms
-    /// on a software GPU, where the view cube's and Shift views jump).
+    /// A named view restored: 700 ms, animated at any frame rate (live display-modes-1125: rAF-sampled camera changes
+    /// end at 690-752 ms; perspective switches animate too).
     pub fn animate_to_named_view(&mut self, to: Camera, cx: &mut Context<Self>) {
-        self.animate_from(to, nav::CAMERA_SHORT_ANIMATION, (self.clock)(), cx);
+        self.animate_from(to, nav::CAMERA_NAMED_VIEW_ANIMATION, (self.clock)(), cx);
     }
 
     pub fn animate_to(&mut self, to: Camera, cx: &mut Context<Self>) {

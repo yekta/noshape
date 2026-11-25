@@ -59,7 +59,7 @@ impl PartStudioView {
         match a {
             Action::View(sv) => self.view(sv, cx),
             Action::GraphicsPrefs => self.open_graphics_prefs(w, cx),
-            Action::NamedViews => self.toggle_named_views(w, cx),
+            Action::NamedViews => self.open_named_views(w, cx),
             Action::PreviousView => self.previous_view(cx),
             Action::ZoomFit => self.zoom_fit(cx),
             Action::ZoomWindow => self.toggle_zoom_window(cx),

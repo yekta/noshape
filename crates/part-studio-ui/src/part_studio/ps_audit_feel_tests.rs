@@ -425,7 +425,7 @@ fn a_new_sketch_keeps_the_isolate_panel_and_closes_tool_panels(cx: &mut TestAppC
         match panel {
             "Isolate" => keys(cx, window, &["shift-i"]),
             "Mass properties" => cx.update(|cx| view.update(cx, |v, cx| v.open_mass(cx))),
-            _ => cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_named_views(w, cx))).unwrap(),
+            _ => cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_named_views(w, cx))).unwrap(),
         }
         wait_until(cx, window, |cx| !view.read(cx).ui_busy());
         let open = |cx: &mut TestAppContext| {

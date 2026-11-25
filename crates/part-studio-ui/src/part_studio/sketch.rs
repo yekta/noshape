@@ -6534,7 +6534,7 @@ impl PartStudioView {
                 if this.named_views.is_none() {
                     this.finish_sketch(window, cx);
                 }
-                this.toggle_named_views(window, cx);
+                this.open_named_views(window, cx);
             }))
             .capture_action(cx.listener(|this, _: &Copy, _, cx| {
                 let text = this.sketch_data(cx).and_then(|d| this.sketch.as_ref()?.copy_selection(&d));

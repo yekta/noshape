@@ -18,6 +18,24 @@ pub struct Props {
     pub views: Vec<String>,
     /// The view picked in the list.
     pub picked: Option<String>,
+    /// The typed name is taken ([`NAME_IN_USE`] shown until the field is cleared).
+    pub taken: bool,
+}
+
+/// Live display-modes-1125: a used name, by Enter or "+".
+pub const NAME_IN_USE: &str = "Name is already in use. New view not saved.";
+
+/// What "+" or Enter does with the typed name (live display-modes-1125): a blank one nothing (no message), a used one
+/// [`NAME_IN_USE`], else saves the trimmed name.
+pub fn new_view_name<'a>(typed: &str, mut existing: impl Iterator<Item = &'a str>) -> Result<Option<String>, &'static str> {
+    let name = typed.trim();
+    if name.is_empty() {
+        return Ok(None);
+    }
+    if existing.any(|n| n == name) {
+        return Err(NAME_IN_USE);
+    }
+    Ok(Some(name.to_string()))
 }
 
 /// What the user did.
@@ -50,7 +68,7 @@ pub fn render<V: 'static>(props: Props, input: &Entity<InputState>, key: &'stati
         let Some(name) = i.checked_sub(1).and_then(|k| picks.get(k)).cloned() else { return };
         v.update(cx, |this, cx| on(this, Action::Pick(name), w, cx));
     });
-    let empty_name = input.read(cx).value().is_empty();
+    let empty_name = input.read(cx).value().trim().is_empty();
     let picked = props.picked.is_some();
     let square = |id: &'static str, icon: AnyElement, border: Rgba| {
         div()
@@ -68,9 +86,9 @@ pub fn render<V: 'static>(props: Props, input: &Entity<InputState>, key: &'stati
             .hover(|d| d.bg(pal.panel_hover))
             .child(icon)
     };
-    // Live part-studio/75 (measured): until a name is typed the "+" is
-    // #aeaeae in a #ddd border; enabled #999 in #aaa (dom/panel-named-views).
-    let (add_color, add_border) = if empty_name { (gpui_kit::rgb(0xaeaeae), gpui_kit::rgb(0xdddddd)) } else { (gpui_kit::rgb(0x999999), gpui_kit::rgb(0xaaaaaa)) };
+    // Live display-modes-1125: the "+" is disabled (#999) while the name is empty or only spaces, #333 once typed;
+    // part-studio/75: a #ddd border until then, #aaa after.
+    let (add_color, add_border) = if empty_name { (gpui_kit::rgb(0x999999), gpui_kit::rgb(0xdddddd)) } else { (gpui_kit::rgb(0x333333), gpui_kit::rgb(0xaaaaaa)) };
     let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }];
     let esc = view.clone();
     v_flex()
@@ -139,6 +157,24 @@ pub fn render<V: 'static>(props: Props, input: &Entity<InputState>, key: &'stati
                             .tooltip(crate::ui::tooltip("Remove view"))
                             .on_click(act(Action::Remove)),
                     ),
+            )
+        })
+        // Live display-modes-1125: a red alert under the select (#aa252d on #f9ebec, 1 px #dd979b, radius 5.25).
+        .when(props.taken, |d| {
+            d.child(
+                div()
+                    .id("nv-name-taken")
+                    .mx(px(5.))
+                    .mt(px(4.))
+                    .px(px(8.))
+                    .py(px(8.))
+                    .bg(gpui_kit::rgb(0xf9ebec))
+                    .border_1()
+                    .border_color(gpui_kit::rgb(0xdd979b))
+                    .rounded(px(5.25))
+                    .text_size(px(12.))
+                    .text_color(gpui_kit::rgb(0xaa252d))
+                    .child(NAME_IN_USE),
             )
         })
         .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa)))))

@@ -514,6 +514,8 @@ pub struct AsmUi {
     /// The open Named views dialog's name field, and the view picked in its list.
     pub named_views: Option<(Entity<InputState>, Subscription)>,
     pub named_view_picked: Option<String>,
+    /// The typed name is used: the dialog's red "Name is already in use" until the field is cleared.
+    pub named_view_taken: bool,
     /// The Graphics preferences the scene is built with (kept current).
     pub graphics: crate::graphics_prefs::GraphicsPrefs,
     /// Isolate dialog › Select transparent geometry; Alt held (pick through

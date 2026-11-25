@@ -51,6 +51,8 @@ pub const AXIS_ROTATION_SNAP_TOLERANCE: f64 = 0.001;
 pub const CAMERA_SNAP_ANIMATION: Duration = Duration::from_millis(125);
 pub const CAMERA_SHORT_ANIMATION: Duration = Duration::from_millis(250);
 pub const CAMERA_LONG_ANIMATION: Duration = Duration::from_millis(500);
+/// A named view's restore (live display-modes-1125: camera changes from the first frame to 690-752 ms).
+pub const CAMERA_NAMED_VIEW_ANIMATION: Duration = Duration::from_millis(700);
 /// Drag distance (logical px) before a press becomes a drag.
 pub const DRAG_THRESHOLD_PX: f64 = 3.0;
 

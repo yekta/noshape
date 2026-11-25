@@ -206,7 +206,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("view_camera", &[r##"{"action": "zoom_fit"}"##, r##"{"action": "normal_to", "refs": ["plane:top"]}"##, r##"{"tab": "Drawing 1", "action": "zoom_window", "box": [[400, 200], [800, 500]]}"##]),
     ("view_display", &[r##"{"isolate": ["Part 1"]}"##, r##"{"exit_isolate": true, "highlight_boundary": true}"##, r##"{"tab": "Assembly 1", "show_mates": true, "snap_mode": false}"##, r##"{"isolate": ["Part 1"], "transparency": 0.5, "expand": 3}"##, r##"{"tab": "Assembly 1", "exploded_view": "Explode 1", "explode_progress": 1}"##]),
     ("render_file_page", &[r##"{"tab": "plan.pdf"}"##, r##"{"tab": "plan.pdf", "page": 2, "scale": 3, "file": "/tmp/plan-2.png"}"##]),
-    ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##, r##"{"tab": "Assembly 1", "name": "", "view": "window"}"##]),
+    ("render_named_view", &[r##"{"name": "Section A", "view": "front", "section": [{"plane": "plane:right"}]}"##, r##"{"name": "Section A", "delete": true}"##, r##"{"tab": "Assembly 1", "name": "Top", "view": "window"}"##]),
     // import / export
     ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##, r##"{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}"##]),
     ("import_files", &[r##"{"files": ["/tmp/bracket.step"]}"##, r##"{"files": ["/tmp/a.x_t", "/tmp/b.x_t"], "combine": true}"##]),

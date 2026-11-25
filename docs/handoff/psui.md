@@ -87,20 +87,19 @@ docs/DECISIONS.md (read first; it wins over anything here).
   shown sketches' regions (nearest_region_hit) and returns the region when it is on or in front of the nearest face
   (5e-5); covers hover and click. Test sketch_hover_feel_tests a_sketch_region_on_a_rim_face_wins_over_the_face;
   ::hover_matrix:: ::dialogs:: ::sm:: ::feel:: green (175). TICKETS row marked fixed, to verify.
-- Named views vs live display-modes-1125 parked as /root/psui-scratch/nv-wip.patch (git apply): 700 ms restore
-  (CAMERA_NAMED_VIEW_ANIMATION, nav_feel row, asm uses animate_to_named_view), dialog new_view_name() + NAME_IN_USE
-  alert + Props.taken, "+" #999/#333 and trim. Still to do on the hosts (view_tools.rs ~400-530, assembly_view.rs
-  ~7357-7450): blank name refused silently (no "View N"; fix a_named_view_is_no_undo_step to type a name), duplicate
-  -> taken=true and text kept, cleared when the field empties; creation order (drop the sort); Shift+V/menu open-only
-  (focus the field if open). Display modes: compare menu rows per mode (Shaded without edges hides Hidden + Tangent
-  rows, Translucent hides Hidden) and mode per tab, session only.
+- 11-25 11:4x named views = live display-modes-1125 (PS + asm + op render_named_view): blank name saves nothing,
+  a used one shows NAME_IN_USE (red alert, text kept, gone when the field empties or Enter on it empty), creation order
+  (no sort), Shift+V/menu open-only (open_named_views focuses the field), 700 ms restore. Tests
+  named_views_refuse_blank_and_used_names, a_named_view_is_no_undo_step, e2e assembly_named_views. Display modes: menu
+  rows per mode and per-tab session-only mode already = live (camera_menu.rs, opts per view, not saved).
 - asm UI batch (lead 10:0x: asm's open P0/P1 UI/feel rows, no solver internals) committed: Insert split button white,
   row untinted under it (quiet ids in item_row), OsSelect hover = blue underline only (set_hover_underline(false) for
   Insert config selects); mate dialog accept_pale() (reopened "not consistent" pale) and field_text() (Tangent's
   inferred picks read "Face of …"). TICKETS 778 + 694 "fixed, to verify". Not taken (solver): ERR-MATE-CREATING-REV-RED,
   ERR-MATE-OVERDEF-BOTH (eval.rs ~870 held_back). Left: IMP-ASM-ROW-ICON (import), ASM-PATTERN-PREVIEW-LATE (speed).
-- NEXT: display modes + named views vs live: asked live (REQUESTS 11-25 09:25, block + hole + fillets, pixels per mode,
-  menu rows, persistence, named views panel). Ours: camera_menu.rs, view_tools.rs named views, render translucent 25 %.
+- NEXT: display-mode pixels vs live display-modes-1125 (1): per-mode face/edge colours s1-s8 (Translucent draws hidden
+  edges dark #242627/#404447; Hidden edges visible light ~#c4c8cb; silhouette 1 px core + AA). Then asm rows left:
+  IMP-ASM-ROW-ICON, ASM-PATTERN-PREVIEW-LATE.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.

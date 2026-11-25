@@ -26,11 +26,11 @@ pub fn ops() -> Vec<Op> {
         group: "render",
         verb: "named_view",
         summary: "Save or delete a named view of a Part Studio or an Assembly",
-        description: "The Named views dialog's \"+\" (save the view: the window's camera with `view: \"window\"`, else a standard orientation zoomed to fit; with an optional section like render_image's) or its remove button (`delete`). An empty name gives \"View 1\", \"View 2\"... Not undo steps, as in the app. render_image and view_camera (`view`) take named views; drawing_insert_view a Part Studio's.",
+        description: "The Named views dialog's \"+\" (save the view: the window's camera with `view: \"window\"`, else a standard orientation zoomed to fit; with an optional section like render_image's) or its remove button (`delete`). An empty name or a used one saves nothing, as in the app. Not undo steps, as in the app. render_image and view_camera (`view`) take named views; drawing_insert_view a Part Studio's.",
         fields: vec![
             doc_field(),
             opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
-            req("name", s(), "View name (empty: the next \"View n\")."),
+            req("name", s(), "View name: not empty, not one the tab has already."),
             opt("view", s(), "What to save: \"window\" (the window's camera, view_camera) or a standard orientation zoomed to fit (default isometric)."),
             opt("section", json!({ "type": "array", "items": { "type": "object" }, "maxItems": 3 }), "Section planes saved with the view (as render_image)."),
             opt("delete", json!({ "type": "boolean" }), "Delete the named view instead."),
@@ -389,6 +389,13 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         edit_named_views(od, tab, &format!("Delete view : {name}"), |l| l.retain(|v| v.name != name))?;
         return Ok(json!({ "deleted": name }).into());
     }
+    // As the dialog (live display-modes-1125): "+" is off while the name is blank; a used name isn't saved.
+    if name.is_empty() {
+        return Err(OpError::param("name", "type a view name"));
+    }
+    if existing.contains(&name) {
+        return Err(OpError::param("name", "Name is already in use. New view not saved."));
+    }
     let view_name = a.opt_str("view")?.unwrap_or("isometric");
     // The section saved with it: plane ids in a Part Studio, the default planes in an assembly.
     let (c, section) = if view_name == "window" {
@@ -415,10 +422,8 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         };
         (fit_camera(lo, hi, 4.0 / 3.0, Some(view)), section)
     };
-    let name = if name.is_empty() { (1..).map(|n| format!("View {n}")).find(|n| !existing.contains(n)).unwrap_or_default() } else { name };
     let v = noshape_model::partstudio::NamedView { name: name.clone(), target: c.target.to_array(), rotation: c.rotation.to_array(), distance: c.distance, perspective: c.projection == noshape_render::Projection::Perspective, section: section.iter().map(|(n, d)| [n.x, n.y, n.z, *d]).collect() };
     edit_named_views(od, tab, &format!("Save view : {name}"), |l| {
-        l.retain(|x| x.name != v.name);
         l.push(v);
     })?;
     Ok(json!({ "saved": name, "named_views": named_views(od, tab).into_iter().map(|v| v.name).collect::<Vec<_>>() }).into())
