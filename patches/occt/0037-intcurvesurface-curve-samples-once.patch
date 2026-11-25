@@ -1,0 +1,137 @@
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_Inter.pxx
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_Inter.pxx
+@@ -115,6 +115,68 @@
+   return anIns.first->second;
+ }
+ 
++// noshape (patch 0037): a curve's samples are the same against every patch of the surface; Perform met the patches
++// one by one and sampled the whole curve again for each (an impeller flange's 669-pole edge against its shell's
++// offset wall: 8.4 s). Kept for one Perform call, by the curve and the range.
++struct CurveSamples
++{
++  const void*                              Curve;
++  double                                   U1, U2, Defl;
++  int                                      NbMin;
++  occ::handle<NCollection_HArray1<double>> Pars;
++};
++
++inline thread_local std::vector<CurveSamples>* t_curveSamples = nullptr;
++
++// One Perform call's samples: on for the scope's life, the outer scope's again after.
++class CurveSamplesScope
++{
++public:
++  CurveSamplesScope()
++      : myPrev(t_curveSamples)
++  {
++    t_curveSamples = &mySamples;
++  }
++
++  ~CurveSamplesScope() { t_curveSamples = myPrev; }
++
++  CurveSamplesScope(const CurveSamplesScope&)            = delete;
++  CurveSamplesScope& operator=(const CurveSamplesScope&) = delete;
++
++private:
++  std::vector<CurveSamples>* myPrev;
++  std::vector<CurveSamples>  mySamples;
++};
++
++template <typename CurveTool, typename CurveType>
++occ::handle<NCollection_HArray1<double>> SampleParsOnce(const CurveType& theCurve,
++                                                        const double     theU1,
++                                                        const double     theU2,
++                                                        const double     theDefl,
++                                                        const int        theNbMin)
++{
++  std::vector<CurveSamples>* aCache = t_curveSamples;
++  if (aCache == nullptr)
++  {
++    return CurveTool::SamplePars(theCurve, theU1, theU2, theDefl, theNbMin);
++  }
++  const void* aCurve = &theCurve;
++  if constexpr (std::is_same_v<CurveType, occ::handle<Adaptor3d_Curve>>)
++  {
++    aCurve = theCurve.get();
++  }
++  for (const CurveSamples& aS : *aCache)
++  {
++    if (aS.Curve == aCurve && aS.U1 == theU1 && aS.U2 == theU2 && aS.Defl == theDefl && aS.NbMin == theNbMin)
++    {
++      return aS.Pars;
++    }
++  }
++  occ::handle<NCollection_HArray1<double>> aPars = CurveTool::SamplePars(theCurve, theU1, theU2, theDefl, theNbMin);
++  aCache->push_back({aCurve, theU1, theU2, theDefl, theNbMin, aPars});
++  return aPars;
++}
++
+ constexpr double THE_TOLTANGENCY         = 0.00000001;
+ constexpr double THE_TOLERANCE_ANGULAIRE = 1.e-12;
+ constexpr double THE_TOLERANCE           = 0.00000001;
+@@ -143,6 +205,7 @@
+ {
+   theReset();
+   theDone = true;
++  const CurveSamplesScope aSamplesScope;
+ 
+   NCollection_DynamicArray<IntCurveSurface_InterUtils::UVBounds> aIntervals;
+   IntCurveSurface_InterUtils::DecomposeSurfaceIntervals<SurfaceType, SurfaceTool>(theSurface,
+@@ -222,7 +285,7 @@
+             double                                   defl  = 0.1;
+             int                                      NbMin = 10;
+             occ::handle<NCollection_HArray1<double>> aPars =
+-              CurveTool::SamplePars(theCurve, u1, u2, defl, NbMin);
++              SampleParsOnce<CurveTool>(theCurve, u1, u2, defl, NbMin);
+ 
+             PolygonType polygon(theCurve, aPars->Array1());
+             theInternalPerform(theCurve, polygon, theSurface, UU1, VV1, UU2, VV2);
+@@ -236,7 +299,7 @@
+           double                                   defl  = 0.1;
+           int                                      NbMin = 10;
+           occ::handle<NCollection_HArray1<double>> aPars =
+-            CurveTool::SamplePars(theCurve, u1, u2, defl, NbMin);
++            SampleParsOnce<CurveTool>(theCurve, u1, u2, defl, NbMin);
+ 
+           PolygonType polygon(theCurve, aPars->Array1());
+           theInternalPerform(theCurve, polygon, theSurface, UU1, VV1, UU2, VV2);
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_TheHCurveTool.cxx
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_TheHCurveTool.cxx
+@@ -194,6 +194,13 @@
+     aPars(k) = t1;
+   }
+   // Analysis of deflection
++  // noshape (patch 0037): each sample's point evaluated once; the walk below took them again for every chord it
++  // tried, quadratic in a long B-spline's knots.
++  NCollection_Array1<gp_Pnt> aPnts(1, nbsu);
++  for (i = 1; i <= nbsu; ++i)
++  {
++    aPnts(i) = aBC->Value(aPars(i));
++  }
+ 
+   double aDefl2 = std::max(Defl * Defl, 1.e-9);
+   double tol    = std::max(0.01 * aDefl2, 1.e-9);
+@@ -212,12 +219,10 @@
+       continue;
+     }
+ 
+-    t2        = aPars(j);
+-    gp_Pnt p1 = aBC->Value(t2);
++    const gp_Pnt& p1 = aPnts(j);
+     for (k = j + 2; k <= nbsu; ++k)
+     {
+-      t2        = aPars(k);
+-      gp_Pnt p2 = aBC->Value(t2);
++      const gp_Pnt& p2 = aPnts(k);
+ 
+       if (p1.SquareDistance(p2) <= tol)
+       {
+@@ -235,7 +240,7 @@
+           break;
+         }
+ 
+-        gp_Pnt pp = aBC->Value(aPars(l));
++        const gp_Pnt& pp = aPnts(l);
+         double d  = lin.SquareDistance(pp);
+ 
+         if (d <= aDefl2)
