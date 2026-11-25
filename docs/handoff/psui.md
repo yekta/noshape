@@ -77,6 +77,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   tool), Windows and Mac; each matched action must have a handler there (Workspace-level ones excepted). All match;
   only Enter (Accept, commits what is open, never the sketch) and Tab/Shift+Tab (focus walk) are ours beyond live's map.
   Also b9c2f2423: a_circles_rim_lights test waits for the build + centre pick (failed core's 08:44 land under load).
+- DONE 11-25 10:xx (lead): featurelist-1125 vs ours: all as live (no delete warning, reorder above a dependency moves
+  then fails red, F2 nothing, empty name -> lowest free default (ops rename_feature), rolled-back/suppressed rows #999 =
+  #333 at 0.5). New list matrix rows: undo/redo of a reorder, a rollback move, a menu Delete with dependents.
 - NEXT: display modes + named views vs live: asked live (REQUESTS 11-25 09:25, block + hole + fillets, pixels per mode,
   menu rows, persistence, named views panel). Ours: camera_menu.rs, view_tools.rs named views, render translucent 25 %.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
