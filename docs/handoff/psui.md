@@ -162,10 +162,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   scratch runs); ui_state query "redItems"; has_export_geometry (parts/surfaces/composites); mate dialog clear_slot
   (x on an edited mate = touched: ✓ enabled, title "Mate needs two mate connectors."). Hole title "↧ 12 mm" = std's
   default (live's THRU was the account's remembered End).
-  NEXT: 1) manip-drag P0 open item: live's Move face arrow sits at the click point (15,15,20), ours at face_anchor
-  (centroid-ish); needs the pick's world point kept with the selection (none is kept today): a design step, ask the
-  lead whether before parts 3+ (Move face ring, triad, assembly drags) arrive. Live also commits Extrude's dragged
-  depth as the 1-decimal value ("30.3*mm") and Fillet's at full precision: check ours writes the same. 2) LOOK-OUTLINE-
+  17:4x (lead): Move face arrow at the click point: ui.face_clicks (behaviors.rs face_click_point, mod.rs
+  note_face_click on a graphics face click, ray hit on the model before the preview), manipulators moveFace OFFSET /
+  Translate base; T1 move_faces_arrow_starts_where_the_face_was_clicked. Not checked: live commits Extrude's dragged
+  depth as the 1-decimal value ("30.3*mm"), Fillet's at full precision. Parts 3+ (ring, triad, asm drags) from live.
+  NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
   (~l.785 split-button ▾, 812 arrow outline, 828-831 filter popover / Tab focus).
