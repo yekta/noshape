@@ -138,6 +138,8 @@ pub(super) struct SketchUi {
     dim_line_hover: Option<noshape_sketch::ConstraintId>,
     /// Pattern instance-count label being typed into (`3x`).
     count_edit: Option<(crate::sketch_mode::PatternHandle, Entity<InputState>, Subscription)>,
+    /// The pattern label a click selected (orange, as a dimension's; live: a double-click opens it).
+    pattern_label_picked: Option<crate::sketch_mode::PatternHandle>,
     /// The dimension box's `#` variable autofill list (live, qa4
     /// DIM-AUTOCOMPLETE: "(x) #var 10 mm", then "(x) New variable…").
     dim_completion: Option<crate::var_complete::VarCompletion>,
@@ -2772,6 +2774,18 @@ impl PartStudioView {
     }
 
     /// Click on a pattern's `Nx` label or an on-canvas value: type a new one.
+    /// A click on a pattern's count or spacing label picks it; a double-click opens its box (live 11-04, as a
+    /// dimension's).
+    fn pattern_label_clicked(&mut self, h: crate::sketch_mode::PatternHandle, clicks: usize, init: String, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(ui) = self.ui_mut() {
+            ui.pattern_label_picked = (clicks < 2).then_some(h);
+        }
+        if clicks >= 2 {
+            self.open_count_edit(h, init, window, cx);
+        }
+        cx.notify();
+    }
+
     fn open_count_edit(&mut self, h: crate::sketch_mode::PatternHandle, init: String, window: &mut Window, cx: &mut Context<Self>) {
         let state = cx.new(|cx| InputState::new(window, cx).default_value(init));
         let sub = cx.subscribe_in(&state, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
@@ -3012,8 +3026,10 @@ impl PartStudioView {
         let at = SKETCH_FONTS.iter().position(|f| f.name == cur).or_else(|| SKETCH_FONTS.iter().position(|f| f.name == SKETCH_DEFAULT_FONT)).unwrap_or(0);
         // B / I show only for fonts that have the style (live: hidden, not greyed).
         let (has_bold, has_italic) = SKETCH_FONTS.get(at).map_or((true, true), |f| (f.bold, f.italic));
-        let mut row = h_flex().gap_1().child(
-            crate::ui_script::mark(div().w(px(218.)).flex_none(), || "dropdown:Font".into()).child(
+        // Live (dom dialog-sketch-text): the select 1 px in, the buttons from 251 px on, each in a 3 px margin.
+        let slot = |id: &'static str| div().mx(px(3.)).debug_selector(move || id.into());
+        let mut row = h_flex().child(
+            crate::ui_script::mark(div().ml(px(1.)).w(px(218.)).flex_none().debug_selector(|| "sk-text-font".into()), || "dropdown:Font".into()).child(
                 // Live (sketch-text-font-typed-ok): the text box keeps the keyboard through a pick.
                 crate::os_ui::select_field("sk-text-font", SKETCH_FONTS.iter().map(|f| f.name.to_string()).collect(), at, move |i, window, cx| {
                     let Some(f) = SKETCH_FONTS.get(i) else { return };
@@ -3032,16 +3048,16 @@ impl PartStudioView {
                 .border_color(gpui_kit::rgb(0xd7d7d7))
                 .pl(px(6.)),
             ),
-        ).child(div().w(px(24.)));
+        ).child(div().w(px(29.)).flex_none());
         row = row
             // Live (dom dialog-sketch-text): a 25 px bold "B" and italic "I" in
-            // #1651b0 (33 / 30 x 30 buttons), then the two flip icons (20 px).
-            .when(has_bold, |r| r.child(crate::ui_script::mark(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx))), || "button:Bold".into())))
-            .when(has_italic, |r| r.child(crate::ui_script::mark(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx))), || "button:Italic".into())));
+            // #1651b0 (33 / 30 x 30 buttons), then the two flip icons (20 px, #1651b0 too).
+            .when(has_bold, |r| r.child(slot("sk-text-bold").child(crate::ui_script::mark(Button::new("sk-text-bold").child(div().text_size(px(25.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x1651b0)).child("B")).ghost().w(px(33.)).h(px(30.)).selected(bold).tooltip("Bold").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Bold, cx))), || "button:Bold".into()))))
+            .when(has_italic, |r| r.child(slot("sk-text-italic").child(crate::ui_script::mark(Button::new("sk-text-italic").child(div().text_size(px(25.)).italic().text_color(gpui_kit::rgb(0x1651b0)).child("I")).ghost().w(px(30.)).h(px(30.)).selected(italic).tooltip("Italic").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::Italic, cx))), || "button:Italic".into()))));
         if let Some((fh, fv)) = flips {
             row = row
-                .child(crate::ui_script::mark(Button::new("sk-text-fliph").child(crate::ui::glyph("sketch-flip-horizontal", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fh).tooltip("Flip horizontal").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))), || "button:Flip horizontal".into()))
-                .child(crate::ui_script::mark(Button::new("sk-text-flipv").child(crate::ui::glyph("sketch-flip-vertical", 20., gpui_kit::rgb(0x333333))).ghost().w(px(30.)).h(px(30.)).ml(px(6.)).selected(fv).tooltip("Flip vertical").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipVertical, cx))), || "button:Flip vertical".into()));
+                .child(slot("sk-text-fliph").child(crate::ui_script::mark(Button::new("sk-text-fliph").child(crate::ui::glyph("sketch-flip-horizontal", 20., gpui_kit::rgb(0x1651b0))).ghost().w(px(30.)).h(px(30.)).selected(fh).tooltip("Flip horizontal").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipHorizontal, cx))), || "button:Flip horizontal".into())))
+                .child(slot("sk-text-flipv").child(crate::ui_script::mark(Button::new("sk-text-flipv").child(crate::ui::glyph("sketch-flip-vertical", 20., gpui_kit::rgb(0x1651b0))).ghost().w(px(30.)).h(px(30.)).selected(fv).tooltip("Flip vertical").on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_text_style(TextStyle::FlipVertical, cx))), || "button:Flip vertical".into())));
         }
         let _ = pal;
         row.into_any_element()
@@ -3597,6 +3613,7 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("sk-text-dialog")
+                .debug_selector(|| "sk-text-dialog".into())
                 .key_context("SketchEntry")
                 // Live sketch-tools-1123 text.md: one Esc closes the dialog, the tool off, nothing kept.
                 .on_action(cx.listener(|this, _: &SketchEntryCancel, window, cx| {
@@ -3651,6 +3668,7 @@ impl PartStudioView {
                         .child(div().h(px(42.)).pt(px(6.)).child(style))
                         .child(
                             div()
+                                .debug_selector(|| "sk-text-preview".into())
                                 .h(px(47.))
                                 .p(px(2.))
                                 .bg(gpui_kit::rgb(0xeeeeee))
@@ -3668,6 +3686,7 @@ impl PartStudioView {
                         .child(
                             div()
                                 .id("sk-text-edit")
+                                .debug_selector(|| "sk-text-edit".into())
                                 .map(|d| crate::ui_script::mark(d, || "field:Text".into()))
                                 .h(px(93.))
                                 .border_1()
@@ -3704,6 +3723,8 @@ impl PartStudioView {
                         )
                         .child(
                             h_flex()
+                                .debug_selector(|| "sk-text-count".into())
+                                .mt(px(2.))
                                 .h(px(23.))
                                 .pl(px(4.))
                                 .pr(px(4.))
@@ -4539,6 +4560,7 @@ impl PartStudioView {
 
         // ---- pattern instance counts (`3x`, click to type; live sketch/136–138)
         let count_edit = self.ui_ref().and_then(|u| u.count_edit.as_ref().map(|(h, st, _)| (*h, st.clone())));
+        let picked = self.ui_ref().and_then(|u| u.pattern_label_picked);
         for (h, at, n) in ed.pattern_count_labels(&data.sketch) {
             let Some((x, y)) = project(at) else { continue };
             if let Some((eh, st)) = &count_edit
@@ -4550,14 +4572,14 @@ impl PartStudioView {
             // Centred on the editor's anchor (live sketch-gaps3).
             let label_w = crate::sketch_mode::label_width_px(&format!("{n}x")) as f32;
             out.push(
-                pattern_label_box(y, 28.)
+                pattern_label_box(y, 28., picked == Some(h))
                     .id(SharedString::from(format!("sk-count-{h:?}")))
+                    .debug_selector(move || format!("sk-count-{h:?}"))
                     .left(px(x - label_w * 0.5 - PATTERN_LABEL_PAD))
-                    .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_count_edit(h, n.to_string(), window, cx)))
+                    .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.pattern_label_clicked(h, ev.click_count(), n.to_string(), window, cx)))
                     .child(format!("{n}x"))
                     .into_any_element(),
             );
@@ -4625,14 +4647,14 @@ impl PartStudioView {
             // Centred on the spacing dimension's line (live sketch/136).
             let label_w = crate::sketch_mode::label_width_px(&text) as f32;
             out.push(
-                pattern_label_box(y, 26.)
+                pattern_label_box(y, 26., picked == Some(h))
                     .id(SharedString::from(format!("sk-spacing-{h:?}")))
+                    .debug_selector(move || format!("sk-spacing-{h:?}"))
                     .left(px(x - label_w * 0.5 - PATTERN_LABEL_PAD))
-                    .cursor_pointer()
                     .whitespace_nowrap()
                     .occlude()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_count_edit(h, init.clone(), window, cx)))
+                    .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.pattern_label_clicked(h, ev.click_count(), init.clone(), window, cx)))
                     .child(text)
                     .into_any_element(),
             );
@@ -6804,19 +6826,14 @@ const PATTERN_LABEL_PAD: f32 = 6.;
 
 /// A sketch pattern's count or spacing label centred on `y` (live sketch-gaps2 / 3): black 16 px regular text on an
 /// opaque box `h` px high (the count 28, the spacing 26) in the sketch plane's colour, which masks the dimension
-/// line and the grid under it.
-fn pattern_label_box(y: f32, h: f32) -> Div {
+/// line and the grid under it; as a dimension's label, tan when hovered and orange once a click picked it (live
+/// 11-04 pattern manipulators).
+fn pattern_label_box(y: f32, h: f32, picked: bool) -> Div {
     use crate::theme::{pick, viewport as l, viewport_dark as d};
-    div()
-        .absolute()
-        .top(px(y - h * 0.5))
-        .h(px(h))
-        .px(px(PATTERN_LABEL_PAD))
-        .flex()
-        .items_center()
-        .bg(gpui_kit::rgb_static(pick(0xf5f8fa, 0x3d3d3d)))
-        .text_size(px(16.))
-        .text_color(gpui_kit::rgb_static(pick(l::SKETCH_FULL, d::SKETCH_FULL)))
+    let fill = if picked { rgb(0xd9a566) } else { gpui_kit::rgb_static(pick(0xf5f8fa, 0x3d3d3d)) };
+    let text = if picked { rgb(0x000000) } else { gpui_kit::rgb_static(pick(l::SKETCH_FULL, d::SKETCH_FULL)) };
+    let label = div().absolute().top(px(y - h * 0.5)).h(px(h)).px(px(PATTERN_LABEL_PAD)).flex().items_center().bg(fill).text_size(px(16.)).text_color(text);
+    if picked { label } else { label.hover(|s| s.bg(rgb(0xd9bfa0)).text_color(rgb(0x000000))) }
 }
 
 fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, driving: bool) -> (Option<Rgba>, Rgba) {

@@ -88,7 +88,7 @@ impl PartStudioView {
     /// typed, then the first 10 by live's score of their names ("fil" finds Fillet, Fill, Finish flex PCB model, …).
     /// In a sketch, the sketch tools by their plain names, with Extrude, Revolve and Construction (live qa5-ts-sketch-*:
     /// "chamfer" lists just the sketch "Chamfer").
-    fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
+    pub(super) fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
         use noshape_ops::tool_search::studio_rank;
         if self.sketch.is_some() {
             use noshape_ops::tool_search::SketchSearch;
@@ -180,6 +180,7 @@ impl PartStudioView {
         let detail = items.get(sel).map(|item| {
             let (icon, name, _, desc) = info(item);
             v_flex()
+                .debug_selector(|| "tool-search-info".into())
                 .flex_1()
                 .min_w_0()
                 .pl(px(12.))
@@ -288,7 +289,7 @@ impl PartStudioView {
                                 .flex_none()
                                 .gap(px(2.))
                                 // Live 10-27: a bold "Recently used" centred over the rows.
-                                .when(recents, |d| d.child(div().h(px(22.)).flex_none().flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Recently used")))
+                                .when(recents, |d| d.child(div().debug_selector(|| "tool-search-recent".into()).h(px(22.)).flex_none().flex().items_center().justify_center().text_size(px(14.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Recently used")))
                                 .children(rows),
                         )
                         .child(div().w(px(1.)).ml(px(12.)).h(px(142.)).bg(gpui_kit::rgb(0xcccccc)))

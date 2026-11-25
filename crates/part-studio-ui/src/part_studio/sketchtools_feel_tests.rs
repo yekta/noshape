@@ -360,6 +360,29 @@ fn rows() -> Vec<Row> {
             let closed = cx.update(|cx| view.read(cx).palette.is_none());
             expect((f32::from(panel.size.width).round(), (f32::from(right - width)).abs() < 1., start, highlight, typed.as_str(), closed), (600., true, true, true, "f", true), "the panel's width, at the right edge, 'Start typing', Highlight on, the input typed into, Esc closes")
         } },
+        Row { id: "search / Recently used and the info box", live: "behaviours 4.9 (10-27): an empty search lists a bold 'Recently used' over the tools used last, newest first (Delete part, Extrude), the first row highlighted; the right pane shows its icon, bold name and description 'Delete one or more parts or surfaces. For composite parts, specify whether to delete, dissolve, or ignore.'", gap: false, check: |cx| {
+            use super::super::super::view_tools::PaletteItem;
+            let (window, view) = part_studio(cx, "st-search-recent");
+            for t in ["extrude", "deleteBodies"] {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature(t, w, cx))).unwrap();
+                draw(cx, window);
+                keys(cx, window, &["escape"]);
+            }
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();
+            draw(cx, window);
+            let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+            let (heading, info) = (vcx.debug_bounds("tool-search-recent").is_some(), vcx.debug_bounds("tool-search-info").is_some());
+            let (names, sel) = cx.update(|cx| {
+                let v = view.read(cx);
+                (v.palette_items(cx).iter().map(|i| if let PaletteItem::Feature(id) = i { features::get(id).map_or("", |t| t.name) } else { "" }).collect::<Vec<_>>(), v.ui.palette_sel)
+            });
+            let desc = crate::tool_text::description("deleteBodies");
+            expect(
+                (heading, names, sel, info, desc),
+                (true, vec!["Delete part", "Extrude"], 0, true, Some("Delete one or more parts or surfaces. For composite parts, specify whether to delete, dissolve, or ignore.")),
+                "'Recently used', newest first, the first row highlighted, its info pane",
+            )
+        } },
         Row { id: "search / the found tool lit in the sketch toolbar", live: "search-tools-1118: Alt+C in a sketch; 'f' lights Fillet's button yellow (its group's face), a member under a ⌄ lights the ⌄ (Fix: the test window's collapsed constraints), Highlight tool in toolbar off lights nothing", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-search-lit", Tool::Select);
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();

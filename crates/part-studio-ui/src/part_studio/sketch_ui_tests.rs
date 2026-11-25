@@ -361,6 +361,39 @@ fn a_finished_sketch_is_one_undo_step_and_a_reentered_one_starts_empty(cx: &mut 
     assert_eq!((features(cx), curves(cx)), (n, 1), "the whole edit is one step");
 }
 
+/// Live sketch-gaps2 / 3: a linear pattern's "3x" and spacing labels are 16 px text on opaque boxes about 30 × 28 and
+/// 30 × 26 px; as a dimension's label (live 11-04), a click picks one (orange, no box), a double-click opens its box.
+#[gpui::test]
+fn pattern_labels_pick_on_a_click_and_open_on_a_double_click_as_live(cx: &mut TestAppContext) {
+    use crate::sketch_mode::PatternHandle as H;
+    let (window, view) = sketch_with(cx, "sk-pattern-labels", Tool::Circle);
+    click(cx, window, &view, (600., 400.));
+    click(cx, window, &view, (615., 400.));
+    keys(cx, window, &["escape"]);
+    let circle = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).expect("the sketch");
+        d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Circle).map(|e| e.id).expect("the circle")
+    });
+    cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().selection = vec![circle]));
+    sketch_in_tool(cx, window, view.clone(), Tool::LinearPattern);
+    let bounds = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel).unwrap_or_else(|| panic!("{sel}"));
+    let (count, spacing) = (bounds(cx, "sk-count-LinearCount"), bounds(cx, "sk-spacing-LinearStep"));
+    let size = |b: Bounds<gpui_kit::Pixels>| (f32::from(b.size.width), f32::from(b.size.height));
+    let ((cw, ch), (sw, sh)) = (size(count), size(spacing));
+    assert!(ch == 28. && (26. ..=34.).contains(&cw), "3x box {cw} × {ch} (live 30-31 × 28-29)");
+    assert!(sh == 26. && (26. ..=34.).contains(&sw), "spacing box {sw} × {sh} (live ~30 × 26)");
+    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui_ref().map(|u| (u.pattern_label_picked, u.count_edit.as_ref().map(|e| e.0))));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(count.center(), Modifiers::default());
+    draw(cx, window);
+    assert_eq!(state(cx), Some((Some(H::LinearCount), None)), "a click picks the label, no box");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: count.center(), modifiers: Modifiers::default(), click_count: 2, first_mouse: false });
+    vcx.simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: count.center(), modifiers: Modifiers::default(), click_count: 2 });
+    draw(cx, window);
+    assert_eq!(state(cx), Some((None, Some(H::LinearCount))), "a double-click opens its box");
+    assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().map(|e| e.tool)), Some(Tool::LinearPattern), "the pattern still open");
+}
+
 /// Live everyday-1125: a circle copied in Sketch 1 (Top) and pasted with Ctrl+V in Sketch 2 (Front) lands centred on
 /// the pointer in Sketch 2's plane with its radius, no constraint added; Ctrl+V outside a sketch does nothing.
 #[gpui::test]
@@ -9539,6 +9572,37 @@ fn f1_in_a_sketch_opens_help_on_the_current_or_last_tool(cx: &mut TestAppContext
     let (window, _view) = sketch_with(cx, "f1-help", Tool::Select);
     keys(cx, window, &["f1", "l", "f1", "escape", "f1", "shift-o", "escape", "f1"]);
     assert_eq!(*OPENED.lock(), ["Sketch tools", "Line", "Line", "Concentric"]);
+}
+
+/// Live dom/dialog-sketch-text (sketch/132): the Text dialog 404 × 249 px: the 218 × 26 font select, B / I / the flips
+/// 6 px apart from 254 px, the 47 px grey preview, the 93 px edit box, "12/250 characters" in a 23 px row 2 px under
+/// it (offsets from the dialog's corner).
+#[gpui::test]
+fn the_text_dialog_is_laid_out_as_live(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "text-layout", Tool::Text);
+    click(cx, window, &view, (400., 300.));
+    click(cx, window, &view, (500., 340.));
+    let bounds = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel).unwrap_or_else(|| panic!("{sel}"));
+    let dialog = bounds(cx, "sk-text-dialog");
+    let rect = |b: Bounds<gpui_kit::Pixels>| {
+        let r = |v: gpui_kit::Pixels| f32::from(v).round() as i32;
+        (r(b.origin.x - dialog.origin.x), r(b.origin.y - dialog.origin.y), r(b.size.width), r(b.size.height))
+    };
+    assert_eq!((f32::from(dialog.size.width), f32::from(dialog.size.height)), (404., 249.), "the dialog");
+    for (sel, live) in [
+        ("sk-text-font", (4, 40, 218, 26)),
+        ("sk-text-bold", (254, 38, 33, 30)),
+        ("sk-text-italic", (293, 38, 30, 30)),
+        ("sk-text-fliph", (329, 38, 30, 30)),
+        ("sk-text-flipv", (365, 38, 30, 30)),
+        ("sk-text-preview", (3, 74, 398, 47)),
+        ("sk-text-edit", (3, 128, 398, 93)),
+        ("sk-text-count", (3, 223, 398, 23)),
+    ] {
+        assert_eq!(rect(bounds(cx, sel)), live, "{sel}");
+    }
+    let count = cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| ed.text_string.chars().count()));
+    assert_eq!(count, Some(12), "\"Default text\": 12/250 characters");
 }
 
 /// Live sketch-tools-1123 text.md: with a new text's dialog open a canvas click starts and commits nothing (the
