@@ -52,20 +52,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
    (builder.rs `backed`); silhouette_vertex drops them unless face-lit / query / error, pick pass keeps them.
    Now 808080 + 3B4E59. T1 edge_looks::a_curved_outline_at_rest_is_the_band_outside_the_face; back_face_cull test
    allows <= 3 outline px (kept back faces beside the band). hover_matrix 125/125 green with it. Then commit + TICKETS.
-2. P0 combined hover: live/psui/hover-combined-1125/index.md (29 cells, raw/an.json: nf = changed px in the 80 px
-   crop parked vs hovered). Plan: tests at the end of hover_matrix_tests.rs (matrix_studio; changed(parked, hovered)
-   crops): Fillet FACE / cPlane VERTEX / extrude circle region (103,22,0) picked then hovered: nf ~0; Part selected
-   (v.selection = [Body]) then start_feature("fillet"): selection [] and field empty; edit_sketch: E1 selected
-   hovered small (live 52 vs 415), V2 (0,0,20) selected hovered 0, a sketch point on a model vertex (add point
-   [40,0] to Sketch 2 -> vertex (40,0,0)) takes the hover; 6-new-PF "blue 648bbe 299 px" = the depth ARROW lit
-   (bbox 23x40 above the face centre), not a face tint: check ours lights the arrow from the face centre. Start docs
-   sketch only on Top/Front/Right (ui_parity.rs:328), so the Remove pocket cell needs another shape. Rules: hover on a field-picked or
-   sketch-selected entity changes 0 px (exception: selected model edge in a sketch 52 px vs 415); Fillet opened with
-   Part 1 selected clears it, field empty; a sketch point on a model vertex takes the hover; Extrude New preview face
-   hovers 648bbe (299 px); inside a Remove preview no hover, the top-face region preselected; Shell/Fillet's new edges
-   not hoverable, the original face is.
-3. EXPORT-MULTI-ROW-INDIVIDUAL (P2, qa row l.35): "Export unique parts as individual files" box for a multi-row
-   export (live dx/maker-io-1125 l.55) + ops e2e.
+2. DONE (fe39cfd77) combined hover P0: 3 tests at the end of hover_matrix_tests.rs (combined_hover_*); fixed: a
+   sketch click took the edge under a lit model vertex (sketch.rs lit_vertex_at); harness: Matrix::reset now clears
+   SketchEditor::model_selection. interaction-feel.md rows filled; left "? (qa)": Extrude region picked hovered,
+   face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
+   Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
+3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
 4. Interaction suite (lead 19:4x): baseline run 1125-1501-c7944540 (qa-scratch/suites/<run>/uip.log, uip/*.json vs
    tests/ui-parity/live/*.json): 20 PS+sketch failing (skip drw/sm/asm/docs/ver). Found: plane-* (4) = stale live
    (recorder right-clicked the feature-list row at x 89; ours is the viewport menu = live 2255) -> REQUESTS re-record;
