@@ -131,7 +131,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (1x 46-72, 2x 16-72), offscreen 0.66 + peak <= 0.92. Run ~/psui-scratch/dm/t11.out (render, scene
   --no-fail-fast, profiles, clippy). 0.85 profiles: a 1.07 col, p30 1.09, d 0.85. edge_looks hovered core then
   failed (the plain edge under a lit band was opaque): shader style bit 20 = part edge, its 22 % share x EDGE_INK.
-  Run t12 (scene, render, ps-ui, asm-ui --no-fail-fast + clippy). Then commit (code, TICKETS, handoff) + land.
+  t12 green (4 crates + clippy). 14:4x QUEUED cd7a6606 (edge ink, parts menu material items, TICKETS, handoff);
+  455eb8d8 is on main. Lead at 941k: not told (report cd7a6606 + 455eb8d8 when < 200k).
+  14:5x lead: continue SKT-USE-HOVER (glyph size / orange hover), TRIAD-LOOK (spread sd 41 vs 12),
+  CONFIG-FILTER-HELP (expanded at once at s3), then live's everyday PS / assembly / first-user captures vs ours.
+  15:0x SKT-USE-HOVER: live's on-edge use glyph (s23/full/use-use-1-edge-done, use-3-hover-used-edge) is a 9 px black
+  ring (2 px) round white, no tile; hovered a 12 px #ffc685 disc. sketch.rs glyph tile: `ring` (on_curve) branch
+  draws that (selected #fab601). Run ~/psui-scratch/useg/t1.out (use_/glyph tests + clippy); then TICKETS + land.
   Parts-list menu: Edit material… / Show center of mass with a material (mod.rs; test
   a_part_with_a_material_offers_edit_material_and_its_center_of_mass in list_feel_tests, green).
   To compare (live, no ask yet): live/psui/everyday-1125 (undo scopes: sketch ✓ one step, re-entered sketch
