@@ -5131,6 +5131,7 @@ impl PartStudioView {
                     .into_any_element(),
                 );
             }
+            let ring = on_curve(&g);
             let cid = g.constraint;
             let gent = g.entity;
             boxes.push((cid, gent, x + dx, y + dy));
@@ -5165,7 +5166,9 @@ impl PartStudioView {
                     .size(px(20. + 2. * margin))
                     .p(px(margin))
                     .cursor_pointer()
-                    // Live sketch/28: plain 20 px boxes, 18 px icons.
+                    // Live sketch/28: plain 20 px boxes, 18 px icons. A used curve's own glyph on its middle: a 9 px black
+                    // ring round white, hovered a 12 px #ffc685 disc (live sketch-tools-1123 use-1-edge-done,
+                    // use-3-hover-used-edge).
                     .child(
                         div()
                             .id(SharedString::from(format!("glyph-tile-{}-{}", cid.0, g.entity.0)))
@@ -5173,8 +5176,11 @@ impl PartStudioView {
                             .flex()
                             .items_center()
                             .justify_center()
-                            .bg(bg)
-                            .child(icon_px(g.icon, 18.0, fg))
+                            .map(|t| match (ring, hovered || selected) {
+                                (false, _) => t.bg(bg).child(icon_px(g.icon, 18.0, fg)),
+                                (true, false) => t.child(div().size(px(9.)).rounded_full().border_2().border_color(rgb(0x000000)).bg(rgb(0xffffff))),
+                                (true, true) => t.child(div().size(px(12.)).rounded_full().bg(rgb(if selected { 0xfab601 } else { 0xffc685 }))),
+                            })
                             // On the tile itself the glyph takes back a hover its clear margin gave way.
                             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                                 if *h {
