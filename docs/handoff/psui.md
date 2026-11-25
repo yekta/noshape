@@ -58,7 +58,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
    face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
    Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
 3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
-4. Interaction suite (lead 19:4x): baseline run 1125-1501-c7944540 (qa-scratch/suites/<run>/uip.log, uip/*.json vs
+4. Interaction suite (lead 19:4x). DONE so far: sketch-entity-* Hide other/all sketches (rows only with another
+   sketch in the studio, live behaviours "qa4 r5 s6b" (5) + ctx-menus-1117 setup had Sketch 1). NEXT: plane-* (4) to
+   live/REQUESTS as stale (re-record), then sketch-coincident, constraint-refusals, fully-defined/offset focus, then report
+   before/after (before 20) to the lead.
+   Original notes: baseline run 1125-1501-c7944540 (qa-scratch/suites/<run>/uip.log, uip/*.json vs
    tests/ui-parity/live/*.json): 20 PS+sketch failing (skip drw/sm/asm/docs/ver). Found: plane-* (4) = stale live
    (recorder right-clicked the feature-list row at x 89; ours is the viewport menu = live 2255) -> REQUESTS re-record;
    sketch-entity-* (4): ours adds "Hide other sketches / Hide all sketches" before Curve/surface analysis and lacks
