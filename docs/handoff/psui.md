@@ -104,6 +104,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   edges) before touching the line shader. QUEUED: 8ff1c3dc (FLOW fix + asm batch), 16f8487c (named views); commits
   7a13baed6 + 131779706 (study, ticket) local, land with the next change. Lead not told (was 865k): tell on next
   report: lands + solver rows not taken + LOOK-OUTLINE-WEIGHT. NEXT: asm rows IMP-ASM-ROW-ICON, ASM-PATTERN-PREVIEW-LATE.
+- 11-25 12:0x: 6089774b2 IMP-ASM-ROW-ICON (subassembly rows never show "Has degrees of freedom": live behaviours
+  "DOF display"; fn shows_dof_glyph) + ASM-INSERT-FIRST-FIT-BESIDE-DIALOG (fit_inset(): the Insert dialog is not left
+  out, a feature dialog is); ASM-PATTERN-PREVIEW-LATE was already qa-verified (dropped its open repeats + other wf23
+  repeats). Test note: the test window doesn't redraw the list/front slices after the evaluation lands, so the row
+  and fit tests check the rule (shows_dof_glyph on the evaluated nodes, fit_inset()), not pixels. Landed with the
+  study/ticket/handoff commits. NEXT: LOOK-OUTLINE-WEIGHT when live answers REQUESTS 11:5x; open asm P2s
+  ASM-CHANGE-CONFIG-PANEL-LOOK, ASM-INSERT-THUMB-CONFIG.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
