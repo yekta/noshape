@@ -137,7 +137,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   CONFIG-FILTER-HELP (expanded at once at s3), then live's everyday PS / assembly / first-user captures vs ours.
   15:0x SKT-USE-HOVER: live's on-edge use glyph (s23/full/use-use-1-edge-done, use-3-hover-used-edge) is a 9 px black
   ring (2 px) round white, no tile; hovered a 12 px #ffc685 disc. sketch.rs glyph tile: `ring` (on_curve) branch
-  draws that (selected #fab601). Run ~/psui-scratch/useg/t1.out (use_/glyph tests + clippy); then TICKETS + land.
+  draws that (selected #fab601). Green; QUEUED with cd7a6606 (carried) at 15:0x.
+  15:0x lead (qa b92222847): FLOW-REGION-UNDER-FACE-PICK partly: opening + rim regions pick as live, but a click
+  on the outer ring region beside the box (-1, 20, 30) still adds "Face of Extrude 1" (live: Face of Sketch 2): a
+  region outside the part (over nothing or a side face) must win too. NEXT (in order): FLOW-REGION-UNDER-FACE-PICK,
+  TRIAD-LOOK, CONFIG-FILTER-HELP, then live everyday PS / asm / first-user captures vs ours.
   Parts-list menu: Edit material… / Show center of mass with a material (mod.rs; test
   a_part_with_a_material_offers_edit_material_and_its_center_of_mass in list_feel_tests, green).
   To compare (live, no ask yet): live/psui/everyday-1125 (undo scopes: sketch ✓ one step, re-entered sketch
