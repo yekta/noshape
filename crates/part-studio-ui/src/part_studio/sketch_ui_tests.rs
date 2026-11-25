@@ -1852,12 +1852,12 @@ fn the_dimension_tool_flow_as_lives(cx: &mut TestAppContext) {
     click(cx, window, &view, mids[1]);
     pointer(cx, off(mids[1], -40., 0.));
     click(cx, window, &view, off(mids[1], -40., 0.));
-    let measured = input(cx).expect("the second box").0;
+    input(cx).expect("the second box");
     keys(cx, window, &["1", "a", "b", "c", "enter"]);
     let got = (input(cx), cx.update(|cx| view.read(cx).ui.dim_invalid), cx.update(|cx| view.read(cx).message.clone()));
     assert!(got.0.as_ref().is_some_and(|t| t.0 == "1abc") && got.1, "\"1abc\" Enter: the box stays, invalid: {got:?}");
     keys(cx, window, &["escape"]);
-    assert_eq!(input(cx).map(|t| t.0), Some(measured.clone()), "the first Esc restores the measured text, the box open");
+    assert_eq!(input(cx).map(|t| t.0).as_deref(), Some("0 mm"), "the first Esc empties the box to 0 mm, the box open (live dimbox-esc-1125)");
     keys(cx, window, &["escape"]);
     assert!(input(cx).is_none() && dims(cx) == 2 && tool(cx) == Some(Tool::Dimension), "the second Esc closes it, the dimension kept");
     // Esc after a pick: dropped, the tool off.
@@ -2481,9 +2481,9 @@ fn dimension_tool_click_click_type_enter(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()));
 }
 
-/// Parity sketch.md 7.16a: Esc on an untouched new box closes it at once
-/// and the dimension keeps its measured value; reopened and changed, the
-/// first Esc reverts the text and keeps the box, the second closes it.
+/// Parity sketch.md 7.16a: Esc on an untouched new box closes it at once and the dimension keeps its measured value.
+/// Live dimbox-esc-1125: reopened and changed (or refused), the first Esc empties the box to an unfocused "0 mm"
+/// (no pink, nothing committed), the second closes it; with the unit list open the first Esc only closes the list.
 #[gpui::test]
 fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     let (window, view) = line_then_dimension_tool(cx, "dim-esc");
@@ -2501,17 +2501,43 @@ fn dimension_box_escape_as_live(cx: &mut TestAppContext) {
     let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.value().is_some()).unwrap().id);
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
     draw(cx, window);
-    let box_text = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).dim_input.as_ref().map(|d| d.1.read(cx).value().to_string()));
-    let before = box_text(cx);
+    let state = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let v = view.read(cx);
+            v.dim_input.as_ref().map(|d| (d.1.read(cx).value().to_string(), d.1.read(cx).focus_handle(cx).is_focused(w), v.ui.dim_invalid))
+        })
+        .unwrap()
+    };
+    let open = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_dim_edit(cid, w, cx))).unwrap();
+        draw(cx, window);
+    };
     keys(cx, window, &["7"]);
-    assert_eq!(box_text(cx).as_deref(), Some("7"), "typing replaces the value");
+    assert_eq!(state(cx), Some(("7".into(), true, false)), "typing replaces the value");
     keys(cx, window, &["escape"]);
-    // (The measured text depends on the viewport's scale, so compare with it
-    // rather than with the typed key.)
-    let text = box_text(cx);
-    assert!(text.is_some() && text == before, "the first Esc reverts and keeps the box: {text:?} vs {before:?}");
+    assert_eq!(state(cx), Some(("0 mm".into(), false, false)), "the first Esc empties the box to 0 mm, unfocused");
+    assert!(near(&dimensions(cx, &view), &measured), "nothing committed: {:?}", dimensions(cx, &view));
     keys(cx, window, &["escape"]);
     assert!(cx.update(|cx| view.read(cx).dim_input.is_none()), "the second Esc closes it");
+    assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));
+    // Refused (pink): the first Esc clears the pink too.
+    open(cx);
+    keys(cx, window, &["5", "space", "d", "e", "g", "enter"]);
+    assert_eq!(state(cx).map(|s| s.2), Some(true), "5 deg refused on a length");
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx), Some(("0 mm".into(), false, false)), "pink cleared, 0 mm, unfocused");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()));
+    // The unit list open: three Esc presses.
+    open(cx);
+    keys(cx, window, &["7", "space", "m"]);
+    assert!(cx.update(|cx| view.read(cx).ui_ref().is_some_and(|u| u.dim_completion.is_some())), "the unit list is open");
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx), Some(("7 m".into(), true, false)), "the first Esc only closes the list");
+    keys(cx, window, &["escape"]);
+    assert_eq!(state(cx), Some(("0 mm".into(), false, false)));
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).dim_input.is_none()));
     assert!(near(&dimensions(cx, &view), &measured), "{:?}", dimensions(cx, &view));
 }
 
