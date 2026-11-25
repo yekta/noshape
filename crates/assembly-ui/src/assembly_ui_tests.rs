@@ -4847,3 +4847,63 @@ fn hovering_the_origin_row_lights_the_origin(cx: &mut TestAppContext) {
     draw(cx, window);
     assert_eq!((on, lit(cx)), (true, false), "the origin lit on the row, not off it");
 }
+
+/// Live asm/hinge-limits-1125: a Revolute turned 40° keeps its angle on a ✓ with nothing changed; any real edit puts it
+/// back to 0, clamped into its limits: 10/110 → 10° (the min), −120/110 → 0°; Undo brings 40° back.
+#[gpui::test]
+fn an_edited_revolute_goes_home_into_its_limits(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "edit-home");
+    let settle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        });
+    })
+    .unwrap();
+    settle(cx);
+    let id = cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates.iter().find(|m| m.name == "Revolute 1").expect("Revolute 1").id);
+    let angle = |cx: &mut TestAppContext| {
+        settle(cx);
+        cx.update(|cx| view.read(cx).result.mates.iter().find(|m| m.id == id).map(|m| m.values[0].to_degrees()).unwrap())
+    };
+    // Turned to 40° (as a drag leaves it).
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let solved = v.result.prepared.solve(&noshape_model::assembly::eval::SolveOptions { locks: vec![(id, [40f64.to_radians(), 0.0, 0.0, 0.0])], ..Default::default() });
+        v.apply_solved(solved, cx);
+        v.edit("Move", cx, |_| {});
+    }));
+    assert!((angle(cx) - 40.0).abs() < 1e-6, "turned to 40°: {}", angle(cx));
+    let edit = |limits: Option<(&'static str, &'static str)>, cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_mate(id, w, cx))).unwrap();
+        settle(cx);
+        if let Some((lo, hi)) = limits {
+            cx.update_window(window, |_, w, cx| {
+                let dialog = view.read(cx).mate.as_ref().unwrap().dialog.clone();
+                dialog.update(cx, |d, cx| {
+                    d.type_limit("rz", false, lo, true, w, cx);
+                    d.type_limit("rz", true, hi, true, w, cx);
+                });
+            })
+            .unwrap();
+            settle(cx);
+        }
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_mate(w, cx))).unwrap();
+        angle(cx)
+    };
+    let undo = |cx: &mut TestAppContext| {
+        let doc = cx.update(|cx| view.read(cx).doc.clone());
+        cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+        angle(cx)
+    };
+    assert!((edit(None, cx) - 40.0).abs() < 1e-6, "✓ with nothing changed keeps 40°");
+    assert!((edit(Some(("10", "110")), cx) - 10.0).abs() < 1e-6, "limits 10/110: home 0 clamped to the min");
+    assert!((undo(cx) - 40.0).abs() < 1e-6, "Undo: 40° back");
+    assert!(edit(Some(("-120", "110")), cx).abs() < 1e-6, "limits −120/110: home 0");
+}

@@ -916,6 +916,17 @@ impl AssemblyView {
     // ------------------------------------------------------------ evaluation
 
     /// Assembly to evaluate (with the mate being edited applied) and solve options.
+    /// Mate `id` as the assembly has it in the chosen configuration (not the dialog's edit of it).
+    fn effective_mate(&self, id: MateId, cx: &App) -> Option<noshape_model::assembly::Mate> {
+        let a = self.assembly(cx)?;
+        if !a.has_configured() {
+            return a.mate(id).cloned();
+        }
+        let mut a = a.clone();
+        a.apply_configuration(&self.ui.config_values);
+        a.mate(id).cloned()
+    }
+
     fn effective(&self, cx: &App) -> Option<(Assembly, SolveOptions)> {
         let mut asm = self.assembly(cx)?.clone();
         // The configuration chosen above the instance list.
@@ -2784,6 +2795,17 @@ impl AssemblyView {
             let to = self.result.solved.placement(moving)?.to_dmat4() * a.instance(moving)?.placement.to_dmat4().inverse();
             Some(group.into_iter().filter_map(|g| Some((g, Placement::from_dmat4(&(to * a.instance(g)?.placement.to_dmat4()))))).collect::<Vec<_>>())
         });
+        // A real edit puts the mate back to its home position, clamped into its limits; ✓ with nothing changed keeps
+        // the dragged pose (live asm/hinge-limits-1125).
+        if let Some(id) = editing
+            && !matches!(m.mate_type, MateType::Fastened | MateType::Tangent | MateType::Width)
+            && self.effective_mate(id, cx).is_some_and(|before| before != m)
+        {
+            let units = self.units(cx);
+            let home = [0, 1, 2, 3].map(|ix| noshape_model::assembly::eval::held_in_limits(&m, ix, 0.0, &units));
+            let solved = self.result.prepared.solve(&SolveOptions { locks: vec![(id, home)], ..Default::default() });
+            self.apply_solved(solved, cx);
+        }
         // Solved placements of the preview (which includes this mate) are folded in.
         self.edit(&desc, cx, |a| {
             noshape_ops::assembly::commit_mate(a, m, editing, &values);
