@@ -20,10 +20,19 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   no value changed, solves by plain least change (model-core regen/features/sketch.rs `[] if held`; sketch
   `Sketch::holds`). Ours now (4, 2.02) / (75.0044, 1.3068): a 4 µm x drift at the far end (min norm), all rows OK over
   1-5 %. qa corpus 127 docs SAME. T1 a_mirrored_profile_follows_its_used_edge_by_the_least_change.
-- **NOW: FLOW-EXTRUDE-UP-TO-FACE-BESIDE (P1, TICKETS):** doesn't reproduce in a model test (T1
-  kernel_robustness::an_add_up_to_a_rim_face_beside_the_profile_ends_on_its_plane: qa's R5 box, shell, lip, Ø6 post
-  Add up to the lip top: OK). Asked qa (11:1x) to keep flow 58's document after step 36 in ~/agents/qa-keep on vibex7.
-  Note FLOW-USE-OWN-FACE-REFUSED (skasm): Use on the rim projected nothing in that flow, so Sketch 2 was empty.
+- **Re-land stack (lead 11:3x):** QUEUED e6849a8b (6 rebased commits: fillet crash, tickets, ops arc fix db2fd8e7's
+  content, STL fin repair, handoffs, fillet r50 test) then QUEUED 34533ae0 (+ knife fix 2db79d46 + up-to test 768340c4).
+  qa's bracket recheck waits on the arc fix. Uncommitted: this handoff + archive (pruned landed items).
+- **Impeller STL vs live (live/core/stl-impeller-1125; ours .ex6.sh on vibex7 with ~/tmp/core/ud/cli-fix):** our doc
+  = live's Impellergehaeuse tab (b9a28c38). Triangles ours / live: Coarse 14 830 / 16 292, Medium 38 424 / 49 570,
+  Fine 178 808 / 316 872, Custom(0.01/2/0.01) 272 474 / 492 184; all ours watertight (0 defects). Presets match live's;
+  circles were tuned to exact segment counts, freeform (loft) faces come out coarser. Next: sag vs live's Custom mesh
+  (live raw/s6-bin-custom.stl as reference: centroid-to-mesh distance of ours vs live's per resolution; numpy/scipy
+  are local only, not on vibex7), then decide whether to densify B-spline faces (export mesh_params in ops/export.rs).
+- **FLOW-EXTRUDE-UP-TO-FACE-BESIDE: not a bug (closed 11:5x, TICKETS):** the cell's floor click hits the outer front
+  wall (it hides the floor in that view): Sketch 3 on y = 0, extrude along -y, lip top parallel. Replay kit: vibex8
+  ~/tmp/core/upto (wf/run.sh copy + 58k cell; the app's doc is /tmp/noshape-uip-<pid>/encl-shell.noshape, run.sh's keep
+  copies nothing), core-scratch/upto/inspect*.py (MCP: Extrude 3 params, region areas, faces). T1 test stays.
 - **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
   (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
 - **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
@@ -115,23 +124,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. QUEUED 318c67d5 (03:23; carries 0c582c74 + ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED,
-   Move face (part offset to nothing fails; boss offset to its axis removed), and ERR-FACE-PATTERN-FAILED-PREVIEW +
-   ERR-SWEEP-FAIL-BODY: failed face patterns/mirrors (off copies), holes off their part (tool at its Depth from the
-   point) and too-tight sweeps fill error_shapes, drawn dark red. T1s features_c boss_block()/face_nearest() helpers,
-   kernel_robustness a_sweep_round_too_tight_a_bend_draws_its_body_red; hole/pattern/sweep tests 90/90 on vibex8.
-   Also queued: ERR-BUBBLE-ON-ERROR (behaviors.rs tool_missed: the tool preview runs as New, so the studio display's
-   Error counts too; UI test a_remove_missing_with_no_merge_scope_shows_only_its_error) and ERR-ADD-PATTERN-PREVIEW-TINT
-   (part pattern Add with NO_GEOMETRY_CHANGE -> error_shapes = the instances; regen tessellates them on Info; mod.rs
-   draws an Info feature's error_mesh while open; T1 an_add_pattern_changing_nothing_draws_its_instances_red).
-   Probes out of git: ~/core-keep/probes2.patch.
-0. QUEUED 35dceca0 (11-24, 19 commits = every core commit since 11-20): error_refs (only blamed inputs red; an error
-   without explicit refs reddens its err_at params' inputs, none when it has an error_mesh: psui's flange/pattern UI
-   tests), APPEAR-SPLIT/PATTERN-COPY part colours, SUBTRACT-CUT-FACES (ScopeRule 20, legacy_cut_face_names), Split
-   names + order (extrude_face_order), hose joints (ring_sweep). The 11-23 failed queues' base carried unlanded
-   psui/studios commits: rebased with --onto (only core's). Green on vibex7: model 628, model-core, model-data, scene,
-   custom, psui 526, ops e2e. After it lands: tell qa to rescore errors-1123 core rows + APPEAR-SPLIT/PATTERN; ask dx
-   to rerun the hose x_t.
 0. P1 SPEED-ASM-OPEN-SCISSOR (WIP, core-rmx branch core-slabs, commits 7a9c1af8 + cb5c5ec6; diff also
    /root/core-scratch/slabs-wip2.diff is older). offset_by_slabs now unifies a COPY (the null OCCT fallback was unify
    editing the input's shared edges), history = compose(inputs, h, copy+unify) with moved faces/edges/vertices ->

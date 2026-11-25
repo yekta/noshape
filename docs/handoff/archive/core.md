@@ -4918,3 +4918,22 @@ skasm meanwhile; I'll list what I change here before landing.
 - **SPEED-VALVE-CONFIG LANDED c17f6eaab.** Impeller Delete face 2 / Extrude 4 speed PARKED (lead 11-21): from feature 29
   our impeller is a wrong model (Halter, Extrude impellerraum 38 vs 59 faces); wait for blend's cascade fix.
 
+
+## 11-25: landed (pruned from the handoff)
+0. QUEUED 318c67d5 (03:23; carries 0c582c74 + ba3d71cf): Thicken centre-of-curvature refusal + guided-loft LOFT_FAILED,
+   Move face (part offset to nothing fails; boss offset to its axis removed), and ERR-FACE-PATTERN-FAILED-PREVIEW +
+   ERR-SWEEP-FAIL-BODY: failed face patterns/mirrors (off copies), holes off their part (tool at its Depth from the
+   point) and too-tight sweeps fill error_shapes, drawn dark red. T1s features_c boss_block()/face_nearest() helpers,
+   kernel_robustness a_sweep_round_too_tight_a_bend_draws_its_body_red; hole/pattern/sweep tests 90/90 on vibex8.
+   Also queued: ERR-BUBBLE-ON-ERROR (behaviors.rs tool_missed: the tool preview runs as New, so the studio display's
+   Error counts too; UI test a_remove_missing_with_no_merge_scope_shows_only_its_error) and ERR-ADD-PATTERN-PREVIEW-TINT
+   (part pattern Add with NO_GEOMETRY_CHANGE -> error_shapes = the instances; regen tessellates them on Info; mod.rs
+   draws an Info feature's error_mesh while open; T1 an_add_pattern_changing_nothing_draws_its_instances_red).
+   Probes out of git: ~/core-keep/probes2.patch.
+0. QUEUED 35dceca0 (11-24, 19 commits = every core commit since 11-20): error_refs (only blamed inputs red; an error
+   without explicit refs reddens its err_at params' inputs, none when it has an error_mesh: psui's flange/pattern UI
+   tests), APPEAR-SPLIT/PATTERN-COPY part colours, SUBTRACT-CUT-FACES (ScopeRule 20, legacy_cut_face_names), Split
+   names + order (extrude_face_order), hose joints (ring_sweep). The 11-23 failed queues' base carried unlanded
+   psui/studios commits: rebased with --onto (only core's). Green on vibex7: model 628, model-core, model-data, scene,
+   custom, psui 526, ops e2e. After it lands: tell qa to rescore errors-1123 core rows + APPEAR-SPLIT/PATTERN; ask dx
+   to rerun the hose x_t.
