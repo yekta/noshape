@@ -216,6 +216,9 @@ impl PointSprite {
     pub const STROKE_RING: u32 = 512;
     /// With [`Self::STROKE_RING`] (hovered): a wider middle, its core the hovered stroke's light #99b2da between the rims.
     pub const SOFT_CORE: u32 = 1024;
+    /// With [`Self::STROKE_RING`] (hovered on a selected mate connector): one colour throughout, see-through inside
+    /// 0.66 of the radius, the connector's own blue showing in the middle (live as-mc-selhover).
+    pub const FLAT_RING: u32 = 2048;
 }
 
 /// The axis-aligned bounds of `it` (`None` when empty).

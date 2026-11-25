@@ -1407,6 +1407,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         const CORE: [u8; 4] = [0xf7, 0xf7, 0xf8, 255];
         const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
         const CENTER_HOVER: [u8; 4] = [0x3a, 0x6b, 0xa8, 255];
+        const CENTER_HOVER_FLAT: [u8; 4] = [0x60, 0x87, 0xbd, 255];
         const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
         // A hovered explode handle keeps its hollow stroke, slate edged with a blue core (live workflow 24 s04).
         const EXPLODE_HOVER: ([u8; 4], [u8; 4]) = ([92, 114, 131, 255], [117, 152, 200, 255]);
@@ -1478,7 +1479,16 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let o: [f32; 3] = p3(f.origin);
         // Live hover-matrix-1121 as2 (qa FEEL-ASM-MANIPULATOR-RING): a hollow ring, ~18 px, the pick showing through
         // its ~12 px middle; hovered a 20 px blue stroke, #3a6ba8 rims round a #99b2da core (qa FEEL-ASM-MOVE-RING-RIMS).
-        let (color, style, ring_px) = if chl { (CENTER_HOVER, PointSprite::STROKE_RING | PointSprite::SOFT_CORE, 20.0) } else { (edge, PointSprite::STROKE_RING, 18.0) };
+        // On a selected mate connector, hovered, the 18 px ring stays one #6087bd, the connector's blue through its
+        // middle (live as-mc-selhover: 144 px of #0101d0; qa 7e58aaae8).
+        let on_connector = h.connectors.iter().any(|(c, _, look, _)| {
+            matches!(look, crate::builder::ConnectorLook::Selected | crate::builder::ConnectorLook::Hovered) && c.origin.distance(f.origin) < 1e-9
+        });
+        let (color, style, ring_px) = match (chl, on_connector) {
+            (true, true) => (CENTER_HOVER_FLAT, PointSprite::STROKE_RING | PointSprite::FLAT_RING, 18.0),
+            (true, false) => (CENTER_HOVER, PointSprite::STROKE_RING | PointSprite::SOFT_CORE, 20.0),
+            _ => (edge, PointSprite::STROKE_RING, 18.0),
+        };
         op.points.push(PointSprite { position: o, color, pick_id: cid, size: ring_px, style: LineSegment::ON_TOP | style, _pad: 0 });
         // Over the selected edges' band (below): idle it shows through a fifth, hovered it lies over the band (live
         // as2-edge-selected_s / selhover_f, qa FEEL-ASM-RING-OVER-BAND).

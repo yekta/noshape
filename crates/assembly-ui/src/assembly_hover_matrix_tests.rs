@@ -287,8 +287,14 @@ cells! {
     mc_selected: MC, State::Selected => |c| {
         assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0xf5f5f6, 16)) && shows(&c, 0xe2ba70, 40.0));
     }
+    // Hovered, the move ring over it stays one #6087bd with the connector's own blue in its middle (live
+    // as-mc-selhover: 144 px of #0101d0; qa 7e58aaae8: the edge's #3a6ba8 rims had covered it, 245 px).
     mc_selected_hovered: MC, State::SelectedHovered => |c| {
-        assert!(shows(&c, 0xffe187, 14.0) && between(&c, 6.0, 8.0).any(|p| close(p, 0x85a3d0, 24)));
+        let ring = between(&c, 6.0, 8.0).filter(|p| close(*p, 0x6087bd, 16)).count();
+        let (rims, connector) = (c.iter().filter(|p| close(**p, 0x3a6ba8, 8)).count(), c.iter().filter(|p| close(**p, 0x0101d0, 30)).count());
+        assert!(shows(&c, 0xffe187, 14.0), "the selected connector's disc");
+        // Ours 60 ring px, 0 rim px, 58 connector px; with the edge's ring 0 ring px.
+        assert!(ring >= 30 && rims < 10 && connector >= 40, "{ring} ring px, {rims} rim px, {connector} connector px");
     }
     mc_hovered_other_selected: MC, State::HoveredOtherSelected => |c| {
         // No selected instance's #ffa033 band (as the silhouette test measures it: a blended pixel where the

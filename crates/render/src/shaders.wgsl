@@ -1432,13 +1432,15 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     }
     // Style bit 512: a stroked ring, see-through inside 0.66 of the radius, its middle mixed 88 % toward white between
     // rims of the colour (the move manipulator's centre, live hover-matrix-1121 as2); bit 1024 (hovered): inside 0.58,
-    // its middle the hovered stroke's light #99b2da (live as2-edge-selhover_f).
+    // its middle the hovered stroke's light #99b2da (live as2-edge-selhover_f); bit 2048: one colour throughout
+    // (hovered on a selected mate connector, live as-mc-selhover).
     if ((i.style & 512u) != 0u) {
         let soft_core = (i.style & 1024u) != 0u;
         let inner = select(0.66, 0.58, soft_core) * i.rpx;
         cov = cov * clamp(d - inner + 0.5, 0.0, 1.0);
         let core = clamp(1.0 - abs(d - 0.5 * (inner + i.rpx)) / (0.75 * g.viewport.z), 0.0, 1.0);
-        rgb = select(mix(rgb, vec3<f32>(1.0), 0.88 * core), mix(rgb, srgb_to_linear(vec3(0.6, 0.698, 0.855)), core), soft_core);
+        let cored = select(mix(rgb, vec3<f32>(1.0), 0.88 * core), mix(rgb, srgb_to_linear(vec3(0.6, 0.698, 0.855)), core), soft_core);
+        rgb = select(cored, rgb, (i.style & 2048u) != 0u);
     }
     // Style bit 16: a ring only, see-through inside (live midpoint markers:
     // a 9 px ring with a 1.75 px stroke, inner radius 0.6).
