@@ -3,13 +3,18 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 18:16) — read first
-- QUEUED 1db32be0 (25 commits: 7ec8a1b3's 23 + its handoff + the FEEL-MC-ARC-PICK-VERTEX-ASM app T1
-  an_arc_edges_connector_is_its_centre_near_its_end: a 270 deg arc hovered 3 mm from its end in a Fastened mate,
-  preview and click at its centre; the fix itself is 8a9122de2 on main). TICKETS' open duplicate row dropped.
-- SUITE-INTRO-TAILFIN-INTERSECTED (pm 11-25 18:0x): still the first difference in boundary/fill/mutualtrim/ruled,
-  Tail fin surface 3567.145 vs live 3567.188 mm2 (12 ppm): the derived car body vertex 0.39 um off (core's
-  Fillet 1/loft), routed to core.
+## NOW (11-25 19:0x) — read first
+- QUEUED 5af8d24a (27 commits: 1db32be0's 25 + handoff + first-week/mistakes-3): unresolved mate chips "Missing mate
+  connector of <instance>" (MateDialog.unresolved keeps the instance name); a face sketch's imprinted region left out
+  of the whole-sketch "Faces of" chip count (mod.rs region_counts); T1s a_text_sketchs_extrude_on_a_part_adds_into_it,
+  a_new_plane_opens_offset_25_mm_then_on_the_last_type, e2e first_hour_assembly_mistakes_as_live,
+  an_unresolved_mates_chips_say_missing_mate_connector_of_their_instance.
+- Already as live (no change): Text dialog (32 fonts, Default text, 12/250, own ✓), Plane defaults, delete instance
+  takes its mate in one undo step, wrong-face Fastened OK moving the first pick.
+- Open (lead): live's stacked "insert twice" was a REST insert; ours (ops + dialog) offsets 1/8 box as live's dialog (A18).
+- Open: a reopened unresolved mate's chips turn red only once its evaluation returns (~one debounce).
+- Arc connector T1 + TICKETS dedupe in this land; tail fin still core's (3567.145 vs 3567.188, derived vertex 0.39 um).
+
 - Was: QUEUED 7ec8a1b3 (23 commits; replaces c9f9e1ac, failed on a feedback_feel_tests.rs conflict with psui 8a62f4834:
   both tests kept). Carries: screws translator, API Warning, l.706 sketch feel, e2e same-part mate made in error,
   SKETCH-DRAG-SOLVE (3 px start, grab offset kept; latency slow-drag test expects the offset), centre point arc
