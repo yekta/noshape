@@ -38,7 +38,7 @@ pub enum RefSourceKind {
 /// The open "Select …" panel of a reference parameter.
 pub struct RefPicker {
     pub path: String,
-    panel: Entity<SelectItemPanel>,
+    pub(crate) panel: Entity<SelectItemPanel>,
     _sub: Subscription,
 }
 
@@ -152,10 +152,32 @@ fn source_tab(value: &str) -> &str {
 /// The value of one part of Part Studio `key`: `tab#part`, or for another
 /// document / version `ext:mv|tab#part|path`.
 pub fn part_value(key: &str, body: &noshape_model::BodyId) -> String {
-    match crate::derived::ExternalRef::parse(key) {
-        Some(r) => format!("ext:{}|{}#{body}|{}", r.microversion, r.tab, r.path.display()),
-        None => format!("{key}#{body}"),
+    parts_value(key, &[body.to_string()])
+}
+
+/// A Part Studio with some of its parts picked: `tab#part,part` (another document's `ext:mv|tab#part,part|path`).
+pub fn parts_value(key: &str, parts: &[String]) -> String {
+    if parts.is_empty() {
+        return key.to_string();
     }
+    let list = parts.join(",");
+    match crate::derived::ExternalRef::parse(key) {
+        Some(r) => format!("ext:{}|{}#{list}|{}", r.microversion, r.tab, r.path.display()),
+        None => format!("{key}#{list}"),
+    }
+}
+
+/// The studio and the picked parts of a [`parts_value`].
+pub fn value_parts(value: &str) -> (String, Vec<String>) {
+    let list = |p: &str| p.split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
+    if let Some(rest) = value.strip_prefix("ext:") {
+        let mut it = rest.splitn(3, '|');
+        if let (Some(mv), Some(tab), Some(path)) = (it.next(), it.next(), it.next()) {
+            let (tab, parts) = tab.split_once('#').map_or((tab, Vec::new()), |(t, p)| (t, list(p)));
+            return (format!("ext:{mv}|{tab}|{path}"), parts);
+        }
+    }
+    value.split_once('#').map_or((value.to_string(), Vec::new()), |(t, p)| (t.to_string(), list(p)))
 }
 
 impl FeatureDialog {
@@ -270,7 +292,7 @@ impl FeatureDialog {
             panel.update(cx, |p, _| p.title = Some("Select sketch"));
         }
         let p2 = path.clone();
-        let sub = cx.subscribe(&panel, move |this: &mut Self, _, ev: &SelectItemEvent, cx| match ev {
+        let sub = cx.subscribe(&panel, move |this: &mut Self, panel, ev: &SelectItemEvent, cx| match ev {
             // Picking a file closes the panel (live 483, 610); a Part
             // Studio's stays open to pick its parts (486).
             SelectItemEvent::Picked(v) => {
@@ -280,6 +302,12 @@ impl FeatureDialog {
                 }
                 if derived {
                     this.pick_derived_source(v, cx);
+                    // The panel lights every part the Derived takes.
+                    let value = this.derived_reference_value();
+                    panel.update(cx, |p, cx| {
+                        p.value = value;
+                        cx.notify();
+                    });
                 } else {
                     this.set_value(&p2, ParamValue::Text(v.clone()), cx);
                 }

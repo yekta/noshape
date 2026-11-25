@@ -4184,7 +4184,7 @@ impl FeatureDialog {
         v_flex().w_full().pb(px(5.)).child(field).children(update).into_any_element()
     }
 
-    /// The Derived source as a reference value for the panel: `tab[#part]`,
+    /// The Derived source as a reference value for the panel: `tab[#part,part]`,
     /// then the source configuration after a tab (`input=value;…`).
     pub fn derived_reference_value(&self) -> String {
         let studio = self.feature.params.text("partStudio").to_string();
@@ -4192,17 +4192,7 @@ impl FeatureDialog {
             Reference::Body(b) => Some(b.to_string()),
             _ => None,
         }).collect();
-        let base = match (parts.as_slice(), studio.strip_prefix("ext:")) {
-            ([one], Some(rest)) => {
-                let mut it = rest.splitn(3, '|');
-                match (it.next(), it.next(), it.next()) {
-                    (Some(mv), Some(tab), Some(path)) => format!("ext:{mv}|{tab}#{one}|{path}"),
-                    _ => studio.clone(),
-                }
-            }
-            ([one], None) => format!("{studio}#{one}"),
-            _ => studio.clone(),
-        };
+        let base = crate::fs_reference::parts_value(&studio, &parts);
         let cfg = noshape_model::regen::features::importing::derived_configuration(&self.feature.params);
         if cfg.0.is_empty() {
             return base;
@@ -4211,23 +4201,30 @@ impl FeatureDialog {
         format!("{base}\t{}", pairs.join(";"))
     }
 
-    /// A pick in the Select Part Studio panel: the studio (or one of its
-    /// parts) and its configuration become the Derived parameters.
+    /// A pick in the Select Part Studio panel: the studio (all its parts) or one of its parts; another part of the
+    /// studio whose parts are picked is added to them (live maker-io-1125: "Parts (2)").
     pub fn pick_derived_source(&mut self, value: &str, cx: &mut Context<Self>) {
         use noshape_model::regen::features::importing::DERIVED_CONFIG_PREFIX;
         let (base, cfg) = value.split_once('\t').unwrap_or((value, ""));
-        let (key, part) = split_part_value(base);
-        let body = part.and_then(|p| {
+        let (key, picked) = crate::fs_reference::value_parts(base);
+        let body = |p: &str| {
             let local = self.derived_sources.iter().find(|s| s.tab == key).and_then(|s| s.parts.iter().find(|(b, _)| b.to_string() == p).map(|(b, _)| b.clone()));
             local.or_else(|| self.ext_info.as_ref().filter(|i| i.key == key).and_then(|i| i.parts.iter().find(|(b, _)| b.to_string() == p).map(|(b, _)| b.clone())))
-        });
+        };
+        let same = !picked.is_empty() && self.feature.params.text("partStudio") == key;
+        let mut bodies: Vec<Reference> = if same { self.feature.params.query("parts").to_vec() } else { Vec::new() };
+        for b in picked.iter().filter_map(|p| body(p)).map(Reference::Body) {
+            if !bodies.contains(&b) {
+                bodies.push(b);
+            }
+        }
         self.feature.params.0.retain(|k, _| !k.starts_with(DERIVED_CONFIG_PREFIX));
         for kv in cfg.split(';').filter(|s| !s.is_empty()) {
             if let Some((k, v)) = kv.split_once('=') {
                 self.feature.params.set(&format!("{DERIVED_CONFIG_PREFIX}{k}"), ParamValue::Text(v.to_string()));
             }
         }
-        self.feature.params.set("parts", ParamValue::Query(body.into_iter().map(Reference::Body).collect()));
+        self.feature.params.set("parts", ParamValue::Query(bodies));
         // Clicking the selected studio again clears the field (live).
         let key = if key.is_empty() { String::new() } else { key };
         self.set_value("partStudio", ParamValue::Text(key), cx);
@@ -5098,26 +5095,6 @@ impl Render for DialogMoveGhost {
 /// Tolerance options of a tolerant quantity, stored as `<param>__tolerance`
 /// text (the model reads them for hole callouts and fits).
 pub use noshape_model::fits::Tolerance;
-
-/// A Part Studio reference value split into the studio key and the picked
-/// part: `tab#part`, or `ext:<microversion>|<tab>#<part>|<path>` (as the
-/// model's FeatureScript references store it).
-fn split_part_value(value: &str) -> (String, Option<String>) {
-    if let Some(rest) = value.strip_prefix("ext:") {
-        let mut it = rest.splitn(3, '|');
-        if let (Some(mv), Some(tab), Some(path)) = (it.next(), it.next(), it.next()) {
-            let (tab, part) = match tab.split_once('#') {
-                Some((t, p)) => (t, Some(p.to_string())),
-                None => (tab, None),
-            };
-            return (format!("ext:{mv}|{tab}|{path}"), part);
-        }
-    }
-    match value.split_once('#') {
-        Some((t, p)) => (t.to_string(), Some(p.to_string())),
-        None => (value.to_string(), None),
-    }
-}
 
 /// A field outside the dialog asking for the Create variable popup
 /// ([`FeatureDialog::open_external_create_variable`]).

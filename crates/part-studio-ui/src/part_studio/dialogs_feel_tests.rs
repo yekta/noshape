@@ -2434,3 +2434,49 @@ fn move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between(cx: &m
     assert_eq!(after_undo_key, dragged, "Ctrl+Z in the dialog after the drag");
     assert!(committed != before && undone == before, "angle: before {before}, committed {committed}, undone {undone}");
 }
+
+/// Live maker-io-1125, Derived's Select Part Studio: a part click takes that part, plain clicks on the studio's other
+/// parts add them (both light), a studio click takes the whole studio again; the field shows the studio's name alone.
+#[gpui::test]
+fn derived_part_clicks_add_parts_and_a_studio_click_takes_them_all(cx: &mut TestAppContext) {
+    use crate::fs_reference::{RefSource, RefSourceKind, part_value};
+    let (window, view) = block(cx, "dlg-derived-parts");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("importDerived", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().map(|e| e.dialog.clone())).expect("the Derived dialog");
+    let body = |i| noshape_model::BodyId { feature: noshape_model::FeatureId(0x77), index: i };
+    let parts: Vec<(noshape_model::BodyId, String)> = (0..3).map(|i| (body(i), format!("Part {}", i + 1))).collect();
+    cx.update(|cx| dialog.update(cx, |d, _| {
+        d.ref_sources = vec![RefSource { tab: "t9".into(), name: "Part Studio 2".into(), what: RefSourceKind::PartStudio(parts.clone()), configuration: None }];
+        d.derived_sources = vec![crate::feature_dialog::DerivedSource { tab: "t9".into(), parts: parts.clone() }];
+    }));
+    draw(cx, window);
+    let field = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ref-partStudio").expect("the Part Studio field");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(field.center(), Modifiers::default());
+    draw(cx, window);
+    let panel = cx.update(|cx| dialog.read(cx).ref_picker.as_ref().map(|r| r.panel.clone())).expect("the Select Part Studio panel");
+    let click = |cx: &mut TestAppContext, value: String| {
+        cx.update(|cx| panel.update(cx, |_, cx| cx.emit(crate::select_item::SelectItemEvent::Picked(value))));
+        draw(cx, window);
+        cx.update(|cx| {
+            let d = dialog.read(cx);
+            let taken: Vec<String> = d.feature.params.query("parts").iter().map(|r| match r {
+                Reference::Body(b) => b.to_string(),
+                r => format!("{r:?}"),
+            }).collect();
+            let shown = d.reference_shown(noshape_model::params::ReferenceKind::PartStudio, &d.derived_reference_value());
+            (d.feature.params.text("partStudio").to_string(), taken, shown, panel.read(cx).value.clone())
+        })
+    };
+    let one = click(cx, part_value("t9", &body(0)));
+    assert_eq!(one, ("t9".into(), vec![body(0).to_string()], "Part Studio 2".into(), part_value("t9", &body(0))), "a part click takes that part");
+    let two = click(cx, part_value("t9", &body(2)));
+    let both = format!("t9#{},{}", body(0), body(2));
+    assert_eq!(two, ("t9".into(), vec![body(0).to_string(), body(2).to_string()], "Part Studio 2".into(), both.clone()), "a second part click adds it, the panel lights both");
+    let again = click(cx, part_value("t9", &body(2)));
+    assert_eq!(again.1.len(), 2, "a picked part clicked again adds nothing: {again:?}");
+    let whole = click(cx, "t9".into());
+    assert_eq!(whole, ("t9".into(), Vec::new(), "Part Studio 2".into(), "t9".into()), "a studio click takes all its parts");
+    let after = click(cx, part_value("t9", &body(1)));
+    assert_eq!(after.1, vec![body(1).to_string()], "a part click after the whole studio takes that part alone");
+}

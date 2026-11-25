@@ -841,7 +841,7 @@ impl SelectItemPanel {
             let taken: Vec<String> = parts
                 .iter()
                 .flatten()
-                .filter(|(b, _)| b.index != u32::MAX && (current == s.tab || current == crate::fs_reference::part_value(&s.tab, b)))
+                .filter(|(b, _)| b.index != u32::MAX && (current == s.tab || part_picked(&current, &s.tab, b)))
                 .map(|(_, n)| n.clone())
                 .collect();
             if open && let Some(cfg) = s.configuration.clone() {
@@ -854,7 +854,7 @@ impl SelectItemPanel {
             if open && !pending {
                 for (body, name) in part_hits {
                     let value = crate::fs_reference::part_value(&s.tab, &body);
-                    let on = current == value;
+                    let on = part_picked(&current, &s.tab, &body);
                     let studio = s.tab.clone();
                     let icon = if body.index == u32::MAX { "sketch" } else { "part" };
                     // The studio picked whole: its parts are what the Derived takes, pale blue (live 407).
@@ -2278,6 +2278,12 @@ fn level_row(label: &'static str, shown: &str, select: Entity<crate::os_select::
     h_flex().h(px(30.)).px(px(6.)).gap(px(6.)).child(label).child(div().flex_1().min_w_0().child(select)).into_any_element()
 }
 
+/// Whether `body` of the studio `tab` is among the parts the panel's value picks.
+fn part_picked(current: &str, tab: &str, body: &noshape_model::BodyId) -> bool {
+    let (studio, parts) = crate::fs_reference::value_parts(current);
+    studio == tab && parts.contains(&body.to_string())
+}
+
 fn source_of(base: &str) -> String {
     match base.strip_prefix("ext:") {
         Some(rest) => {
@@ -2569,6 +2575,21 @@ impl Render for SelectItemPanel {
 #[cfg(test)]
 mod picked_tests {
     use super::*;
+
+    /// Live maker-io-1125: the parts picked from one studio all light ("Parts (2)"), as a value `tab#part,part`.
+    #[::core::prelude::v1::test]
+    fn several_picked_parts_all_light() {
+        let b = |i| noshape_model::BodyId { feature: noshape_model::FeatureId(7), index: i };
+        let value = crate::fs_reference::parts_value("t1", &[b(0).to_string(), b(2).to_string()]);
+        assert_eq!(value, "t1#F7.0,F7.2");
+        assert_eq!(crate::fs_reference::value_parts(&value), ("t1".to_string(), vec!["F7.0".to_string(), "F7.2".to_string()]));
+        let lit: Vec<bool> = (0..3).map(|i| part_picked(&value, "t1", &b(i))).collect();
+        assert_eq!(lit, [true, false, true]);
+        assert!(!part_picked(&value, "t2", &b(0)) && !part_picked("t1", "t1", &b(0)), "another studio's part, the studio picked whole");
+        let key = format!("ext:{}|t1|/d/a.noshape", noshape_store::MicroversionId::generate());
+        let ext = crate::fs_reference::parts_value(&key, &[b(0).to_string(), b(2).to_string()]);
+        assert_eq!(crate::fs_reference::value_parts(&ext), (key, vec!["F7.0".to_string(), "F7.2".to_string()]));
+    }
 
     #[::core::prelude::v1::test]
     fn a_missing_studio_opens_the_whole_list() {

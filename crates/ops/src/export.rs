@@ -1763,6 +1763,15 @@ mod tests {
         assert_eq!(&z[..4], &[0x50, 0x4b, 0x03, 0x04]);
         let n = usize::from(u16::from_le_bytes([z[26], z[27]]));
         assert_eq!(String::from_utf8_lossy(&z[30..30 + n]), "Part Studio 1 - Part 1.stl");
+        // Live maker-io-1125: several parts, one "<tab> - Part N" entry each.
+        let pin = k::make_box(&k::Plane::xy(), 0.01, 0.01, 0.01).unwrap();
+        let block = k::make_box(&k::Plane::xy(), 0.04, 0.03, 0.01).unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        let out = super::write_export(&s, &dir.join("out.zip"), vec![("Part 1".into(), block, [0.5; 4]), ("Part 2".into(), pin, [0.5; 4])]).unwrap();
+        let z = std::fs::read(&out).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let has = |name: &str| z.windows(name.len()).any(|w| w == name.as_bytes());
+        assert!(has("Part Studio 1 - Part 1.stl") && has("Part Studio 1 - Part 2.stl"), "one entry per part");
     }
 
     /// qa RHINO-GREEN: RHINO is offered only by a build that can write it;

@@ -630,3 +630,26 @@ fn checkbox_row(id: &'static str, label: &'static str, on: bool, disabled: bool)
         )
         .child(label)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{CUSTOM_FIELDS, custom_text};
+    use noshape_ops::export::{CustomResolution, ExportSettings, PartFormat, UNITS, unit_abbreviation};
+
+    /// Live maker-io-1125: STL's Custom fields show their lengths in the chosen Units (Fine at Inch: 0.002362 in, 2.5,
+    /// 0.001 in; at Millimeter 0.06 / 2.5 / 0.0254); 3MF's three fields from Coarse read 0.00024 / 12.5 / 10.
+    #[test]
+    fn custom_fields_in_the_chosen_units() {
+        let unit = |name: &str| UNITS.iter().position(|u| u.0 == name).unwrap();
+        let texts = |s: &ExportSettings, range: std::ops::Range<usize>| -> Vec<String> { CUSTOM_FIELDS[range].iter().map(|f| custom_text(s, f)).collect() };
+        let mut stl = ExportSettings { format: PartFormat::Stl, custom: CustomResolution::preset(2), units: unit("Inch"), ..Default::default() };
+        assert_eq!(texts(&stl, 0..3), ["0.002362", "2.5", "0.001"]);
+        assert_eq!(unit_abbreviation(stl.units), "in");
+        stl.units = unit("Millimeter");
+        assert_eq!(texts(&stl, 0..3), ["0.06", "2.5", "0.0254"]);
+        let mf = ExportSettings { format: PartFormat::ThreeMf, custom: CustomResolution::preset(0), ..Default::default() };
+        assert_eq!(texts(&mf, 3..6), ["0.00024", "12.5", "10"]);
+        let labels: Vec<&str> = CUSTOM_FIELDS[3..].iter().map(|f| f.label).collect();
+        assert_eq!(labels, ["Distance tolerance (m)", "Angular tolerance (deg)", "Maximum chord length (m)"]);
+    }
+}
