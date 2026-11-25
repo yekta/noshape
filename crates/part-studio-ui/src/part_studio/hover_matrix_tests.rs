@@ -3092,5 +3092,15 @@ fn print_display_mode_pixels(cx: &mut TestAppContext) {
         let q = m.screen(cx, [37., 0., 10.]);
         let tan: Vec<String> = (-4..=4).map(|i| hex(at(q.x as i64 + i, q.y as i64))).collect();
         println!("== {name}: {} | sil {} | tangent row {}", row.join(" "), col.join(","), tan.join(","));
+        // Live edge-ink-1125's edges: 9 px across each, along the screen normal (nearest px), and its column.
+        for (n, p, d) in [("a", [20., 0., 20.], [1., 0., 0.]), ("b", [20., 0., 0.], [1., 0., 0.]), ("p30", [40., 15., 20.], [0., 1., 0.]), ("c1", [0.88, 0.88, 10.], [0., 0., 1.]), ("c2", [39.12, 29.12, 10.], [0., 0., 1.]), ("d1", [37., 0., 10.], [0., 0., 1.]), ("d2", [40., 3., 10.], [0., 0., 1.])] {
+            let q = m.screen(cx, p);
+            let e = m.screen(cx, [p[0] + d[0], p[1] + d[1], p[2] + d[2]]) - q;
+            let e = e / e.length();
+            let nrm = glam::DVec2::new(-e.y, e.x);
+            let perp: Vec<String> = (-4..=4).map(|i| { let s = q + nrm * i as f64; hex(at(s.x.round() as i64, s.y.round() as i64)) }).collect();
+            let colm: Vec<String> = (-4..=4).map(|j| hex(at(q.x.round() as i64, q.y.round() as i64 + j))).collect();
+            println!("ink {name} {n} ({:.1},{:.1}) {:.0}deg perp {} col {}", q.x, q.y, e.y.atan2(e.x).to_degrees(), perp.join(","), colm.join(","));
+        }
     }
 }

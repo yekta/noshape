@@ -5238,6 +5238,11 @@ impl PartStudioView {
                 };
                 // Live (qa4 r4 s5, feel/featurelist.json): several parts selected (the right-clicked one counts) get the
                 // parts menu; a part with features or other things selected gets its own menu without Copy <part>.
+                // Live everyday-1125: with a material, "Edit material…" and "Show center of mass" (after Hide).
+                let (has_material, com_shown) = {
+                    let this = view.read(cx);
+                    (this.studio(cx).and_then(|s| s.part_properties.get(&b)).is_some_and(|p| p.material.is_some()), this.ui.com.as_ref().is_some_and(|(c, _)| *c == b))
+                };
                 let (parts, others) = {
                     let this = view.read(cx);
                     let mut parts: Vec<BodyId> = this.selection.iter().filter_map(|r| if let Reference::Body(x) = r { Some(x.clone()) } else { None }).collect();
@@ -5264,7 +5269,7 @@ impl PartStudioView {
                 let mut m = menu
                     .item(item("Rename", Box::new(move |this, w, cx| this.start_part_rename(b1.clone(), w, cx))))
                     .item(item("Properties…", Box::new(move |this, w, cx| this.open_part_meta(b2.clone(), w, cx))))
-                    .item(item("Assign material…", Box::new(move |this, w, cx| {
+                    .item(item(if has_material { "Edit material…" } else { "Assign material…" }, Box::new(move |this, w, cx| {
                         let t = targets(this, &b3);
                         this.open_material_panel(t, w, cx);
                     })))
@@ -5352,6 +5357,10 @@ impl PartStudioView {
                             let all: Vec<Reference> = this.display.bodies.iter().map(|d| Reference::Body(d.id.clone())).collect();
                             this.set_visibility(&all, true, cx);
                         })));
+                }
+                if has_material {
+                    let bm = b.clone();
+                    m = m.item(item(if com_shown { "Hide center of mass" } else { "Show center of mass" }, Box::new(move |this, _, cx| this.toggle_center_of_mass(&bm, cx))).icon_name("com-indicator"));
                 }
                 m = m
                     .item(item("Isolate…", Box::new(move |this, w, cx| {

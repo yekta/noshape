@@ -1649,6 +1649,27 @@ fn a_list_scrolled_under_a_still_drag_drops_at_its_line(cx: &mut TestAppContext)
 /// ("Multiple values") and the common ones shown; a Description typed and saved goes to both and nothing else changes
 /// (each keeps its name, part number and Exclude from all BOMs); a row clicked shows that part alone, Ctrl+click brings
 /// the other back.
+/// Live everyday-1125: with a material, a part's menu says "Edit material…" for "Assign material…" and offers
+/// "Show center of mass" after the Hide items.
+#[gpui::test]
+fn a_part_with_a_material_offers_edit_material_and_its_center_of_mass(cx: &mut TestAppContext) {
+    let l = studio(cx, "part-menu-material", 1.0);
+    l.right_click(cx, "part:Part 1");
+    let before = l.menu(cx);
+    assert!(before.iter().any(|n| n == "Assign material…") && !before.iter().any(|n| n.ends_with("center of mass")), "{before:?}");
+    l.keys(cx, "escape");
+    let part = cx.update(|cx| l.view.read(cx).display.bodies[0].id.clone());
+    let (doc, tab) = cx.update(|cx| (l.view.read(cx).doc.clone(), l.view.read(cx).tab));
+    cx.update(|cx| doc.update(cx, |d, cx| d.edit_studio(tab, "Material", cx, |ps| ps.part_properties.entry(part).or_default().material = Some("ABS".into()))));
+    draw(cx, l.window);
+    l.right_click(cx, "part:Part 1");
+    let menu = l.menu(cx);
+    assert!(menu.iter().any(|n| n == "Edit material…") && !menu.iter().any(|n| n == "Assign material…"), "{menu:?}");
+    let at = |n: &str| menu.iter().position(|m| m == n).unwrap_or_else(|| panic!("{n} in {menu:?}"));
+    assert_eq!(at("Show center of mass"), at("Isolate…") - 1, "after the Hide items, before Isolate…: {menu:?}");
+    assert!(at("Hide") < at("Show center of mass"));
+}
+
 #[gpui::test]
 fn several_parts_share_one_properties_dialog(cx: &mut TestAppContext) {
     let l = studio(cx, "multi-props", 1.0);
