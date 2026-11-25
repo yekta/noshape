@@ -751,13 +751,60 @@ impl Sketch {
             let lines_beside: BTreeSet<EntityId> = cons.iter().filter(|(c, us)| us.contains(&u) && self.connective(*c)).flat_map(|(_, us)| us.iter().copied()).filter(|x| *x != u).collect();
             let corner = round && lines_beside.len() == 2 && lines_beside.iter().all(|x| hv(*x));
             let joined_both_ends = self.endpoints(u).is_some_and(|(a, b)| !self.coincident_class(a).is_empty() && !self.coincident_class(b).is_empty());
+            // An H / V line joined to a line a changed line-to-line Distance moved, its H / V chain leading on to
+            // the Distance's other line, is carried whole: the chain's line on that other line takes the change
+            // (live qa hobbyist-1125 phone stand: a thinner base takes the lip down whole, its outer side shortens).
+            let carried_between = hv(u) && {
+                let class = |q: EntityId| {
+                    let mut v = self.coincident_class(q);
+                    v.push(q);
+                    v
+                };
+                let next = |x: EntityId, q: EntityId| {
+                    let mut v: Vec<EntityId> = class(q).into_iter().filter_map(|r| unit_of.get(&r).copied()).filter(|y| *y != x).collect();
+                    v.sort_unstable();
+                    v.dedup();
+                    (v.len() == 1).then(|| v[0])
+                };
+                let far = |y: EntityId, q: EntityId| self.endpoints(y).and_then(|(a, b)| if class(a).contains(&q) { Some(b) } else if class(b).contains(&q) { Some(a) } else { None });
+                let moved = |y: EntityId| self.endpoints(y).is_some_and(|(a, b)| [a, b].iter().any(|p| matches!((orig.point(*p), self.point(*p)), (Some(x), Some(z)) if (x - z).length() > 1e-9)));
+                let was_unheld = orig.unheld_constraints(1e-9);
+                let pairs: Vec<(EntityId, EntityId)> = cons
+                    .iter()
+                    .filter(|(c, _)| was_unheld.contains(c))
+                    .filter_map(|(c, _)| match self.constraint(*c).map(|k| &k.kind) {
+                        Some(ConstraintKind::Distance { a, b, .. }) if self.kind(*a) == Some(EntityKind::Line) && self.kind(*b) == Some(EntityKind::Line) => Some((*a, *b)),
+                        _ => None,
+                    })
+                    .collect();
+                // From u out through its end q over H / V lines: the first other unit and the lines passed on the way.
+                let walk = |q: EntityId, stop: [EntityId; 2]| {
+                    let (mut cur, mut at, mut n) = (u, q, 0);
+                    for _ in 0..64 {
+                        let y = next(cur, at)?;
+                        if stop.contains(&y) || !hv(y) {
+                            return Some((y, n));
+                        }
+                        at = far(y, at)?;
+                        cur = y;
+                        n += 1;
+                    }
+                    None
+                };
+                self.endpoints(u).is_some_and(|(s0, s1)| {
+                    pairs.iter().any(|&(a, b)| {
+                        let ends = [walk(s0, [a, b]), walk(s1, [a, b])];
+                        [(a, b), (b, a)].iter().any(|&(m, k)| moved(m) && placed.contains(&m) && ends.contains(&Some((m, 0))) && ends.iter().any(|e| matches!(e, Some((x, n)) if *x == k && *n >= 1)))
+                    })
+                })
+            };
             let ladder: &[(u8, u8)] = if corner {
                 &[(1, 3), (3, 1), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (0, 0)]
             } else if end_carried && resized {
                 &[(1, 1), (0, 1), (1, 2), (1, 0), (0, 2), (0, 0)]
             } else if lower_held.is_some() {
                 &[(1, 3), (0, 3), (1, 2), (1, 1), (1, 0), (2, 1), (2, 0), (0, 2), (0, 1), (3, 1), (0, 0)]
-            } else if hv(u) && chained.is_none() && joined_both_ends && !cons.iter().any(|(c, us)| us.as_slice() == [u] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }))) {
+            } else if hv(u) && chained.is_none() && joined_both_ends && !carried_between && !cons.iter().any(|(c, us)| us.as_slice() == [u] && matches!(self.constraint(*c).map(|k| &k.kind), Some(ConstraintKind::Length { .. }))) {
                 // An H / V line joined at both ends with no size of its own
                 // takes the change, its neighbours staying (live fuzz s622:
                 // a T's thinner flange keeps the other underside's level).
@@ -841,7 +888,7 @@ impl Sketch {
                         && if pair { us.iter().any(|x| *x == u || partners.contains(x)) } else { us.contains(&u) && (us.iter().all(|x| *x == u || placed.contains(x)) || self.connective(c)) }
                 };
                 let Some(mut sub) = self.sub_sketch_by(cons, &keep, &fixed) else { return false };
-                if shape == 3 && end_carried {
+                if shape == 3 && end_carried && !carried_between {
                     continue;
                 }
                 // An Equal partner of a dimension that changes takes its new

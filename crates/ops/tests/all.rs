@@ -26,6 +26,7 @@ mod result_keys;
 mod saved_references;
 mod sketch_open_perf;
 mod sketch_recursion;
+mod sketch_variable_edit;
 mod smoke;
 mod spawn_guard;
 mod symmetric_mirror;
