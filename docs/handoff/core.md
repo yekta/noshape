@@ -5,19 +5,24 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **P0 SCISSOR REGRESSION BISECT (lead 15:1x, first)**: new vs the slabs run (d-slab 12:51) in parity d-now (14:42):
-  97ad5f Extrude 2 / Boolean 2 / Fillet 3 / Move face 1, fed22d Extrude 18/28/38 / Fillet 18 / Move face 7 (97ad5f
-  Sketch 2 fails in both). Suspect skasm ad2024d69 + af3f106e6 (sketch.rs: lost Use entities turned free, were fixed).
-  Running (bg, ~50 min from 15:2x): branch **core-bis** in core-rf (HEAD = probe commit "BISECT PROBE (never land)",
-  then this handoff commit), .pa2.sh on vibex7: arm keep (NOSHAPE_BIS_KEEP_USE=1) then free; results
-  ~/tmp/core/sc/d-keep, d-free, pa-*.out. Keep fixes them -> hand to skasm (ids roster.md) with the evidence; else
-  bisect the other commits 57be5890b..bed5d200b. Afterwards: git checkout core-trial, cherry-pick the handoff commits
-  (git log core-trial..core-bis -- docs; never the probe ac54df4ef), delete core-bis. CLI st.py on the saved doc is NOT usable (in-context refs lost on save).
+- **P0 SCISSOR REGRESSION BISECT (lead 15:1x, first)**: 97ad5f Extrude 2 / Boolean 2 / Fillet 3 / Move face 1 (Sketch 2
+  fails in both) fail now, built in the "slabs" run (d-slab, vibex7 ~/tmp/core/sc). The Use change (ad2024d69) is NOT it
+  (probe arm keep = free), nor anything in 57be5890b..f10f72e7b (e584df0a8 fails too, also from crates/ops with
+  TMPDIR). The slabs binary's base was main 25316ac6f (11-24 11:18), not 57be5890b: bisecting the 43 engine commits
+  25316ac6f..e584df0a8 (list core-scratch/bis-list.txt) in core-rf (detached), `.pa3.sh <tag>` via rb.sh vibex7
+  (~15 min a step; d-<tag>). Suspect my 4ab5258bc (sketch follows a moved used edge by least change). fed22d's
+  Extrude 18/28/38 / Fillet 18 pass at HEAD (not a regression). After: git checkout core-trial in core-rf.
 - **NEXT after the bisect: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
   confirms, our UI must show the blue banner "Parameters have been overridden. Check input." (on reopen; live
   behaviours ~33077) and the feature row's Info state; today only the op reports Info (dialog, row OK, tooltip plain).
 - **then P2 STEP-EXPORT-FACE-APPEARANCE (lead 15:3x, qa 235120708)**: a user face appearance exports as live:
   OVER_RIDING_STYLED_ITEM on the face named 'Face appearance 1', DRAUGHTING_PRE_DEFINED_COLOUR('green') when named.
+- **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
+  (c2-surf-intro-boundary/fill/mutualtrim/ruled; -offset's Offset area): Derived 1 car body's tail vertex x 33.940348 vs
+  33.940739 (Fillet 1 setback?); doc vibex6 ~/tmp/skasm/fin/c2-surf-intro-fill.noshape. (2) c2-surf-intro-simple Loft
+  1: 1 face, live 4 (4-segment profiles). (3) c2-wrap-text-cylinders Wrap keeps lines (86 line; live 6 line/270 other).
+  (4) c2-hunting-knife Revolve 1 18 vs 19 vertices: shown_topology (common.cpp) shows no vertex on the closed ring the
+  sphere cuts in the loft tip; live likely one at the loft's seam (y=0). Doc vibex8 ~/tmp/bool/knife.noshape.
 - **P1 MESH-MOVE-FACE (lead 11-25 14:4x, qa flow 5, live qa/dl-bracket-1125)**: Move face Offset on an STL part (1 mesh
   face) offsets the whole mesh: kernel `Shape::offset_mesh` (mesh_io.cpp: facets unified, OCCT sharp offset, then its
   convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
@@ -142,11 +147,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (top face 89.76 vs live 66.95 mm²) because Sketch 6 isn't translated as live: its PROJECTED constraint finds no model
   geometry, its circular pattern isn't kept, and the solve (1.97 mm) is taken back. Sketch translation, not modelling
   (skasm's).
-- **GearLab 90f78b:** with ae8b7f751 plus asm's unlanded 93346d03d (custom features with a `def` map; std 1777/1793)
-  the loft builds; Gear Lab 1 then fails at an opFillet on the 157-face toothed solid ("Failed to fillet
-  selections."): blend's. 4.3 s vs live 2.4 s, mostly 2 Booleans (1.7 s, bool's) and 1.2 M edge_point_at calls
-  (0.53 s; not looked at). Repro vibex7: `NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/m90
-  <ops test binary> parity::parity_models --ignored --nocapture`.
 - **1dc32b (asm-infento-subs):** Draft 1 = live on dx's corrected input (-1306.543 vs -1306.54 mm³; OCCT 0030 +
   draft work bound landed af81dda05). Left: Fillet 2 / 3 / 12, Chamfer 3 (blend's); Extrude 42 17.6 s (bool's
   Boolean); Mirror 2 2.2 s (unify, bool2's). Hole 4-6 time: f1f212d03 above.
