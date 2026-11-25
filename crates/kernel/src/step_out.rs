@@ -386,6 +386,8 @@ pub(crate) struct Part {
     pub name: String,
     /// sRGB 0..1.
     pub color: Option<[f32; 3]>,
+    /// Its faces' own colours (face index in `TopExp::MapShapes` order), sRGB 0..1.
+    pub face_colors: Vec<Option<[f32; 3]>>,
     pub occt: Rc<Occt>,
     pub sdr: u32,
     /// Its model definitions (AP242 only).
@@ -630,7 +632,7 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
             ],
             complex: true,
         });
-        let mdgpr = part.color.map(|_| b.reserve());
+        let mdgpr = (part.color.is_some() || part.face_colors.iter().any(Option::is_some)).then(|| b.reserve());
 
         // The shape representation and its placement.
         let p0 = b.add(Ent::simple("CARTESIAN_POINT", vec![s(""), V::List(vec![V::Real(0.0), V::Real(0.0), V::Real(0.0)])]));
@@ -641,24 +643,12 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
         b.add(Ent::simple("SHAPE_DEFINITION_REPRESENTATION", vec![V::Ref(pds), V::Ref(sr)]));
 
         // The solid (or sheet, wire) with its colour, then its topology.
-        let rgb: Option<Vec<V>> = part.color.map(|c| std::iter::once(s("")).chain(c.iter().map(|&x| V::Real((f64::from(x.clamp(0.0, 1.0)) * 255.0).round() / 255.0))).collect());
+        let mut face_colors = part.face_colors.iter().copied();
+        let mut face_styles: HashMap<[u32; 3], u32> = HashMap::new();
         let mut styled = Vec::new();
         let mut solids = Vec::new();
         for &it in &items {
-            let i = cp.visit(&mut b, it, &mut |b, item| {
-                let Some(rgb) = &rgb else { return };
-                let col = b.add(Ent::simple("COLOUR_RGB", rgb.clone()));
-                let fasc = b.add(Ent::simple("FILL_AREA_STYLE_COLOUR", vec![s(""), V::Ref(col)]));
-                let fas = b.add(Ent::simple("FILL_AREA_STYLE", vec![s(""), list(&[fasc])]));
-                let ssfa = b.add(Ent::simple("SURFACE_STYLE_FILL_AREA", vec![V::Ref(fas)]));
-                let sss = b.add(Ent::simple("SURFACE_SIDE_STYLE", vec![s(""), list(&[ssfa])]));
-                let ssu = b.add(Ent::simple("SURFACE_STYLE_USAGE", vec![V::Enum("BOTH".into()), V::Ref(sss)]));
-                let psa = b.add(Ent::simple("PRESENTATION_STYLE_ASSIGNMENT", vec![list(&[ssu])]));
-                styled.push(b.add(Ent::simple("STYLED_ITEM", vec![s(""), list(&[psa]), V::Ref(item)])));
-            })?;
-            if let Some(V::Str(n)) = b.ents[i as usize].recs[0].1.first_mut() {
-                *n = part.name.replace('\'', "''");
-            }
+            let i = styled_solid(&mut b, &mut cp, it, part, &mut face_colors, &mut face_styles, &mut styled)?;
             solids.push(i);
         }
         let mut rep_o = rep.clone();
@@ -691,6 +681,47 @@ pub(crate) fn write(parts: &[Part], file_name: &str, timestamp: &str, schema: Sc
     }
 
     Ok(numbered(&b, file_name, timestamp, schema))
+}
+
+/// Solid `it` of `part` copied, with the part's colour and its faces' own (live: OVER_RIDING_STYLED_ITEMs over the
+/// solid's style, one per face; `face_colors` goes on over the part's solids, `face_styles` shares a colour's style).
+fn styled_solid(b: &mut Builder, cp: &mut Copier, it: u32, part: &Part, face_colors: &mut impl Iterator<Item = Option<[f32; 3]>>, face_styles: &mut HashMap<[u32; 3], u32>, styled: &mut Vec<u32>) -> Result<u32> {
+    let mut own = None;
+    let i = cp.visit(b, it, &mut |b, item| {
+        let Some(c) = part.color else { return };
+        let psa = surface_style(b, c);
+        own = Some(b.add(Ent::simple("STYLED_ITEM", vec![s(""), list(&[psa]), V::Ref(item)])));
+    })?;
+    styled.extend(own);
+    if let Some(V::Str(n)) = b.ents[i as usize].recs[0].1.first_mut() {
+        *n = part.name.replace('\'', "''");
+    }
+    for (f, c) in face_order(cp.src, it).into_iter().zip(face_colors) {
+        let (Some(c), Some(&face)) = (c, cp.map.get(&f)) else { continue };
+        let psa = *face_styles.entry(rgb_key(c)).or_insert_with(|| surface_style(b, c));
+        styled.push(match own {
+            Some(o) => b.add(Ent::simple("OVER_RIDING_STYLED_ITEM", vec![s(""), list(&[psa]), V::Ref(face), V::Ref(o)])),
+            None => b.add(Ent::simple("STYLED_ITEM", vec![s(""), list(&[psa]), V::Ref(face)])),
+        });
+    }
+    Ok(i)
+}
+
+/// A colour (sRGB 0..1) to 1/255 steps, as written.
+fn rgb_key(c: [f32; 3]) -> [u32; 3] {
+    c.map(|x| (x.clamp(0.0, 1.0) * 255.0).round() as u32)
+}
+
+/// A surface style of colour `c` (sRGB 0..1) on both sides: its PRESENTATION_STYLE_ASSIGNMENT.
+fn surface_style(b: &mut Builder, c: [f32; 3]) -> u32 {
+    let rgb = std::iter::once(s("")).chain(c.iter().map(|&x| V::Real((f64::from(x.clamp(0.0, 1.0)) * 255.0).round() / 255.0))).collect();
+    let col = b.add(Ent::simple("COLOUR_RGB", rgb));
+    let fasc = b.add(Ent::simple("FILL_AREA_STYLE_COLOUR", vec![s(""), V::Ref(col)]));
+    let fas = b.add(Ent::simple("FILL_AREA_STYLE", vec![s(""), list(&[fasc])]));
+    let ssfa = b.add(Ent::simple("SURFACE_STYLE_FILL_AREA", vec![V::Ref(fas)]));
+    let sss = b.add(Ent::simple("SURFACE_SIDE_STYLE", vec![s(""), list(&[ssfa])]));
+    let ssu = b.add(Ent::simple("SURFACE_STYLE_USAGE", vec![V::Enum("BOTH".into()), V::Ref(sss)]));
+    b.add(Ent::simple("PRESENTATION_STYLE_ASSIGNMENT", vec![list(&[ssu])]))
 }
 
 /// A solid's faces in OCCT's order (its shells', the outer first): the
@@ -1018,29 +1049,17 @@ pub(crate) fn write_assembly(root: &str, parts: &[Part], instances: &[AsmInstanc
 
     // Each part's solids with their colour, then each of its instances' placement.
     let mut styled = Vec::new();
+    let mut face_styles: HashMap<[u32; 3], u32> = HashMap::new();
     let mut placements: Vec<u32> = vec![0; instances.len()];
     for &p in &order {
         let src = &parts[p].occt.0;
         let (items, rep_id) = rep_items(src, parts[p].sdr)?;
         let rep = src.get(&rep_id).ok_or_else(|| bad("representation"))?.clone();
         let mut cp = if p == 0 { Copier { src, map: cp0.map.clone() } } else { Copier { src, map: HashMap::new() } };
-        let rgb: Option<Vec<V>> = parts[p].color.map(|c| std::iter::once(s("")).chain(c.iter().map(|&x| V::Real((f64::from(x.clamp(0.0, 1.0)) * 255.0).round() / 255.0))).collect());
+        let mut face_colors = parts[p].face_colors.iter().copied();
         let mut solids = Vec::new();
         for &it in &items {
-            let i = cp.visit(&mut b, it, &mut |b, item| {
-                let Some(rgb) = &rgb else { return };
-                let col = b.add(Ent::simple("COLOUR_RGB", rgb.clone()));
-                let fasc = b.add(Ent::simple("FILL_AREA_STYLE_COLOUR", vec![s(""), V::Ref(col)]));
-                let fas = b.add(Ent::simple("FILL_AREA_STYLE", vec![s(""), list(&[fasc])]));
-                let ssfa = b.add(Ent::simple("SURFACE_STYLE_FILL_AREA", vec![V::Ref(fas)]));
-                let sss = b.add(Ent::simple("SURFACE_SIDE_STYLE", vec![s(""), list(&[ssfa])]));
-                let ssu = b.add(Ent::simple("SURFACE_STYLE_USAGE", vec![V::Enum("BOTH".into()), V::Ref(sss)]));
-                let psa = b.add(Ent::simple("PRESENTATION_STYLE_ASSIGNMENT", vec![list(&[ssu])]));
-                styled.push(b.add(Ent::simple("STYLED_ITEM", vec![s(""), list(&[psa]), V::Ref(item)])));
-            })?;
-            if let Some(V::Str(n)) = b.ents[i as usize].recs[0].1.first_mut() {
-                *n = parts[p].name.replace('\'', "''");
-            }
+            let i = styled_solid(&mut b, &mut cp, it, &parts[p], &mut face_colors, &mut face_styles, &mut styled)?;
             solids.push(i);
         }
         for (k, inst) in instances.iter().enumerate().filter(|(_, i)| i.part == p) {

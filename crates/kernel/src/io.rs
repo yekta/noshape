@@ -589,6 +589,9 @@ pub struct StepOptions {
     pub pmi: Vec<Option<PartPmi>>,
     /// Every surface written as a B-surface (Preprocessing "… and convert all surfaces to b-surfaces").
     pub all_bsurfaces: bool,
+    /// Each shape's face colours (index = shape; then face index, `TopExp::MapShapes` order; sRGB 0..1), written as
+    /// overriding styled items on the faces (live: an imported part's face colours survive export and re-import).
+    pub face_colors: Vec<Vec<Option<[f32; 3]>>>,
 }
 
 /// A part's MBD for STEP AP242 as Onshape writes it (live 1746: CAx-IF
@@ -755,6 +758,7 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
     // MBD: AP242 only (AP214 / AP203 carry none, live 1746), written by the
     // layout rewrite (step_out.rs).
     let pmi_of = |i: usize| opts.pmi.get(i).cloned().flatten().filter(|_| opts.schema != StepSchema::Ap214 && opts.schema != StepSchema::Ap203);
+    let face_styles = |i: usize| opts.face_colors.get(i).cloned().unwrap_or_default();
     let name_of = |i: usize| shapes[i].name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| format!("Part {}", i + 1));
     let mut parts: Vec<Option<crate::step_out::Part>> = (0..v.len()).map(|_| None).collect();
     // All parts in one OCCT call (a call per part cost 0.7 ms each: 1.4 s of
@@ -767,7 +771,7 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
         // A shape OCCT merged with another (the same shape twice) is written
         // on its own below.
         if let Some(&sdr) = sdrs.get(t) {
-            parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt: occt.clone(), sdr, pmi: pmi_of(i) });
+            parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, face_colors: face_styles(i), occt: occt.clone(), sdr, pmi: pmi_of(i) });
         }
     }
     for (i, sh) in v.iter().enumerate() {
@@ -777,7 +781,7 @@ fn step_parts(shapes: &[ExportShape], unit: LengthUnit, opts: &StepOptions) -> R
         let tmp = tmp_file();
         let occt = read_back(&tmp, ck(ffi::write_step(&vec_to_list(std::slice::from_ref(sh)), &[], &[], &[], path_str(&tmp)?, schema, file_unit, opts.all_bsurfaces)))?;
         let sdr = occt.sdr()?;
-        parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, occt, sdr, pmi: pmi_of(i) });
+        parts[i] = Some(crate::step_out::Part { name: name_of(i), color: shapes[i].color, face_colors: face_styles(i), occt, sdr, pmi: pmi_of(i) });
     }
     Ok(parts.into_iter().flatten().collect())
 }

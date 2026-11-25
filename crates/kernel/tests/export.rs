@@ -19,7 +19,7 @@ fn step_schemas_and_units() {
     for (schema, tag) in [(StepSchema::Ap242, "AP242"), (StepSchema::Ap214, "AUTOMOTIVE_DESIGN"), (StepSchema::Ap203, "CONFIG_CONTROL_DESIGN")] {
         for (unit, utag) in [(LengthUnit::Millimeter, "MILLI"), (LengthUnit::Inch, "INCH"), (LengthUnit::Yard, "'YARD'")] {
             let path = dir.join(format!("{tag}-{}.step", utag.trim_matches('\'')));
-            write_step_with(&path, &[ExportShape { shape: s.clone(), name: Some("Part 1".into()), color: None }], LengthUnit::Meter, &StepOptions { schema, file_unit: Some(unit), pmi: Vec::new(), all_bsurfaces: false }).unwrap();
+            write_step_with(&path, &[ExportShape { shape: s.clone(), name: Some("Part 1".into()), color: None }], LengthUnit::Meter, &StepOptions { schema, file_unit: Some(unit), pmi: Vec::new(), all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
             let text = std::fs::read_to_string(&path).unwrap();
             let header = text.split("ENDSEC").next().unwrap();
             assert!(header.to_uppercase().contains(tag), "{tag}: {header}");
@@ -1261,7 +1261,7 @@ fn step_layout_like_onshape() {
     let dir = std::env::temp_dir().join(format!("noshape-g47-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("g47 3parts.step");
-    write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: Vec::new(), all_bsurfaces: false }).unwrap();
+    write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: Vec::new(), all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     let count = |s: &str| text.matches(s).count();
     assert!(text.starts_with("ISO-10303-21;\nHEADER;\n"));
@@ -1339,7 +1339,7 @@ fn step_layout_variants_like_onshape() {
 
     let one = [ExportShape { shape: cube.clone(), name: Some("Part 1".into()), color: Some([0.6157, 0.8118, 0.9294]) }];
     let p214 = dir.join("a214.step");
-    write_step_with(&p214, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None, pmi: Vec::new(), all_bsurfaces: false }).unwrap();
+    write_step_with(&p214, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None, pmi: Vec::new(), all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
     let t = std::fs::read_to_string(&p214).unwrap();
     assert!(t.contains("/* description */ ('STEP AP214',\n'CAx-IF Rec.Pracs.---User Defined Attributes---1.5---2016-08-15'),"));
     assert!(t.contains("FILE_SCHEMA (('AUTOMOTIVE_DESIGN {1 0 10303 214 3 1 1}'));"));
@@ -1347,14 +1347,14 @@ fn step_layout_variants_like_onshape() {
     assert!(t.contains("=VALUE_REPRESENTATION_ITEM('number of annotations',COUNT_MEASURE(0.));"));
     assert!(t.contains("=APPLICATION_CONTEXT(\n'core data for automotive mechanical design processes');"));
     let p203 = dir.join("a203.step");
-    write_step_with(&p203, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap203, file_unit: None, pmi: Vec::new(), all_bsurfaces: false }).unwrap();
+    write_step_with(&p203, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap203, file_unit: None, pmi: Vec::new(), all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
     let t = std::fs::read_to_string(&p203).unwrap();
     assert!(t.contains("/* description */ ('STEP AP203'),"));
     assert!(t.contains("FILE_SCHEMA (('CONFIG_CONTROL_DESIGN'));"));
     assert!(t.contains("=DESIGN_CONTEXT('',#") && t.contains("=MECHANICAL_CONTEXT('',#"));
     assert!(t.contains("=APPLICATION_CONTEXT(\n'configuration controlled 3D designs of mechanical parts and assemblie\ns');"));
     let pin = dir.join("inch.step");
-    write_step_with(&pin, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: Some(LengthUnit::Inch), pmi: Vec::new(), all_bsurfaces: false }).unwrap();
+    write_step_with(&pin, &one, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: Some(LengthUnit::Inch), pmi: Vec::new(), all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
     let t = std::fs::read_to_string(&pin).unwrap();
     assert!(t.contains("CONVERSION_BASED_UNIT('INCH',#"));
     assert!(t.contains("=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(3.93700787401575E-7),"), "{t}");
@@ -1374,7 +1374,7 @@ fn write_g47_step() {
     let Some(dir) = std::env::var_os("NOSHAPE_STEP_OUT") else { return };
     let colors = [[0.6157, 0.8118, 0.9294], [0.6471, 0.6471, 0.6471], [0.2314, 0.3804, 0.7059]];
     let parts: Vec<ExportShape> = (0..3).map(|i| ExportShape { shape: make_box_corners(DVec3::new(0.02 * i as f64, 0.0, 0.0), DVec3::new(0.02 * i as f64 + 0.01, 0.01, 0.01)).unwrap(), name: Some(format!("Part {}", i + 1)), color: Some(colors[i]) }).collect();
-    write_step_with(&std::path::Path::new(&dir).join("g47 3parts.step"), &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: Vec::new(), all_bsurfaces: false }).unwrap();
+    write_step_with(&std::path::Path::new(&dir).join("g47 3parts.step"), &parts, LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: Vec::new(), all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
 }
 
 /// Prints the volume and faces (kind, area mm², box mm) of the parts of the
@@ -1523,7 +1523,7 @@ fn step_ap242_pmi_round_trips() {
     let dir = std::env::temp_dir().join(format!("noshape-pmi-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("pmi block.step");
-    write_step_with(&path, &[ExportShape { shape: block, name: Some("Block".into()), color: None }], LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: vec![Some(pmi)], all_bsurfaces: false }).unwrap();
+    write_step_with(&path, &[ExportShape { shape: block, name: Some("Block".into()), color: None }], LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap242, file_unit: None, pmi: vec![Some(pmi)], all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
     let lines = read_step_pmi(&path).unwrap();
     let text = std::fs::read_to_string(&path).unwrap();
     // The distance as XDE reads it: a linear distance (type 2) of 10 mm
@@ -1559,7 +1559,7 @@ fn step_ap242_pmi_round_trips() {
     let ap214 = dir.join("pmi block 214.step");
     let block = make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.02, 0.03)).unwrap();
     let pmi = PartPmi { datums: vec![PmiDatum { faces: vec![5], letter: "A".into(), presentation: None }], dims: Vec::new() };
-    write_step_with(&ap214, &[ExportShape { shape: block, name: Some("Block".into()), color: None }], LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None, pmi: vec![Some(pmi)], all_bsurfaces: false }).unwrap();
+    write_step_with(&ap214, &[ExportShape { shape: block, name: Some("Block".into()), color: None }], LengthUnit::Meter, &StepOptions { schema: StepSchema::Ap214, file_unit: None, pmi: vec![Some(pmi)], all_bsurfaces: false, face_colors: Vec::new() }).unwrap();
     assert!(!std::fs::read_to_string(&ap214).unwrap().contains("DATUM"));
 }
 
@@ -2869,4 +2869,45 @@ fn a_sat_edge_off_its_faces_is_put_back_on_them() {
     assert!(moved > 0, "no spline edge written");
     let a: f64 = back.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
     assert!((a - want).abs() < 5e-6 * want, "{a} vs {want}");
+}
+
+/// STEP-EXPORT-FACE-COLOURS (qa 11-25, live step-colour-roundtrip-1125): a part's face colours go out as
+/// OVER_RIDING_STYLED_ITEMs on the faces over the solid's colour (a plain STYLED_ITEM without one), and a re-import
+/// gives every face its colour back.
+#[test]
+fn step_face_colours_survive_export_and_reimport() {
+    let red = [204.0 / 255.0, 0.0, 0.0];
+    let blue = [0.0, 51.0 / 255.0, 1.0];
+    let (holed, plain) = (part(), make_box_corners(DVec3::new(0.1, 0.0, 0.0), DVec3::new(0.12, 0.02, 0.02)).unwrap());
+    let mut a = vec![None; holed.faces().len()];
+    a[0] = Some(red);
+    a[6] = Some(blue);
+    a[3] = Some(red);
+    let mut b = vec![None; plain.faces().len()];
+    b[5] = Some(blue);
+    let dir = std::env::temp_dir().join(format!("noshape-face-colours-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for schema in [StepSchema::Ap242, StepSchema::Ap214] {
+        let path = dir.join(format!("face colours {schema:?}.step"));
+        let parts = [ExportShape { shape: holed.clone(), name: Some("Holed".into()), color: Some([0.5, 0.5, 0.5]) }, ExportShape { shape: plain.clone(), name: Some("Plain".into()), color: None }];
+        write_step_with(&path, &parts, LengthUnit::Meter, &StepOptions { schema, face_colors: vec![a.clone(), b.clone()], ..Default::default() }).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text.matches("=OVER_RIDING_STYLED_ITEM(").count(), 3, "{schema:?}: Holed's faces over its solid's style");
+        assert_eq!(text.matches("=STYLED_ITEM(").count(), 2, "{schema:?}: Holed's solid and Plain's face");
+        let back = read_step(&path, LengthUnit::Meter).unwrap();
+        for (name, want) in [("Holed", &a), ("Plain", &b)] {
+            let p = back.iter().find(|p| p.name.as_deref() == Some(name)).unwrap_or_else(|| panic!("{schema:?}: {name} read back"));
+            let mut got = vec![None; want.len()];
+            for &(i, c) in &p.face_colors {
+                got[i] = Some(c);
+            }
+            let same = got.iter().zip(want.iter()).all(|(g, w)| match (g, w) {
+                (Some(g), Some(w)) => g.iter().zip(w).all(|(x, y)| (x - y).abs() < 1e-3),
+                (None, None) => true,
+                _ => false,
+            });
+            assert!(same, "{schema:?} {name}: {got:?}, want {want:?}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

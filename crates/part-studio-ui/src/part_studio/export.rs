@@ -67,7 +67,7 @@ impl PartStudioView {
             self.flash_info(msg, cx);
             return;
         }
-        // The exported bodies' MBD (STEP AP242 semantic PMI), in their order.
+        // The exported bodies' MBD (STEP AP242 semantic PMI) and face colours, in their order.
         let mut s = s;
         if let (Some(ctx), Some(ps)) = (self.context.as_ref(), self.studio(cx)) {
             let ids: Vec<BodyId> = ctx
@@ -78,6 +78,7 @@ impl PartStudioView {
                 .map(|b| b.id.clone())
                 .collect();
             s.pmi = noshape_ops::export::studio_pmi(ps, ctx, &ids, &self.doc.read(cx).session.doc.settings.units, s.mbd_text());
+            s.face_colors = ids.iter().map(|id| noshape_ops::export::part_face_colors(self.display.body(id))).collect();
         }
         // Inspection list (live inspection-list-1118): the Part Studio's Characteristics.
         if s.format == PartFormat::InspectionList

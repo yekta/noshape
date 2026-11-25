@@ -141,6 +141,8 @@ pub struct ExportSettings {
     /// Each part's MBD (index = part; [`studio_pmi`]), written to STEP AP242
     /// as semantic PMI.
     pub pmi: Vec<Option<k::PartPmi>>,
+    /// Each part's face colours (index = part; [`part_face_colors`]), written to STEP as overriding styles.
+    pub face_colors: Vec<Vec<Option<[f32; 3]>>>,
     /// The dialog's values of the formats not shown, given back on
     /// switching to them.
     pub memory: Box<SolidExportPrefs>,
@@ -426,6 +428,7 @@ impl Default for ExportSettings {
             custom: CustomResolution::default(),
             inspection: String::new(),
             pmi: Vec::new(),
+            face_colors: Vec::new(),
             memory: Box::default(),
             name: String::new(),
             hidden_before_urdf: None,
@@ -500,7 +503,7 @@ fn part_files(s: &ExportSettings, ext: &str, parts: &[(String, k::Shape, [f32; 4
             name.push('_');
         }
         let t = tmp(i);
-        let one = ExportSettings { pmi: vec![s.pmi.get(i).cloned().flatten()], ..s.clone() };
+        let one = ExportSettings { pmi: vec![s.pmi.get(i).cloned().flatten()], face_colors: vec![s.face_colors.get(i).cloned().unwrap_or_default()], ..s.clone() };
         write_parts(&one, &t, std::slice::from_ref(p))?;
         out.extend(with_mesh_file(&t, &format!("{name}.{ext}"))?);
     }
@@ -865,6 +868,13 @@ fn parasolid_version(s: &ExportSettings) -> &'static str {
 }
 
 /// A part as the STEP writer takes it: Onshape writes the colour's 8-bit sRGB values.
+/// A part's face colours as STEP writes them (sRGB, by face index; empty without any): the colours features gave
+/// its faces (an import's).
+pub fn part_face_colors(d: Option<&noshape_model::display::BodyDisplay>) -> Vec<Option<[f32; 3]>> {
+    let srgb = |v: f32| f32::from(crate::appearance::lin_to_srgb(v)) / 255.0;
+    d.map(|d| d.face_colors.iter().map(|c| c.map(|c| [srgb(c[0]), srgb(c[1]), srgb(c[2])])).collect()).unwrap_or_default()
+}
+
 fn step_shape(n: &str, sh: &k::Shape, c: &[f32; 4]) -> k::ExportShape {
     let srgb = |v: f32| crate::appearance::lin_to_srgb(v) as f32 / 255.0;
     k::ExportShape { shape: sh.clone(), name: Some(n.to_string()), color: Some([srgb(c[0]), srgb(c[1]), srgb(c[2])]) }
@@ -885,7 +895,7 @@ fn step_options(s: &ExportSettings) -> k::StepOptions {
     } else {
         None
     };
-    k::StepOptions { schema, file_unit, pmi: s.pmi.clone(), all_bsurfaces: s.preprocessing == STEP_PREPROCESSING.len() - 1 }
+    k::StepOptions { schema, file_unit, pmi: s.pmi.clone(), face_colors: s.face_colors.clone(), all_bsurfaces: s.preprocessing == STEP_PREPROCESSING.len() - 1 }
 }
 
 /// The Part Studio Format list's row `i` ([`PartFormat::list`]).
