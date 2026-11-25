@@ -71,6 +71,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
   double regen (confirmed: regen at 60 s stopped 8 s later when the view showed). bc3f3f817.
 - qa partly rows: PARTS-ROW-TOOLTIP (with_list_row_tooltip stays + tooltip_after_press; matrix row "parts / a row
   clicked into Boolean's field") and CONFIG-FILTER-HELP (help title at once, expanded at 1.97 s as live) b8d36439f.
+- NOW (lead 11-25 09:0x): shortcuts vs live shortcuts-1123 (onshape-research/live/shortcuts-1123: ps/psdlg/sk/sktool.md,
+  raw/<os>-<ctx>.json rows {seq, act, ev dp, add/rem, px}; raw/api-keyboardshortcuts.json = live's key->action map per
+  scope). Compact list: /root/psui-scratch/keys-ps.txt (Windows key | effect | action | MAC diff). Plan: GPUI matrix
+  test: open each context (ps no tool / feature dialog / sketch / sketch + tool), take the window's context stack, ask
+  the keymap `bindings_for_input` per live key (Windows keys; Mac via secondary-), compare our action with live's act
+  (a table live act -> our action); fix gaps. Then display modes (shaded / edges / hidden edges / translucent) and
+  named views vs live. Live table as GPUI keystrokes: /root/psui-scratch/keys-live.tsv (ctx, key e.g. "ctrl-shift-left",
+  live act id e.g. "zoomToFit" (empty = not in live's map), acted 0/1, preventDefault 0/1; Windows rows, 71 bound in
+  ps/psdlg, 97 in sk/sktool). Many of ours are on_key_down handlers, not keymap actions: record both the dispatched
+  action (`cx.observe_keystrokes`, KeystrokeEvent.action) and a small state signature (dialog type, sketch tool, camera
+  moved, selection, open panel) per key; Esc between keys. Test helper `keys(cx, window, &[..])` sketch_ui_tests:168.
+- Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
 - SKT-USE-HOVER fixed (bb472f3b1): a used curve's own use glyph always drawn, centred on its middle (Show constraints
