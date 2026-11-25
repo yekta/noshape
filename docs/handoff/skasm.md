@@ -20,6 +20,11 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   sketch_dimension_fills: off the sketch's normal the values lie in the plane along the sketch x at the 16 px size, the
   screen Label kept for the hit only; CameraChanged notifies on the flip). Arrowheads were already in-plane. Then the
   Offset preview's "5" in the plane the same way (its screen box kept for hover / click), landing next.
+- Live's everyday notes (behaviours "Everyday assembly" / "Everyday Part Studio") already hold in ours; pinned by T1s
+  the_undo_steps_of_everyday_assembly_work_as_lives, a_finished_sketch_is_one_undo_step,
+  a_circle_pastes_into_another_sketch_under_the_pointer (landing with the iso text). Still unchecked from those notes:
+  the parts-list menu (Where used… · Create task…; Edit material… / Show center of mass once a material is set),
+  Copy part + Ctrl+V in an Assembly inserting "Part 1 <1>" under the pointer (psui/asm own those, not me).
 - LANDING e4458668 (lead at 96% context, not messaged): dim box Esc, OPS-TANGENT-MATE A ("Mate is invalid." for a
   same-instance Tangent is live's text, errors-1123), pattern row mark; phone stand (cc40754f) not on main at 15:1x.
 - Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
