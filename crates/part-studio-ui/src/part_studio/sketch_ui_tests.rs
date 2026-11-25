@@ -7457,6 +7457,38 @@ fn the_config_filter_help_stays_while_the_new_inputs_name_is_typed(cx: &mut Test
     assert_eq!((after_click, typed, entered), (Some(400.), Some(400.), Some(400.)), "the supported filters after the click, while typing, after Enter");
 }
 
+/// Live asm config-filter-help-1123: the box's "Filter inputs" shows as the pointer arrives and expands under the box
+/// 1.97 s later. Workflow 06 (qa CONFIG-FILTER-HELP): Configure clicked with no pause before it puts the box under the
+/// pointer; the name typed 1.1 s later; the supported filters shown by 2.1 s.
+#[gpui::test]
+fn the_config_filter_help_expands_two_seconds_after_the_box_comes_under_the_pointer(cx: &mut TestAppContext) {
+    let (window, view) = studio_with_variables(cx, "cfg-filter-help-timing", &[("width", "30 mm")]);
+    view.update(cx, |v, cx| {
+        v.right_panel = Some(crate::part_studio::config_panel::RightPanel::Configurations);
+        cx.notify();
+    });
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, sel: &'static str| gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(sel);
+    let step = |cx: &mut TestAppContext, ms: u64| {
+        for _ in 0..ms / 10 {
+            cx.executor().advance_clock(std::time::Duration::from_millis(10));
+            draw(cx, window);
+        }
+    };
+    let button = at(cx, "cfg-configure").expect("Configure Part Studio").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(button, gpui_kit::Modifiers::default());
+    let shown = |cx: &mut TestAppContext| at(cx, "rich-tooltip").map(|b| f32::from(b.size.width));
+    step(cx, 300);
+    let short = shown(cx).is_some_and(|w| w < 200.);
+    step(cx, 800);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_input("Large");
+    step(cx, 400);
+    let before = shown(cx).is_some_and(|w| w < 200.);
+    step(cx, 600);
+    let after = shown(cx);
+    assert_eq!((short, before, after), (true, true, Some(400.)), "(the short tip at 0.3 s, still short at 1.5 s, the supported filters at 2.1 s)");
+}
+
 /// Live2 config.json (tableKeys): in the Configurations table, Enter on an edited value commits it and moves the
 /// selection down one row (the cell below framed).
 #[gpui::test]

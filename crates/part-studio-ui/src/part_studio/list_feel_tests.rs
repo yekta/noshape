@@ -468,6 +468,22 @@ fn rows() -> Vec<Row> {
             crate::ui_script::clear_tooltip();
             expect((f32::from(b.top() - a.top()), f32::from(a.size.height), tip), (26., 24., Some("Part 1".to_string())), "(pitch, band, tooltip after the click)")
         } },
+        Row { id: "parts / a row clicked into Boolean's field shows its tooltip", live: "workflow 17 s11 (qa PS-PARTS-ROW-TOOLTIP-PITCH): Boolean Union open, the pointer comes from the dialog and clicks Part 1; 'Part 1' right of the row (x230-320 y680-700)", gap: false, check: |l, cx| {
+            cx.update_window(l.window, |_, w, cx| l.view.update(cx, |v, cx| {
+                v.selection.clear();
+                v.start_feature("boolean", w, cx);
+            }))
+            .unwrap();
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            draw(cx, l.window);
+            crate::ui_script::clear_tooltip();
+            l.click(cx, "part:Part 1", NONE);
+            l.wait(cx, 1500);
+            let tip = crate::ui_script::shown_tooltip();
+            crate::ui_script::clear_tooltip();
+            l.keys(cx, "escape");
+            expect(tip, Some("Part 1".to_string()), "tooltip after the click")
+        } },
         Row { id: "dialog / Final", live: "a 49 x 22 button right of the slider; pressed, Final is on (walk8 9a-9c)", gap: false, check: |l, cx| {
             l.double_click(cx, "feature:Extrude 1");
             wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());

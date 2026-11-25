@@ -485,7 +485,8 @@ pub fn rich_tooltip(title: impl Into<SharedString>, description: impl Into<Share
 }
 
 /// A text box's help (live workflows-1123 06 s2-s4, the Configurations panel's "Filter inputs"): the title beside the
-/// box, then after [`TOOLTIP_EXPAND_DELAY`] the expanded tooltip under it, centred, `body` under the title band.
+/// box at once ([`HELP_TIP_DELAY`]), then [`HELP_EXPAND_DELAY`] later the expanded tooltip under it, centred, `body`
+/// under the title band.
 /// `text` is the body's words, for the parity recorder. The view shown is kept in `held` for [`held_help`].
 pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString>, body: impl Fn() -> AnyElement + 'static, anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>, held: HeldHelp) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let (title, text): (SharedString, SharedString) = (title.into(), text.into());
@@ -494,7 +495,7 @@ pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString
         let (anchor, body) = (anchor.get(), body.clone());
         let tip = cx.new(|cx| {
             cx.spawn(async move |this: WeakEntity<RichTooltip>, cx| {
-                cx.background_executor().timer(TOOLTIP_EXPAND_DELAY).await;
+                cx.background_executor().timer(HELP_EXPAND_DELAY).await;
                 let _ = this.update(cx, |t, cx| {
                     t.expanded = true;
                     cx.notify();
@@ -507,6 +508,11 @@ pub fn help_tooltip(title: impl Into<SharedString>, text: impl Into<SharedString
         tip.into()
     }
 }
+
+/// A text box's help title shows as the pointer arrives (live asm config-filter-help-1123: "at once")…
+pub const HELP_TIP_DELAY: std::time::Duration = std::time::Duration::ZERO;
+/// …and moves under the box, expanded, 1.97 s after it (the same capture).
+const HELP_EXPAND_DELAY: std::time::Duration = std::time::Duration::from_millis(1970);
 
 /// A [`help_tooltip`]'s view, kept by its owner: gpui hides a tooltip once a key is pressed, live keeps this help
 /// while the pointer rests on the box and the user types (workflows-1123 06 s3-s4: a new input's name typed, Enter).
@@ -713,9 +719,10 @@ pub fn with_user_side_tooltip(row: Stateful<Div>, text: impl Into<SharedString>)
 }
 
 /// [`with_user_side_tooltip`] for a list row drawn [`LIST_ROW_INSET`] short of the list's right edge: the tooltip
-/// beside the list, as a feature row's (live list-1119: the Parts row's).
+/// beside the list, as a feature row's (live list-1119: the Parts row's). A click on the row, even before its tooltip
+/// shows, leaves it to show by the still pointer (qa wf23 17 s11: "Part 1" clicked into Boolean's field).
 pub fn with_list_row_tooltip(row: Stateful<Div>, text: impl Into<SharedString>) -> Stateful<Div> {
-    tip_with(row, text.into(), TipSide::Right, true, LIST_ROW_INSET, false)
+    tip_with(row, text.into(), TipSide::Right, true, LIST_ROW_INSET, true).tooltip_after_press()
 }
 
 /// How far the default geometry, Parts and curve rows stop short of the list's right edge.

@@ -1368,6 +1368,7 @@ impl PartStudioView {
                             this.ui.cfg_filter_help.borrow_mut().take();
                         }))
                         .tooltip(crate::ui::help_tooltip("Filter inputs", config_filter_help_text(), config_filter_help, self.ui.cfg_filter_anchor.clone(), self.ui.cfg_filter_help.clone()))
+                        .tooltip_show_delay(crate::ui::HELP_TIP_DELAY)
                         .children(crate::ui::held_help(&self.ui.cfg_filter_help, self.ui.cfg_filter_anchor.get(), window)),
                 )
                 .child(toggles)
