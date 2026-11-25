@@ -864,11 +864,8 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         (None, _, None) => return Err(OpError::param("a", "required for a new mate")),
         (_, None, None) => return Err(OpError::param("b", "required for a new mate")),
     };
-    // (Two parts of one flexible subassembly instance may mate at this level, live asm-tvc-mount's Fastened 3; in a rigid
-    // one they are one body and the evaluation says so.)
-    if ca.instance == cb.instance && ca.path == cb.path && ca.instance != InstanceId::ORIGIN && mate_type != MateType::Width && !(mate_type == MateType::Tangent && ca == cb) {
-        return Err(OpError::param("b", "Mate connectors are on same instance."));
-    }
+    // Both on one instance: made, and the evaluation flags it "Mate connectors are on same instance.", as live's dialog
+    // and REST (OPS-TANGENT-MATE; behaviours "skasm (2026-11-04 00:22, P3)").
     let id = editing.unwrap_or_else(|| MateId(asm.next_id()));
     let name = match (a.opt_str("name")?, &old) {
         (Some(n), _) => n.trim().to_string(),
