@@ -2688,6 +2688,64 @@ fn a_mate_row_spans_the_list(cx: &mut TestAppContext) {
     assert!((f32::from(row.right()) - list_w).abs() <= 1., "the mate row spans the list ({row:?}, list {list_w})");
 }
 
+/// Live errors-1123 mates (Tangent cylinder ↔ plane): "Mate is not consistent." keeps ✓ green while the mate is
+/// created and pale when the committed mate is reopened; "Mate overdefines the assembly." keeps it green either way.
+#[gpui::test]
+fn a_reopened_inconsistent_mate_has_a_pale_check(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "mate-pale-reopened", |ctx| {
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let pale_with = |view: &Entity<AssemblyView>, msg: &str, cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let d = view.read(cx).mate.as_ref().expect("a mate dialog").dialog.clone();
+            d.update(cx, |d, _| d.status = Some(msg.to_string()));
+            d.read(cx).accept_pale(cx)
+        })
+    };
+    let id = cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates[0].id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_mate(id, w, cx))).unwrap();
+    cx.run_until_parked();
+    assert!(pale_with(&view, "Mate is not consistent.", cx), "reopened, not consistent: pale");
+    assert!(!pale_with(&view, "Mate overdefines the assembly.", cx), "reopened, overdefines: green");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.close_mate(w, cx);
+            v.start_mate(MateType::Revolute, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", false, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(!pale_with(&view, "Mate is not consistent.", cx), "creating, not consistent: green");
+}
+
+/// Live errors-1123 mates: a Tangent's chips name its entities ("Face of Part 1 <1>"), not "Mate connector of …",
+/// for a mate made through the agent API too.
+#[gpui::test]
+fn a_tangents_chips_name_its_faces(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "tangent-chips", |ctx| {
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "tangent", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let id = cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates[0].id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_mate(id, w, cx))).unwrap();
+    cx.run_until_parked();
+    let texts: Vec<String> = cx.update(|cx| {
+        let d = view.read(cx).mate.as_ref().expect("a mate dialog").dialog.read(cx);
+        (0..2).filter_map(|i| d.field(i).map(|c| d.field_text(i, c).to_string())).collect()
+    });
+    assert_eq!(texts, ["Face of Part 1 <1>", "Face of Part 2 <1>"]);
+}
+
 /// Live2 errors-1119 a5: a Revolute's minimum above its maximum disables ✓ and Enter (the dialog stays, nothing made).
 #[gpui::test]
 fn crossed_limits_keep_the_mate_dialog_open(cx: &mut TestAppContext) {
@@ -2742,6 +2800,28 @@ fn the_insert_dialog_leaves_out_an_empty_part_studio(cx: &mut TestAppContext) {
         assert!(vcx.debug_bounds("ins-row start empty").is_none(), "{query}: the empty studio left out");
         assert_eq!(vcx.debug_bounds("ins-no-match").is_some(), none, "{query}: the no-match line");
     }
+}
+
+/// Live workflows-1123 07 s19: with the pointer on a configured Part Studio's split button (Set to last viewed | ▾)
+/// the row stays white; elsewhere on the row it tints as any other.
+#[gpui::test]
+fn a_configured_rows_split_button_keeps_its_row_untinted(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "insert-cfg-btn", |ctx| {
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Configuration" }));
+    });
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_insert(w, cx))).unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let row = vcx.debug_bounds("ins-row Part Studio 1").expect("Part Studio 1 listed");
+    let y = row.center().y;
+    vcx.simulate_mouse_move(gpui_kit::point(row.right() - px(20.), y), None, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).ui.insert_cfg_btn_hover.is_some(), "the caret under the pointer"));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(gpui_kit::point(row.left() + px(120.), y), None, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    cx.update(|cx| assert!(view.read(cx).ui.insert_cfg_btn_hover.is_none(), "the row's name under the pointer"));
 }
 
 /// Live2 asm-dialogs-1119 q-ins / q-ins-sort: Insert's Part Studios are listed by name A → Z by default, the Sort

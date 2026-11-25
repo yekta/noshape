@@ -574,6 +574,8 @@ pub struct AsmUi {
     /// Insert dialog: configuration list selects per (Part Studio, input).
     pub insert_cfg_selects: HashMap<(TabId, String), Entity<crate::os_select::OsSelect>>,
     pub insert_cfg_subs: Vec<Subscription>,
+    /// The configured row whose split button is under the pointer (its row stays untinted).
+    pub insert_cfg_btn_hover: Option<TabId>,
     /// The "Folder name" dialog of Add selection to folder….
     pub folder_name: Option<FolderNameDialog>,
     /// Zebra stripes: the open dialog, and the accepted settings shown after.
@@ -4830,12 +4832,22 @@ impl AssemblyView {
         let probe = caret.clone();
         Some(
             h_flex()
+                .id(SharedString::from(format!("inscfg-btn-{studio}")))
                 .flex_none()
+                // Live workflows-1123 07 s19: white, and the row under it untinted while the pointer is on it.
                 .mr(px(6.))
                 .h(px(30.))
                 .rounded(px(3.))
                 .border_1()
                 .border_color(rgb(0xaaaaaa))
+                .bg(rgb(0xffffff))
+                .on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                    let v = on.then_some(studio);
+                    if this.ui.insert_cfg_btn_hover != v {
+                        this.ui.insert_cfg_btn_hover = v;
+                        cx.notify();
+                    }
+                }))
                 .child(
                     div()
                         .id(SharedString::from(format!("inscfg-last-{studio}")))
@@ -4954,7 +4966,11 @@ impl AssemblyView {
                     let sel = match self.ui.insert_cfg_selects.get(&key) {
                         Some(s) => s.clone(),
                         None => {
-                            let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("inscfg-{studio}-{}", inp.id))));
+                            let s = cx.new(|_| {
+                                let mut s = crate::os_select::OsSelect::new(SharedString::from(format!("inscfg-{studio}-{}", inp.id)));
+                                s.set_hover_underline(false);
+                                s
+                            });
                             let id2 = id.clone();
                             let sub = cx.subscribe(&s, move |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
                                 let crate::os_select::OsSelectEvent::Picked(oid) = ev;

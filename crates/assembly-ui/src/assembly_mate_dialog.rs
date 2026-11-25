@@ -13,6 +13,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::assembly::eval::{limit_keys, offset_axes};
 use noshape_model::assembly::{Limits, Mate, MateConnectorRef, MateId, MateType};
+use noshape_model::reference::Reference;
 use noshape_units::ExprValue;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -94,6 +95,8 @@ pub struct MateDialog {
     /// An option was changed (a checkbox, a value, a flip): ✓ is on though the title is red (live
     /// asm-cylindrical-limits, asm-tangent-propagation). Picks don't count.
     pub touched: bool,
+    /// A mate being created (not a committed one reopened).
+    pub is_new: bool,
     /// A limit typed in this session: only then are crossed limits flagged (pink, the title's "A parameter value is not
     /// valid."); a committed mate reopened keeps white fields (live errors-1123 mates, limits).
     limits_typed: bool,
@@ -314,6 +317,7 @@ impl MateDialog {
             advance_disarmed: None,
             picks_undo: Vec::new(),
             touched: false,
+            is_new,
             limits_typed: false,
             hovered_field: None,
             picks_redo: Vec::new(),
@@ -691,6 +695,19 @@ impl MateDialog {
 
     /// ✓ and Enter take the mate: both connectors set and no minimum limit above its maximum (live2 errors-1119 a5: ✓
     /// disabled while they cross).
+    /// ✓ drawn pale. Live errors-1123 mates: pale on a mate that can't solve (connectors lost, between fixed
+    /// instances, bad limits, inactive), green on one that only fights other mates ("not consistent": green while
+    /// creating, pale reopened); a Tangent with one entity keeps it green.
+    pub fn accept_pale(&self, cx: &App) -> bool {
+        let invalid = self.to_mate(cx).is_none();
+        let crossed = !self.crossed_limits(cx).is_empty();
+        let unsolvable = self.inactive.is_some()
+            || self.cone_out_of_range(cx).is_some()
+            || self.status.as_deref().is_some_and(|m| m != "Mate overdefines the assembly." && (m != "Mate is not consistent." || !self.is_new));
+        let one_tangent = self.mate_type == MateType::Tangent && (self.a.is_some() || self.b.is_some());
+        (invalid && !self.touched && !one_tangent) || crossed || unsolvable
+    }
+
     pub fn can_accept(&self, cx: &App) -> bool {
         self.to_mate(cx).is_some() && self.crossed_limits(cx).is_empty() && self.cone_out_of_range(cx).is_none()
     }
@@ -882,6 +899,21 @@ impl MateDialog {
         self.active.is_some_and(|a| slots.contains(&a)) || (self.active.is_none() && slots.contains(&0) && self.editing_field.is_none())
     }
 
+    /// A pick's chip text: "Mate connector of Part 1 <1>"; a Tangent's entity "Face of Part 1 <1>", gone "Missing
+    /// entity of Part 1 <1>" (live errors-1123 mates).
+    pub fn field_text(&self, field: usize, c: &MateConnectorRef) -> SharedString {
+        if self.mate_type == MateType::Tangent && let Some(inst) = self.lost.get(&field) {
+            return format!("Missing entity of {inst}").into();
+        }
+        if self.unresolved.contains(&field) {
+            return "Mate connector".into();
+        }
+        match &c.reference {
+            Reference::Implicit { on, .. } if self.mate_type == MateType::Tangent => (self.labeler)(&MateConnectorRef { reference: (**on).clone(), ..c.clone() }).into(),
+            _ => (self.labeler)(c).into(),
+        }
+    }
+
     /// One Onshape selection box over some connector slots: the filled
     /// slots are its rows; it is the active box while one of them takes the
     /// next pick.
@@ -893,11 +925,7 @@ impl MateDialog {
             let Some(c) = self.slot(field) else { continue };
             let lost = self.lost.get(&field);
             let unresolved = self.unresolved.contains(&field);
-            let text: SharedString = match lost {
-                Some(inst) if self.mate_type == MateType::Tangent => format!("Missing entity of {inst}").into(),
-                _ if unresolved => "Mate connector".into(),
-                _ => (self.labeler)(c).into(),
-            };
+            let text = self.field_text(field, c);
             let text_del = text.clone();
             // Live (qa5 MT3): "Mate connector of Part 1 <3> (Click to edit)".
             let edit_tip = format!("{text} (Click to edit)");
@@ -1137,13 +1165,7 @@ impl Render for MateDialog {
         }
         let regen_error = self.regen_error(cx);
         let invalid = self.to_mate(cx).is_none();
-        let crossed = !self.crossed_limits(cx).is_empty();
-        // Live errors-1123 mates: ✓ pale on a mate that can't solve (connectors lost, between fixed instances, bad
-        // limits, inactive), green on one that only fights other mates.
-        let unsolvable = self.inactive.is_some() || self.cone_out_of_range(cx).is_some() || self.status.as_deref().is_some_and(|m| !matches!(m, "Mate overdefines the assembly." | "Mate is not consistent."));
-        // (A Tangent with one entity keeps it green, live errors-1123 mates.)
-        let one_tangent = t == MateType::Tangent && (self.a.is_some() || self.b.is_some());
-        let pale = (invalid && !self.touched && !one_tangent) || crossed || unsolvable;
+        let pale = self.accept_pale(cx);
         let query_boxes = match t {
             // Live (dom/dialog-mate-tangent-*): one "Face, edge or vertex" field per entity.
             MateType::Tangent => vec![self.query_box("mate-q-ent-a", "Face, edge or vertex", &[0], cx), self.query_box("mate-q-ent-b", "Face, edge or vertex", &[1], cx)],

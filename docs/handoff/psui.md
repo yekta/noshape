@@ -82,6 +82,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   #333 at 0.5). New list matrix rows: undo/redo of a reorder, a rollback move, a menu Delete with dependents.
 - LANDING: readout #666, drag pills, Use glyph landed. 26251e31 (shortcuts) failed on a rebase conflict (09:24);
   rebased clean at 10:06 and queued as b8e0a0b5 (rim test, shortcuts matrix, featurelist rows + handoffs). Await the lead.
+- asm UI batch (lead 10:0x: asm's open P0/P1 UI/feel rows, no solver internals) committed: Insert split button white,
+  row untinted under it (quiet ids in item_row), OsSelect hover = blue underline only (set_hover_underline(false) for
+  Insert config selects); mate dialog accept_pale() (reopened "not consistent" pale) and field_text() (Tangent's
+  inferred picks read "Face of …"). TICKETS 778 + 694 "fixed, to verify". Not taken (solver): ERR-MATE-CREATING-REV-RED,
+  ERR-MATE-OVERDEF-BOTH (eval.rs ~870 held_back). Left: IMP-ASM-ROW-ICON (import), ASM-PATTERN-PREVIEW-LATE (speed).
 - NEXT: display modes + named views vs live: asked live (REQUESTS 11-25 09:25, block + hole + fillets, pixels per mode,
   menu rows, persistence, named views panel). Ours: camera_menu.rs, view_tools.rs named views, render translucent 25 %.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).

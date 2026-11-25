@@ -99,6 +99,8 @@ pub struct OsSelect {
     list_overflow: Rc<Cell<bool>>,
     /// Scroll of the open list (at most [`LIST_MAX_H`] tall).
     scroll: ScrollHandle,
+    /// A hovered field draws its underline blue (a dialog parameter's select).
+    hover_underline: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -111,7 +113,13 @@ impl OsSelect {
     }
 
     pub fn new(id: impl Into<SharedString>) -> Self {
-        Self { id: id.into(), items: Vec::new(), pictures: Default::default(), translated: false, current: SharedString::default(), missing: None, height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), _subs: Vec::new() }
+        Self { id: id.into(), items: Vec::new(), pictures: Default::default(), translated: false, current: SharedString::default(), missing: None, height: FIELD_H, search: None, query: String::new(), highlight: 0, return_focus: None, focus: None, bounds: Default::default(), list_bounds: Default::default(), list_overflow: Default::default(), scroll: ScrollHandle::new(), hover_underline: true, _subs: Vec::new() }
+    }
+
+    /// Hovering changes nothing (the Insert dialog's configuration selects,
+    /// live workflows-1123 07 s20); a dialog parameter's select underlines blue.
+    pub fn set_hover_underline(&mut self, on: bool) {
+        self.hover_underline = on;
     }
 
     /// A shorter field (Hole's lookup rows are 22 px).
@@ -275,15 +283,24 @@ impl OsSelect {
             .pr(px(4.))
             .border_b_1()
             .border_color(pal.border)
-            // `#def1fb` hover (§4.5).
-            .hover(|d| d.bg(pal.row_hover))
+            .group(self.id.clone())
             .cursor_pointer()
             .child(div().flex_1().min_w_0().text_size(px(14.)).text_color(if missing.is_some() { pal.error } else { pal.text }).when(missing.is_some(), |d| d.italic()).truncate().map(|d| if self.translated { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
             // Live: the 8x4 bootstrap caret, 6 px from the end.
             .child(crate::ui::glyph("drawing-tool-caret", 12., pal.text))
-            // Focused (live/feel/mirror 37, after a pick): a 1 px `#1651b0` line over the grey underline, no glow.
+            // Focused (live/feel/mirror 37, after a pick): a 1 px `#1651b0` line over the grey underline, no glow. Hovered:
+            // the same line and no fill (live CSS `os-select-toggle:hover`: border-bottom `--os-parameter-underline--active`).
             .relative()
-            .when(focused, |d| d.child(div().absolute().left_0().right_0().bottom_0().h(px(1.)).bg(gpui_kit::rgb(0x1651b0))))
+            .child(
+                div()
+                    .absolute()
+                    .left_0()
+                    .right_0()
+                    .bottom_0()
+                    .h(px(1.))
+                    .when(focused, |d| d.bg(gpui_kit::rgb(0x1651b0)))
+                    .when(!focused && self.hover_underline, |d| d.group_hover(self.id.clone(), |s| s.bg(gpui_kit::rgb(0x1651b0)))),
+            )
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open(window, cx)))
             .into_any_element()
     }

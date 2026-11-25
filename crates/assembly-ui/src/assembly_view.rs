@@ -6200,9 +6200,12 @@ impl AssemblyView {
         let (source, tab) = (self.ui.insert_source, self.ui.insert_tab);
         // Tree rows: expander, 70x40 thumbnail cell, name (13.33 px light).
         self.request_insert_thumbs(cx);
+        // A hovered split button keeps its row untinted (live wf07 s19).
+        let quiet: Vec<String> = self.ui.insert_cfg_btn_hover.map(|t| vec![format!("ins-ps-{t}"), format!("ins-asm-{t}")]).unwrap_or_default();
         let item_row = |id: SharedString, indent: f32, expander: Option<AnyElement>, icon: &'static str, thumb: Option<Arc<RenderImage>>, name: String, cx: &App| {
             let row_name = name.clone();
             let selector = format!("ins-row {name}");
+            let lit = !quiet.iter().any(|q| q.as_str() == id.as_ref());
             h_flex()
                 .id(id)
                 .debug_selector(move || selector)
@@ -6211,7 +6214,7 @@ impl AssemblyView {
                 .h(px(40.))
                 .pl(px(4. + indent))
                 .cursor_pointer()
-                .hover(|d| d.bg(pal.row_hover))
+                .when(lit, |d| d.hover(|d| d.bg(pal.row_hover)))
                 .child(div().w(px(14.)).h_full().flex_none().flex().items_center().children(expander))
                 .child(div().w(px(70.)).h(px(40.)).flex_none().flex().items_center().justify_center().child(match thumb {
                     Some(img) => gpui_kit::img(img).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
@@ -6270,7 +6273,7 @@ impl AssemblyView {
                         .into_any_element()
                 });
                 let cfg_button = self.insert_config_button(s.tab, cx);
-                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_thumb(s.tab, None), s.name.clone(), cx).children(cfg_button).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
+                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_thumb(s.tab, None), s.name.clone(), cx).children(cfg_button.map(|b| h_flex().flex_none().child(b).child(div().w(px(4.))))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
                 if open && let Some(el) = self.render_insert_config(s.tab, cx) {
                     body = body.child(div().pl(px(50.)).pr_2().child(el));
                 }
@@ -6306,7 +6309,7 @@ impl AssemblyView {
             for (tab, name) in list {
                 let n2 = name.clone();
                 let cfg_button = self.insert_config_button(tab, cx);
-                body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", None, name, cx).children(cfg_button).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
+                body = body.child(item_row(SharedString::from(format!("ins-asm-{tab}")), 0., None, "assembly", None, name, cx).children(cfg_button.map(|b| h_flex().flex_none().child(b).child(div().w(px(4.))))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_assembly(tab, n2.clone(), cx))));
                 // A configured assembly: its configuration inputs before inserting.
                 if let Some(el) = self.render_insert_config(tab, cx) {
                     body = body.child(div().pl(px(40.)).pr_2().child(el));
