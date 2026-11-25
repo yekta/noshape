@@ -2144,9 +2144,26 @@ static bool new_faces_valid(const TopoDS_Shape& in, const TopoDS_Shape& out)
 {
   ShapeIMap had;
   TopExp::MapShapes(in, TopAbs_FACE, had);
+  // (And the faces kept beside them: their shared edges can come back changed in place (c2-impeller-loft's Bohrungssitz
+  // fuse: the rod's two seamed cylinder faces left with open wires).)
+  ShapeIMap touched;
   for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
-    if (!had.Contains(x.Current()) && !BRepCheck_Analyzer(x.Current()).IsValid())
+    if (!had.Contains(x.Current()))
+    {
+      if (!BRepCheck_Analyzer(x.Current()).IsValid())
+        return false;
+      TopExp::MapShapes(x.Current(), TopAbs_EDGE, touched);
+    }
+  for (TopExp_Explorer x(out, TopAbs_FACE); x.More(); x.Next())
+  {
+    if (!had.Contains(x.Current()))
+      continue;
+    bool beside = false;
+    for (TopExp_Explorer e(x.Current(), TopAbs_EDGE); e.More() && !beside; e.Next())
+      beside = touched.Contains(e.Current());
+    if (beside && !BRepCheck_Analyzer(x.Current()).IsValid())
       return false;
+  }
   return true;
 }
 
