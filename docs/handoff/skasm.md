@@ -3,15 +3,18 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 13:48) — read first
-- QUEUED (one stack, re-queued 13:4x): Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent
-  (live tangent-one-entity-1123: ✓ after one pick makes it in error "Tangent mate needs two entities.", agent API too),
-  and 74897781e: (a) ERR-MATE-OVERDEF-BOTH flush residual: solver.rs held-back step reds a mate between the same two
-  parts as one that can't hold (a part-wide rule broke oracle_asm f16/f76/f80/1798 a1); (b) P0
-  FEEL-MC-ARC-PICK-VERTEX-ASM: inference::choose keeps an arc's centre wherever along it. If it fails: fix forward.
-- NEXT P1 FLOW-VAR-UNDERDEFINED-SKETCH-MOVES (lead 11-25, TICKETS qa phone stand): #t 5->4 live moves the lip rigidly
-  (l3 keeps 10 mm, l1 stretches); ours stretches l3. constructive.rs placement order; repro qa-scratch/tmp/stand/t4.py.
-- Then: OVERDEF-BOTH replays (vibex8 errc cells m-tan-planes-c, m-slider-lim-c; the slot was busy with qa parity).
+## NOW (11-25 14:11) — read first
+- LANDED: Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent (live tangent-one-entity-1123).
+- QUEUED (one stack): e846e605f (a) ERR-MATE-OVERDEF-BOTH flush residual: solver.rs held-back step reds a mate
+  between the same two parts as one that can't hold (a part-wide rule broke oracle_asm f16/f76/f80/1798 a1);
+  (b) P0 FEEL-MC-ARC-PICK-VERTEX-ASM: inference::choose keeps an arc's centre wherever along it; fa234aead P1
+  FLOW-VAR-UNDERDEFINED-SKETCH-MOVES: constructive.rs `carried_between` (an H/V line on the line a changed
+  line-to-line Distance moved, its H/V chain reaching the Distance's other line, keeps its shape even when
+  end_carried; the chain's last line stretches). If it fails: fix forward.
+- Replays (vibex8 errc, 13:13 binary): m-tan-planes-c both red once complete, m-slider-lim-c Revolute OK, as live.
+  (A new mate's row/title red before both picks is live's, not a bug.)
+- NEXT: the remaining asm mate rows (TICKETS, most-used first); OPS-TANGENT-MATE P2 needs a lead call (REST accepts
+  a same-instance Tangent, the dialog doesn't).
 - Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
   "Everyday Part Studio" (sketch undo scope, paste on the pointer).
 - App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
