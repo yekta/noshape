@@ -52,11 +52,22 @@ struct Shown {
 /// A view's display and the studio and document variables it was made from.
 pub type Made = (Arc<PartStudio>, BTreeMap<String, Quantity>, Arc<StudioDisplay>);
 
-/// Each document's thumbnail regeneration while it runs (a closed or busy Part Studio regenerated here).
+/// Each document's thumbnail regeneration while it runs (a closed or busy Part Studio regenerated here) and its tab.
 #[derive(Default)]
-struct ThumbnailJobs(HashMap<PathBuf, RegenCancel>);
+struct ThumbnailJobs(HashMap<PathBuf, (TabId, RegenCancel)>);
 
 impl Global for ThumbnailJobs {}
+
+impl ThumbnailJobs {
+    /// A view made the display of `tab`: a thumbnail still regenerating that same studio (it gave up waiting for a
+    /// slow open: the impeller's 60 s) stops, and its retry draws the view's display (it burned 59 s of the cores
+    /// after the open). True when one stopped.
+    fn stop_for_view(&self, path: &Path, tab: TabId) -> bool {
+        let Some((_, cancel)) = self.0.get(path).filter(|(t, c)| *t == tab && !c.aborted()) else { return false };
+        cancel.abort();
+        true
+    }
+}
 
 /// Other pictures' regenerations of a document's studios while they run (a tab's hover card): a view's regeneration
 /// stops them too.
@@ -96,7 +107,7 @@ impl std::error::Error for Cancelled {}
 pub fn regen_started(path: &Path, tab: TabId, cx: &mut App) {
     let shown = cx.default_global::<StudioDisplays>().0.entry((path.to_path_buf(), tab)).or_default();
     shown.pending.get_or_insert_with(Instant::now);
-    if let Some(job) = cx.try_global::<ThumbnailJobs>().and_then(|j| j.0.get(path)) {
+    if let Some((_, job)) = cx.try_global::<ThumbnailJobs>().and_then(|j| j.0.get(path)) {
         job.abort();
         if noshape_render::perf::enabled() {
             log::info!(target: "perf", "thumbnail: stopped, tab {} regenerates in its view", tab.0);
@@ -114,7 +125,11 @@ pub fn regen_started(path: &Path, tab: TabId, cx: &mut App) {
 pub fn regen_done(path: &Path, tab: TabId, made: Option<Made>, cx: &mut App) {
     let shown = cx.default_global::<StudioDisplays>().0.entry((path.to_path_buf(), tab)).or_default();
     shown.pending = None;
+    let made_any = made.is_some();
     shown.made = made;
+    if made_any && cx.try_global::<ThumbnailJobs>().is_some_and(|j| j.stop_for_view(path, tab)) && noshape_render::perf::enabled() {
+        log::info!(target: "perf", "thumbnail: stopped, tab {} shown by its view", tab.0);
+    }
 }
 
 /// A Part Studio view went away.
@@ -361,8 +376,11 @@ impl Thumbnailer {
         self.dirty = false;
         let cancel = RegenCancel::default();
         let path = session.path.clone();
+        let regenerates = shown.is_none();
         let job = Job { tab, shown, config: studio.configuration.defaults(), studio, units: doc.settings.units, doc_vars, engine: self.engine.clone(), gpu: self.gpu.clone(), cancel: cancel.clone() };
-        cx.default_global::<ThumbnailJobs>().0.insert(path, cancel);
+        if regenerates {
+            cx.default_global::<ThumbnailJobs>().0.insert(path, (tab, cancel));
+        }
         Prepared::Job(Box::new(job))
     }
 
@@ -427,7 +445,7 @@ fn store_to_file(path: PathBuf, branch: noshape_store::BranchId, tab: TabId, tab
 
 #[cfg(test)]
 mod tests {
-    use super::{decide, Duration, Instant, PartStudio, Shown, Source, StudioDisplay, MAX_WAIT};
+    use super::{decide, Duration, Instant, PartStudio, RegenCancel, Shown, Source, StudioDisplay, TabId, ThumbnailJobs, MAX_WAIT};
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
@@ -457,5 +475,22 @@ mod tests {
         assert_eq!(kind(decide(Some(&regenerating), &edited, &vars)), "wait");
         let stuck = Shown { pending: Instant::now().checked_sub(MAX_WAIT + Duration::from_secs(1)), made: None };
         assert_eq!(kind(decide(Some(&stuck), &edited, &vars)), "regenerate", "waited long enough");
+    }
+
+    /// A thumbnail that gave up waiting for a slow open and regenerates the studio itself stops once the view shows
+    /// that studio (its retry draws the view's display); another tab's regeneration goes on.
+    #[test]
+    fn a_thumbnail_regeneration_stops_when_the_view_shows_its_studio() {
+        let path = std::path::PathBuf::from("doc.noshape");
+        let (shown_tab, other_tab) = (TabId(1), TabId(2));
+        let cancel = RegenCancel::default();
+        let mut jobs = ThumbnailJobs::default();
+        jobs.0.insert(path.clone(), (shown_tab, cancel.clone()));
+        assert!(!jobs.stop_for_view(&path, other_tab), "another tab's view");
+        assert!(!jobs.stop_for_view(std::path::Path::new("other.noshape"), shown_tab), "another document");
+        assert!(!cancel.aborted());
+        assert!(jobs.stop_for_view(&path, shown_tab));
+        assert!(cancel.aborted());
+        assert!(!jobs.stop_for_view(&path, shown_tab), "stopped once");
     }
 }

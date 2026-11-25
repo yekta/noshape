@@ -77,7 +77,8 @@ pub fn prepare() -> Option<PathBuf> {
     Some(doc)
 }
 
-/// A page start's documents (`{"name", "start"}`, a start of starts.json; `"folder"` with its own `documents`) in `dir`.
+/// A page start's documents (`{"name", "start"}`, a start of starts.json; `"file"`, a copy of a document; `"folder"`
+/// with its own `documents`) in `dir`.
 fn build_documents(dir: &Path, docs: &Value, starts: &Value) {
     for d in docs.as_array().into_iter().flatten() {
         let name = d["name"].as_str().unwrap_or_else(|| fail(&format!("a start document without a name: {d}")));
@@ -87,11 +88,17 @@ fn build_documents(dir: &Path, docs: &Value, starts: &Value) {
             build_documents(&sub, &d["documents"], starts);
             continue;
         }
+        let path = dir.join(format!("{name}.noshape"));
+        // `"file"`: a copy of a document file (a speed run's real document).
+        if let Some(file) = d["file"].as_str() {
+            std::fs::copy(file, &path).unwrap_or_else(|e| fail(&format!("start document {name}: {file}: {e}")));
+            noshape_app_core::doc_files::add_recent(&path);
+            continue;
+        }
         let start = match d["start"].as_str() {
             Some(s) => starts.get(s).cloned().unwrap_or_else(|| fail(&format!("no start {s}"))),
             None => json!({ "units": "mm", "features": [], "tabs": [] }),
         };
-        let path = dir.join(format!("{name}.noshape"));
         noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &path, &start).unwrap_or_else(|e| fail(&format!("start document {name}: {e}")));
         // Live's account opened each: they are in Recently opened.
         noshape_app_core::doc_files::add_recent(&path);
