@@ -381,12 +381,22 @@ pub fn dynamic_level(table: &str, path: &[String]) -> Option<std::sync::Arc<DynL
     Some(level)
 }
 
+/// An option as the dialog lists it: std's pipe tap types sentence-cased (live hole-1125: "Straight pipe tap",
+/// "Tapered pipe tap"; the path keeps std's key).
+fn option_label(key: &str) -> String {
+    match key {
+        "Straight Pipe Tap" => "Straight pipe tap".into(),
+        "Tapered Pipe Tap" => "Tapered pipe tap".into(),
+        _ => key.into(),
+    }
+}
+
 fn level_info(table: &str, path: &[String]) -> Option<LevelInfo> {
     if let Some(l) = dynamic_level(table, path) {
         return Some(LevelInfo { name: l.name, options: l.entries.iter().map(|(k, _)| (k.clone(), k.clone())).collect(), default: l.default.clone() });
     }
     let (Entry::Level(l), _) = walk(table, path)? else { return None };
-    let options: Vec<Opt> = l.entries.iter().map(|(k, _)| (k.clone(), k.clone())).collect();
+    let options: Vec<Opt> = l.entries.iter().map(|(k, _)| (k.clone(), option_label(k))).collect();
     // A level without a default (Hole type, Standard) starts on its first option.
     let default = l.default.clone().or_else(|| options.first().map(|o| o.0.clone()))?;
     Some(LevelInfo { name: &l.name, options, default })
@@ -722,6 +732,31 @@ mod tests {
         v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
         sync_hole_standard(&mut v);
         assert_eq!(v.lookup("isoHoleTableEx").first().map(String::as_str), Some("Tapped"));
+    }
+
+    /// Live hole-1125 (hl9, hl10): the dialog's lists for each standard and style, their ends and defaults.
+    #[test]
+    fn lists_are_lives() {
+        let names = |t: &str, path: &[&str]| table_levels(t, &p(path)).into_iter().map(|o| o.1).collect::<Vec<_>>();
+        let ends = |t: &str, path: &[&str]| {
+            let n = names(t, path);
+            (n.len(), n[..2].to_vec(), n[n.len() - 1].clone(), table_level_default(t, &p(path)).unwrap())
+        };
+        assert_eq!(names(TABLE_ANSI_HOLE_EX, &[]), ["Drilled", "Clearance", "Tapped", "PEM®"]);
+        assert_eq!(names(TABLE_ISO_HOLE_EX, &[]), ["Drilled", "Clearance", "Tapped", "PEM®"]);
+        assert_eq!(names(TABLE_ISO_HOLE, &[]), ["Drilled", "Clearance", "Tapped"], "Counterbore / Countersink: no PEM®");
+        assert_eq!(names(TABLE_ANSI_HOLE, &[]), ["Drilled", "Clearance", "Tapped"]);
+        assert_eq!(ends(TABLE_ANSI_HOLE_EX, &["Drilled"]), (170, p(&["#80 (0.0135)", "#79 (0.0145)"]), "1 (1.0)".into(), "1/4 (0.25)".into()));
+        for t in [TABLE_ISO_HOLE_EX, TABLE_ISO_HOLE] {
+            assert_eq!(ends(t, &["Drilled"]), (157, p(&["0.05", "0.1"]), "38".into(), "5".into()), "{t}");
+        }
+        assert_eq!(names(TABLE_ISO_HOLE_EX, &["Tapped"]), ["Straight tap", "Straight pipe tap", "Tapered pipe tap"]);
+        assert_eq!(ends(TABLE_ISO_HOLE_EX, &["Tapped", "Straight tap"]), (42, p(&["M1", "M1.1"]), "M68".into(), "M5".into()));
+        assert_eq!(names(TABLE_ISO_HOLE_EX, &["Tapped", "Straight tap", "M5"]), ["0.5 mm (Fine)", "0.80 mm (Coarse)"]);
+        assert_eq!(table_level_default(TABLE_ISO_HOLE_EX, &p(&["Tapped", "Straight tap", "M5"])).unwrap(), "0.80 mm (Coarse)");
+        assert_eq!(ends(TABLE_ISO_HOLE_EX, &["Tapped", "Straight tap", "M5", "0.80 mm (Coarse)"]), (4, p(&["None", "Close"]), "Loose".into(), "None".into()));
+        let m5 = table_values(TABLE_ISO_HOLE_EX, &p(&["Tapped", "Straight tap", "M5", "0.80 mm (Coarse)", "None"])).unwrap();
+        assert!((m5.tap_drill_diameter.unwrap() - 4.2e-3).abs() < 1e-9 && (m5.pitch.unwrap() - 0.8e-3).abs() < 1e-12);
     }
 
     #[test]
