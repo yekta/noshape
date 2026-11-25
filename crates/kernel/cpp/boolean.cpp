@@ -39,6 +39,9 @@
 #include <ShapeAnalysis_Curve.hxx>
 #include <BRepAlgo.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
+#include <BRepTopAdaptor_FClass2d.hxx>
+#include <GeomAPI_IntCS.hxx>
+#include <GeomAPI_IntSS.hxx>
 #include <NCollection_HSequence.hxx>
 
 #include <BOPAlgo_MakerVolume.hxx>
@@ -13660,6 +13663,116 @@ static TopoDS_Shape exact_on_extrusion(const TopoDS_Shape& projected, const Topo
 }
 
 namespace {
+// Edges joined into wires, a compound of them in `out` (nothing where there are none).
+void as_wires(const occ::handle<NCollection_HSequence<TopoDS_Shape>>& edges, TopoDS_Shape& out)
+{
+  if (edges->IsEmpty())
+    return;
+  const occ::handle<NCollection_HSequence<TopoDS_Shape>> wires = ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, Precision::Confusion(), true);
+  if (wires.IsNull() || wires->IsEmpty())
+    return;
+  BRep_Builder    b;
+  TopoDS_Compound w;
+  b.MakeCompound(w);
+  for (int i = 1; i <= wires->Length(); ++i)
+    b.Add(w, wires->Value(i));
+  out = w;
+}
+
+// The sweep plane (through `o`, normal `n`, the line along `t` over [lo, hi]) on one cylinder, cone or sphere face:
+// the surfaces' own intersection (exact conics) cut where the sweep's ends cross it, each part inside the face; false
+// where that isn't so (a part leaving the face or crossing its seam, a curve the reach doesn't bound): the section then.
+// (OCCT's section of one cone face took 8.6 ms: a hex socket on a screw head, c2-config-parts-screws' Split 3.)
+bool sweep_on_elementary(const TopoDS_Shape& target, const gp_Pnt& o, const gp_Dir& t, const gp_Dir& n, double lo, double hi, NCollection_HSequence<TopoDS_Shape>& edges)
+{
+  TopoDS_Face face;
+  for (TopExp_Explorer x(target, TopAbs_FACE); x.More(); x.Next())
+  {
+    if (!face.IsNull())
+      return false;
+    face = TopoDS::Face(x.Current());
+  }
+  if (face.IsNull())
+    return false;
+  const BRepAdaptor_Surface sa(face, false);
+  if (sa.GetType() != GeomAbs_Cylinder && sa.GetType() != GeomAbs_Cone && sa.GetType() != GeomAbs_Sphere)
+    return false;
+  const occ::handle<Geom_Surface> s = BRep_Tool::Surface(face);
+  GeomAPI_IntSS                   ss(new Geom_Plane(gp_Ax3(o, n, t)), s, Precision::Confusion());
+  if (!ss.IsDone())
+    return false;
+  const auto along = [&](const gp_Pnt& p) { return gp_Vec(o, p).Dot(gp_Vec(t)); };
+  const auto within = [&](const gp_Pnt& p) {
+    const double a = along(p);
+    return a >= lo && a <= hi;
+  };
+  ShapeAnalysis_Surface   sas(s);
+  BRepTopAdaptor_FClass2d inside(face, Precision::PConfusion());
+  double                  u0f, u1f, v0f, v1f;
+  BRepTools::UVBounds(face, u0f, u1f, v0f, v1f);
+  for (int i = 1; i <= ss.NbLines(); ++i)
+  {
+    const occ::handle<Geom_Curve> c = ss.Line(i);
+    const bool                    periodic = c->IsPeriodic();
+    const double                  f = c->FirstParameter(), l = periodic ? f + c->Period() : c->LastParameter();
+    const bool                    open[2] = {!periodic && Precision::IsInfinite(f), !periodic && Precision::IsInfinite(l)};
+    std::vector<double>           us;
+    for (double h : {lo, hi})
+    {
+      GeomAPI_IntCS cs(c, new Geom_Plane(gp_Ax3(o.Translated(gp_Vec(t) * h), t)));
+      if (!cs.IsDone() || cs.NbSegments() > 0)
+        return false;
+      for (int k = 1; k <= cs.NbPoints(); ++k)
+      {
+        double a, b, u;
+        cs.Parameters(k, a, b, u);
+        us.push_back(periodic ? ElCLib::InPeriod(u, f, l) : u);
+      }
+    }
+    std::sort(us.begin(), us.end());
+    // (An unbounded end within the reach: a line along the sweep, the projection degenerate there.)
+    if ((open[0] && within(c->Value(us.empty() ? 0.0 : us.front() - 1.0))) || (open[1] && !us.empty() && within(c->Value(us.back() + 1.0))))
+      return false;
+    if (!open[0])
+      us.insert(us.begin(), f);
+    if (!open[1])
+      us.push_back(l);
+    for (size_t k = 0; k + 1 < us.size(); ++k)
+    {
+      const double a = us[k], b = us[k + 1];
+      if (b - a <= 1e-12 * (1 + std::abs(b)) || !within(c->Value(0.5 * (a + b))))
+        continue;
+      // (Wholly off the face (the cone's other nappe's branch): none; partly: the section.)
+      constexpr int N = 16;
+      int           in = 0, off = 0;
+      double        last_u = 0;
+      for (int j = 1; j < N; ++j)
+      {
+        const gp_Pnt p  = c->Value(a + (b - a) * j / N);
+        gp_Pnt2d     uv = sas.ValueOfUV(p, Precision::Confusion());
+        if (sas.Gap() > 1e-7)
+          return false;
+        if (s->IsUPeriodic())
+          uv.SetX(ElCLib::InPeriod(uv.X(), u0f, u0f + s->UPeriod()));
+        const TopAbs_State st = inside.Perform(uv);
+        (st == TopAbs_IN ? in : off) += 1;
+        if (st == TopAbs_ON || (in > 1 && std::abs(uv.X() - last_u) > 1.0))
+          return false;
+        last_u = uv.X();
+      }
+      if (in == 0)
+        continue;
+      if (off > 0)
+        return false;
+      BRepBuilderAPI_MakeEdge me(c, a, b);
+      if (!me.IsDone())
+        return false;
+      edges.Append(me.Edge());
+    }
+  }
+  return true;
+}
+
 // A straight edge projected along `d`: the target's section by the plane through it along `d` (parametrized as
 // BRepProj_Projection's sweep of it: X along the line, Y along `d`) where it lies within the line's reach, as
 // BRepProj's, whose sweep's edges then lie off the target (their tests against a B-spline face were most of
@@ -13703,6 +13816,11 @@ bool project_line_along(const TopoDS_Shape& item, const TopoDS_Shape& target, co
   const double lo = std::min(0.0, s1), hi = std::max(0.0, s1);
   if (off[0] > 0 || off[1] < 0 || along[0] > hi || along[1] < lo)
     return true;
+  if (occ::handle<NCollection_HSequence<TopoDS_Shape>> own = new NCollection_HSequence<TopoDS_Shape>; sweep_on_elementary(target, o, t, n, lo, hi, *own))
+  {
+    as_wires(own, out);
+    return true;
+  }
   // (Faces only, as BRepProj gives its section.)
   TopoDS_Shape faces = target;
   if (target.ShapeType() == TopAbs_COMPOUND)
@@ -13723,8 +13841,7 @@ bool project_line_along(const TopoDS_Shape& item, const TopoDS_Shape& target, co
   sec.Build();
   if (!sec.IsDone())
     return true;
-  // (The plane's section edges within the line's reach, the sweep's: all of them in it or out of it, else BRepProj's,
-  // whose sweep's ends cut them.)
+  // (The plane's section edges within the line's reach, the sweep's; one past it cut at its ends, as BRepProj's.)
   occ::handle<NCollection_HSequence<TopoDS_Shape>> edges = new NCollection_HSequence<TopoDS_Shape>;
   for (TopExp_Explorer x(sec.Shape(), TopAbs_EDGE); x.More(); x.Next())
   {
@@ -13740,21 +13857,61 @@ bool project_line_along(const TopoDS_Shape& item, const TopoDS_Shape& target, co
     }
     if (reach[0] > hi || reach[1] < lo)
       continue;
-    if (!(reach[0] > lo && reach[1] < hi))
+    if (reach[0] > lo && reach[1] < hi)
+    {
+      edges->Append(x.Current());
+      continue;
+    }
+    // (Past the line's reach (a hex socket's short line over a screw head's whole cone: BRepProj took 20-35 ms a
+    // line): the edge's parts within it, cut where the sweep's ends cross it.)
+    const TopoDS_Edge& se = TopoDS::Edge(x.Current());
+    double             f, l;
+    const occ::handle<Geom_Curve> g = BRep_Tool::Curve(se, f, l);
+    TopoDS_Face        face;
+    if (g.IsNull() || !sec.HasAncestorFaceOn1(se, face))
       return false;
-    edges->Append(x.Current());
+    double                              pf, pl;
+    const occ::handle<Geom2d_Curve>     pc = BRep_Tool::CurveOnSurface(se, face, pf, pl);
+    if (pc.IsNull() || std::abs(pf - f) > 1e-9 || std::abs(pl - l) > 1e-9)
+      return false;
+    const auto along_at = [&](double u) { return gp_Vec(o, g->Value(u)).Dot(gp_Vec(t)); };
+    constexpr int       N = 64;
+    std::vector<double> cuts{f};
+    for (int k = 1; k <= N; ++k)
+    {
+      double u0 = f + (l - f) * (k - 1) / N, u1 = f + (l - f) * k / N;
+      for (double h : {lo, hi})
+      {
+        double a0 = along_at(u0) - h, a1 = along_at(u1) - h;
+        if ((a0 < 0) == (a1 < 0))
+          continue;
+        double v0 = u0, v1 = u1;
+        for (int i = 0; i < 60 && v1 - v0 > 1e-15 * (1 + std::abs(v1)); ++i)
+        {
+          const double m = 0.5 * (v0 + v1);
+          ((along_at(m) - h < 0) == (a0 < 0) ? v0 : v1) = m;
+        }
+        cuts.push_back(0.5 * (v0 + v1));
+      }
+    }
+    cuts.push_back(l);
+    std::sort(cuts.begin(), cuts.end());
+    BRep_Builder bb;
+    for (size_t i = 0; i + 1 < cuts.size(); ++i)
+    {
+      const double u0 = cuts[i], u1 = cuts[i + 1], mid = along_at(0.5 * (u0 + u1));
+      if (u1 - u0 <= 1e-12 * (1 + std::abs(l - f)) || mid < lo || mid > hi)
+        continue;
+      BRepBuilderAPI_MakeEdge me(g, u0, u1);
+      if (!me.IsDone())
+        return false;
+      TopoDS_Edge ne = me.Edge();
+      bb.UpdateEdge(ne, pc, face, BRep_Tool::Tolerance(se));
+      bb.Range(ne, face, u0, u1);
+      edges->Append(ne);
+    }
   }
-  if (edges->IsEmpty())
-    return true;
-  const occ::handle<NCollection_HSequence<TopoDS_Shape>> wires = ShapeAnalysis_FreeBounds::ConnectEdgesToWires(edges, Precision::Confusion(), true);
-  if (wires.IsNull() || wires->IsEmpty())
-    return true;
-  BRep_Builder    b;
-  TopoDS_Compound w;
-  b.MakeCompound(w);
-  for (int i = 1; i <= wires->Length(); ++i)
-    b.Add(w, wires->Value(i));
-  out = w;
+  as_wires(edges, out);
   return true;
 }
 } // namespace

@@ -204,3 +204,51 @@ fn a_line_projected_from_a_tangent_corner_is_one_curve_to_it() {
     let ends: Vec<DVec3> = edges[0].vertices().iter().map(|v| v.vertex_point().unwrap()).collect();
     assert!(ends.iter().any(|p| (*p - corner).length() < 1e-7), "{ends:?}");
 }
+
+/// A hexagon's lines projected along the axis onto a cone's face (a hex socket on a screw head's chamfer cone,
+/// c2-config-parts-screws' Split 3): each one curve on the cone, straight under its line, from foot to foot.
+#[test]
+fn hex_lines_projected_along_onto_a_cone() {
+    let cone = k::make_cone(&k::Plane::from_normal(DVec3::ZERO, DVec3::Z), 0.004, 0.001, 0.002, 2.0 * PI).unwrap();
+    let face = cone.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cone { .. }))).unwrap();
+    let radius_at = |z: f64| 0.004 - 1.5 * z;
+    let corner = |i: usize| DVec3::new(0.0017 * (i as f64 * PI / 3.0).cos(), 0.0017 * (i as f64 * PI / 3.0).sin(), 0.01);
+    for i in 0..6 {
+        let (a, b) = (corner(i), corner(i + 1));
+        let r = k::project_curves(&k::make_line(a, b).unwrap(), &face, Some(DVec3::NEG_Z)).unwrap();
+        let edges = r.edges();
+        assert_eq!(edges.len(), 1, "line {i}");
+        let info = edges[0].edge_info().unwrap();
+        for (end, want) in [(info.start, a), (info.end, b)] {
+            let other = if want == a { b } else { a };
+            assert!((end.truncate() - want.truncate()).length() < 1e-9 || (end.truncate() - other.truncate()).length() < 1e-9, "line {i}: end {end}");
+        }
+        assert!((info.start.truncate() - info.end.truncate()).length() > 0.0017 - 1e-9, "line {i}: from foot to foot");
+        for k in 0..=8 {
+            let p = edges[0].point_at(info.first_param + (info.last_param - info.first_param) * k as f64 / 8.0).unwrap();
+            assert!((p.truncate().length() - radius_at(p.z)).abs() < 1e-7, "line {i}: {p} off the cone");
+            assert!((p.truncate() - a.truncate()).perp_dot(b.truncate() - a.truncate()).abs() < 1e-7 * 0.0017, "line {i}: {p} off its line");
+        }
+    }
+}
+
+/// A line projected along -z over a torus' tube, shorter than the tube is wide: the plane's section (the tube's
+/// circle) cut where the line's reach ends, top and bottom arcs, as BRepProj's.
+#[test]
+fn a_short_line_projected_along_onto_a_torus_is_cut_at_its_reach() {
+    let (big, r) = (0.01, 0.003);
+    let torus = k::make_torus(&k::Plane::from_normal(DVec3::ZERO, DVec3::Z), big, r, 2.0 * PI).unwrap();
+    let line = k::make_line(DVec3::new(0.008, 0.0, 0.01), DVec3::new(0.012, 0.0, 0.01)).unwrap();
+    let res = k::project_curves(&line, &torus, Some(DVec3::NEG_Z)).unwrap();
+    let length: f64 = res.edges().iter().map(|e| e.edge_info().unwrap().length).sum();
+    let want = 2.0 * r * (PI - 2.0 * (2.0f64 / 3.0).acos());
+    assert!((length - want).abs() < 1e-7, "length {length}, want {want}");
+    for e in res.edges() {
+        let info = e.edge_info().unwrap();
+        for k in 0..=8 {
+            let p = e.point_at(info.first_param + (info.last_param - info.first_param) * k as f64 / 8.0).unwrap();
+            assert!(p.x > 0.008 - 1e-9 && p.x < 0.012 + 1e-9 && p.y.abs() < 1e-9, "{p} outside the line's reach");
+            assert!((((p.x - big).powi(2) + p.z * p.z).sqrt() - r).abs() < 1e-7, "{p} off the tube");
+        }
+    }
+}
