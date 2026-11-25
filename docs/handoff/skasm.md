@@ -19,6 +19,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - NEXT (lead 11-25 15:1x) iso dimension text as live/skasm/dim-iso-1125: in iso the text and arrowheads lie in the
   sketch plane (baseline along the projected x; glyphs 12 -> 6-7 px tall, arrowheads 7-8 -> 4.1-4.5 px wide), constant
   screen size; after the sketch's check mark no dims are drawn.
+  Start: in-plane text exists (mod.rs `plane_text` ~7490 glyph outlines; shown_dims.rs lays closed-sketch labels in
+  the plane; render overlay.rs `world_fills`); the open sketch's labels are GPUI text at viewport px (sketch.rs
+  PlacedDimension) and the arrowheads screen-px in scene sketch_mode.rs. Plan: size = px x (mm/px at the label anchor),
+  laid along the sketch x / y, so n view is unchanged (12 px upright) and iso foreshortens; keep the label's hit box.
+- LANDING e4458668 (lead at 96% context, not messaged): dim box Esc, OPS-TANGENT-MATE A ("Mate is invalid." for a
+  same-instance Tangent is live's text, errors-1123), pattern row mark; phone stand (cc40754f) not on main at 15:1x.
 - Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
   "Everyday Part Studio" (sketch undo scope, paste on the pointer).
 - App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
