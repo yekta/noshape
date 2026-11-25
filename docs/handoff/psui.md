@@ -123,6 +123,23 @@ docs/DECISIONS.md (read first; it wins over anything here).
   numbers and plan in TICKETS LOOK-OUTLINE-WEIGHT. NEXT: LOOK-OUTLINE-WEIGHT (profile ours, then fs_line / width).
   13:2x qa rescore 8b55eeb86 left PARTLY (mine): SKT-USE-HOVER (glyph 14x13 vs 8-9 px, hover no orange),
   TRIAD-LOOK (sd 41 vs 12), CONFIG-FILTER-HELP (s3 title only); after LOOK-OUTLINE-WEIGHT.
+  13:3x QUEUED 998aa0bf (export MBD fix + audit + stack); f9cd315a failed 13:29 on the handoff, rebased + re-QUEUED 455eb8d8 13:4x. LOOK-OUTLINE-WEIGHT: unlit part edges at PART_EDGE_INK 0.8
+  (render scene.rs + shaders EDGE_INK, params.x bit 6; builder.rs / asm_scene.rs .part_edges()); offscreen
+  part_edges_carry_lives_ink now 0.62 by its measure + peak <= 0.85. Wide run ~/psui-scratch/dm/t9.out (render,
+  scene, ps-ui, asm-ui + clippy). NEXT: land it, then SKT-USE-HOVER / TRIAD-LOOK / CONFIG-FILTER-HELP.
+  13:5x ink 0.85 (band-off run: band adds ~0.08 only, kept); temp switch removed; edge_looks now a luminance bound
+  (1x 46-72, 2x 16-72), offscreen 0.66 + peak <= 0.92. Run ~/psui-scratch/dm/t11.out (render, scene
+  --no-fail-fast, profiles, clippy). 0.85 profiles: a 1.07 col, p30 1.09, d 0.85. edge_looks hovered core then
+  failed (the plain edge under a lit band was opaque): shader style bit 20 = part edge, its 22 % share x EDGE_INK.
+  Run t12 (scene, render, ps-ui, asm-ui --no-fail-fast + clippy). Then commit (code, TICKETS, handoff) + land.
+  Parts-list menu: Edit material… / Show center of mass with a material (mod.rs; test
+  a_part_with_a_material_offers_edit_material_and_its_center_of_mass in list_feel_tests, green).
+  To compare (live, no ask yet): live/psui/everyday-1125 (undo scopes: sketch ✓ one step, re-entered sketch
+  empty stack; Ctrl+V of a part: nothing in a PS, inserts under the pointer in an assembly) and
+  live/psui/asm-everyday-1125 (drag = one undo step, fixed drag none, Insert session one step; hidden row
+  opacity 0.5, suppressed strike + italic + 0.5, suppressed row menu, BOM counts hidden not suppressed).
+  live/psui/first-user-1125 (new doc: no first-run hints, empty PS toolbar all enabled but Undo/Redo, tooltip
+  short <=62 ms then expanded 400 px ~2.2 s, new doc units = Preferences, no units field in the dialog).
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
