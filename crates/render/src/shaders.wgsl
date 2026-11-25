@@ -47,6 +47,8 @@ fn load_inst(slot: u32) {
 
 // The part edges' width in logical px (`PART_EDGE_WIDTH`; live's DEFAULT_LINE_WIDTH 1: ~0.84 px of ink at DPR 1).
 const EDGE_WIDTH: f32 = 1.0;
+// An unlit part edge's opacity (`PART_EDGE_INK`, live psui/edge-ink-1125).
+const EDGE_INK: f32 = 0.85;
 // Live's BACKFACE_SILHOUETTE_WIDTH_FACTOR (feel/look.json): back-face silhouettes 1.2 × the edge width.
 const BACKFACE_SILHOUETTE_WIDTH_FACTOR: f32 = 1.2;
 const HOVER: u32 = 1u;
@@ -1160,6 +1162,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // A construction line's band is opaque, as a solid line's (live sk-hover-matrix-1123 CL: core #fda80b selected).
     if (own_edge && (l.style & 8u) != 0u) { alpha = 1.0; }
     if ((st & DIM) != 0u) { alpha = alpha * 0.3; }
+    // params.x bit 6 (Instance::part_edges): unlit, an edge darkens what is under it in proportion, as live's.
+    if ((inst.params.x & 64u) != 0u && (st & (HOVER | SELECTED | QUERY | ERROR | BODY)) == 0u) { alpha = alpha * EDGE_INK; }
     // A selected part's edges are a darker amber, so the part reads as one
     // amber body: half the part amber in sRGB, 806026 where a 2× edge covers
     // its pixel (live2 hl-pixels-1118), 9D772F on a 1× edge's antialiased
@@ -1173,7 +1177,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     let seg = length(l.b - l.a);
     o.along = (t + select(0.0, l.dash_from / seg, seg > 0.0)) * len;
     o.world = mix(wa, wb, t);
-    o.style = l.style;
+    // Bit 20 (internal): a part edge (Instance::part_edges), its plain line at EDGE_INK under a lit band too.
+    o.style = l.style | select(0u, 1048576u, (inst.params.x & 64u) != 0u);
     o.across = side * half;
     // A part edge's own highlight band (fs_line); 2: on a lit face's boundary (LINED), its core at 78 % over the face's
     // line instead of the dark edge: a selected face's #ffa90a (live sel-gestures-1122 ps-box-crossing-result, and a
@@ -1236,7 +1241,7 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
         // Over a hovered face's boundary line (style 4096, LineSegment::OVER_LIT_FACE): the core at 78 % over that line's
         // #ffc685, uniform #ffaf25 (live b3/dlg-face-otherhover13).
         if ((i.style & 4096u) != 0u) { return vec4(col * 0.78 + linear_to_srgb(g.hover.rgb) * 0.22, i.color.a); }
-        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
+        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u) * select(1.0, EDGE_INK, (i.style & 1048576u) != 0u);
         let alpha = 0.78 + edge;
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / alpha, alpha * i.color.a);
     }
@@ -1251,7 +1256,7 @@ fn fs_line_plain(i: LineOut) -> @location(0) vec4<f32> {
         let dpr = max(g.viewport.z, 1.0);
         let a = abs(i.across);
         let col = linear_to_srgb(i.color.rgb);
-        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u);
+        let edge = clamp(0.5 * dpr + 0.5 - a, 0.0, 1.0) * select(0.22, 0.0, (i.style & 1024u) != 0u) * select(1.0, EDGE_INK, (i.style & 1048576u) != 0u);
         if (a > 2.5 * dpr - max(1.0, 0.6 * dpr)) { return vec4(col, i.color.a); }
         if (i.core > 1.5) { return vec4(col * 0.78 + linear_to_srgb(i.under) * 0.22, i.color.a); }
         return vec4((col * 0.78 + linear_to_srgb(i.under) * edge) / (0.78 + edge), (0.78 + edge) * i.color.a);

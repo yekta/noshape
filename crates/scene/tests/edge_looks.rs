@@ -204,10 +204,14 @@ fn edge_and_face_highlights_look_as_live() {
         let (top, side) = (rest[0], rest[before + 4 * k]);
         let show = |c: &[[u8; 3]]| c.iter().map(|&x| hex(x)).collect::<Vec<_>>().join(" ");
         // The plain edge: dark at its middle, about 1 CSS px (live look.json: at 1× its darkest pixel ~L 60, it
-        // straddles two rows).
+        // straddles two rows; live psui/edge-ink-1125: L 52-71 at ±30°, never black).
         let edge_rows = &rest[..before + 4 * k];
         let dark = edge_rows.iter().filter(|c| c.iter().all(|&v| v < 0x60)).count();
-        assert!(edge_rows.iter().any(|c| c.iter().all(|&v| v < 0x48)) && dark <= k + 1, "{dpr}x plain edge: {}", show(edge_rows));
+        let lum = |c: &[u8; 3]| 0.2126 * c[0] as f64 + 0.7152 * c[1] as f64 + 0.0722 * c[2] as f64;
+        let darkest = edge_rows.iter().map(lum).fold(f64::MAX, f64::min);
+        // (Not black: an opaque edge read L ~41 at 1×, 0 at 2× where the core covers whole pixels.)
+        let least = if k == 1 { 46.0 } else { 16.0 };
+        assert!((least..=72.0).contains(&darkest) && dark <= k + 1, "{dpr}x plain edge (darkest L {darkest:.0}): {}", show(edge_rows));
         for (name, colour) in [("edge hovered", HOVER), ("edge selected", SELECT)] {
             let col = get(name);
             // The band: the rows that differ from the plain render.

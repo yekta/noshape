@@ -53,6 +53,10 @@ pub struct LineSegment {
 /// A part's edges, logical px (live feel/look.json: DEFAULT_LINE_WIDTH 1, ~0.84 px of ink at a pixel ratio of 1;
 /// 1.25 drew ~1.15 and solid black).
 pub const PART_EDGE_WIDTH: f32 = 1.0;
+/// An unlit part edge's opacity ([`Instance::part_edges`]): live's edges darken what is under them in proportion,
+/// ~0.77 of black at most and ~0.9 px of ink across at every slant (live psui/edge-ink-1125); ours at 1.0 drew a pure
+/// black core and ~1.3 px across a slanted outline.
+pub const PART_EDGE_INK: f32 = 0.85;
 
 impl LineSegment {
     pub const DASHED: u32 = 1;
@@ -352,6 +356,9 @@ pub struct Instance {
     /// Translucent meshes drawn after the lines and points (color pass): a
     /// drawing's release watermark lies over the ink. Lines: after the points, and points after those (a lit edge's band over its midpoint's ring, a fill over the band).
     pub over_lines: bool,
+    /// Lines: a part's edges, drawn at [`PART_EDGE_INK`] unless lit (hovered, selected, queried, failing, or in a
+    /// selected part).
+    pub part_edges: bool,
     /// A see-through part of the Translucent display mode: only its front faces blend over the image (Onshape culls
     /// the back faces).
     pub front_only: bool,
@@ -494,6 +501,7 @@ impl Instance {
             outline_through: false,
             over_transparent: false,
             over_lines: false,
+            part_edges: false,
             front_only: false,
             closed: false,
             on_top: false,
@@ -533,6 +541,11 @@ impl Instance {
     /// Draw a translucent mesh after the lines and points, lines after the points, points after those ([`Instance::over_lines`]).
     pub fn over_lines(mut self) -> Self {
         self.over_lines = true;
+        self
+    }
+    /// See [`Instance::part_edges`].
+    pub fn part_edges(mut self) -> Self {
+        self.part_edges = true;
         self
     }
     /// See [`Instance::closed`].
@@ -1260,7 +1273,7 @@ impl Scene {
             f(&mut h, &i.pick_plane.map_or([0.0; 3], |n| n.to_array()));
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
             (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.preview_lit, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);
-            (i.hidden_only, i.over_transparent, i.over_lines, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
+            (i.hidden_only, i.over_transparent, i.over_lines, i.part_edges, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self, i.outline_through).hash(&mut h);
         }
         self.states.hash(&mut h);

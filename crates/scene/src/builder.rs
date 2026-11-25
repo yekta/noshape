@@ -756,7 +756,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let s = Instance::new(Drawable::Lines(sil)).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).layer(1);
                 scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
             }
-            let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
+            let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1).part_edges();
             let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
             // Shaded mode hides edges visually but keeps them pickable.
             let tangent = (opts.tangent_edges != TangentEdges::Visible && b.kind != BodyKind::Wire && opts.display_mode != DisplayMode::Shaded).then(|| {
@@ -783,7 +783,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // tangent ones dash-dot); all of them stay pickable.
                 Some(t) => {
                     scene.instances.push(edges.pick_only());
-                    scene.instances.push(Instance::new(Drawable::Lines(t.sharp)).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1));
+                    scene.instances.push(Instance::new(Drawable::Lines(t.sharp)).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1).part_edges());
                     if opts.tangent_edges == TangentEdges::Phantom {
                         // Phantom edges: Graphics preferences width (0.5 px default) and color.
                         let c = theme::lin(opts.graphics.phantom_color);

@@ -3178,7 +3178,8 @@ fn the_3d_pick_matrix_matches_live() {
 /// The ink across a part's edge at a device pixel ratio of 1, in px (darkness summed down a pixel column through the
 /// edge, against the darker surface beside it, times the edge's slope): live/feel/look.json's 1 px edges carry ~0.84
 /// (live/feel/look/part-studio-iso.png, never reaching black). Median over the block's visible edges.
-fn edge_ink(r: &mut Renderer, width: f32) -> f64 {
+/// The median ink across the box's slanted edges (px) and the darkest pixel's share of black.
+fn edge_ink(r: &mut Renderer, width: f32) -> (f64, f64) {
     let (lo, hi) = ([0.0f32, 0.0, 0.0], [0.04f32, 0.03, 0.01]);
     let mut scene = Scene::default();
     scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh(lo, hi, 1)))).with_color(srgb(0x9a, 0xb4, 0xcc)));
@@ -3188,7 +3189,7 @@ fn edge_ink(r: &mut Renderer, width: f32) -> f64 {
     for (k, (a, b)) in pairs.iter().enumerate() {
         lines.push_polyline(&[corner(*a), corner(*b)], [0, 0, 0, 255], 10 + k as u32, width, LineSegment::CORE);
     }
-    scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&lines))).per_primitive_color().layer(1));
+    scene.instances.push(Instance::new(Drawable::Lines(r.upload_lines(&lines))).per_primitive_color().layer(1).part_edges());
     let mut cam = Camera::default();
     cam.set_view(noshape_render::StandardView::Isometric);
     let (w, h) = (900u32, 600u32);
@@ -3202,7 +3203,7 @@ fn edge_ink(r: &mut Renderer, width: f32) -> f64 {
     let vp = glam::DVec2::new(w as f64, h as f64);
     let radius = (scene.bounds().map(|(a, b)| (b - a).length() * 0.5).unwrap_or(1.0)) as f64;
     let c3 = |i: u32| glam::Vec3::from(corner(i)).as_dvec3();
-    let mut inks = Vec::new();
+    let (mut inks, mut peak) = (Vec::new(), 0.0f64);
     // The iso view's visible edges: the top face's four and the three verticals in front.
     for (a, b) in [(4, 5), (6, 7), (4, 6), (5, 7), (1, 5), (2, 6), (3, 7)] {
         let (sa, sb) = (cam.project(c3(a), vp, radius).unwrap(), cam.project(c3(b), vp, radius).unwrap());
@@ -3217,14 +3218,17 @@ fn edge_ink(r: &mut Renderer, width: f32) -> f64 {
             let m = (5..12).min_by(|i, j| col[*i].total_cmp(&col[*j])).unwrap();
             let refl = ((col[m - 5] + col[m - 4]) * 0.5).min((col[m + 4] + col[m + 5]) * 0.5);
             let ink: f64 = (m - 2..=m + 2).map(|i| ((refl - col[i]) / refl).clamp(0.0, 1.0)).sum();
+            peak = peak.max((refl - col[m]) / refl);
             inks.push(ink * d.x.abs());
         }
     }
     inks.sort_by(f64::total_cmp);
-    inks[inks.len() / 2]
+    (inks[inks.len() / 2], peak)
 }
 
-/// look.json: a part's edges carry live's ink (~0.84 px at a pixel ratio of 1; 1.25 px edges drew ~1.15).
+/// A part's edges carry live's ink, no black core (live psui/edge-ink-1125: the darkest px ~0.62-0.77 of black, ~0.94 px
+/// across; ours on its block (print_display_mode_pixels) ~0.97 px, 0.64-0.87 at PART_EDGE_INK; opaque, 1.11 and black).
+/// This box's measure reads ~0.66 for that (0.77 for the opaque edge).
 #[test]
 fn part_edges_carry_lives_ink() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
@@ -3235,8 +3239,9 @@ fn part_edges_carry_lives_ink() {
             return;
         }
     };
-    let ink = edge_ink(&mut r, PART_EDGE_WIDTH);
-    assert!((ink - 0.84).abs() <= 0.1, "a part edge's ink: ours {ink:.2} px, live 0.84");
+    let (ink, peak) = edge_ink(&mut r, PART_EDGE_WIDTH);
+    assert!((ink - 0.66).abs() <= 0.06, "a part edge's ink: {ink:.2} px by this measure, 0.66 expected");
+    assert!(peak <= 0.92, "the darkest edge px is {peak:.2} of black, live's at most ~0.77 (the face's share on top)");
 }
 
 /// Live2 asm-dialogs-1119 (ok.png): Part 2's top flush in Part 1's top shows Part 1's face (with Part 2's edges on it);

@@ -384,6 +384,8 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                 let edge_color = if !sketch && mode == DisplayMode::HiddenLine { theme::lin(theme::viewport::EDGE_UNSHADED) } else { edge_color };
                 let line_w = opts.graphics.line_width;
                 let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1);
+                // A part's own dark edges at live's ink (a sketch's grey and an Insert preview's amber stay as they are).
+                let edges = if sketch || previewed { edges } else { edges.part_edges() };
                 if !sketch && mode == DisplayMode::Shaded {
                     // Shaded without edges: hidden but still pickable.
                     scene.instances.push(edges.pick_only());
@@ -408,7 +410,8 @@ pub fn build(result: &AssemblyResult, opts: &AsmSceneOptions, cache: &mut AsmGpu
                         }
                     };
                     scene.instances.push(edges.pick_only());
-                    scene.instances.push(Instance::new(Drawable::Lines(sharp)).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1));
+                    let sharp = Instance::new(Drawable::Lines(sharp)).with_color(edge_color).with_transform(t).pick_base(edge_base).line_scale(line_w).layer(1);
+                    scene.instances.push(if sketch || previewed { sharp } else { sharp.part_edges() });
                     if opts.tangent_edges == TangentEdges::Phantom {
                         let c = theme::lin(opts.graphics.phantom_color);
                         scene.instances.push(Instance::new(Drawable::Lines(phantom)).with_color(c).with_transform(t).unpickable().line_scale(opts.graphics.phantom_width / 0.5).layer(1));
