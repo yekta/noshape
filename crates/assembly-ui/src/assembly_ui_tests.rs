@@ -2562,6 +2562,103 @@ fn a_fixed_instances_drag_drops_the_no_drop_cursor_at_the_release(cx: &mut TestA
     });
 }
 
+/// Live asm-everyday-1125 (behaviours "Everyday assembly"): each free drag is one undo step (Ctrl+Z takes the last
+/// back, Ctrl+Y redoes it); a mate dialog closed with Esc adds none; a Fastened mate is one step, and its Ctrl+Z also
+/// puts the moved part back; Fix is one step, and a fixed part's drag moves nothing and adds none.
+#[gpui::test]
+fn the_undo_steps_of_everyday_assembly_work_as_lives(cx: &mut TestAppContext) {
+    use crate::viewport::ViewportEvent;
+    use gpui_kit::Modifiers;
+    let (window, view) = pattern_assembly(cx, "everyday-undo");
+    draw(cx, window);
+    let settle = |cx: &mut TestAppContext| {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+        draw(cx, window);
+    };
+    let drag = |cx: &mut TestAppContext| {
+        let to = cx
+            .update_window(window, |_, w, cx| {
+                view.update(cx, |v, cx| {
+                    let (lo, hi) = v.result.instance_bounds(instance(v, "Part 1 <1>", cx)).unwrap();
+                    let at = v.viewport.read(cx).project((lo + hi) * 0.5).unwrap();
+                    let vp = v.viewport.clone();
+                    v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+                    // (A drag starts past 2 px and 50 ms.)
+                    std::thread::sleep(std::time::Duration::from_millis(60));
+                    let to = at + glam::DVec2::new(20.0, 0.0);
+                    v.on_viewport_event(&vp, &ViewportEvent::ToolDrag { position: to }, w, cx);
+                    to
+                })
+            })
+            .unwrap();
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let vp = v.viewport.clone();
+                v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: to, modifiers: Modifiers::default() }, w, cx);
+            })
+        })
+        .unwrap();
+        settle(cx);
+    };
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    let steps = |cx: &mut TestAppContext| cx.update(|cx| doc.read(cx).session.undo_len());
+    let at = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        v.result.solved.placement(instance(v, "Part 1 <1>", cx)).unwrap().to_dmat4().w_axis.truncate()
+    });
+    let mates = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates.len());
+    let undo = |cx: &mut TestAppContext| {
+        cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+        settle(cx);
+    };
+    let (n0, p0, m0) = (steps(cx), at(cx), mates(cx));
+    drag(cx);
+    let p1 = at(cx);
+    drag(cx);
+    let p2 = at(cx);
+    assert!(p1.distance(p0) > 1e-6 && p2.distance(p1) > 1e-6, "each drag moves it: {p0} {p1} {p2}");
+    assert_eq!(steps(cx), n0 + 2, "one step per drag");
+    undo(cx);
+    assert!(at(cx).distance(p1) < 1e-9, "Ctrl+Z takes the last drag back only");
+    cx.update(|cx| doc.update(cx, |d, cx| d.redo(cx)));
+    settle(cx);
+    assert!(at(cx).distance(p2) < 1e-9, "Ctrl+Y redoes it");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            v.close_mate(w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx);
+    assert_eq!(steps(cx), n0 + 2, "an Esc'd mate dialog adds no step");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let (a, b) = (face_connector(v, "Part 1 <1>", true, cx), face_connector(v, "Part 2 <1>", false, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+            v.accept_mate(w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx);
+    assert_eq!((steps(cx), mates(cx)), (n0 + 3, m0 + 1), "the mate is one step");
+    assert!(at(cx).distance(p2) > 1e-6, "the first pick moved");
+    undo(cx);
+    assert_eq!(mates(cx), m0, "Ctrl+Z removes the mate");
+    assert!(at(cx).distance(p2) < 1e-9, "and puts the part back: {} vs {p2}", at(cx));
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let id = instance(v, "Part 1 <1>", cx);
+        v.set_fixed(vec![id], true, cx);
+    }));
+    settle(cx);
+    let fixed = steps(cx);
+    drag(cx);
+    assert_eq!((steps(cx), at(cx)), (fixed, p2), "a fixed part's drag moves nothing and adds no step");
+}
+
 /// Live icons2 10-23 (a), asm-fixed-drag-1118: a free instance's press-drag keeps the default cursor and, Snap mode
 /// off, carries the part with the pointer in the plane of the screen (its centre the pointer's 20 px away), not
 /// turning it (the point drag turned it 1–2°) and no jump onto a snap target.
