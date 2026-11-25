@@ -1,6 +1,6 @@
 {
  "scenario": "select-top-plane",
- "recorded": "2026-11-25T22:04:34.219Z",
+ "recorded": "2026-11-25T23:06:19.071Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "10fb1fb8359061e250acc4e7",
+  "element": "2ade88f673d4e9fe85bf3eb2",
   "start": "block",
   "startElement": "d0643b8ab31b96fd21acb45e",
   "runner": "live2 .nstate-uip-4.json"
@@ -50,18 +50,9 @@
      "related": false,
      "hidden": false,
      "cls": ""
-    },
-    {
-     "name": "Sketch 2",
-     "state": "error",
-     "selected": false,
-     "editing": false,
-     "related": false,
-     "hidden": false,
-     "cls": "ns-list-item-error"
     }
    ],
-   "rollbackAfter": "Sketch 2"
+   "rollbackAfter": "Extrude 1"
   },
   "parts": [
    "Part 1"
@@ -113,10 +104,10 @@
     }
    },
    "ok": true,
-   "ti": 23397,
-   "tmove": 23448,
+   "ti": 24446,
+   "tmove": 24495,
    "moves": 2,
-   "tdown": 24036,
+   "tdown": 25109,
    "at": [
     1083,
     568
@@ -158,18 +149,9 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
@@ -211,9 +193,9 @@
     },
     "measure": null
    },
-   "t": 25984,
-   "te": 25985
+   "t": 27090,
+   "te": 27090
   }
  ],
- "t0_epoch_ms": 1795644255792
+ "t0_epoch_ms": 1795647960048
 }

@@ -1,6 +1,6 @@
 {
  "scenario": "plane-menu-size-to-part-studio",
- "recorded": "2026-11-25T22:03:59.106Z",
+ "recorded": "2026-11-25T23:05:43.589Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "592c53bd5770c8b6ac78ce30",
+  "element": "606b05713edc84d23acd20cf",
   "start": "block",
   "startElement": "d0643b8ab31b96fd21acb45e",
   "runner": "live2 .nstate-uip-4.json"
@@ -50,18 +50,9 @@
      "related": false,
      "hidden": false,
      "cls": ""
-    },
-    {
-     "name": "Sketch 2",
-     "state": "error",
-     "selected": false,
-     "editing": false,
-     "related": false,
-     "hidden": false,
-     "cls": "ns-list-item-error"
     }
    ],
-   "rollbackAfter": "Sketch 2"
+   "rollbackAfter": "Extrude 1"
   },
   "parts": [
    "Part 1"
@@ -113,10 +104,10 @@
     }
    },
    "ok": true,
-   "ti": 25571,
-   "tmove": 25638,
+   "ti": 23031,
+   "tmove": 23078,
    "moves": 6,
-   "tdown": 27428,
+   "tdown": 24851,
    "at": [
     1222,
     568
@@ -171,18 +162,9 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
@@ -224,8 +206,8 @@
     },
     "measure": null
    },
-   "t": 29550,
-   "te": 29551
+   "t": 26889,
+   "te": 26889
   },
   {
    "step": 2,
@@ -236,10 +218,10 @@
     }
    },
    "ok": true,
-   "ti": 29551,
-   "tmove": 29603,
+   "ti": 26889,
+   "tmove": 26935,
    "moves": 2,
-   "tdown": 30694,
+   "tdown": 28012,
    "at": [
     1293,
     626
@@ -275,18 +257,9 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
@@ -328,9 +301,9 @@
     },
     "measure": null
    },
-   "t": 32569,
-   "te": 32569
+   "t": 29894,
+   "te": 29894
   }
  ],
- "t0_epoch_ms": 1795644219077
+ "t0_epoch_ms": 1795647925727
 }

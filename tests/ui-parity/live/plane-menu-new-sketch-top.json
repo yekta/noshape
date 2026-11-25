@@ -1,6 +1,6 @@
 {
  "scenario": "plane-menu-new-sketch-top",
- "recorded": "2026-11-25T22:03:14.024Z",
+ "recorded": "2026-11-25T23:04:59.911Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "6ea3c86b46ae423433f092dc",
+  "element": "8c90035affcba7447cf6844d",
   "start": "block",
   "startElement": "d0643b8ab31b96fd21acb45e",
   "runner": "live2 .nstate-uip-4.json"
@@ -50,18 +50,9 @@
      "related": false,
      "hidden": false,
      "cls": ""
-    },
-    {
-     "name": "Sketch 2",
-     "state": "error",
-     "selected": false,
-     "editing": false,
-     "related": false,
-     "hidden": false,
-     "cls": "ns-list-item-error"
     }
    ],
-   "rollbackAfter": "Sketch 2"
+   "rollbackAfter": "Extrude 1"
   },
   "parts": [
    "Part 1"
@@ -113,10 +104,10 @@
     }
    },
    "ok": true,
-   "ti": 23539,
-   "tmove": 23588,
+   "ti": 25016,
+   "tmove": 25074,
    "moves": 2,
-   "tdown": 24351,
+   "tdown": 25719,
    "at": [
     1083,
     568
@@ -171,18 +162,9 @@
        "related": false,
        "hidden": false,
        "cls": ""
-      },
-      {
-       "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Sketch 2"
+     "rollbackAfter": "Extrude 1"
     },
     "parts": [
      "Part 1"
@@ -224,8 +206,8 @@
     },
     "measure": null
    },
-   "t": 26338,
-   "te": 26339
+   "t": 27806,
+   "te": 27806
   },
   {
    "step": 2,
@@ -236,10 +218,10 @@
     }
    },
    "ok": true,
-   "ti": 26339,
-   "tmove": 26386,
+   "ti": 27806,
+   "tmove": 27857,
    "moves": 3,
-   "tdown": 27441,
+   "tdown": 28905,
    "at": [
     1154,
     582
@@ -249,7 +231,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 3",
+     "title": "Sketch 2",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -275,7 +257,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 3",
+      "title": "Sketch 2",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -328,15 +310,6 @@
       },
       {
        "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
-      },
-      {
-       "name": "Sketch 3",
        "state": "ok",
        "selected": true,
        "editing": true,
@@ -345,7 +318,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 3"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
@@ -393,8 +366,8 @@
     },
     "measure": null
    },
-   "t": 30285,
-   "te": 30285
+   "t": 31982,
+   "te": 31982
   },
   {
    "step": 3,
@@ -403,15 +376,15 @@
     "until": "dialog"
    },
    "ok": true,
-   "ti": 30285,
-   "tmove": 34706,
+   "ti": 31982,
+   "tmove": 36331,
    "moves": 1,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 3",
+     "title": "Sketch 2",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -437,7 +410,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 3",
+      "title": "Sketch 2",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -490,15 +463,6 @@
       },
       {
        "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
-      },
-      {
-       "name": "Sketch 3",
        "state": "ok",
        "selected": true,
        "editing": true,
@@ -507,7 +471,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 3"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
@@ -555,8 +519,8 @@
     },
     "measure": null
    },
-   "t": 35157,
-   "te": 35157
+   "t": 36791,
+   "te": 36791
   },
   {
    "step": 4,
@@ -565,7 +529,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 35157,
+   "ti": 36791,
    "pointer": {
     "at": [
      1889,
@@ -574,15 +538,15 @@
     "hover": [],
     "element": "button.btn.btn-secondary"
    },
-   "tdown": 35162,
-   "tmove": 38451,
+   "tdown": 36798,
+   "tmove": 40131,
    "moves": 1,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": {
-     "title": "Sketch 3",
+     "title": "Sketch 2",
      "titleState": "ok",
      "kind": "sketch",
      "tabs": [],
@@ -608,7 +572,7 @@
     },
     "dialogs": [
      {
-      "title": "Sketch 3",
+      "title": "Sketch 2",
       "titleState": "ok",
       "kind": "sketch",
       "tabs": [],
@@ -661,15 +625,6 @@
       },
       {
        "name": "Sketch 2",
-       "state": "error",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "ns-list-item-error"
-      },
-      {
-       "name": "Sketch 3",
        "state": "ok",
        "selected": true,
        "editing": true,
@@ -678,7 +633,7 @@
        "cls": "edited selected"
       }
      ],
-     "rollbackAfter": "Sketch 3"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
@@ -726,9 +681,9 @@
     },
     "measure": null
    },
-   "t": 38893,
-   "te": 38893
+   "t": 40600,
+   "te": 40600
   }
  ],
- "t0_epoch_ms": 1795644175781
+ "t0_epoch_ms": 1795647880536
 }
