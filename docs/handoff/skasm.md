@@ -4,6 +4,18 @@ Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## NOW (11-24 22:40) — read first
+- LEAD 11-25 TASK 1 (drags on big sketches under a frame) committed + queued (see land.sh --status): scene `drag_step` /
+  `DragStep::solve` / `drag_stepped` (tool_drag = all three); psui `drag_off_thread` (a slow sketch's step solves
+  off the UI thread, moves meanwhile coalesce in `ui.drag_next`, the release waits in `ui.drag_release`) and
+  `solve_dropped` (the drop's full solve: `ed.solve_on_drop` off, solved as a typed dimension's). fz211 probe
+  (skasm-scratch/probes/zz_probe_fz211_drag.rs, append to sketch_ui_tests.rs; tdrag.sh): UI-thread events first step
+  198 -> 5 ms, steps 20-30 -> 0, release 137-215 -> 7-9. T1 latency_tests a_slow_sketch_drags_off_the_ui_thread.
+  Suites green: sketch 173, psui sketch suites 532, scene 212, clippy clean.
+- LEAD 11-25 TASK 2 Insert DXF/DWG: REQUESTS row "skasm 11-25 00:06" (files live/skasm/dxf-insert-1125/). Ours
+  (maker-bracket): TEXT dropped, no constraints (ends merged), centred on origin unless "Use file origin", all
+  selected, message "Inserted N entities from <file>" (live's?). Fixed in the same commit: insert's end join was all
+  pairs (grid-2000: 683 -> 51 ms, grid cells; dwg test a_big_drawings_meeting_ends_share_points). Compare when live
+  answers.
 - LEAD 11-24 TASK: sketch speed + robustness as felt. S300 T2 (latency_tests a_300_line_sketch_keeps_up_with_the_hand,
   321 lines, 483 constraints): open 33 ms (live 1.2-1.9 s), drag step to frame 15 (UI 13), release 23, dim edit 55
   (live ~1.1 s), unsolvable value warned 67, ✓ 16 (live 0.24 s). Model sketches <= 5 ms.

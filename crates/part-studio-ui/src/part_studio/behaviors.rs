@@ -598,6 +598,11 @@ pub struct UiState {
     pub std_edit_task: Option<Task<()>>,
     /// A slow sketch's dimension solve running off the UI thread (sketch.rs `commit_dimension`): sketch input waits.
     pub sketch_solve: Option<Task<()>>,
+    /// A slow sketch's drag step solving off the UI thread (sketch.rs `drag_off_thread`); the pointer's newest plane
+    /// point and its release while it runs, taken up when it's done.
+    pub sketch_drag: Option<Task<()>>,
+    pub drag_next: Option<DVec2>,
+    pub drag_release: Option<(DVec2, gpui_kit::Modifiers)>,
     /// Tests: every sketch counts as slow to solve (`sketch_solves_slowly`).
     #[cfg(test)]
     pub slow_sketch: bool,
@@ -1053,6 +1058,9 @@ impl UiState {
             panel_check_focus: None,
             std_edit_task: None,
             sketch_solve: None,
+            sketch_drag: None,
+            drag_next: None,
+            drag_release: None,
             #[cfg(test)]
             slow_sketch: false,
             std_edit_run_old: None,

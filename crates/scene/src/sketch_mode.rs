@@ -19,6 +19,7 @@ use noshape_render::{LineData, LineSegment, PointData, PointSprite};
 use noshape_sketch::{AutoConstraint, ConstraintId, ConstraintKind, Curve2, DistanceMode, DragHandle, EntityId, EntityKind, Inference, InferenceContext, InferenceKind, Sketch, SketchTool, Transform};
 use noshape_units::{Dim, ExprValue, Quantity, UnitPrefs};
 use std::f64::consts::{PI, TAU};
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConstraintTool {
@@ -272,6 +273,33 @@ struct Click {
 
 /// How near (screen px) a 3 point arc's third click takes the semicircle over its ends (live2 arcmid: 7.5 yes, 8 no).
 const ARC3_SEMICIRCLE_PX: f64 = 7.75;
+
+/// One solve of a geometry drag ([`SketchEditor::drag_step`]).
+#[derive(Clone, Debug)]
+pub struct DragStep {
+    handle: DragHandle,
+    to: DVec2,
+    /// The sketch as the drag found it: each step solves from it (a big component: from the last step).
+    origin: Option<Arc<Sketch>>,
+    /// The drag's first step: it takes the DOF analysis once (dragging keeps it current, so every step's
+    /// regeneration reuses it instead of redoing it: qa SKETCH-DRAG-BIG, 30–50 ms per step on 1000 entities).
+    begins: bool,
+}
+
+impl DragStep {
+    /// Live: a drag's result depends only on where it ends (drag probes 12: four paths to one pixel, the same
+    /// points), so each step solves from the drag's start (a jump too far for one solve goes there in steps,
+    /// `Sketch::drag`); in a big component from the last step (`Sketch::begin_drag`). Returns the drag's origin.
+    pub fn solve(&self, sk: &mut Sketch) -> Option<Arc<Sketch>> {
+        let handles = [(self.handle, self.to)];
+        let origin = if self.begins { sk.begin_drag(&handles).then(|| Arc::new(sk.clone())) } else { self.origin.clone() };
+        if let Some(o) = &origin {
+            sk.restore_geometry(o);
+        }
+        sk.drag(&handles);
+        origin
+    }
+}
 
 #[derive(Clone, Debug)]
 enum DragState {
@@ -681,7 +709,9 @@ pub struct SketchEditor {
     pub glyph_row_at: Option<(EntityId, DVec2)>,
     drag: Option<DragState>,
     /// The sketch as a geometry drag found it: each step solves from it.
-    drag_origin: Option<Sketch>,
+    drag_origin: Option<Arc<Sketch>>,
+    /// A geometry drag's release solves the sketch; off: the UI solves a slow sketch's off the UI thread.
+    pub solve_on_drop: bool,
     /// Curves a dragged point lay on when its drag began: its drop takes nothing on them.
     drag_held: Vec<EntityId>,
     box_end: Option<DVec2>,
@@ -1554,6 +1584,7 @@ impl SketchEditor {
             glyph_row_at: None,
             drag: None,
             drag_origin: None,
+            solve_on_drop: true,
             drag_held: Vec::new(),
             box_end: None,
             box_remove: false,
@@ -4852,6 +4883,59 @@ impl SketchEditor {
         Ok(())
     }
 
+    /// A geometry drag's next solve, if the pointer at `p` needs one (a press dragged past its start, or a new pointer
+    /// position). [`Self::tool_drag`] solves it at once; the UI solves a slow sketch's off the UI thread.
+    pub fn drag_step(&mut self, sk: &Sketch, p: DVec2) -> Option<DragStep> {
+        self.cursor = Some(p);
+        match self.drag.clone()? {
+            DragState::Pending { entity, start } if !self.below_drag_start(p - start) => {
+                // (A spline's handle arm drags its handle: the tip follows, the spline's end stays.)
+                let tip = sk.entity(entity).filter(|e| sk.is_spline_arm(e.id)).and_then(|e| e.endpoints()).map(|(_, tip)| tip);
+                let handle = match tip {
+                    Some(t) => DragHandle::Point(t),
+                    None if is_point(sk, entity) => DragHandle::Point(entity),
+                    None => DragHandle::Entity { id: entity, grab: start },
+                };
+                self.drag_held = match handle {
+                    DragHandle::Point(id) => sk.point(id).map_or(Vec::new(), |q| sk.entities().filter(|e| e.id != id && sk.curve(e.id).is_some_and(|c| c.distance(q) < 1e-9)).map(|e| e.id).collect()),
+                    DragHandle::Entity { .. } => Vec::new(),
+                };
+                // A drag aligns only with points it snaps onto itself.
+                self.woken.clear();
+                self.woken_mids.clear();
+                self.drag = Some(DragState::Geometry { handle, at: None });
+                Some(DragStep { handle, to: p, origin: None, begins: true })
+            }
+            DragState::Geometry { handle, at } if at != Some(p) => Some(DragStep { handle, to: p, origin: self.drag_origin.clone(), begins: false }),
+            _ => None,
+        }
+    }
+
+    /// A solved [`DragStep`]: the drag moves on from it (`origin`: what [`DragStep::solve`] returned).
+    pub fn drag_stepped(&mut self, data: &SketchData, step: &DragStep, origin: Option<Arc<Sketch>>) -> EditOutcome {
+        if step.begins {
+            self.drag_origin = origin;
+        }
+        let p = step.to;
+        match step.handle {
+            // From the last step, a dragged curve moves on from there.
+            DragHandle::Entity { id, .. } if self.drag_origin.is_none() => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p }, at: Some(p) }),
+            handle @ DragHandle::Entity { .. } => self.drag = Some(DragState::Geometry { handle, at: Some(p) }),
+            handle @ DragHandle::Point(id) => {
+                self.drag = Some(DragState::Geometry { handle, at: Some(p) });
+                // Shift suppresses snapping onto other geometry.
+                self.drag_snap = if self.shift_held { None } else { self.point_drop_target(&data.sketch, id) };
+                // A point the drag snaps onto wakes: the drag then aligns with it (live feel retaken 11-18).
+                if let Some((t, _, Drop::Merge)) = self.drag_snap
+                    && is_point(&data.sketch, t)
+                {
+                    self.wake(t);
+                }
+            }
+        }
+        EditOutcome::changed()
+    }
+
     pub fn tool_drag(&mut self, data: &mut SketchData, p: DVec2) -> EditOutcome {
         self.cursor = Some(p);
         // A press on a corner dragged past the click slop: the radius / distances follow the pointer as its arrow's
@@ -4871,67 +4955,13 @@ impl SketchEditor {
                 _ => None,
             };
         }
+        if let Some(step) = self.drag_step(&data.sketch, p) {
+            let origin = step.solve(&mut data.sketch);
+            return self.drag_stepped(data, &step, origin);
+        }
         match self.drag.clone() {
-            Some(DragState::Pending { entity, start, .. }) => {
-                if self.below_drag_start(p - start) {
-                    return EditOutcome::none();
-                }
-                // (A spline's handle arm drags its handle: the tip follows, the spline's end stays.)
-                let tip = data.sketch.entity(entity).filter(|e| data.sketch.is_spline_arm(e.id)).and_then(|e| e.endpoints()).map(|(_, tip)| tip);
-                let handle = match tip {
-                    Some(t) => DragHandle::Point(t),
-                    None if is_point(&data.sketch, entity) => DragHandle::Point(entity),
-                    None => DragHandle::Entity { id: entity, grab: start },
-                };
-                // The DOF analysis once, before the drag: dragging keeps it
-                // current, so every step's regeneration reuses it instead of
-                // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
-                // entities).
-                self.drag_origin = data.sketch.begin_drag(&[(handle, p)]).then(|| data.sketch.clone());
-                let sk = &data.sketch;
-                self.drag_held = match handle {
-                    DragHandle::Point(id) => sk.point(id).map_or(Vec::new(), |q| sk.entities().filter(|e| e.id != id && sk.curve(e.id).is_some_and(|c| c.distance(q) < 1e-9)).map(|e| e.id).collect()),
-                    DragHandle::Entity { .. } => Vec::new(),
-                };
-                // A drag aligns only with points it snaps onto itself.
-                self.woken.clear();
-                self.woken_mids.clear();
-                self.drag = Some(DragState::Geometry { handle, at: None });
-                self.tool_drag(data, p)
-            }
-            Some(DragState::Geometry { handle, at }) => {
-                if at == Some(p) {
-                    return EditOutcome::none();
-                }
-                // Live: a drag's result depends only on where it ends (drag
-                // probes 12: four paths to one pixel, the same points), so
-                // each step solves from the drag's start (a jump too far for
-                // one solve goes there in steps, `Sketch::drag`); in a big
-                // component from the last step (`Sketch::begin_drag`).
-                if let Some(o) = &self.drag_origin {
-                    data.sketch.restore_geometry(o);
-                }
-                data.sketch.drag(&[(handle, p)]);
-                match handle {
-                    // From the last step, a dragged curve moves on from there.
-                    DragHandle::Entity { id, .. } if self.drag_origin.is_none() => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p }, at: Some(p) }),
-                    DragHandle::Entity { .. } => self.drag = Some(DragState::Geometry { handle, at: Some(p) }),
-                    DragHandle::Point(id) => {
-                        self.drag = Some(DragState::Geometry { handle, at: Some(p) });
-                        // Shift suppresses snapping onto other geometry.
-                        self.drag_snap = if self.shift_held { None } else { self.point_drop_target(&data.sketch, id) };
-                        // A point the drag snaps onto wakes: the drag then aligns with it (live feel retaken 11-18).
-                        if let Some((t, _, Drop::Merge)) = self.drag_snap
-                            && is_point(&data.sketch, t)
-                        {
-                            self.wake(t);
-                        }
-                    }
-                    #[allow(unreachable_patterns)]
-                    _ => {}
-                }
-                EditOutcome::changed()
-            }
+            // A geometry drag's step was solved above; a press not yet dragged past the start, or a repeated pointer.
+            Some(DragState::Pending { .. } | DragState::Geometry { .. }) => EditOutcome::none(),
             Some(DragState::Label { constraint, start, additive, dragging, .. }) => {
                 if !dragging && self.below_drag_start(p - start) {
                     return EditOutcome::none();
@@ -5359,7 +5389,9 @@ impl SketchEditor {
                 }
                 self.drag_snap = None;
                 self.drag_external = None;
-                data.sketch.solve();
+                if self.solve_on_drop {
+                    data.sketch.solve();
+                }
                 EditOutcome::changed()
             }
             Some(DragState::Box { start }) => {

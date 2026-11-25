@@ -589,3 +589,66 @@ fn a_slow_sketch_solves_a_dimension_off_the_ui_thread(cx: &mut TestAppContext) {
     assert!((length(cx, line) - 50.0).abs() < 1e-6, "the last solved shape kept: {}", length(cx, line));
     assert!((length(cx, bottom) - 12.0).abs() < 1e-6, "the rest as it was");
 }
+
+/// A slow sketch's drag (fuzz fz211: steps up to ~0.2 s) keeps the UI thread free: each step solves off it, the last
+/// solved shape shown meanwhile; the pointer's moves during a solve make one next step, its release waits for it, and
+/// the point ends under the pointer as on a quick sketch.
+#[gpui::test]
+fn a_slow_sketch_drags_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_with(cx, "slow-drag", |path| crate::session::Session::create(path, crate::user_units::new_document()).unwrap());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Plane(DatumPlane::Top)];
+        v.start_feature("sketch", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    let end = cx
+        .update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| {
+            let (a, b) = (data.sketch.add_point(DVec2::new(0.02, 0.01)), data.sketch.add_point(DVec2::new(0.04, 0.01)));
+            data.sketch.add_line_between(a, b).unwrap();
+            b
+        })))
+        .unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.regen_sync(w, cx);
+        v.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx));
+        v.ui.slow_sketch = true;
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ev, w, cx);
+        }))
+        .unwrap();
+    };
+    event(cx, ViewportEvent::Hover(None));
+    let (o, dx, dy) = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().screen_map.unwrap());
+    let m = glam::DMat2::from_cols(dx, dy);
+    let px = |q: DVec2| (m.inverse() * (q - o)).round();
+    let plane = |p: DVec2| o + m * (p + DVec2::splat(0.5));
+    let point = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.point(end).unwrap());
+    let start = point(cx);
+    let from = px(start);
+    let to = from + DVec2::new(30.0, 20.0);
+    let none = Modifiers::default();
+    event(cx, ViewportEvent::PointerMove { position: from, modifiers: none });
+    event(cx, ViewportEvent::ToolDown { position: from, modifiers: none, click_count: 1 });
+    event(cx, ViewportEvent::ToolDrag { position: from + DVec2::new(10.0, 5.0) });
+    let held = cx.update(|cx| view.read(cx).ui.sketch_drag.is_some());
+    assert!(held, "the step solves off the UI thread");
+    assert_eq!(point(cx), start, "the last solved shape shown meanwhile");
+    event(cx, ViewportEvent::ToolDrag { position: from + DVec2::new(20.0, 10.0) });
+    event(cx, ViewportEvent::ToolDrag { position: to });
+    event(cx, ViewportEvent::ToolUp { position: to, modifiers: none });
+    let dragging = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().geometry_dragging());
+    assert!(dragging, "the release waits for the solve");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let done = cx.update(|cx| (view.read(cx).ui.sketch_drag.is_none(), view.read(cx).sketch.as_ref().unwrap().geometry_dragging()));
+    assert_eq!(done, (true, false), "solved, the drag ended");
+    let at = point(cx);
+    assert!((at - plane(to)).length() < 1e-9, "the point under the pointer: {at} vs {}", plane(to));
+}

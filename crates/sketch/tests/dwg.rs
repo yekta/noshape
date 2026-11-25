@@ -202,3 +202,20 @@ fn rejects_bad_input() {
     let d = parse_cad(&fixture("r2000_entities-2d.dxf")).unwrap();
     assert_eq!(d.entities.len(), 7);
 }
+
+/// A big drawing's meeting curve ends share one point each: 400 squares of 4 lines make 1600 corners (found by grid
+/// cell, not by every pair of ends: 2000 entities took 0.7 s).
+#[test]
+fn a_big_drawings_meeting_ends_share_points() {
+    let mut d = DxfDrawing::default();
+    for i in 0..20 {
+        for j in 0..20 {
+            let o = DVec2::new(i as f64 * 12.0, j as f64 * 12.0);
+            let c = [o, o + DVec2::new(10.0, 0.0), o + DVec2::new(10.0, 10.0), o + DVec2::new(0.0, 10.0)];
+            d.entities.extend((0..4).map(|k| DxfEntity::Curve(Curve2::Line { a: c[k], b: c[(k + 1) % 4] })));
+        }
+    }
+    let mut sk = Sketch::new();
+    assert_eq!(sk.insert_drawing(&d, 0.001, DVec2::ZERO).len(), 1600);
+    assert_eq!(sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).count(), 1600);
+}

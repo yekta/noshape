@@ -1276,6 +1276,10 @@ impl PartStudioView {
         if self.ui.sketch_solve.is_some() && !matches!(ev, ViewportEvent::CameraChanged | ViewportEvent::Hover(_)) {
             return true;
         }
+        // (A slow sketch's drag step solving off the UI thread takes the pointer's moves and release when it's done.)
+        if self.ui.sketch_drag.is_some() && !matches!(ev, ViewportEvent::CameraChanged | ViewportEvent::Hover(_) | ViewportEvent::ToolDrag { .. } | ViewportEvent::ToolUp { .. }) {
+            return true;
+        }
         match ev {
             ViewportEvent::CameraChanged => {
                 // Arrowheads, glyph offsets and the name are sized in pixels.
@@ -1660,7 +1664,11 @@ impl PartStudioView {
                 if let Some(ed) = &mut self.sketch {
                     ed.box_remove = window.modifiers().control;
                 }
-                if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_drag(data, p)) {
+                if self.ui.sketch_drag.is_some() {
+                    self.ui.drag_next = Some(p);
+                } else if !self.drag_off_thread(p, window, cx)
+                    && let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_drag(data, p))
+                {
                     self.apply_outcome(out, window, cx);
                 }
                 self.sync_sketch_dragging(cx);
@@ -1675,6 +1683,10 @@ impl PartStudioView {
                 true
             }
             ViewportEvent::ToolUp { position, modifiers } => {
+                if self.ui.sketch_drag.is_some() {
+                    self.ui.drag_release = Some((*position, *modifiers));
+                    return true;
+                }
                 if let Some(at) = self.ui.sketch_ctrl_press.take()
                     && (*position - at).length() < 3.0
                 {
@@ -1704,8 +1716,20 @@ impl PartStudioView {
                 {
                     ed.drop_pending_click();
                 }
+                // A slow sketch's drop solves off the UI thread (fuzz fz211: ~0.2 s).
+                let solve_later = self.sketch_solves_slowly(cx) && self.sketch.as_ref().is_some_and(|ed| ed.geometry_dragging());
+                if let Some(ed) = &mut self.sketch {
+                    ed.solve_on_drop = !solve_later;
+                }
                 if let Some(out) = self.with_sketch(cx, |ed, data| ed.tool_up(data, p)) {
-                    self.apply_outcome(out, window, cx);
+                    if solve_later {
+                        self.solve_dropped(window, cx);
+                    } else {
+                        self.apply_outcome(out, window, cx);
+                    }
+                }
+                if let Some(ed) = &mut self.sketch {
+                    ed.solve_on_drop = true;
                 }
                 // A fillet / chamfer made by a drag's release opens its box (live sketch-tools-1123).
                 self.sync_dim_edit(window, cx);
@@ -2392,6 +2416,73 @@ impl PartStudioView {
         self.sketch.as_ref().is_some_and(|ed| self.display.feature_state(ed.feature).is_some_and(|s| s.time_ms >= 50.0))
     }
 
+    /// A slow sketch's geometry drag step (fuzz fz211: up to ~0.2 s) solves off the UI thread: the last solved shape
+    /// stays on screen, the pointer's moves meanwhile make one next step, its release waits for the solve. False: the
+    /// pointer at `p` needs no geometry solve, or the sketch is quick (solved on the UI thread).
+    fn drag_off_thread(&mut self, p: DVec2, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if !self.sketch_solves_slowly(cx) {
+            return false;
+        }
+        let Some((step, mut sketch)) = self.with_sketch(cx, |ed, data| Some((ed.drag_step(&data.sketch, p)?, data.sketch.clone()))).flatten() else { return false };
+        let solve = cx.background_spawn(async move {
+            let origin = step.solve(&mut sketch);
+            (step, sketch, origin)
+        });
+        self.ui.sketch_drag = Some(cx.spawn_in(window, async move |this, cx| {
+            let (step, sketch, origin) = solve.await;
+            let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                this.ui.sketch_drag = None;
+                // (A drag ended meanwhile, Esc: the step is dropped.)
+                let out = this.with_sketch(cx, |ed, data| {
+                    ed.geometry_dragging().then(|| {
+                        data.sketch = sketch;
+                        ed.drag_stepped(data, &step, origin)
+                    })
+                });
+                if let Some(out) = out.flatten() {
+                    this.apply_outcome(out, window, cx);
+                }
+                this.sync_sketch_dragging(cx);
+                if let Some(p) = this.ui.drag_next.take()
+                    && this.drag_off_thread(p, window, cx)
+                {
+                    return;
+                }
+                if let Some((position, modifiers)) = this.ui.drag_release.take() {
+                    let vp = this.viewport.clone();
+                    this.sketch_viewport_event(&vp, &ViewportEvent::ToolUp { position, modifiers }, window, cx);
+                }
+            });
+        }));
+        true
+    }
+
+    /// A slow sketch's dropped drag solves off the UI thread, as a typed dimension's (`commit_dimension`).
+    fn solve_dropped(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(mut sketch) = self.sketch_data(cx).map(|d| d.sketch.clone()) else { return };
+        self.regen_seq += 1;
+        let seq = self.regen_seq;
+        self.begin_pending(seq, window, cx);
+        let solve = cx.background_spawn(async move {
+            sketch.solve();
+            sketch
+        });
+        self.ui.sketch_solve = Some(cx.spawn_in(window, async move |this, cx| {
+            let sketch = solve.await;
+            let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                this.ui.sketch_solve = None;
+                if this.with_sketch(cx, |_, data| data.sketch = sketch).is_some() {
+                    this.regen_sync(window, cx);
+                }
+                if this.pending.as_ref().is_some_and(|p| p.seq == seq) {
+                    this.end_pending(seq, cx);
+                }
+                cx.notify();
+            });
+        }));
+        cx.notify();
+    }
+
     /// A typed dimension value applied (`res`): the box, the message and the regeneration follow.
     fn dimension_applied(&mut self, res: Option<Result<(), String>>, window: &mut Window, cx: &mut Context<Self>) {
         match res {
@@ -2496,7 +2587,7 @@ impl PartStudioView {
         if m.control || m.platform || !self.focus.contains_focused(window, cx) || window.has_focused_input(cx) {
             return;
         }
-        if self.ui.sketch_solve.is_some() {
+        if self.ui.sketch_solve.is_some() || self.ui.sketch_drag.is_some() {
             return;
         }
         let Some(ed) = &mut self.sketch else { return };

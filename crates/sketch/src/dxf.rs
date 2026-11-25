@@ -6,6 +6,7 @@ use crate::ids::EntityId;
 use crate::nurbs::Nurbs;
 use crate::sketch::{Result, Sketch};
 use glam::DVec2;
+use std::collections::{HashMap, HashSet};
 
 /// One drawing entity in file units.
 #[derive(Clone, Debug, PartialEq)]
@@ -61,21 +62,28 @@ impl Sketch {
         }
         // Join coincident curve ends.
         let tol = 1e-9 * self.bbox().size().max_element().max(1e-3);
-        let ends: Vec<EntityId> = created.iter().filter_map(|c| self.endpoints(*c)).flat_map(|(a, b)| [a, b]).collect();
-        let mut merged: Vec<EntityId> = Vec::new();
-        for (i, a) in ends.iter().enumerate() {
-            if merged.contains(a) || self.entity(*a).is_none() {
+        let ends: Vec<(EntityId, DVec2)> = created.iter().filter_map(|c| self.endpoints(*c)).flat_map(|(a, b)| [a, b]).filter_map(|e| Some((e, self.point(e)?))).collect();
+        // Ends by grid cell (a cell per tolerance: a drawing's thousands of ends meet their neighbours only).
+        let cell = |p: DVec2| ((p.x / tol).floor() as i64, (p.y / tol).floor() as i64);
+        let mut cells: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+        for (i, (_, p)) in ends.iter().enumerate() {
+            cells.entry(cell(*p)).or_default().push(i);
+        }
+        let mut merged: HashSet<EntityId> = HashSet::new();
+        for (i, &(a, pa)) in ends.iter().enumerate() {
+            if merged.contains(&a) || self.entity(a).is_none() {
                 continue;
             }
-            for b in ends.iter().skip(i + 1) {
-                if merged.contains(b) || a == b || self.entity(*b).is_none() {
+            let (cx, cy) = cell(pa);
+            let mut near: Vec<usize> = (cx - 1..=cx + 1).flat_map(|x| (cy - 1..=cy + 1).map(move |y| (x, y))).filter_map(|c| cells.get(&c)).flatten().copied().filter(|j| *j > i).collect();
+            near.sort_unstable();
+            for j in near {
+                let (b, pb) = ends[j];
+                if merged.contains(&b) || a == b || self.entity(b).is_none() {
                     continue;
                 }
-                if let (Some(pa), Some(pb)) = (self.point(*a), self.point(*b))
-                    && (pa - pb).length() <= tol
-                    && self.merge_points(*b, *a).is_ok()
-                {
-                    merged.push(*b);
+                if (pa - pb).length() <= tol && self.merge_points(b, a).is_ok() {
+                    merged.insert(b);
                 }
             }
         }
