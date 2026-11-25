@@ -71,7 +71,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   - impeller cold (fresh cache): window 0.39 s, first viewport frame 0.73 s, full display 58-60 s = regen: Boolean
     Flansch+Gehäuse 21.3 s, Delete face 1 30.8 s (kernel: SPEED-IMPELLER, blend/bool/core). Warm (cache kept) 0.57-0.68 s.
   - UI stalls 103-203 ms during every open (first frames: ui cpu 113 ms in one, 14-20 ms in the others = waiting).
-  - To do: start page first frame (NOSHAPE_FRAME_LOG first present), open by a click on the page (ui_script page start
+  - Start page (no document): first frame 453-489 ms after exec (startpage.sh, frame log), no UI stalls.
+  - To do: open by a click on the page (ui_script page start
     with a copied file), tab switch, edit commit (DocModel::flush -> session.commit on the UI thread?), the stalls.
 - 11-25 05:3x TRIAD-LOOK round 3 (qa 8641c8b2a, a lighter px every ~7 cols): qa's "bluest px per column" is the
   outline rim, not the core. Live (psui/manip-feel-1122 transform-x-hover) ~4 px strokes, 1.45 px core, rim ~1.3 px
