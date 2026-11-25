@@ -57,6 +57,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   render::worker::full_frames_only(true) in both crates' gpu_pointer (Windows' software GL drew a 1x frame, the full
   one 150 ms later). Open: (3)'s failing frame had no amber band - check a 1x frame draws the body band if it recurs.
   Minor bug (not fixed): the frame cache keeps a seq's 1x image on software GL. macOS: kernel loft test, not mine.
+- 11-25 05:5x-06:0x (lead): LINUX-MIME-ASSOC-HARDEN QUEUED 2dc33a82 (install.sh: mkdir ~/.config before xdg-mime, the
+  mimeapps.list default written when xdg-mime didn't, mimeinfo.cache by hand without update-desktop-database;
+  .github/release/check_install_linux.sh from release.yml: the lead's workflow_dispatch dry run pending).
+  FEEL-TAB-TO-FLIP-FOCUS QUEUED 6a116778 (pattern_flip_focus handle on "pat-opp", Tab focuses it; open: live's 1 px blue
+  count line while the flip is focused). Queue empty after these: awaiting qa re-shots.
 - 11-25 05:3x TRIAD-LOOK round 3 (qa 8641c8b2a, a lighter px every ~7 cols): qa's "bluest px per column" is the
   outline rim, not the core. Live (psui/manip-feel-1122 transform-x-hover) ~4 px strokes, 1.45 px core, rim ~1.3 px
   each side, per-column rim sum median 334 sd 12 range 301-365; ours (3 / 1.5 px) a 0.75 px rim, never full. Now 4.5 /
