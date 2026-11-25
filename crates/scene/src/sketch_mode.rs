@@ -466,9 +466,9 @@ const WOKEN_MIDS: [EntityId; 4] = [EntityId(u32::MAX - 5), EntityId(u32::MAX - 6
 const WOKEN_EDGE_MID: EntityId = EntityId(u32::MAX - 9);
 /// Trim: crossings this close to a chain's corner don't count (live sktools-1118 ~1 px, recheck b5b664aa 0.6 px).
 const TRIM_CORNER_PX: f64 = 1.5;
-/// How far the pointer moves from a press, on screen, before the press is a drag (live2 "feel (sketch)" (5): a drag
-/// starts at about 5 px on an end point or a line, whatever the time; less is a click).
-const DRAG_START_PX: f64 = 5.0;
+/// How far the pointer moves from a press, on screen, before the press is a drag (live sketch-drag-1125: none at 1-2 px,
+/// started by 4 px; less is a click).
+const DRAG_START_PX: f64 = 3.0;
 /// The square round a snapped point: its 1 px sides 8 px from the point (live qsnap/za-p2p-d8: 17 px outside), #FFC92A.
 const SNAP_SQUARE_HALF_PX: f64 = 8.0;
 const SNAP_SQUARE_COLOR: [u8; 4] = [0xff, 0xc9, 0x2a, 0xff];
@@ -710,6 +710,8 @@ pub struct SketchEditor {
     drag: Option<DragState>,
     /// The sketch as a geometry drag found it: each step solves from it.
     drag_origin: Option<Arc<Sketch>>,
+    /// A dragged point's offset from the pointer at the press: it keeps it (live sketch-drag-1125).
+    drag_grab: DVec2,
     /// A geometry drag's release solves the sketch; off: the UI solves a slow sketch's off the UI thread.
     pub solve_on_drop: bool,
     /// Curves a dragged point lay on when its drag began: its drop takes nothing on them.
@@ -1586,6 +1588,7 @@ impl SketchEditor {
             glyph_row_at: None,
             drag: None,
             drag_origin: None,
+            drag_grab: DVec2::ZERO,
             solve_on_drop: true,
             drag_held: Vec::new(),
             box_end: None,
@@ -4933,10 +4936,15 @@ impl SketchEditor {
                 // A drag aligns only with points it snaps onto itself.
                 self.woken.clear();
                 self.woken_mids.clear();
+                // The pressed point keeps its offset from the pointer (live sketch-drag-1125: no jump onto the pointer).
+                self.drag_grab = match handle {
+                    DragHandle::Point(id) if tip.is_none() => sk.point(id).map_or(DVec2::ZERO, |q| q - start),
+                    _ => DVec2::ZERO,
+                };
                 self.drag = Some(DragState::Geometry { handle, at: None });
-                Some(DragStep { handle, to: p, origin: None, begins: true })
+                Some(DragStep { handle, to: p + self.drag_grab, origin: None, begins: true })
             }
-            DragState::Geometry { handle, at } if at != Some(p) => Some(DragStep { handle, to: p, origin: self.drag_origin.clone(), begins: false }),
+            DragState::Geometry { handle, at } if at != Some(p) => Some(DragStep { handle, to: p + self.drag_grab, origin: self.drag_origin.clone(), begins: false }),
             _ => None,
         }
     }
@@ -4946,7 +4954,7 @@ impl SketchEditor {
         if step.begins {
             self.drag_origin = origin;
         }
-        let p = step.to;
+        let p = step.to - self.drag_grab;
         match step.handle {
             // From the last step, a dragged curve moves on from there.
             DragHandle::Entity { id, .. } if self.drag_origin.is_none() => self.drag = Some(DragState::Geometry { handle: DragHandle::Entity { id, grab: p }, at: Some(p) }),
@@ -12955,11 +12963,11 @@ mod tests {
         }
     }
 
-    /// Live2 "feel (sketch)" (5): a press on an entity becomes a drag only at about 5 px from the press, on screen;
-    /// less is a click (it selects).
+    /// Live sketch-drag-1125: a press on an entity becomes a drag at 3 px from the press, on screen (none at 1-2 px,
+    /// started by 4 px); less is a click (it selects).
     #[test]
-    fn a_press_drags_from_5_px() {
-        for (moved, drags) in [(4.0, false), (6.0, true)] {
+    fn a_press_drags_from_3_px() {
+        for (moved, drags) in [(2.0, false), (4.0, true)] {
             let (mut ed, mut d) = editor(Tool::Select);
             let pt = d.sketch.add_point(v(0.01, 0.01));
             ed.tool_down(&mut d, v(0.01, 0.01), Some(pt), false, false);
@@ -15125,6 +15133,69 @@ mod tests {
         let fit = fit.expect("a fit spline");
         assert_eq!(fit.len(), 3);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { a, b: Some(_) } if a == fit[1])), "the middle point's VERTICAL");
+    }
+
+    /// Live sketch-drag-1125: a point pressed a few px off keeps that offset from the pointer (no jump onto it).
+    #[test]
+    fn a_dragged_point_keeps_its_grab_offset() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let pt = d.sketch.add_point(v(0.01, 0.01));
+        let press = v(0.01 + 3.0 * PX, 0.01 - 2.0 * PX);
+        ed.tool_down(&mut d, press, Some(pt), false, false);
+        for k in 1..=4 {
+            ed.tool_drag(&mut d, press + v(0.005, 0.002) * (k as f64 / 4.0));
+        }
+        ed.tool_up(&mut d, press + v(0.005, 0.002));
+        let at = d.sketch.point(pt).unwrap();
+        assert!((at - v(0.015, 0.012)).length() < 1e-9, "{at:?}: moved by the pointer's travel, not onto the pointer");
+    }
+
+    /// Live sketch-drag-1125 (SKETCH-DRAG-SOLVE): an under-defined sketch's drags solve as live's: the corner (40, 20) to
+    /// (50, 28) moves only its two edges; the rim (78, 10) to (82, 10) only the radius (8 -> 12), the centre fixed; an
+    /// arc's end (centre (110, 0), R15, 0-90°) to (100, 22): its start fixed, the radius as small as reaches (centre on
+    /// the chord's midpoint, 180°; live R 16.64 for its drop at (100.15, 22.13)); a spline's point only that point; no constraint added.
+    #[test]
+    fn under_defined_drags_solve_as_live() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::CornerRect);
+        click(&mut ed, &mut d, mm(0.0, 0.0));
+        click(&mut ed, &mut d, mm(40.0, 20.0));
+        ed.set_tool(Tool::Circle);
+        click(&mut ed, &mut d, mm(70.0, 10.0));
+        click(&mut ed, &mut d, mm(78.0, 10.0));
+        ed.set_tool(Tool::Select);
+        let arc = d.sketch.add_arc(mm(110.0, 0.0), mm(125.0, 0.0), mm(110.0, 15.0));
+        let spline = d.sketch.add_fit_spline(&[mm(0.0, -45.0), mm(30.0, -40.0), mm(60.0, -45.0)]).unwrap();
+        let constraints = d.sketch.constraints().count();
+        let points = |d: &SketchData| d.sketch.entities().filter(|e| is_point(&d.sketch, e.id)).filter_map(|e| Some((e.id, d.sketch.point(e.id)?))).collect::<Vec<_>>();
+        let near = |a: DVec2, b: DVec2, tol_mm: f64| (a - b).length() < tol_mm * 1e-3;
+        let moved = |before: &[(EntityId, DVec2)], d: &SketchData| before.iter().filter(|(id, q)| !near(d.sketch.point(*id).unwrap(), *q, 1e-6)).map(|(_, q)| [q.x * 1e3, q.y * 1e3]).collect::<Vec<_>>();
+        // The corner: only the corner and its two neighbours' shared coordinates move.
+        let before = points(&d);
+        drag(&mut ed, &mut d, mm(40.0, 20.0), mm(50.0, 28.0));
+        let mut m = moved(&before, &d);
+        m.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        assert_eq!(m.len(), 3, "the corner and its two neighbours: {m:?}");
+        for (q, want) in [(mm(50.0, 28.0), "corner"), (mm(50.0, 0.0), "right bottom"), (mm(0.0, 28.0), "left top"), (mm(0.0, 0.0), "origin corner kept")] {
+            assert!(d.sketch.entities().any(|e| is_point(&d.sketch, e.id) && near(d.sketch.point(e.id).unwrap(), q, 1e-6)), "{want} at {q:?}");
+        }
+        // The rim: the radius only.
+        let circle = d.sketch.entities().find(|e| e.kind() == EntityKind::Circle).map(|e| e.id).unwrap();
+        let centre = |d: &SketchData, id| d.sketch.point(d.sketch.entity(id).unwrap().center().unwrap()).unwrap();
+        let radius = |d: &SketchData, id| (d.sketch.curve(id).unwrap().point(0.0) - centre(d, id)).length() * 1e3;
+        drag(&mut ed, &mut d, mm(78.0, 10.0), mm(82.0, 10.0));
+        assert!(near(centre(&d, circle), mm(70.0, 10.0), 1e-6) && (radius(&d, circle) - 12.0).abs() < 1e-6, "rim: centre {:?}, R {}", centre(&d, circle), radius(&d, circle));
+        // The arc's end: its start kept, the centre on the chord's midpoint.
+        let (a0, a1) = d.sketch.endpoints(arc).unwrap();
+        drag(&mut ed, &mut d, mm(110.0, 15.0), mm(100.0, 22.0));
+        let (s0, s1, c) = (d.sketch.point(a0).unwrap(), d.sketch.point(a1).unwrap(), centre(&d, arc));
+        assert!(near(s0, mm(125.0, 0.0), 1e-6) && near(s1, mm(100.0, 22.0), 1e-6), "arc ends {s0:?} {s1:?}");
+        assert!(near(c, (s0 + s1) * 0.5, 1e-6) && (radius(&d, arc) - (s1 - s0).length() * 0.5e3).abs() < 1e-6, "arc centre {c:?}, R {}", radius(&d, arc));
+        // A spline's point: that point only.
+        let before = points(&d);
+        drag(&mut ed, &mut d, mm(30.0, -40.0), mm(30.0, -30.0));
+        assert_eq!(moved(&before, &d), vec![[30.0, -40.0]], "only the dragged point (spline {spline:?})");
+        assert_eq!(d.sketch.constraints().count(), constraints, "no constraint added");
     }
 
     /// Live sketch/132: with the Text dialog open only the dash-dot box and its 4 corner points, no text.

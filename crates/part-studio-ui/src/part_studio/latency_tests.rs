@@ -651,5 +651,7 @@ fn a_slow_sketch_drags_off_the_ui_thread(cx: &mut TestAppContext) {
     let done = cx.update(|cx| (view.read(cx).ui.sketch_drag.is_none(), view.read(cx).sketch.as_ref().unwrap().geometry_dragging()));
     assert_eq!(done, (true, false), "solved, the drag ended");
     let at = point(cx);
-    assert!((at - plane(to)).length() < 1e-9, "the point under the pointer: {at} vs {}", plane(to));
+    // It keeps its offset from the press (live sketch-drag-1125: the grab offset).
+    let want = plane(to) + (start - plane(from));
+    assert!((at - want).length() < 1e-9, "the point under the pointer, grab offset kept: {at} vs {want}");
 }

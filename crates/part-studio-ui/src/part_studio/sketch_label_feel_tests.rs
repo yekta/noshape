@@ -36,8 +36,8 @@ fn a_dimension_label_follows_the_pointer_without_a_selection(cx: &mut TestAppCon
     vcx.simulate_mouse_down(pointer.window_point(cx, start), gpui_kit::MouseButton::Left, Modifiers::default());
     draw(cx, window);
     let mut off = Vec::new();
-    // Live's slow drag: 40 px across the line, 60 px along it, then back to 2 px from the press (live2: a drag starts
-    // 5 px from the press; from then on the label goes wherever the pointer goes).
+    // Live's slow drag: 40 px across the line, 60 px along it, then back to 2 px from the press (live sketch-drag-1125:
+    // a drag starts by 4 px from the press; from then on the label goes wherever the pointer goes).
     let out: Vec<DVec2> = (1..=10).map(|i| DVec2::new(0.0, 4.0 * i as f64)).chain((1..=10).map(|i| DVec2::new(-6.0 * i as f64, 40.0))).collect();
     let back: Vec<DVec2> = (1..=10).map(|i| DVec2::new(-60.0, 40.0) * (1.0 - i as f64 / 10.0) + DVec2::new(0.0, 2.0) * (i as f64 / 10.0)).collect();
     for d in out.into_iter().chain(back) {
@@ -46,7 +46,7 @@ fn a_dimension_label_follows_the_pointer_without_a_selection(cx: &mut TestAppCon
         vcx.simulate_mouse_move(pointer.window_point(cx, at), Some(gpui_kit::MouseButton::Left), Modifiers::default());
         pointer.frames(cx, &view);
         let got = label_at(cx, &view).expect("the label");
-        let want = if d == DVec2::new(0.0, 4.0) { start } else { at };
+        let want = at;
         if (got - want).length() > 1.5 {
             off.push(format!("pointer at {d:?} from the press: label {:.1} px off ({got:?} vs {want:?})", (got - want).length()));
         }

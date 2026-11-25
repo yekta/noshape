@@ -361,6 +361,81 @@ fn a_finished_sketch_is_one_undo_step_and_a_reentered_one_starts_empty(cx: &mut 
     assert_eq!((features(cx), curves(cx)), (n, 1), "the whole edit is one step");
 }
 
+/// Live sketch-drag-1125 (qa SKETCH-DRAG): a re-edited sketch's rectangle corner pressed and moved 2 px stays put; past
+/// 3 px it follows the pointer, the region fills hidden until the release; no constraint added; in the sketch one
+/// Ctrl+Z takes one drag back and Ctrl+Y redoes it; after ✓ one Ctrl+Z reverts the whole edit (both drags).
+#[gpui::test]
+fn sketch_drags_hide_the_fills_and_undo_one_at_a_time_as_live(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sk-drag-undo", Tool::CornerRect);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (600., 340.));
+    keys(cx, window, &["escape"]);
+    let finish = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    };
+    finish(cx);
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_some());
+    // (the points, rounded to µm, and the constraint count of the open sketch, or of the stored one once closed)
+    let summary = |sk: &noshape_sketch::Sketch| {
+        let mut pts: Vec<[i64; 2]> = sk.entities().filter_map(|e| sk.point(e.id)).map(|p| [(p.x * 1e6).round() as i64, (p.y * 1e6).round() as i64]).collect();
+        pts.sort();
+        (pts, sk.constraints().count())
+    };
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        if let Some(d) = v.sketch_data(cx) {
+            return Some(summary(&d.sketch));
+        }
+        match v.studio(cx)?.features.iter().find(|f| f.id == sketch)?.params.get("sketch") {
+            Some(noshape_model::ParamValue::Sketch(d)) => Some(summary(&d.sketch)),
+            _ => None,
+        }
+    });
+    let start = state(cx).expect("the sketch");
+    drag(cx, window, &view, (600., 340.), (602., 340.), 2);
+    assert_eq!(state(cx), Some(start.clone()), "2 px: nothing moves");
+    let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ev, w, cx);
+        })).unwrap();
+        draw(cx, window);
+    };
+    let fills_hidden = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).opts.sketch_dragging);
+    event(cx, ViewportEvent::PointerMove { position: DVec2::new(600., 340.), modifiers: Modifiers::default() });
+    event(cx, ViewportEvent::ToolDown { position: DVec2::new(600., 340.), modifiers: Modifiers::default(), click_count: 1 });
+    event(cx, ViewportEvent::ToolDrag { position: DVec2::new(610., 335.) });
+    event(cx, ViewportEvent::ToolDrag { position: DVec2::new(620., 330.) });
+    assert!(fills_hidden(cx), "the fills hidden while the corner is dragged");
+    assert!(cx.update(|cx| view.read(cx).highlighted_hover(cx).is_empty()), "no hover orange while dragging");
+    event(cx, ViewportEvent::ToolUp { position: DVec2::new(620., 330.), modifiers: Modifiers::default() });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert!(!fills_hidden(cx), "back on release");
+    let one = state(cx).expect("the sketch");
+    assert!(one.0 != start.0 && one.1 == start.1, "the corner moved, no constraint added");
+    drag(cx, window, &view, (500., 400.), (480., 420.), 4);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let two = state(cx).expect("the sketch");
+    assert!(two.0 != one.0 && two.1 == start.1, "the second drag");
+    let step = |cx: &mut TestAppContext, redo: bool| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.draft_undo(redo, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    };
+    step(cx, false);
+    assert_eq!(state(cx), Some(one.clone()), "Ctrl+Z takes one drag back");
+    step(cx, true);
+    assert_eq!(state(cx), Some(two.clone()), "Ctrl+Y redoes it");
+    finish(cx);
+    assert_eq!(state(cx), Some(two), "both drags kept");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(state(cx), Some(start), "after ✓ one Ctrl+Z reverts the whole edit");
+}
+
 /// Live sketch-gaps2 / 3: a linear pattern's "3x" and spacing labels are 16 px text on opaque boxes about 30 × 28 and
 /// 30 × 26 px; as a dimension's label (live 11-04), a click picks one (orange, no box), a double-click opens its box.
 #[gpui::test]

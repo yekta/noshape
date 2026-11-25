@@ -3,24 +3,27 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 17:0x) — read first
-- QUEUED 18d00b55 (carries 8886d746): screws translator (28 -> 33; name breaks bbox ties only, duct-multipart back to
-  full), ops "Warning" for an unsolvable sketch (`api_status`, e2e expects Warning; the row stays red), l.706 sketch
-  feel (pattern labels pick/double-click/tan hover, Text dialog as live's DOM, Search tools Recently used row; T1s,
-  interaction-feel rows). Open REQUESTS skasm 11-25 16:30 (1x default? count label click? Recently used in a sketch),
-  16:21 lora refs. Knife Revolve vertex routed to core (shown_topology closed edge).
-- IN FLIGHT, P0 SKETCH-DRAG-SOLVE (lead; live psui/sketch-drag-1125, behaviours "Sketch drags…"), UNCOMMITTED:
-  scene sketch_mode.rs: DRAG_START_PX 5 -> 3 (`a_press_drags_from_3_px`); `drag_grab` (a dragged point keeps its
-  offset from the pointer: drag_step / drag_stepped) + T1 `a_dragged_point_keeps_its_grab_offset`; T1
-  `under_defined_drags_solve_as_live` (corner/rim/arc end/spline as live: they already matched; arc R = chord/2;
-  no hover orange mid-drag). psui: `sketch_drags_hide_the_fills_and_undo_one_at_a_time_as_live` (2 px nothing,
-  opts.sketch_dragging during, draft_undo one drag, redo, after ✓ one doc undo reverts both);
-  sketch_label_feel_tests label drag 4 px now drags. Run: skasm-scratch/bin/tdrag.sh via rb.sh vibex6 (scene
-  sketch_mode::, psui sketch, clippy); log ~/tmp/skasm/tdrag.log (first run predates drag_grab: rerun). Then
-  commit "skasm: sketch drags as live (sketch-drag-1125): 3 px start, grab offset kept; tests", land, report.
-- Open note: our labels are stored as absolute positions; live stores labelDistance/labelRatio (a label drop = the
-  drop point in both). Whether a label follows its dragged line is unchecked.
-- NEXT after the P0: remaining l.706 answers from live (REQUESTS 16:30); the WARNING status word (done in ops, landing).
+## NOW (11-25 17:4x) — read first
+- FIX FORWARD (lead 17:3x): all lands since 16:16 failed. e4458668 failed ops e2e
+  `two_parts_of_a_flexible_subassembly_mate_in_its_parent` (expected a part-with-itself mate refused; 7417afb1e makes it,
+  flagged): test updated (uncommitted), run skasm-scratch/bin/te2e.sh. 18d00b55/8886d746/f3e0b4f3/80c0df76/3ffd041e/
+  deaba572: rebase conflict with psui b0e47f46 in sketch_ui_tests.rs (both added an undo-scope test at one spot):
+  when b0e47f46 is on origin/main, rebase and keep psui's `a_finished_sketch_is_one_undo_step_and_a_reentered_one_
+  starts_empty`, drop my `a_finished_sketch_is_one_undo_step` (trial in ~/tmp/skasm/rbtry: only that conflict).
+- P0 SKETCH-DRAG-SOLVE, UNCOMMITTED, commit with the fix: scene DRAG_START_PX 5 -> 3, `drag_grab` (point keeps its grab
+  offset), T1s `a_press_drags_from_3_px`, `a_dragged_point_keeps_its_grab_offset`, `under_defined_drags_solve_as_live`
+  (corner/rim/arc end/spline already matched live); psui `sketch_drags_hide_the_fills_and_undo_one_at_a_time_as_live`
+  (also: no hover orange mid-drag via highlighted_hover; entity hover isn't in the scene overlay). tdrag.sh: scene 221
+  ok, drag+label 4 ok. Commit "skasm: sketch drags as live (sketch-drag-1125): 3 px start, grab offset kept; tests".
+- Open note: labels stored absolute; live labelDistance/labelRatio; whether a label follows a dragged line unchecked.
+- NEXT (live posted, lead 17:4x), after the above:
+  1) lora: refs in; c2-lora 39/46, first diff f39 "Ribs" (191/474/277 vs live 177/444/265, vol -3.46 mm3).
+  2) live/skasm/sketch-feel-1125: 2nd-direction arrow + "1x" shown by default; count label tan hover, orange click,
+     double-click opens the box (ours matches); a sketch's Alt+C has NO "Recently used" (fix ours + the row/T1).
+  3) live/skasm/glyph-taken-1125: the 2nd corner's glyph row goes left past the 1st, about (-40,-12) px.
+  4) live/skasm/infer-arc-circle-1125: circle r-point gives TANGENT .perimeterSnap0 but a line end beats tangent;
+     3-point arc near a semicircle gives MIDPOINT(center); centre-point arc end stores HORIZONTAL to a woken centre
+     (corrects the catalogue); `t` = Tangent constraint.
 
 ## Earlier NOW (11-25 14:11)
 - LANDED: Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent (live tangent-one-entity-1123).
