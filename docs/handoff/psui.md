@@ -97,9 +97,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Insert config selects); mate dialog accept_pale() (reopened "not consistent" pale) and field_text() (Tangent's
   inferred picks read "Face of …"). TICKETS 778 + 694 "fixed, to verify". Not taken (solver): ERR-MATE-CREATING-REV-RED,
   ERR-MATE-OVERDEF-BOTH (eval.rs ~870 held_back). Left: IMP-ASM-ROW-ICON (import), ASM-PATTERN-PREVIEW-LATE (speed).
-- NEXT: display-mode pixels vs live display-modes-1125 (1): per-mode face/edge colours s1-s8 (Translucent draws hidden
-  edges dark #242627/#404447; Hidden edges visible light ~#c4c8cb; silhouette 1 px core + AA). Then asm rows left:
-  IMP-ASM-ROW-ICON, ASM-PATTERN-PREVIEW-LATE.
+- 11-25 11:4x display-mode pixels vs live display-modes-1125 (1): study hover_matrix_tests print_display_mode_pixels
+  (T2, --ignored --nocapture; live's block, iso 0.290 mm/px). Faces + tangent edges = live; outline heavier ->
+  TICKETS LOOK-OUTLINE-WEIGHT (P2, mine, open). Fixture note: a REMOVE extrude from Top needs "symmetric": true
+  (THROUGH_ALL / midplane missed the block). NEXT: asm rows left: IMP-ASM-ROW-ICON, ASM-PATTERN-PREVIEW-LATE.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.

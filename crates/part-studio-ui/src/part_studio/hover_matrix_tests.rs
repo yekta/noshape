@@ -3026,3 +3026,71 @@ fn sk_a_construction_circle_is_dashed(cx: &mut TestAppContext) {
     let gaps = (0..steps).filter(|i| bare[*i] && !bare[(i + steps - 1) % steps]).count();
     assert!((4..=7).contains(&gaps), "{gaps} gaps round the rim, {} of {steps} samples bare, r {:.0} px", bare.iter().filter(|b| **b).count(), (rim - centre).length());
 }
+
+/// Display modes study (live display-modes-1125 (1)): live's block (40×30×20, a Ø10 hole through, 3 mm fillets on the
+/// vertical edges) seen Isometric at 0.290 mm/px; prints each state's pixels at live's sample points
+/// (cargo test -p noshape-part-studio-ui --lib print_display_mode_pixels -- --ignored --nocapture).
+#[gpui::test]
+#[ignore = "T2: prints the display modes' pixels"]
+fn print_display_mode_pixels(cx: &mut TestAppContext) {
+    use crate::scene_builder::{DisplayMode as D, TangentEdges as T};
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Block", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[20, 15], [25, 15]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "40 mm", "symmetric": true, "operationType": "REMOVE" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [0, 0, 10]", "edge through [40, 0, 10]", "edge through [40, 30, 10]", "edge through [0, 30, 10]"], "radius": "3 mm" } },
+    ] });
+    let m = matrix_studio_from(cx, "display-mode-pixels", start);
+    let failed = cx.update(|cx| m.view.read(cx).display.features.iter().filter_map(|f| f.message.clone()).collect::<Vec<_>>());
+    assert!(failed.is_empty(), "the block regenerates: {failed:?}");
+    cx.update(|cx| {
+        let vp = m.view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            let forward = DVec3::new(-1., 1., -1.).normalize();
+            let up = (DVec3::Z - forward * DVec3::Z.dot(forward)).normalize();
+            vp.camera.rotation = noshape_render::Camera::look_rotation(forward, up);
+            vp.camera.target = DVec3::new(0.02, 0.015, 0.01);
+            vp.camera.distance = 0.290e-3 * vp.size().y / (2.0 * (vp.camera.fov_y * 0.5).tan());
+            vp.request_frame(cx);
+        });
+    });
+    let states = [
+        ("s1 shaded+edges", D::ShadedWithEdges, false, T::Visible),
+        ("s2 shaded", D::Shaded, false, T::Visible),
+        ("s3 unshaded", D::HiddenLine, false, T::Visible),
+        ("s4 translucent", D::Translucent, false, T::Visible),
+        ("s5 s1+hidden", D::ShadedWithEdges, true, T::Visible),
+        ("s6 s3+hidden", D::HiddenLine, true, T::Visible),
+        ("s7 s1+phantom", D::ShadedWithEdges, false, T::Phantom),
+        ("s8 s1+removed", D::ShadedWithEdges, false, T::Removed),
+    ];
+    let hex = |p: [u8; 3]| format!("{:02x}{:02x}{:02x}", p[0], p[1], p[2]);
+    for (name, mode, hidden, tangent) in states {
+        cx.update_window(m.window, |_, w, cx| {
+            m.view.update(cx, |v, cx| {
+                v.opts.hidden_edges_visible = hidden;
+                v.opts.tangent_edges = tangent;
+                v.set_display_mode(mode, w, cx);
+            })
+        })
+        .unwrap();
+        m.park(cx);
+        let (w, h, px) = m.frame(cx);
+        let at = |x: i64, y: i64| px[(y.clamp(0, h as i64 - 1) * w as i64 + x.clamp(0, w as i64 - 1)) as usize];
+        let mut row = Vec::new();
+        for (n, p) in [("a", [31., 23., 20.]), ("b", [20., 0., 10.]), ("c", [40., 15., 10.]), ("f", [37., 0., 10.]), ("e1", [20., 10., 0.]), ("e2", [0., 27., 10.]), ("rim", [20., 10., 20.])] {
+            let q = m.screen(cx, p);
+            let (x, y) = (q.x as i64, q.y as i64);
+            let dark = (-3..=3).flat_map(|i| (-3..=3).map(move |j| (i, j))).map(|(i, j)| at(x + i, y + j)).min_by_key(|c| c.iter().map(|&v| v as u32).sum::<u32>()).unwrap_or_default();
+            row.push(format!("{n}=#{}/{}", hex(at(x, y)), hex(dark)));
+        }
+        row.push(format!("g=#{}", hex(at(40, h as i64 / 2))));
+        let q = m.screen(cx, [20., 0., 0.]);
+        let col: Vec<String> = (-6..=6).map(|j| hex(at(q.x as i64, q.y as i64 + j))).collect();
+        let q = m.screen(cx, [37., 0., 10.]);
+        let tan: Vec<String> = (-4..=4).map(|i| hex(at(q.x as i64 + i, q.y as i64))).collect();
+        println!("== {name}: {} | sil {} | tangent row {}", row.join(" "), col.join(","), tan.join(","));
+    }
+}

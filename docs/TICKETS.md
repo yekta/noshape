@@ -30,6 +30,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 ## qa 11-25 12:3x: hobbyist hinged box (lead 11-25): ops build of the start (qa-scratch/tmp/hinge/hinge.py, iso.py), on green 2a0eef330 and v0.4.60 / v0.4.68
 
 - [ ] P0 **BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX (bool)** (qa 11-25 12:3x): on a 60x40x30 box with R5 vertical edges and Shell 2 (top removed), a hinge knuckle (circle R3 at y 40, z 30 on the Right plane, Extrude Add 20 mm, Merge with all) that starts flush with the box's side (x 0..20, or x 40..60 ending at x 60) gives "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained." and stays a second part (565.49 mm3), though it overlaps the 2 mm back wall (y 38..40, z 27..30) for 15 mm. The same cylinder merges on the plain box, the filleted-only box and the shelled-only box, and at x 5..20 / 10..20 on the filleted shelled box (+341.3 / +227.6 mm3). Same in v0.4.60 and v0.4.68 (not a regression). Repro: `python3 /root/qa-scratch/tmp/hinge/iso.py <noshape binary>` (cases fillet+shell and fillet+shell x40-60). Wrong geometry for a hobbyist's hinge.
+## psui 11-25 11:4x: display modes vs live display-modes-1125 (study hover_matrix print_display_mode_pixels, T2)
+
+- [ ] P2 **LOOK-OUTLINE-WEIGHT (psui)** (psui 11-25 11:4x): faces in all 4 modes = live within 1 level, tangent edges
+  visible / phantom / removed = live (ink ~1.0 px, live's core #181d20), hidden edges in Translucent and Hidden edges
+  visible within AA noise. The part's outline is heavier: the bottom front edge's vertical column reads 333f45, 000000
+  (~1.5 px of ink, on the face side) where live has 546872, 383a3c, c9ced3 (~0.8 px, centred); not the backface band
+  (same without it). Look at the edge line's depth offset / AA where a line borders the background.
 
 ## qa 11-25 10:3x: hobbyist enclosure flow (lead 11-25) on green 2d91090e7 / bd448e76c: hm2/wf/57-62-encl-*.json (start encl-shell in wf/starts.json), hm2/out-flow5-1125 (vibex7)
 
