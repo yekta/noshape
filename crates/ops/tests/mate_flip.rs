@@ -423,6 +423,31 @@ fn a_tangent_with_one_entity_is_made_in_error() {
     let _ = std::fs::remove_file(&path);
 }
 
+/// OPS-TANGENT-MATE: a Tangent between two faces of one part is made (live's REST and dialog take it), flagged "Mate is
+/// invalid." (live errors-1123 mates), and keeps each face under its connector as the dialog does (its chips "Face of …").
+#[test]
+fn a_tangent_on_one_part_is_made_in_error_on_its_faces() {
+    let dir = std::env::temp_dir().join(format!("noshape-tangent-same-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("t.noshape");
+    let _ = std::fs::remove_file(&path);
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    studio(&mut ctx, "Part Studio 1", json!({ "tool": "corner_rectangle", "points": [[-50, -30], [50, 30]] }), "10 mm");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    let (top, side) = (face(&mut ctx, "Part 1 <1>", [0.0, 0.0, 1.0]), face(&mut ctx, "Part 1 <1>", [1.0, 0.0, 0.0]));
+    call(&mut ctx, "assembly_mate", json!({ "type": "tangent", "a": { "instance": "Part 1 <1>", "entity": top }, "b": { "instance": "Part 1 <1>", "entity": side } }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let m = &list["mates"][0];
+    assert_eq!((m["name"].clone(), m["ok"].clone(), m["message"].clone()), (json!("Tangent 1"), json!(false), json!("Mate is invalid.")), "{m}");
+    let doc = ctx.doc(path.to_str()).unwrap().doc().clone();
+    let tab = noshape_ops::doc::find_tab(&doc, "Assembly 1").unwrap();
+    let Some(noshape_model::document::TabContent::Assembly(asm)) = doc.tab(tab).map(|t| &t.content) else { panic!("Assembly 1") };
+    let on_face = |r: &noshape_model::reference::Reference| matches!(r, noshape_model::reference::Reference::Implicit { on, .. } if matches!(**on, noshape_model::reference::Reference::Face(_)));
+    assert!(on_face(&asm.mates[0].a.reference) && on_face(&asm.mates[0].b.reference), "{:?} / {:?}", asm.mates[0].a.reference, asm.mates[0].b.reference);
+    let _ = std::fs::remove_file(&path);
+}
+
 /// A Tangent's flip is its own (live's flipAlignment, the dialog's button alone): a Ø10 × 40 pin laid on its side
 /// under the fixed plate's top face (z 10) rests on it, its axis at z 15, by default and unflipped (live
 /// asm-cov-tangent: flipAlignment false, the pin on the plate); flipped it sinks to the face's inside, axis at z 5.

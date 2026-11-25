@@ -1228,11 +1228,15 @@ impl AssemblyView {
             }));
         // Live 1723: the pattern / mirror / replicate row's menu.
         let view = cx.entity();
-        row.os_context_menu(move |menu, window, cx| {
-            let entries = view.read(cx).pattern_menu(id, cx);
-            fill_menu(menu, entries, view.clone(), window, cx)
-        })
-        .into_any_element()
+        let row = row
+            .os_context_menu(move |menu, window, cx| {
+                let entries = view.read(cx).pattern_menu(id, cx);
+                fill_menu(menu, entries, view.clone(), window, cx)
+            })
+            .into_any_element();
+        // Live's runner names a pattern row as a mate (qa UIS-MATE-PATTERN-ROW, workflows-1123 04 s13).
+        let name = pat.name.clone();
+        crate::ui_script::wrap(row, move || format!("mate:{name}"))
     }
 
     // ------------------------------------------------------------ patterns
