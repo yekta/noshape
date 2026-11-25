@@ -633,15 +633,16 @@ fn a_slow_sketch_drags_off_the_ui_thread(cx: &mut TestAppContext) {
     let point = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.point(end).unwrap());
     let start = point(cx);
     let from = px(start);
-    let to = from + DVec2::new(30.0, 20.0);
+    // (Upward: down it would end level with the origin, which snaps.)
+    let to = from + DVec2::new(30.0, -20.0);
     let none = Modifiers::default();
     event(cx, ViewportEvent::PointerMove { position: from, modifiers: none });
     event(cx, ViewportEvent::ToolDown { position: from, modifiers: none, click_count: 1 });
-    event(cx, ViewportEvent::ToolDrag { position: from + DVec2::new(10.0, 5.0) });
+    event(cx, ViewportEvent::ToolDrag { position: from + DVec2::new(10.0, -5.0) });
     let held = cx.update(|cx| view.read(cx).ui.sketch_drag.is_some());
     assert!(held, "the step solves off the UI thread");
     assert_eq!(point(cx), start, "the last solved shape shown meanwhile");
-    event(cx, ViewportEvent::ToolDrag { position: from + DVec2::new(20.0, 10.0) });
+    event(cx, ViewportEvent::ToolDrag { position: from + DVec2::new(20.0, -10.0) });
     event(cx, ViewportEvent::ToolDrag { position: to });
     event(cx, ViewportEvent::ToolUp { position: to, modifiers: none });
     let dragging = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().geometry_dragging());

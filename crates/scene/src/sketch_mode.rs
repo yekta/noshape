@@ -2274,14 +2274,19 @@ impl SketchEditor {
     /// reach on screen (live2 "feel (sketch)" (2): a dragged end lands on a line from 7 px); `None` clears it.
     pub fn set_drag_external(&mut self, snap: Option<ExternalSnap>) {
         let reach = |q: DVec2| self.cursor.is_some_and(|c| self.screen_metric().map_or((q - c).length(), |m| m.len(q - c)) <= self.world_per_px * INFERENCE_PX);
-        self.drag_external = snap.filter(|s| self.drag_snap.is_none() && !self.shift_held && matches!(s, ExternalSnap::Edge { position, .. } if reach(*position)));
+        // (A curve beats an alignment: the edge wins over a level / plumb snap.)
+        let aligned = |snap: &Option<(EntityId, DVec2, Drop)>| snap.is_none_or(|(_, _, d)| matches!(d, Drop::Level(_)));
+        self.drag_external = snap.filter(|s| aligned(&self.drag_snap) && !self.shift_held && matches!(s, ExternalSnap::Edge { position, .. } if reach(*position)));
+        if self.drag_external.is_some() {
+            self.drag_snap = None;
+        }
     }
 
     /// The release of a point dragged onto a model edge: `id` the edge's linked (used) curve; the point lands on it,
     /// coincident, or at its midpoint (live2: MIDPOINT on release).
     pub fn drop_onto_external(&mut self, id: EntityId) {
         if let Some(ExternalSnap::Edge { position, midpoint, .. }) = self.drag_external.take()
-            && self.drag_snap.is_none()
+            && self.drag_snap.is_none_or(|(_, _, d)| matches!(d, Drop::Level(_)))
         {
             self.drag_snap = Some((id, position, if midpoint { Drop::Midpoint } else { Drop::OnCurve }));
         }
