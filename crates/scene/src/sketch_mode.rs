@@ -464,6 +464,9 @@ const WOKEN_MIDS: [EntityId; 4] = [EntityId(u32::MAX - 5), EntityId(u32::MAX - 6
 /// Stands for a model edge's midpoint a level crosses ([`SketchEditor::woken_edge_mid`]) in an inference's alignment
 /// until the click makes a point there.
 const WOKEN_EDGE_MID: EntityId = EntityId(u32::MAX - 9);
+/// Stands for a centre point arc's centre, clicked but not made yet, in its start's and end's alignments (live
+/// infer-arc-circle-1125: VERTICAL / HORIZONTAL to the centre).
+const ARC_CENTRE: EntityId = EntityId(u32::MAX - 10);
 /// Trim: crossings this close to a chain's corner don't count (live sktools-1118 ~1 px, recheck b5b664aa 0.6 px).
 const TRIM_CORNER_PX: f64 = 1.5;
 /// How far the pointer moves from a press, on screen, before the press is a drag (live sketch-drag-1125: none at 1-2 px,
@@ -1964,7 +1967,7 @@ impl SketchEditor {
             exclude: Vec::new(),
             origin: true,
             woken: self.woken.iter().copied().filter(|w| Some(*w) != own_start).collect(),
-            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]).into_iter().chain(self.woken_point.as_ref().map(|(_, q)| (WOKEN_POINT, *q))).chain(self.woken_mid_points(sk)).collect(),
+            woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]).into_iter().chain(self.woken_point.as_ref().map(|(_, q)| (WOKEN_POINT, *q))).chain(self.woken_mid_points(sk)).chain(self.arc_centre_anchor()).collect(),
             screen: self.screen_metric(),
         };
         let mut all = noshape_sketch::infer(sk, p, &ctx);
@@ -2761,6 +2764,14 @@ impl SketchEditor {
             distance: seen,
             priority: 2,
         })
+    }
+
+    /// A centre point arc's clicked centre as an alignment anchor, unless it sits on a point (whose own alignments
+    /// stand for it).
+    fn arc_centre_anchor(&self) -> Option<(EntityId, DVec2)> {
+        let c = self.clicks.first().filter(|_| self.tool == Tool::CenterArc)?;
+        let on_point = c.inference.as_ref().is_some_and(|i| i.constraints.iter().any(|a| matches!(a, AutoConstraint::CoincidentPoint(_))));
+        (!on_point).then_some((ARC_CENTRE, c.pos))
     }
 
     /// The click takes the woken model edge's perpendicular or an end's alignment: the edge is used in `sk` as `id`.
@@ -4202,11 +4213,16 @@ impl SketchEditor {
                 if self.clicks.len() < 3 {
                     return EditOutcome::redraw();
                 }
-                let c: Vec<Click> = std::mem::take(&mut self.clicks);
+                let mut c: Vec<Click> = std::mem::take(&mut self.clicks);
                 // The sweep follows the cursor: counter-clockwise unless the cursor went the other way.
                 let ccw = self.center_arc_sweep >= 0.0;
                 let id = sk.center_point_arc(c[0].pos, c[1].pos, c[2].pos, ccw);
                 if let Some(noshape_sketch::Geometry::Arc { center, start, end }) = sk.entity(id).map(|e| e.geometry.clone()) {
+                    for inf in c.iter_mut().filter_map(|k| k.inference.as_mut()) {
+                        for a in &mut inf.constraints {
+                            *a = retarget_auto(*a, ARC_CENTRE, center);
+                        }
+                    }
                     attach(sk, center, None, &c[0]);
                     let (s_click, e_click) = if ccw { (&c[1], &c[2]) } else { (&c[2], &c[1]) };
                     attach(sk, start, Some(id), s_click);
@@ -7683,6 +7699,7 @@ impl SketchEditor {
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == noshape_sketch::ORIGIN => Some(DVec2::ZERO),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == WOKEN_POINT => self.woken_point.as_ref().map(|w| w.1),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == WOKEN_EDGE_MID => self.woken_edge_mid.as_ref().map(|w| w.1),
+                    AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if *p == ARC_CENTRE => self.clicks.first().map(|c| c.pos),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_MIDS.contains(p) => self.woken_mid_points(&data.sketch).find(|(k, _)| k == p).map(|(_, q)| q),
                     AutoConstraint::HorizontalWith(p) | AutoConstraint::VerticalWith(p) if WOKEN_EDGE_ENDS.contains(p) => {
                         self.woken_edge.as_ref().map(|w| if *p == WOKEN_EDGE_ENDS[0] { w.1 } else { w.2 })
@@ -14754,6 +14771,46 @@ mod tests {
         assert!(tangent(3.0), "1.85 px off: tangent");
         let tangent_r = 5.0 / 2f64.sqrt();
         assert!(!tangent(tangent_r - 3.0 * 0.275365), "3 px off: not");
+    }
+
+    /// Live infer-arc-circle-1125 (0.293 mm a px): a circle's radius point at a line's end that is also its tangent
+    /// point stores COINCIDENT to the end and no TANGENT (the point wins); a centre-point arc's start straight above its
+    /// centre stores VERTICAL to it and its end at 180 degrees HORIZONTAL.
+    #[test]
+    fn circle_and_centre_arc_snaps_store_as_live() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let (mut ed, mut d) = editor(Tool::Circle);
+        ed.world_per_px = 0.293e-3;
+        let l = d.sketch.add_line(mm(0.0, 0.0), mm(20.0, 0.0));
+        let end = d.sketch.endpoints(l).unwrap().1;
+        click(&mut ed, &mut d, mm(20.0, 15.0));
+        ed.pointer_move(&mut d, mm(20.3, 0.4), false, false);
+        click(&mut ed, &mut d, mm(20.3, 0.4));
+        let kinds: Vec<_> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        assert!(kinds.iter().any(|k| matches!(k, ConstraintKind::Coincident { a, b } if *a == end || *b == end)), "coincident to the end: {kinds:?}");
+        assert!(!kinds.iter().any(|k| matches!(k, ConstraintKind::Tangent { .. })), "no tangent: {kinds:?}");
+        let (mut ed, mut d) = editor(Tool::CenterArc);
+        ed.world_per_px = 0.293e-3;
+        click(&mut ed, &mut d, mm(60.0, 20.0));
+        ed.pointer_move(&mut d, mm(60.3, 35.0), false, false);
+        click(&mut ed, &mut d, mm(60.3, 35.0));
+        for a in [1.8f64, 2.4, 3.0] {
+            ed.pointer_move(&mut d, mm(60.0, 20.0) + DVec2::from_angle(a) * 0.015, false, false);
+        }
+        ed.pointer_move(&mut d, mm(45.0, 20.4), false, false);
+        click(&mut ed, &mut d, mm(45.0, 20.4));
+        let arc = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).map(|e| e.id).expect("the arc");
+        let centre = d.sketch.entity(arc).unwrap().center().unwrap();
+        let (s0, s1) = d.sketch.endpoints(arc).unwrap();
+        let with = |k: &ConstraintKind, horizontal: bool| match k {
+            ConstraintKind::Horizontal { a, b: Some(b) } if horizontal => Some((*a, *b)),
+            ConstraintKind::Vertical { a, b: Some(b) } if !horizontal => Some((*a, *b)),
+            _ => None,
+        };
+        let kinds: Vec<_> = d.sketch.constraints().map(|c| c.kind.clone()).collect();
+        let pairs = |h: bool| kinds.iter().filter_map(|k| with(k, h)).filter(|(a, b)| *a == centre || *b == centre).map(|(a, b)| if a == centre { b } else { a }).collect::<Vec<_>>();
+        let (v_pts, h_pts) = (pairs(false), pairs(true));
+        assert!(v_pts.len() == 1 && h_pts.len() == 1 && v_pts[0] != h_pts[0] && [s0, s1].contains(&v_pts[0]) && [s0, s1].contains(&h_pts[0]), "start VERTICAL, end HORIZONTAL to the centre: {kinds:?}");
     }
 
     /// Live (sketch-mirror-preselected-batch): a left-to-right box over a line and a circle selects the two, not their
