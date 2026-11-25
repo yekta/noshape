@@ -22,6 +22,8 @@ pub(super) fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
         eprintln!("asm feel: GPU pointer tests skipped: {e}");
         return None;
     }
+    // Pixel checks on one frame per view, whatever the runner's speed (no software rasteriser's 1x frame, settled later).
+    noshape_render::worker::full_frames_only(true);
     use noshape_render::{Camera, Drawable, Instance, PointData, PointSprite, RenderParams, Renderer, Scene, StandardView, Style};
     let mut r = Renderer::new().ok()?;
     let points = PointData { points: vec![PointSprite { position: [0.0; 3], color: [0, 0, 255, 255], pick_id: 7, size: 6.0, style: 2, _pad: 0 }] };
@@ -1859,6 +1861,10 @@ fn a_short_press_selects_the_face_and_the_triads_ball_moves_only_the_triad(cx: &
     // Live triad-snap-1121: the release leaves the triad where the ball is: at the pointer, or on the inference point
     // it snapped to over a face.
     let to = at + DVec2::new(60.0, 0.0);
+    // The press on the ball once its hover is in (pressed before, a slow runner's press took the part's face and dragged
+    // the part, the triad on it: Windows CI 45490384199).
+    move_to(cx, window, &view, at);
+    wait_until(cx, window, &view, |v, _| v.manip_hover == Some(crate::assembly_scene::ManipHandle::Center));
     // Where the ball is as the button comes up (a slow runner's view may answer differently after the release).
     let ball = std::cell::Cell::new(to);
     drag_with(cx, window, &view, at, to, Modifiers::default(), |cx| {

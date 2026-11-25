@@ -107,6 +107,14 @@ impl RenderJob {
 /// How long a software rasteriser's view stays unchanged before its frame is drawn again at the full sample count.
 const SETTLE: Duration = Duration::from_millis(150);
 
+static FULL_FRAMES_ONLY: AtomicBool = AtomicBool::new(false);
+
+/// Tests: a software rasteriser's frames drawn at their full sample count at once, never a 1x frame settled later, so a
+/// frame checked shows the same pixels however slow the runner (Windows CI's WARP, nightly 45490384199).
+pub fn full_frames_only(on: bool) {
+    FULL_FRAMES_ONLY.store(on, Ordering::Relaxed);
+}
+
 /// A software rasteriser's frames (lead 11-22: 4x MSAA on llvmpipe was ~7x the frame): 1x while the view changes
 /// (orbit, drag, animation, hover), the last one again at the style's sample count once it has settled.
 #[derive(Default)]
@@ -219,7 +227,7 @@ impl RenderWorker {
                         }
                     }
                     Msg::Adopt(job) => {
-                        if software {
+                        if software && !FULL_FRAMES_ONLY.load(Ordering::Relaxed) {
                             settle.queue((*job).clone(), Instant::now());
                         }
                         renderer.adopt_frame(job.target, job.request())
@@ -285,7 +293,7 @@ impl RenderWorker {
                         if renderer.can_submit(jobs[i].target) {
                             let job = jobs.swap_remove(i);
                             let (target, seq) = (job.target, job.seq);
-                            let req = if software { settle.moving(job, Instant::now()) } else { job.request() };
+                            let req = if software && !FULL_FRAMES_ONLY.load(Ordering::Relaxed) { settle.moving(job, Instant::now()) } else { job.request() };
                             perf::frame_milestone(seq, "taken by the render thread");
                             if let Err(e) = renderer.submit_frame(target, seq, req) {
                                 on_done(Completed::Frame { target, seq, result: Err(e) });
