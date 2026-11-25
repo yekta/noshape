@@ -187,14 +187,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (live/psui/manip-ring-1125; then make revolve_arc's moveFace anchor match). Asm 2.5 px threshold kept: live's band
   is (2, 3] (2 none, 3 drags), tested by app-core presses_drag_and_open_the_menu_as_live. LOOK-OUTLINE-WEIGHT: on main
   (f6da23b36 PART_EDGE_INK 0.85), "fixed, to verify" for qa; nothing left for me.
-  maker-io-1125 (lead 18:2x) DONE 18:28, landing 3e32049bf: 1) file names = live (ops test now also checks one
-  "<tab> - Part N" zip entry per part); 2) Custom fields = live (part_studio::export::tests custom_fields_in_the_chosen_units);
-  3) bubble: no change (live's 0.8-1.4 s delay is server latency); 4) FIXED: Derived's panel value is "tab#p1,p2"
-  (fs_reference parts_value / value_parts); a part click on the picked studio adds the part, a studio click takes
-  all, a picked part clicked again adds nothing (live unknown: toggle off?); panel lights every picked part; test
-  ui_tests::dialogs::derived_part_clicks_add_parts_and_a_studio_click_takes_them_all. Derived op takes a parts list
-  already (no op change). Core rows sent to the lead: 2nd Derived of the same source+configuration errors; whole-studio
-  Derived follows the part count, part-picked keeps its parts; blob Update… re-imports in place.
+  maker-io-1125 DONE (queued 86ade867): Derived multi-part pick fixed ("tab#p1,p2"); names/Custom fields tested;
+  bubble no change; core rows routed by the lead. Open: live's click on an already-picked part (ours: no change).
+  18:37 (lead 18:3x): FIRST-WEEK-ISOLATE: PS Isolate already = live (panel controls, others pale at
+  isolate_alpha(knob) 0.27 vs live ~0.30, Esc restores); test isolate_pales_the_other_parts_and_esc_gives_their_colours_back.
+  FEEL-ASM-ORIGIN-ROW-HOVER: fixed by asm ede393a3b, feel doc row was stale -> "="; test
+  hovering_the_origin_row_lights_the_origin. Next: the ring when live answers REQUESTS "psui 11-25 18:10".
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
