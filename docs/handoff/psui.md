@@ -49,20 +49,31 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Tests note: a field made active by user_focus_query alone is taken back by the focused field's tab stop on the next
   render: focus `tab_stop_handle("q:<path>")` as a click does. The viewport's context menu is `view.context_menu`.
   Batch 3 queued as b0f71099 (20:2x).
-- Lead task 11-24 20:3x: INTERACTION LATENCY on a ~50-feature corpus part vs live (timing-1123 + timings-1117/1118):
-  hover, click, dialog open, first preview after a field edit, Enter → rebuilt, undo; fix ≥ 100 ms AND ≥ 2× live (no
-  UI-thread blocking); report a short table. State (uncommitted): latency_tests.rs refactored (hover_and_click,
-  edit_runs with undo, perf_document_at) + T2 everyday_interactions_on_a_corpus_part (NOSHAPE_LATENCY_DOC).
-  Doc: c2-impeller-loft (= live "Impellergehaeuse", 48 features; live ✓ regenerated 3239 ms, unsuppress 1361) built by
-  an UNCOMMITTED scratch test sketch_open_perf::psui_write_model_document (live_refs + add_sketch_refs; revert it before
-  committing) → vibex8 ~/tmp/psui/impeller.noshape, Mac ~/noshape-host/psui-keep/impeller.noshape (10 steps not OK).
-  vibex8 numbers are software-GL (pick avg 448 ms): use the Mac (rb.sh mac, /root/psui-scratch/lat-mac.sh).
-  Mac run started ~21:15 UTC (background, output /root/psui-scratch/lat-mac.out; log Mac ~/noshape-host/psui-keep/lat.log).
-  vibex8 smoke (software GL, first doc broken: 36 not OK) — NOT for the report: 30-feature part hover 1239 ms (pick avg
-  448), click 93, dialog 49 (3 of 7 runs ~2 s), step 41 (outliers ~1.9 s), ✓ 485, menu 248, sketch in 83 / out 34,
-  undo 33; impeller hover 255 (a steady ~250: a timer?), click 53, dialog 1583, step 51, Enter 31, undo 29 (broken doc).
-  Watch on the Mac: periodic ~2 s spikes on dialog open / field steps; hover's steady ~250 ms; ✓ on the 30-feature
-  part (485 vs live 310-350); the impeller's full regen (SCORE: ours 6.5 s vs live 2.8 s, core's) will show in Enter.
+- Lead task 11-24 20:3x: INTERACTION LATENCY on a ~50-feature corpus part vs live (timing-1123 + timings-1117/1118);
+  fix ≥ 100 ms AND ≥ 2× live; report a short table. Then (lead 11-25 00:0x) qa's TRIAD-LOOK (87ccb60fc): the hovered
+  transform triad's X arrow shaft draws with 13 gaps (now lighter blue, still broken): fix the shaft rendering.
+  State (uncommitted, latency_tests.rs only): hover_and_click(points), edit_runs (open / 3 depth steps / ✓ / undo),
+  perf_document_at, timed_applied (a view observer: the moment `done` first held, since the test dispatcher runs
+  background tasks inline: std's editing logic / a selection's measure would count), T2
+  everyday_interactions_on_a_corpus_part (NOSHAPE_LATENCY_DOC; the grid's two_lit_points; each hover sample now
+  rests on its start point first: after the warm-up the pointer already sat on the target face → "hover changed"
+  never held → 60 s timeout).
+  Doc: c2-impeller-loft (live "Impellergehaeuse", 48 features), vibex8 ~/tmp/psui/impeller.noshape, Mac
+  ~/noshape-host/psui-keep/impeller.noshape (10 steps not OK; edited: "Extrude Flansch", index 12, 35 after it).
+  Mac numbers (00:0x, before timed_applied): 30-feature part all far under live (hover 17, click 9, dialog 17, step
+  17, ✓ 97, menu 9, sketch 17/17, undo 17). Impeller: hover 17 (live 10-50), click 9 on an edge / 197 on the shelled
+  face = its background measure (190 ms Mac, 1.2 s vibex8; the selection draws at once), dialog 17-20 (live 322-448),
+  field preview: regen 215 ms (1 feature, 12 cached; live 200-300), ✓ 6.9 s = regen of 35 features (live 3.2 s:
+  core's regen speed, SCORE 6.5 vs 2.8 s), undo 9 (cached display; live 1361).
+  FOUND: Extrude's std editing logic (booleanStepEditLogic → evCollision, crates/custom host/evaluate.rs
+  ev_collision_detection) takes 10 s Mac / >15 s vibex8 (DIALOG_LIMIT 15 s: fails there) per depth change: the
+  solid containment pass 1.4-2.7 s (tight boxes + common), then faces_cross's k::section on Offset(-3 mm) × BSpline
+  face pairs: 2.9 s and 6.4 s (BOPAlgo_AlertUserBreak at SECTION_WORK 500k steps: steps are slow on offset
+  surfaces, so the step budget isn't ~0.5 s here). Background (✓ doesn't wait), but Add/New auto-choice lands 10 s
+  late and burns a core. Tried: section without Approximation / PCurves: no change (still 15 s): the
+  intersection itself. In the test the dispatcher runs std's logic before the preview (inline), so the corpus test's
+  field-edit row reads 9.8 s even with timed_applied (click fixed by it: 3.8 ms). Decision for the lead (crates/custom isn't psui's): a time cap per section, or skip faces
+  when the bodies' common already decided, or kernel work on offset sections.
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field

@@ -49,10 +49,14 @@ fn thirty_features(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<PartStud
 
 /// tests/perf/<name>.noshape in a test window drawing real frames, regenerated and shown.
 fn perf_document(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    perf_document_at(cx, &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../tests/perf/{name}.noshape")))
+}
+
+/// A copy of document `src` in a test window drawing real frames, regenerated and shown.
+fn perf_document_at(cx: &mut TestAppContext, src: &std::path::Path) -> (AnyWindowHandle, Entity<PartStudioView>) {
     RENDERING.set(true);
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../../tests/perf/{name}.noshape"));
     let (window, view) = part_studio_with(cx, "latency", |path| {
-        std::fs::copy(&src, path).unwrap();
+        std::fs::copy(src, path).unwrap();
         crate::session::Session::open(path).unwrap()
     });
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Solid));
@@ -86,6 +90,25 @@ fn timed(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStu
         assert!(t0.elapsed() < Duration::from_secs(60), "timed out");
         std::thread::sleep(Duration::from_micros(100));
     }
+}
+
+/// [`timed`] to the moment `done` first held (the state applied; its frame follows within one): the test runs
+/// background tasks on its own thread, so a slow one started by the same change (std's editing logic, a selection's
+/// measurement), which the app runs beside it, would otherwise count.
+fn timed_applied(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, go: impl FnOnce(&mut TestAppContext), done: impl Fn(&gpui_kit::App) -> bool + 'static) -> f64 {
+    let done = std::rc::Rc::new(done);
+    let seen = std::rc::Rc::new(std::cell::Cell::new(None::<Instant>));
+    let t0 = Instant::now();
+    let _watch = cx.update(|cx| {
+        let (done, seen) = (done.clone(), seen.clone());
+        cx.observe(view, move |_, cx| {
+            if seen.get().is_none() && done(cx) {
+                seen.set(Some(Instant::now()));
+            }
+        })
+    });
+    let t = timed(cx, window, view, go, |cx| done(cx));
+    seen.get().map_or(t, |at| (at - t0).as_secs_f64() * 1000.0)
 }
 
 /// Frames and tasks run for `dur` of real time (a hand resting, the time between two mouse moves).
@@ -124,78 +147,16 @@ fn everyday_interactions_beat_live_on_the_30_feature_part(cx: &mut TestAppContex
     let Some(_gpu) = gpu_pointer() else { return };
     let (window, view) = thirty_features(cx);
     let pointer = Pointer::new(cx, window, &view);
-    let (a, b) = two_points_on_the_part(cx, &view);
     let mut ms: [Vec<f64>; 9] = Default::default();
-    // A while of slow hovering over the part first, as anyone's session starts (the pick's running average settles).
-    for k in 0..40 {
-        move_to(cx, window, &pointer, a + DVec2::new(k as f64 * 1.5, 0.0));
-        pump(cx, window, &view, Duration::from_millis(16));
-    }
-
-    // Hover and click, alternating between the two points (the first place something lit is kept for the menu).
-    let mut lit_at = None;
-    for i in 0..RUNS * 2 {
-        let (from, at) = if i % 2 == 0 { (b, a) } else { (a, b) };
-        cx.update(|cx| view.update(cx, |v, cx| {
-            v.selection.clear();
-            v.ui.last_click = None;
-            v.rebuild_scene(cx);
-        }));
-        // A hand resting, then live's approach (behaviours "pre-highlight": 8 moves 16 ms apart, the last on the face),
-        // timed from the last move.
-        pump(cx, window, &view, Duration::from_millis(200));
-        let before = cx.update(|cx| view.read(cx).hover.clone());
-        for k in 1..8 {
-            move_to(cx, window, &pointer, from + (at - from) * (k as f64 / 8.0));
-            pump(cx, window, &view, Duration::from_millis(16));
-        }
-        let win = pointer.window_point(cx, at);
-        let t = timed(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default()), |cx| {
-            let v = view.read(cx);
-            v.hover.is_some() && v.hover != before && v.ui.scene_task.is_none() && pointer.vp.read(cx).hover_settled()
-        });
-        ms[0].push(t);
-        let lit = cx.update(|cx| view.read(cx).hover.clone());
-        if lit_at.is_none() && lit.is_some() {
-            lit_at = Some(at);
-        }
-        let t = timed(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(win, Modifiers::default()), |cx| {
-            let v = view.read(cx);
-            v.selection.first() == lit.as_ref() && v.ui.scene_task.is_none()
-        });
-        ms[1].push(t);
-    }
+    let points = two_points_on_the_part(cx, &view);
+    let (hover, click, lit_at) = hover_and_click(cx, window, &view, &pointer, points);
+    (ms[0], ms[1]) = (hover, click);
 
     // Extrude 1 (the plate, under all 29 others): open, depth steps as a drag gives them, ✓.
     let extrude = cx.update(|cx| view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "extrude").map(|f| f.id))).expect("an Extrude");
-    // (Each waits for a display applied after it: a preview or the regeneration's, `display_seq`.)
+    let [open, step, commit, _] = edit_runs(cx, window, &view, extrude, 10.0, false);
+    (ms[2], ms[3], ms[4]) = (open, step, commit);
     let seq = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display_seq);
-    for run in 0..RUNS {
-        cx.update(|cx| view.update(cx, |v, _| v.selection.clear()));
-        let s0 = seq(cx);
-        let t = timed(cx, window, &view, |cx| {
-            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(extrude, w, cx))).unwrap();
-        }, |cx| view.read(cx).edit.is_some() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
-        ms[2].push(t);
-        for step in 0..3 {
-            let text = format!("{:.3} mm", 10.0 + (run * 3 + step) as f64 * 0.137);
-            let s0 = seq(cx);
-            let t = timed(cx, window, &view, |cx| {
-                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
-                    if let Some(e) = &v.edit {
-                        e.dialog.update(cx, |d, cx| d.set_expr_text("depth", &text, w, cx));
-                    }
-                }))
-                .unwrap();
-            }, |cx| view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
-            ms[3].push(t);
-        }
-        let s0 = seq(cx);
-        let t = timed(cx, window, &view, |cx| {
-            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_open_dialog(w, cx))).unwrap();
-        }, |cx| view.read(cx).edit.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
-        ms[4].push(t);
-    }
 
     // The context menu of what is under the pointer, a sketch on Top, ✓, and the sketch's Undo.
     let at = lit_at.expect("something lit under the pointer");
@@ -249,6 +210,148 @@ fn everyday_interactions_beat_live_on_the_30_feature_part(cx: &mut TestAppContex
     report.push(format!("average pick: {:.1} ms", cx.update(|cx| pointer.vp.read(cx).average_pick_ms())));
     eprintln!("{}", report.join("\n"));
     assert!(slower.is_empty(), "slower than half of live's time: {slower:?}");
+}
+
+/// The everyday interactions on a mid-size corpus part (NOSHAPE_LATENCY_DOC, e.g. c2-impeller-loft's document: live's
+/// "Impellergehaeuse", 48 features) against live's recorded times: slower only where ours is ≥ 100 ms and ≥ 2× live's
+/// (lead 11-24). The edited feature is the first blind Extrude (the most features after it).
+#[gpui::test]
+#[ignore = "T2: wall-clock timing; a corpus document (NOSHAPE_LATENCY_DOC) in a release build"]
+fn everyday_interactions_on_a_corpus_part(cx: &mut TestAppContext) {
+    let Some(doc) = std::env::var_os("NOSHAPE_LATENCY_DOC") else {
+        eprintln!("latency: NOSHAPE_LATENCY_DOC unset");
+        return;
+    };
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = perf_document_at(cx, std::path::Path::new(&doc));
+    let pointer = Pointer::new(cx, window, &view);
+    let points = two_lit_points(cx, window, &view, &pointer);
+    let (hover, click, _) = hover_and_click(cx, window, &view, &pointer, points);
+    let blind = |f: &noshape_model::Feature| f.type_id == "extrude" && !f.suppressed && matches!(f.params.get("endBound"), Some(noshape_model::ParamValue::Enum(b)) if b == "BLIND");
+    let (extrude, name, after, depth) = cx
+        .update(|cx| {
+            let v = view.read(cx);
+            let s = v.studio(cx)?;
+            let k = s.features.iter().position(blind)?;
+            let f = &s.features[k];
+            // (A plain "<n> mm"; anything else steps from 10 mm.)
+            let depth = f.params.text("depth").strip_suffix(" mm").and_then(|n| n.trim().parse::<f64>().ok());
+            Some((f.id, f.name.clone(), s.features.len() - k - 1, depth.unwrap_or(10.0)))
+        })
+        .expect("a blind Extrude");
+    let [open, step, commit, undo] = edit_runs(cx, window, &view, extrude, depth, true);
+    // Live (behaviours): pre-highlight 10–50 ms; click → selected 57–67 ms (timings-1117); the dialog shown 322–448 ms
+    // (timings-1117); a field's preview: Enter → the regeneration's reply 0.2–0.3 s (core edit commit, 30 features);
+    // ✓ → regenerated 3.2 s and unsuppress (the same rebuild of the features after one) 1.4 s on this part (timing-1123).
+    let rows = [("hover: a face lit", 50.0, hover), ("click: selected and drawn", 67.0, click), ("dialog: open on its preview", 448.0, open), ("field edit: its preview drawn", 300.0, step), ("Enter: the part rebuilt", 3239.0, commit), ("undo: rebuilt again", 1361.0, undo)];
+    let failing = cx.update(|cx| {
+        let v = view.read(cx);
+        v.studio(cx).map_or(0, |s| s.features.iter().filter(|f| v.display.feature_state(f.id).is_some_and(|st| st.status != noshape_model::display::FeatureStatus::Ok)).count())
+    });
+    let mut report = vec![format!("{name} ({after} features after it, {failing} not OK), depth from {depth:.3} mm"), format!("{:<32} {:>9} {:>9}", "", "ours", "live")];
+    let mut slower = Vec::new();
+    for (what, live, runs) in rows {
+        let m = median(runs.clone());
+        report.push(format!("{what:<32} {m:>6.1} ms {live:>6.0} ms  (runs: {})", runs.iter().map(|x| format!("{x:.0}")).collect::<Vec<_>>().join(" ")));
+        if m >= 100.0 && m >= 2.0 * live {
+            slower.push(what);
+        }
+    }
+    eprintln!("LATENCY\n{}", report.join("\n"));
+    assert!(slower.is_empty(), "≥ 100 ms and ≥ 2× live: {slower:?}");
+}
+
+/// The hover-to-lit and click-to-selected times, alternating between two points on the part (after a while of slow
+/// hovering, as anyone's session starts: the pick's running average settles), and the first point something lit at.
+fn hover_and_click(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, pointer: &Pointer, (a, b): (DVec2, DVec2)) -> (Vec<f64>, Vec<f64>, Option<DVec2>) {
+    for k in 0..40 {
+        move_to(cx, window, pointer, a + DVec2::new(k as f64 * 1.5, 0.0));
+        pump(cx, window, view, Duration::from_millis(16));
+    }
+    let (mut hover, mut click) = (Vec::new(), Vec::new());
+    let mut lit_at = None;
+    for i in 0..RUNS * 2 {
+        let (from, at) = if i % 2 == 0 { (b, a) } else { (a, b) };
+        cx.update(|cx| view.update(cx, |v, cx| {
+            v.selection.clear();
+            v.ui.last_click = None;
+            v.rebuild_scene(cx);
+        }));
+        // A hand resting, then live's approach (behaviours "pre-highlight": 8 moves 16 ms apart, the last on the face),
+        // timed from the last move.
+        move_to(cx, window, pointer, from);
+        pump(cx, window, view, Duration::from_millis(200));
+        let before = cx.update(|cx| view.read(cx).hover.clone());
+        for k in 1..8 {
+            move_to(cx, window, pointer, from + (at - from) * (k as f64 / 8.0));
+            pump(cx, window, view, Duration::from_millis(16));
+        }
+        let win = pointer.window_point(cx, at);
+        let t = timed(cx, window, view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(win, None, Modifiers::default()), |cx| {
+            let v = view.read(cx);
+            v.hover.is_some() && v.hover != before && v.ui.scene_task.is_none() && pointer.vp.read(cx).hover_settled()
+        });
+        hover.push(t);
+        let lit = cx.update(|cx| view.read(cx).hover.clone());
+        if lit_at.is_none() && lit.is_some() {
+            lit_at = Some(at);
+        }
+        let v = view.clone();
+        let t = timed_applied(cx, window, view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(win, Modifiers::default()), move |cx| {
+            let v = v.read(cx);
+            v.selection.first() == lit.as_ref() && v.ui.scene_task.is_none()
+        });
+        click.push(t);
+    }
+    (hover, click, lit_at)
+}
+
+/// Feature `id`'s dialog opened on its preview, its depth stepped from `depth` mm as a drag gives it (each step's
+/// preview), ✓ (the part rebuilt) and, with `undo`, the edit undone (rebuilt again): the times of each, ms.
+fn edit_runs(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, extrude: noshape_model::FeatureId, depth: f64, undo: bool) -> [Vec<f64>; 4] {
+    let mut ms: [Vec<f64>; 4] = Default::default();
+    // (Each waits for a display applied after it: a preview or the regeneration's, `display_seq`.)
+    let seq = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display_seq);
+    for run in 0..RUNS {
+        cx.update(|cx| view.update(cx, |v, _| v.selection.clear()));
+        let s0 = seq(cx);
+        let t = timed(cx, window, view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(extrude, w, cx))).unwrap();
+        }, |cx| view.read(cx).edit.is_some() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+        ms[0].push(t);
+        for step in 0..3 {
+            let text = format!("{:.3} mm", depth + (run * 3 + step) as f64 * 0.137);
+            let s0 = seq(cx);
+            let v = view.clone();
+            let t = timed_applied(cx, window, view, |cx| {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                    if let Some(e) = &v.edit {
+                        e.dialog.update(cx, |d, cx| d.set_expr_text("depth", &text, w, cx));
+                    }
+                }))
+                .unwrap();
+            }, move |cx| {
+                let v = v.read(cx);
+                v.display_seq > s0 && v.pending.is_none() && v.ui.scene_task.is_none()
+            });
+            // (Then whatever else the change started, std's editing logic, before the next one.)
+            let _ = timed(cx, window, view, |_| {}, |cx| !view.read(cx).ui_busy());
+            ms[1].push(t);
+        }
+        let s0 = seq(cx);
+        let t = timed(cx, window, view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_open_dialog(w, cx))).unwrap();
+        }, |cx| view.read(cx).edit.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+        ms[2].push(t);
+        if undo {
+            let s0 = seq(cx);
+            let t = timed(cx, window, view, |cx| {
+                cx.update(|cx| view.read(cx).doc.clone()).update(cx, |d, cx| d.undo(cx));
+            }, |cx| view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+            ms[3].push(t);
+        }
+    }
+    ms
 }
 
 /// Two points of the view lighting different things: tried on a grid round the view's centre, each after a rest.
