@@ -1390,6 +1390,20 @@ impl Sketch {
     /// Driving constraints that don't hold as the geometry stands (within
     /// `tol`): the equations' residuals, and coincident points / concentric
     /// centers apart (one unknown in the solve, so no equation shows them).
+    /// After a solve that left the sketch unsolved: whether it still solved what `around` (and its points) belongs to,
+    /// the unsolved constraints all elsewhere and already unheld in `before` (live sk-conflict-add-1125: beside a red
+    /// conflict, a new constraint, fillet or dimension solves and is kept).
+    pub fn solved_beside_conflicts(&self, before: &Sketch, around: &[EntityId]) -> bool {
+        let mut near: HashSet<EntityId> = around.iter().copied().collect();
+        for e in around {
+            near.extend(self.endpoints(*e).map(|(a, b)| [a, b]).into_iter().flatten());
+            near.extend(self.entity(*e).and_then(|x| x.center()));
+        }
+        let was = before.unheld_constraints(1e-9);
+        let now = self.unheld_constraints(1e-9);
+        !now.is_empty() && now.iter().all(|c| was.contains(c) && self.constraint(*c).is_some_and(|k| !k.kind.entities().iter().any(|e| near.contains(e))))
+    }
+
     pub(crate) fn unheld_constraints(&self, tol: f64) -> HashSet<ConstraintId> {
         let sys = System::build(self, &HashSet::new(), &[]);
         let mut out = HashSet::new();

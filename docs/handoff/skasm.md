@@ -20,8 +20,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - NEXT: linear pattern on fz211 still 172-188 ms with quick solves (was 250-295): it's apply_pattern ->
   linear_grid_pattern (+ link_linear_pattern's PatternLinks) -> finish_create's solve; break it down (sketch crate
   linear_pattern_groups vs the solve) and get it < 100 ms or off the UI thread.
-- REQUESTS skasm 11-25 01:31 (live): a constraint / fillet / dimension added beside a red conflict: kept or undone?
-  Ours (solve_after_constraint ~9493, fillet radius edit ~5056) reverts on any conflict anywhere: match live's answer.
+- QUEUED (11-25, after 9102b99e) "constraints beside a conflict solve" (live sk-conflict-add-1125: everything added
+  beside a red conflict is kept and solves): `Sketch::solved_beside_conflicts(before, around)` (unheld constraints
+  all elsewhere and already unheld before) keeps solve_after_constraint's and the fillet radius edit's solve.
+  T1 scene constraints_beside_a_conflict_solve. Open from live: a dimension on B's top made nothing (live's kit?).
 - LEAD 11-24 TASK: sketch speed + robustness as felt. S300 T2 (latency_tests a_300_line_sketch_keeps_up_with_the_hand,
   321 lines, 483 constraints): open 33 ms (live 1.2-1.9 s), drag step to frame 15 (UI 13), release 23, dim edit 55
   (live ~1.1 s), unsolvable value warned 67, ✓ 16 (live 0.24 s). Model sketches <= 5 ms.

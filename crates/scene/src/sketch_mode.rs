@@ -5053,7 +5053,8 @@ impl SketchEditor {
                     let legs = fillet_legs(&data.sketch, arc);
                     let _ = data.sketch.set_dimension_value(dim, r);
                     data.dimension_exprs.remove(&dim.0);
-                    let solved = data.sketch.solve().is_solved();
+                    let around: Vec<EntityId> = legs.iter().map(|(e, _)| *e).chain([arc]).collect();
+                    let solved = data.sketch.solve().is_solved() || data.sketch.solved_beside_conflicts(&before, &around);
                     // A leg used up to its end is fine (live types a fillet
                     // of a whole leg smaller again).
                     let kept = legs.iter().all(|(e, d0)| matches!(data.sketch.curve(*e), Some(Curve2::Line { a, b }) if (b - a).dot(*d0) >= -1e-12 * d0.length_squared()));
@@ -9493,7 +9494,7 @@ pub fn solve_after_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityI
     mirror_second_line(sk, c, ids);
     let light = if centers.is_empty() { what_moves(sk, c, ids) } else { centers };
     let report = sk.solve_with(&noshape_sketch::SolveOptions { light, ..Default::default() });
-    if !report.is_solved() {
+    if !report.is_solved() && !sk.solved_beside_conflicts(&before, ids) {
         *sk = before;
         return false;
     }
@@ -13177,6 +13178,29 @@ mod tests {
             let at = sk.point(*p).unwrap();
             assert!((at - (*was + v(0.0, -0.04046))).length() < 1e-9, "corner {p:?}: {was} -> {at}");
         }
+    }
+
+    /// Live (sk-conflict-add-1125): with rectangle A red (a 40 and a conflicting 50 on its bottom), constraints and a
+    /// dimension added on a free line B away from it are kept and solve; A stays as it was.
+    #[test]
+    fn constraints_beside_a_conflict_solve() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let mut sk = Sketch::new();
+        let a = sk.corner_rectangle(mm(0.0, 0.0), mm(40.0, 20.0));
+        sk.add_constraint(ConstraintKind::Length { curve: a.curves[0], value: 0.04 }).unwrap();
+        sk.add_constraint(ConstraintKind::Length { curve: a.curves[0], value: 0.05 }).unwrap();
+        assert!(!sk.solve().is_solved());
+        let a_at: Vec<DVec2> = sk.entities().filter(|e| e.kind() == EntityKind::Point).filter_map(|e| sk.point(e.id)).collect();
+        let b = sk.add_line(mm(60.0, 0.0), mm(75.0, 3.0));
+        assert!(apply_constraint(&mut sk, ConstraintTool::Horizontal, &[b]).is_ok_and(|n| n > 0));
+        solve_after_constraint(&mut sk, ConstraintTool::Horizontal, &[b]);
+        let Some(Curve2::Line { a: b0, b: b1 }) = sk.curve(b) else { panic!() };
+        assert!((b0.y - b1.y).abs() < 1e-9, "B levelled: {b0} {b1}");
+        let mut data = SketchData { sketch: sk, ..Default::default() };
+        let dim = add_dimension(&mut data, ConstraintKind::Length { curve: b, value: 0.03 }, None, None).unwrap();
+        assert!(data.sketch.constraint(dim).unwrap().driving, "a driving dimension");
+        let a_now: Vec<DVec2> = data.sketch.entities().filter(|e| e.kind() == EntityKind::Point).filter_map(|e| data.sketch.point(e.id)).take(a_at.len()).collect();
+        assert_eq!(a_now, a_at, "A as it was");
     }
 
     /// Live2 11-17 part 2b: two free lines, L1 picked first, then a constraint from the selection. L1 never moves; L2
