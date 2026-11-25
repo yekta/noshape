@@ -227,6 +227,10 @@ pub struct SolveOptions {
     /// the Mate feature is accepted" (help: Mates). Other mates and
     /// relations are not enforced and report ok.
     pub only_mate: Option<MateId>,
+    /// `only_mate` is a new mate (its dialog creating it). Live's preview of a new connector mate checks no other mate:
+    /// errors-1123 mates "CREATING vs COMMITTED", Revolute 1 kept, the pin dropped flush with the block's top, no
+    /// error. A new Tangent's preview and a reopened mate's check every mate.
+    pub new_mate: bool,
     /// Skip the degrees-of-freedom analysis (each step of a drag): `dof` and
     /// `instance_dof` stay empty, and the caller keeps the previous ones
     /// until the drag is committed and re-evaluated.
@@ -871,11 +875,12 @@ impl Prepared {
         // defined (the instance list), not of the one-mate preview solve:
         // every mate and relation, nothing held, at the previewed poses.
         let mut every_mate = false;
+        let new_connector_mate = opts.new_mate && only_mate.is_some_and(|only| self.mates.iter().any(|(id, t, _)| *id == only && *t != MateType::Tangent));
         if only_mate.is_some() {
             let mut all: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: self.fixed[i] }).collect();
             let full = solver::solve(&mut all, &mates, &all_rels, &[]);
             let moved = |b: usize| bodies[b].pose.origin.distance(poses0[b].origin) > 1e-12 || bodies[b].pose.rotation.angle_between(poses0[b].rotation) > 1e-12;
-            if full.held_back.iter().any(|&b| moved(b)) {
+            if !new_connector_mate && full.held_back.iter().any(|&b| moved(b)) {
                 // A mate that overdefines the assembly moves nothing, in its dialog too: it and the mates it fights
                 // red (live errors-1123 mates, qa ERR-MATE-SOLVE-MOVES).
                 for (b, p) in bodies.iter_mut().zip(&poses0) {

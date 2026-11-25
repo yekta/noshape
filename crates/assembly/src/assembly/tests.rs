@@ -7088,8 +7088,8 @@ fn redundant_mates_are_fine_until_they_disagree() {
 }
 
 /// Live errors-1123 mates (qa ERR-MATE-SOLVE-MOVES / ERR-MATE-OVERDEF-BOTH): a pin on Revolute 1 in a plate's hole,
-/// then a second mate from the pin's mid axis to the plate's side face: nothing moves, created (the dialog's one-mate
-/// preview) or solved, and both mates read "Mate overdefines the assembly.".
+/// then a second mate from the pin's mid axis to the plate's side face (made over REST): nothing moves, reopened in its
+/// dialog (the one-mate preview) or solved, and both mates read "Mate overdefines the assembly.".
 #[test]
 fn an_overdefining_mate_moves_nothing_and_both_mates_are_red() {
     let f = doc_with(vec![plate_with_hole(), pin_studio()]);
@@ -7126,6 +7126,51 @@ fn an_overdefining_mate_moves_nothing_and_both_mates_are_red() {
             assert!((DVec3::from(p.translation) - before).length() < 1e-9 && DQuat::from_array(p.rotation).angle_between(turned) < 1e-9, "{t:?} {what}: the pin moved to {p:?}");
             let status: Vec<_> = res.mates.iter().map(|s| (s.ok, s.message.as_deref())).collect();
             assert_eq!(status, vec![(false, Some("Mate overdefines the assembly.")); 2], "{t:?} {what}");
+        }
+    }
+}
+
+/// Live errors-1123 mates "CREATING vs COMMITTED" (qa ERR-MATE-CREATING-REV-RED / ERR-MATE-OVERDEF-BOTH): with Revolute 1
+/// kept, a new Slider or Fastened from the pin's top to the plate's top previews the pin dropped flush, no mate in
+/// error; a new Tangent of the same two planes is in error at once, Revolute 1 too, and nothing moves.
+#[test]
+fn a_new_mate_previews_alone_but_a_new_tangent_checks_every_mate() {
+    let f = doc_with(vec![plate_with_hole(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let (plate_top, pin_top) = (face_with(&rp, "CapEnd"), face_with(&rq, "CapEnd"));
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
+            part_instance(2, "Pin <1>", f.studios[1], pin, DVec3::new(0.05, 0.04, 0.02), false),
+        ],
+        mates: vec![mate(10, MateType::Revolute, conn(1, cylinder_face(&rp), Inference::MidAxis), conn(2, cylinder_face(&rq), Inference::MidAxis))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates[0].ok);
+    asm.instances[1].placement = res.solved.placement(InstanceId(2)).unwrap();
+    let before = DVec3::from(asm.instances[1].placement.translation);
+    let units = f.doc.settings.units;
+    for t in [MateType::Slider, MateType::Fastened, MateType::Tangent] {
+        let mut a = asm.clone();
+        let m = match t {
+            MateType::Tangent => mate(11, t, MateConnectorRef::on(InstanceId(2), vec![], pin_top.clone()), MateConnectorRef::on(InstanceId(1), vec![], plate_top.clone())),
+            _ => mate(11, t, conn(2, pin_top.clone(), Inference::Centroid), conn(1, plate_top.clone(), Inference::Centroid)),
+        };
+        let preview = SolveOptions { only_mate: Some(m.id), new_mate: true, hold_values: eval::new_mate_holds(&m, &units), ..Default::default() };
+        a.mates.push(m);
+        let res = ev.evaluate(&f.doc, &a, &preview, None);
+        let p = DVec3::from(res.solved.placement(InstanceId(2)).unwrap().translation);
+        let status: Vec<_> = res.mates.iter().map(|s| s.ok).collect();
+        if t == MateType::Tangent {
+            assert!((p - before).length() < 1e-9, "{t:?}: the pin moved {before} -> {p}");
+            assert_eq!(status, vec![false, false], "{t:?}: {:?}", res.mates.iter().map(|s| s.message.clone()).collect::<Vec<_>>());
+        } else {
+            let (fa, fb) = res.solved.mate_frames[&MateId(11)];
+            assert!(fa.origin.distance(fb.origin) < 1e-9 && p.truncate().distance(before.truncate()) < 1e-9 && (p - before).length() > 1e-3, "{t:?}: the pin moves along its axis, its top flush with the plate's: {before} -> {p}");
+            assert_eq!(status, vec![true, true], "{t:?}: {:?}", res.mates.iter().map(|s| s.message.clone()).collect::<Vec<_>>());
         }
     }
 }

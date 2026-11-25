@@ -964,6 +964,7 @@ impl AssemblyView {
             // mated to the moving one stay where they are.
             if !s.solve_all {
                 opts.only_mate = Some(m.id);
+                opts.new_mate = s.editing.is_none();
             }
             // A new mate brings its connectors together (free values zero;
             // live qa5 A4: Slider flip turns the block over onto the plate).
