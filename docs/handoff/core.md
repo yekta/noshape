@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 10:54 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 12:21 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -12,17 +12,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
 - **Re-land (lead 10:5x):** the 6 commits (fillet crash, tickets, ops arc fix, STL fin repair, handoffs, fillet r50
-  test) rebased onto main 11:0x (conflict in sketch_ui_tests.rs: both sides appended a test, both kept): QUEUED e6849a8b.
-- **Knife reference fix (P1, lead): QUEUED with this handoff.** Extrude 1 2 -> 2.02 mm lost Sketch 8's vertex and
+  test) LANDED (267d94bbf).
+- **Knife reference fix (P1, lead): LANDED 4ab5258bc (+ up-to test 15f6f0dc9).** Extrude 1 2 -> 2.02 mm lost Sketch 8's vertex and
   Sketches 7/11's edges: Sketch 6 (Extrude 3's groove, mirrored by Symmetric constraints, 2 DOF) slid 2.3 mm along its
   used edge under the constructive placement, and Extrude 3 + Fillet 3 cut the corner away. Live (knife-depth-1125):
   all 52 rows OK at 2.02 / 2.06, Sketch 6 shifts plainly (x unchanged). Fix: a sketch that held before re-projecting,
   no value changed, solves by plain least change (model-core regen/features/sketch.rs `[] if held`; sketch
   `Sketch::holds`). Ours now (4, 2.02) / (75.0044, 1.3068): a 4 µm x drift at the far end (min norm), all rows OK over
   1-5 %. qa corpus 127 docs SAME. T1 a_mirrored_profile_follows_its_used_edge_by_the_least_change.
-- **Re-land stack (lead 11:3x):** QUEUED e6849a8b (6 rebased commits: fillet crash, tickets, ops arc fix db2fd8e7's
-  content, STL fin repair, handoffs, fillet r50 test) then QUEUED 34533ae0 (+ knife fix 2db79d46 + up-to test 768340c4).
-  qa's bracket recheck waits on the arc fix. Uncommitted: this handoff + archive (pruned landed items).
+- **Docs land:** FLOW-EXTRUDE-UP-TO-FACE-BESIDE closure + handoffs failed 12:04 (rebase conflict in this file); re-picked
+  onto main 12:3x (TICKETS union duplicates dropped), re-queued with this handoff. Old branch kept as core-rf-backup.
 - **Impeller STL vs live (live/core/stl-impeller-1125; ours .ex6.sh on vibex7 with ~/tmp/core/ud/cli-fix):** our doc
   = live's Impellergehaeuse tab (b9a28c38). Triangles ours / live: Coarse 14 830 / 16 292, Medium 38 424 / 49 570,
   Fine 178 808 / 316 872, Custom(0.01/2/0.01) 272 474 / 492 184; all ours watertight (0 defects). Presets match live's;
