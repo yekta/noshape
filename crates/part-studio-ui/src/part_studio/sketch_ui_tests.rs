@@ -9192,3 +9192,164 @@ fn insert_dxf_drops_points_and_texts_and_undoes_in_one_step(cx: &mut TestAppCont
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.insert_dxf_bytes(b"not a drawing", w, cx))).unwrap();
     assert_eq!(cx.update(|cx| view.read(cx).message.clone()), Some((noshape_model::display::FeatureStatus::Warning, crate::sketch_mode::DXF_UNREADABLE.to_string())));
 }
+
+/// An everyday bracket drawn as a person does, each step checked against live's recorded tools (behaviours "spec: skasm
+/// sketch tools: exact entities and constraints on commit", "spec: skasm sketch Dimension tool", "skb sketch trim
+/// constraints"): a line chain from the Origin, a tangent arc, lines back to the Origin, a hole at the arc's centre,
+/// three dimensions typed in their boxes, a mirror about the left edge, and that edge trimmed away.
+#[gpui::test]
+fn a_bracket_drawn_step_by_step_as_live(cx: &mut TestAppContext) {
+    use noshape_sketch::{EntityId, EntityKind};
+    use std::collections::BTreeMap;
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    // (Clicks land within a pixel of their points in the iso view: positions are found within 1 mm.)
+    let (window, view) = sketch_with(cx, "bracket", Tool::Line);
+    let at = |cx: &mut TestAppContext, q: DVec2| { let p = on_screen(cx, &view, q); (p.x, p.y) };
+    let kinds = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let mut m: BTreeMap<&'static str, usize> = BTreeMap::new();
+        for c in d.sketch.constraints() {
+            *m.entry(c.kind.name()).or_default() += 1;
+        }
+        // Ours shares a joint's point where live stores a COINCIDENT (drawn with its glyph).
+        for e in d.sketch.entities().filter(|e| e.kind() == EntityKind::Point) {
+            let users = d.sketch.users_of_point(e.id).len() + usize::from(e.external);
+            if users > 1 {
+                *m.entry("Coincident").or_default() += users - 1;
+            }
+        }
+        m
+    });
+    let added = |before: &BTreeMap<&'static str, usize>, now: &BTreeMap<&'static str, usize>| -> BTreeMap<&'static str, usize> {
+        now.iter().map(|(k, n)| (*k, n.saturating_sub(before.get(k).copied().unwrap_or(0)))).filter(|(_, d)| *d > 0).collect()
+    };
+    let curve_at = |cx: &mut TestAppContext, q: DVec2| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.entities().filter(|e| e.kind() != EntityKind::Point && !e.external).find(|e| d.sketch.curve(e.id).is_some_and(|c| c.distance(q) < 1e-3)).map(|e| e.id)
+    });
+    let along = |cx: &mut TestAppContext, id: EntityId, t: f64| cx.update(|cx| {
+        let c = view.read(cx).sketch_data(cx).unwrap().sketch.curve(id).unwrap();
+        let (a, b) = c.domain();
+        c.point(a + (b - a) * t)
+    });
+    let mid = |cx: &mut TestAppContext, id: EntityId| along(cx, id, 0.4);
+    // Where a click takes curve `id`: 40 % along it; on a circle the rim point farthest on screen from its centre (the
+    // view is iso, at 2.8 px/mm the centre point is in reach elsewhere).
+    let pick_on = |cx: &mut TestAppContext, id: EntityId| {
+        let mut p = mid(cx, id);
+        let circle = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.kind(id) == Some(EntityKind::Circle));
+        if circle {
+            let c = along(cx, id, 0.0).lerp(along(cx, id, 0.5), 0.5);
+            let far = |cx: &mut TestAppContext, q: DVec2| { let (a, b) = (at(cx, q), at(cx, c)); (a.0 - b.0).hypot(a.1 - b.1) };
+            for k in 0..24 {
+                let q = along(cx, id, k as f64 / 24.0);
+                if far(cx, q) > far(cx, p) {
+                    p = q;
+                }
+            }
+        }
+        p
+    };
+    let solved = |cx: &mut TestAppContext| cx.update(|cx| {
+        let mut sk = view.read(cx).sketch_data(cx).unwrap().sketch.clone();
+        let r = sk.solve();
+        (r.is_solved(), sk.regions().len())
+    });
+    let tool = |cx: &mut TestAppContext, t: Tool| {
+        keys(cx, window, &["escape", "escape"]);
+        sketch_in_tool(cx, window, view.clone(), t);
+    };
+    let clicks = |cx: &mut TestAppContext, pts: &[DVec2]| {
+        for q in pts {
+            let p = at(cx, *q);
+            click(cx, window, &view, p);
+        }
+    };
+    let none = BTreeMap::new();
+    // 1. Line from the Origin, right, then up: each segment levelled / plumbed, joined, the start on the Origin.
+    clicks(cx, &[mm(0., 0.), mm(40., 0.), mm(40., 20.)]);
+    let k1 = kinds(cx);
+    assert_eq!(added(&none, &k1), BTreeMap::from([("Coincident", 2), ("Horizontal", 1), ("Vertical", 1)]), "line chain");
+    // 2. Tangent arc from the chain's end over to (20, 20): COINCIDENT + TANGENT only.
+    tool(cx, Tool::TangentArc);
+    clicks(cx, &[mm(40., 20.), mm(20., 20.)]);
+    let k2 = kinds(cx);
+    assert_eq!(added(&k1, &k2), BTreeMap::from([("Coincident", 1), ("Tangent", 1)]), "tangent arc");
+    let (arc, top) = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let arc = d.sketch.entities().find(|e| e.kind() == EntityKind::Arc).map(|e| e.id).expect("the arc");
+        let c = d.sketch.curve(arc).unwrap();
+        let (a, b) = c.domain();
+        (arc, [c.point(a), c.point((a + b) / 2.0), c.point(b)])
+    });
+    assert!(top.iter().zip([mm(40., 20.), mm(30., 30.), mm(20., 20.)]).all(|(p, q)| p.distance(q) < 1e-3) || top.iter().rev().zip([mm(40., 20.), mm(30., 30.), mm(20., 20.)]).all(|(p, q)| p.distance(q) < 1e-3), "on up from the line, over (30, 30): {top:?}");
+    // 3. Lines back to the Origin: one closed region.
+    tool(cx, Tool::Line);
+    clicks(cx, &[mm(20., 20.), mm(0., 20.), mm(0., 0.)]);
+    let k3 = kinds(cx);
+    assert_eq!(added(&k2, &k3), BTreeMap::from([("Coincident", 3), ("Horizontal", 1), ("Vertical", 1)]), "lines back to the Origin");
+    assert_eq!(solved(cx), (true, 1), "closed profile");
+    // 4. A hole on the arc's centre.
+    tool(cx, Tool::Circle);
+    clicks(cx, &[mm(30., 20.), mm(34., 20.)]);
+    let k4 = kinds(cx);
+    let hole = curve_at(cx, mm(34., 20.)).expect("the hole");
+    let tied = added(&k3, &k4);
+    assert!(tied == BTreeMap::from([("Coincident", 1)]) || tied == BTreeMap::from([("Concentric", 1)]), "the hole's centre on the arc's: {tied:?}");
+    assert_eq!(solved(cx), (true, 2), "profile and hole");
+    // 5. Dimensions typed in their boxes: the bottom LENGTH 50 (the first dimension scales the sketch onto it, live
+    // 1785), the hole DIAMETER 8 (picked on its rim across from the centre: the view is iso, at 2.8 px/mm the centre
+    // point is in reach elsewhere), the arc RADIUS 12.
+    tool(cx, Tool::Dimension);
+    let bottom = curve_at(cx, mm(20., 0.)).expect("the bottom");
+    for (id, off, typed) in [(bottom, mm(0., -8.), ["5", "0"]), (hole, mm(-2., -9.), ["8", "enter"]), (arc, mm(4., 14.), ["1", "2"])] {
+        let p = pick_on(cx, id);
+        // (The hole's placed in the open below its centre: a click on another curve would be a second pick.)
+        let place = if id == hole { along(cx, id, 0.0).lerp(along(cx, id, 0.5), 0.5) + off } else { p + off };
+        clicks(cx, &[p, place]);
+        keys(cx, window, &typed);
+        if typed[1] != "enter" {
+            keys(cx, window, &["enter"]);
+        }
+    }
+    let dims = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let mut v: Vec<(&'static str, i64)> = d.sketch.constraints().filter(|c| c.driving && c.kind.is_dimension()).map(|c| (c.kind.name(), (c.kind.value().unwrap() * 1e6).round() as i64)).collect();
+        v.sort();
+        v
+    });
+    assert_eq!(dims, vec![("Diameter", 8000), ("Length", 50000), ("Radius", 12000)], "typed dimensions");
+    let len = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.curve(bottom).unwrap().length());
+    assert!((len - 0.05).abs() < 1e-9, "the bottom is 50 mm: {len}");
+    assert_eq!(solved(cx), (true, 2), "dimensioned");
+    // 6. Mirror about the left edge: the profile and the hole copied across.
+    let left = curve_at(cx, mm(0., 10.)).expect("the left edge");
+    let rest: Vec<EntityId> = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.entities().filter(|e| e.kind() != EntityKind::Point && !e.external && e.id != left).map(|e| e.id).collect()
+    });
+    tool(cx, Tool::Mirror);
+    let axis = mid(cx, left);
+    clicks(cx, &[axis]);
+    for id in &rest {
+        let p = pick_on(cx, *id);
+        clicks(cx, &[p]);
+    }
+    let (curves, mirrored_hole) = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let curves = d.sketch.entities().filter(|e| e.kind() != EntityKind::Point && !e.external).count();
+        let centre = |id: EntityId| d.sketch.entity(id).and_then(|e| e.center()).and_then(|c| d.sketch.point(c));
+        let c = centre(hole).unwrap();
+        let twin = d.sketch.entities().filter(|e| e.kind() == EntityKind::Circle && e.id != hole).find_map(|e| centre(e.id)).unwrap();
+        (curves, (twin - DVec2::new(-c.x, c.y)).length())
+    });
+    assert_eq!(curves, 2 * rest.len() + 1, "each picked curve mirrored once");
+    assert!(mirrored_hole < 1e-9, "the hole's twin across the left edge: {mirrored_hole}");
+    assert_eq!(solved(cx), (true, 4), "both halves, sharing the middle edge, and their holes");
+    // 7. Trim the middle edge away (no crossing inside it): one outline around two holes.
+    tool(cx, Tool::Trim);
+    let p = pick_on(cx, left);
+    clicks(cx, &[p]);
+    assert!(cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entity(left).is_none()), "the middle edge trimmed away");
+    assert_eq!(solved(cx), (true, 3), "outline with two holes, and the holes");
+}

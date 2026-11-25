@@ -3,7 +3,13 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 05:26) — read first
+## NOW (11-25 07:41) — read first
+- IN TEST (11-25 07:41) bracket everyday check (lead 11-25): psui `a_bracket_drawn_step_by_step_as_live` draws lines, a
+  tangent arc, a hole, 3 dimensions, a mirror and a trim step by step against live's tool specs (behaviours 18337-18403,
+  15793); all as live but one: a tangent / 3 point arc ended level with its own start took a HORIZONTAL. Fixed in `infer`
+  (`own_start`: only Line, Midpoint line, Inscribed polygon align with their own first click, behaviours ~40336); scene
+  test `arcs_take_no_alignment_with_their_own_start`. psui sketch suites 534 ok; clippy + ops sketch rerun (tbr4.sh).
+  Open: the hole's centre tie (Coincident vs Concentric) and trim's offspring constraints not checked against live.
 - QUEUED 9102b99e 11-25 02:40 (3 commits): (1) "free geometry joined to a conflict drags": `Sketch::drag` retries a
   Failed drag with `SolveOptions::unheld` = `unheld_constraints(1e-9)` unless the handle is FullyConstrained (fz211
   stuck free entities 161 -> 3; open: lines 92, 95, fit spline 215; T1 misc free_geometry_joined_to_a_conflict_drags).

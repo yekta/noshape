@@ -1937,16 +1937,24 @@ impl SketchEditor {
         // While a line chain is drawing a tangent arc there is no anchor
         // direction to infer from (the arc is tangent by construction).
         let anchor = if self.tangent_mode { None } else { self.anchor_pos(sk) };
+        let anchor_point = self.chain_end.or_else(|| self.line_start_point());
+        // Live (behaviours "every other tool step", 11-13): only Line, Midpoint line and Inscribed polygon align with
+        // their own first click; a tangent arc's or a 3 point arc's end takes no H/V through its start.
+        let first_snap = || match self.clicks.first()?.inference.as_ref()?.constraints.first() {
+            Some(AutoConstraint::CoincidentPoint(p)) => Some(*p),
+            _ => None,
+        };
+        let own_start = if self.tangent_mode || !matches!(self.tool, Tool::Line | Tool::MidpointLine | Tool::Polygon) { self.chain_end.or_else(first_snap) } else { None };
         let ctx = InferenceContext {
             tool: if self.tangent_mode { SketchTool::TangentArc } else { self.tool.inference_tool() },
             anchor,
-            anchor_point: self.chain_end.or_else(|| self.line_start_point()),
+            anchor_point,
             snap_radius: self.world_per_px * if self.exact_inference { 0.1 } else { INFERENCE_PX },
             angle_tolerance: if self.exact_inference { 1e-9 } else { 3f64.to_radians() },
             align_radius: self.exact_inference.then_some(self.world_per_px * 1e-3),
             exclude: Vec::new(),
             origin: true,
-            woken: self.woken.clone(),
+            woken: self.woken.iter().copied().filter(|w| Some(*w) != own_start).collect(),
             woken_at: self.woken_edge.as_ref().map_or(Vec::new(), |(_, a, z)| vec![(WOKEN_EDGE_ENDS[0], *a), (WOKEN_EDGE_ENDS[1], *z)]).into_iter().chain(self.woken_point.as_ref().map(|(_, q)| (WOKEN_POINT, *q))).chain(self.woken_mid_points(sk)).collect(),
             screen: self.screen_metric(),
         };
@@ -13052,6 +13060,31 @@ mod tests {
 
     /// Live sketch-linear-pattern-click-commit: a circle's linear pattern adds no Equal; a construction line runs
     /// from the seed's centre to the first instance's (both ends Coincident), horizontal, its length the spacing.
+    /// Live (behaviours "every other tool step", 11-13): only Line, Midpoint line and Inscribed polygon align with their
+    /// own first click. A 3 point arc or a tangent arc started on a line's end and ended level with it takes no
+    /// HORIZONTAL (ours levelled the end with the start).
+    #[test]
+    fn arcs_take_no_alignment_with_their_own_start() {
+        for tool in [Tool::Arc3, Tool::TangentArc] {
+            let (mut ed, mut d) = editor(Tool::Select);
+            d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.02));
+            ed.set_tool(tool);
+            click(&mut ed, &mut d, v(0.0, 0.02));
+            click(&mut ed, &mut d, v(-0.02, 0.02));
+            if tool == Tool::Arc3 {
+                click(&mut ed, &mut d, v(-0.01, 0.03));
+            }
+            assert_eq!(count(&d, EntityKind::Arc), 1, "{tool:?}");
+            let kinds: Vec<&str> = d.sketch.constraints().map(|c| c.kind.name()).collect();
+            assert!(!kinds.contains(&"Horizontal"), "{tool:?}: {kinds:?}");
+        }
+        // Line still levels its end with its start.
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.0, 0.02));
+        click(&mut ed, &mut d, v(-0.02, 0.02));
+        assert!(d.sketch.constraints().any(|c| c.kind.name() == "Horizontal"));
+    }
+
     #[test]
     fn a_linear_pattern_draws_its_direction_line_as_live() {
         let (mut ed, mut d) = editor(Tool::Select);
