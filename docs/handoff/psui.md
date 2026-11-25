@@ -58,7 +58,12 @@ docs/DECISIONS.md (read first; it wins over anything here).
    face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
    Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
 3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
-4. Interaction suite (lead 19:4x). DONE so far: sketch-entity-* Hide other/all sketches (rows only with another
+4. FIRST AFTER COMPACTION (lead 23:1x): use live's triage (live/REQUESTS.md "11-25 23:09"). 5 plane-* recordings
+   were stale (being re-recorded, abaedadb). The other 17 match live today, so they're OUR fixes, most-used first, each with a T1:
+   sketch-entity x4 (Hide rows done in b00920fe; check the rest), sketch-coincident-constraint, sketch-constraint-refusals,
+   sketch-fully-defined, sketch-offset, mate-connector-shift-lock-inference, routing-curve x5, ver-protection-enable.
+   Skip the 2 gusset ones (sheet metal). Then give qa the after count (qa id from roster; check agent_status first).
+   Interaction suite (lead 19:4x). DONE so far: sketch-entity-* Hide other/all sketches (rows only with another
    sketch in the studio, live behaviours "qa4 r5 s6b" (5) + ctx-menus-1117 setup had Sketch 1). NEXT: plane-* (4) to
    live/REQUESTS as stale (re-record), then sketch-coincident, constraint-refusals, fully-defined/offset focus, then report
    before/after (before 20) to the lead.
