@@ -880,7 +880,9 @@ impl Prepared {
             let mut all: Vec<SolverBody> = bodies.iter().enumerate().map(|(i, b)| SolverBody { pose: b.pose, fixed: self.fixed[i] }).collect();
             let full = solver::solve(&mut all, &mates, &all_rels, &[]);
             let moved = |b: usize| bodies[b].pose.origin.distance(poses0[b].origin) > 1e-12 || bodies[b].pose.rotation.angle_between(poses0[b].rotation) > 1e-12;
-            if !new_connector_mate && full.held_back.iter().any(|&b| moved(b)) {
+            // (A preview that couldn't move anything counts too: qa's pin top on the block top stayed put.)
+            let only_fails = only_mate.and_then(|only| mate_index.get(&only)).is_some_and(|&i| !full.mate_ok.get(i).copied().unwrap_or(true));
+            if !new_connector_mate && (only_fails || full.held_back.iter().any(|&b| moved(b))) {
                 // A mate that overdefines the assembly moves nothing, in its dialog too: it and the mates it fights
                 // red (live errors-1123 mates, qa ERR-MATE-SOLVE-MOVES).
                 for (b, p) in bodies.iter_mut().zip(&poses0) {

@@ -356,6 +356,17 @@ type SelectAction = std::rc::Rc<dyn Fn(&mut FeatureDialog, SharedString, &mut Co
 /// See [`FeatureDialog::extra`].
 pub type DialogExtra = Arc<dyn Fn(&mut Window, &mut Context<FeatureDialog>) -> (Vec<AnyElement>, Option<AnyElement>)>;
 
+/// One parameter row as `render_param` draws it: its spec, value path, the dialog's values, the spec drawn beside
+/// it, the icon buttons after it and the array item it sits in.
+struct ParamRow<'a> {
+    s: &'static ParamSpec,
+    path: &'a str,
+    values: &'a ParamValues,
+    companion: Option<&'static ParamSpec>,
+    trailing: &'a [&'static ParamSpec],
+    prefix: Option<(&'static str, usize)>,
+}
+
 #[derive(Clone)]
 struct ExtInfo {
     key: String,
@@ -2659,7 +2670,7 @@ impl FeatureDialog {
                 }
                 Some(self.render_axis_buttons(s, &path, next_axis, &values, prefix, cx))
             } else {
-                self.render_param(s, &path, &values, companion, &trailing, prefix, window, cx)
+                self.render_param(ParamRow { s, path: &path, values: &values, companion, trailing: &trailing, prefix }, window, cx)
             };
             // Configure features mode: a click on a top-level number,
             // checkbox, choice or selection configures it at once (live psb
@@ -2892,18 +2903,8 @@ impl FeatureDialog {
         Some(h_flex().w_full().ml(px(-2.)).pr(px(12.)).min_h(px(self.live_h(LIVE_CHECKBOX_ROW))).child(cb).into_any_element())
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn render_param(
-        &mut self,
-        s: &'static ParamSpec,
-        path: &str,
-        values: &ParamValues,
-        companion: Option<&'static ParamSpec>,
-        trailing: &[&'static ParamSpec],
-        prefix: Option<(&'static str, usize)>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Option<AnyElement> {
+    fn render_param(&mut self, row: ParamRow, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let ParamRow { s, path, values, companion, trailing, prefix } = row;
         let pal = p();
         // Onshape dialog field label: 13.33 px #666 (§3.9).
         let flips: Vec<AnyElement> = trailing

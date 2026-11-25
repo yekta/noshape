@@ -7153,20 +7153,28 @@ fn a_new_mate_previews_alone_but_a_new_tangent_checks_every_mate() {
     asm.instances[1].placement = res.solved.placement(InstanceId(2)).unwrap();
     let before = DVec3::from(asm.instances[1].placement.translation);
     let units = f.doc.settings.units;
-    for t in [MateType::Slider, MateType::Fastened, MateType::Tangent] {
+    // (The plate free too, the dialog holding one of the two parts: the Tangent still checks every mate.)
+    let mut free = asm.clone();
+    free.instances[0].fixed = false;
+    // (The dialog picks a Tangent's faces as inferred connectors; the agent API passes them bare.)
+    let cases = [(MateType::Slider, &asm, None, true), (MateType::Fastened, &asm, None, true), (MateType::Tangent, &asm, None, false), (MateType::Tangent, &free, Some(1), false), (MateType::Tangent, &free, Some(2), false),
+        (MateType::Tangent, &asm, None, true), (MateType::Tangent, &free, Some(1), true), (MateType::Tangent, &free, Some(2), true)];
+    for (t, asm, hold, inferred) in cases {
         let mut a = asm.clone();
         let m = match t {
-            MateType::Tangent => mate(11, t, MateConnectorRef::on(InstanceId(2), vec![], pin_top.clone()), MateConnectorRef::on(InstanceId(1), vec![], plate_top.clone())),
+            MateType::Tangent if !inferred => mate(11, t, MateConnectorRef::on(InstanceId(2), vec![], pin_top.clone()), MateConnectorRef::on(InstanceId(1), vec![], plate_top.clone())),
             _ => mate(11, t, conn(2, pin_top.clone(), Inference::Centroid), conn(1, plate_top.clone(), Inference::Centroid)),
         };
-        let preview = SolveOptions { only_mate: Some(m.id), new_mate: true, hold_values: eval::new_mate_holds(&m, &units), ..Default::default() };
+        let preview = SolveOptions { only_mate: Some(m.id), new_mate: true, hold: hold.map(InstanceId).into_iter().collect(), hold_values: eval::new_mate_holds(&m, &units), ..Default::default() };
         a.mates.push(m);
         let res = ev.evaluate(&f.doc, &a, &preview, None);
         let p = DVec3::from(res.solved.placement(InstanceId(2)).unwrap().translation);
+        let plate_at = DVec3::from(res.solved.placement(InstanceId(1)).unwrap().translation);
+        assert!(plate_at.length() < 1e-9, "{t:?} hold {hold:?} inferred {inferred}: the plate moved to {plate_at}");
         let status: Vec<_> = res.mates.iter().map(|s| s.ok).collect();
         if t == MateType::Tangent {
-            assert!((p - before).length() < 1e-9, "{t:?}: the pin moved {before} -> {p}");
-            assert_eq!(status, vec![false, false], "{t:?}: {:?}", res.mates.iter().map(|s| s.message.clone()).collect::<Vec<_>>());
+            assert!((p - before).length() < 1e-9, "{t:?} hold {hold:?} inferred {inferred}: the pin moved {before} -> {p}");
+            assert_eq!(status, vec![false, false], "{t:?} hold {hold:?} inferred {inferred}: {:?}", res.mates.iter().map(|s| s.message.clone()).collect::<Vec<_>>());
         } else {
             let (fa, fb) = res.solved.mate_frames[&MateId(11)];
             assert!(fa.origin.distance(fb.origin) < 1e-9 && p.truncate().distance(before.truncate()) < 1e-9 && (p - before).length() > 1e-3, "{t:?}: the pin moves along its axis, its top flush with the plate's: {before} -> {p}");

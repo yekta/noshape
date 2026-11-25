@@ -2789,6 +2789,62 @@ fn a_reopened_inconsistent_mate_has_a_pale_check(cx: &mut TestAppContext) {
     assert!(!pale_with(&view, "Mate is not consistent.", cx), "creating, not consistent: green");
 }
 
+/// qa's pin-block (err/c build.py): a 40 mm block with a Ø10 hole, fixed, and a Ø10 × 30 pin, Revolute 1 holding the
+/// pin in the hole.
+fn pin_block_document(cx: &mut TestAppContext, name: &str) -> std::path::PathBuf {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-{name}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap(), "length_unit": "mm" }));
+    for (shapes, depth) in [(json!([{ "tool": "corner_rectangle", "points": [[-20, -20], [20, 20]] }, { "tool": "circle", "points": [[0, 0], [5, 0]] }]), "20 mm"), (json!([{ "tool": "circle", "points": [[60, 0], [65, 0]] }]), "30 mm")] {
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": shapes }));
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"].clone()], "depth": depth, "operationType": "NEW" } }));
+    }
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    call(&mut ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, i: &str, at: [f64; 3]| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "at": [at] }))["faces"][0]["id"].clone();
+    let (pin, hole) = (face(&mut ctx, "Part 2 <1>", [65., 0., 15.]), face(&mut ctx, "Part 1 <1>", [5., 0., 10.]));
+    call(&mut ctx, "assembly_mate", json!({ "type": "revolute", "name": "Revolute 1", "a": { "instance": "Part 2 <1>", "entity": pin, "inference": "mid_axis" }, "b": { "instance": "Part 1 <1>", "entity": hole, "inference": "mid_axis", "flip": true }, "flip_primary": true }));
+    path
+}
+
+/// Live errors-1123 mates (CREATING): a new Tangent from the pin's top to the block's fights Revolute 1: both turn red
+/// while it is being created, its dialog saying so (qa err/c m-tan-planes-c: ours left Revolute 1 OK, the pin unable
+/// to move in the preview).
+#[gpui::test]
+fn a_new_tangent_fighting_a_revolute_is_red_while_created(cx: &mut TestAppContext) {
+    let path = pin_block_document(cx, "tangent-creating-red");
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Tangent, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", true, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.mate.as_ref().expect("the Tangent dialog").dialog.read(cx);
+        let ok: Vec<_> = v.result.mates.iter().map(|m| (m.ok, m.message.clone())).collect();
+        assert_eq!(ok.iter().map(|m| m.0).collect::<Vec<_>>(), vec![false, false], "both red while created: {ok:?}");
+        assert_eq!(d.status.as_deref(), Some("Mate overdefines the assembly."), "the dialog names it: {ok:?}");
+    });
+}
+
 /// Live errors-1123 mates: a Tangent's chips name its entities ("Face of Part 1 <1>"), not "Mate connector of …",
 /// for a mate made through the agent API too.
 #[gpui::test]
