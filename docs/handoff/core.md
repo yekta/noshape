@@ -33,7 +33,20 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     concave edge, both ends on a piece's ends, tangent to it): 8 pieces + 2 arcs + 2 smooth edges -> rolling balls fail
     at blend_section rolling_ball's det ~ 0 ("tangent"): the arc lies on the groove's own 0.5 mm round, the ball is
     0.5 mm too, so it sits in it (degenerate contact). Live needs a vertex blend / setback there; not rolling balls.
-- **Extrude editing logic's evCollision on the impeller (lead 11-25), landing.** psui: a depth change's Add/New
+- **NOW (lead 11-25): scissor blends, land only if nothing gets worse; skip F23.** Fresh status on main (.pm3.sh ->
+  vibex7 ~/tmp/core/pm3-<m>.txt, docs pm3-<m>/<m>.noshape): 9cbb0e fails Move face 2, Fillet 6, 18, 19, 23, Boolean 4;
+  2d82a0 fails Chamfer 2, Draft 1, Move face 1/3/9, Replace face 2, Fillet 4, 5, 7, 13, 25, 28, 30 BUT its Derived 1 is
+  "translation incomplete" (Left Plate 120044 vs live 105870 mm3: source sketches moved by our solve then taken back,
+  source Fillet 13 / Delete face 1 unmapped) -> 2d82a0's blends run on other geometry than live's (translator issue).
+  F18 (= F19 mirrored?): 7 picks -> 44 edges, 4 closed 11-edge chains (outlines of the planes y=+-11, +-8.25/7.75)
+  turning convex<->concave (a plate tangent into a taller hub); OCCT fails each chain alone. Concave balls failed on
+  "arc through 3 points" in ball_section's side(): at a junction the shared ball's contact is off this edge's
+  cylinder, the feet collapse onto an end. WIP /root/core-scratch/run/f18-wip.patch (with ZZ_F debug: detail.rs
+  ZZF prints + per-chain OCCT probe, kernel construct.rs arc backtrace; remove before landing): side() -> Option
+  (zero-length dropped) + a line when the mid foot collapses. Now: "boolean failed: the union lost one of its parts"
+  then a kernel crash (signal 11) on the retry. Next: which union (sections' tools at the convex/concave junction).
+  Probe: .sc5.sh <model> "<feature>" (build CLI + .sc4.sh with ZZ_F; prints the feature's own debug).
+- **Extrude editing logic's evCollision on the impeller (lead 11-25), landed f237c5e1.** psui: a depth change's Add/New
   auto-choice took 10-15 s (DIALOG_LIMIT 15 s). Now 3.0 s (2.6 s with the cached common), bench
   regen_profile::bench_editing_logic_one (T2; NOSHAPE_ELOGIC_DOC/_FEATURE; .el.sh "Extrude Flansch" in core-rf).
   crates/custom host/evaluate.rs: common_of (4 cached commons, thread-local) + crossing_in_common (a non-analytic
@@ -42,7 +55,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   common when one of a solid's first 8 vertices is Outside. A/B vs uncapped sections: 14 of 15 pairs agree; the 15th
   is a real 0.4-3.8 degree crossing the section misses. Stale runs: custom run.rs with_dialog_cancel (thread-local
   flag -> call_and_diff's 20 ms timer + Interp::set_cancel); part-studio-ui ui.std_edit_cancel / drop_std_edit_run
-  (new run, dialog close). Left: the remaining ~2.6 s is the impeller x flange common itself.
+  (new run, dialog close). PARKED (lead 11-25): the remaining ~2.6 s, the impeller x flange common itself (k::common;
+  a crossing test without the full common would be next).
 - **Concave balls landed (f8cec294c, 11-24):** fillet_in's last arm with_concave_balls(rolling_ball_blend): concave
   edges' balls added, no run-on for concave edges, oblique free ends trimmed (concave_end_walls), ledge drops trimmed
   (ledge_walls + trim_by_walls). Fresh-translation A/B (.pm2.sh sc9cbb|sc2d82 on vibex7 ~/tmp/core/pm): 9cbb0e Fillet 2
