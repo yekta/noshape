@@ -2657,3 +2657,41 @@ regen no slower (release, debug). Binaries in /root/skasm-scratch/apps (delete w
   glyph pair ~23 px right of live's (tickets/wf13-glyph-offset.png).
 - Host note: vibex8 still "held for a speed run" (qa, set 03:21) at 04:45.
 
+
+
+# Moved from the handoff 11-25 08:55
+## core's sketch cases (2026-11-16), queue item 3
+- c2-sm-rocker-enclosure-sm Extrude 2 (now its first difference once core's split-face attributes fix lands, 8/14):
+  Sketch 4's four circles are PROJECTED (Use) constraints whose live external edges (refs.jsonl
+  AjhQtHt4MbMf.{0..3}.project: x 45–60 mm, y ±78, z −91 / −21) aren't on our part. Our sketch comes out with two
+  circles (both rows map onto one), so Extrude 2 names one region twice ([0, 19] twice) and cuts 2 holes of live's 4
+  (ours 26/52/24, live 28/56/24). Probe: `NOSHAPE_PROBE_SKETCH="Sketch 4" NOSHAPE_PROBE_PARAM=entities` in
+  parity::bodies_after_feature_probe (core's probe patch).
+- c2-loft-guide-curves-wave-washer Loft 1 ("Could not create loft", 6/7): live says JHk / JH4 are Sketch 2's points
+  (POINT bodies JHb / JHv at (0, ±25.4, 3.81) mm); our Sketch 4 now coincides with them but solves its rectangles
+  outward (live's stored geometry is inconsistent): waiting on live's sketches.json (REQUESTS 06:2x).
+- c2-surf-workshop-manualblend Sweep 2 (11/19): Sketch 5's CONCENTRIC to vertex JNE now kept (anchors_off counts a
+  CONCENTRIC in the plane, within 10 µm when the stored was 0.1 mm+ off); our sweep now lies where live's does (x
+  −60.9…−26.3), but it takes the path's name "Curve 2" and the wire becomes "Surface 3": Sweep's body identity (core).
+- c2-sm-rocker-enclosure-body Extrude 6 (15/28): Sketch 6 now kept (its hexagon's pattern centre COINCIDENT with
+  the Use of JRR's centre, which live's refs `center` has; the stored was 2.8 mm off). Extrude 6's counts now match
+  (39/97/58); volume 379696 vs live 379830 mm³ (live cuts only the hexagon pocket, 66.81 mm² x 5 = 334.07 mm³; ours
+  134 more = 26.8 mm² x 5). Extrude 6's ids JtC / JtG map by text (ids fail): our regions 110.97 + 22.94 mm², live
+  84.16 + 22.94. Our first region runs past the hexagon (x -86.01 vs -84.04, y to 43.01 vs 41.04) to the pocket
+  floor's imprinted corner arcs (boundary entities >= 2^30): how regions meet imprinted face edges differs.
+  Sketch 5's take-back is right: its circles are stored on live's centres, our Use of JZB lands 6.43 mm off (our
+  model's edge: core's split-face fix).
+- Settled 11-18: config-parts links / pulleys / linear-rail / standoffs / sprockets match to the end; cpcurves has no
+  sketch difference left (first: 3D fit spline 1, "Cannot evaluate tangency for end condition.").
+
+## P1 TABLET-STAND-FACE-NAMES: DONE 11-22 (acf660cb)
+- Cause (not the fuse): a rolled bend's planar end caps with exact arcs get tighter boxes (x 67.999994 vs the B-spline
+  arcs' 68.066990), so their geometric `Role::New` key fell before the bend cylinder's (68.000000): New 11/12/13 swapped.
+- Fix: rolled_bend also thickens plain and keys each cap by its plain twin's box (NameKey); fresh_part_names uses it.
+  Saved tablet-stand copy: all Ok, names identical to the plain build's (probe /root/skasm-scratch/probes/zz_smnames.rs,
+  bin/smn.sh). T2 sheetmetal_std a_rolled_walls_faces_keep_their_names_with_exact_arcs.
+
+## Closed 11-19: big-sketch feel (no row >= 100 ms and >= 2x live; live: open 2.6-25 s, edit 2.7-13 s, press 31-56 ms;
+ours: press 3-25 ms, drag 4-15 ms/step, edit 14-20 ms). Probe: /root/skasm-scratch/probes/zz_sketch_speed.rs (REDRAW too).
+Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six on green.
+

@@ -332,3 +332,55 @@ fn a_sketch_on_a_face_imprints_the_faces_edges() {
     assert!((v - std::f64::consts::PI * 64.0 * 5.0).abs() < 1e-3, "the whole circle: {v} mm³");
 }
 
+
+/// Live (skb 10-25, l.15801): a model edge used in a sketch on a face is a line in the edge's place; it follows the
+/// model when the block grows, and the sketch's plane rises with the face.
+#[test]
+fn a_used_edge_follows_the_model_and_the_face_sketch_rises_with_it() {
+    let (mut ps, units) = block();
+    let r = regen(&ps, &units);
+    let body = &r.context.bodies[0];
+    let cap = body.faces.iter().find(|n| format!("{n:?}").contains("CapEnd")).expect("top cap face").clone();
+    let frame = PlaneFrame { origin: glam::DVec3::new(0.0, 0.0, 0.025), ..PlaneFrame::TOP };
+    // The cap's front edge (y = -25 mm), projected as Use does.
+    let (edge, line) = body.edges.iter().find_map(|n| {
+        let shape = noshape_model::regen::measure::resolve_shapes(&r.context, &Reference::Edge((**n).clone())).into_iter().next()?;
+        let c = noshape_model::regen::features::sketch::project_edge(&shape, &frame)?;
+        let (a, b) = (frame.to_world(c.start_point()), frame.to_world(c.end_point()));
+        ((a.y + 0.025).abs() < 1e-9 && (b.y + 0.025).abs() < 1e-9 && (a.z - 0.025).abs() < 1e-9 && (b.z - 0.025).abs() < 1e-9 && (a - b).length() > 0.05).then(|| ((**n).clone(), c))
+    }).expect("the top front edge");
+    let mut sk = noshape_sketch::Sketch::new();
+    let used = sk.add_line(line.start_point(), line.end_point());
+    sk.set_external(used, true).unwrap();
+    let data = SketchData { sketch: sk, external_refs: [(used.0, Reference::Edge(edge))].into_iter().collect(), ..Default::default() };
+    let mut s2 = ps.new_feature("sketch", &units).unwrap();
+    s2.params.set("sketchPlane", ParamValue::Query(vec![Reference::Face((*cap).clone())]));
+    s2.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
+    let s2_id = s2.id;
+    ps.features.push(s2);
+    let used_line = |r: &noshape_model::regen::RegenResult| {
+        let s = r.context.sketches.iter().find(|s| s.feature == s2_id).unwrap();
+        let c = s.sketch.curve(used).unwrap();
+        let (a, b) = (s.frame.to_world(c.start_point()), s.frame.to_world(c.end_point()));
+        (a.z.max(b.z), (a - b).length(), a.y.max(b.y))
+    };
+    let (z, len, y) = used_line(&regen(&ps, &units));
+    assert!((z - 0.025).abs() < 1e-9 && (len - 0.1).abs() < 1e-9 && (y + 0.025).abs() < 1e-9, "z {z} len {len} y {y}");
+
+    // A taller (40 mm) and wider (120 mm) block: the line rises with the face and lengthens.
+    if let Some(ParamValue::Expr(e)) = ps.features[1].params.0.get_mut("depth") {
+        *e = ExprValue::new("40 mm");
+    }
+    if let Some(ParamValue::Sketch(d)) = ps.features[0].params.0.get_mut("sketch") {
+        let d = std::sync::Arc::make_mut(d);
+        let pts: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).collect();
+        for p in &pts[1..3] {
+            let q = d.sketch.point(*p).unwrap();
+            d.sketch.set_point(*p, q + DVec2::new(0.02, 0.0)).unwrap();
+        }
+    }
+    let r = regen(&ps, &units);
+    let (z, len, y) = used_line(&r);
+    assert!((z - 0.04).abs() < 1e-9, "the used line rose with the face: z {z}");
+    assert!((len - 0.12).abs() < 1e-9 && (y + 0.025).abs() < 1e-9, "it follows the wider block: len {len} y {y}");
+}
