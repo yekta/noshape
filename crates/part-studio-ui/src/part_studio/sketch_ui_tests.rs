@@ -9748,6 +9748,27 @@ fn sketch_dimension_text_lies_in_the_plane_in_iso(cx: &mut TestAppContext) {
     let (_, zoomed, _) = state(cx);
     let zoomed = zoomed.unwrap();
     assert!((zoomed - iso).abs().max_element() < 1.5, "constant screen size: {iso:?} -> {zoomed:?}");
+    // Offset's distance in the plane too (live offset-iso-1124: the "5").
+    let fills = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch_dimension_fills(cx).len());
+    let before = fills(cx);
+    sketch_in_tool(cx, window, view.clone(), Tool::Offset);
+    let mid = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let ends: Vec<DVec2> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).filter_map(|e| d.sketch.point(e.id)).collect();
+        let m = ends.iter().fold(DVec2::ZERO, |a, p| a + *p) / ends.len() as f64;
+        v.viewport.read(cx).project(v.sketch.as_ref().unwrap().frame.to_world(m)).unwrap()
+    });
+    click(cx, window, &view, (mid.x, mid.y));
+    view.update(cx, |v, cx| {
+        let ed = v.sketch.as_mut().unwrap();
+        ed.offset_distance = 10.0 * ed.world_per_px;
+        cx.notify();
+    });
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.offset_pending.is_some())), "the offset preview");
+    assert!(fills(cx) > before, "the offset's value in the plane: {before} -> {}", fills(cx));
+    keys(cx, window, &["escape"]);
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
     settle(cx);
