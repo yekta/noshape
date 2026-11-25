@@ -3822,7 +3822,7 @@ impl SketchEditor {
                     // the width, its leader radial (vertical). No value box opens
                     // for a slot (sketch/307–311).
                     let label = data.sketch.entity(*cap).and_then(|e| e.center()).and_then(|c| data.sketch.point(c)).map(|c| c + DVec2::Y * self.slot_width * 2.0);
-                    let _ = add_dimension(data, ConstraintKind::Diameter { curve: *cap, value: self.slot_width }, label, None);
+                    let _ = add_own_dimension(data, ConstraintKind::Diameter { curve: *cap, value: self.slot_width }, label);
                     self.slot_session = Some(*cap);
                 }
                 None => {
@@ -4285,7 +4285,7 @@ impl SketchEditor {
                         // Rho is an intrinsic dimension: accepting or dismissing
                         // the initial box keeps the default driving value.
                         let rho = self.conic_rho.clamp(0.01, 0.99);
-                        add_dimension(data, ConstraintKind::Rho { conic: id, value: rho }, Some(label), None);
+                        add_own_dimension(data, ConstraintKind::Rho { conic: id, value: rho }, Some(label));
                         self.set_otf(data, vec![OtfField { kind: ConstraintKind::Rho { conic: id, value: 0.0 }, scale: 1.0, label, place: None, place_active: None, label_at: None }]);
                         EditOutcome::changed()
                     }
@@ -7840,6 +7840,17 @@ pub fn add_dimension(data: &mut SketchData, kind: ConstraintKind, label: Option<
     Some(cid)
 }
 
+/// A new entity's own dimension, which nothing else fixes yet (a pattern's spacing, a slot's width, a conic's rho):
+/// driving at its measured value, without [`add_dimension`]'s analysed solve (100–240 ms in a big sketch).
+fn add_own_dimension(data: &mut SketchData, kind: ConstraintKind, label: Option<DVec2>) -> Option<ConstraintId> {
+    let cid = data.sketch.add_reference(kind).ok()?;
+    let _ = data.sketch.set_driving(cid, true);
+    if let Some(p) = label {
+        data.dimension_labels.insert(cid.0, [p.x, p.y]);
+    }
+    Some(cid)
+}
+
 fn de_casteljau(pts: &[DVec2], t: f64) -> DVec2 {
     let mut v = pts.to_vec();
     while v.len() > 1 {
@@ -8412,12 +8423,8 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
     } else if step.x.abs() < 1e-12 {
         let _ = sk.add_constraint(ConstraintKind::Vertical { a: line, b: None });
     }
-    // Nothing else fixes the spacing (the instances are new, held only by their links): driving at once, without
-    // add_dimension's analysed solve (100–180 ms in a big sketch); the caller solves.
     let label = p0 + step * 0.5 + step.try_normalize().unwrap_or(DVec2::X).perp() * wpp * 24.0;
-    if let Ok(c) = sk.add_constraint(ConstraintKind::Length { curve: line, value: step.length() }) {
-        data.dimension_labels.insert(c.0, [label.x, label.y]);
-    }
+    add_own_dimension(data, ConstraintKind::Length { curve: line, value: step.length() }, Some(label));
     Some(line)
 }
 
@@ -10454,6 +10461,10 @@ mod tests {
         assert!(!ed.slot_pending());
         assert!(ed.selection.is_empty(), "committing clears it");
         assert_eq!(count(&d, EntityKind::Arc), 2, "the empty-space click committed it");
+        let width = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Diameter { .. })).unwrap().clone();
+        assert!(width.driving && d.dimension_labels.contains_key(&width.id.0), "the width drives, labelled");
+        let report = d.sketch.solve();
+        assert!(report.is_solved() && !report.redundant.contains(&width.id), "{:?} {:?}", width.id, report.redundant);
         assert!(!d.sketch.entity(line).unwrap().construction, "centerline stays solid");
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Diameter { .. })), "Ø width dimension");
         // Esc discards a pending slot and leaves the tool (live sketch-tools-1123 slot.md).

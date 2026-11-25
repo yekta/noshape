@@ -20,7 +20,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - QUEUED (11-25 05:26) "linear pattern ... quick": the 172-188 ms was add_dimension's analysed solve (100-178 ms) of
   the spacing dimension; link_linear_pattern now adds that Length driving directly (fresh instances, nothing else fixes
   it). fz211 linear pattern 32-37 ms (all probed tools now < 50 ms). T1 a_linear_pattern_draws_its_direction_line_as_live
-  checks driving + label + no redundancy. Same analysed add_dimension remains in slot width / conic rho (not probed).
+  checks driving + label + no redundancy.
+- QUEUED (11-25) slot width / conic rho the same way (`add_own_dimension`: measured, driving, no solve): fz211 slot
+  preview 240 -> 60 ms, conic 3rd click 172 -> 41 ms. T1 slot_previews_until_... checks the width drives, not redundant.
 - QUEUED (11-25, after 9102b99e) "constraints beside a conflict solve" (live sk-conflict-add-1125: everything added
   beside a red conflict is kept and solves): `Sketch::solved_beside_conflicts(before, around)` (unheld constraints
   all elsewhere and already unheld before) keeps solve_after_constraint's and the fillet radius edit's solve.
