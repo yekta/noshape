@@ -3,7 +3,7 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 19:0x) — read first
+## NOW (11-25 18:40) — read first
 - QUEUED 5af8d24a (27 commits: 1db32be0's 25 + handoff + first-week/mistakes-3): unresolved mate chips "Missing mate
   connector of <instance>" (MateDialog.unresolved keeps the instance name); a face sketch's imprinted region left out
   of the whole-sketch "Faces of" chip count (mod.rs region_counts); T1s a_text_sketchs_extrude_on_a_part_adds_into_it,
