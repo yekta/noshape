@@ -10978,9 +10978,9 @@ fn two_parts_of_a_flexible_subassembly_mate_in_its_parent() {
     let (top, bottom) = (face(&mut ctx, block, 1.0), face(&mut ctx, pin, -1.0));
     let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "planar", "a": { "instance": pin, "entity": bottom }, "b": { "instance": block, "entity": top } }));
     assert_eq!(m["mate_ok"], true, "{m}");
-    // A part with itself is still refused, by name.
-    let e = try_call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "planar", "a": { "instance": block, "entity": top }, "b": { "instance": block, "entity": top } })).unwrap_err().to_json();
-    assert_eq!(e["param"], "b", "{e}");
+    // A part with itself is made in error, as live's REST and dialog (DECISIONS: same-instance mates accepted).
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "planar", "a": { "instance": block, "entity": top }, "b": { "instance": block, "entity": top } }));
+    assert!(m["mate_ok"] == false && m["mate_message"].is_string(), "{m}");
 }
 
 /// A drawing view showing an exploded view keeps showing it when an earlier one is deleted, and a named position
