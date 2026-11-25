@@ -658,6 +658,12 @@ pub fn user_select_field_focusable(id: impl Into<ElementId>, options: Vec<String
     select_field_inner(id, options, Vec::new(), current, FieldOpts { focus: Some(focus.clone()), flat: false }, 0, on_select)
 }
 
+/// [`select_field_flat`] of user content as a Tab stop (`focus`): live Change configuration's inputs (workflows-1123
+/// 06 s22: a 1 px `#d7d7d7` underline, no box).
+pub fn user_select_field_flat_focusable(id: impl Into<ElementId>, options: Vec<String>, current: usize, focus: &FocusHandle, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> Stateful<Div> {
+    select_field_inner(id, options, Vec::new(), current, FieldOpts { focus: Some(focus.clone()), flat: true }, 0, on_select)
+}
+
 /// How a [`select_field`] looks: a Tab stop (`focus`), Onshape's flat list field.
 #[derive(Default)]
 struct FieldOpts {

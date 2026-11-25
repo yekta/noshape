@@ -2888,6 +2888,41 @@ fn a_configured_rows_split_button_keeps_its_row_untinted(cx: &mut TestAppContext
     cx.update(|cx| assert!(view.read(cx).ui.insert_cfg_btn_hover.is_none(), "the row's name under the pointer"));
 }
 
+/// Live workflows-1123 06 s22 (qa ASM-CHANGE-CONFIG-PANEL-LOOK): Change configuration of a Part Studio with a list
+/// input alone has no Generate button (live qa5 cf-052 greys one with a typed input); the list is an underlined field
+/// (26 px), not a box; a ▾ at the Part Studio row's left folds the inputs and parts.
+#[gpui::test]
+fn change_configuration_of_a_list_has_no_generate_and_folds_under_its_caret(cx: &mut TestAppContext) {
+    for typed in [false, true] {
+        let path = two_parts_document(cx, &format!("cfg-panel-{typed}"), |ctx| {
+            call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Configuration" }));
+            if typed {
+                call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "variable", "name": "d", "value": "10 mm", "range": ["1 mm", "100 mm"] }));
+            }
+        });
+        let (window, view) = open_assembly_with_front(cx, &path);
+        let list_id = cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                let top = v.assembly(cx).unwrap().instances[0].id;
+                v.open_config(top, w, cx);
+                v.config_panel.as_ref().unwrap().inputs[0].id.clone()
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let sel: &'static str = Box::leak(format!("cfg-{list_id}").into_boxed_str());
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        assert_eq!(vcx.debug_bounds("cfg-generate").is_some(), typed, "Generate only with a typed input ({typed})");
+        let select = vcx.debug_bounds(sel).expect("the Configuration list");
+        assert_eq!(select.size.height, px(26.), "an underlined field, not the 34 px box");
+        let caret = vcx.debug_bounds("cfg-caret").expect("the Part Studio row's caret");
+        vcx.simulate_click(caret.center(), gpui_kit::Modifiers::none());
+        draw(cx, window);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        assert!(vcx.debug_bounds(sel).is_none() && vcx.debug_bounds("cfg-generate").is_none(), "folded");
+    }
+}
+
 /// Live2 asm-dialogs-1119 q-ins / q-ins-sort: Insert's Part Studios are listed by name A → Z by default, the Sort
 /// button right of the search box turns it to Z → A, kept when the dialog is closed and reopened; the filters are
 /// Parts and Sketches, also with no sketches, and Flat patterns only with sheet metal (live workflows-1123 16 s2).

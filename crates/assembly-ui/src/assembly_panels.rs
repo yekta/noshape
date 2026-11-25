@@ -381,6 +381,8 @@ pub struct ConfigSession {
     pub texts: Vec<(String, Entity<InputState>)>,
     /// Generate is enabled once an input changed (live: greyed at first).
     pub generate: bool,
+    /// The Part Studio row's caret closed: its inputs and parts hidden.
+    pub collapsed: bool,
     /// The dialog (Tab leaves it past its last control).
     pub focus: FocusHandle,
     pub _subs: Vec<Subscription>,
@@ -3361,7 +3363,7 @@ impl AssemblyView {
                 InputEvent::Focus => {}
             }));
         }
-        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false, focus: cx.focus_handle(), _subs: subs, select_focus, help_focus: cx.focus_handle().tab_stop(true) });
+        self.config_panel = Some(ConfigSession { instance: top, inputs, values, texts, generate: false, collapsed: false, focus: cx.focus_handle(), _subs: subs, select_focus, help_focus: cx.focus_handle().tab_stop(true) });
         cx.notify();
     }
 
@@ -3486,7 +3488,7 @@ impl AssemblyView {
                     let at = opts.iter().position(|o| o.id == cur).unwrap_or(0);
                     let (v, ids) = (view.clone(), opts.iter().map(|o| o.id.clone()).collect::<Vec<_>>());
                     let focus = select_focus.get(&inp.id).cloned().unwrap_or_else(|| cx.focus_handle());
-                    let select = os::user_select_field_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
+                    let select = os::user_select_field_flat_focusable(SharedString::from(format!("cfg-{}", inp.id)), opts.iter().map(|o| o.name.clone()).collect(), at, &focus, move |i, _, cx| {
                         let (id, oid) = (id.clone(), ids.get(i).cloned().unwrap_or_default());
                         v.update(cx, |this, cx| {
                             if let Some(s) = &mut this.config_panel {
@@ -3496,7 +3498,7 @@ impl AssemblyView {
                             cx.notify();
                         })
                     });
-                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().flex_1().min_w_0().child(select)));
+                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().flex_1()).child(div().flex_none().w(px(153.)).mr(px(9.)).child(select)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
@@ -3527,6 +3529,10 @@ impl AssemblyView {
         });
         let entry = studio.and_then(|t| self.catalog.studios.iter().find(|c| c.tab == t).cloned());
         let generate_on = s.generate;
+        let collapsed = s.collapsed;
+        // Live (qa5 cf-052: a quantity input, Generate greyed; workflows-1123 06 s22: lists only, none): Generate is
+        // for typed values, not for lists.
+        let generate_shown = inputs.iter().zip(&shown).any(|(i, v)| v.visible && !matches!(i.kind, ConfigInputKind::List { .. }));
         let thumb_row = |id: SharedString, indent: f32, icon: &'static str, thumb: Option<Arc<RenderImage>>, label: String, faded: bool, cx: &App| {
             h_flex()
                 .id(id)
@@ -3556,16 +3562,34 @@ impl AssemblyView {
         );
         if let Some(e) = &entry {
             let cfg_button = self.insert_config_button(e.tab, cx);
+            // Live 06 s22: a ▾ at its left (x 5-14 in the dialog) folds what is under it.
+            let caret = div()
+                .id("cfg-caret")
+                .debug_selector(|| "cfg-caret".into())
+                .absolute()
+                .left(px(3.))
+                .top(px(13.))
+                .cursor_pointer()
+                .child(crate::ui::glyph(if collapsed { "expander-right" } else { "expander-down" }, 14., pal.icon_tertiary))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    if let Some(s) = &mut this.config_panel {
+                        s.collapsed = !s.collapsed;
+                    }
+                    cx.notify();
+                }));
             list = list.child(
                 thumb_row("cfg-studio".into(), 14., "part-studio", self.insert_thumb(e.tab, None), e.name.clone(), true, cx)
+                    .relative()
+                    .child(caret)
                     .children(cfg_button)
                     .child(div().w(px(4.))),
             );
         }
-        list = list.child(div().pl(px(40.)).pr(px(8.)).child(body)).child(
+        let generate = generate_shown.then(|| {
             div().pl(px(48.)).py(px(4.)).child(
                 div()
                     .id("cfg-generate")
+                    .debug_selector(|| "cfg-generate".into())
                     // Live: a white button.
                     .bg(gpui_kit::rgb(0xffffff))
                     .w(px(80.))
@@ -3586,9 +3610,12 @@ impl AssemblyView {
                         }
                         cx.notify();
                     })),
-            ),
-        );
-        if let Some(e) = &entry {
+            )
+        });
+        if !collapsed {
+            list = list.child(div().pl(px(40.)).pr(px(8.)).child(body)).children(generate);
+        }
+        if let Some(e) = entry.as_ref().filter(|_| !collapsed) {
             for (k, part) in e.parts.iter().enumerate() {
                 list = list.child(thumb_row(SharedString::from(format!("cfg-part-{k}")), 40., if part.3 { "surface-body" } else { "part" }, self.insert_thumb(e.tab, Some(&part.0)), part.1.clone(), true, cx));
             }
