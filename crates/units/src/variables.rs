@@ -479,7 +479,7 @@ mod tests {
                 .as_ref()
                 .unwrap_err()
                 .to_string()
-                .contains("cannot add")
+                .contains("Cannot add")
         );
     }
 

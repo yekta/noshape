@@ -275,7 +275,7 @@ fn dimension_errors() {
     assert!(
         ev_err("10 + 5 mm")
             .to_string()
-            .contains("cannot add unitless and length")
+            .contains("Cannot add number and length.")
     );
     assert!(matches!(
         ev_err("2 ^ (1 mm)"),

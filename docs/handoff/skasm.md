@@ -3,14 +3,28 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 08:55) — read first
+## NOW (11-25 09:45) — read first
 - QUEUED 2d91090e (11-25 08:45): image fit + dash-dot preview, spline arm test, circle centre on a line = trim boundary.
-- IN PROGRESS (lead 11-25): construction geometry. Plane matches what live recorded (types/std cPlaneLogic on
-  preselection only, P7 wording, oracle results-10 geometry, offset arrow + angle arc manipulators). Use re-projects on
-  regen; lost source = "Some external references are missing.". REQUESTS skasm 11-25 08:52 filed (plane previews /
-  manipulators / flip / resize after ✓; Use under model edits, deleted / suppressed sources, off-plane edges).
-  New model test sketch_assoc::a_used_edge_follows_the_model_and_the_face_sketch_rises_with_it (bin/tuse.sh ->
-  ~/tmp/skasm/tuse.log) passes: ours follows; LANDING.
+- LANDING (lead 11-25, parametric basics): ours re-solves sketches on a variable edit, renames follow, unknown #name in
+  a feature = live's "Variable not found, is suppressed, or has not been set."; first dimension scales the sketch (live).
+  Fix: units EvalError texts in live's words ("Cannot use angle as length.", "Cannot add angle and length.", "Cannot
+  apply cos to length.", number for unitless) so ops/feature messages match the app (bin/tunits.sh -> tunits.log).
+  REQUESTS skasm 11-25 09:30 (rename follows?, dimension box errors, table cell wrong unit, field errors, re-solve).
+- LANDING: image placement per live spline-image-1125 (answers REQUESTS 07:55): the 2nd click sets the WIDTH only,
+  height = width / aspect (image_box; scene test an_images_second_click_sets_its_width_as_live; bin/timg2.sh ->
+  ~/tmp/skasm/timg2.log, then commit with the units wording fix once tunits.log is green).
+- NEXT from live/skasm/spline-image-1125/index.md (check ours, fix each with a test):
+  image: box lines SOLID sketch-blue (not construction); placement COINCIDENT first click->origin when snapped +
+  HORIZONTAL bottom; ~50 % opacity outside edit (Part Studio, other sketches); interior not hover/pickable; middle
+  drag translates (scales about the pinned corner when Coincident to the origin), corner/edge drags scale, aspect
+  always kept; bottom Length 100 -> 100 x 66.67; Fix on bottom stops drags; right-click menus verbatim (Edit image,
+  Switch to <file>, no opacity/lock). Spline: interior point drag moves only that point (end derivatives kept);
+  body drag bends (free points + derivatives move); handle drag scales the derivative, no length text, H/V snap adds
+  a constraint on the handle end; no curvature handle; end dropped on start = no periodic, no Coincident, sketch
+  WARNING "Some of the geometry intersects itself or is degenerate."; Bezier CP drag keeps the other CPs, body drag
+  moves all CP y; menus verbatim (index.md (3)).
+- QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
+  plane resize after ✓ is already in behaviours "icons2 plane resize rules".
 - DROPPED (lead 11-25): the ops center_point_arc P1; core fixed it in db2fd8e7 (my ops edits reverted).
 - LANDING Insert image as live G13: `image_box` fits INSIDE the dragged rect (min side, was max); preview
   = dash-dot rect to the pointer + the picture inside (`SketchEditor::image_preview`, psui sketch_overlay draws it via

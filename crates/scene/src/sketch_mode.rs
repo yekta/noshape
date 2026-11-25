@@ -7141,7 +7141,7 @@ impl SketchEditor {
                     }
                     _ => {}
                 },
-                // Live G13: a dash-dot rectangle to the pointer, the picture fitted inside it ([`Self::image_preview`]).
+                // Live G13: a dash-dot rectangle to the pointer, the picture in it (width to the pointer) ([`Self::image_preview`]).
                 Tool::InsertImage => {
                     if let (Some(a), Some(_)) = (anchors.first(), &self.pending_image) {
                         dash_dot.push(vec![*a, DVec2::new(c.x, a.y), c, DVec2::new(a.x, c.y), *a]);
@@ -7757,8 +7757,8 @@ impl SketchEditor {
 
     /// Entities highlighted as related (picks, mirror axis, entities of the
     /// selected / hovered constraints).
-    /// Insert image between its clicks: the picture's corners (lower-left, lower-right, upper-right, upper-left) fitted
-    /// inside the rectangle from the first click to the pointer, as the second click would place it (live G13).
+    /// Insert image between its clicks: the picture's corners (lower-left, lower-right, upper-right, upper-left) as the
+    /// second click would place it there (its width to the pointer, live spline-image-1125).
     pub fn image_preview(&self) -> Option<[DVec2; 4]> {
         if self.tool != Tool::InsertImage {
             return None;
@@ -8450,12 +8450,12 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
 }
 
 /// Lower-left corner and height of an image rectangle dragged from `a` to `b` with its aspect ratio (width / height)
-/// locked: fitted inside the dragged rectangle by its limiting side, from `a` (live G13: a wide drag leaves blank space
-/// at the side, a tall one at the top or bottom).
+/// locked, from `a` towards `b`.
 fn image_box(a: DVec2, b: DVec2, aspect: f64) -> (DVec2, f64) {
+    // Live (skasm spline-image-1125): the second click sets the width only; the height follows the image's aspect.
     let d = b - a;
-    let h = d.y.abs().min(d.x.abs() / aspect.max(1e-9));
-    let w = h * aspect;
+    let w = d.x.abs();
+    let h = w / aspect.max(1e-9);
     let x = if d.x < 0.0 { a.x - w } else { a.x };
     let y = if d.y < 0.0 { a.y - h } else { a.y };
     (DVec2::new(x, y), h)
@@ -11680,12 +11680,11 @@ mod tests {
         assert!(s.spline_handles().is_some() && arms(&d) == 2, "open: handles {:?}, arms {}", s.spline_handles(), arms(&d));
     }
 
-    /// Live G13: Insert image's two clicks fit the picture inside the dragged rectangle by its limiting side (a wide
-    /// drag leaves blank space at the side, a tall one above), as the preview showed; one HORIZONTAL on the bottom;
-    /// the tool ends.
+    /// Live (skasm spline-image-1125, G13): Insert image's second click sets the picture's width, its height follows
+    /// the aspect, as the preview showed; one HORIZONTAL on the bottom; the tool ends.
     #[test]
-    fn an_image_fits_inside_its_dragged_rectangle_as_live() {
-        for (to, size) in [(v(0.06, 0.01), v(0.015, 0.01)), (v(0.015, 0.04), v(0.015, 0.01))] {
+    fn an_images_second_click_sets_its_width_as_live() {
+        for (to, size) in [(v(0.06, 0.01), v(0.06, 0.04)), (v(0.015, 0.04), v(0.015, 0.01))] {
             let (mut ed, mut d) = editor(Tool::InsertImage);
             ed.pending_image = Some(("guide.png".into(), vec![1, 2, 3], 1.5));
             click(&mut ed, &mut d, v(0.0, 0.0));

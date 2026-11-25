@@ -77,19 +77,27 @@ impl fmt::Display for ParseErrorKind {
 }
 
 /// Evaluation failure.
+/// A dimension as live names it in an expression error: "number" for a plain number.
+fn word(d: &Dim) -> String {
+    if *d == Dim::UNITLESS { "number".into() } else { d.name() }
+}
+
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum EvalError {
     #[error("undefined variable `#{0}`")]
     UndefinedVariable(String),
-    #[error("cannot {op} {left} and {right}")]
+    // Live's words (Variable dialog, ui 10-26 c): "Cannot add angle and length.".
+    #[error("Cannot {op} {} and {}.", word(.left), word(.right))]
     DimensionMismatch {
         op: &'static str,
         left: Dim,
         right: Dim,
     },
-    #[error("expected {expected}, got {found}")]
+    // Live: "Cannot use angle as length.".
+    #[error("Cannot use {} as {}.", word(.found), word(.expected))]
     WrongDimension { expected: Dim, found: Dim },
-    #[error("`{func}` expects {expected}, got {found}")]
+    // Live: "Cannot apply cos to length.".
+    #[error("Cannot apply {func} to {}.", word(.found))]
     BadArgument {
         func: &'static str,
         expected: &'static str,
