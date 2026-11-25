@@ -348,14 +348,20 @@ fn an_under_defined_sketchs_row_says_so(cx: &mut TestAppContext) {
 
 /// Live qa/mistakes-1125: a rectangle dimensioned 40 x 20 with a third length on the opposite side, conflicting (30) or
 /// only redundant (40): the row red, its tooltip "<name> did not regenerate properly: Sketch could not be solved.";
-/// opened, the sketch's title red and ✓ enabled.
+/// opened, the sketch's title red and ✓ enabled. Live overdefined-downstream-1125: an Extrude of it (hiding it) keeps
+/// building from the last solved rectangle (8000 mm³), a new one of its region too (12000 mm³), and the tooltip ends
+/// "… Sketch could not be solved. (Hidden)".
 #[gpui::test]
 fn an_over_defined_sketchs_row_and_dialog_as_live(cx: &mut TestAppContext) {
     use noshape_model::display::FeatureStatus;
     for (name, top) in [("Sketch conflict", "30 mm"), ("Sketch redundant", "40 mm")] {
-        let start = serde_json::json!({ "units": "mm", "features": [
+        let extruded = name == "Sketch redundant";
+        let mut start = serde_json::json!({ "units": "mm", "features": [
             { "type": "newSketch", "name": name, "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 20]] }] },
         ] });
+        if extruded {
+            start["features"].as_array_mut().unwrap().push(serde_json::json!({ "type": "extrude", "name": "Extrude 1", "params": { "entities": [format!("{name} region 0")], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }));
+        }
         let (window, view) = part_studio_with(cx, &format!("fb-overdefined-{}", &name[7..]), |path| {
             let mut ctx = noshape_ops::Ctx::new();
             noshape_ops::ui_parity::build_start(&mut ctx, path, &start).unwrap();
@@ -374,6 +380,14 @@ fn an_over_defined_sketchs_row_and_dialog_as_live(cx: &mut TestAppContext) {
             call("sketch_dimension", serde_json::json!({ "sketch": name, "entities": [bottom], "value": "40 mm", "label": [20, -8] }));
             call("sketch_dimension", serde_json::json!({ "sketch": name, "entities": [left], "value": "20 mm", "label": [-8, 10] }));
             call("sketch_dimension", serde_json::json!({ "sketch": name, "entities": [upper], "value": top, "label": [20, 28] }));
+            if extruded {
+                let volume = |call: &mut dyn FnMut(&str, serde_json::Value) -> serde_json::Value| (call("query_parts", serde_json::json!({}))["parts"].as_array().unwrap().iter().filter_map(|p| p["volume"].as_f64()).sum::<f64>() * 10.0).round() / 10.0;
+                assert_eq!(volume(&mut call), 8000.0, "Extrude 1 keeps the last solved rectangle");
+                let regions: Vec<serde_json::Value> = call("sketch_get", serde_json::json!({ "sketch": name }))["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+                assert_eq!(regions.len(), 1, "its one region");
+                call("feature_add", serde_json::json!({ "type": "extrude", "params": { "entities": regions, "endBound": "BLIND", "depth": "5 mm", "oppositeDirection": true, "operationType": "NEW" } }));
+                assert_eq!(volume(&mut call), 12000.0, "Extrude 2 of its region builds");
+            }
             crate::session::Session::open(path).unwrap()
         });
         cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
@@ -382,7 +396,8 @@ fn an_over_defined_sketchs_row_and_dialog_as_live(cx: &mut TestAppContext) {
         let status = cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.message.clone())));
         assert_eq!(status, Some((FeatureStatus::Error, Some("Sketch could not be solved.".to_string()))), "{name}: the row red");
         let tip = row_tooltip(cx, window, name);
-        assert_eq!(tip, Some(format!("{name} did not regenerate properly: Sketch could not be solved.")), "{name}: the row's tooltip");
+        let hidden = if extruded { " (Hidden)" } else { "" };
+        assert_eq!(tip, Some(format!("{name} did not regenerate properly: Sketch could not be solved.{hidden}")), "{name}: the row's tooltip");
         cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
         wait_until(cx, window, |cx| !view.read(cx).ui_busy());
         draw(cx, window);

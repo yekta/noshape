@@ -6265,7 +6265,11 @@ impl PartStudioView {
             fn typed(name: &str, type_name: &str) -> String {
                 if needs_type_tag(name, type_name) { format!("{name} [{type_name}]") } else { name.to_string() }
             }
-            let head = format!("{}{}", typed(&name, f.feature_type().map(|t| t.name).unwrap_or("")), if f.hidden { " (Hidden)" } else { "" });
+            // A hidden feature's error reads "<name> did not regenerate properly: <msg> (Hidden)" (live
+            // overdefined-downstream-1125), its name alone "<name> (Hidden)".
+            let hidden = if f.hidden { " (Hidden)" } else { "" };
+            let named = typed(&name, f.feature_type().map(|t| t.name).unwrap_or(""));
+            let head = format!("{named}{hidden}");
             // While its dialog is open, the dialog's error (live errors-1123 count 0: the message, not the bare name, one
             // space after "properly:" where the title's has two).
             let dialog_msg = self.edit.as_ref().filter(|_| editing).and_then(|e| e.dialog.read(cx).title_status()).filter(|s| s.0 == FeatureStatus::Error);
@@ -6275,20 +6279,20 @@ impl PartStudioView {
                     // Live: unresolved selections add a second line ("1 missing selection").
                     FeatureStatus::Error => {
                         let more = noshape_model::regen::missing_text(s.missing);
-                        Some(if s.missing > 0 && m != more { format!("{head} did not regenerate properly: {m}\n{more}") } else { format!("{head} did not regenerate properly: {m}") })
+                        Some(if s.missing > 0 && m != more { format!("{named} did not regenerate properly: {m}{hidden}\n{more}") } else { format!("{named} did not regenerate properly: {m}{hidden}") })
                     }
                     // A warning that only lost selections: the name, then "1 missing selection" (live feel/feedback.json
                     // "warnings"); one with its own message reads as an error's (live L27).
                     FeatureStatus::Warning if only_missing_selections(s.status, &m) => Some(format!("{head}\n{m}")),
                     FeatureStatus::Warning => {
                         let more = noshape_model::regen::missing_text(s.missing);
-                        Some(if s.missing > 0 && m != more { format!("{head} did not regenerate properly: {m}\n{more}") } else { format!("{head} did not regenerate properly: {m}") })
+                        Some(if s.missing > 0 && m != more { format!("{named} did not regenerate properly: {m}{hidden}\n{more}") } else { format!("{named} did not regenerate properly: {m}{hidden}") })
                     }
                     FeatureStatus::Info => None,
                     _ => Some(m),
                 }
             });
-            let msg = dialog_msg.map(|(_, m)| format!("{head} did not regenerate properly: {}", m.trim_start())).or(regen_msg);
+            let msg = dialog_msg.map(|(_, m)| format!("{named} did not regenerate properly: {}{hidden}", m.trim_start())).or(regen_msg);
             // A sketch lists no inputs; an under-defined one says so.
             let sketch_tip = (f.type_id == "sketch").then(|| format!("{head}{}", if underdefined { " is not fully defined" } else { "" }));
             // Live (qa4 r5 s8 (3), ui 10-25 c): a suppressed row reads "Extrude 1
