@@ -6530,8 +6530,8 @@ fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
 }
 
 /// Live 11-17 ctx-menus-1117 (menus-sk.json): the sketch's right-click menus on a line, on its end, on a line and its
-/// end selected, with Line drawing (Add comment, a cloud item, left out). Hide other / all sketches with no other sketch
-/// shown (qa MENU-SK-HIDE-SKETCHES).
+/// end selected, with Line drawing (Add comment, a cloud item, left out). The Part Studio's only sketch: no Hide other / all
+/// sketches (live behaviours "qa4 r5 s6b" (5); with another sketch, hover_matrix's sk_a_lines_menu_hides_other_sketches).
 #[gpui::test]
 fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
     let (window, view) = sketch_with(cx, "sketch-entity-menus", Tool::Line);
@@ -6561,13 +6561,13 @@ fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
         cx.update(|cx| view.update(cx, |v, cx| v.close_context_menu(cx)));
         labels.into_iter().filter(|l| l != "———").collect::<Vec<_>>()
     };
-    let line_menu = ["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Construction", "Extrude…", "Revolve…", "Hide other sketches", "Hide all sketches", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis", "Delete sketch entity"];
+    let line_menu = ["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Construction", "Extrude…", "Revolve…", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Align view with vertical axis", "Delete sketch entity"];
     let mut wrong = Vec::new();
     for (what, got, want) in [
         ("a line", menu(cx, line, vec![], Tool::Select), line_menu.to_vec()),
         ("a selected line", menu(cx, line, vec![line], Tool::Select), line_menu.to_vec()),
-        ("a line's end", menu(cx, end, vec![], Tool::Select), vec!["Confirm Sketch 1", "Hide other sketches", "Hide all sketches", "Clear selection", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane", "Delete sketch entity"]),
-        ("a line and its end", menu(cx, line, vec![line, end], Tool::Select), vec!["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Hide other sketches", "Hide all sketches", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Delete 2 sketch entities"]),
+        ("a line's end", menu(cx, end, vec![], Tool::Select), vec!["Confirm Sketch 1", "Clear selection", "Select", "Select other…", "Zoom to fit", "View normal to sketch plane", "Delete sketch entity"]),
+        ("a line and its end", menu(cx, line, vec![line, end], Tool::Select), vec!["Confirm Sketch 1", "Copy sketch entities", "Transform sketch entities", "Curve/surface analysis…", "Clear selection", "Select", "Select other…", "Zoom to fit", "Zoom to selection", "View normal to sketch plane", "Delete 2 sketch entities"]),
     ] {
         if got != want.iter().map(|s| s.to_string()).collect::<Vec<_>>() {
             wrong.push(format!("{what}: ours {got:?}"));

@@ -3304,3 +3304,17 @@ fn combined_hover_a_sketch_point_on_a_model_vertex_takes_the_hover(cx: &mut Test
     assert!(selected.as_ref().is_some_and(|(s, n)| s.len() == 1 && *n == 0), "the sketch point selected: {selected:?}");
     assert!(changed(&sel, &again) <= 4, "selected then hovered: {} px", changed(&sel, &again));
 }
+
+/// Live ctx-menus-1117 sk-line (Sketch 2 edited, Sketch 1 under Extrude 1): a sketch line's menu has Hide other sketches
+/// and Hide all sketches when the Part Studio has another sketch, shown or not (qa MENU-SK-HIDE-SKETCHES).
+#[gpui::test]
+fn sk_a_lines_menu_hides_other_sketches(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "sk-line-menu-hides");
+    m.edit_sketch(cx);
+    let p = m.screen(cx, SK_LINE);
+    approach(cx, &m, p);
+    m.pointer.right_click(cx, &m.view, p);
+    let rows = cx.update(|cx| m.view.read(cx).context_menu.as_ref().map(|(_, menu, _)| menu.read(cx).labels()).unwrap_or_default());
+    assert!(rows.iter().any(|r| r == "Hide other sketches") && rows.iter().any(|r| r == "Hide all sketches"), "{rows:?}");
+}

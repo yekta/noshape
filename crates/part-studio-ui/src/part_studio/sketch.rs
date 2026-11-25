@@ -6120,6 +6120,7 @@ impl PartStudioView {
         let lit_plane = own_plane.filter(|r| plane_ref.as_ref() == Some(r));
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
         let this_sketch = self.sketch.as_ref().map(|e| e.feature);
+        let other_sketches = self.display.sketches.iter().any(|s| Some(s.feature) != this_sketch);
         let Some(ed) = &mut self.sketch else { return };
         // The menu acts on the selection and the entity under the cursor, which joins the selection only when an item
         // runs (live ui-parity sketch-entity-copy-paste: the right-click and Copy sketch entities select nothing).
@@ -6447,8 +6448,9 @@ impl PartStudioView {
             if n == 0 {
                 m = m.item(item("Show all", Box::new(|this, _, cx| this.show_everything(cx))));
             }
-            // Also with no other sketch shown (live ctx-menus-1117 sk-line*, qa MENU-SK-HIDE-SKETCHES).
-            if n > 0 && !tool_active {
+            // When the Part Studio has another sketch, shown or not (live ctx-menus-1117 sk-line*, qa
+            // MENU-SK-HIDE-SKETCHES); not in its only sketch (live behaviours "qa4 r5 s6b" (5)).
+            if n > 0 && !tool_active && other_sketches {
                 m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(this_sketch, cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
             }
             if !tool_active && (n == 0 || curves_selected) {
