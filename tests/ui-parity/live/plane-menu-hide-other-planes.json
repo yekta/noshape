@@ -1,19 +1,23 @@
 {
  "scenario": "plane-menu-hide-other-planes",
- "recorded": "2026-11-13T06:23:07.157Z",
+ "recorded": "2026-11-25T22:02:39.177Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "6e40c813062dce93200444e0",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "0ead2efa580f6c5cf0393d26",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -46,9 +50,18 @@
      "related": false,
      "hidden": false,
      "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "error",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "ns-list-item-error"
     }
    ],
-   "rollbackAfter": "Extrude 1"
+   "rollbackAfter": "Sketch 2"
   },
   "parts": [
    "Part 1"
@@ -100,9 +113,13 @@
     }
    },
    "ok": true,
+   "ti": 25451,
+   "tmove": 25497,
+   "moves": 3,
+   "tdown": 26445,
    "at": [
-    89,
-    235
+    1083,
+    470
    ],
    "state": {
     "focus": {
@@ -114,18 +131,19 @@
     "list": {
      "kind": "context-menu",
      "rows": [
-      "Rename",
       "New sketch…",
       "Offset plane…",
       "Size to Part Studio",
-      "Hide",
+      "Hide Front plane",
       "Hide other planes",
       "Hide all planes",
       "Section view…",
+      "Select",
+      "Select other…",
       "Add comment",
+      "Zoom to fit",
       "Zoom to selection",
-      "View normal to",
-      "Show dependencies…"
+      "View normal to"
      ],
      "highlighted": null,
      "disabled": []
@@ -153,9 +171,18 @@
        "related": false,
        "hidden": false,
        "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
@@ -197,7 +224,8 @@
     },
     "measure": null
    },
-   "t": 44143
+   "t": 28551,
+   "te": 28551
   },
   {
    "step": 2,
@@ -208,9 +236,13 @@
     }
    },
    "ok": true,
+   "ti": 28551,
+   "tmove": 28618,
+   "moves": 2,
+   "tdown": 29722,
    "at": [
-    179,
-    371
+    1154,
+    572
    ],
    "state": {
     "focus": {
@@ -243,9 +275,18 @@
        "related": false,
        "hidden": false,
        "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
@@ -287,7 +328,9 @@
     },
     "measure": null
    },
-   "t": 49695
+   "t": 31877,
+   "te": 31878
   }
- ]
+ ],
+ "t0_epoch_ms": 1795644139485
 }

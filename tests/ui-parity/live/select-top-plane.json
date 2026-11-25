@@ -1,18 +1,23 @@
 {
  "scenario": "select-top-plane",
- "recorded": "2026-11-06T10:46:32.393Z",
+ "recorded": "2026-11-25T22:04:34.219Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.1 backfilled"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "aa4ddb4f0bc296a93883e3a7",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "10fb1fb8359061e250acc4e7",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -44,9 +50,18 @@
      "related": false,
      "hidden": false,
      "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "error",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "ns-list-item-error"
     }
    ],
-   "rollbackAfter": "Extrude 1"
+   "rollbackAfter": "Sketch 2"
   },
   "parts": [
    "Part 1"
@@ -59,7 +74,34 @@
   "message": null,
   "tooltip": null,
   "sketch": null,
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -71,9 +113,13 @@
     }
    },
    "ok": true,
+   "ti": 23397,
+   "tmove": 23448,
+   "moves": 2,
+   "tdown": 24036,
    "at": [
-    89,
-    209
+    1083,
+    568
    ],
    "state": {
     "focus": {
@@ -81,6 +127,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -111,9 +158,18 @@
        "related": false,
        "hidden": false,
        "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "error",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Extrude 1"
+     "rollbackAfter": "Sketch 2"
     },
     "parts": [
      "Part 1"
@@ -126,9 +182,38 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25952
+   "t": 25984,
+   "te": 25985
   }
- ]
+ ],
+ "t0_epoch_ms": 1795644255792
 }
