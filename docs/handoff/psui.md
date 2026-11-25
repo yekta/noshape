@@ -49,31 +49,23 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Tests note: a field made active by user_focus_query alone is taken back by the focused field's tab stop on the next
   render: focus `tab_stop_handle("q:<path>")` as a click does. The viewport's context menu is `view.context_menu`.
   Batch 3 queued as b0f71099 (20:2x).
-- Lead task 11-24 20:3x: INTERACTION LATENCY on a ~50-feature corpus part vs live (timing-1123 + timings-1117/1118);
-  fix ≥ 100 ms AND ≥ 2× live; report a short table. Then (lead 11-25 00:0x) qa's TRIAD-LOOK (87ccb60fc): the hovered
-  transform triad's X arrow shaft draws with 13 gaps (now lighter blue, still broken): fix the shaft rendering.
-  State (uncommitted, latency_tests.rs only): hover_and_click(points), edit_runs (open / 3 depth steps / ✓ / undo),
-  perf_document_at, timed_applied (a view observer: the moment `done` first held, since the test dispatcher runs
-  background tasks inline: std's editing logic / a selection's measure would count), T2
-  everyday_interactions_on_a_corpus_part (NOSHAPE_LATENCY_DOC; the grid's two_lit_points; each hover sample now
-  rests on its start point first: after the warm-up the pointer already sat on the target face → "hover changed"
-  never held → 60 s timeout).
-  Doc: c2-impeller-loft (live "Impellergehaeuse", 48 features), vibex8 ~/tmp/psui/impeller.noshape, Mac
-  ~/noshape-host/psui-keep/impeller.noshape (10 steps not OK; edited: "Extrude Flansch", index 12, 35 after it).
-  Mac numbers (00:0x, before timed_applied): 30-feature part all far under live (hover 17, click 9, dialog 17, step
-  17, ✓ 97, menu 9, sketch 17/17, undo 17). Impeller: hover 17 (live 10-50), click 9 on an edge / 197 on the shelled
-  face = its background measure (190 ms Mac, 1.2 s vibex8; the selection draws at once), dialog 17-20 (live 322-448),
-  field preview: regen 215 ms (1 feature, 12 cached; live 200-300), ✓ 6.9 s = regen of 35 features (live 3.2 s:
-  core's regen speed, SCORE 6.5 vs 2.8 s), undo 9 (cached display; live 1361).
-  FOUND: Extrude's std editing logic (booleanStepEditLogic → evCollision, crates/custom host/evaluate.rs
-  ev_collision_detection) takes 10 s Mac / >15 s vibex8 (DIALOG_LIMIT 15 s: fails there) per depth change: the
-  solid containment pass 1.4-2.7 s (tight boxes + common), then faces_cross's k::section on Offset(-3 mm) × BSpline
-  face pairs: 2.9 s and 6.4 s (BOPAlgo_AlertUserBreak at SECTION_WORK 500k steps: steps are slow on offset
-  surfaces, so the step budget isn't ~0.5 s here). Background (✓ doesn't wait), but Add/New auto-choice lands 10 s
-  late and burns a core. Tried: section without Approximation / PCurves: no change (still 15 s): the
-  intersection itself. In the test the dispatcher runs std's logic before the preview (inline), so the corpus test's
-  field-edit row reads 9.8 s even with timed_applied (click fixed by it: 3.8 ms). Decision for the lead (crates/custom isn't psui's): a time cap per section, or skip faces
-  when the bodies' common already decided, or kernel work on offset sections.
+- DONE 11-25 00:4x: interaction latency reported (lead: "great table"); queued 65d02d59 (latency_tests.rs: T2
+  everyday_interactions_on_a_corpus_part, NOSHAPE_LATENCY_DOC; timed_applied). Extrude evCollision slowness → core.
+  Mac numbers: impeller hover 8.5 / click 3.8 / dialog 17 / field preview regen 215 / ✓ 6.7 s (core regen) / undo 9.
+  Corpus doc: vibex8 ~/tmp/psui/impeller.noshape, Mac ~/noshape-host/psui-keep/impeller.noshape.
+- NOW: TRIAD-LOOK (qa 87ccb60fc, TICKETS row 94, P0): the hovered X arrow's shaft is "broken".
+  Pixel map of qa's shot (/root/qa-scratch/feel1122/manipnav/rs-d337d0a8-1079/m10-tr-x-drag20/11.png, 2560×1600,
+  shaft at x 1735-1790, y 869-883): the darker blue outline (B, (48-64,96-112,160-176)) is continuous, the light-blue
+  core (L, (96-112,144-160,192-208)) only in 1-2 px pieces every ~3-5 px. The triad (triad.rs ~787) draws `back`
+  (outline, edge_px, layer 40) and `front` (core, core_px, layer 41), both LineSegment::ON_TOP (style 2: vs_line
+  sets c.z = c.w, shaders.wgsl ~1142). The "line" pipeline: depth write off, GreaterEqual, EDGE_DEPTH_BIAS
+  (renderer.rs ~3035); line-hidden pipelines use Less. Next: find which pass/pipeline draws layer 41 and why its
+  fragments fail intermittently (depth at exactly 1.0 + bias clamp, a hidden-line pass with Less, or something
+  writing depth 1.0, e.g. the ON_TOP point discs). Fix, then tighten the test
+  a_hovered_triad_arrow_is_solid_blue_over_the_part (hover_matrix_tests.rs ~2402): it counts any blue (b-r>40), so it
+  passed; require the core colour (L) along the centre line, and use qa's view (default iso, fit, the block of the
+  "mnv" start, Transform on face [30,22,20], Translate by XYZ, hover X near the triad origin) if the test's view
+  doesn't reproduce. qa's XY square outline is broken the same way (FEEL-TRANSFORM-ARROW-DASHED).
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field
