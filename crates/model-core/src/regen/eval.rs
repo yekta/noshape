@@ -2163,8 +2163,15 @@ pub fn unchanged(a: &Shape, b: &Shape) -> bool {
     // The same edges (ends and lengths): what a Boolean that missed the part hands back, measured without the
     // volumes (each ~1 s on c2-impeller-loft's shelled loft: its Extrude 1 2.1 s, live 34 ms). A real change cuts new
     // edges; edges only split (a touching tool) still go by the volumes.
-    if a.count(ShapeType::Edge) == b.count(ShapeType::Edge) && same_edges(a, b, 1e-3 * tol) {
-        return true;
+    if a.count(ShapeType::Edge) == b.count(ShapeType::Edge) {
+        if same_edges(a, b, 1e-3 * tol) {
+            return true;
+        }
+        // As many edges, some moved past a ten-thousandth of the part: a cut's new edges in place of others, changed
+        // (c2-sm-rocker-enclosure-body's Extrude 11: 143 ms of volumes to find it).
+        if !same_edges(a, b, 1e2 * tol) {
+            return false;
+        }
     }
     // The volume between them from the faces they don't share (two whole volumes: ~0.5 s on asm-isaac-ball's 180-face
     // part); the part's own volume (at most its box's) only where that change is near the 1e-9 bound.
