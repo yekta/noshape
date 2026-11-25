@@ -42,6 +42,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (same without it, and silhouette_edges adds none on planes). Ours: a vertical edge 1.0 px of ink, this 30° one ~1.5
   (a 1 px line: ~1.15): suspect the line shader's AA footprint on slanted lines. Needs live's profile across a slanted
   interior edge to confirm (REQUESTS) before changing the shader.
+  psui 11-25 13:1x, live answered (live/psui/edge-ink-1125): ~1 px of ink at every slant: perpendicular profiles sum
+  to ~0.93 px, the darkest px ~0.7-0.77 of black (outline core #383a3c over #e7edf2 = black at ~76 %, vertical
+  interior #181d20 on #677f8c); 30° lines read 2 px in a column only from AA (column total ~1.07). Ours: part edges
+  are opaque black, width 1.0 (PART_EDGE_WIDTH, fs_line's plain branch returns the colour, MSAA does the AA): the core
+  goes to #000000 and the 30° column sums ~1.5 where a 1 px line gives 1.15. Next: profile ours across the same
+  edges (vertical and ±30°) to split the colour (live's peak ~0.77) from the slanted footprint, then fix the shader.
 
 ## qa 11-25 10:3x: hobbyist enclosure flow (lead 11-25) on green 2d91090e7 / bd448e76c: hm2/wf/57-62-encl-*.json (start encl-shell in wf/starts.json), hm2/out-flow5-1125 (vibex7)
 
