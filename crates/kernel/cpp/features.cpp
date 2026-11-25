@@ -1049,6 +1049,10 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     dump_op("prism_until", compound_of({profile.shape, until.shape}), {}, p.str());
   }
   std::vector<TopoDS_Shape> args{profile.shape, until.shape};
+  // A mesh target as planar facets (OCCT splits by surfaces), merged back into one mesh face on the result: live
+  // extrudes up to a mesh face, its part MIXED (qa mistakes-1125 batch 3).
+  MeshFacets         facets;
+  const TopoDS_Shape target = facet_mesh(until.shape, facets);
   HHist                     hist;
   TopoDS_Shape              base = profile.shape;
   std::unique_ptr<BRepBuilderAPI_Transform> tr;
@@ -1071,7 +1075,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   {
     Bnd_Box bb, bt;
     BRepBndLib::Add(base, bb, false);
-    BRepBndLib::Add(until.shape, bt, false);
+    BRepBndLib::Add(target, bt, false);
     auto along = [&](const Bnd_Box& b, bool top) {
       double x0, y0, z0, x1, y1, z1;
       b.Get(x0, y0, z0, x1, y1, z1);
@@ -1086,7 +1090,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
       return best;
     };
     const double reach = bb.IsVoid() || bt.IsVoid() ? 0 : along(bt, true) - along(bb, false);
-    const double diag  = bbox_diag({base, until.shape});
+    const double diag  = bbox_diag({base, target});
     len                = reach > 0 ? reach + 0.05 * diag + 1e-6 : 1.1 * diag + 1e-6;
   }
   BRepPrimAPI_MakePrism prism(base, gp_Vec(dir) * len, false, true);
@@ -1098,13 +1102,13 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   // Split the long prism by the target and keep the pieces touching the start cap. Only the target's faces over the
   // profile's footprint can cut it: a part as the target (Up to next / part) gives those alone (c2-fan-blade-sweep's
   // Extrude 8, up to the next of a fan's blades: 106 ms of split by every face).
-  TopoDS_Shape tool = until.shape;
+  TopoDS_Shape tool = target;
   // The faces over the footprint not wholly behind the profile, by where they start along the direction (their
   // geometry's box: a B-spline's poles only bring one sooner).
   std::vector<std::pair<double, TopoDS_Shape>> ahead;
   {
     ShapeIMap tf;
-    TopExp::MapShapes(until.shape, TopAbs_FACE, tf);
+    TopExp::MapShapes(target, TopAbs_FACE, tf);
     if (tf.Extent() > 8)
     {
       // Across the direction (a frame with z along it): the profile's footprint, and each face box's corners there.
@@ -1263,7 +1267,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   else
     spp = split_by(tool);
   BRepAlgoAPI_Splitter& sp = *spp;
-  HHist spH = history_of({longPrism, patched.IsNull() ? until.shape : tool}, sp);
+  HHist spH = history_of({longPrism, patched.IsNull() ? target : tool}, sp);
   merge_into(hist, spH);
   // (The patch's pieces as the target face's.)
   if (!patched.IsNull())
@@ -1277,7 +1281,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   for (TopExp_Explorer e(prism.LastShape(), TopAbs_FACE); e.More(); e.Next())
     for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
       endFaces.Add(img);
-  for (TopExp_Explorer e(patched.IsNull() ? until.shape : tool, TopAbs_FACE); e.More(); e.Next())
+  for (TopExp_Explorer e(patched.IsNull() ? target : tool, TopAbs_FACE); e.More(); e.Next())
     for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
       targetFaces.Add(img);
 
@@ -1342,7 +1346,16 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     result = sh;
   }
   if (sheet)
-    result = join_target_seam_splits(result, until.shape, hist, false);
+    result = join_target_seam_splits(result, target, hist, false);
+  if (!facets.source.empty())
+  {
+    occ::handle<BRepTools_History> back;
+    result = unfacet_mesh(result, facets, back);
+    facets.to_facets->Merge(hist);
+    if (!back.IsNull())
+      facets.to_facets->Merge(back);
+    hist = facets.to_facets;
+  }
   // Parasolid's frame of the extruded cylinders (live "core (2026-10-26)"
   // (3)): z back toward the sketch, x gp_Ax2's default, origin on the axis
   // 0.002 mm past the face's far end (Onshape extrudes blind to the target's
@@ -1365,7 +1378,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   const noshape::KernelTimer timer("prism_until.naming");
   {
     ShapeIMap inputs;
-    TopExp::MapShapes(until.shape, TopAbs_EDGE, inputs);
+    TopExp::MapShapes(target, TopAbs_EDGE, inputs);
     TopExp::MapShapes(profile.shape, TopAbs_EDGE, inputs);
     const noshape::KernelTimer t2("prism_until.circles");
     circles_on_revolutions(result, inputs);
@@ -1386,7 +1399,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
       prismFaces.Add(img);
   std::vector<TopoDS_Shape> caps;
   for (TopExp_Explorer f(result, TopAbs_FACE); f.More(); f.Next())
-    if (targetFaces.Contains(f.Current()) && !prismFaces.Contains(f.Current()))
+    if ((targetFaces.Contains(f.Current()) && !prismFaces.Contains(f.Current())) || is_mesh_face(TopoDS::Face(f.Current())))
       caps.push_back(f.Current());
   hb.add_cap(0, REL_LAST, compound_of(caps));
   const noshape::KernelTimer t3("prism_until.finish");

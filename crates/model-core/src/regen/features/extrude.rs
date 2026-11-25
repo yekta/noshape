@@ -194,6 +194,11 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
                     // A cylinder: the whole cylinder, as live ends a profile reaching past the face round it (c2-rings-loft's
                     // Extrude 3: up to the bore, of which its rounds left the top).
                     let ext = ev.model_extent() * 4.0;
+                    // A mesh face as it is (live: up to it where it covers the profile, MIXED; qa mistakes-1125).
+                    if face.is_mesh() {
+                        let target = if off != 0.0 { face.translated(-dir * off)? } else { face };
+                        return Ok(End::UpTo(target));
+                    }
                     match (face.face_plane()?, face.face_surface()?) {
                         (Some(pl), _) => k::make_plane_face(&pl, -ext, ext, -ext, ext)?,
                         (None, k::Surface::Cylinder { origin, axis, x_dir, radius }) => {

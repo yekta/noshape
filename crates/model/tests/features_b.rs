@@ -1139,6 +1139,45 @@ fn move_face_offsets_a_mesh_part_and_delete_face_removes_it() {
     assert!(s.ok().context.bodies.is_empty());
 }
 
+/// Live qa mistakes-1125 batch 3: Extrude Up to face on a mesh part's face stops at the mesh where it covers the
+/// region (the new part MIXED: its end cap the mesh's); a region beside it fails "Failed to extrude selections, check
+/// input.". A 20 mm STL cube at z 30..50, a 10 x 10 rectangle on Top under it and one beside it.
+#[test]
+fn extrude_up_to_a_mesh_face_stops_on_the_mesh() {
+    let dir = std::env::temp_dir().join(format!("noshape-featb-meshupto-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("cube.stl");
+    let bx = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.02, 0.02, 0.02).unwrap().translated(DVec3::new(0.0, 0.0, 0.03)).unwrap();
+    noshape_kernel::write_stl(&bx, &path, 1e-4, noshape_kernel::StlFormat::Binary).unwrap();
+    let mesh = noshape_kernel::read_mesh_bodies(&path, noshape_kernel::LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    let brep = String::from_utf8(mesh.to_brep_bytes().unwrap()).unwrap();
+    let up_to = |x0: f64| {
+        let mut s = Studio::new();
+        let b = brep.clone();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(b)));
+        let face = Reference::Face((*s.ok().context.bodies[0].faces[0]).clone());
+        let mut sk = noshape_sketch::Sketch::new();
+        rect(&mut sk, x0, 0.005, 0.01, 0.01);
+        let id = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let e = s.extrude_largest(id, "1 mm");
+        let f = s.ps.features.iter_mut().find(|f| f.id == e).unwrap();
+        f.params.set("endBound", ParamValue::Enum("UP_TO_SURFACE".into()));
+        f.params.set("endBoundEntityFace", ParamValue::Query(vec![face]));
+        s.regen()
+    };
+    let r = up_to(0.005);
+    let st = r.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+    let b = r.context.bodies.iter().find(|b| (b.shape.volume().unwrap() - 3e-6).abs() < 1e-12).expect("the 10 x 10 x 30 mm part");
+    assert!(b.shape.is_mesh() && b.faces.len() == 6, "MIXED, 6 faces: {}", b.faces.len());
+    let bb = b.shape.bounding_box(false).unwrap();
+    assert!((bb.max.z - 0.03).abs() < 1e-6 && bb.min.z.abs() < 1e-6, "{bb:?}");
+    let r = up_to(0.03);
+    let st = r.display.features.last().unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Failed to extrude selections, check input.")));
+}
+
 /// An STL's open pieces are surfaces of their own, without a composite (live stl-split-1121: "Surface N" sheets; a mesh
 /// that closes is a solid, DECISIONS 11-22).
 #[test]
