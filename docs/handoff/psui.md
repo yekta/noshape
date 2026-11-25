@@ -195,9 +195,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
   2) Custom: CUSTOM_FIELDS + stl_mm/custom_text convert on a Units change (format_number 6 dp: Inch 0.002362 / 0.001
   = live); 3MF Coarse prefill 0.00024 / 12.5 / 10 (ops PRESETS) = live. No GUI test of either found yet: write T1s
   (Units switch Fine -> Inch texts; 3MF Custom labels + values; file names for 1 row / 2 rows / individual).
-  To do: 3) bubble timing (live: shows 0.76-1.4 s after Export, gone ~5.7-6.5 s; ours flash_info at once in
-  export_preparing: check its duration and the delay); 4) Derived Insert dialog picking (studio click = all parts,
-  part click = one, plain clicks add, field shows only the studio name).
+  3) bubble: ours shows at once (export_preparing -> flash 5 s); live's lasts ~5 s but shows 0.8-1.4 s late
+  (server latency, DECISIONS 11-07 + feedback within a frame): no change, say so to the lead.
+  4) DIFF, to fix next: feature_dialog.rs pick_derived_source sets parts = [the clicked part] (replaces); live: a
+  plain click on another part of the same studio ADDS it (Parts (2), both rows #b2ddf6, studio row clear), a studio
+  click = all parts (parts []). derived_reference_value encodes only one part ("tab#part") as the panel's value
+  (fs_reference.rs open_reference_picker -> PanelSetup.value -> SelectItemPanel highlight): make it carry several
+  (e.g. tab#p1,p2) and the panel light every picked part; field text must stay the studio name only (check
+  render_reference_field's display of "tab#part"). Unknown in live: a click on an already-picked part (toggle off?):
+  ask live in REQUESTS if needed. Then T1 (feature_dialog tests: two part picks -> parts query 2, field text = studio
+  name) and ops e2e only if an op changes (derived op already takes parts list? check crates/ops derived).
+  Core rows (route, not mine): 2nd Derived of the same source+configuration errors "Creating multiple Derived
+  features from the same source and configuration is not allowed. Consider editing the previous Derived feature.";
+  whole-studio Derived follows the part count, part-picked keeps its parts; blob Update… re-imports in place.
+  1)+2) still need T1s (see above).
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
