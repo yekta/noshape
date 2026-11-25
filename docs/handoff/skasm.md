@@ -3,16 +3,13 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 11:27) — read first
+## NOW (11-25 11:30) — read first
 - QUEUED 2e5a9eaf (11-25 11:20): Use own face/edge midpoint (FLOW-USE-OWN-FACE-REFUSED: qa's rim click took the outer
   edge's Implicit Midpoint; Use on it now uses the edge), Use on a face = outer loop, end-on edge = point, lost Use
   source free, spline/image menus + op sketch_edit_image. Reported to lead.
-- IN FLIGHT, UNCOMMITTED (live/skasm/variables-1125, live 11-25):
-  - (1a) Variable dialog "Update all references": FeatureDialog.var_rename (set in focus_for_edit for assignVariable),
-    row under Name once it differs (render_update_references), accept_edit runs variable_table::rename_refs when
-    ticked. (1b) Variable table rename toast "Renamed variable 'b' to 'a'. Updated all feature and configuration
-    variable references." (config_panel flash_for 6.7 s). UI test renaming_a_variable_updates_its_references_unless_
-    unticked; run ~/skasm-scratch/bin/tvar.sh (log ~/tmp/skasm/tvar.log). Then commit + land.
+- QUEUED cf95fef7 (11-25 11:30): variables-1125 (1): Variable dialog "Update all references" (FeatureDialog.var_rename,
+  render_update_references, accept_edit rename_refs) + Variable table rename toast; UI test renaming_a_variable_*.
+- OPEN from variables-1125:
   - (2) sketch dim box refusal already as live (pink, no message; length + bare number = DimensionMismatch). Esc: ours
     two-step (behaviours ~6471), live 11-25 says one Esc closes: REQUESTS skasm 11-25 11:24 asks live which.
   - (3) value `5 deg` on a Length variable: check our Variable row error text "Cannot use 5 deg (angle) as length."
