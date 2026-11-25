@@ -88,6 +88,8 @@ pub struct LiveRef {
     /// A body live's per-feature line calls a sheet ("Surface") where refs.jsonl doesn't say (asm-robot-relations
     /// 0c3466's six imported sheets): only [`Translator::sheet_as_faces`] reads it, not the body's own resolution.
     pub sheet: bool,
+    /// A body's name in live's line at that index (its `parts`), to tell bodies in one box apart.
+    pub name: Option<String>,
 }
 
 /// What became of one Onshape feature.
@@ -352,7 +354,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false, name: None };
         let key = (k as usize, id.to_string());
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
@@ -5246,9 +5248,13 @@ impl<'a> Translator<'a> {
                 };
                 let all: Vec<&Value> = parts["parts"].as_array().into_iter().flatten().filter(|b| !off(b).is_nan()).collect();
                 let same_kind: Vec<&Value> = all.iter().copied().filter(|b| r.geometry.as_deref().is_some_and(|g| b["kind"] == g)).collect();
-                if same_kind.is_empty() { all } else { same_kind }
-                    .into_iter()
-                    .min_by(|a, b| off(a).total_cmp(&off(b)))
+                let pool = if same_kind.is_empty() { all } else { same_kind };
+                // Bodies in one box (a part and the helix it was swept along): live's name for the body tells them apart.
+                let nearest = pool.iter().map(|b| off(b)).fold(f64::INFINITY, f64::min);
+                let tied: Vec<&Value> = pool.iter().copied().filter(|b| off(b) <= nearest + 1e-9).collect();
+                tied.iter()
+                    .find(|b| r.name.as_deref().is_some_and(|n| b["name"] == n))
+                    .or(tied.first())
                     .and_then(|b| b["id"].as_str().map(str::to_string))
                     .ok_or_else(|| format!("{id}: no part of ours"))
             }
@@ -8166,6 +8172,12 @@ pub fn live_refs(lines: &[Value], refs: &str) -> HashMap<(usize, String), LiveRe
         r.sketch |= all.get(&key).is_some_and(|b| b.sketch);
         // (A body keeps the line's word that it is a sheet: asm-robot-relations 0c3466's six imported sheets.)
         r.sheet = r.geometry.is_none() && all.get(&key).is_some_and(|b| b.kind == r.kind && b.geometry.as_deref() == Some("Surface"));
+        // A body refs.jsonl gives without its type keeps the line's kind and name (c2-config-parts-screws: Extrude 1's
+        // merge scope "Part 1", not the helix wire in the same box).
+        if let Some(b) = all.get(&key).filter(|b| r.kind == "BODY" && b.kind == "BODY") {
+            r.geometry = r.geometry.clone().or_else(|| b.geometry.clone());
+            r.name = r.name.clone().or_else(|| b.name.clone());
+        }
         all.insert(key, r);
     }
     all
@@ -8248,7 +8260,7 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
                     Some("SHEET") => Some("Surface"),
                     _ => None,
                 };
-                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), bbox: Some([lo, hi]), geometry: kind.map(str::to_string), ..Default::default() });
+                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), bbox: Some([lo, hi]), geometry: kind.map(str::to_string), name: part.and_then(|p| p["name"].as_str()).map(str::to_string), ..Default::default() });
             }
             // A sketch's wire body and regions (live's FeatureScript fetch).
             if b["type"] == "SKETCH" {
