@@ -3,7 +3,7 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 19:0x) — P0 in flight, read first
+## NOW (11-25 18:50) — P0 in flight, read first
 - P0 (lead): asm-scissor-lift Studio 97ad5f regression bisected (core) to my 528c169ba (regions.rs: tolerance() >= T_END_JOIN
   15 nm, merge_points >= FREE_END_JOIN 0.25 um). From it Extrude 2 / Boolean 2 / Fillet 3 / Move face 1 fail; ebcd90710
   builds them. Evidence vibex7 ~/tmp/core/sc d-b22 (good) vs d-b23 (bad). Sketch 2 = a 2 x 74 mm rectangle (x 50.25/52.25
