@@ -747,13 +747,16 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
             // Onshape's backface silhouettes: the outline band of opaque solids
             // (with edges and in hidden line).
-            if b.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) && replaced.is_none() {
+            let backed = b.kind == BodyKind::Solid && color[3] >= 0.999 && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine) && replaced.is_none();
+            if backed {
                 let s = Instance::new(Drawable::Mesh(cached.mesh.clone())).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).back_silhouette();
                 scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
             }
             // Silhouettes of curved faces, like the edges (not in plain Shaded).
             if let Some(sil) = cached.silhouettes.clone().filter(|_| opts.display_mode != DisplayMode::Shaded && b.kind != BodyKind::Wire) {
                 let s = Instance::new(Drawable::Lines(sil)).with_color(edge_color).pick_base(face_base).line_scale(opts.graphics.line_width).layer(1);
+                // At rest the backface band is the outline (live edge-ink-1125 c1/c2: ~0.7 px of ink outside the face).
+                let s = if backed { s.backed() } else { s };
                 scene.instances.push(if opts.section_skip.contains(&b.id) { s.ignore_clip() } else { s });
             }
             let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1).part_edges();

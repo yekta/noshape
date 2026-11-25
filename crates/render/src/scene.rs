@@ -359,6 +359,9 @@ pub struct Instance {
     /// Lines: a part's edges, drawn at [`PART_EDGE_INK`] unless lit (hovered, selected, queried, failing, or in a
     /// selected part).
     pub part_edges: bool,
+    /// Silhouette lines of a body drawn with its [`Instance::back_silhouette`] band: only lit ones (a hovered or
+    /// selected face's, query-lit or failing) are drawn; at rest the band is the outline, as live's.
+    pub backed: bool,
     /// A see-through part of the Translucent display mode: only its front faces blend over the image (Onshape culls
     /// the back faces).
     pub front_only: bool,
@@ -502,6 +505,7 @@ impl Instance {
             over_transparent: false,
             over_lines: false,
             part_edges: false,
+            backed: false,
             front_only: false,
             closed: false,
             on_top: false,
@@ -546,6 +550,11 @@ impl Instance {
     /// See [`Instance::part_edges`].
     pub fn part_edges(mut self) -> Self {
         self.part_edges = true;
+        self
+    }
+    /// See [`Instance::backed`].
+    pub fn backed(mut self) -> Self {
+        self.backed = true;
         self
     }
     /// See [`Instance::closed`].
@@ -1273,7 +1282,7 @@ impl Scene {
             f(&mut h, &i.pick_plane.map_or([0.0; 3], |n| n.to_array()));
             format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
             (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.preview_lit, i.selected_only, i.unlit_only, i.decal_selected, i.layer).hash(&mut h);
-            (i.hidden_only, i.over_transparent, i.over_lines, i.part_edges, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
+            (i.hidden_only, i.over_transparent, i.over_lines, i.part_edges, i.backed, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box, i.see_through_self, i.outline_through).hash(&mut h);
         }
         self.states.hash(&mut h);

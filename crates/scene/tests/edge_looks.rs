@@ -171,6 +171,101 @@ fn print_edge_profiles() {
     }
 }
 
+/// A Ø30 × 20 mm cylinder standing on Top (its sides' silhouettes are the outline live's hm19 block shows at its
+/// filleted vertical edges).
+fn cylinder() -> StudioDisplay {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::new(0.0, 0.0), 0.015);
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let regen = |ps: &PartStudio| Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let key = regen(&ps).display.sketches[0].regions[0].key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key }]));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("20 mm")));
+    ps.features.push(ex);
+    let out = regen(&ps);
+    assert_eq!(out.display.bodies.len(), 1);
+    out.display
+}
+
+/// The cylinder's left and right outline at rest (isometric, fit, 900 × 600 at a pixel ratio of 1): per row and side,
+/// 8 px from 3 px out in the background into the face.
+fn outline_rows() -> Option<Vec<[Vec<[u8; 3]>; 2]>> {
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return None;
+        }
+    };
+    let display = cylinder();
+    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let up = r.uploader();
+    let (w, h) = (900u32, 600u32);
+    let mut cache = GpuCache::default();
+    let built = builder::build(&display, &SceneOptions { display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() }, &mut cache, &up);
+    let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap();
+    let mut cam = noshape_render::Camera::default();
+    cam.set_view(noshape_render::StandardView::Isometric);
+    cam.fit_box(lo, hi, w as f64 / h as f64);
+    let scene = builder::with_highlights(&built, &display, &[], None, &[], Vec::new(), Default::default(), &up);
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &style, pick: false }).unwrap();
+    let px = |x: i64, y: i64| {
+        let o = ((y as u32 * w + x as u32) * 4) as usize;
+        [f.bgra[o + 2], f.bgra[o + 1], f.bgra[o]]
+    };
+    let bg = px(5, 5);
+    let centre = cam.project(glam::DVec3::new(0.0, 0.0, 0.01), glam::DVec2::new(w as f64, h as f64), 1.0).unwrap();
+    let (cx, cy) = (centre.x.round() as i64, centre.y.round() as i64);
+    let mut rows = Vec::new();
+    for y in cy - 20..cy + 20 {
+        // From the background in: the first pixel off the background, each way.
+        let side = |step: i64| {
+            let out = (0..w as i64 / 2).map(|k| cx + step * (w as i64 / 2 - 2 - k)).find(|&x| !close(px(x, y), bg, 3)).unwrap();
+            (-3..5).map(|k| px(out - step * k, y)).collect::<Vec<_>>()
+        };
+        rows.push([side(-1), side(1)]);
+    }
+    Some(rows)
+}
+
+/// LOOK-OUTLINE-WEIGHT: prints the cylinder's outline rows (cargo test -p noshape-scene --test all
+/// edge_looks::print_outline_rows -- --ignored --nocapture).
+#[test]
+#[ignore = "T2: prints the outline's pixels"]
+fn print_outline_rows() {
+    let Some(rows) = outline_rows() else { return };
+    for [l, r] in rows.iter().step_by(4) {
+        println!("left {}   right {}", l.iter().map(|c| hex(*c)).collect::<Vec<_>>().join(" "), r.iter().map(|c| hex(*c)).collect::<Vec<_>>().join(" "));
+    }
+}
+
+/// LOOK-OUTLINE-WEIGHT (qa 11-25 on live's hm19 block; live psui/edge-ink-1125 c1/c2): a curved face's outline at rest
+/// is ~0.6-0.7 px of ink outside the face (#dee4e9 #484c4f | #5e7480; #637783 + #a2a6a9): the backface band. The face's
+/// own pixel beside it keeps at least ~0.7 of its shade (ours drew a centred silhouette line over the band too: half
+/// of the face pixel dark, #444648 #344046).
+#[test]
+fn a_curved_outline_at_rest_is_the_band_outside_the_face() {
+    let Some(rows) = outline_rows() else { return };
+    let lum = |c: [u8; 3]| 0.2126 * c[0] as f64 + 0.7152 * c[1] as f64 + 0.0722 * c[2] as f64;
+    for [l, r] in &rows {
+        for (name, row) in [("left", l), ("right", r)] {
+            let (bg, face) = (lum(row[0]), lum(row[7]));
+            // row[3]: the first pixel off the background (the band, or the face's own edge pixel).
+            let band = 1.0 - lum(row[3]) / bg;
+            let inside = lum(row[4]) / face;
+            let shown: Vec<String> = row.iter().map(|c| hex(*c)).collect();
+            assert!(band >= 0.3 && inside >= 0.65, "{name}: {shown:?}: the band {band:.2} of black, the face beside it {inside:.2} of its shade");
+        }
+    }
+}
+
 fn hex(c: [u8; 3]) -> String {
     format!("{:02X}{:02X}{:02X}", c[0], c[1], c[2])
 }

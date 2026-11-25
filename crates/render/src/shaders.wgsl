@@ -980,19 +980,14 @@ fn silhouette_vertex(index: u32, s: SilhouetteIn) -> LineOut {
     load_inst(slot);
     // Decided first: most candidates aren't silhouettes, and the line's own vertex work was spent on each of them
     // for nothing.
-    if (!is_silhouette(s.a, s.n1, s.n2)) {
-        var none: LineOut;
-        none.pos = vec4(0.0, 0.0, -2.0, 1.0);
-        none.color = vec4(0.0);
-        none.pick = 0u;
-        none.along = 0.0;
-        none.world = vec3(0.0);
-        none.style = 0u;
-        none.slot = slot;
-        none.across = 0.0;
-        none.core = 0.0;
-        return none;
-    }
+    if (!is_silhouette(s.a, s.n1, s.n2)) { return no_line(slot); }
+    // A hovered or selected face's silhouette is part of its outline (live behaviours EDGE-HIGHLIGHT-LOOK (d):
+    // "lights both of its long edges ... including the silhouette"): the face band its boundary edges get. A whole
+    // part's state isn't drawn here, nor a part a selected feature row made (their outline is their own).
+    let fst = state_of(global_pick(s.pick));
+    let face_lit = (fst & (HOVER | SELECTED)) != 0u && (fst & (BODY | BAND)) == 0u;
+    // params.z bit 1 (Instance::backed): at rest the backface band is the outline (the pick pass keeps the line).
+    if ((inst.params.z & 2u) != 0u && !face_lit && (fst & (QUERY | ERROR)) == 0u && g.viewport.w <= 0.0) { return no_line(slot); }
     var l: LineIn;
     l.a = s.a;
     l.b = s.b;
@@ -1001,12 +996,22 @@ fn silhouette_vertex(index: u32, s: SilhouetteIn) -> LineOut {
     l.width = s.width;
     // Lifted: a hovered part's silhouette over the part edges it runs on.
     l.style = 32u;
-    // A hovered or selected face's silhouette is part of its outline (live behaviours EDGE-HIGHLIGHT-LOOK (d):
-    // "lights both of its long edges ... including the silhouette"): the face band its boundary edges get. A whole
-    // part's state isn't drawn here, nor a part a selected feature row made (their outline is their own).
-    let fst = state_of(global_pick(s.pick));
-    let face_lit = (fst & (HOVER | SELECTED)) != 0u && (fst & (BODY | BAND)) == 0u;
     return line_vertex(index, l, select(~(HOVER | SELECTED), 0xffffffffu, face_lit), select(0u, OUTLINE, face_lit));
+}
+
+// A vertex outside the clip volume: the line isn't drawn.
+fn no_line(slot: u32) -> LineOut {
+    var none: LineOut;
+    none.pos = vec4(0.0, 0.0, -2.0, 1.0);
+    none.color = vec4(0.0);
+    none.pick = 0u;
+    none.along = 0.0;
+    none.world = vec3(0.0);
+    none.style = 0u;
+    none.slot = slot;
+    none.across = 0.0;
+    none.core = 0.0;
+    return none;
 }
 
 // `w` moved toward the eye by `px` physical pixels' worth of world length

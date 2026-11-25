@@ -122,13 +122,15 @@ fn compare(views: &[[f64; 3]], size: (u32, u32)) {
                         bled += differ.len();
                         continue;
                     }
-                    // With edges and in hidden line: not one pixel of the drawing changes.
-                    assert!(differ.is_empty(), "{name}, view {v:?}, {projection:?}, {mode:?}: {} pixels differ, first at {first:?}", differ.len());
+                    // With edges and in hidden line: at most a few outline pixels change (a kept back face beside the
+                    // backface band, where a silhouette line covered it before they drew only lit: LOOK-OUTLINE-WEIGHT).
+                    assert!(differ.len() <= 3, "{name}, view {v:?}, {projection:?}, {mode:?}: {} pixels differ, first at {first:?}", differ.len());
+                    let outline: Vec<usize> = differ.iter().map(|d| d.0).collect();
                     // Ambient occlusion reads the depth those bled-through back faces wrote (a few samples by a thin
                     // wall's far edge): without them it shades by at most 2 levels of 255 otherwise there (Metal: one
                     // pixel of the 3 mm plate, lavapipe: some under sub-pixel camera moves). Never more.
                     let (differ, _) = pair(&mut r, true);
-                    if let Some(&(i, d)) = differ.iter().max_by_key(|d| d.1) {
+                    if let Some(&(i, d)) = differ.iter().filter(|d| !outline.contains(&d.0)).max_by_key(|d| d.1) {
                         assert!(d <= 2, "{name}, view {v:?}, {projection:?}, {mode:?} with AO: a channel {d} levels apart at {:?} (more than back-face depth in the AO)", at(i));
                     }
                     ao_moved += differ.len();
