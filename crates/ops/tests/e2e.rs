@@ -3043,6 +3043,31 @@ fn import_appearances_off_keeps_the_part_colour() {
     assert_eq!(at("noapp"), at("Part Studio 1") + 1, "{tabs:?}");
 }
 
+/// STEP-EXPORT-FACE-APPEARANCE (live face-appearance-1125): a face appearance goes out on its face, the face named
+/// "Face appearance 1" and #00ff00 as the predefined 'green'; re-imported, Part 1 is #e51919 with that face green.
+#[test]
+fn a_face_appearance_is_exported_to_step_and_comes_back() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "export-faceapp.noshape");
+    let part = call(&mut ctx, "query_parts", json!({}))["parts"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "parts": [part], "color": "#e51919" }));
+    let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "part_set_appearance", json!({ "faces": [top], "color": "#00ff00" }));
+    let step = scratch("faceapp.step");
+    call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": step.to_str().unwrap() }));
+    let text = std::fs::read_to_string(&step).unwrap();
+    assert_eq!(text.matches("=ADVANCED_FACE('Face appearance 1'").count(), 1, "the face named after its appearance");
+    assert_eq!(text.matches("DRAUGHTING_PRE_DEFINED_COLOUR('green')").count(), 1, "#00ff00 as 'green'");
+    assert_eq!(text.matches("=OVER_RIDING_STYLED_ITEM(").count(), 1, "the face's style over the part's");
+    call(&mut ctx, "import_files", json!({ "files": [step.to_str().unwrap()] }));
+    let back = &call(&mut ctx, "query_parts", json!({ "tab": "faceapp" }))["parts"][0];
+    assert_eq!(back["color"], "#e51919", "{back}");
+    let a = call(&mut ctx, "part_appearances", json!({ "tab": "faceapp" }));
+    let imported = a["imported"].as_array().unwrap();
+    assert_eq!(imported.len(), 1, "{a}");
+    assert_eq!(imported[0]["color"], "#00ff00", "{a}");
+}
+
 /// A face whose file colour differs from its part's is listed as a face appearance made by the import (live
 /// import-fidelity-1123: Mac mini Main 152 of 258 faces, source Import 1); the part's other faces have none.
 #[test]
@@ -3072,6 +3097,64 @@ fn two_imported_files_each_go_right_after_the_open_tab() {
     let tabs: Vec<String> = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
     let at = |n: &str| tabs.iter().position(|t| t == n).unwrap_or_else(|| panic!("{n}: {tabs:?}"));
     assert_eq!((at("parts3"), at("face-colour")), (at("Part Studio 1") + 1, at("Part Studio 1") + 2), "{tabs:?}");
+}
+
+/// Live maker-io-1125: a file tab's Update… re-imports in place; a whole-studio Derived follows the source's part count, a
+/// part-picked one keeps its parts by name (new geometry) and leaves the new one out; a second Derived of the same source fails
+/// even with other parts picked.
+#[test]
+fn a_file_update_reimports_in_place_and_its_derived_follow_as_live() {
+    use noshape_kernel as k;
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("file-update.noshape").to_str().unwrap() }));
+    // Part i: a 10 mm square peg `h` mm high, 30 mm apart.
+    let write = |name: &str, heights: &[f64]| {
+        let p = scratch(name);
+        let parts: Vec<k::ExportShape> = heights
+            .iter()
+            .enumerate()
+            .map(|(i, h)| {
+                let x = i as f64 * 0.03;
+                let shape = k::make_box_corners(glam::DVec3::new(x, 0.0, 0.0), glam::DVec3::new(x + 0.01, 0.01, h / 1000.0)).unwrap();
+                k::ExportShape { shape, name: Some(format!("Part {}", i + 1)), color: None }
+            })
+            .collect();
+        k::write_step(&p, &parts, k::LengthUnit::Meter).unwrap();
+        p
+    };
+    let v1 = write("upd-maker-set.step", &[15.0, 10.0]);
+    let v2 = write("upd-maker-set-v2.step", &[25.0, 10.0, 20.0]);
+    call(&mut ctx, "import_files", json!({ "files": [v1.to_str().unwrap()] }));
+    let parts = |ctx: &mut Ctx, tab: &str| -> Vec<(String, f64)> {
+        let mut l: Vec<(String, f64)> = call(ctx, "query_parts", json!({ "tab": tab }))["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), (num(&p["volume"]) * 10.0).round() / 10.0)).collect();
+        l.sort_by(|a, b| a.0.cmp(&b.0));
+        l
+    };
+    let peg = |h: f64| 100.0 * h;
+    assert_eq!(parts(&mut ctx, "upd-maker-set"), [("Part 1".to_string(), peg(15.0)), ("Part 2".to_string(), peg(10.0))]);
+    let ids: Vec<Value> = call(&mut ctx, "query_parts", json!({ "tab": "upd-maker-set" }))["parts"].as_array().unwrap().iter().map(|p| p["id"].clone()).collect();
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Target" }));
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Target 2" }));
+    let picked = call(&mut ctx, "feature_add", json!({ "tab": "Target", "type": "importDerived", "params": { "partStudio": "upd-maker-set", "parts": ids } }));
+    assert_eq!(picked["feature_status"]["status"], "Ok", "{picked}");
+    let whole = call(&mut ctx, "feature_add", json!({ "tab": "Target 2", "type": "importDerived", "params": { "partStudio": "upd-maker-set" } }));
+    assert_eq!(whole["feature_status"]["status"], "Ok", "{whole}");
+    // (a) A second Derived of the same source and configuration, Part 2 only: refused.
+    let again = call(&mut ctx, "feature_add", json!({ "tab": "Target", "type": "importDerived", "params": { "partStudio": "upd-maker-set", "parts": [ids[1].clone()] } }));
+    assert_eq!(again["feature_status"]["message"], "Creating multiple Derived features from the same source and configuration is not allowed. Consider editing the previous Derived feature.", "{again}");
+    call(&mut ctx, "feature_delete", json!({ "tab": "Target", "features": [again["feature"].clone()] }));
+    // (c) Update… with v2: the same Part Studio, now 3 parts, Part 1 25 mm high.
+    let tabs_before = call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().len();
+    let u = call(&mut ctx, "import_update", json!({ "tab": "upd-maker-set.step", "file": v2.to_str().unwrap() }));
+    assert_eq!(u["updated"][0]["tab"], "upd-maker-set", "{u}");
+    assert_eq!(call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().len(), tabs_before, "no new tab");
+    let v2_parts = vec![("Part 1".to_string(), peg(25.0)), ("Part 2".to_string(), peg(10.0)), ("Part 3".to_string(), peg(20.0))];
+    assert_eq!(parts(&mut ctx, "upd-maker-set"), v2_parts);
+    // (b) The whole-studio Derived follows the count; the part-picked one keeps Part 1 + Part 2 with their new geometry.
+    assert_eq!(parts(&mut ctx, "Target 2"), v2_parts);
+    assert_eq!(parts(&mut ctx, "Target"), v2_parts[..2]);
+    let h = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(h["history"][0]["description"], "Update upd-maker-set-v2.step", "{h}");
 }
 
 /// Bringing a file into an existing Part Studio (live import-into-doc-1123 §6): Import adds its own tab, and a Derived of

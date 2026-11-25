@@ -211,6 +211,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     // import / export
     ("export_parts", &[r##"{"format": "STEP", "file": "/tmp/bracket.step"}"##, r##"{"format": "STL", "file": "/tmp/bracket.stl", "parts": ["Part 1"]}"##, r##"{"tab": "Assembly 1", "format": "STEP", "file": "/tmp/assembly.step"}"##]),
     ("import_files", &[r##"{"files": ["/tmp/bracket.step"]}"##, r##"{"files": ["/tmp/a.x_t", "/tmp/b.x_t"], "combine": true}"##]),
+    ("import_update", &[r##"{"tab": "bracket.step", "file": "/tmp/bracket-v2.step"}"##]),
     // Feature Studio, history
     ("featurestudio_get", &[r##"{"tab": "Feature Studio 1"}"##]),
     ("featurestudio_std", &[r##"{}"##, r##"{"module": "common.fs"}"##]),

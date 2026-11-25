@@ -2560,6 +2560,11 @@ impl FeatureDialog {
         if let Some((vals, id)) = self.values_for_path_mut(path) {
             vals.set(&id, v);
         }
+        // A Hole size the user types is theirs, the schema's 5 mm too: off the Standard's it reads "Parameters have
+        // been overridden" (as the ops' hole_standard).
+        if self.feature.type_id == "hole" && noshape_model::features::hole_tables::HOLE_TABLE_DIMENSIONS.contains(&path) {
+            self.feature.params.set(noshape_model::features::hole_tables::TABLE_SYNCED_PARAM, ParamValue::Bool(true));
+        }
         true
     }
 

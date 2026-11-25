@@ -186,8 +186,8 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .filter(|b| !(r.display.body(&b.id).is_some_and(|d| d.hidden) && !s.hidden && selected.is_empty()))
         .map(|b| b.id.clone())
         .collect();
-    s.face_colors = ids.iter().map(|id| crate::export::part_face_colors(r.display.body(id))).collect();
     if let Some(noshape_model::TabContent::PartStudio(ps)) = od.doc().tab(tab).map(|t| &t.content) {
+        (s.face_colors, s.face_names) = ids.iter().map(|id| crate::export::part_face_styles(r.display.body(id), Some(ps))).unzip();
         s.pmi = crate::export::studio_pmi(ps, &r.context, &ids, &od.doc().settings.units, s.mbd_text());
         s.inspection = crate::export::inspection_list_csv(ps, &od.doc().settings.units);
     }

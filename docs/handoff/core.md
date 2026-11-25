@@ -1,25 +1,26 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 15:02 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 19:44 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **P0 SCISSOR REGRESSION BISECT: DONE (18:45)**: skasm's 528c169ba (regions.rs: T-end join >= 15 nm, free ends merged
-  within 0.25 um) fails scissor 97ad5f Extrude 2 / Boolean 2 / Fillet 3 / Move face 1 (ebcd90710 before it builds them;
-  vibex7 ~/tmp/core/sc d-b22 vs d-b23). Sent to the lead for skasm (at 235k). fed22d's Extrude 18/28/38 pass on main.
-- **WAITING on live hole-override-1125: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
-  confirms, our UI must show the blue banner "Parameters have been overridden. Check input." (on reopen; live
-  behaviours ~33077) and the feature row's Info state; today only the op reports Info (dialog, row OK, tooltip plain).
-- **then P2 STEP-EXPORT-FACE-APPEARANCE (lead 15:3x, qa 235120708)**: a user face appearance exports as live:
-  OVER_RIDING_STYLED_ITEM on the face named 'Face appearance 1', DRAUGHTING_PRE_DEFINED_COLOUR('green') when named.
-- **NOW: DERIVED PARITY (lead 18:2x, live/dx/maker-io-1125; psui did the picker)**: (a) a second Derived of the same
-  source + configuration errors "Creating multiple Derived features from the same source and configuration is not
-  allowed…" even with other parts; (b) a whole-studio Derived follows the source's part count, a part-picked one keeps
-  its parts (new geometry) and skips new ones; (c) Blob › Update… re-imports in place and the Derived follows. Each: a
-  test + an ops e2e.
-- **then c2-lora-enclosure-ribs f39 "Ribs" (skasm 18:0x)**: ours 191/474/277 F/E/V vs live 177/444/265, +212 mm², -3.46
-  mm³; the 4 r1.1 circles at (±35, ±15) are profiles too (likely the extra faces). Doc vibex6 ~/tmp/skasm/q/lora.noshape.
+- **LANDING (11-25 ~20:00)**: lead order 1-3 done in one commit: (1) Ø5 Hole banner: the dialog's typed size marks
+  the Hole tableSynced (feature_dialog.rs set_text_value, as ops hole_standard), so Ø5 = schema default still reads
+  "Parameters have been overridden. Check input." (UI test dialogs::an_overridden_hole_diameter_shows_the_blue_banner,
+  also after ✓ + reopen). (2) STEP face appearance: ADVANCED_FACE named after the appearance, 8 AP214 colours as
+  DRAUGHTING_PRE_DEFINED_COLOUR (only green checked in live), OVER_RIDING_STYLED_ITEM; ops export::part_face_styles,
+  ops appearance::face_appearances_of. (3) Derived (c): op import_update + Blob Update…; part-picked Derived picks
+  remapped by name (Import body index = file part × 64 + solid); e2e a_file_update_reimports_in_place_and_its_derived_
+  follow_as_live green. (a)+(b) were already as live.
+- **4. lora f39 Ribs (skasm)**: ours 191/474/277 F/E/V vs live 177/444/265, +212 mm², -3.46 mm³. Doc copied to vibex7
+  ~/tmp/core/lora (700; lora.noshape + lr.py: Base after Ribs, faces near the 4 r1.1 circles at (±35,±15)). Run
+  `.t4.sh` (release cli + lr.py). rib.fs on a circle: surface extrude + thicken ±0.8 = tube r0.3..1.9, then excess
+  removal (findExcess: pieces not touching the profile; the piece at the extrude's far end); ours: solid_a.rs rib ->
+  rib_sheet for a 1-edge closed wire. Profiles: 22 lines + 4 circles (26 ids), thickness 1.6, normal, opposite, merge.
+- **5. SCISSOR follow-up (lead 11-25 19:4x, from skasm)**: 528c169ba is right; the old build was a false pass (Extrude 2
+  went ~34.6 mm the wrong way). Real first diff: 97ad5f Delete face 1 errors in ours both ways; live 1606.6 -> 1704.7
+  mm³, so Sketch 2 lands on another face. Evidence vibex6 ~/tmp/skasm/sc (a0.log / a-old.log, save/ vs save-old/).
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
   (c2-surf-intro-boundary/fill/mutualtrim/ruled; -offset's Offset area): Derived 1 car body's tail vertex x 33.940348 vs
   33.940739 (Fillet 1 setback?); doc vibex6 ~/tmp/skasm/fin/c2-surf-intro-fill.noshape. (2) c2-surf-intro-simple Loft
@@ -31,9 +32,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
   (live 35320.926): the holes' facet rims stay sharp (OCCT can't fillet them). Delete face already removed the part.
   T1 mesh_import::a_mesh_body_offsets_whole_with_rounded_convex_edges, features_b::move_face_offsets_a_mesh_part_….
-- **P1 HOLE Ø5 "overridden"**: NOT changed. std hole.fs reports HOLE_PARAMS_OVERRIDDEN_INFO for Ø5 on Drilled 1/4, and
-  behaviours L52 / prize-wheel-tim show it as the blue banner over the graphics area (qa checked dialog/toast/tooltip
-  only). Asked live (REQUESTS hole-override-1125); change only if live shows no INFO featureState.
 - **Scissor parity 11-25 14:3x** (core-scratch/pa-now-1125.out, saved doc vibex7 ~/tmp/core/sc/fresh): 2d82a0
   Chamfer 2 fixed. New vs the slabs run, not from the chamfer (it only runs after OCCT fails): fed22d Extrude
   18/28/38 + Fillet 18 + Move face 7, 97ad5f Extrude 2/Boolean 2/Fillet 3/Move face 1, 665cf3 Fillet 2/3, 57725f

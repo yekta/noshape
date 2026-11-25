@@ -7,6 +7,7 @@
 use noshape_model::document::{Document, TabContent, TabId};
 use noshape_model::file_tab::FileTab;
 use noshape_model::{ParamValue, PartStudio};
+use noshape_model::reference::{FeatureId, Reference};
 use noshape_units::{LengthUnit, UnitPrefs};
 use std::path::{Path, PathBuf};
 
@@ -542,6 +543,73 @@ pub fn add_import_feature(ps: &mut PartStudio, file: &str, foreign: Foreign, uni
     }
 }
 
+/// A file tab's Update…: the new file as a file tab, and a CAD file read as an Import feature's data (`None` when it
+/// doesn't translate or isn't CAD). Reads and translates: off the UI thread.
+pub fn read_update(path: &Path, units: &UnitPrefs) -> Option<(FileTab, Option<Foreign>)> {
+    let bytes = std::fs::read(path).ok()?;
+    let file = FileTab::new(&import_names(path).1, &bytes, noshape_model::file_tab::now());
+    if file.kind() != noshape_model::file_tab::FileKind::Cad {
+        return Some((file, None));
+    }
+    let c = ImportChoice::defaults(&[path.to_path_buf()]);
+    let mesh = MESH_FILES.iter().any(|e| path.extension().is_some_and(|x| x.eq_ignore_ascii_case(e)));
+    let units = if mesh { UnitPrefs { length: MESH_UNITS[c.unit.min(MESH_UNITS.len() - 1)].1, ..*units } } else { *units };
+    Some((file, read_foreign(path, &units).ok()))
+}
+
+/// Update… of file tab `tab` (live maker-io-1125): the file replaced, and every Import feature made from it reads the
+/// new one in place (same tabs; Derived features of them follow). The Part Studios updated: none when the file isn't
+/// imported anywhere or didn't translate.
+pub fn update_file(d: &mut Document, tab: TabId, file: FileTab, foreign: Option<&Foreign>) -> Vec<TabId> {
+    let Some(TabContent::File(old)) = d.tab(tab).map(|t| &t.content) else { return Vec::new() };
+    let (old_name, new_name) = (old.file_name.clone(), file.file_name.clone());
+    if let Some(t) = d.tab_mut(tab) {
+        t.content = TabContent::File(file);
+    }
+    let Some(foreign) = foreign else { return Vec::new() };
+    let names = |info: &str| -> Vec<Option<String>> { serde_json::from_str::<Vec<noshape_model::features::importing::ImportPartInfo>>(info).unwrap_or_default().into_iter().map(|p| p.name).collect() };
+    let new_names = names(&foreign.parts);
+    let mut updated = Vec::new();
+    // Per Import updated: its studio, feature and its parts' old names.
+    let mut renamed: Vec<(String, String, FeatureId, Vec<Option<String>>)> = Vec::new();
+    for t in d.tabs.iter_mut() {
+        let TabContent::PartStudio(ps) = &mut t.content else { continue };
+        let mut hit = false;
+        for f in ps.features.iter_mut().filter(|f| f.type_id == "importForeign" && f.params.text("foreignId") == old_name) {
+            renamed.push((t.id.to_string(), t.name.clone(), f.id, names(f.params.text("partInfo"))));
+            f.params.set("blobData", ParamValue::Text(foreign.brep.clone()));
+            f.params.set("partInfo", ParamValue::Text(foreign.parts.clone()));
+            f.params.set("foreignId", ParamValue::Text(new_name.clone()));
+            hit = true;
+        }
+        if hit {
+            updated.push(t.id);
+        }
+    }
+    // Live maker-io-1125: a part-picked Derived keeps its parts by name, though the file's parts renumber (v2's new
+    // Part 3 came first in the file: the picks still hit Part 1 + Part 2).
+    let unique = |l: &[Option<String>], n: &str| l.iter().filter(|x| x.as_deref() == Some(n)).count() == 1;
+    for t in d.tabs.iter_mut() {
+        let TabContent::PartStudio(ps) = &mut t.content else { continue };
+        for f in ps.features.iter_mut().filter(|f| f.type_id == "importDerived") {
+            let source = f.params.text("partStudio").split(['\t', '#']).next().unwrap_or("").to_string();
+            let Some((_, _, import, old)) = renamed.iter().find(|r| r.0 == source || r.1 == source) else { continue };
+            for r in f.params.query_mut("parts").iter_mut() {
+                let Reference::Body(b) = r else { continue };
+                // (An Import's body index is its file part's × 64 + the part's solid.)
+                let Some(Some(n)) = old.get(b.index as usize / 64).filter(|_| b.feature == *import) else { continue };
+                if !unique(old, n) || !unique(&new_names, n) {
+                    continue;
+                }
+                if let Some(k) = new_names.iter().position(|x| x.as_deref() == Some(n.as_str())) {
+                    b.index = k as u32 * 64 + b.index % 64;
+                }
+            }
+        }
+    }
+    updated
+}
+
 /// Add a file tab named after the file, in `folder` when given. A second
 /// file of the same name keeps it (live: two "g25-b.step" tabs).
 pub fn add_file_tab(d: &mut Document, file: FileTab, folder: Option<TabId>, after: Option<TabId>) -> TabId {
@@ -906,6 +974,37 @@ pub fn description() -> String {
 
 #[cfg(test)]
 mod tests {
+    /// Blob › Update… (live dx/maker-io-1125): the file tab's content is replaced in place and every Import of the old
+    /// file takes the new file's B-rep and parts; Imports of other files stay.
+    #[test]
+    fn a_file_update_replaces_its_imports_in_place() {
+        use noshape_model::file_tab::FileTab;
+        use noshape_model::params::ParamValue;
+        use noshape_model::partstudio::PartStudio;
+        use noshape_model::{Document, TabContent};
+        let mut d = Document::new();
+        let file = d.add_tab("set.step", TabContent::File(FileTab::new("set.step", b"v1", 0)));
+        let units = d.settings.units;
+        let studio = |foreign: &str| {
+            let mut ps = PartStudio::new();
+            let mut f = ps.new_feature("importForeign", &units).expect("an Import");
+            f.params.set("foreignId", ParamValue::Text(foreign.into()));
+            f.params.set("blobData", ParamValue::Text("old".into()));
+            ps.insert_at_rollback(f);
+            TabContent::PartStudio(ps)
+        };
+        let (a, b) = (d.add_tab("set", studio("set.step")), d.add_tab("other", studio("other.step")));
+        let new = super::Foreign { brep: "new".into(), parts: "[]".into() };
+        let updated = super::update_file(&mut d, file, FileTab::new("set.step", b"v2", 1), Some(&new));
+        assert_eq!(updated, vec![a]);
+        let blob = |t| match d.tab(t).map(|t| &t.content) {
+            Some(TabContent::PartStudio(ps)) => ps.features[0].params.text("blobData").to_string(),
+            _ => String::new(),
+        };
+        assert_eq!((blob(a), blob(b)), ("new".to_string(), "old".to_string()));
+        assert!(matches!(d.tab(file).map(|t| &t.content), Some(TabContent::File(f)) if f.uploaded == 1), "the file tab replaced in place");
+    }
+
     /// A glTF's meshes as live imports them (exchange batch 2, 11-20): a part per node, named by it, even where two
     /// touch (c2-duct-multipart's four; ours read them as two).
     #[test]

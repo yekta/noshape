@@ -341,7 +341,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
-- **import**: [`import_files`](#import_files)
+- **import**: [`import_files`](#import_files), [`import_update`](#import_update)
 - **featurestudio**: [`featurestudio_std`](#featurestudio_std), [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor), [`featurestudio_format`](#featurestudio_format), [`featurestudio_import`](#featurestudio_import), [`featurestudio_profile`](#featurestudio_profile)
 - **agents**: [`agents_status`](#agents_status), [`agents_connect`](#agents_connect), [`agents_disconnect`](#agents_disconnect)
 - **cli**: [`cli_status`](#cli_status), [`cli_install`](#cli_install)
@@ -7969,6 +7969,24 @@ Examples:
 | `keep_files` | boolean |  | Keep the files as file tabs in "CAD Imports". |
 | `upload_only` | boolean |  | Upload only: every file kept as it is, as a file tab after the import's tab, nothing translated. A bare assembly file (.sldasm, .iam, .catproduct, .asm) needs it, as the dialog: Onshape needs a zip of the assembly and all of its references to translate it. |
 | `after` | string |  | Tab to put the new tabs after (default: the open tab, as the app). |
+
+#### import_update
+
+Update… a file tab with another file (CAD Imports › ‹file› › Update…): its imported Part Studios follow in place (edits the document (one undoable history entry)).
+
+A file tab's context menu › Update…: the tab holds the new file (its name stays). A CAD file is translated again into every Import feature made from the old one, in place: the same Part Studios, so their parts follow (a whole-studio Derived of one takes the new part count; a part-picked Derived keeps its parts, with their new geometry, and leaves new ones out), as live. A CAD file imported nowhere is imported anew after the open tab, as the app. One edit ("Update ‹file›"). Returns the Part Studios updated and their parts.
+
+Examples:
+
+```json
+{"tab": "bracket.step", "file": "/tmp/bracket-v2.step"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | The file tab (name or id). |
+| `file` | string | required | Path of the new file. |
 
 ### featurestudio
 

@@ -416,21 +416,23 @@ fn download_to(f: &FileTab, path: &std::path::Path) -> Option<String> {
 pub fn update(doc: &Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut App) {
     let doc = doc.clone();
     crate::file_dialogs::request_open_path("Update file", "All files", &["*"], window, cx, move |path, cx| {
-        let Ok(bytes) = std::fs::read(&path) else { return };
-        let name = path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default();
-        let file = FileTab::new(&name, &bytes, noshape_model::file_tab::now());
-        let cad = file.kind() == noshape_model::file_tab::FileKind::Cad;
-        doc.update(cx, |d, cx| {
-            d.edit_document(&format!("Update {name}"), cx, |d| {
-                if let Some(t) = d.tab_mut(tab) {
-                    t.content = TabContent::File(file);
+        let units = doc.read(cx).session.doc.settings.units;
+        let p = path.clone();
+        let job = cx.background_spawn(async move { noshape_ops::import::read_update(&p, &units) });
+        cx.spawn(async move |cx| {
+            let Some((file, foreign)) = job.await else { return };
+            cx.update(|cx| {
+                let (name, cad) = (file.file_name.clone(), file.kind() == FileKind::Cad);
+                // Live maker-io-1125: the Import features made from the file read the new one in place.
+                let mut updated = Vec::new();
+                doc.update(cx, |d, cx| d.edit_document(&format!("Update {name}"), cx, |d| updated = noshape_ops::import::update_file(d, tab, file, foreign.as_ref())));
+                // A CAD file imported nowhere is imported again at once, with the Import dialog's defaults (live 2430).
+                if cad && updated.is_empty() && let Some(reimport) = REIMPORT.get() {
+                    reimport(&doc, path, cx);
                 }
-            })
-        });
-        // A CAD file is imported again at once, with the Import dialog's defaults (live 2430).
-        if cad && let Some(reimport) = REIMPORT.get() {
-            reimport(&doc, path, cx);
-        }
+            });
+        })
+        .detach();
     });
 }
 

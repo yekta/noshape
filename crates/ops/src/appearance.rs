@@ -3,7 +3,7 @@
 //! `crates/app/src/part_studio/material_panel.rs` and `appearance.rs`.
 
 use noshape_model::partstudio::{Appearance, AppearanceTarget, FaceAppearance, PartStudio, TessQuality};
-use noshape_model::reference::{BodyId, FeatureId, Reference};
+use noshape_model::reference::{BodyId, FeatureId, Reference, Role, TopoName};
 
 /// A Material Library tab's Update… (also the history text).
 pub const UPDATE_MATERIAL_LIBRARY: &str = "Update material library";
@@ -87,6 +87,45 @@ pub fn face_appearance_name(all: &[FaceAppearance], index: usize) -> Option<Stri
     }
     let n = all[..=index].iter().filter(|x| matches!(x.target, AppearanceTarget::Faces(_))).count();
     matches!(a.target, AppearanceTarget::Faces(_)).then(|| format!("Face appearance {n}"))
+}
+
+/// The face / feature appearance (index in `all`) each face of `body` shows (by face index): the last one covering
+/// it; suppressed ones leave the part's colour (live 2292). `own` lists the studio's features: a feature's appearance
+/// also covers the faces of the bodies it made that came from elsewhere (a Derived's, named after their source).
+pub fn face_appearances_of(body: &noshape_model::display::BodyDisplay, all: &[FaceAppearance], own: &std::collections::HashSet<FeatureId>) -> Vec<Option<usize>> {
+    let mut out = vec![None; body.face_refs.len()];
+    for (k, a) in all.iter().enumerate().filter(|(_, a)| !a.suppressed) {
+        for (fi, r) in body.face_refs.iter().enumerate() {
+            let from = match r {
+                Reference::Face(n) => lineage(n),
+                _ => Vec::new(),
+            };
+            let hit = match &a.target {
+                AppearanceTarget::Faces(faces) => faces.contains(r) || faces.iter().any(|f| matches!(f, Reference::Face(m) if from.contains(&m))),
+                AppearanceTarget::Feature(f) => r.depends_on() == Some(*f) || from.iter().any(|m| m.creator() == Some(*f)) || (body.id.feature == *f && r.depends_on().is_none_or(|d| !own.contains(&d))),
+            };
+            if hit {
+                out[fi] = Some(k);
+            }
+        }
+    }
+    out
+}
+
+/// The faces a face stands for: the faces it was split from and those a pattern, mirror or transform copied it from
+/// (live appearance-1123 Q5: split pieces and copies keep their source's face and feature appearances).
+fn lineage(n: &TopoName) -> Vec<&TopoName> {
+    let mut out = Vec::new();
+    let mut todo = vec![n];
+    while let Some(n) = todo.pop() {
+        out.push(n);
+        match n {
+            TopoName::Split { parent, .. } => todo.push(parent),
+            TopoName::Face { role: Role::Copy { of, .. }, .. } => todo.push(of),
+            _ => {}
+        }
+    }
+    out
 }
 
 pub const RENAME_APPEARANCE: &str = "Rename appearance";

@@ -2061,6 +2061,54 @@ fn a_typed_hole_depth_waits_for_enter(cx: &mut TestAppContext) {
     assert_eq!(after, (true, true, true), "(the depth taken, the preview regenerated, the dialog open) after Enter");
 }
 
+/// Live hole-info-1891 (behaviours, prize-wheel-tim) and qa dl-bracket-1125: a Simple Drilled 1/4 Hole typed to Ø5 mm
+/// is INFO "Parameters have been overridden. Check input.", shown as the blue banner over the graphics while its
+/// dialog is open, and again on reopening it.
+#[gpui::test]
+fn an_overridden_hole_diameter_shows_the_blue_banner(cx: &mut TestAppContext) {
+    const OVERRIDDEN: &str = "Parameters have been overridden. Check input.";
+    let (window, view) = block(cx, "dlg-hole-override");
+    let top = cx.update(|cx| {
+        let v = view.read(cx);
+        let b = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+        let at_top = |i: usize| {
+            let Some(&(first, count)) = b.mesh.face_ranges.get(i) else { return false };
+            b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][2] - 0.01).abs() < 1e-6)
+        };
+        b.face_refs.iter().enumerate().find(|(i, _)| at_top(*i)).map(|(_, r)| r.clone()).expect("the top face")
+    });
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.mc_mode = Some("locations".into());
+        d.active_query = Some("locations".into());
+        d.add_pick(top, cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let banner = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).message.clone().filter(|(_, m)| m == OVERRIDDEN).map(|(s, _)| s));
+    assert_eq!(banner(cx), None, "no banner at the table's Ø");
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("holeDiameterV3", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["5", "space", "m", "m", "enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| dialog.read(cx).feature.id);
+    let state = cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.message.clone())));
+    assert_eq!(state, Some((noshape_model::display::FeatureStatus::Info, Some(OVERRIDDEN.into()))), "the Hole's state at Ø5 mm");
+    assert_eq!(banner(cx), Some(noshape_model::display::FeatureStatus::Info), "the blue banner with the dialog open");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    for _ in 0..300 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+    }
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    assert_eq!(banner(cx), Some(noshape_model::display::FeatureStatus::Info), "the blue banner on reopening the Hole");
+}
+
 /// Live2 qv-fillets (11-17): the Query variable dialog shows no count: with a face selected it opens with the face in
 /// its box and no "n items" / "(n)" anywhere in its fields.
 #[gpui::test]

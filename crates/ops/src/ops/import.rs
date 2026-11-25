@@ -32,7 +32,55 @@ pub fn ops() -> Vec<Op> {
         mutates: true,
         destructive: false,
         run: files,
+    }, Op {
+        group: "import",
+        verb: "update",
+        summary: "Update… a file tab with another file (CAD Imports › ‹file› › Update…): its imported Part Studios follow in place",
+        description: "A file tab's context menu › Update…: the tab holds the new file (its name stays). A CAD file is translated again into every Import feature made from the old one, in place: the same Part Studios, so their parts follow (a whole-studio Derived of one takes the new part count; a part-picked Derived keeps its parts, with their new geometry, and leaves new ones out), as live. A CAD file imported nowhere is imported anew after the open tab, as the app. One edit (\"Update ‹file›\"). Returns the Part Studios updated and their parts.",
+        fields: vec![
+            doc_field(),
+            req("tab", s(), "The file tab (name or id)."),
+            req("file", s(), "Path of the new file."),
+        ],
+        mutates: true,
+        destructive: false,
+        run: update,
     }]
+}
+
+fn update(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let units = od.doc().settings.units;
+    let tab = doc::find_tab(od.doc(), a.str("tab")?).map_err(|e| e.with_param("tab"))?;
+    if !matches!(od.doc().tab(tab).map(|t| &t.content), Some(noshape_model::document::TabContent::File(_))) {
+        return Err(OpError::param("tab", "a file tab (Update… is on file tabs)"));
+    }
+    let path = PathBuf::from(a.str("file")?);
+    if !path.is_file() {
+        return Err(OpError::param("file", &format!("no such file: {}", path.display())));
+    }
+    let (file, foreign) = import::read_update(&path, &units).ok_or_else(|| OpError::param("file", &format!("could not read {}", path.display())))?;
+    let (name, cad) = (file.file_name.clone(), file.kind() == noshape_model::file_tab::FileKind::Cad);
+    if cad && foreign.is_none() {
+        return Err(OpError::param("file", &import::failed_to_translate(&name)));
+    }
+    let mut updated = od.session.edit_document(&format!("Update {name}"), |d| import::update_file(d, tab, file, foreign.as_ref()))?;
+    // Imported nowhere: imported anew, as the app's Update….
+    if cad && updated.is_empty() {
+        let before: Vec<noshape_model::document::TabId> = od.doc().tabs.iter().map(|t| t.id).collect();
+        let c = ImportChoice::defaults(std::slice::from_ref(&path));
+        let (inputs, _) = import::read_inputs(std::slice::from_ref(&path), &c, false, &units);
+        let after = od.window.active_tab.or(od.session.active_tab);
+        od.session.edit_document(&import::description(), |d| import::apply(d, inputs, &c, after, &units))?;
+        updated = od.doc().tabs.iter().filter(|t| !before.contains(&t.id) && doc::is_part_studio(&t.content)).map(|t| t.id).collect();
+    }
+    let mut studios = Vec::new();
+    for t in updated {
+        let r = od.regenerate(t, None)?;
+        let parts: Vec<serde_json::Value> = r.display.bodies.iter().map(|b| json!({ "id": crate::refs::body_id(&b.id), "name": b.name })).collect();
+        studios.push(json!({ "tab": od.doc().tab(t).map(|x| x.name.clone()).unwrap_or_default(), "parts": parts }));
+    }
+    Ok(json!({ "file": name, "updated": studios }).into())
 }
 
 fn files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
