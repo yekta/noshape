@@ -2367,8 +2367,6 @@ fn move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between(cx: &m
     let mut d = 2.0f64.sqrt() * 2.0;
     while d < 90.0 {
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: to(d), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
-        // (Each move's preview first: a loaded host's builds lag the moves.)
-        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
         draw(cx, window);
         let (text, selected) = cx.update(|cx| dialog.read(cx).input_text("angle", cx)).unwrap_or_default();
         let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
