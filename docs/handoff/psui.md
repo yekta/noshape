@@ -187,6 +187,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (live/psui/manip-ring-1125; then make revolve_arc's moveFace anchor match). Asm 2.5 px threshold kept: live's band
   is (2, 3] (2 none, 3 drags), tested by app-core presses_drag_and_open_the_menu_as_live. LOOK-OUTLINE-WEIGHT: on main
   (f6da23b36 PART_EDGE_INK 0.85), "fixed, to verify" for qa; nothing left for me.
+  IN FLIGHT (lead 18:2x, dx parked): live/dx/maker-io-1125 (behaviours "Maker import/export…") vs ours; fix diffs
+  with T1 + ops e2e; model-side diffs to core (2nd Derived of the same studio errors; whole-studio Derived follows
+  the part count, part-picked keeps its parts; Update… re-imports in place).
+  Checked so far (code read, no test yet): 1) names: part-studio-ui export.rs open_part_export (one row "<tab> -
+  <part>", else tab), ops export.rs file_ext (individual -> zip), write_export entries "<tab> - <part>.<ext>" = live.
+  2) Custom: CUSTOM_FIELDS + stl_mm/custom_text convert on a Units change (format_number 6 dp: Inch 0.002362 / 0.001
+  = live); 3MF Coarse prefill 0.00024 / 12.5 / 10 (ops PRESETS) = live. No GUI test of either found yet: write T1s
+  (Units switch Fine -> Inch texts; 3MF Custom labels + values; file names for 1 row / 2 rows / individual).
+  To do: 3) bubble timing (live: shows 0.76-1.4 s after Export, gone ~5.7-6.5 s; ours flash_info at once in
+  export_preparing: check its duration and the delay); 4) Derived Insert dialog picking (studio click = all parts,
+  part click = one, plain clicks add, field shows only the studio name).
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
