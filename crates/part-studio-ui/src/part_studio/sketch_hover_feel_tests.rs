@@ -700,6 +700,67 @@ fn a_small_circles_region_lights_in_a_region_field(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// qa FLOW-REGION-UNDER-FACE-PICK (enclosure flow cell 61; live behaviours.md: a sketch region on a part's face wins
+/// over the face under it): an open box's rim sketched over with a larger rectangle; in Extrude the rim's region
+/// lights and is picked, not the rim face under it.
+#[gpui::test]
+fn a_sketch_region_on_a_rim_face_wins_over_the_face(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = part_studio_with(cx, "region-over-rim", |path| {
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| {
+            let op = noshape_ops::registry::by_tool_name(tool).unwrap_or_else(|| panic!("no tool {tool}"));
+            noshape_ops::registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value
+        };
+        // (The ops' session closed before the window opens the file.)
+        {
+            let ctx = &mut noshape_ops::Ctx::new();
+            call(ctx, "document_create", serde_json::json!({ "path": path, "length_unit": "mm" }));
+            let s1 = call(ctx, "sketch_create", serde_json::json!({ "plane": "plane:top" }))["sketch"].clone();
+            let d = call(ctx, "sketch_draw", serde_json::json!({ "sketch": s1, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+            call(ctx, "feature_add", serde_json::json!({ "type": "extrude", "params": { "entities": d["regions"].as_array().unwrap().iter().map(|r| r.get("id").unwrap_or(r).clone()).collect::<Vec<_>>(), "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } }));
+            call(ctx, "feature_add", serde_json::json!({ "type": "fillet", "params": { "entities": { "query": { "kind": "edges", "at": [[0, 0, 15], [60, 0, 15], [60, 40, 15], [0, 40, 15]] } }, "radius": "5 mm" } }));
+            call(ctx, "feature_add", serde_json::json!({ "type": "shell", "params": { "entities": { "query": { "kind": "faces", "at": [[30, 20, 30]] } }, "thickness": "2 mm" } }));
+            let rim = call(ctx, "query_entities", serde_json::json!({ "kind": "faces", "at": [[1, 20, 30]] }))["faces"][0]["id"].clone();
+            let s2 = call(ctx, "sketch_create", serde_json::json!({ "plane": rim }))["sketch"].clone();
+            call(ctx, "sketch_draw", serde_json::json!({ "sketch": s2, "tool": "corner_rectangle", "points": [[-2, -2, 30], [62, 42, 30]] }));
+        }
+        crate::session::Session::open(path).unwrap()
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.sketches.len() == 2 && !view.read(cx).display.bodies.is_empty());
+    let sketch = cx.update(|cx| view.read(cx).display.sketches.iter().find(|s| s.name == "Sketch 2").expect("Sketch 2").feature);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let mut wrong = Vec::new();
+    let on_screen = |cx: &mut TestAppContext, p: [f64; 3]| cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::from_array(p) * 0.001)).expect("on screen");
+    for (what, p) in [("the rim", [1., 20., 30.]), ("the rim's far side", [59., 20., 30.]), ("the opening", [30., 20., 30.])] {
+        let at = on_screen(cx, p);
+        pointer.move_to(cx, &view, at);
+        let got = hovered(cx, &view);
+        if !matches!(&got, Some(Reference::SketchRegion { sketch: s, .. }) if *s == sketch) {
+            wrong.push(format!("{what}: lit {got:?}, not a region of Sketch 2"));
+        }
+    }
+    // As qa's flow: the opening first, then the rim.
+    for p in [[30., 20., 30.], [1., 20., 30.]] {
+        let at = on_screen(cx, p);
+        pointer.click(cx, &view, at);
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let rim = on_screen(cx, [1., 20., 30.]);
+        pointer.move_to(cx, &view, rim + DVec2::new(2.0, 0.0));
+        pointer.move_to(cx, &view, rim);
+    }
+    let picked = cx.update(|cx| match view.read(cx).edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.get("entities").cloned()) {
+        Some(noshape_model::params::ParamValue::Query(refs)) => refs,
+        _ => Vec::new(),
+    });
+    if !(picked.len() == 2 && picked.iter().all(|r| matches!(r, Reference::SketchRegion { sketch: s, .. } if *s == sketch))) {
+        wrong.push(format!("the clicks on the opening and the rim put {picked:?} in the field, not two regions"));
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
 /// What of `feature` is lit: the hover, the sketch editor's own hover (sketch mode) and a shown point's disc.
 fn sketch_lit(cx: &mut TestAppContext, view: &Entity<PartStudioView>, feature: noshape_model::reference::FeatureId) -> Vec<String> {
     cx.update(|cx| {

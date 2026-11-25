@@ -2161,8 +2161,17 @@ impl PartStudioView {
                 nearest = Some((t, r));
             }
         });
-        let r = nearest.map(|(_, r)| r.clone()).filter(|r| !behaviors::made_by(r, dialog.feature.id) && !dialog.selected_refs().contains(r))?;
-        Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
+        // (A shown sketch's region on or in front of that face wins, as without a preview: qa FLOW-REGION-UNDER-FACE-PICK,
+        // the rim's region clicked after the opening's.)
+        let region = self.opts.show_sketches.then(|| nearest_region_hit(&self.display, o, d)).flatten().filter(|(t, _)| nearest.is_none_or(|(n, _)| *t <= n + 5e-5));
+        let (reference, kind) = match region {
+            Some((_, r)) => (r, PickKind::SketchRegion),
+            None => (nearest.map(|(_, r)| r.clone())?, PickKind::Face),
+        };
+        if behaviors::made_by(&reference, dialog.feature.id) || dialog.selected_refs().contains(&reference) {
+            return None;
+        }
+        Some(scene_builder::PickTarget { reference, kind, anchor: None })
     }
 
     /// Whether the ray from `o` along `d` meets face `r` as the model before the previewed feature has it.
@@ -8867,23 +8876,44 @@ fn face_depths(display: &noshape_model::display::StudioDisplay, r: Option<&Refer
     depths
 }
 
+/// Where the ray from `o` along `d` meets triangle `a b c`, if it does in front of `o`.
+fn ray_triangle_depth(o: glam::DVec3, d: glam::DVec3, a: glam::DVec3, b: glam::DVec3, c: glam::DVec3) -> Option<f64> {
+    let (e1, e2) = (b - a, c - a);
+    let p = d.cross(e2);
+    let det = e1.dot(p);
+    if det.abs() < 1e-18 {
+        return None;
+    }
+    let t = o - a;
+    let u = t.dot(p) / det;
+    let q = t.cross(e1);
+    let w = d.dot(q) / det;
+    let depth = e2.dot(q) / det;
+    (u >= 0.0 && w >= 0.0 && u + w <= 1.0 && depth > 0.0).then_some(depth)
+}
+
+/// The nearest shown sketch region the ray from `o` along `d` meets in `display`, and its depth.
+fn nearest_region_hit(display: &noshape_model::display::StudioDisplay, o: glam::DVec3, d: glam::DVec3) -> Option<(f64, Reference)> {
+    let mut nearest: Option<(f64, Reference)> = None;
+    for sk in display.sketches.iter().filter(|s| !s.hidden && !s.on_flat) {
+        for r in &sk.regions {
+            let p = |i: u32| r.positions.get(i as usize).map(|p| glam::Vec3::from(*p).as_dvec3());
+            for t in r.indices.as_chunks::<3>().0 {
+                let (Some(a), Some(b), Some(c)) = (p(t[0]), p(t[1]), p(t[2])) else { continue };
+                let Some(depth) = ray_triangle_depth(o, d, a, b, c) else { continue };
+                if nearest.as_ref().is_none_or(|(n, _)| depth < *n) {
+                    nearest = Some((depth, Reference::SketchRegion { sketch: sk.feature, key: r.key.clone() }));
+                }
+            }
+        }
+    }
+    nearest
+}
+
 /// Each place the ray from `o` along `d` meets face `r` (any face with `None`) as `display` draws it: the face and the
 /// depth.
 fn face_hits<'a>(display: &'a noshape_model::display::StudioDisplay, r: Option<&Reference>, o: glam::DVec3, d: glam::DVec3, mut found: impl FnMut(&'a Reference, f64)) {
-    let hit = |a: glam::DVec3, b: glam::DVec3, c: glam::DVec3| {
-        let (e1, e2) = (b - a, c - a);
-        let p = d.cross(e2);
-        let det = e1.dot(p);
-        if det.abs() < 1e-18 {
-            return None;
-        }
-        let t = o - a;
-        let u = t.dot(p) / det;
-        let q = t.cross(e1);
-        let w = d.dot(q) / det;
-        let depth = e2.dot(q) / det;
-        (u >= 0.0 && w >= 0.0 && u + w <= 1.0 && depth > 0.0).then_some(depth)
-    };
+    let hit = |a, b, c| ray_triangle_depth(o, d, a, b, c);
     // (A body whose box the ray misses is skipped: a heavy part's triangles only when the pointer is over it.)
     let misses = |(lo, hi): (glam::DVec3, glam::DVec3)| {
         let (lo, hi) = (lo - glam::DVec3::splat(1e-6), hi + glam::DVec3::splat(1e-6));
