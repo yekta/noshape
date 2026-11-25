@@ -62,7 +62,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   .github/release/check_install_linux.sh from release.yml: the lead's workflow_dispatch dry run pending).
   FEEL-TAB-TO-FLIP-FOCUS QUEUED 6a116778 + the count line (pattern_flip_focus handle on "pat-opp", Tab focuses it; the 1 px blue
   count line via QuantityInput companion focus), count line QUEUED 3126085b.
-- 11-25 07:5x latency pass DONE (lead 06:1x), landing with the qa fixes below. Ours (local Xvfb :396, llvmpipe, debug):
+- 11-25 07:4x latency pass DONE (lead 06:1x), reported. 3126085b + 2ad72895 FAILED on rebase conflicts (lead 07:5x): rebased
+  clean onto main 07:5x, re-landed (see QUEUED below / land.sh --status). Ours (local Xvfb :396, llvmpipe, debug):
   start page 0.45-0.49 s; small doc shown 0.78-0.94 s; impeller warm 0.57-0.68 s, cold 58-77 s (kernel SPEED-IMPELLER:
   Boolean Flansch+Gehäuse 21 s, Delete face 1 31 s); tab switch 50-75 ms to first frame (live 1.7-3.0 s settled);
   rename/undo/redo frame 54-70 ms; save (commit_tabs, impeller) 7.5 ms (serialise 2.0, write 5.5). Fixed: page open
@@ -74,8 +75,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   iso cell (all top edges used by then). WIP /root/psui-scratch/use/use-glyph-wip.patch (Use hover: glyph under the
   pointer -> hover_constraint, r = None; test use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge FAILS: no
   glyph_boxes, our use glyphs draw only with Show constraints on or hovered; live draws a black use glyph at the
-  edge's middle after Use). Next: draw use glyphs always (check live), then the hover.
-- Live batches waiting: psui/appearance-1125, measure-1125, section-1125 (behaviours.md).
+  edge's middle after Use). The patch now also draws a used entity's own use glyph always (sketch.rs glyph filter:
+  `use_glyph_entity(g.constraint) == Some(g.entity)`; end glyphs only with Show constraints; live use-convert: one at
+  the middle, none at the ends). A full `--lib sketch::` run on vibex8 was started with it (~/tmp/psui/use.log there):
+  read it, fix other tests that count glyphs, then land with TICKETS row 62 "fixed, to verify".
+- Live pages for me (live resent 07:5x): live/psui/appearance-1125 (Appearance panel/dialog: preview <=0.25 s,
+  ✕ reverts, "Add appearance to face…" = Face appearance feature, material never changes colour), measure-1125
+  (status readouts: 14 px/600 #666, 187-224 ms after mouse-down, ~12 px of an edge's middle picks the midpoint, "["
+  panel units), section-1125 (chip "Section plane 1 (Front/Right)", Shift+X toggles/reopens, no flip button, 180 deg
+  in the rotation field flips, cap/cut edges never pick, area readout uncut). Index.md + behaviours.md sections each.
 - Cleanup: Xvfb :396 (lat3/xvfb.pid), lat3 binaries noshape-lat/new/fix.
 - 11-25 07:1x P0 (lead): as-mc-selhover regression from ae3a5f96a fixed: PointSprite::FLAT_RING (2048) keeps the
   old flat 18 px #6087bd ring on a selected mate connector; test mc_selected_hovered (60/0/58 px). QUEUED 3e10a3a2
