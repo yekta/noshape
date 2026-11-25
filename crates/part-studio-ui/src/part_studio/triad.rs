@@ -784,8 +784,8 @@ pub(super) fn triad_glyph(t: &Triad, hover: Option<usize>, dragging: bool, turn:
     let fade = |c: [u8; 4], on: bool| if dragging && !on { [c[0], c[1], c[2], 70] } else { c };
     let mut stroke = |pts: &[DVec3], on: bool| {
         let p: Vec<[f32; 3]> = pts.iter().map(|w| f(*w)).collect();
-        back.push_polyline(&p, fade(if on { blue } else { gray }, on), 0, edge_px, LineSegment::ON_TOP);
-        front.push_polyline(&p, fade(if on { blue_inner } else { white }, on), 0, core_px, LineSegment::ON_TOP);
+        back.push_polyline(&p, fade(if on { blue } else { gray }, on), 0, edge_px, LineSegment::ON_TOP | LineSegment::SMOOTH);
+        front.push_polyline(&p, fade(if on { blue_inner } else { white }, on), 0, core_px, LineSegment::ON_TOP | LineSegment::SMOOTH);
     };
     let circle = |c: DVec3, u: DVec3, v: DVec3, r: f64| (0..=24).map(|k| {
         let a = k as f64 / 24.0 * std::f64::consts::TAU;

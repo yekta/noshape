@@ -1087,7 +1087,9 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
         let least = select(select(5.0, 3.0, (l.style & 128u) != 0u), 0.0, (l.style & 256u) != 0u);
         width = select(max(l.width * inst.extra.x, least), 11.0, held);
     }
-    let half = max(width * g.viewport.z * 0.5, 0.5);
+    // A SMOOTH line (style 8192): one device px wider each side, faded across it (fs_line).
+    let soft_edge = (l.style & 8192u) != 0u && !picking;
+    let half = max(width * g.viewport.z * 0.5, 0.5) + select(0.0, 1.0, soft_edge);
 
     var wa = (inst.model * vec4(l.a, 1.0)).xyz;
     var wb = (inst.model * vec4(l.b, 1.0)).xyz;
@@ -1177,7 +1179,8 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // line instead of the dark edge: a selected face's #ffa90a (live sel-gestures-1122 ps-box-crossing-result, and a
     // hovered edge: ps-owner-matrix-1124 #FFC06A), a hovered one's #ffc685 under a selected edge (#F8A820).
     let lined = own_edge && (st & LINED) != 0u;
-    o.core = select(0.0, select(1.0, 2.0, lined), own_edge);
+    // Negative: a SMOOTH line's half width.
+    o.core = select(select(0.0, select(1.0, 2.0, lined), own_edge), 1.0 - half, soft_edge);
     o.under = select(base, select(g.select.rgb, g.hover.rgb, (st & (HOVER | SELECTED)) == (HOVER | SELECTED)), lined);
     if ((st & HIDDEN) != 0u) { o.pos = vec4(0.0, 0.0, -2.0, 1.0); }
     return o;
@@ -1219,6 +1222,8 @@ fn fs_line(i: LineOut) -> @location(0) vec4<f32> {
     // outer device pixel on each side opaque, the core at 78 % over the scene, so the plain near-black edge under
     // its middle shows through at 22 %. No dark outline. A sketch curve's own grey or blue shows through the same way
     // (live hover-matrix-1121 ps/sketch-*, sk/*: #F2C694 over a grey line, #C89C96 over a blue one).
+    // A SMOOTH line: the pixel's share of the band (its half width -core).
+    if (i.core < 0.0) { return vec4(linear_to_srgb(i.color.rgb), i.color.a * clamp(0.5 - i.core - abs(i.across), 0.0, 1.0)); }
     if (i.core > 0.0) {
         let dpr = max(g.viewport.z, 1.0);
         let a = abs(i.across);

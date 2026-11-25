@@ -91,6 +91,9 @@ impl LineSegment {
     /// With CORE | BAND: the core opaque at 78 % over the hover colour, uniform #ffaf25 for a picked edge's band over a
     /// hovered face's boundary line (live b3/dlg-face-otherhover13).
     pub const OVER_LIT_FACE: u32 = 4096;
+    /// Antialiased across its width (a manipulator's strokes: live part-studio/444's hovered Transform arrow, a smooth
+    /// 3-tone shaft; multisampling alone left a thin core in steps along a slanted shaft, qa TRIAD-LOOK).
+    pub const SMOOTH: u32 = 8192;
 }
 
 impl LineData {

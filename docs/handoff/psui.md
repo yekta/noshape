@@ -53,19 +53,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   everyday_interactions_on_a_corpus_part, NOSHAPE_LATENCY_DOC; timed_applied). Extrude evCollision slowness → core.
   Mac numbers: impeller hover 8.5 / click 3.8 / dialog 17 / field preview regen 215 / ✓ 6.7 s (core regen) / undo 9.
   Corpus doc: vibex8 ~/tmp/psui/impeller.noshape, Mac ~/noshape-host/psui-keep/impeller.noshape.
-- NOW: TRIAD-LOOK (qa 87ccb60fc, TICKETS row 94, P0): the hovered X arrow's shaft is "broken".
-  Pixel map of qa's shot (/root/qa-scratch/feel1122/manipnav/rs-d337d0a8-1079/m10-tr-x-drag20/11.png, 2560×1600,
-  shaft at x 1735-1790, y 869-883): the darker blue outline (B, (48-64,96-112,160-176)) is continuous, the light-blue
-  core (L, (96-112,144-160,192-208)) only in 1-2 px pieces every ~3-5 px. The triad (triad.rs ~787) draws `back`
-  (outline, edge_px, layer 40) and `front` (core, core_px, layer 41), both LineSegment::ON_TOP (style 2: vs_line
-  sets c.z = c.w, shaders.wgsl ~1142). The "line" pipeline: depth write off, GreaterEqual, EDGE_DEPTH_BIAS
-  (renderer.rs ~3035); line-hidden pipelines use Less. Next: find which pass/pipeline draws layer 41 and why its
-  fragments fail intermittently (depth at exactly 1.0 + bias clamp, a hidden-line pass with Less, or something
-  writing depth 1.0, e.g. the ON_TOP point discs). Fix, then tighten the test
-  a_hovered_triad_arrow_is_solid_blue_over_the_part (hover_matrix_tests.rs ~2402): it counts any blue (b-r>40), so it
-  passed; require the core colour (L) along the centre line, and use qa's view (default iso, fit, the block of the
-  "mnv" start, Transform on face [30,22,20], Translate by XYZ, hover X near the triad origin) if the test's view
-  doesn't reproduce. qa's XY square outline is broken the same way (FEEL-TRANSFORM-ARROW-DASHED).
+- TRIAD-LOOK (qa 87ccb60fc, TICKETS row 94): fixed 11-25 01:0x, queued (LineSegment::SMOOTH on the triad's strokes:
+  a stroke antialiased across its width; MSAA alone stepped the 1.5 px core along a slanted shaft). Test
+  a_hovered_triad_arrow_is_solid_blue_over_the_part checks the default (slanted) view too. Awaits qa's re-shot
+  (also the XY square, FEEL-TRANSFORM-ARROW-DASHED). section_manip.rs's arrows (3 / 1.5 px) are drawn the same way:
+  give them SMOOTH too if qa sees steps there.
 - a2341555 (skasm's stack) FAILED an ops parity test (Text letters' counter): skasm owns that land now (lead 11-24
   16:xx); don't touch psui-skrebase. eaa20b28 LANDED as 9d6b9fc61.
 - Landing (14:2x, land-edb.out): TICKETS one row per psui ticket; list matrix row "a row clicked into a dialog's field

@@ -2414,32 +2414,44 @@ fn a_hovered_triad_arrow_is_solid_blue_over_the_part(cx: &mut TestAppContext) {
         }
     }));
     draw(cx, m.window);
-    // Looking from the top-front edge's side at the block's centre: the X shaft (from the centre) lies along that
-    // edge on screen, the edge in front of it (qa manipnav r6).
-    cx.update(|cx| {
-        let vp = m.view.read(cx).viewport.clone();
-        vp.update(cx, |vp, cx| {
-            vp.camera.rotation = noshape_render::Camera::look_rotation(DVec3::new(0., 15., -10.).normalize(), DVec3::Z);
-            vp.camera.target = DVec3::new(0.02, 0.015, 0.01);
-            vp.request_frame(cx);
+    // The default view (the shaft slanted, as qa's manipnav m10), then from the top-front edge's side at the block's
+    // centre: the X shaft (from the centre) along that edge on screen, the edge in front of it (qa manipnav r6).
+    for edge_view in [false, true] {
+        if edge_view {
+            cx.update(|cx| {
+                let vp = m.view.read(cx).viewport.clone();
+                vp.update(cx, |vp, cx| {
+                    vp.camera.rotation = noshape_render::Camera::look_rotation(DVec3::new(0., 15., -10.).normalize(), DVec3::Z);
+                    vp.camera.target = DVec3::new(0.02, 0.015, 0.01);
+                    vp.request_frame(cx);
+                });
+            });
+            draw(cx, m.window);
+        }
+        let (a, b) = cx.update(|cx| {
+            let v = m.view.read(cx);
+            let t = v.current_triad(cx).expect("the triad");
+            let s = v.triad_hit_segments(&t, cx)[0];
+            (s.0, s.1)
         });
-    });
-    draw(cx, m.window);
-    let (a, b) = cx.update(|cx| {
-        let v = m.view.read(cx);
-        let t = v.current_triad(cx).expect("the triad");
-        let s = v.triad_hit_segments(&t, cx)[0];
-        (s.0, s.1)
-    });
-    let at = |cx: &mut TestAppContext, p: DVec3| m.exact(cx, [p.x * 1000.0, p.y * 1000.0, p.z * 1000.0]);
-    let (sa, sb) = (at(cx, a), at(cx, b));
-    m.pointer.move_to(cx, &m.view, sa.lerp(sb, 0.4).round());
-    assert_eq!(cx.update(|cx| m.view.read(cx).ui.triad_hover), Some(0), "the X arrow hovered");
-    let (w, _, px) = m.frame(cx);
-    // On the stroke's centre line: blue (the outline or the core), never the part's dark edge.
-    let samples: Vec<[u8; 3]> = (0..24).map(|k| sa.lerp(sb, 0.1 + 0.4 * k as f64 / 23.0).round()).map(|q| px[(q.y as u32 * w + q.x as u32) as usize]).collect();
-    let blue = samples.iter().filter(|c| c[2] as i32 - c[0] as i32 > 40).count();
-    assert!(blue == samples.len(), "{blue}/{} samples blue along the shaft: {samples:?}", samples.len());
+        let at = |cx: &mut TestAppContext, p: DVec3| m.exact(cx, [p.x * 1000.0, p.y * 1000.0, p.z * 1000.0]);
+        let (sa, sb) = (at(cx, a), at(cx, b));
+        m.pointer.move_to(cx, &m.view, sa.lerp(sb, 0.4).round());
+        assert_eq!(cx.update(|cx| m.view.read(cx).ui.triad_hover), Some(0), "the X arrow hovered (edge view {edge_view})");
+        let (w, _, px) = m.frame(cx);
+        // Along the stroke's centre line, every pixel mostly the light core #97B1D9 over the #3F6FAC outline (live's
+        // shaft is antialiased across its width); qa r6-r10 saw the core in steps, the outline between them, 13 gaps
+        // in 56 px.
+        let (outline, core) = (DVec3::new(63., 111., 172.), DVec3::new(151., 177., 217.));
+        let n = (sb - sa).length().floor() as usize;
+        let share: Vec<(DVec2, f64)> = (n / 10..n / 2).map(|k| sa.lerp(sb, k as f64 / n as f64)).map(|q| {
+            let c = px[(q.y as u32 * w + q.x as u32) as usize];
+            let c = DVec3::new(c[0] as f64, c[1] as f64, c[2] as f64);
+            (q, (c - outline).dot(core - outline) / (core - outline).length_squared())
+        }).collect();
+        let gaps = share.iter().filter(|s| s.1 < 0.6).count();
+        assert!(gaps == 0, "edge view {edge_view}: {gaps} of {} centre-line pixels not the core: {share:?}", share.len());
+    }
 }
 
 /// FEEL-TRANSFORM-TRIAD-LOOK (qa manipnav r6, live manip-feel-1122): while Translate by XYZ's X arrow is dragged, live
