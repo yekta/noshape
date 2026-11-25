@@ -4944,3 +4944,31 @@ skasm meanwhile; I'll list what I change here before landing.
   selections."): blend's. 4.3 s vs live 2.4 s, mostly 2 Booleans (1.7 s, bool's) and 1.2 M edge_point_at calls
   (0.53 s; not looked at). Repro vibex7: `NOSHAPE_FS_TRACE=1 NOSHAPE_PARITY_MODELS=~/agents/asm-keep/m90
   <ops test binary> parity::parity_models --ignored --nocapture`.
+
+- **Re-land (lead 10:5x):** the 6 commits (fillet crash, tickets, ops arc fix, STL fin repair, handoffs, fillet r50
+  test) LANDED (267d94bbf).
+- **Knife reference fix (P1, lead): LANDED 4ab5258bc (+ up-to test 15f6f0dc9).** Extrude 1 2 -> 2.02 mm lost Sketch 8's vertex and
+  Sketches 7/11's edges: Sketch 6 (Extrude 3's groove, mirrored by Symmetric constraints, 2 DOF) slid 2.3 mm along its
+  used edge under the constructive placement, and Extrude 3 + Fillet 3 cut the corner away. Live (knife-depth-1125):
+  all 52 rows OK at 2.02 / 2.06, Sketch 6 shifts plainly (x unchanged). Fix: a sketch that held before re-projecting,
+  no value changed, solves by plain least change (model-core regen/features/sketch.rs `[] if held`; sketch
+  `Sketch::holds`). Ours now (4, 2.02) / (75.0044, 1.3068): a 4 µm x drift at the far end (min norm), all rows OK over
+  1-5 %. qa corpus 127 docs SAME. T1 a_mirrored_profile_follows_its_used_edge_by_the_least_change.
+- **Docs land:** FLOW-EXTRUDE-UP-TO-FACE-BESIDE closure + handoffs failed 12:04 (rebase conflict in this file); re-picked
+  onto main 12:3x (TICKETS union duplicates dropped), re-queued with this handoff. Old branch kept as core-rf-backup.
+- **LANDED 18:41 771be348 (core-rf, target moved to vibex8 core-rp): c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
+  85/184/104, 688437.672); doc 0 -> 6/8. rounds.rs takes OCCT's free-form corner patches; Replace face rolls its fillets
+  again (reblend + replace_by_prism: onto_plane tweak, onto_cylinder = sewn pocket solid on the face's side of the
+  cylinder template, Fuse/Cut + unify). Suite vibex8 101/174 vs base: only this doc moved. Follow-up: 8 extra vertices /
+  19 mm3 in OCCT's refillet corners (5-edge vertices, asymmetric centroid); Replace face 2 builds (550.5 cm3), unchecked.
+- **LANDED 16:01 core-bis as 6d8e63f8** (fit spline one end, loft to point Coons, Normal to profile, pinched thicken,
+  flat fan): singularities 5 -> 8/15. Target removed. screws Sweep 1 valid on main (bool: closed).
+- **LANDED (queued 03:02) 199faacf, core-th: release P0 c2-sm-tablet-stand** Sketch 3 "Some external references are
+  missing." (skasm): f9ad07b50's exact thicken rebuild gave the SM part's vertices no history. k::thicken_plain (no
+  rebuild) for opThicken + both sheetmetal.rs; native Thicken / thin loft keep it. skasm compat SAME as 0.4.63. Root
+  fix later: map the old vertices to the rebuilt ones in exact_hist, then use the rebuild everywhere again.
+- **LANDED 04:15 1a106f47 as 3bbeb609: qa validity P1s** (LORA unify keeps a valid shape; SURFLOFTS 3-sided Coons;
+  WRAP1 BuildCurves3d at 1e-7, walls from the target surface). Suite pair vibex6:
+  118 -> 119 / 174 docs, 1840 -> 1848 features, none worse (c2-rib-wrap 10 -> 18). OPEN (P2, mine): a thin wrapped r3
+  disc fuse loses the cylinder in OCCT (cut -> 0 volume, common empty); recording /root/core-scratch/wrap-disc-fuse-lost.bin
+  (parts[0] objects, parts[1] tools; tool 1 fails alone).

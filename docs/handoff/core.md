@@ -5,18 +5,21 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **P0 SCISSOR REGRESSION BISECT (lead 15:1x, first)**: 97ad5f Extrude 2 / Boolean 2 / Fillet 3 / Move face 1 (Sketch 2
-  fails in both) fail now, built in the "slabs" run (d-slab, vibex7 ~/tmp/core/sc). The Use change (ad2024d69) is NOT it
-  (probe arm keep = free), nor anything in 57be5890b..f10f72e7b (e584df0a8 fails too, also from crates/ops with
-  TMPDIR). The slabs binary's base was main 25316ac6f (11-24 11:18), not 57be5890b: bisecting the 43 engine commits
-  25316ac6f..e584df0a8 (list core-scratch/bis-list.txt) in core-rf (detached), `.pa3.sh <tag>` via rb.sh vibex7
-  (~15 min a step; d-<tag>). Suspect my 4ab5258bc (sketch follows a moved used edge by least change). fed22d's
-  Extrude 18/28/38 / Fillet 18 pass at HEAD (not a regression). After: git checkout core-trial in core-rf.
-- **NEXT after the bisect: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
+- **P0 SCISSOR REGRESSION BISECT: DONE (18:45)**: skasm's 528c169ba (regions.rs: T-end join >= 15 nm, free ends merged
+  within 0.25 um) fails scissor 97ad5f Extrude 2 / Boolean 2 / Fillet 3 / Move face 1 (ebcd90710 before it builds them;
+  vibex7 ~/tmp/core/sc d-b22 vs d-b23). Sent to the lead for skasm (at 235k). fed22d's Extrude 18/28/38 pass on main.
+- **WAITING on live hole-override-1125: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
   confirms, our UI must show the blue banner "Parameters have been overridden. Check input." (on reopen; live
   behaviours ~33077) and the feature row's Info state; today only the op reports Info (dialog, row OK, tooltip plain).
 - **then P2 STEP-EXPORT-FACE-APPEARANCE (lead 15:3x, qa 235120708)**: a user face appearance exports as live:
   OVER_RIDING_STYLED_ITEM on the face named 'Face appearance 1', DRAUGHTING_PRE_DEFINED_COLOUR('green') when named.
+- **NOW: DERIVED PARITY (lead 18:2x, live/dx/maker-io-1125; psui did the picker)**: (a) a second Derived of the same
+  source + configuration errors "Creating multiple Derived features from the same source and configuration is not
+  allowed…" even with other parts; (b) a whole-studio Derived follows the source's part count, a part-picked one keeps
+  its parts (new geometry) and skips new ones; (c) Blob › Update… re-imports in place and the Derived follows. Each: a
+  test + an ops e2e.
+- **then c2-lora-enclosure-ribs f39 "Ribs" (skasm 18:0x)**: ours 191/474/277 F/E/V vs live 177/444/265, +212 mm², -3.46
+  mm³; the 4 r1.1 circles at (±35, ±15) are profiles too (likely the extra faces). Doc vibex6 ~/tmp/skasm/q/lora.noshape.
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
   (c2-surf-intro-boundary/fill/mutualtrim/ruled; -offset's Offset area): Derived 1 car body's tail vertex x 33.940348 vs
   33.940739 (Fillet 1 setback?); doc vibex6 ~/tmp/skasm/fin/c2-surf-intro-fill.noshape. (2) c2-surf-intro-simple Loft
@@ -52,17 +55,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
-- **Re-land (lead 10:5x):** the 6 commits (fillet crash, tickets, ops arc fix, STL fin repair, handoffs, fillet r50
-  test) LANDED (267d94bbf).
-- **Knife reference fix (P1, lead): LANDED 4ab5258bc (+ up-to test 15f6f0dc9).** Extrude 1 2 -> 2.02 mm lost Sketch 8's vertex and
-  Sketches 7/11's edges: Sketch 6 (Extrude 3's groove, mirrored by Symmetric constraints, 2 DOF) slid 2.3 mm along its
-  used edge under the constructive placement, and Extrude 3 + Fillet 3 cut the corner away. Live (knife-depth-1125):
-  all 52 rows OK at 2.02 / 2.06, Sketch 6 shifts plainly (x unchanged). Fix: a sketch that held before re-projecting,
-  no value changed, solves by plain least change (model-core regen/features/sketch.rs `[] if held`; sketch
-  `Sketch::holds`). Ours now (4, 2.02) / (75.0044, 1.3068): a 4 µm x drift at the far end (min norm), all rows OK over
-  1-5 %. qa corpus 127 docs SAME. T1 a_mirrored_profile_follows_its_used_edge_by_the_least_change.
-- **Docs land:** FLOW-EXTRUDE-UP-TO-FACE-BESIDE closure + handoffs failed 12:04 (rebase conflict in this file); re-picked
-  onto main 12:3x (TICKETS union duplicates dropped), re-queued with this handoff. Old branch kept as core-rf-backup.
 - **Impeller STL vs live (live/core/stl-impeller-1125; ours .ex6.sh on vibex7 with ~/tmp/core/ud/cli-fix):** our doc
   = live's Impellergehaeuse tab (b9a28c38). Triangles ours / live: Coarse 14 830 / 16 292, Medium 38 424 / 49 570,
   Fine 178 808 / 316 872, Custom(0.01/2/0.01) 272 474 / 492 184; all ours watertight (0 defects). Presets match live's;
@@ -92,11 +84,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   makes 4 coincident parts, as live (REQUESTS (9) answered). Count 0: the app's field says live's "A parameter value is not
   valid." (feature_dialog VALUE_NOT_VALID); ops names the range. behaviours E13 "angle 0 → must be positive" is the
   assembly pattern.
-- **LANDED 18:41 771be348 (core-rf, target moved to vibex8 core-rp): c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
-  85/184/104, 688437.672); doc 0 -> 6/8. rounds.rs takes OCCT's free-form corner patches; Replace face rolls its fillets
-  again (reblend + replace_by_prism: onto_plane tweak, onto_cylinder = sewn pocket solid on the face's side of the
-  cylinder template, Fuse/Cut + unify). Suite vibex8 101/174 vs base: only this doc moved. Follow-up: 8 extra vertices /
-  19 mm3 in OCCT's refillet corners (5-edge vertices, asymmetric centroid); Replace face 2 builds (550.5 cm3), unchecked.
 - **dx: c2-impeller-loft Delete face 2 (622 ms vs live 12):** comes AFTER the doc's first difference (Fillet 3, blend):
   our input isn't live's. Face 33 goes onto neighbours; face 39 (x=5 plane with a bore) OCCT spends its bound and
   gives up (face left; live 65 -> 63 faces). Revisit when Fillet 3 matches. Moving by_region before OCCT broke kernel
@@ -112,17 +99,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   parts); Constrained surface: 1 of 961 points (Linear pattern 1 copy of Sketch 2's rL3agFJlOTPG1.MirrorCS.end,
   instance 2) unmapped -> TRACE COPY added; Projected curve 1 TWO_SKETCHES: 4 edges vs live 2 (guess: closed ellipse
   prism's seam splits the section; join across seams); frames = dx (7aac1279c fixed the path query).
-- **LANDED 16:01 core-bis as 6d8e63f8** (fit spline one end, loft to point Coons, Normal to profile, pinched thicken,
-  flat fan): singularities 5 -> 8/15. Target removed. screws Sweep 1 valid on main (bool: closed).
-- **LANDED (queued 03:02) 199faacf, core-th: release P0 c2-sm-tablet-stand** Sketch 3 "Some external references are
-  missing." (skasm): f9ad07b50's exact thicken rebuild gave the SM part's vertices no history. k::thicken_plain (no
-  rebuild) for opThicken + both sheetmetal.rs; native Thicken / thin loft keep it. skasm compat SAME as 0.4.63. Root
-  fix later: map the old vertices to the rebuilt ones in exact_hist, then use the rebuild everywhere again.
-- **LANDED 04:15 1a106f47 as 3bbeb609: qa validity P1s** (LORA unify keeps a valid shape; SURFLOFTS 3-sided Coons;
-  WRAP1 BuildCurves3d at 1e-7, walls from the target surface). Suite pair vibex6:
-  118 -> 119 / 174 docs, 1840 -> 1848 features, none worse (c2-rib-wrap 10 -> 18). OPEN (P2, mine): a thin wrapped r3
-  disc fuse loses the cylinder in OCCT (cut -> 0 volume, common empty); recording /root/core-scratch/wrap-disc-fuse-lost.bin
-  (parts[0] objects, parts[1] tools; tool 1 fails alone).
 - **KNIFEHANDLE-LOFT1 (qa P1 11-21, in progress):** Loft 1 = SURFACE through P1 (2 splines), P2-P6 ellipses, a point
   (tip 188.575), 2 guides (side profile splines; guide 1 runs on to x=0); live Handle 1/2/3, 21477.23 mm2, box x
   13.09..188.58, y +-19.958, z -39.98..13.80. Work: /root/core-scratch/gordon3.diff (k::loft_gordon = OCCT 8
