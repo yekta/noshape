@@ -13,7 +13,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   end_carried; the chain's last line stretches). If it fails: fix forward.
 - Replays (vibex8 errc, 13:13 binary): m-tan-planes-c both red once complete, m-slider-lim-c Revolute OK, as live.
   (A new mate's row/title red before both picks is live's, not a bug.)
-- NEXT: the remaining asm mate rows (TICKETS, most-used first); OPS-TANGENT-MATE P2 needs a lead call (REST accepts
+- NEXT (lead 11-25 14:1x) dim box Esc as live/skasm/dimbox-esc-1125: Esc #1 empties the box to an unfocused "0 mm"
+  (pink cleared, nothing committed), Esc #2 closes it; with the unit autocomplete open a third Esc is needed (first
+  closes the list). REQUESTS skasm 11-25 11:24 answered.
+- Then: the remaining asm mate rows (TICKETS, most-used first); OPS-TANGENT-MATE P2 needs a lead call (REST accepts
   a same-instance Tangent, the dialog doesn't).
 - Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
   "Everyday Part Studio" (sketch undo scope, paste on the pointer).
