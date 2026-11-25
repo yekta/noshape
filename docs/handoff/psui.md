@@ -61,7 +61,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
   mimeapps.list default written when xdg-mime didn't, mimeinfo.cache by hand without update-desktop-database;
   .github/release/check_install_linux.sh from release.yml: the lead's workflow_dispatch dry run pending).
   FEEL-TAB-TO-FLIP-FOCUS QUEUED 6a116778 + the count line (pattern_flip_focus handle on "pat-opp", Tab focuses it; the 1 px blue
-  count line via QuantityInput companion focus). NOW: latency pass (lead 11-25 06:1x).
+  count line via QuantityInput companion focus), count line QUEUED 3126085b.
+- NOW latency pass (lead 11-25 06:1x: app start to a usable window, open from the start page (small + 48-feature
+  impeller), Part Studio tab switch, saving; vs live where captured; fix >=100 ms and >=2x gaps and UI stalls; short
+  table). Live: open-times.json (18-40 s from navigation), qa-scratch/lat/score-lat.md (tab switch settled 1.7-3.0 s,
+  open toolbar 3.8 s / interactive 15.4 s); timing-1123 has no open/tab/save rows. Ours so far (local Xvfb :393/:394,
+  llvmpipe, /root/green/noshape 06:10, scripts /root/psui-scratch/lat2/{start,open,open-warm}.sh):
+  - live-30-features from the command line: open shown 0.78-0.94 s after process start; window 0.35 s.
+  - impeller cold (fresh cache): window 0.39 s, first viewport frame 0.73 s, full display 58-60 s = regen: Boolean
+    Flansch+Gehäuse 21.3 s, Delete face 1 30.8 s (kernel: SPEED-IMPELLER, blend/bool/core). Warm (cache kept) 0.57-0.68 s.
+  - UI stalls 103-203 ms during every open (first frames: ui cpu 113 ms in one, 14-20 ms in the others = waiting).
+  - To do: start page first frame (NOSHAPE_FRAME_LOG first present), open by a click on the page (ui_script page start
+    with a copied file), tab switch, edit commit (DocModel::flush -> session.commit on the UI thread?), the stalls.
 - 11-25 05:3x TRIAD-LOOK round 3 (qa 8641c8b2a, a lighter px every ~7 cols): qa's "bluest px per column" is the
   outline rim, not the core. Live (psui/manip-feel-1122 transform-x-hover) ~4 px strokes, 1.45 px core, rim ~1.3 px
   each side, per-column rim sum median 334 sd 12 range 301-365; ours (3 / 1.5 px) a 0.75 px rim, never full. Now 4.5 /
