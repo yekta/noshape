@@ -3,6 +3,27 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
+## NOW (11-25 19:0x) — P0 in flight, read first
+- P0 (lead): asm-scissor-lift Studio 97ad5f regression bisected (core) to my 528c169ba (regions.rs: tolerance() >= T_END_JOIN
+  15 nm, merge_points >= FREE_END_JOIN 0.25 um). From it Extrude 2 / Boolean 2 / Fillet 3 / Move face 1 fail; ebcd90710
+  builds them. Evidence vibex7 ~/tmp/core/sc d-b22 (good) vs d-b23 (bad). Sketch 2 = a 2 x 74 mm rectangle (x 50.25/52.25
+  +15 nm, y 56 / -17.999999225) on a face (frame origin (55,0,49.5), normal +X), "could not be solved" both ways; its
+  regions include imprinted face edges (8 regions now). Suspect: merge_points 0.25 um or the 15 nm tolerance merging the
+  rectangle's corners/edges with face edges (0.775 um / 15 nm off) in imprint(). ~/tmp/core/sc/w.noshape is STALE (Extrude 2
+  entities empty): use the fresh save.
+  RUNNING (vibex6, bg): parity_assemblies scissor only with the release all-* binary, NOSHAPE_PARITY_ASSEMBLIES=
+  ~/tmp/skasm/sc/root (symlink), SAVE ~/tmp/skasm/sc/save, log ~/tmp/skasm/sc/a0.log. Next: Extrude 2's region refs vs
+  Sketch 2's regions; build with an env switch for the old tolerances to compare; fix so 97ad5f builds and
+  free_ends_close_regions_within_0_2_um holds; T1 on the offending geometry (crates/sketch/tests/regions.rs or model-core).
+- UNCOMMITTED in worktree: temporary SKT timers in crates/model-core/src/regen/features/sketch.rs (lines tagged `// SKT`,
+  NOSHAPE_SKT env): remove before any commit (`grep -n SKT`).
+- Speed (after the P0, lead): sketch / mate cases >=100 ms and >=2x live from run 1124-2341-b93ec1e8 (/root/qa-scratch/suites).
+  Only regenerations are timed there; found so far: "Profile for Tail Fin" (c2-surf-intro-ruled) 253-276 ms vs live 20
+  (200 points, 3 bsplines, 2 Pierce, 334 dof). pt0 run (vibex6 ~/tmp/skasm/pt.sh, ~/tmp/skasm/pt0/run.log, "  name: X ms,
+  live Y ms" lines) = the "before" per-feature times of the 127 timed docs. live is capturing user-action timings.
+- Later: GLYPH-CIRCLE (live gl5): a lone glyph ~38 px from its point at an angle set by screen position (~15 deg from up on
+  the left to ~84 deg on the right, flips left at the right edge); a taken spot moves round the same circle.
+
 ## NOW (11-25 18:40) — read first
 - QUEUED 5af8d24a (27 commits: 1db32be0's 25 + handoff + first-week/mistakes-3): unresolved mate chips "Missing mate
   connector of <instance>" (MateDialog.unresolved keeps the instance name); a face sketch's imprinted region left out
