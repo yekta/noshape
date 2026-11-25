@@ -244,6 +244,11 @@ impl List {
         draw(cx, self.window);
     }
 
+    fn redo(&self, cx: &mut TestAppContext) {
+        cx.update(|cx| self.view.read(cx).doc.clone()).update(cx, |d, cx| d.redo(cx));
+        draw(cx, self.window);
+    }
+
     fn dragging(&self, cx: &mut TestAppContext) -> bool {
         cx.update(|cx| cx.has_active_drag())
     }
@@ -1217,6 +1222,44 @@ fn rows() -> Vec<Row> {
             l.undo(cx);
             wait_until(cx, l.window, |cx| hidden(cx) == Some(false));
             expect(cx.update(|cx| hidden(cx)), Some(false), "Part 1 hidden after Ctrl+Z")
+        } },
+        Row { id: "undo / a reorder is one step, Ctrl+Y redoes it", live: "a row dragged, then Ctrl+Z: the old order (202–212 ms); Ctrl+Y: the move again (live featurelist-1125)", gap: false, check: |l, cx| {
+            let before = l.order(cx);
+            let (from, to) = (l.at(cx, "feature:Extrude 3"), l.at_y(cx, "feature:Sketch 2", 6.));
+            l.drag(cx, from, to, true);
+            let moved = l.order(cx);
+            l.undo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            let undone = l.order(cx);
+            l.redo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            expect((undone == before, l.order(cx) == moved, moved != before), (true, true, true), "(Ctrl+Z restores the order, Ctrl+Y moves again, the drag moved)")
+        } },
+        Row { id: "undo / a rollback move is one step, Ctrl+Y redoes it", live: "the bar dropped higher, then Ctrl+Z: back at the end; Ctrl+Y: rolled back again (live featurelist-1125: rollbackIndex 7 -> 3 -> 7 -> 3)", gap: false, check: |l, cx| {
+            let (from, to) = (l.at(cx, "rollback"), l.at_y(cx, "feature:Extrude 2", 6.));
+            l.drag(cx, from, to, true);
+            let moved = l.rolled_to(cx);
+            l.undo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            let undone = l.rolled_to(cx);
+            l.redo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy());
+            expect((moved, undone, l.rolled_to(cx)), (Some("Sketch 2".to_string()), Some("Extrude 3".to_string()), Some("Sketch 2".to_string())), "(rolled to after the drop, after Ctrl+Z: the end, after Ctrl+Y)")
+        } },
+        Row { id: "menu / Delete with dependents: gone at once, no dialog; Ctrl+Z brings it back, Ctrl+Y deletes again", live: "Block deleted by its menu's Delete with three dependents: no dialog, no toast, the dependents red; Ctrl+Z restores, Ctrl+Y redoes (live featurelist-1125)", gap: false, check: |l, cx| {
+            let has = |cx: &gpui_kit::App| l.view.read(cx).studio(cx).is_some_and(|s| s.features.iter().any(|f| f.name == "Sketch 1"));
+            l.right_click(cx, "feature:Sketch 1");
+            let at = l.bounds(cx, "menu:Delete").ok_or("no Delete row")?.center();
+            l.press(cx, at, MouseButton::Left, NONE, 1);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && !has(cx));
+            let asked = (cx.update(|cx| l.view.read(cx).edit.is_some()), cx.update(|cx| l.view.read(cx).context_menu.is_some()), crate::ui_script::noted_message());
+            let gone = !cx.update(|cx| has(cx));
+            l.undo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && has(cx));
+            let back = cx.update(|cx| has(cx));
+            l.redo(cx);
+            wait_until(cx, l.window, |cx| !l.view.read(cx).ui_busy() && !has(cx));
+            expect((asked, gone, back, !cx.update(|cx| has(cx))), ((false, false, None), true, true, true), "((a dialog, a menu, a message), deleted, back after Ctrl+Z, deleted after Ctrl+Y)")
         } },
         Row { id: "undo / a view change or a selection is no step", live: "Shift+5 and a row click: Undo stays off", gap: false, check: |l, cx| {
             let before = cx.update(|cx| l.view.read(cx).doc.read(cx).can_undo());
