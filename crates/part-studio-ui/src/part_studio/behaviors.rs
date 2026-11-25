@@ -749,6 +749,8 @@ pub struct UiState {
     /// The sketch draws something with GPUI that follows the camera (set
     /// by `render_sketch_labels`: the dimension box, glyphs, counts...).
     pub sketch_follows_camera: bool,
+    /// The view is oblique to the open sketch: its dimension labels are drawn in its plane (`sketch_dims_in_plane`).
+    pub sketch_dims_in_plane: bool,
     /// Entity of the hovered dialog selection row.
     pub query_hover: Option<Reference>,
     /// The pointer is over the manipulator arrow (drawn outlined).
@@ -1127,6 +1129,7 @@ impl UiState {
             plane_drag: None,
             planes_picked_in_graphics: Vec::new(),
             sketch_follows_camera: false,
+            sketch_dims_in_plane: false,
             query_hover: None,
             manip_hover: None,
             sized_for_wpp: 0.0,
