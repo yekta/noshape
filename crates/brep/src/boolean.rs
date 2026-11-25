@@ -2441,7 +2441,10 @@ impl Ctx<'_> {
         // only after trying the other turns ([`GFace::uv_of`]): 4 ms a rim on one thread, c2-config-parts-nuts' Sweep 1.)
         let ps: Vec<DVec3> = ts.iter().map(|&t| point(t)).collect();
         let g = &self.faces[f];
-        let on = par_map(N + 1, &|k| !free::clearly_off(g, ps[k], gap) && free::surface_distance(g, ps[k]) <= gap)?;
+        // (Off by the surface's patch boxes before projecting: an edge beside a 210 x 58 pole offset fit, its 257
+        // points off its hull's box but not its patches', c2-impeller-loft's Boolean 1, most of its time.)
+        let patches = matches!(g.s, Surf::Nurbs { .. }).then(|| g.patches.get_or_init(|| free::cached_grouped(g)));
+        let on = par_map(N + 1, &|k| !free::clearly_off(g, ps[k], gap) && !patches.is_some_and(|x| free::off_patches(x, ps[k], gap)) && free::surface_distance(g, ps[k]) <= gap)?;
         if on.iter().all(|&x| x) {
             return Ok(Some(vec![(t0, e0, t1, e1)]));
         }
