@@ -2140,7 +2140,8 @@ thread_local bool t_usd_order_moot = false;
 
 // Whether the faces of `out` not in `in` (those USD merged) are valid on their own (c2-config-parts-screws' Sweep 1:
 // two pieces of the shank's cylinder between thread turns merged into a face with unorientable wires, the volume kept).
-static bool new_faces_valid(const TopoDS_Shape& in, const TopoDS_Shape& out)
+// (`image` and `sf`: each face of the input in `in`, and the input's own, untouched by USD.)
+static bool new_faces_valid(const TopoDS_Shape& in, const TopoDS_Shape& out, const std::vector<TopoDS_Shape>& image, const std::vector<TopoDS_Shape>& sf)
 {
   ShapeIMap had;
   TopExp::MapShapes(in, TopAbs_FACE, had);
@@ -2161,7 +2162,13 @@ static bool new_faces_valid(const TopoDS_Shape& in, const TopoDS_Shape& out)
     bool beside = false;
     for (TopExp_Explorer e(x.Current(), TopAbs_EDGE); e.More() && !beside; e.Next())
       beside = touched.Contains(e.Current());
-    if (beside && !BRepCheck_Analyzer(x.Current()).IsValid())
+    if (!beside || BRepCheck_Analyzer(x.Current()).IsValid())
+      continue;
+    // (Unless it was so in the input already: an invalid fuse's (c2-sm-louver's), USD's merge beside it kept.)
+    size_t i = 0;
+    while (i < image.size() && !image[i].IsSame(x.Current()))
+      ++i;
+    if (i == image.size() || BRepCheck_Analyzer(sf[i]).IsValid())
       return false;
   }
   return true;
@@ -2307,7 +2314,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     int merged_faces = 0;
     for (TopExp_Explorer x(u.Shape(), TopAbs_FACE); x.More(); x.Next())
       ++merged_faces;
-    if (merged_faces == (int)sf.size() && !new_faces_valid(in, u.Shape()))
+    if (merged_faces == (int)sf.size() && !new_faces_valid(in, u.Shape(), image, sf))
     {
       t_usd_order_moot = true;
       break;
@@ -2324,7 +2331,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
       return change && ((need <= 1e-8 * std::abs(volume0()) && (need == 0 || (merges_elementary(in, u) && pieces_within(in, u, Precision::Confusion()))))
                         || (need <= 1e-7 * std::abs(volume0()) && pieces_within(in, u, Precision::Confusion())));
     };
-    if ((!keeps_volume(change, u.Shape()) && !roomy()) || !new_faces_valid(in, u.Shape()))
+    if ((!keeps_volume(change, u.Shape()) && !roomy()) || !new_faces_valid(in, u.Shape(), image, sf))
     {
       // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
       // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
@@ -2397,7 +2404,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     std::vector<FaceShare>    share;
     images(cp, HHist(), in, image, share);
     u.Build();
-    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &known), u.Shape()) || !new_faces_valid(in, u.Shape()))
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &known), u.Shape()) || !new_faces_valid(in, u.Shape(), image, sf))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
