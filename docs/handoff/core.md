@@ -42,7 +42,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   the solids' common has an edge between their images (history) with its midpoint off both faces' edges; analytic
   pairs keep faces_cross's section. After: 3.6 s (1.8 s with the cached common). A/B: ZZ_COLL also runs the
   uncapped section per fast pair and prints "coll: check fast X section Y [MISMATCH]" (el.txt on vibex7; the
-  before run el-A.txt was cut by the 15 s cap, not comparable). Still to do: cheap
+  before run el-A.txt was cut by the 15 s cap, not comparable). RESULT: 14 pairs agree, 1 pair (Extrusion x
+  Offset(-3 mm), section 6.9 s) MISMATCH: fast says crossing, the uncapped section says not (the old capped code
+  gave ABUT there too). Next: find which is right (the common's edge between them: midpoint, both faces' normals
+  there; tangent contact? a boundary within 1e-7?), tighten crossing_in_common, rerun .el.sh. Still to do: cheap
   containment rejection (a vertex OUT => no common), cancel the stale run on a new depth (part-studio-ui
   boolean_edit_logic / custom run.rs), tests (custom crate), land.
 - **Concave balls landed (f8cec294c, 11-24):** fillet_in's last arm with_concave_balls(rolling_ball_blend): concave
