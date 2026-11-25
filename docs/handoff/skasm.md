@@ -3,18 +3,17 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 13:11) — read first
-- LANDED 1f00e732 as af3f106e. QUEUED c579ea43 (Tangent creating fix, UI state dump as drawn, ParamRow). If it
-  fails: fix forward, rebase, land.sh again.
-- LANDING after it: ERR-MATE-TANGENT-WORDS one entity (live tangent-one-entity-1123): ✓ enabled after one pick
-  (`can_accept` via `to_committed_mate`); ✓/Enter commits the Tangent with that entity as a and b
-  (`Mate::lacks_second_entity`), eval fails it "Tangent mate needs two entities."; reopened, b is empty. Agent API:
-  assembly_mate tangent without b does the same. Tests: ui a_tangent_with_one_entity_picked_is_made_in_error, ops
-  mate_flip::a_tangent_with_one_entity_is_made_in_error. Face-gone chips: the dialog already drew live's (dump fixed).
-- ERR-MATE-OVERDEF-BOTH: eval's only_mate full check reverts + solves every mate when the full solve fails the new
-  mate (`only_fails`). OPEN residual: a Tangent on faces already flush with the same normal (two_parts_document tops +
-  Revolute on tops) leaves the Revolute OK: the solver blames only the Tangent; live red both.
-- NEXT: OVERDEF-BOTH replays (vibex8 errc cells m-tan-planes-c, m-slider-lim-c), then the other asm mate rows.
+## NOW (11-25 13:48) — read first
+- QUEUED (one stack, re-queued 13:4x): Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent
+  (live tangent-one-entity-1123: ✓ after one pick makes it in error "Tangent mate needs two entities.", agent API too),
+  and 74897781e: (a) ERR-MATE-OVERDEF-BOTH flush residual: solver.rs held-back step reds a mate between the same two
+  parts as one that can't hold (a part-wide rule broke oracle_asm f16/f76/f80/1798 a1); (b) P0
+  FEEL-MC-ARC-PICK-VERTEX-ASM: inference::choose keeps an arc's centre wherever along it. If it fails: fix forward.
+- NEXT P1 FLOW-VAR-UNDERDEFINED-SKETCH-MOVES (lead 11-25, TICKETS qa phone stand): #t 5->4 live moves the lip rigidly
+  (l3 keeps 10 mm, l1 stretches); ours stretches l3. constructive.rs placement order; repro qa-scratch/tmp/stand/t4.py.
+- Then: OVERDEF-BOTH replays (vibex8 errc cells m-tan-planes-c, m-slider-lim-c; the slot was busy with qa parity).
+- Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
+  "Everyday Part Studio" (sketch undo scope, paste on the pointer).
 - App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
   vibex8:tmp/skasm/` (vibex6 can't ssh vibex8). Probe-on-a-doc pattern: a temp gpui test opening a copied .noshape.
 - OPEN: (2) dim box Esc, one or two (REQUESTS skasm 11-25 11:24, awaiting live).
