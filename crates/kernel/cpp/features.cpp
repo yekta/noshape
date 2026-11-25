@@ -12726,6 +12726,252 @@ OpOut op_round_tool(P3 a, P3 d, P3 u0, P3 u1, double half, rust::Slice<const dou
   return make_result(args, solid, nullptr);
 }
 
+// Moved faces whose neighbours run along their normal (planes square to it, cylinders about axes along it) offset as
+// the slab between each and its offset, cut from the solid (inwards) or fused to it (outwards): a plane's prism along
+// its normal, a whole cylinder's ring between its two end planes. OCCT's MakeOffset works over the whole part
+// (scissor-lift's Move faces: 1 s on 185 faces, some results broken). False where a face isn't such a face, two moved
+// faces meet where their slabs leave a corner open (a concave edge cut, a convex one fused), or a slab isn't wholly
+// inside the solid (a cut) or outside it (a fuse).
+static bool offset_by_slabs(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& faces, const std::vector<double>& offs,
+                            TopoDS_Shape& out, HHist& hist)
+{
+  if (solid_count_of(solid) != 1)
+    return false;
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto moved = [&](const TopoDS_Shape& f) -> int {
+    for (size_t i = 0; i < faces.size(); ++i)
+      if (faces[i].IsSame(f))
+        return (int)i;
+    return -1;
+  };
+  auto outward = [](const TopoDS_Face& f, const gp_Pln& p) {
+    gp_Dir n = p.Position().XDirection().Crossed(p.Position().YDirection());
+    return f.Orientation() == TopAbs_REVERSED ? n.Reversed() : n;
+  };
+  std::vector<TopoDS_Shape> cuts, fuses, tops(faces.size());
+  // A moved face's edges and vertices and their copies on its slab's far face.
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> alias;
+  for (size_t i = 0; i < faces.size(); ++i)
+  {
+    const TopoDS_Face f = TopoDS::Face(faces[i]);
+    const double      d = offs[i];
+    if (std::abs(d) < 1e-12)
+      return false;
+    BRepAdaptor_Surface a(f);
+    if (a.GetType() == GeomAbs_Plane)
+    {
+      const gp_Dir n = outward(f, a.Plane());
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      {
+        if (BRep_Tool::Degenerated(TopoDS::Edge(x.Current())))
+          continue;
+        for (const TopoDS_Shape& g : ef.FindFromKey(x.Current()))
+        {
+          if (g.IsSame(f))
+            continue;
+          BRepAdaptor_Surface b(TopoDS::Face(g));
+          const int j = moved(g);
+          if (j >= 0)
+          {
+            // A moved neighbour: the same offset, a plane, on the side of this one's plane that closes the corner.
+            if (offs[j] != d || b.GetType() != GeomAbs_Plane)
+              return false;
+            GProp_GProps gp;
+            BRepGProp::SurfaceProperties(g, gp);
+            const double s = gp_Vec(a.Plane().Location(), gp.CentreOfMass()).Dot(gp_Vec(n));
+            if (s * d >= 0 || std::abs(s) < 1e-9)
+              return false;
+            continue;
+          }
+          if (b.GetType() == GeomAbs_Plane && std::abs(b.Plane().Axis().Direction().Dot(n)) < 1e-9)
+            continue;
+          if (b.GetType() == GeomAbs_Cylinder && b.Cylinder().Axis().Direction().IsParallel(n, 1e-9))
+            continue;
+          return false;
+        }
+      }
+      BRepPrimAPI_MakePrism pr(f, gp_Vec(n) * d);
+      if (!pr.IsDone())
+        return false;
+      tops[i] = pr.LastShape();
+      for (TopAbs_ShapeEnum k : {TopAbs_EDGE, TopAbs_VERTEX})
+        for (TopExp_Explorer x(f, k); x.More(); x.Next())
+          alias.emplace_back(x.Current(), pr.LastShape(x.Current()));
+      (d < 0 ? cuts : fuses).push_back(pr.Shape());
+      continue;
+    }
+    if (a.GetType() != GeomAbs_Cylinder)
+      return false;
+    // A whole cylinder between two end planes square to its axis, no other face moved next to it.
+    const gp_Cylinder  cy = a.Cylinder();
+    const gp_Dir       ax = cy.Axis().Direction();
+    std::vector<gp_Circ> ends;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge e = TopoDS::Edge(x.Current());
+      if (BRep_Tool::IsClosed(e, f))
+        continue;
+      BRepAdaptor_Curve c(e);
+      if (c.GetType() != GeomAbs_Circle || !BRep_Tool::IsClosed(e))
+        return false;
+      for (const TopoDS_Shape& g : ef.FindFromKey(e))
+      {
+        if (g.IsSame(f))
+          continue;
+        BRepAdaptor_Surface b(TopoDS::Face(g));
+        if (moved(g) >= 0 || b.GetType() != GeomAbs_Plane || !b.Plane().Axis().Direction().IsParallel(ax, 1e-9))
+          return false;
+      }
+      ends.push_back(c.Circle());
+    }
+    if (ends.size() != 2)
+      return false;
+    const bool   away = cy.Position().Direct() != (f.Orientation() == TopAbs_REVERSED);
+    const double r = cy.Radius(), r2 = r + (away ? d : -d);
+    if (r2 < 1e-7)
+      return false;
+    const gp_Vec h(ends[0].Location(), ends[1].Location());
+    if (std::abs(h.Dot(gp_Vec(ax))) < 1e-9 || h.Crossed(gp_Vec(ax)).Magnitude() > 1e-9)
+      return false;
+    const gp_Ax2      base(ends[0].Location(), ax);
+    const TopoDS_Edge old_c = BRepBuilderAPI_MakeEdge(gp_Circ(base, r)).Edge();
+    const TopoDS_Edge new_c = BRepBuilderAPI_MakeEdge(gp_Circ(base, r2)).Edge();
+    const bool        new_out = r2 > r;
+    BRepBuilderAPI_MakeFace mf(gp_Pln(base), BRepBuilderAPI_MakeWire(new_out ? new_c : old_c).Wire(), true);
+    mf.Add(TopoDS::Wire(BRepBuilderAPI_MakeWire(new_out ? old_c : new_c).Wire().Reversed()));
+    if (!mf.IsDone())
+      return false;
+    BRepPrimAPI_MakePrism pr(mf.Face(), h);
+    if (!pr.IsDone())
+      return false;
+    // (The face's own edge copy in the ring: its generated wall is the offset cylinder.)
+    TopoDS_Shape ring_new;
+    for (TopExp_Explorer x(mf.Face(), TopAbs_EDGE); x.More(); x.Next())
+      if (std::abs(BRepAdaptor_Curve(TopoDS::Edge(x.Current())).Circle().Radius() - r2) < 1e-9 && !pr.Generated(x.Current()).IsEmpty())
+        ring_new = pr.Generated(x.Current()).First();
+    if (ring_new.IsNull())
+      return false;
+    tops[i] = ring_new;
+    (d < 0 ? cuts : fuses).push_back(pr.Shape());
+  }
+  auto volume = [](const TopoDS_Shape& s) {
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(s, g);
+    return g.Mass();
+  };
+  // The slabs' own volume (overlapping ones at a corner fused first).
+  auto slabs = [&](const std::vector<TopoDS_Shape>& t) -> double {
+    if (t.size() == 1)
+      return volume(t[0]);
+    BRepAlgoAPI_Fuse fu;
+    fu.SetArguments(single(t[0]));
+    fu.SetTools(to_list(std::vector<TopoDS_Shape>(t.begin() + 1, t.end())));
+    fu.Build();
+    return fu.HasErrors() ? -1.0 : volume(fu.Shape());
+  };
+  TopoDS_Shape              cur = solid;
+  HHist                     h;
+  std::vector<TopoDS_Shape> inputs{solid};
+  for (int pass = 0; pass < 2; ++pass)
+  {
+    const std::vector<TopoDS_Shape>& t = pass == 0 ? cuts : fuses;
+    if (t.empty())
+      continue;
+    const double want = slabs(t);
+    if (want <= 0)
+      return false;
+    std::vector<TopoDS_Shape> args{cur};
+    args.insert(args.end(), t.begin(), t.end());
+    std::unique_ptr<BRepAlgoAPI_BooleanOperation> op;
+    if (pass == 0)
+      op.reset(new BRepAlgoAPI_Cut());
+    else
+      op.reset(new BRepAlgoAPI_Fuse());
+    op->SetArguments(single(cur));
+    op->SetTools(to_list(t));
+    op->Build();
+    if (op->HasErrors())
+      return false;
+    const double v0 = volume(cur), v1 = volume(op->Shape());
+    if (std::abs(std::abs(v1 - v0) - want) > 1e-6 * want)
+      return false;
+    merge_into(h, history_of(args, *op));
+    inputs.insert(inputs.end(), t.begin(), t.end());
+    cur = op->Shape();
+  }
+  // On a copy: UnifySameDomain changes its input's edges, which the result shares with `solid` (its OCCT fallback
+  // then came back null).
+  BRepBuilderAPI_Copy cp(cur, true, false);
+  HHist               step = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{cur}), cp);
+  ShapeUpgrade_UnifySameDomain u(cp.Shape(), true, true, false);
+  u.Build();
+  step->Merge(u.History());
+  h   = compose(compound_of(inputs), h, step);
+  cur = u.Shape();
+  if (solid_count_of(cur) != 1 || !BRepCheck_Analyzer(cur).IsValid())
+    return false;
+  // Each face to its images (a moved face to its slab's far face's): every face of the result one face's image.
+  ShapeIMap fm, rm;
+  TopExp::MapShapes(solid, TopAbs_FACE, fm);
+  TopExp::MapShapes(cur, TopAbs_FACE, rm);
+  std::vector<int> owners(rm.Extent() + 1, 0);
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const int          j   = moved(fm(i));
+    const TopoDS_Shape src = j >= 0 ? tops[j] : fm(i);
+    ShapeList imgs = h->Modified(src);
+    if (imgs.IsEmpty())
+    {
+      if (h->IsRemoved(src))
+        return false;
+      imgs.Append(src);
+    }
+    for (const TopoDS_Shape& img : imgs)
+    {
+      const int k = rm.FindIndex(img);
+      if (k == 0 || ++owners[k] > 1)
+        return false;
+    }
+  }
+  if (std::any_of(owners.begin() + 1, owners.end(), [](int o) { return o != 1; }))
+    return false;
+  // The whole history (edges and vertices too), each moved face, edge and vertex taking its far copy's images.
+  for (int i = 1; i <= fm.Extent(); ++i)
+    if (moved(fm(i)) >= 0)
+      alias.emplace_back(fm(i), tops[moved(fm(i))]);
+  for (const auto& [old_s, copy] : alias)
+  {
+    ShapeList imgs = h->Modified(copy);
+    if (imgs.IsEmpty() && !h->IsRemoved(copy))
+      imgs.Append(copy);
+    bool first = true;
+    for (const TopoDS_Shape& img : imgs)
+    {
+      if (first)
+        h->ReplaceModified(old_s, img);
+      else
+        h->AddModified(old_s, img);
+      first = false;
+    }
+  }
+  // Each face's images generated from it, as OCCT's offset reports them (named "Offset of" each face:
+  // asm-scissor-lift Studio 665cf3's Extrude 1 ends on one).
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const ShapeList imgs = h->Modified(fm(i));
+    for (const TopoDS_Shape& img : imgs)
+      h->ReplaceGenerated(fm(i), img);
+  }
+  // The part itself: compose keeps faces, edges and vertices only (without it the part lost its identity).
+  for (TopExp_Explorer x(cur, TopAbs_SOLID); x.More(); x.Next())
+    for (TopExp_Explorer y(solid, TopAbs_SOLID); y.More(); y.Next())
+      h->ReplaceModified(y.Current(), x.Current());
+  out  = cur;
+  hist = h;
+  return true;
+}
+
 OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
                       rust::Slice<const double> offsets)
 {
@@ -12756,6 +13002,11 @@ OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
   TopoDS_Shape prism;
   HHist        ph;
   if (same && offset_prism_sides(s.shape, faces.items, offsets[0], prism, ph))
+    return make_result(args, prism, ph.get());
+  std::vector<double> offs;
+  for (size_t i = 0; i < faces.items.size(); ++i)
+    offs.push_back(offsets.size() == 1 ? offsets[0] : offsets[i]);
+  if (offset_by_slabs(s.shape, faces.items, offs, prism, ph))
     return make_result(args, prism, ph.get());
   mo.MakeOffsetShape();
   if (!mo.IsDone())

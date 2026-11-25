@@ -1735,3 +1735,44 @@ fn a_thin_wire_coiled_on_a_routing_curve_sweeps() {
     let v = r.volume().unwrap();
     assert!((v - want).abs() < 0.01 * want, "{} mm3, want {}", v * 1e9, want * 1e9);
 }
+
+/// A face moved along its normal between neighbours that run along it (square planes, parallel cylinders) is the part
+/// cut or fused with the face's slab: exact volume, one solid, and each face of the result one face's image (the
+/// scissor-lift's Move faces, where OCCT's offset took up to 1 s, and its fallback came back null after the slab's
+/// unify had changed the part's own edges).
+#[test]
+fn a_face_moved_between_square_neighbours_is_the_part_and_its_slab() {
+    let check = |s: &Shape, face: &Shape, d: f64| {
+        let (v0, a) = (s.volume().unwrap(), face.area().unwrap());
+        let r = offset_faces(s, std::slice::from_ref(face), d).unwrap();
+        assert!(r.shape.is_valid() && r.shape.count(ShapeType::Solid) == 1, "offset {d}: {:?} {} solids", r.shape.shape_type(), r.shape.count(ShapeType::Solid));
+        assert!(close(r.shape.volume().unwrap(), v0 + a * d, 1e-9), "offset {d}: {} vs {}", r.shape.volume().unwrap(), v0 + a * d);
+        let faces = r.shape.faces();
+        assert_eq!(faces.len(), s.faces().len(), "offset {d}");
+        let by_out = r.history.by_output();
+        for i in 0..faces.len() as u32 {
+            let from: std::collections::HashSet<u32> =
+                by_out.get(&(ShapeType::Face, i)).into_iter().flatten().filter(|h| h.arg == 0 && h.input_kind == ShapeType::Face).map(|h| h.input_index).collect();
+            assert_eq!(from.len(), 1, "offset {d}: face {i} from {from:?}");
+        }
+        // Each face generated from the one it was, as OCCT's offset (named "Offset of" it: asm-scissor-lift's Extrude 1).
+        assert!(r.history.records.iter().filter(|h| h.input_kind == ShapeType::Face && h.output_kind == ShapeType::Face).all(|h| h.relation == Relation::Generated), "offset {d}");
+    };
+    let at_z = |s: &Shape, z: f64| s.faces().into_iter().find(|f| f.is_planar() && close(f.centroid().unwrap().z, z, 1e-9)).unwrap();
+    // A block with a pocket: its top (a plane with a hole) up and down, the pocket's floor deeper and higher.
+    let block = make_box(&Plane::xy(), 40.0, 30.0, 20.0).unwrap();
+    let pocket = make_box_corners(DVec3::new(15.0, 10.0, 12.0), DVec3::new(25.0, 20.0, 21.0)).unwrap();
+    let s = cut(&block, &pocket).unwrap().shape;
+    for d in [4.0, -3.0] {
+        check(&s, &at_z(&s, 20.0), d);
+    }
+    for d in [-3.0, 2.0] {
+        check(&s, &at_z(&s, 12.0), d);
+    }
+    // Rounded corners and a hole: the top down (its slab cut away along the cylinders).
+    let vertical: Vec<Shape> = block.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| (i.start.z - i.end.z).abs() > 1.0)).collect();
+    let rounded = fillet(&block, &vertical, 5.0).unwrap().shape;
+    let hole = make_cylinder(&Plane::new(DVec3::new(20.0, 15.0, -1.0), DVec3::Z, DVec3::X), 4.0, 22.0, 2.0 * PI).unwrap();
+    let s = cut(&rounded, &hole).unwrap().shape;
+    check(&s, &at_z(&s, 20.0), -3.0);
+}
