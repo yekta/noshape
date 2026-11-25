@@ -33,9 +33,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     concave edge, both ends on a piece's ends, tangent to it): 8 pieces + 2 arcs + 2 smooth edges -> rolling balls fail
     at blend_section rolling_ball's det ~ 0 ("tangent"): the arc lies on the groove's own 0.5 mm round, the ball is
     0.5 mm too, so it sits in it (degenerate contact). Live needs a vertex blend / setback there; not rolling balls.
-- **LEAD 11-25 (after the compaction): P0 first: Fillet 18's kernel crash (signal 11) must become an error, even if
-  the fillet still fails (find the OCCT call: sections()' bool_named Cut/Fuse at blend_section.rs ~1843, or the retry).
-  Then the rest of the 2 h scissor box (~1 h used). 2d82a0 skipped (TICKETS SCISSOR-2D82-DERIVED).**
+- **F18 crash (lead's P0 11-25): landed** (TICKETS SCISSOR-F18-CRASH): the concave balls' Booleans left the part open
+  (5 free edges); unify's USD then faulted in UnionPCurves (empty pcurve sequence's Last(), gdb: .gd.sh). sections()
+  now fails "the rounds' Booleans left the part open" (Shape::open_edges, kernel rust_boolean.cpp) before unifying;
+  0 of 203 parity models reach it (.zzg.sh log-only run). OCCT patch for the other USD sites: TICKETS
+  OCCT-USD-EMPTY-PCURVES (lead's call). sc9cbb unchanged: 36/194, same failing features.
 - **NOW (lead 11-25): scissor blends, land only if nothing gets worse; skip F23.** Fresh status on main (.pm3.sh ->
   vibex7 ~/tmp/core/pm3-<m>.txt, docs pm3-<m>/<m>.noshape): 9cbb0e fails Move face 2, Fillet 6, 18, 19, 23, Boolean 4;
   2d82a0 fails Chamfer 2, Draft 1, Move face 1/3/9, Replace face 2, Fillet 4, 5, 7, 13, 25, 28, 30 BUT its Derived 1 is

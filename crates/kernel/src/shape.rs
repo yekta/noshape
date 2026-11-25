@@ -312,6 +312,11 @@ impl Shape {
         ffi::shape_inside_out(self.raw()).unwrap_or(false)
     }
 
+    /// How many edges of its solids' shells bound one face only (seams and degenerated edges aside): holes in them.
+    pub fn open_edges(&self) -> Result<usize> {
+        ck(ffi::shape_open_edges(self.raw()))
+    }
+
     pub fn shown_topology(&self) -> Result<ShownTopology> {
         let flags = ck(ffi::shown_topology(self.raw()))?;
         let joined = ck(ffi::edge_joins(self.raw()))?.into_iter().map(|j| j as usize).collect();

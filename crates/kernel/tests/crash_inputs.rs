@@ -177,3 +177,13 @@ fn a_plates_sides_and_countersinks_offset_by_a_kerf() {
     let v = r.volume().unwrap() * 1e9;
     assert!((v - 3729.04).abs() < 0.01, "{v} mm³");
 }
+
+#[test]
+fn open_edges_of_an_open_solid() {
+    let open = read_brep(&Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/open-box.brep")).unwrap();
+    assert_eq!(open.open_edges().unwrap(), 4);
+    let cube = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
+    assert_eq!(cube.open_edges().unwrap(), 0);
+    let cylinder = make_cylinder(&Plane::xy(), 0.005, 0.01, std::f64::consts::TAU).unwrap();
+    assert_eq!(cylinder.open_edges().unwrap(), 0, "a seam bounds one face twice");
+}

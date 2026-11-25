@@ -7294,6 +7294,27 @@ bool shape_inside_out(const OcShape& s)
   return false;
 }
 
+// The edges of its solids' shells on one face only (not a seam or a degenerated edge): a hole in a solid.
+size_t shape_open_edges(const OcShape& s)
+{
+  size_t open = 0;
+  for (TopExp_Explorer so(s.shape, TopAbs_SOLID); so.More(); so.Next())
+  {
+    for (TopExp_Explorer x(so.Current(), TopAbs_SHELL); x.More(); x.Next())
+    {
+      NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> ef;
+      TopExp::MapShapesAndAncestors(x.Current(), TopAbs_EDGE, TopAbs_FACE, ef);
+      for (int i = 1; i <= ef.Extent(); ++i)
+      {
+        const TopoDS_Edge& ed = TopoDS::Edge(ef.FindKey(i));
+        if (ef(i).Extent() == 1 && !BRep_Tool::Degenerated(ed) && !BRep_Tool::IsClosed(ed, TopoDS::Face(ef(i).First())))
+          ++open;
+      }
+    }
+  }
+  return open;
+}
+
 // Two arguments of edges alone (a fill pattern's probes: an instance's circle against a boundary's line) whose lines
 // and circles can't run together along a length: lines not on one line, circles not one circle, a line not all but
 // tangent to a circle in its plane. Their common is empty, as OCCT's (crossing points aren't a common of edges).

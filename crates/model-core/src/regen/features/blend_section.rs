@@ -1854,6 +1854,11 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             }
             named = NamedShape::new(s, n);
         }
+        // An open part (the tools' Booleans leaving holes: asm-scissor-lift 9cbb0e's Fillet 18 with concave balls)
+        // fails here: unifying it crashed the kernel.
+        if named.shape.open_edges()? > 0 {
+            return Err(fail("the rounds' Booleans left the part open"));
+        }
     }
     // (Marked after the Booleans, which drop marks.)
     if !kept_along.is_empty() {

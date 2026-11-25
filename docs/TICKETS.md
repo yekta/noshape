@@ -10,8 +10,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   incomplete (Left Plate 120044 mm3, live 105870): the source's Upper/Lower Cutout and Sketch 2 solve away from live's
   (taken back), its Fillet 13 / Delete face 1 queries unmapped. 2d82a0's failing blends (Chamfer 2, Fillet 4, 5, 7, 13,
   25, 28, 30; Draft 1, Move face 1/3/9, Replace face 2) run on other geometry than live's: not verifiable until then.
-- [ ] P0 **SCISSOR-F18-CRASH (core)**: 9cbb0e Fillet 18's concave-ball fallback (with core's WIP side() fix) crashes the
-  kernel (signal 11) in sections()' tools Boolean; caught, but a crash must become an error. Repro: handoff core.md.
+- [x] P0 **SCISSOR-F18-CRASH (core)**: 9cbb0e Fillet 18's concave-ball fallback (with core's WIP side() fix) crashed the
+  kernel (signal 11, recovered by the crash guard). Not the tools' Boolean: it left the part open (5 free edges), and
+  unify's USD then read `aPCurveSeq.Last()` of an empty sequence in UnionPCurves (unchecked in release OCCT). Fixed:
+  sections() fails "the rounds' Booleans left the part open" (`Shape::open_edges`) before unifying; 0 of 203 parity
+  models ever reach it. Still open below: P2 OCCT-USD-EMPTY-PCURVES.
+- [ ] P2 **OCCT-USD-EMPTY-PCURVES (core, needs the lead: OCCT patch)**: ShapeUpgrade_UnifySameDomain::UnionPCurves
+  dereferences an empty pcurve sequence when no edge of a chain has a pcurve on a (replaced) face; any unify of such a
+  shape faults into the crash guard. A patch (`if (aPCurveSeq.IsEmpty()) continue;` and skip that face) would close it
+  for all 25 USD call sites; repro BREP in vibex7 ~/agents/core-keep/f18-unify-44.brep (parity-derived: not for the repo).
 
 ## qa 11-25 12:3x: hobbyist hinged box (lead 11-25): ops build of the start (qa-scratch/tmp/hinge/hinge.py, iso.py), on green 2a0eef330 and v0.4.60 / v0.4.68
 
