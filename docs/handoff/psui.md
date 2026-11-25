@@ -35,8 +35,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
 
 ## QUEUE (11-25 19:5x, lead + live)
 1. LOOK-OUTLINE-WEIGHT (qa row l.63): cause = a solid's curved outline drew BOTH the backface band and a centred
-   opaque silhouette line (ours 808080 + 27343C: half the face px dark; live ~0.7 px all outside). Fix (uncommitted
-   until the run is green): Instance::backed (params.z bit 1) on silhouette lines of bodies with the band
+   opaque silhouette line (ours 808080 + 27343C: half the face px dark; live ~0.7 px all outside). DONE d9c41793c,
+   QUEUED eaa44314 20:2x (with b976bdb5's stack): Instance::backed (params.z bit 1) on silhouette lines of bodies with the band
    (builder.rs `backed`); silhouette_vertex drops them unless face-lit / query / error, pick pass keeps them.
    Now 808080 + 3B4E59. T1 edge_looks::a_curved_outline_at_rest_is_the_band_outside_the_face; back_face_cull test
    allows <= 3 outline px (kept back faces beside the band). hover_matrix 125/125 green with it. Then commit + TICKETS.
@@ -69,8 +69,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   HEAD-without-wait all green in pairs (/root/psui-scratch/region/t23.sh). Lesson: never wait_until inside a drag.
 - Done: ring look (b0d54bb83), FEEL-MOVEFACE-PICKED-FACE-COLOUR = not a difference (active field rule), T1
   move_faces_axis_field_active_lights_the_edge_not_the_face.
-- QUEUED b976bdb5 19:3x (23 commits). Lead was >200k at queue time, not messaged: tell them ring look, flake fix,
-  face row not a difference, snaps test fix, b976bdb5.
+- QUEUED b976bdb5 19:3x (23 commits), then eaa44314 20:2x (+ outline). Lead told at 20:2x if under 200k.
+- Interaction suite before count (lead asked before/after): 20 PS+sketch failing in run 1125-1501-c7944540.
 ## RESUME HERE (11-24 20:17 UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
 - Stack re-queued as 5175c04d, batch 1 as aeddb0f4 (landed, edb5cd135 on main), batch 2 as e4612e55, batch 3 queued
   now (f22bb2b4f before rebase).
