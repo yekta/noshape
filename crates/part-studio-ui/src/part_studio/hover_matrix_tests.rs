@@ -88,6 +88,7 @@ impl Matrix {
                 ed.selection.clear();
                 ed.selected_regions.clear();
                 ed.selected_constraints.clear();
+                ed.model_selection.clear();
             }
             v.refresh_scene(false, cx);
         });
@@ -3161,4 +3162,145 @@ fn move_faces_ring_head_is_drawn_as_live(cx: &mut TestAppContext) {
     assert_eq!(lit((w, h, px)), [false, false], "idle, the stem and the line white in grey");
     m.pointer.move_to(cx, &m.view, foot - DVec2::Y * 20.0);
     assert_eq!(lit(m.frame(cx)), [true, true], "hovered, the stem and the line light");
+}
+
+/// Live hover-combined-1125 (P0, a selection field's or a sketch's picks hovered): what a dialog's field holds or a
+/// sketch has selected changes nothing when hovered (Fillet's picked face, Plane's picked vertex, a model vertex
+/// selected in a sketch: 0 px); a model edge selected in a sketch changes a little (52 px against 415 unselected); a
+/// part selected before Fillet opens is let go, its field empty.
+#[gpui::test]
+fn combined_hover_picked_or_selected_changes_nothing(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "combined-1125");
+    let mut bad = Vec::new();
+    let open = |cx: &mut TestAppContext, ty: &str| {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature(ty, w, cx))).unwrap();
+        wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    };
+    let close_dialog = |cx: &mut TestAppContext| {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+        wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    };
+    for (ty, name, target) in [("fillet", "1-fillet-TF-picked", FACE), ("cPlane", "2-plane-V-picked", VERTEX)] {
+        open(cx, ty);
+        let p = m.screen(cx, target);
+        approach(cx, &m, p);
+        m.pointer.click(cx, &m.view, p);
+        wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+        m.park(cx);
+        let rest = m.crop(cx, p);
+        approach(cx, &m, p);
+        let n = changed(&rest, &m.crop(cx, p));
+        if n > 4 {
+            bad.push(format!("{name}: {n} px"));
+        }
+        close_dialog(cx);
+    }
+    // 4-partsel-fillet-TF: Part 1 selected, then Fillet.
+    let part = cx.update(|cx| m.view.read(cx).display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| Reference::Body(b.id.clone()))).expect("the block");
+    m.view.update(cx, |v, _| v.selection = vec![part]);
+    open(cx, "fillet");
+    let (sel, field) = cx.update(|cx| {
+        let v = m.view.read(cx);
+        (v.selection.len(), v.edit.as_ref().map_or(0, |e| e.dialog.read(cx).feature.params.query("entities").len()))
+    });
+    if (sel, field) != (0, 0) {
+        bad.push(format!("4-partsel-fillet: selection {sel}, field {field}"));
+    }
+    close_dialog(cx);
+    // 5-sk: in a sketch, a model vertex / edge selected then hovered.
+    m.edit_sketch(cx);
+    for (name, target, most) in [("5-sk-V2-sel", [0., 0., 20.], 4), ("5-sk-E1-sel", EDGE, 120)] {
+        let (plain, unselected) = rest_and_lit(cx, &m, None, target);
+        let (sel, lit) = rest_and_lit(cx, &m, Some(target), target);
+        let picked = cx.update(|cx| m.view.read(cx).sketch.as_ref().map(|ed| ed.model_selection.clone()).unwrap_or_default());
+        let hovered = cx.update(|cx| m.view.read(cx).hover.clone());
+        if picked.len() != 1 || hovered.as_ref() != picked.first() {
+            bad.push(format!("{name}: selected {picked:?}, lit {hovered:?}"));
+        }
+        let n = changed(&sel, &lit);
+        if n > most {
+            bad.push(format!("{name}: {n} px (unselected {} px)", changed(&plain, &unselected)));
+        }
+    }
+    assert!(bad.is_empty(), "picked or selected then hovered: {bad:?}");
+}
+
+/// Live hover-combined-1125 cells 7 (P0, hovering in a Shell's or a Fillet's preview): with Shell's top face removed, the
+/// top front edge lights the front face (Shell takes faces), and the shelled wall's inner top edge the removed top face,
+/// changing nothing; Fillet's tangent edge on top lights the top face, never an edge of the preview.
+#[gpui::test]
+fn combined_hover_in_shell_and_fillet_previews_takes_the_model_before_them(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let m = matrix_studio(cx, "combined-1125-7");
+    let mut bad = Vec::new();
+    let hovered = |cx: &mut TestAppContext, at: [f64; 3]| {
+        let p = m.screen(cx, at);
+        approach(cx, &m, p);
+        cx.update(|cx| m.view.read(cx).hover.clone())
+    };
+    let top = hovered(cx, FACE);
+    assert!(matches!(top, Some(Reference::Face(_))), "the top face: {top:?}");
+    m.park(cx);
+    for ty in ["shell", "fillet"] {
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_feature(ty, w, cx))).unwrap();
+        wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+        let pick = m.screen(cx, if ty == "shell" { FACE } else { EDGE });
+        approach(cx, &m, pick);
+        m.pointer.click(cx, &m.view, pick);
+        wait_until(cx, m.window, |cx| m.view.read(cx).ui.preview_before.is_some() && !m.view.read(cx).ui_busy());
+        m.park(cx);
+        if ty == "shell" {
+            let lit = hovered(cx, EDGE);
+            if !matches!(lit, Some(Reference::Face(_))) || lit == top {
+                bad.push(format!("7-shell-E1: {lit:?}"));
+            }
+            m.park(cx);
+            let inner = [12., 2., 20.];
+            let p = m.screen(cx, inner);
+            let rest = m.crop(cx, p);
+            let lit = hovered(cx, inner);
+            let n = changed(&rest, &m.crop(cx, p));
+            // (Live's hover is the removed face; ours lights nothing new on a face the field holds: the same pixels.)
+            if (lit.is_some() && lit != top) || n > 4 {
+                bad.push(format!("7-shell-EI: {lit:?}, {n} px"));
+            }
+        } else {
+            let r = cx.update(|cx| m.view.read(cx).edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.expr("radius").and_then(|x| x.cached.map(|q| q.value)))).expect("the radius") * 1000.0;
+            let lit = hovered(cx, [12., r, 20.]);
+            if lit != top {
+                bad.push(format!("7-fillet-FT (r {r} mm): {lit:?}"));
+            }
+        }
+        m.park(cx);
+        cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+        wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    }
+    assert!(bad.is_empty(), "hovered in a preview: {bad:?}");
+}
+
+/// Live hover-combined-1125 5-sk-V (P0): in a sketch, its point drawn on a model vertex takes the hover, not the vertex
+/// (live JKI at 240 ms), and clicked it is the sketch point selected, unchanged when hovered again (5-sk-V-sel: 0 px).
+#[gpui::test]
+fn combined_hover_a_sketch_point_on_a_model_vertex_takes_the_hover(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "point": [[60, 25]] }, { "point": [[40, 0]] }] }
+    ] });
+    let m = matrix_studio_from(cx, "combined-1125-5v", start);
+    m.edit_sketch(cx);
+    let v = [40., 0., 0.];
+    let (rest, lit) = rest_and_lit(cx, &m, None, v);
+    let (point, model) = cx.update(|cx| {
+        let view = m.view.read(cx);
+        (view.sketch.as_ref().and_then(|ed| ed.hover), view.hover.clone())
+    });
+    assert!(point.is_some() && !matches!(model, Some(Reference::Vertex(_))), "the sketch point lit, not the vertex: {point:?} {model:?}");
+    assert!(changed(&rest, &lit) > 20, "the point lights");
+    let (sel, again) = rest_and_lit(cx, &m, Some(v), v);
+    let selected = cx.update(|cx| m.view.read(cx).sketch.as_ref().map(|ed| (ed.selection.clone(), ed.model_selection.len())));
+    assert!(selected.as_ref().is_some_and(|(s, n)| s.len() == 1 && *n == 0), "the sketch point selected: {selected:?}");
+    assert!(changed(&sel, &again) <= 4, "selected then hovered: {} px", changed(&sel, &again));
 }

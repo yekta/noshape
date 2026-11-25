@@ -1052,16 +1052,16 @@ else REQUESTS "psui 11-25 18:41: hover in combined states"; qa to score ours onc
 |---|---|---|---|
 | Fillet field active, the picked edge hovered | = picked: the #FFA90A strip of the 1.3 mm preview, no #FFC685 band (b3) | = our picked | = (qa 21:4x verified, green a08754b16) |
 | Fillet field active, a face hovered over the fillet preview (an edge picked) | the picked edge stays #FFA90A; the face boundary 2 px #FFC685 (b3) | the same | = (qa 11-24, score-a910) |
-| Fillet field active, a picked face hovered | ? (requested) | to score | ? |
-| Plane field active, a picked vertex hovered | ? (requested) | to score | ? |
-| Extrude region field active, the picked region hovered | ? (requested) | to score | ? |
-| A part selected before the dialog (it fills the field), then hovered with the field active | ? (requested) | to score | ? |
-| Sketch edit, a model edge selected (Select tool), the edge hovered | ? (requested) | to score | ? |
-| Sketch edit, a model face selected, a sketch line on it hovered | ? (requested) | to score | ? |
-| Sketch edit, a model vertex selected, the vertex hovered; and a sketch point over it | ? (requested) | to score | ? |
-| Extrude (New) preview: a face of the part behind the preview body hovered | ? (requested) | to score | ? |
-| Extrude (Remove) preview: a face inside the cut hovered | ? (requested) | to score | ? |
-| Shell / Fillet preview: an edge of the previewed part hovered | ? (requested) | to score | ? |
+| Fillet field active, a picked face hovered | 0 px changed (live psui/hover-combined-1125 1) | the same | = (psui test combined_hover_picked_or_selected_changes_nothing) |
+| Plane field active, a picked vertex hovered | 0 px; the selected dot unchanged (live psui/hover-combined-1125 2) | the same | = (same test) |
+| Extrude region field active, the picked region hovered | 0 px under the preview (live psui/hover-combined-1125 3) | to score | ? (qa) |
+| A part selected before Fillet opens | Fillet clears the selection; the field stays empty; the face hovers as with nothing selected (live psui/hover-combined-1125 4) | the same | = (same test) |
+| Sketch edit, a model edge selected (Select tool), the edge hovered | 52 px changed (415 unselected) (live psui/hover-combined-1125 5) | within 120 px | = (same test) |
+| Sketch edit, a model face selected, a sketch line on it hovered | the line lights as with nothing selected (404 vs 409 px) (live psui/hover-combined-1125 5) | to score | ? (qa) |
+| Sketch edit, a model vertex selected, the vertex hovered; and a sketch point over it | the click selects the lit vertex, 0 px hovered again; a sketch point on the vertex takes the hover and the click (live psui/hover-combined-1125 5) | the same | = (psui 11-25: the click took the edge under the lit vertex, fixed; tests combined_hover_picked_or_selected_changes_nothing, combined_hover_a_sketch_point_on_a_model_vertex_takes_the_hover) |
+| Extrude (New) preview: a face of the part behind the preview body hovered | as without the preview (365 px); the preview body's own top face lights only the depth arrow (#648BBE), nothing preselected (live psui/hover-combined-1125 6) | to score | ? (qa) |
+| Extrude (Remove) preview: a face inside the cut hovered | 0 px: the region under it stays the hover, drawn as nothing new (live psui/hover-combined-1125 6) | to score | ? (qa) |
+| Shell / Fillet preview: an edge of the previewed part hovered | Shell: the face under the edge (it takes faces); the wall's inner edge: 0 px. Fillet: its tangent edge lights the top face, never a preview edge (live psui/hover-combined-1125 7) | the same (on the inner edge ours lights nothing new where live's hover is the removed face: equal pixels) | = (psui test combined_hover_in_shell_and_fillet_previews_takes_the_model_before_them) |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 

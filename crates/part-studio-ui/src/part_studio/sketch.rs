@@ -1613,7 +1613,7 @@ impl PartStudioView {
                     // Another sketch's point or curve too (live workflow 12: Sketch 2's line end, then u, projects it).
                     let own = self.sketch.as_ref().map(|s| s.feature);
                     let other_sketch = |r: &Reference| matches!(r, Reference::SketchEntity { sketch, .. } if Some(*sketch) != own);
-                    let model = self.other_sketch_point_at(*position, cx).or_else(|| self.model_edge_at(*position, cx)).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Origin) || other_sketch(r)));
+                    let model = self.other_sketch_point_at(*position, cx).or_else(|| self.lit_vertex_at(*position, cx)).or_else(|| self.model_edge_at(*position, cx)).or_else(|| self.hover.clone().filter(|r| matches!(r, Reference::Edge(_) | Reference::Vertex(_) | Reference::Origin) || other_sketch(r)));
                     // A plane: selected on release unless the press becomes a box (live2 Part 2).
                     let plane = self.hover.clone().filter(|r| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !self.is_own_sketch_plane(r, cx));
                     if let Some(ed) = &mut self.sketch {
@@ -2715,6 +2715,15 @@ impl PartStudioView {
             .filter(|(d, _)| *d <= OTHER_SKETCH_POINT_REACH_PX)
             .min_by(|a, b| a.0.total_cmp(&b.0))
             .map(|x| x.1)
+    }
+
+    /// The model vertex lit under the click, if it is there (live hover-combined-1125 5-sk-V2: the vertex lit at an
+    /// edge's end is what the click selects, not that edge).
+    fn lit_vertex_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
+        let r = self.hover.clone().filter(|r| matches!(r, Reference::Vertex(_)))?;
+        let at = self.display.bodies.iter().find_map(|b| b.vertex_refs.iter().position(|v| *v == r).and_then(|i| b.mesh.vertices.get(i)))?;
+        let p = self.vp().read(cx).project(DVec3::new(f64::from(at[0]), f64::from(at[1]), f64::from(at[2])))?;
+        (p.distance(position) <= 12.0).then_some(r)
     }
 
     fn model_edge_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
