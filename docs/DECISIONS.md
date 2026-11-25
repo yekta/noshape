@@ -214,3 +214,5 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
 - 11-24 (lead) Our Boolean's section curves may differ from OCCT's in volume by up to ~1e-6 relative with identical
   topology when ours are the more accurate curves (bool, nuts thread cut: 2e-9..5e-8). Tests and the corpus gate compare
   within live's tolerance band (~1e-6 relative), not OCCT's last digits; no live capture needed below that band.
+- 11-25 (lead) A mate between two entities of one instance (e.g. a Tangent of two faces of one part) is accepted by
+  the agent API as live's REST accepts it; the dialog takes it only where live's dialog does (skasm, OPS-TANGENT-MATE).
