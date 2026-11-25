@@ -2218,7 +2218,7 @@ fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &
     click(cx, window, &view, (611., 400.));
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
     draw(cx, window);
-    let ids = |cx: &mut TestAppContext| cx.update(|cx| {
+    let ids = |cx: &gpui_kit::App| {
         let v = view.read(cx);
         let data = v.sketch_data(cx)?;
         let feature = v.sketch.as_ref()?.feature;
@@ -2226,9 +2226,10 @@ fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &
         let centre = data.sketch.entity(circle)?.center()?;
         let pick = v.built.as_ref()?.picks.ids_for(&Reference::SketchEntity { sketch: feature, entity: centre.0 }).first().copied()?;
         Some((circle, pick))
-    });
-    wait_until(cx, window, |_| true);
-    let (circle, centre_pick) = ids(cx).expect("the circle and its centre's pick");
+    };
+    // The circle's picks come with a build on the background threads (a loaded land server takes seconds).
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && ids(cx).is_some());
+    let (circle, centre_pick) = cx.update(|cx| ids(cx)).expect("the circle and its centre's pick");
     // The rim point farthest from the centre on screen (the view is isometric): beyond a point's 10 px reach.
     let (at, off) = cx.update(|cx| {
         let v = view.read(cx);
@@ -7058,6 +7059,8 @@ mod sketch_gesture;
 mod export_feel;
 #[path = "ps_audit_feel_tests.rs"]
 mod audit;
+#[path = "shortcut_matrix_tests.rs"]
+mod shortcut_matrix;
 
 /// Qa SKT-USE-HOVER (live sketch-tools-1123 use-convert, sk23 use-0-hover-vertex): seen from above, the Use tool on a
 /// top corner of the block offers an edge of the top face running across the screen, never the upright edge seen end on
