@@ -2480,3 +2480,39 @@ fn derived_part_clicks_add_parts_and_a_studio_click_takes_them_all(cx: &mut Test
     let after = click(cx, part_value("t9", &body(1)));
     assert_eq!(after.1, vec![body(1).to_string()], "a part click after the whole studio takes that part alone");
 }
+
+/// Live qa/first-week-1125 (Part Studio Isolate…): the isolated part keeps its colour, the others go pale (live ~30 %
+/// over the background: Part 1's top 165,199,220 → 228,239,245) with the Isolate panel open; Esc gives every colour
+/// back exactly and closes the panel.
+#[gpui::test]
+fn isolate_pales_the_other_parts_and_esc_gives_their_colours_back(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "iso-pale", Some(starts["two-blocks"].clone()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let colours = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display_for_scene_inner().bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).map(|b| (b.id.clone(), b.color)).collect::<Vec<_>>());
+    let before = colours(cx);
+    assert_eq!(before.len(), 2, "two parts");
+    let isolated = before[1].0.clone();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Body(isolated.clone())];
+        v.isolate(crate::part_studio::behaviors::IsolateMode::Isolate, w, cx);
+        let focus = v.focus.clone();
+        w.focus(&focus, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let panel = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ps-isolate");
+    let opacity = cx.update(|cx| view.read(cx).ui.isolate.as_ref().map(|i| i.opacity)).expect("isolating");
+    let during = colours(cx);
+    assert!(panel.is_some(), "the Isolate panel");
+    assert_eq!(during[1], before[1], "the isolated part unchanged");
+    let pale = crate::isolate_ui::isolate_alpha(opacity, false);
+    assert_eq!((during[0].1[..3].to_vec(), during[0].1[3]), (before[0].1[..3].to_vec(), pale), "the other part see-through at the knob's alpha");
+    assert!(pale < 0.5, "pale: {pale}");
+    keys(cx, window, &["escape"]);
+    draw(cx, window);
+    let ended = cx.update(|cx| view.read(cx).ui.isolate.is_none());
+    assert!(ended && gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ps-isolate").is_none(), "Esc ends Isolate and closes its panel");
+    assert_eq!(colours(cx), before, "every colour back");
+}

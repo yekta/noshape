@@ -4829,3 +4829,21 @@ fn an_arc_edges_connector_is_its_centre_near_its_end(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// Live hover-list-1122 a03 (FEEL-ASM-ORIGIN-ROW-HOVER): the pointer on the Origin row lights the origin (its ring
+/// over a light orange disc, asm_scene); off the row it is black again.
+#[gpui::test]
+fn hovering_the_origin_row_lights_the_origin(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "origin-row-hover");
+    draw(cx, window);
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.origin_row_hover);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let row = vcx.debug_bounds("asm-origin-row").expect("the Origin row");
+    vcx.simulate_mouse_move(row.center(), None, gpui_kit::Modifiers::default());
+    draw(cx, window);
+    let on = lit(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(row.center() + Point::new(px(0.), row.size.height * 3.), None, gpui_kit::Modifiers::default());
+    draw(cx, window);
+    assert_eq!((on, lit(cx)), (true, false), "the origin lit on the row, not off it");
+}

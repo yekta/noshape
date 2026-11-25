@@ -1008,7 +1008,7 @@ matrix"; ours: asm's frames of the same cells, one Part 1 instance after `f`, to
 | Cell | Live | Ours | Status |
 |---|---|---|---|
 | instance row hovered | the instance's 2 px #FFC685 silhouette; the row #DEF1FB, eye icon, name tooltip; the viewport lights ~880–1030 ms after the pointer stops | the silhouette, row, eye and tooltip the same; the delay not measured | = (delay ?) |
-| Origin row hovered | the origin glyph lit orange (live a03 picture; an earlier note said nothing lit) | stays black (qa 11-22 049f4e313, FEEL-ASM-ORIGIN-ROW-HOVER) | ≠ |
+| Origin row hovered | the origin glyph lit orange (live a03 picture; an earlier note said nothing lit) | lit: its ring in the hover orange over an 18 px light orange disc (asm ede393a3b; test hovering_the_origin_row_lights_the_origin) | = |
 | face / edge hovered in the viewport | the face's boundary / edge band, and the whole instance's silhouette #FFC20E; no row lit | the same | = |
 | face selected in the viewport | the row selected #B2DDF6; the face #E5A222 with a #FFA90A boundary; the move triad at the click, its ring white under the still pointer; "Area: …" in the status bar | the same (#E6A423); the ring unlit until the pointer moves (fixed asm, FEEL-ASM-TRIAD-STILL-POINTER) | = |
 | instance selected (its row clicked) | the instance filled #F2B648 | #F0B648, outline #FFC04C | = |

@@ -982,6 +982,7 @@ impl AssemblyView {
         let origin_picked = self.ui.ps_in_context == Some(behaviors::PsOrigin::Origin);
         h_flex()
             .id("asm-origin-row")
+            .debug_selector(|| "asm-origin-row".into())
             .map(|d| crate::ui_script::mark(d, || "instance:Origin".into()))
             // Live assembly/10: the Part Studio's origin row (dot icon x 73, name x 86).
             .h(px(crate::ui::ROW_H))
