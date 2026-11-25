@@ -179,3 +179,22 @@ fn region_profile_segments_are_consistent() {
     let regs = sk.regions();
     assert!(regs.iter().any(|r| (r.area() - 2.0 / 3.0 * 2.0 * 1.0).abs() < 1e-9));
 }
+
+/// A conflict doesn't freeze the free geometry joined to it: a line perpendicular to a line with two different
+/// lengths drags its free end (fuzz fz211: 161 of 399 free entities, a lone point among them, didn't move).
+#[test]
+fn free_geometry_joined_to_a_conflict_drags() {
+    let mut sk = Sketch::new();
+    let (a, b, c) = (sk.add_point(v(0.0, 0.0)), sk.add_point(v(0.01, 0.0)), sk.add_point(v(0.01, 0.01)));
+    let (l1, l2) = (sk.add_line_between(a, b).unwrap(), sk.add_line_between(b, c).unwrap());
+    sk.add_constraint(ConstraintKind::Perpendicular { a: l1, b: l2 }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: l1, value: 0.01 }).unwrap();
+    sk.add_constraint_ext(ConstraintKind::Length { curve: l1, value: 0.02 }, true).unwrap();
+    assert!(!sk.solve().is_solved(), "over-defined");
+    let (b0, c0) = (sk.point(b).unwrap(), sk.point(c).unwrap());
+    let to = c0 + v(0.0, 0.005);
+    let r = sk.drag(&[(DragHandle::Point(c), to)]);
+    assert!(r.drag_solved, "{:?}", r.status);
+    assert!((sk.point(c).unwrap() - to).length() < 1e-6, "the free end follows: {}", sk.point(c).unwrap());
+    assert!((sk.point(b).unwrap() - b0).length() < 1e-6, "the rest stays");
+}

@@ -118,11 +118,13 @@ pub struct SolveOptions {
     /// rely on the solve to pull new geometry onto its inferences (live
     /// places it there exactly), and for that pass's own solves.
     pub constructive: bool,
+    /// Constraints left out of the solve: a drag's in a component its shape doesn't hold ([`Sketch::drag`]).
+    pub unheld: Vec<ConstraintId>,
 }
 
 impl Default for SolveOptions {
     fn default() -> Self {
-        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), still_across: Vec::new(), allow_collapse: false, constructive: false }
+        SolveOptions { tolerance: 1e-10, max_iterations: 100, analyze: true, light: Vec::new(), still: Vec::new(), still_across: Vec::new(), allow_collapse: false, constructive: false, unheld: Vec::new() }
     }
 }
 
@@ -972,7 +974,7 @@ fn dedup_sorted(mut v: Vec<ConstraintId>) -> Vec<ConstraintId> {
 /// Moves only `opts.light` (with its points, less `opts.still`), every
 /// other parameter held; true (and written back) when that solves.
 pub(crate) fn solve_held(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget]) -> bool {
-    let mut sys = System::build(sk, &HashSet::new(), drag);
+    let mut sys = System::build(sk, &opts.unheld.iter().copied().collect(), drag);
     for i in sys.still_reps(sk, opts) {
         sys.p.fixed[i] = true;
     }
@@ -1001,7 +1003,7 @@ pub(crate) fn run_ext(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget],
 
 /// `run_ext` after its held step.
 fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow_exclusion: bool) -> SolveReport {
-    let mut excluded: HashSet<ConstraintId> = HashSet::new();
+    let mut excluded: HashSet<ConstraintId> = opts.unheld.iter().copied().collect();
     let mut conflicting: Vec<ConstraintId> = Vec::new();
     let mut attempt = 0;
     loop {
@@ -1870,11 +1872,40 @@ impl Sketch {
     /// Constraint states come from the last analysis if the sketch structure
     /// has not changed since.
     pub fn drag(&mut self, handles: &[(DragHandle, DVec2)]) -> SolveReport {
+        let report = self.drag_leaving(handles, Vec::new());
+        if report.drag_solved || !matches!(report.status, SolveStatus::Failed { .. }) {
+            return report;
+        }
+        // A component holding a conflict never converges: its free geometry drags as the last solve left it, the
+        // constraints that shape doesn't hold left out (fuzz fz211: 161 of 399 free entities, a lone point among
+        // them, didn't move).
+        // (What the analysis found fully defined stays put: it's black.)
+        let analysis = self.cache.analysis.as_ref().filter(|(rev, _)| *rev == self.cache.revision).map(|(_, a)| a);
+        let defined = |id: &EntityId| analysis.is_some_and(|a| a.states.get(id) == Some(&ConstraintState::FullyConstrained));
+        if handles.iter().any(|(h, _)| match h {
+            DragHandle::Point(id) | DragHandle::Entity { id, .. } => defined(id),
+        }) {
+            return report;
+        }
+        let unheld: Vec<ConstraintId> = self.unheld_constraints(1e-9).into_iter().collect();
+        if unheld.is_empty() {
+            return report;
+        }
+        let mut retry = self.clone();
+        let r = retry.drag_leaving(handles, unheld);
+        if !r.drag_solved {
+            return report;
+        }
+        *self = retry;
+        r
+    }
+
+    fn drag_leaving(&mut self, handles: &[(DragHandle, DVec2)], unheld: Vec<ConstraintId>) -> SolveReport {
         let lives = self.lives_drag(handles);
         let handles = lives.as_deref().unwrap_or(handles);
         // Well-posed drag steps converge in a few iterations; a step that
         // doesn't converge soon sits at a limit of the constraints.
-        let mut opts = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
+        let mut opts = SolveOptions { analyze: false, max_iterations: 8, unheld, ..SolveOptions::default() };
         let (light, still) = self.drag_weights(handles);
         opts.light = light;
         opts.still = still;
@@ -1918,7 +1949,7 @@ impl Sketch {
         // slides sideways with its dragged corner, its bottom at its height).
         // Only for a small dragged component (`MAX_UNITS`): each kept coordinate is another solve.
         if !opts.still.is_empty() && self.drag_graph().dragged(handles).is_some() {
-            let plain = SolveOptions { analyze: false, max_iterations: 8, ..SolveOptions::default() };
+            let plain = SolveOptions { analyze: false, max_iterations: 8, unheld: opts.unheld.clone(), ..SolveOptions::default() };
             let solve = |t: &[DragTarget]| {
                 let mut s = start.clone();
                 let r = run(&mut s, &plain, t);
