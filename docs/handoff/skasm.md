@@ -16,7 +16,7 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - 11-25 15:0x in this land: dim box Esc as live dimbox-esc-1125 (dim_box_escape; capture_action on the input's Escape,
   which put the committed text back first; ui.dim_box_typed), OPS-TANGENT-MATE A (ops make a same-instance mate, flagged
   by the evaluation), UIS-MATE-PATTERN-ROW (pattern row marked `mate:<name>`).
-- 11-25 16:xx QUEUED with the handoffs: iso dimension text as live dim-iso-1125 (sketch.rs sketch_dims_in_plane /
+- 11-25 15:35 QUEUED with the handoffs: iso dimension text as live dim-iso-1125 (sketch.rs sketch_dims_in_plane /
   sketch_dimension_fills: off the sketch's normal the values lie in the plane along the sketch x at the 16 px size, the
   screen Label kept for the hit only; CameraChanged notifies on the flip). Arrowheads were already in-plane. Next: the
   Offset preview's "5" in the plane (TICKETS FEEL-OFFSET-PREVIEW-LOOK "still to do").
