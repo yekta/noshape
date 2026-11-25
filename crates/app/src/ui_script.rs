@@ -1044,6 +1044,15 @@ pub fn start_page(cx: &mut App) {
                 && !stay_seen.get()
             {
                 front = Some(*new);
+                // A document a step opened is where the steps go now, in live's tab: its size, and active (focus
+                // events and an assembly's frames need an active window).
+                if !known.is_empty() && doc_workspace(*new, cx).is_some() {
+                    let _ = new.update(cx, |_, window, _| {
+                        window.resize(size(px(view_width(&scenario)), px(view_height(&scenario))));
+                        window.activate_window();
+                    });
+                    cx.update(|cx| cx.activate(true));
+                }
             }
             if front.is_none_or(|f| !now.contains(&f)) {
                 front = cx.update(|cx| cx.active_window()).or_else(|| now.last().copied());
@@ -1069,6 +1078,19 @@ pub fn start_page(cx: &mut App) {
         let redraw = async |w: AnyWindowHandle, cx: &mut AsyncApp| {
             noshape_app_core::gpu::frame_log("driver");
             noshape_app_core::ui_script::clear();
+            // A document's cached chrome and its tab's graphics repainted too, as the document runner does.
+            if let Some(ws) = doc_workspace(w, cx) {
+                let _ = w.update(cx, |_, _, cx| ws.update(cx, |ws, cx| {
+                    ws.ui_redraw(cx);
+                    if let Some(ps) = ws.active_part_studio() {
+                        ps.update(cx, |p, cx| p.ui_redraw(cx));
+                    } else if let Some(a) = ws.active_assembly() {
+                        a.update(cx, |a, cx| a.ui_redraw(cx));
+                    } else if let Some(d) = ws.active_drawing() {
+                        d.update(cx, |d, cx| d.ui_redraw(cx));
+                    }
+                }));
+            }
             let _ = w.update(cx, |_, window, _| window.refresh());
             sleep(cx, 150).await;
         };
@@ -1103,7 +1125,7 @@ pub fn start_page(cx: &mut App) {
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
             redraw(w, cx).await;
             let before: Vec<AnyWindowHandle> = cx.update(|cx| cx.windows());
-            let find = |t: &Value, cx: &mut AsyncApp| cx.update(|cx| locate(t, &None, &None, &None, cx));
+            let find = |t: &Value, cx: &mut AsyncApp| page_locate(t, w, cx);
             // A control scrolled out of view is wheeled into it first, as a browser's click scrolls to it.
             let mut found = Err(String::new());
             if matches!(what, "click" | "dblclick" | "rclick" | "hover") {
@@ -1253,6 +1275,9 @@ pub fn start_page(cx: &mut App) {
             // A document a step opened is built and drawn before its state is read.
             sleep(cx, 900).await;
             let Some(w) = follow(cx) else { break };
+            if let Some(ws) = doc_workspace(w, cx) {
+                settle_doc(&ws, cx).await;
+            }
             let state_now = read(w, cx).await;
             screenshot(i + 1);
             let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
@@ -1277,6 +1302,50 @@ pub fn start_page(cx: &mut App) {
         cx.update(|cx| cx.quit());
     })
     .detach();
+}
+
+/// The document a window shows (a page scenario's step opened it), if it shows one.
+pub(crate) fn doc_workspace(w: AnyWindowHandle, cx: &mut AsyncApp) -> Option<Entity<Workspace>> {
+    w.update(cx, |_, window, cx| crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<Workspace>().ok())).ok().flatten()
+}
+
+/// A page step's target in window `w`; in a document a step opened, its tab's graphics too (a Part Studio's, an
+/// Assembly's or a Drawing's), as the document runner finds them.
+pub(crate) fn page_locate(t: &Value, w: AnyWindowHandle, cx: &mut AsyncApp) -> Result<Point<Pixels>, String> {
+    let ws = doc_workspace(w, cx);
+    cx.update(|cx| {
+        let (ps, asm, drw) = ws
+            .map(|ws| {
+                let ws = ws.read(cx);
+                (ws.active_part_studio(), ws.active_assembly(), ws.active_drawing())
+            })
+            .unwrap_or_default();
+        locate(t, &ps, &asm, &drw, cx)
+    })
+}
+
+/// A document's work after a page step settled as the document runner's `settle`: its tab's regeneration or evaluation
+/// done (at most 30 s), then a Part Studio's frame of it on screen (at most 5 s).
+async fn settle_doc(ws: &Entity<Workspace>, cx: &mut AsyncApp) {
+    let t = Instant::now();
+    loop {
+        cx.background_executor().timer(Duration::from_millis(120)).await;
+        let busy = cx.update(|cx| {
+            let w = ws.read(cx);
+            match (w.active_part_studio(), w.active_drawing()) {
+                (Some(ps), _) => ps.read(cx).ui_busy(),
+                (None, Some(d)) => d.read(cx).ui_busy(),
+                (None, None) => w.ui_view_pending(cx),
+            }
+        });
+        if !busy || t.elapsed() > Duration::from_secs(30) {
+            break;
+        }
+    }
+    let t = Instant::now();
+    while t.elapsed() < Duration::from_secs(5) && cx.update(|cx| ws.read(cx).active_part_studio().is_some_and(|ps| ps.read(cx).ui_frame_pending(cx))) {
+        cx.background_executor().timer(Duration::from_millis(10)).await;
+    }
 }
 
 /// A document window's state after a step (README "state"): its active tab's, with the document's tab bar.

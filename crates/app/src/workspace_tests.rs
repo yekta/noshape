@@ -26,9 +26,8 @@ fn dialog_window(cx: &mut TestAppContext) -> AnyWindowHandle {
     cx.update(|cx| gpui_kit::open_window(WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() }, cx, |_, cx| cx.new(|_| Blank)).unwrap().0)
 }
 
-/// A new document (its Part Studio 1 with a block) and Variable Studios A, B and C in a workspace, opened in that order (C active,
-/// B the previous one).
-fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Workspace>, [TabId; 4]) {
+/// The app's hooks, keys and a headless GPU, as main sets them up.
+fn app(cx: &mut TestAppContext) -> crate::gpu::Gpu {
     cx.update(gpui_kit::init);
     cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
     static HOOKS: std::sync::Once = std::sync::Once::new();
@@ -41,6 +40,13 @@ fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Wo
     });
     let gpu = crate::gpu::Gpu::headless().unwrap();
     cx.update(|cx| cx.set_global(crate::gpu::GpuGlobal(gpu.clone())));
+    gpu
+}
+
+/// A new document (its Part Studio 1 with a block) and Variable Studios A, B and C in a workspace, opened in that order (C active,
+/// B the previous one).
+fn workspace(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Workspace>, [TabId; 4]) {
+    let gpu = app(cx);
     let dir = std::env::temp_dir().join(format!("noshape-workspace-{name}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("tabs.noshape");
@@ -611,5 +617,39 @@ fn imported_plain_files_are_read_in_the_background_and_a_missing_one_says_so(cx:
     assert!(doc.read_with(cx, |d, _| d.notice_link("photo.png has been imported.").is_some_and(|l| l.label == "Open document")));
     let errors = errors.borrow();
     assert!(errors.len() == 1 && errors[0].starts_with("Import failed: gone.pdf could not be read"), "{errors:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// qa (flow 91, ui_script.rs "not in a Part Studio…"): a document in a window of its own, as the documents page
+/// opens one (an app window whose content becomes the document's workspace), takes a page scenario's graphics targets:
+/// its Part Studio's origin.
+#[gpui::test]
+fn a_page_step_finds_the_graphics_of_a_document_the_page_opened(cx: &mut TestAppContext) {
+    let gpu = app(cx);
+    let dir = std::env::temp_dir().join(format!("noshape-workspace-page-open-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("page-open.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    call(&mut Ctx::new(), "document_create", json!({ "path": path.to_str().unwrap() }));
+    let doc = cx.new(|_| DocModel::new(crate::session::Session::open(&path).unwrap()));
+    let bounds = Bounds { origin: Point::default(), size: size(px(1400.), px(900.)) };
+    let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() };
+    let w = cx.update(|cx| crate::os_menu::open_window(options, cx, |window, cx| cx.new(|cx| Workspace::new(doc, gpu, window, cx)))).unwrap().0;
+    let mut acx = cx.to_async();
+    let ws = crate::ui_script::doc_workspace(w, &mut acx).expect("the window's document");
+    let tab = cx.update(|cx| ws.read(cx).doc.read(cx).session.doc.ordered_tabs()[0].id);
+    cx.update_window(w, |_, window, cx| ws.update(cx, |ws, cx| ws.activate(tab, window, cx))).unwrap();
+    for _ in 0..12000 {
+        draw(cx, w);
+        if cx.update(|cx| ws.read(cx).active_part_studio().is_some_and(|ps| !ps.read(cx).ui_busy())) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let at = crate::ui_script::page_locate(&json!({ "origin": true }), w, &mut acx);
+    assert!(at.as_ref().is_ok_and(|p| p.x > px(0.) && p.y > px(0.) && p.x < bounds.size.width && p.y < bounds.size.height), "the origin in the window: {at:?}");
+    cx.update_window(w, |_, window, _| window.remove_window()).unwrap();
     let _ = std::fs::remove_dir_all(&dir);
 }
