@@ -1357,7 +1357,9 @@ fn handle_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
     } else if hover {
         (crate::theme::rgb8(0x134e96), crate::theme::rgb8(0xa2b9df), 4.0, 2.0)
     } else {
-        ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 3.0, 1.5)
+        // 4 px across: live's halo reaches 2 px each side of the core (manip-drag-1125 Extrude arrow, workflow 03 s19
+        // Corner break arrow; ours at 3 px left 1 px, qa FEEL-CORNER-BREAK-VERTEX-PICK's white outline).
+        ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 4.0, 1.5)
     }
 }
 
@@ -1478,7 +1480,10 @@ fn arrow_glyph(a: &Arrow, stem: Option<(f64, f64)>, hover: bool, dragging: bool,
     let mut front = LineData::default();
     for (data, color, width) in [(&mut back, outline, outline_px), (&mut front, core, core_px)] {
         if !a.tangential {
-            data.push_polyline(&[f(tip + dir * stem_from * wpp), f(base)], color, 0, width, LineSegment::ON_TOP);
+            // The halo starts where the core does, not half its width before (live: the face at the shaft's foot
+            // keeps its shade, an_edited_extrudes_end_cap_greys_its_top_once).
+            let from = stem_from + (width - core_px) as f64 * 0.5;
+            data.push_polyline(&[f(tip + dir * from * wpp), f(base)], color, 0, width, LineSegment::ON_TOP);
         }
         for p in &heads {
             data.push_polyline(&p.iter().map(|v| f(*v)).collect::<Vec<_>>(), color, 0, width, LineSegment::ON_TOP);
@@ -1569,7 +1574,7 @@ mod snap_tests {
         assert_eq!(handle_style(true, true), (blue, blue, 2.0, 2.0));
         assert_eq!(handle_style(false, true), (blue, blue, 2.0, 2.0));
         assert_eq!(handle_style(true, false), (crate::theme::rgb8(0x134e96), crate::theme::rgb8(0xa2b9df), 4.0, 2.0));
-        assert_eq!(handle_style(false, false), ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 3.0, 1.5));
+        assert_eq!(handle_style(false, false), ([0x6a, 0x76, 0x7d, 191], crate::theme::rgb8(0xffffff), 4.0, 1.5));
     }
 
     /// Live "angularStep": 5° within 2° up to a 573 px radius, free in between; then whole 1° and 0.1° steps (the
