@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 20:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 20:29 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -20,9 +20,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   c2-rib-wrap 18/18; c2-parting-line-draft-parting-line Rib 1 73/213/143 vs live 73/214/144 is the same before (open).
 - **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
   (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
-- **5. SCISSOR follow-up (lead 11-25 19:4x, from skasm)**: 528c169ba is right; the old build was a false pass (Extrude 2
-  went ~34.6 mm the wrong way). Real first diff: 97ad5f Delete face 1 errors in ours both ways; live 1606.6 -> 1704.7
-  mm³, so Sketch 2 lands on another face. Evidence vibex6 ~/tmp/skasm/sc (a0.log / a-old.log, save/ vs save-old/).
+- **5. SCISSOR 97ad5f: NOT CORE (11-25 20:4x, sent to the lead)**: the first diff is Derived 1, not Delete face 1. Live's
+  Derived 1 = one part "WAGO Mount Extended" 51 faces 1606.634; ours 2 parts (Part 1, 1 mesh face 1564.85, + 19 faces
+  1644.51). Its source "a0989746e9c6735c0a31036c (1)" (another doc's studio) has no live geometry in the fetch (no
+  studios/ file): 13 queries "not mapped", Sketch 1's mesh cPoints empty, so Sketch 1 unsolved, Extrude 2 / Replace face /
+  Move face / Mirror / Pattern / Delete part 1 lose picks (the mesh part stays). Needs the source's refs fetched (skasm /
+  live). Probes: vibex7 ~/tmp/core/sc/sc1-4.py on sc.noshape (600, from vibex6 ~/tmp/skasm/sc/save).
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
   (c2-surf-intro-boundary/fill/mutualtrim/ruled; -offset's Offset area): Derived 1 car body's tail vertex x 33.940348 vs
   33.940739 (Fillet 1 setback?); doc vibex6 ~/tmp/skasm/fin/c2-surf-intro-fill.noshape. (2) c2-surf-intro-simple Loft
