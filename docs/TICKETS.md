@@ -5,6 +5,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## core, 2026-11-25 (asm-scissor-lift scissor blends)
+- [ ] P2 **SCISSOR-2D82-DERIVED (parity translator, parked by the lead 11-25)**: Studio 2d82a0's Derived 1 translates
+  incomplete (Left Plate 120044 mm3, live 105870): the source's Upper/Lower Cutout and Sketch 2 solve away from live's
+  (taken back), its Fillet 13 / Delete face 1 queries unmapped. 2d82a0's failing blends (Chamfer 2, Fillet 4, 5, 7, 13,
+  25, 28, 30; Draft 1, Move face 1/3/9, Replace face 2) run on other geometry than live's: not verifiable until then.
+- [ ] P0 **SCISSOR-F18-CRASH (core)**: 9cbb0e Fillet 18's concave-ball fallback (with core's WIP side() fix) crashes the
+  kernel (signal 11) in sections()' tools Boolean; caught, but a crash must become an error. Repro: handoff core.md.
+
 ## qa 11-24 13:5x: everyday new-user flow (lead 11-24) on green 63731676b: live workflows-1122 01 13 32 02 21 03 34 06 04 07 19 38 28 17 39(v) replayed (vibex8, qa-scratch/hm2/out-flow-1124, bin/flow-1124.sh); state per step vs live, viewport timing and px vs ours on 11-22 (out-wf)
 - [x] **NOT A REGRESSION (psui 11-24 14:25: a capture-timing artefact of a loaded host; the same green 35dceca06 replayed on a quiet vibex8 shows the preview at both steps: wf04 s2 0 px of the rest blue, the shell floor (169,186,166) vs live (172,184,172); wf38 s16 0 px, (207,224,235) vs live (208,224,232). In qa's 13:27 run every frame rendered in 200-600 ms (11-22: ~100), so the step's shot (settled 946 ms) came before the preview's frame at 1016 ms; all 15 workflows' frames were 1.2-1.8x slower that run. The replay's settle should wait for the preview's display, not a quiet gap.)** P1 **FEEL-PREVIEW-BODY-BLUE (psui; regression)**: workflow 04 step 2 (Shell, top face picked) and workflow 38 step 16 (Boolean Intersect, Part 2 picked): ours now fills the previewed body light blue (152,194,218): 8.9k px / 6.0k px around x 1075-1300, y 330-610. Live draws grey-green (172,184,172) for the shell and (208,224,232) for the intersect, and so did ours on 11-22 (out-wf: 0 px of that blue, live 0). No other step of the 15 workflows has it. Started between the 11-22 21:05 green and 63731676b; candidates core a4804bf07 (body colours on failure) and psui 6ca785d6d.
 - Still open on 63731676b, nothing new: FEEL-CLICK-EMPTY-SELECTS-PLANE (skasm P0) + SKETCH-SELECTED-GLYPH-OFFSET (skasm P1): wf13 s15 selection = corner + Front plane, Delete leaves 2 lines / 3 constraints, Sketch 1 ends "Sketch could not be solved." after the width dimension.
