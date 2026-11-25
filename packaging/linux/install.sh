@@ -33,9 +33,30 @@ apps="$share/applications" icons="$share/icons/hicolor" mime="$share/mime"
 # Agents are the user's: under `sudo ./install.sh`, their configuration is the invoking user's, not root's.
 as_user() { if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then sudo -u "$SUDO_USER" -H "$@"; else "$@"; fi; }
 
+# Sets key=value in [section] of an ini file (the section or the line added when missing; `-` as the value removes it).
+ini_set() {
+  t="${TMPDIR:-/tmp}/noshape.ini.$$"
+  { [ -f "$1" ] && cat "$1"; true; } | awk -v s="[$2]" -v k="$3" -v v="$4" '
+    function put() { if (!done && v != "-") print k "=" v; done = 1 }
+    $0 == s { print; insec = 1; seen = 1; next }
+    /^\[/ { if (insec) put(); insec = 0 }
+    insec && index($0, k "=") == 1 { put(); next }
+    { print }
+    END { if (!done && v != "-") { if (!seen) print s; put() } }' > "$t"
+  $sudo cp "$t" "$1"; rm -f "$t"
+}
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
+
 refresh() {
   command -v update-mime-database >/dev/null 2>&1 && $sudo update-mime-database "$mime" 2>/dev/null || true
-  command -v update-desktop-database >/dev/null 2>&1 && $sudo update-desktop-database -q "$apps" 2>/dev/null || true
+  # Without update-desktop-database (a stock desktop may lack it), noshape.desktop's MimeType indexed by hand.
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    $sudo update-desktop-database -q "$apps" 2>/dev/null || true
+  elif [ -f "$apps/noshape.desktop" ]; then
+    ini_set "$apps/mimeinfo.cache" "MIME Cache" application/x-noshape "noshape.desktop;"
+  elif [ -f "$apps/mimeinfo.cache" ]; then
+    ini_set "$apps/mimeinfo.cache" "MIME Cache" application/x-noshape -
+  fi
   command -v gtk-update-icon-cache >/dev/null 2>&1 && $sudo gtk-update-icon-cache -q -t "$icons" 2>/dev/null || true
 }
 
@@ -43,6 +64,9 @@ if [ $uninstall = 1 ]; then
   [ -x "$bin/noshape" ] && [ "$agents" != no ] && as_user "$bin/noshape" agents disconnect --command "$bin/noshape" >/dev/null 2>&1 || true
   $sudo rm -f "$bin/noshape" "$apps/noshape.desktop" "$icons/512x512/apps/noshape.png" "$icons/256x256/apps/noshape.png" "$icons/scalable/apps/noshape.svg" "$mime/packages/noshape.xml"
   refresh
+  if [ $system = 0 ] && grep -q '^application/x-noshape=noshape.desktop' "$cfg/mimeapps.list" 2>/dev/null; then
+    ini_set "$cfg/mimeapps.list" "Default Applications" application/x-noshape -
+  fi
   echo "noshape removed from $bin and $share"
   exit 0
 fi
@@ -58,7 +82,14 @@ $sudo install -m 644 "$here/noshape.svg" "$icons/scalable/apps/noshape.svg"
 # .noshape files: their type, opened with Noshape (noshape.desktop's MimeType).
 $sudo install -m 644 "$here/noshape-mime.xml" "$mime/packages/noshape.xml"
 refresh
-[ $system = 1 ] || { command -v xdg-mime >/dev/null 2>&1 && xdg-mime default noshape.desktop application/x-noshape 2>/dev/null || true; }
+# Noshape the default app for .noshape files (the user's mimeapps.list). xdg-mime writes nothing when ~/.config is
+# missing, and a stock desktop may not have it: then the default written directly.
+if [ $system = 0 ]; then
+  mkdir -p "$cfg"
+  command -v xdg-mime >/dev/null 2>&1 && xdg-mime default noshape.desktop application/x-noshape 2>/dev/null || true
+  grep -q '^application/x-noshape=noshape.desktop' "$cfg/mimeapps.list" 2>/dev/null ||
+    ini_set "$cfg/mimeapps.list" "Default Applications" application/x-noshape noshape.desktop
+fi
 # The app links the desktop's libraries (X11/Wayland keyboard, fonts, Vulkan): say which are missing.
 if ! version=$("$bin/noshape" --version 2>/dev/null); then
   echo "noshape is installed to $bin/noshape but can't start: these libraries are missing:" >&2

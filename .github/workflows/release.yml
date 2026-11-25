@@ -431,6 +431,8 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           test "$(command -v noshape)" = "$HOME/.local/bin/noshape"
           python3 $check noshape
+          # .noshape files open with Noshape on a stock desktop too (no ~/.config, no xdg-mime, no update-desktop-database).
+          sh .github/release/check_install_linux.sh "$dir"
           # It updates itself (the binary swapped) under Xvfb with lavapipe. A dry run only: a release build ignores the
           # test feed.
           if [ "$GITHUB_REF_TYPE" != tag ]; then
