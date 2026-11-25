@@ -2256,6 +2256,9 @@ impl PartStudioView {
                     }
                     InputEvent::Change => {
                         this.ui.dim_invalid = false;
+                        let units = this.doc.read(cx).session.doc.settings.units;
+                        let committed = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units));
+                        this.ui.dim_box_typed |= !dim_box_untouched(committed.as_deref(), &st.read(cx).value());
                         let vars = this.sketch_variables(cx);
                         let dim = this.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::dim_unit(&c.kind)));
                         let list = crate::var_complete::VarCompletion::compute("dim", st.read(cx), &vars, dim);
@@ -2275,10 +2278,10 @@ impl PartStudioView {
                 if let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) {
                     dialog.update(cx, |d, cx| d.close_external_create_variable(DIM_BOX_FIELD, cx));
                 }
-                self.ui.dim_box_focus_text = Some(state.read(cx).value().to_string());
                 self.dim_input = Some((cid, state, sub));
                 self.ui.dim_box_offset = Point::default();
                 self.ui.dim_invalid = false;
+                self.ui.dim_box_typed = false;
                 if let Some(ui) = self.ui_mut() {
                     ui.dim_completion = None;
                 }
@@ -2317,6 +2320,31 @@ impl PartStudioView {
         }
         cx.notify();
         true
+    }
+
+    /// Esc in the dimension box. Live dimbox-esc-1125: the unit list open, it closes the list; a changed (or refused)
+    /// box drops its text for a zero in the dimension's unit ("0 mm") and gives the sketch the keys back (qa4 F29),
+    /// nothing committed, and the next Esc (the sketch's) closes it. An untouched box closes at once (qa4
+    /// DIM-ESC-UNTOUCHED).
+    fn dim_box_escape(&mut self, cid: noshape_sketch::ConstraintId, st: &Entity<InputState>, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(ui) = self.ui_mut()
+            && ui.dim_completion.take().is_some()
+        {
+            cx.notify();
+            return;
+        }
+        let untouched = !self.ui.dim_box_typed && !self.ui.dim_invalid;
+        self.ui.dim_invalid = false;
+        window.focus(&self.focus, cx);
+        if untouched {
+            self.sketch_cancel(cx);
+            return;
+        }
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let dim = self.sketch_data(cx).and_then(|d| d.sketch.constraint(cid).map(|c| crate::sketch_mode::dim_unit(&c.kind)));
+        let zero = noshape_units::format_quantity_with(noshape_units::Quantity::new(0.0, dim.unwrap_or(noshape_units::Dim::LENGTH)), &units, 0).replace('°', " deg");
+        st.update(cx, |s, cx| s.set_value(zero, window, cx));
+        cx.notify();
     }
 
     /// The dimension box's text as it would be applied ("41" → "41 mm"), left in the box without applying it: a click
@@ -4632,17 +4660,20 @@ impl PartStudioView {
                         .top(px(y - 30.0) + self.ui.dim_box_offset.y)
                         .w(px(209.))
                         .occlude()
+                        // (The input's own Esc would put the committed text back first.)
+                        .capture_action(cx.listener({
+                            let st = st.clone();
+                            move |this, _: &gpui_kit::component::input::Escape, window, cx| {
+                                cx.stop_propagation();
+                                this.dim_box_escape(cid, &st, window, cx);
+                            }
+                        }))
                         // ↑ / ↓ (Shift ×10, Ctrl ×0.1) and the wheel step the value.
                         .capture_key_down(cx.listener({
                             let st = st.clone();
                             move |this, e: &KeyDownEvent, window, cx| {
                                 let k = &e.keystroke;
-                                // Live (qa5 dim conflict): Esc in a changed box
-                                // reverts it to the committed value and blurs it;
-                                // the box stays, and the next Esc (the sketch's)
-                                // closes it. The sketch gets the keys back (qa4
-                                // F29). An untouched box closes at once (qa4
-                                // DIM-ESC-UNTOUCHED).
+                                // (Esc: dim_box_escape.)
                                 // The autofill list takes ↑ / ↓, Tab and Esc first.
                                 if this.ui_ref().is_some_and(|u| u.dim_completion.is_some()) && !k.modifiers.modified() {
                                     match k.key.as_str() {
@@ -4652,11 +4683,7 @@ impl PartStudioView {
                                             }
                                         }
                                         "tab" => this.accept_dim_completion(cid, None, window, cx),
-                                        "escape" => {
-                                            if let Some(ui) = this.ui_mut() {
-                                                ui.dim_completion = None;
-                                            }
-                                        }
+                                        "escape" => this.dim_box_escape(cid, &st, window, cx),
                                         _ => return,
                                     }
                                     cx.stop_propagation();
@@ -4665,20 +4692,7 @@ impl PartStudioView {
                                 }
                                 if k.key == "escape" && !k.modifiers.modified() {
                                     cx.stop_propagation();
-                                    this.ui.dim_invalid = false;
-                                    let units = this.doc.read(cx).session.doc.settings.units;
-                                    let committed = this.sketch_data(cx).and_then(|d| crate::sketch_mode::dimension_edit_text(&d, cid, &units));
-                                    let untouched = dim_box_untouched(committed.as_deref(), &st.read(cx).value());
-                                    window.focus(&this.focus, cx);
-                                    if untouched {
-                                        this.sketch_cancel(cx);
-                                        return;
-                                    }
-                                    // (Back to what the box held when it took the focus: live sketch-edit-feel-1122.)
-                                    if let Some(text) = this.ui.dim_box_focus_text.clone().or(committed) {
-                                        st.update(cx, |s, cx| s.set_value(text, window, cx));
-                                    }
-                                    cx.notify();
+                                    this.dim_box_escape(cid, &st, window, cx);
                                     return;
                                 }
                                 if (k.key == "up" || k.key == "down") && !k.modifiers.alt {
@@ -4755,12 +4769,11 @@ impl PartStudioView {
                                         // A press on the unfocused box takes it back, all selected.
                                         .capture_any_mouse_down(cx.listener({
                                             let st = st.clone();
-                                            move |this, _: &MouseDownEvent, window, cx| {
+                                            move |_, _: &MouseDownEvent, window, cx| {
                                                 if st.read(cx).focus_handle(cx).is_focused(window) {
                                                     return;
                                                 }
                                                 cx.stop_propagation();
-                                                this.ui.dim_box_focus_text = Some(st.read(cx).value().to_string());
                                                 st.update(cx, |s, cx| {
                                                     s.focus(window, cx);
                                                     s.select_all(window, cx);
