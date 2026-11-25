@@ -6577,7 +6577,8 @@ impl SketchEditor {
             return Ok(());
         }
         data.sketch.set_driving(cid, true).map_err(|e| e.to_string())?;
-        let report = data.sketch.solve();
+        // Analyzed even in a big sketch's quick solves: the redundancy decides.
+        let report = data.sketch.solve_with(&noshape_sketch::SolveOptions::default());
         if report.conflicting().contains(&cid) || report.redundant.contains(&cid) || !report.is_solved() {
             let _ = data.sketch.set_driving(cid, false);
             data.sketch.solve();
@@ -7824,7 +7825,8 @@ pub fn add_dimension(data: &mut SketchData, kind: ConstraintKind, label: Option<
         data.sketch.orient_angle_sector(cid, p);
     }
     let _ = data.sketch.set_driving(cid, true);
-    let report = data.sketch.solve();
+    // Analyzed even in a big sketch's quick solves: the redundancy decides.
+    let report = data.sketch.solve_with(&noshape_sketch::SolveOptions::default());
     if report.conflicting().contains(&cid) || report.redundant.contains(&cid) {
         let _ = data.sketch.set_driving(cid, false);
         data.sketch.solve();
@@ -8429,10 +8431,17 @@ fn image_box(a: DVec2, b: DVec2, aspect: f64) -> (DVec2, f64) {
 /// `None`: the file's own units, else millimeters).
 pub const DXF_UNITS: &[(&str, Option<f64>)] = &[("From file", None), ("Millimeter", Some(0.001)), ("Centimeter", Some(0.01)), ("Meter", Some(1.0)), ("Inch", Some(0.0254)), ("Foot", Some(0.3048)), ("Yard", Some(0.9144))];
 
+/// Insert DXF or DWG's bubble for a file it cannot read (Onshape's words).
+pub const DXF_UNREADABLE: &str = "The DXF/DWG imported with the following error:\n\n- Could not open file.";
+/// Insert DXF or DWG's bubble when it drops points, texts or other entities a sketch does not take (the rest is
+/// still inserted).
+pub const DXF_UNRECOGNIZED: &str = "The DXF/DWG imported with the following error:\n\n- Could not import unrecognized entity.";
+
 /// Insert DXF or DWG from a file: parse it and add its geometry in the
-/// chosen units (see [`DXF_UNITS`]). Errors carry the message the panel shows.
-pub fn insert_dxf_file(data: &mut SketchData, path: &std::path::Path, unit_scale: Option<f64>, use_origin: bool) -> Result<Vec<EntityId>, String> {
-    let drawing = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| noshape_sketch::dwg::parse_cad(&b).map_err(|e| e.to_string())).map_err(|e| format!("Could not insert the drawing: {e}"))?;
+/// chosen units (see [`DXF_UNITS`]). Returns the new entities and the bubble
+/// to show ([`DXF_UNRECOGNIZED`]); a file it cannot read is [`DXF_UNREADABLE`].
+pub fn insert_dxf_file(data: &mut SketchData, path: &std::path::Path, unit_scale: Option<f64>, use_origin: bool) -> Result<(Vec<EntityId>, Option<&'static str>), String> {
+    let drawing = std::fs::read(path).ok().and_then(|b| noshape_sketch::dwg::parse_cad(&b).ok()).ok_or(DXF_UNREADABLE)?;
     let scale = unit_scale.or(drawing.unit_scale).unwrap_or(0.001);
     Ok(insert_dxf(data, &drawing, scale, use_origin))
 }
@@ -8455,20 +8464,25 @@ pub fn image_from_bytes(name: String, bytes: Vec<u8>) -> Result<(String, Vec<u8>
     Ok((name, bytes, w as f64 / h as f64))
 }
 
-/// Insert DXF: add a drawing's geometry (`scale` meters per drawing unit),
-/// centered on the sketch origin unless `use_origin`.
-pub fn insert_dxf(data: &mut SketchData, drawing: &noshape_sketch::dxf::DxfDrawing, scale: f64, use_origin: bool) -> Vec<EntityId> {
+/// Insert DXF: add a drawing's curves (`scale` meters per drawing unit),
+/// centered on the sketch origin unless `use_origin`. Points, texts and
+/// other entities are dropped, as Onshape does, with [`DXF_UNRECOGNIZED`].
+pub fn insert_dxf(data: &mut SketchData, drawing: &noshape_sketch::dxf::DxfDrawing, scale: f64, use_origin: bool) -> (Vec<EntityId>, Option<&'static str>) {
+    use noshape_sketch::dxf::{DxfDrawing, DxfEntity};
+    let curves: Vec<DxfEntity> = drawing.entities.iter().filter(|e| matches!(e, DxfEntity::Curve(_))).cloned().collect();
+    let dropped = drawing.unrecognized + drawing.entities.len() - curves.len();
+    let drawing = DxfDrawing { entities: curves, ..drawing.clone() };
     let offset = if use_origin {
         DVec2::ZERO
     } else {
         let mut tmp = Sketch::new();
-        tmp.insert_drawing(drawing, scale, DVec2::ZERO);
+        tmp.insert_drawing(&drawing, scale, DVec2::ZERO);
         let bb = tmp.bbox();
         if bb.is_empty() { DVec2::ZERO } else { -bb.center() }
     };
-    let ids = data.sketch.insert_drawing(drawing, scale, offset);
+    let ids = data.sketch.insert_drawing(&drawing, scale, offset);
     data.sketch.solve();
-    ids
+    (ids, (dropped > 0).then_some(DXF_UNRECOGNIZED))
 }
 
 /// Corner of a square with the given first corner/center, on the cursor's side.

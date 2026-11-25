@@ -9165,3 +9165,30 @@ fn a_new_sketch_keeps_the_view_and_n_turns_it_normal(cx: &mut TestAppContext) {
     let normal = forward(cx);
     assert!(normal.distance(glam::DVec3::NEG_Z) < 1e-6, "N: normal to Top: {normal:?}");
 }
+
+/// Live (dxf-insert-1125): ✓ on a drawing inserts its curves at once, unconstrained, with nothing selected and no
+/// message; its POINT and TEXT are dropped with a warning bubble; one Ctrl+Z removes the whole insert.
+#[gpui::test]
+fn insert_dxf_drops_points_and_texts_and_undoes_in_one_step(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dxf-insert", Tool::Select);
+    let dxf = "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n10\n0\n20\n0\n11\n10\n21\n0\n0\nLINE\n8\n0\n10\n10\n20\n0\n11\n10\n21\n5\n0\nCIRCLE\n8\n0\n10\n5\n20\n5\n40\n2\n0\nPOINT\n8\n0\n10\n1\n20\n2\n0\nTEXT\n8\n0\n10\n0\n20\n0\n40\n2\n1\nHI\n0\nENDSEC\n0\nEOF\n";
+    let state = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let kinds: Vec<noshape_sketch::EntityKind> = d.sketch.entities().filter(|e| e.kind() != noshape_sketch::EntityKind::Point).map(|e| e.kind()).collect();
+        (kinds.len(), d.sketch.constraint_count())
+    });
+    let constraints = state(cx).1;
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.insert_dxf_bytes(dxf.as_bytes(), w, cx))).unwrap();
+    draw(cx, window);
+    assert_eq!(state(cx), (3, constraints), "2 lines and a circle, no constraints");
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        assert!(ed.selection.is_empty() && ed.message.is_none(), "nothing selected, no message");
+        assert_eq!(v.message, Some((noshape_model::display::FeatureStatus::Warning, crate::sketch_mode::DXF_UNRECOGNIZED.to_string())));
+    });
+    keys(cx, window, &["secondary-z"]);
+    assert_eq!(state(cx).0, 0, "one undo removes the whole insert");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.insert_dxf_bytes(b"not a drawing", w, cx))).unwrap();
+    assert_eq!(cx.update(|cx| view.read(cx).message.clone()), Some((noshape_model::display::FeatureStatus::Warning, crate::sketch_mode::DXF_UNREADABLE.to_string())));
+}

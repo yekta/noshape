@@ -938,6 +938,17 @@ fn sketch_text_and_imports() {
     let circles = created(&d, "circle");
     assert_eq!(circles.len(), 1, "{d}");
     assert!(near(&circles[0]["center"], 5.0, 5.0) && (num(&circles[0]["radius"]) - 2.0).abs() < 1e-9, "{d}");
+    assert!(d.get("warning").is_none(), "{d}");
+    // Points and texts are dropped with Onshape's bubble; a file it cannot read is refused in Onshape's words.
+    let pt = scratch("point-text.dxf");
+    std::fs::write(&pt, "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n10\n0\n20\n40\n11\n10\n21\n40\n0\nPOINT\n8\n0\n10\n1\n20\n2\n0\nTEXT\n8\n0\n10\n0\n20\n0\n40\n2\n1\nHI\n0\nENDSEC\n0\nEOF\n").unwrap();
+    let d = call(&mut ctx, "sketch_insert_dxf", json!({ "sketch": sk, "file": pt.to_str().unwrap(), "use_origin": true }));
+    assert_eq!(created(&d, "line").len(), 1, "{d}");
+    assert_eq!(d["warning"], noshape_scene::sketch_mode::DXF_UNRECOGNIZED, "{d}");
+    let bad = scratch("bad.dxf");
+    std::fs::write(&bad, "not a drawing").unwrap();
+    let e = try_call(&mut ctx, "sketch_insert_dxf", json!({ "sketch": sk, "file": bad.to_str().unwrap() })).unwrap_err();
+    assert_eq!((e.param.as_deref(), e.message.as_str()), (Some("file"), noshape_scene::sketch_mode::DXF_UNREADABLE));
     // Insert image: a 4 x 2 px PNG keeps its 2:1 aspect.
     let png = noshape_scene::png::encode_png(vec![255; 4 * 2 * 4], 4, 2, 4, 2).unwrap();
     let img = scratch("pic.png");

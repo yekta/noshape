@@ -163,8 +163,9 @@ fn bulge_segment(m: &Map, a: DVec3, b: DVec3, bulge: f64, ax: DVec3, ay: DVec3) 
     planar(m, center, ax * r, ay * r, Some(range))
 }
 
-/// Appends the drawing-plane geometry of one model-space entity.
-fn convert(kind: &EntityKind, m: &Map, out: &mut Vec<DxfEntity>) {
+/// Appends the drawing-plane geometry of one model-space entity; false for
+/// an entity that is not 2D geometry (a text, hatch, face or leader).
+fn convert(kind: &EntityKind, m: &Map, out: &mut Vec<DxfEntity>) -> bool {
     let mut push = |c: Option<Curve2>| {
         if let Some(c) = c {
             out.push(DxfEntity::Curve(c));
@@ -220,15 +221,16 @@ fn convert(kind: &EntityKind, m: &Map, out: &mut Vec<DxfEntity>) {
                 }
             }
         }
-        _ => {}
+        _ => return false,
     }
+    true
 }
 
 /// Model-space geometry of a document, block references expanded.
 /// Dimensions (their extension lines, arrows and text blocks) are
 /// annotation, not drawing geometry, and are left out.
 pub fn from_document(doc: &Document, format: &str) -> Result<DxfDrawing> {
-    let mut out = DxfDrawing { entities: Vec::new(), unit_scale: insunits(doc.units.unit.to_insunits() as i64) };
+    let mut out = DxfDrawing { entities: Vec::new(), unit_scale: insunits(doc.units.unit.to_insunits() as i64), unrecognized: 0 };
     let mut doc = doc.clone();
     let not_dimension = |e: &cadkit_core::Entity| !matches!(e.kind, EntityKind::Dimension { .. });
     for m in &mut doc.models {
@@ -238,9 +240,13 @@ pub fn from_document(doc: &Document, format: &str) -> Result<DxfDrawing> {
         b.entities.retain(not_dimension);
     }
     for (i, _) in doc.models.iter().enumerate().filter(|(_, m)| m.kind == ModelKind::Model) {
-        doc.walk(i, 32, |e, ctx| convert(&e.kind, &Map::from(&ctx.transform), &mut out.entities));
+        doc.walk(i, 32, |e, ctx| {
+            if !convert(&e.kind, &Map::from(&ctx.transform), &mut out.entities) {
+                out.unrecognized += 1;
+            }
+        });
     }
-    if out.entities.is_empty() {
+    if out.entities.is_empty() && out.unrecognized == 0 {
         return Err(SketchError::OperationFailed(format!("the {format} file contains no supported 2D geometry")));
     }
     Ok(out)

@@ -35,6 +35,8 @@ pub(crate) struct Cache {
     pub revision: u64,
     pub analysis: Option<(u64, Analysis)>,
     pub drag_graph: Option<(u64, std::sync::Arc<crate::drag_hold::DragGraph>)>,
+    /// [`Sketch::solve`] skips the DOF analysis ([`Sketch::set_quick_solves`]).
+    pub quick: bool,
 }
 
 /// A 2D sketch: entities + constraints.
@@ -72,7 +74,7 @@ impl Sketch {
             return;
         }
         let mut probe = self.clone();
-        probe.solve();
+        probe.solve_with(&crate::solver::SolveOptions::default());
         if probe.cache.revision == self.cache.revision {
             self.cache.analysis = probe.cache.analysis;
         }

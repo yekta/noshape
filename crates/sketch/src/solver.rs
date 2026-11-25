@@ -1592,7 +1592,13 @@ impl Sketch {
 
     /// Solves all driving constraints, warm-started from the current geometry.
     pub fn solve(&mut self) -> SolveReport {
-        self.solve_with(&SolveOptions::default())
+        self.solve_with(&SolveOptions { analyze: !self.cache.quick, ..Default::default() })
+    }
+
+    /// While on, [`Self::solve`] skips the DOF analysis (a big sketch's edits: fuzz fz211's ~80 of its ~110 ms; the
+    /// regeneration after the edit still analyzes it). `solve_with` a default [`SolveOptions`] still analyzes.
+    pub fn set_quick_solves(&mut self, on: bool) {
+        self.cache.quick = on;
     }
 
     pub fn solve_with(&mut self, opts: &SolveOptions) -> SolveReport {

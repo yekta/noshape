@@ -178,7 +178,7 @@ pub fn ops() -> Vec<Op> {
         op(
             "insert_dxf",
             "Import a DXF or DWG drawing into the sketch (Insert DXF or DWG)",
-            "Adds the drawing's geometry, in the file's units unless `units` is given, centered on the sketch origin unless `use_origin`.",
+            "Adds the drawing's curves, unconstrained, in the file's units unless `units` is given, centered on the sketch origin unless `use_origin`. Points, texts and other entities are dropped with a `warning`.",
             vec![
                 req("file", s(), "Path of the .dxf / .dwg file."),
                 opt("units", json!({ "type": "string", "enum": sm::DXF_UNITS.iter().map(|u| u.0).collect::<Vec<_>>() }), "Drawing units (default \"From file\"; millimeters when the file has none)."),
@@ -729,14 +729,16 @@ fn insert_dxf(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => None,
     };
     let path = std::path::PathBuf::from(a.str("file")?);
-    let ids = sm::insert_dxf_file(&mut t.data, &path, scale, a.bool_or("use_origin", false)?).map_err(|m| OpError::param("file", &m))?;
+    let (ids, warning) = sm::insert_dxf_file(&mut t.data, &path, scale, a.bool_or("use_origin", false)?).map_err(|m| OpError::param("file", &m))?;
     if ids.is_empty() {
-        return Err(OpError::param("file", "the drawing has no geometry a sketch can take"));
+        return Err(OpError::param("file", warning.unwrap_or(sm::DXF_UNRECOGNIZED)));
     }
     t.data.sketch.solve();
     let ed = editor(&t);
     let mut out = finish(od, t, &ed, true, &before)?;
-    out.value["message"] = json!(format!("Inserted {} entities from {}", ids.len(), path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default()));
+    if let Some(w) = warning {
+        out.value["warning"] = json!(w);
+    }
     Ok(out)
 }
 

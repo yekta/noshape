@@ -522,8 +522,17 @@ impl PartStudioView {
             return None;
         }
         let dialog = self.edit.as_ref()?.dialog.clone();
+        // A slow sketch's edits solve without the DOF analysis (its regeneration, off the UI thread, analyzes it).
+        let quick = self.sketch_solves_slowly(cx);
         let mut editor = self.sketch.take()?;
-        let r = dialog.update(cx, |d, _| d.sketch_data_mut().map(|data| f(&mut editor, data)));
+        let r = dialog.update(cx, |d, _| {
+            d.sketch_data_mut().map(|data| {
+                data.sketch.set_quick_solves(quick);
+                let r = f(&mut editor, data);
+                data.sketch.set_quick_solves(false);
+                r
+            })
+        });
         self.sketch = Some(editor);
         r
     }
@@ -3782,7 +3791,7 @@ impl PartStudioView {
         if self.sketch.as_ref().is_some_and(|e| e.tool == Tool::InsertImage) {
             self.load_image_bytes(f.file_name.clone(), bytes, cx);
         } else {
-            self.insert_dxf_bytes(&f.file_name, &bytes, window, cx);
+            self.insert_dxf_bytes(&bytes, window, cx);
         }
     }
 
@@ -3818,7 +3827,7 @@ impl PartStudioView {
                         if image {
                             this.load_image_bytes(name, bytes, cx);
                         } else {
-                            this.insert_dxf_bytes(&name, &bytes, window, cx);
+                            this.insert_dxf_bytes(&bytes, window, cx);
                         }
                     })
                 });
@@ -3826,27 +3835,26 @@ impl PartStudioView {
         });
     }
 
-    fn insert_dxf_bytes(&mut self, name: &str, bytes: &[u8], window: &mut Window, cx: &mut Context<Self>) {
-        let drawing = match noshape_sketch::dwg::parse_cad(bytes) {
-            Ok(d) => d,
-            Err(e) => {
-                self.message = Some((FeatureStatus::Error, format!("Could not insert the drawing: {e}")));
-                cx.notify();
-                return;
-            }
+    /// Insert DXF or DWG's ✓: the drawing's curves come in at once, nothing
+    /// selected and no message (live), with a bubble for what it dropped or
+    /// could not read.
+    fn insert_dxf_bytes(&mut self, bytes: &[u8], window: &mut Window, cx: &mut Context<Self>) {
+        let Ok(drawing) = noshape_sketch::dwg::parse_cad(bytes) else {
+            self.message = Some((FeatureStatus::Warning, crate::sketch_mode::DXF_UNREADABLE.into()));
+            cx.notify();
+            return;
         };
         let Some(ed) = self.sketch.as_ref() else { return };
         let scale = ed.dxf_unit_scale.unwrap_or(0.001);
         let use_origin = ed.dxf_use_origin;
-        let n = self.with_sketch(cx, |ed, data| {
-            let ids = crate::sketch_mode::insert_dxf(data, &drawing, scale, use_origin);
-            ed.selection = ids.clone();
-            ids.len()
-        });
-        if n.unwrap_or(0) > 0 {
+        let inserted = self.with_sketch(cx, |_, data| crate::sketch_mode::insert_dxf(data, &drawing, scale, use_origin));
+        let Some((ids, warning)) = inserted else { return };
+        if let Some(w) = warning {
+            self.message = Some((FeatureStatus::Warning, w.into()));
+        }
+        if !ids.is_empty() {
             if let Some(ed) = &mut self.sketch {
                 ed.set_tool(Tool::Select);
-                ed.message = Some(format!("Inserted {} entities from {name}", n.unwrap_or(0)));
             }
             self.regen_sync(window, cx);
         }

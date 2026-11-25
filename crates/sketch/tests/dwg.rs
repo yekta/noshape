@@ -113,13 +113,16 @@ fn r2007_bulged_polyline_matches_dxf_export() {
         sweep += end_angle - start_angle;
     }
     assert!(close(sweep, TAU));
-    // the two halves join into one closed loop in the sketch
+    // the two halves meet in one closed loop in the sketch (unconstrained, as Onshape)
     let mut sk = Sketch::new();
     let ids = sk.insert_drawing(&d, d.unit_scale.unwrap(), DVec2::ZERO);
     assert_eq!(ids.len(), 2);
+    let at = |e| sk.point(e).unwrap();
     let (s0, e0) = sk.endpoints(ids[0]).unwrap();
     let (s1, e1) = sk.endpoints(ids[1]).unwrap();
-    assert!((s0 == e1 || s0 == s1) && (e0 == s1 || e0 == e1));
+    let meet = |a, b| (at(a) - at(b)).length() < 1e-9;
+    assert!((meet(s0, e1) || meet(s0, s1)) && (meet(e0, s1) || meet(e0, e1)));
+    assert_eq!(sk.regions().len(), 1);
 }
 
 #[test]
@@ -203,10 +206,10 @@ fn rejects_bad_input() {
     assert_eq!(d.entities.len(), 7);
 }
 
-/// A big drawing's meeting curve ends share one point each: 400 squares of 4 lines make 1600 corners (found by grid
-/// cell, not by every pair of ends: 2000 entities took 0.7 s).
+/// As in Onshape, an inserted drawing carries no constraints: meeting curve ends stay two points (a dragged corner
+/// opens), and the squares are still regions.
 #[test]
-fn a_big_drawings_meeting_ends_share_points() {
+fn a_drawings_meeting_ends_stay_unconstrained() {
     let mut d = DxfDrawing::default();
     for i in 0..20 {
         for j in 0..20 {
@@ -217,5 +220,7 @@ fn a_big_drawings_meeting_ends_share_points() {
     }
     let mut sk = Sketch::new();
     assert_eq!(sk.insert_drawing(&d, 0.001, DVec2::ZERO).len(), 1600);
-    assert_eq!(sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).count(), 1600);
+    assert_eq!(sk.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).count(), 3200);
+    assert_eq!(sk.constraint_count(), 0);
+    assert_eq!(sk.regions().len(), 400);
 }

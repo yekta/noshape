@@ -2111,7 +2111,7 @@ Examples:
 
 Import a DXF or DWG drawing into the sketch (Insert DXF or DWG) (edits the document (one undoable history entry)).
 
-Adds the drawing's geometry, in the file's units unless `units` is given, centered on the sketch origin unless `use_origin`.
+Adds the drawing's curves, unconstrained, in the file's units unless `units` is given, centered on the sketch origin unless `use_origin`. Points, texts and other entities are dropped with a `warning`.
 
 Examples:
 
