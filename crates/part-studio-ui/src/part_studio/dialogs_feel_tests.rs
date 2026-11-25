@@ -1365,6 +1365,12 @@ fn the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus(cx: &mut Tes
     let (dx, dy, dz) = (mm(cx, "dx"), mm(cx, "dy"), mm(cx, "dz"));
     let focus_after = cx.update_window(window, |_, w, cx| dialog.read(cx).focused_control(w, cx)).unwrap();
     assert!(dx > 1.0 && (dx - dy).abs() < 0.2 && dz == 0.0 && focus_before.is_some() && focus_after == focus_before, "+40 px right: X {dx}, Y {dy}, Z {dz} mm (live 8.3 / 8.3 / 0); the focus {focus_before:?} -> {focus_after:?}");
+    // Live manip-drag-1125 part 3: Ctrl+Z in the dialog takes the whole drag back in one step.
+    keys(cx, window, &["secondary-z"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let (ux, uy) = (mm(cx, "dx"), mm(cx, "dy"));
+    assert_eq!((ux, uy), (0.0, 0.0), "after one Ctrl+Z in the dialog (dragged {dx} / {dy})");
 }
 
 /// Live2 pattern-hole-1118 y (qa): Hole with no point: the title's tooltip ends "[Hole] did not regenerate properly: No
