@@ -6659,6 +6659,10 @@ bool fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_S
   return true;
 }
 
+// A pattern's checked glue with fewer instances than this reaching into the arguments: the plain fuse at once, not
+// fuse_trimmed's (the plain fuse of so few isn't slow).
+static constexpr size_t plain_fuse_tools = 16;
+
 // fuse_trimmed with noshape's own Boolean throughout: each tool cut by the arguments, then the arguments fused with
 // what is left of the tools (they only touch now). False (nothing done) where any of them declines. `srcs`: the
 // arguments' and tools' shapes as the plain fuse had them (their bodies converted once: c2-impeller-loft's nine seats
@@ -10123,16 +10127,18 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
           done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true);
         }
         reach_in = !done && rust_last_decline() == "pattern instances overlapping";
-        if (reach_in)
+        // (Too few for the plain fuse to be slow: the plain fuse at once, as OCCT's below (plain_at_once). The trimmed
+        // tools of c2-impeller-loft's nine seats and c2-rings-loft's eight rings overlap each other: 0.7-0.9 s of cuts
+        // before the plain fuse.)
+        if (reach_in && t.size() >= plain_fuse_tools)
         {
           const KernelTimer trim("boolean.rust.trimmed");
           done = rust_fuse_trimmed(a, t, rs, opts, out, h);
-          // (Instances overlapping one another too, so the trimmed ones don't just touch: OCCT's fuse_trimmed fails
-          // there (their volumes don't add up) and OCCT runs the plain fuse; so does ours (c2-rings-loft's
-          // Circular pattern 1: 8 rings, 222 ms against OCCT's 472).)
-          if (!done)
-            done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
         }
+        // (Instances overlapping one another too, so the trimmed ones don't just touch: OCCT's fuse_trimmed fails
+        // there (their volumes don't add up) and OCCT runs the plain fuse; so does ours.)
+        if (reach_in && !done)
+          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
         if (!done)
           rust_decline(nullptr);
       }
@@ -10235,7 +10241,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
   // (Instances reaching into the arguments, too few for the plain fuse to be slow: the plain fuse at once. The glued
   // one can't be right, and fuse_trimmed's is only kept where OCCT's volumes add up, which its integration of
   // free-form faces can miss by a percent: c2-impeller-loft's nine seats, 0.7 s of glued fuses before the plain one.)
-  const bool plain_at_once = first.glue == 3 && reach_in && t.size() < 16;
+  const bool plain_at_once = first.glue == 3 && reach_in && t.size() < plain_fuse_tools;
   if (plain_at_once)
     first.glue = 0;
   if (first.glue == 4) // (a cut by tools inside the part: checked below)
