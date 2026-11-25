@@ -152,8 +152,9 @@ pub struct ExportSettings {
 /// Resolution › Custom (live 1745): STL's Chordal tolerance · Angular
 /// deviation (deg) · Minimum facet width, in the STL units (stored here in
 /// mm); OBJ / 3MF / glTF / GLB's Distance tolerance (m) · Angular tolerance
-/// (deg) · Maximum chord length (m). Our mesher takes the tolerance and the
-/// angle; the facet width and chord length are kept but not applied.
+/// (deg) · Maximum chord length (m). Our mesher takes the tolerance, the
+/// angle and an STL's facet width ([`mesh_params`]); the chord length is kept
+/// but not applied.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CustomResolution {
     pub chordal_mm: f64,

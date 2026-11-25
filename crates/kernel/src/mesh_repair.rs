@@ -114,6 +114,47 @@ pub fn drop_pinched_triangles(t: &mut Tessellation) -> usize {
     dropped
 }
 
+/// Pairs of triangles on the same three points wound opposite ways dropped: a fin of no volume (BRepMesh left one on
+/// the impeller's bottom face at Medium: a non-manifold edge in the STL). Each of its edges loses one use each way, so a
+/// closed mesh stays closed. Returns how many triangles.
+pub fn drop_cancelling_pairs(t: &mut Tessellation) -> usize {
+    let weld = weld(t);
+    let n = t.indices.len() / 3;
+    // A triangle's points from its lowest, and its winding: (b, c) after the lowest a, or (c, b) for the other way.
+    let key = |k: usize| {
+        let [a, b, c] = [0, 1, 2].map(|i| weld[t.indices[3 * k + i] as usize]);
+        let [a, b, c] = if a < b && a < c { [a, b, c] } else if b < c { [b, c, a] } else { [c, a, b] };
+        if b < c { ([a, b, c], true) } else { ([a, c, b], false) }
+    };
+    let mut open: HashMap<([u32; 3], bool), Vec<usize>, Fast> = HashMap::with_capacity_and_hasher(n, Fast::default());
+    let mut drop = vec![false; n];
+    for k in 0..n {
+        let (pts, way) = key(k);
+        if let Some(other) = open.get_mut(&(pts, !way)).and_then(Vec::pop) {
+            drop[other] = true;
+            drop[k] = true;
+        } else {
+            open.entry((pts, way)).or_default().push(k);
+        }
+    }
+    let dropped = drop.iter().filter(|d| **d).count();
+    if dropped == 0 {
+        return 0;
+    }
+    let mut out = Vec::with_capacity(t.indices.len() - 3 * dropped);
+    for r in &mut t.faces {
+        let first = out.len() as u32;
+        let (lo, hi) = (r.first_index as usize / 3, (r.first_index + r.index_count) as usize / 3);
+        for k in (lo..hi).filter(|k| !drop[*k]) {
+            out.extend_from_slice(&t.indices[3 * k..3 * k + 3]);
+        }
+        r.first_index = first;
+        r.index_count = out.len() as u32 - first;
+    }
+    t.indices = out;
+    dropped
+}
+
 /// Each vertex's first vertex at the same position (the faces' meshes share their edges' points, not indices).
 fn weld(t: &Tessellation) -> Vec<u32> {
     let mut id: HashMap<[u32; 3], u32, Fast> = HashMap::with_capacity_and_hasher(t.positions.len(), Fast::default());

@@ -168,6 +168,7 @@ pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
 pub fn tessellate_closed(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<Tessellation> {
     let mut t = tessellate_raw(shape, &MeshOptions { linear_deflection, angular_deflection, relative: false, parallel: true, exact: false, min_size: 0.0 })?;
     crate::mesh_repair::drop_pinched_triangles(&mut t);
+    crate::mesh_repair::drop_cancelling_pairs(&mut t);
     crate::mesh_repair::repair_folded_faces(shape, &mut t);
     crate::mesh_repair::orient_by_neighbours(&mut t);
     Ok(t)
@@ -181,6 +182,7 @@ pub fn tessellate_export(shape: &Shape, linear_deflection: f64, angular_deflecti
     let big = shape.transformed(&crate::Transform::Scale { center: glam::DVec3::ZERO, factor: UP })?;
     let mut t = tessellate_raw(&big, &MeshOptions { linear_deflection: linear_deflection * UP, angular_deflection, relative: false, parallel: true, exact: true, min_size: min_size * UP })?;
     crate::mesh_repair::drop_pinched_triangles(&mut t);
+    crate::mesh_repair::drop_cancelling_pairs(&mut t);
     crate::mesh_repair::repair_folded_faces(&big, &mut t);
     crate::mesh_repair::orient_by_neighbours(&mut t);
     // (Divided in f64: the f32 a mesh at size would have, 20.0 → 0.02 exactly as written.)

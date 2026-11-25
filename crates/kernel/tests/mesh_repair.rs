@@ -80,3 +80,28 @@ fn a_triangle_wound_against_its_neighbours_is_turned_back() {
     assert_eq!(orient_by_neighbours(&mut t), 1);
     assert_eq!(folds_and_holes(&t), (0, 0));
 }
+
+/// The impeller's Medium STL (lead 11-25, 3D printing): BRepMesh left a triangle and its copy wound the other way on the
+/// bottom face, a fin of no volume (a non-manifold edge). Both go; the mesh is closed again; a closed mesh keeps all.
+#[test]
+fn a_triangle_pair_wound_both_ways_is_dropped() {
+    let part = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.01, 0.02, TAU).unwrap();
+    let mut t = tessellate_closed(&part, 1e-4, 0.35).unwrap();
+    let triangles = t.triangle_count();
+    assert_eq!(drop_cancelling_pairs(&mut t), 0);
+    // A fin on one of the side's triangles: its corners copied, once each way.
+    let side = (0..t.faces.len()).max_by_key(|&f| t.faces[f].index_count).unwrap();
+    let first = t.faces[side].first_index as usize;
+    let corners: Vec<[f32; 3]> = t.indices[first..first + 3].iter().map(|&i| t.positions[i as usize]).collect();
+    let base = t.positions.len() as u32;
+    for p in &corners {
+        t.positions.push(*p);
+        t.normals.push([0.0, 0.0, 1.0]);
+    }
+    let start = t.indices.len() as u32;
+    t.indices.extend([base, base + 1, base + 2, base, base + 2, base + 1]);
+    t.faces.push(FaceRange { first_index: start, index_count: 6, first_vertex: base, vertex_count: 3 });
+    assert_ne!(folds_and_holes(&t), (0, 0));
+    assert_eq!(drop_cancelling_pairs(&mut t), 2);
+    assert_eq!((folds_and_holes(&t), t.triangle_count()), ((0, 0), triangles));
+}
