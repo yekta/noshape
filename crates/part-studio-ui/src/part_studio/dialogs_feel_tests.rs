@@ -2516,3 +2516,45 @@ fn isolate_pales_the_other_parts_and_esc_gives_their_colours_back(cx: &mut TestA
     assert!(ended && gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("ps-isolate").is_none(), "Esc ends Isolate and closes its panel");
     assert_eq!(colours(cx), before, "every colour back");
 }
+
+/// Live manip-ring-1125: Move face's Rotate head sits at std's radius (the top face's middle (20, 15, 20) projected to
+/// the axis: 15 mm), pushed out to 60 px on screen when 15 mm is shorter, std's radius once zoomed in past it.
+#[gpui::test]
+fn move_faces_rotate_ring_keeps_60_px_from_its_axis(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "moveFace", "name": "Move face 1", "params": { "moveFaces": ["face through [15, 15, 20]"], "moveFaceType": "ROTATE", "axis": ["edge through [20, 0, 20]"], "angle": "0 deg" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "dlg-moveface-ring-60", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    // The head's start: its world distance from the axis (the front top edge, y 0, z 20 mm) and on screen.
+    let ring = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let vp = vp.read(cx);
+            let &(end, _, _) = vp.manipulators.first()?;
+            let foot = glam::DVec3::new(end.x, 0.0, 0.02);
+            Some(((end - foot).length() * 1000.0, (vp.project(end)? - vp.project(foot)?).length()))
+        })
+        .expect("the ring")
+    };
+    // At the fit 15 mm is ~31 px on screen here: the head held 60 px out.
+    let (mm, px_fit) = ring(cx);
+    assert!((px_fit - 60.0).abs() < 1.0 && mm > 15.0, "at the fit: {mm} mm, {px_fit} px");
+    // Zoomed in 8x about the viewport's middle.
+    cx.update(|cx| vp.update(cx, |vp, cx| {
+        let size = vp.size();
+        vp.camera.zoom_at(0.125, size * 0.5, size);
+        cx.notify();
+    }));
+    cx.update(|cx| view.update(cx, |_, cx| cx.notify()));
+    draw(cx, window);
+    let (mm_in, px_in) = ring(cx);
+    assert!((mm_in - 15.0).abs() < 1e-6 && px_in > 60.0, "zoomed in: std's 15 mm ({mm_in} mm, {px_in} px)");
+}

@@ -7140,8 +7140,9 @@ impl PartStudioView {
             let c = Rgba::from(Hsla::from(rgb(crate::sketch_mode::SKETCH_BOX_COLOR)));
             fills.push(noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(name), color: [c.r, c.g, c.b, c.a] });
         }
-        // The boxes keep their screen size: their drag handles follow the camera.
-        if self.studio(cx).is_some_and(|s| !s.annotations.is_empty()) {
+        // The boxes keep their screen size: their drag handles follow the camera (so does Move face's ring at its
+        // least on-screen radius).
+        if self.studio(cx).is_some_and(|s| !s.annotations.is_empty()) || self.manip_follows_camera(cx) {
             self.sync_manipulator(cx);
         }
         self.viewport.update(cx, |vp, cx| vp.set_plane_labels(fills, cx));

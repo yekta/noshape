@@ -70,13 +70,31 @@ pub(super) struct ArcHandle {
     pub max: f64,
     /// Transform's: idle, its radius lines and arc grey, only the head white (live manip-feel-1122 rotate-axis-edge-picked).
     pub grey: bool,
+    /// The least on-screen radius, in px (Move face's ring: [`MOVE_FACE_RING_MIN_PX`]); 0: the radius as built.
+    pub min_px: f64,
 }
 
 impl ArcHandle {
     fn point(&self, a: f64) -> DVec3 {
         self.origin + glam::DQuat::from_axis_angle(self.axis, a) * self.radial
     }
+
+    /// The arc as drawn and hit in `view`: its radius at least [`Self::min_px`] long on screen (as projected).
+    fn at_scale(&self, view: &noshape_render::camera_geometry::View) -> ArcHandle {
+        if self.min_px <= 0.0 {
+            return *self;
+        }
+        let Some(shown) = view.project(self.origin + self.radial).zip(view.project(self.origin)).map(|(a, b)| (a - b).length()) else { return *self };
+        if shown >= self.min_px || shown < 1e-6 {
+            return *self;
+        }
+        ArcHandle { radial: self.radial * (self.min_px / shown), ..*self }
+    }
 }
+
+/// Live manip-ring-1125: Move face's Rotate head sits at std's radius (the face's middle projected to the axis, never
+/// the click), pushed out to about 60 px on screen when that is shorter.
+const MOVE_FACE_RING_MIN_PX: f64 = 60.;
 
 // Built per frame and per event for the one edited feature, copied around by value: the handles' array
 // outweighing the triad and section variants costs nothing worth a box.
@@ -195,7 +213,7 @@ impl PartStudioView {
             return None;
         }
         let symmetric = p.bool("symmetric");
-        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: false })
+        Some(ArcHandle { origin: origin + axis * axis.dot(rel), axis, radial, angle: if symmetric { angle * 0.5 } else { angle }, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: false, min_px: if move_face { MOVE_FACE_RING_MIN_PX } else { 0.0 } })
     }
 
     /// Revolve's handles (std addRevolveManipulator, live psb 10-24 rev-*):
@@ -254,7 +272,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         let axis = if p.bool("pullDirection") { -axis } else { axis };
-        Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians(), grey: false })
+        Some(ArcHandle { origin, axis, radial, angle, param: "angle", flip: Some("pullDirection"), secondary: false, max: 89.9f64.to_radians(), grey: false, min_px: 0.0 })
     }
 
     /// Plane's Line angle (std cplane.fs addAngleManipulator): about the
@@ -286,7 +304,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let angle = p.expr("angle").and_then(|x| x.cached.map(|q| q.value).or_else(|| noshape_units::evaluate_as(&x.text, Dim::ANGLE, &units, &self.edit_scope(cx)).ok().map(|q| q.value)))?;
         let axis = if p.bool("oppositeDirection") { -axis } else { axis };
-        Some(ArcHandle { origin: o, axis, radial: radial * size / 4.0, angle, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: false })
+        Some(ArcHandle { origin: o, axis, radial: radial * size / 4.0, angle, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: false, min_px: 0.0 })
     }
 
     /// Transform's Rotate angle and Translate by distance arrow (std
@@ -309,7 +327,7 @@ impl PartStudioView {
                 return None;
             }
             let axis = if opposite { -axis } else { axis };
-            return Manip::of([Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: true })]);
+            return Manip::of([Handle::Arc(ArcHandle { origin, axis, radial, angle: value("angle", Dim::ANGLE)?, param: "angle", flip: Some("oppositeDirection"), secondary: false, max: std::f64::consts::TAU, grey: true, min_px: 0.0 })]);
         }
         if !p.is("transformType", "TRANSLATION_DISTANCE") {
             return None;
@@ -624,6 +642,11 @@ impl PartStudioView {
         }
     }
 
+    /// Whether a handle's hit area depends on the camera (an arc with a least on-screen radius).
+    pub(super) fn manip_follows_camera(&self, cx: &App) -> bool {
+        matches!(self.current_manip(cx), Some(Manip::Handles(hs)) if hs.iter().flatten().any(|h| matches!(h, Handle::Arc(a) | Handle::StdArc(a, _) if a.min_px > 0.0)))
+    }
+
     /// Publish the current arrow's handle to the viewport hit test.
     pub(super) fn sync_manipulator(&mut self, cx: &mut Context<Self>) {
         let arrow = |a: &Arrow| {
@@ -633,7 +656,12 @@ impl PartStudioView {
         };
         // The handle end of the arc (last few degrees) is grabbable.
         // The arc's last stretch, then the stem and head past its end (screen-sized).
+        let view = {
+            let vp = self.viewport.read(cx);
+            noshape_render::camera_geometry::View { camera: vp.camera, size: vp.size() }
+        };
         let arc = |h: &ArcHandle| {
+            let h = h.at_scale(&view);
             let end = h.point(h.angle);
             let tangent = (h.axis.cross(end - h.origin) * if h.angle < 0.0 { -1.0 } else { 1.0 }).normalize_or_zero();
             (end, end + tangent * 1e-3, ARC_STEM_PX + ARC_HEAD_PX)
@@ -1212,7 +1240,7 @@ fn std_handle(m: &noshape_model::display::FeatureManipulator, i: usize) -> Optio
             if radial.length() < 1e-12 {
                 return None;
             }
-            Handle::StdArc(ArcHandle { origin: *axis_origin + *axis_direction * axis_direction.dot(rel), axis: *axis_direction, radial, angle: *angle, param: "", flip: None, secondary: *secondary, max: max.abs().max(min.abs()), grey: false }, i)
+            Handle::StdArc(ArcHandle { origin: *axis_origin + *axis_direction * axis_direction.dot(rel), axis: *axis_direction, radial, angle: *angle, param: "", flip: None, secondary: *secondary, max: max.abs().max(min.abs()), grey: false, min_px: 0.0 }, i)
         }
         M::Points { .. } | M::Triad { .. } => return None,
     })
@@ -1430,6 +1458,7 @@ fn tangent_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
 fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::camera_geometry::View, up: &noshape_render::renderer::Uploader) -> Vec<Instance> {
     let f = |v: DVec3| -> [f32; 3] { [v.x as f32, v.y as f32, v.z as f32] };
     let (outline, core, outline_px, core_px) = handle_style(hover, dragging);
+    let h = h.at_scale(view);
     let end = h.point(h.angle);
     let Some(wpp) = view.world_per_px(end) else { return Vec::new() };
     // The stem and head along the turn at the end, the head's width across the view.
