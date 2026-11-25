@@ -10226,6 +10226,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       if (!stripped && !one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
         scope = rust_unify_scope(*rs[0]);
       bool clean = false;
+      const TopoDS_Shape pre = out;
       if (opts.unify)
         out = scope ? unify_in(out, h, scope.get(), &clean) : unify(out, h);
       std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.rust.result");
@@ -10233,6 +10234,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       lap.reset();
       if (opts.unify && scope)
         r.shape->myUnifyClean = clean;
+      // (A whole unify that left it as it was: op_unify's would too (cf-surface-pattern's Surface Pattern 3: its
+      // merges rejected, the same unify again).)
+      else if (opts.unify && out.IsSame(pre))
+        r.shape->myUnifyClean = true;
       if (!opts.unify)
       {
         r.shape->myUnifyScope = scope;
