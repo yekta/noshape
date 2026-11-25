@@ -111,9 +111,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   and fit tests check the rule (shows_dof_glyph on the evaluated nodes, fit_inset()), not pixels. Queued with the
   study/ticket/handoff commits: QUEUED 17670d52 (carries 8ff1c3dc + 16f8487c). Lead not told yet (883k at 12:1x):
   lead: solver rows go to skasm (lead tells it). 12:0x ASM-CHANGE-CONFIG-PANEL-LOOK fixed (os_ui
-  user_select_field_flat_focusable; ConfigSession.collapsed; Generate only with a non-list input). NEXT: ASM-INSERT-THUMB-CONFIG
-  (live 07 s19-21: Insert thumbnails follow the chosen configuration; insert_thumb(tab, part) keys no configuration);
-  LOOK-OUTLINE-WEIGHT when live answers REQUESTS 11:5x.
+  user_select_field_flat_focusable; ConfigSession.collapsed; Generate only with a non-list input). Queued 301da71f. 12:1x
+  ASM-INSERT-THUMB-CONFIG fixed: the thumb cache keys (studio, configuration, part); the Insert dialog asks for its
+  chosen configuration (insert_dialog_thumb, stale_insert_thumbs); the Change configuration panel still shows the
+  default pictures. NEXT: LOOK-OUTLINE-WEIGHT when live answers REQUESTS 11:5x.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
