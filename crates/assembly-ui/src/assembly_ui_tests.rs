@@ -2935,6 +2935,36 @@ fn a_new_tangent_fighting_a_revolute_is_red_while_created(cx: &mut TestAppContex
     });
 }
 
+/// Live errors-1123 (Tangent planes): a new Tangent on tops already flush, the same way up, under a Revolute on them:
+/// both mates red while it is created, though the Revolute holds (ours blamed the Tangent alone).
+#[gpui::test]
+fn a_new_tangent_on_flush_tops_turns_the_revolute_red_too(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "tangent-flush-red", |ctx| {
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "revolute", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Tangent, w, cx);
+            let (a, b) = (face_connector(v, "Part 2 <1>", true, cx), face_connector(v, "Part 1 <1>", true, cx));
+            v.deliver_connector(a, w, cx);
+            v.deliver_connector(b, w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let ok: Vec<_> = view.read(cx).result.mates.iter().map(|m| (m.ok, m.message.clone())).collect();
+        assert_eq!(ok.iter().map(|m| m.0).collect::<Vec<_>>(), vec![false, false], "both red while created: {ok:?}");
+    });
+}
+
 /// Live tangent-one-entity-1123: after one pick a Tangent's ✓ is enabled; ✓ makes "Tangent 1" in error, "Tangent mate
 /// needs two entities.", and it reopens with its second field empty.
 #[gpui::test]

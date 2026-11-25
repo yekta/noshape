@@ -1285,6 +1285,13 @@ pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relation
     // (a disagreeing Parallel the orientation pass had turned the part for).
     let bound = 1e-5 * characteristic_length(&given, mates).max(1e-3).max(1.0);
     let mut buf = Vec::new();
+    let pair = |m: &SolverMate| {
+        let mut b: Vec<usize> = mate_bodies(m).collect();
+        b.sort_unstable();
+        b.dedup();
+        b
+    };
+    let mut fought: Vec<Vec<usize>> = Vec::new();
     for (i, m) in mates.iter().enumerate() {
         if !mate_bodies(m).any(|b| r.held_back.contains(&b)) {
             continue;
@@ -1293,6 +1300,17 @@ pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relation
         let unheld = nan || res >= bound || axis_disagrees(&given, m);
         r.mate_unheld[i] = unheld;
         r.mate_ok[i] &= !unheld;
+        if unheld {
+            fought.push(pair(m));
+        }
+    }
+    // A mate between the same two parts as one that can't hold reads red with it (live errors-1123: a Tangent on
+    // tops already flush the same way up turns the Revolute on them red too; fuzz f16 / f80: the part's mates to
+    // other parts stay OK).
+    for (i, m) in mates.iter().enumerate() {
+        if mate_bodies(m).any(|b| r.held_back.contains(&b)) && fought.contains(&pair(m)) {
+            r.mate_ok[i] = false;
+        }
     }
     r
 }

@@ -20,8 +20,8 @@ pub struct OnScreen<'a> {
 /// The chosen point's index, as live (asm/feel-1117 reach-corner-strip, asm-feel3-1118, mc-infer-1122, mc-reach-1122):
 /// over a planar face the nearest point (the centroid too) of those within the square around the pointer, else the
 /// face's centroid (a cylinder's side at its axis
-/// midpoint at any height); over an edge its midpoint (a circle's centre) or the nearer of its ends, half-way between
-/// (live mc-reach-1124's 1.8 s steps; mc-infer-1122's d=10 midpoint was its laggy sweep). `entered`:
+/// midpoint at any height); over a straight edge its midpoint or the nearer of its ends, half-way between (live
+/// mc-reach-1124's 1.8 s steps; mc-infer-1122's d=10 midpoint was its laggy sweep), over an arc its centre. `entered`:
 /// the pointer has just come onto the entity, so the face's centroid (its points from the next move on: live2
 /// place-1118 21:05). Shift locks the entity, not the point: the same rule wherever the pointer is (mc-infer-1122
 /// shift.png). Other entities (a vertex): the nearest point.
@@ -35,6 +35,9 @@ pub fn choose(s: &OnScreen, pointer: DVec2, entered: bool) -> Option<usize> {
         Reference::Face(_) if !entered => near.filter(|(.., d)| d.x.abs().max(d.y.abs()) <= FACE_REACH_PX).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
         // Along an edge its midpoint or the nearer end, switching half-way (live mc-reach-1124: the corner end, Z along
         // the edge, from 27 px of a 56 px half).
+        // An arc: its centre wherever along it (qa FEEL-MC-ARC-PICK-VERTEX-ASM: live's hinge knuckle closes on the
+        // centre picked 4 mm from the arc's end); its ends from the vertices themselves.
+        Reference::Edge(_) if matches!(s.points.first(), Some((Reference::Implicit { inference: Inference::CenterRim, .. }, _))) => None,
         Reference::Edge(_) => near.filter(|(i, r, _)| *i == 0 || matches!(r, Reference::Implicit { inference: Inference::Vertex, .. })).min_by(|a, b| a.2.length().total_cmp(&b.2.length())),
         _ => None,
     };
@@ -107,6 +110,17 @@ mod tests {
         assert_eq!(choose(&s, DVec2::new(26.0, 0.0), false), Some(0), "26 px along: the midpoint");
         assert_eq!(choose(&s, DVec2::new(29.0, 0.0), false), Some(1), "29 px along: the corner end");
         assert_eq!(choose(&s, DVec2::new(46.0, 0.0), false), Some(1), "10 px from the corner: its end");
+    }
+
+    /// qa FEEL-MC-ARC-PICK-VERTEX-ASM (hinge knuckle, a 270 degree arc): live takes the arc's centre even 4 mm from its
+    /// end; the end vertex only from the vertex itself.
+    #[test]
+    fn an_arc_takes_its_centre_however_near_its_end() {
+        let edge = Reference::Edge(edge());
+        let (c, m, e) = (implicit(&edge, Inference::CenterRim), implicit(&edge, Inference::Midpoint), implicit(&edge, Inference::Vertex));
+        let s = OnScreen { on: &edge, points: vec![(&c, Some(DVec2::ZERO)), (&m, Some(DVec2::new(-70.0, -70.0))), (&e, Some(DVec2::new(100.0, 0.0)))] };
+        assert_eq!(choose(&s, DVec2::new(100.0, 8.0), false), Some(0), "8 px from the end: the centre");
+        assert_eq!(choose(&s, DVec2::new(-70.0, -70.0), false), Some(0), "over its midpoint: the centre");
     }
 
     #[test]
