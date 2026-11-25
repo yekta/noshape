@@ -862,6 +862,17 @@ impl MateDialog {
         }
     }
 
+    /// A chip's ×: live rule 6 makes that field the active one, its refill not advancing. On an edited mate it is an
+    /// edit: ✓ stays enabled, the title red "Mate needs two mate connectors." (live qa/mistakes-1125).
+    pub fn clear_slot(&mut self, field: usize, cx: &mut Context<Self>) {
+        *self.slot_mut(field) = None;
+        self.active = Some(field);
+        self.advance_disarmed = Some(self.field_of(field));
+        self.touched |= !self.is_new;
+        cx.emit(MateDialogEvent::Changed);
+        cx.notify();
+    }
+
     pub fn set_flip(&mut self, flip_primary: bool, cx: &mut Context<Self>) {
         if self.flip_primary != flip_primary {
             self.flip_primary = flip_primary;
@@ -988,12 +999,7 @@ impl MateDialog {
                                 .child("×")
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
-                                    *this.slot_mut(field) = None;
-                                    // Live rule 6: × makes that field the active one, its refill not advancing.
-                                    this.active = Some(field);
-                                    this.advance_disarmed = Some(this.field_of(field));
-                                    cx.emit(MateDialogEvent::Changed);
-                                    cx.notify();
+                                    this.clear_slot(field, cx);
                                 })),
                         )
                     })

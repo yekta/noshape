@@ -345,3 +345,202 @@ fn an_under_defined_sketchs_row_says_so(cx: &mut TestAppContext) {
     ] }));
     assert_eq!(row_tooltip(cx, window, "Sketch 1").as_deref(), Some("Sketch 1 is not fully defined"));
 }
+
+/// Live qa/mistakes-1125 (behaviours "First-hour mistakes", batches 1 and 2) on the Block 40 × 30 × 20 mm: each mistake's
+/// row (error red or an ok-looking info) and its exact tooltip, and the parts left.
+type Mistake = (&'static str, Vec<serde_json::Value>, &'static str, &'static str, &'static str, usize);
+
+/// Live qa/mistakes-1125's cases on the Block 40 × 30 × 20 mm: (name, the features, the row, its state, its tooltip, the
+/// parts left).
+fn mistakes() -> Vec<Mistake> {
+    let block = || vec![
+        serde_json::json!({ "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] }),
+        serde_json::json!({ "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } }),
+    ];
+    // A second block of its own, apart from the first.
+    let apart = |at: f64| vec![
+        serde_json::json!({ "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "corner_rectangle": [[at, 0], [at + 10.0, 10]] }] }),
+        serde_json::json!({ "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }),
+    ];
+    let mut edges = Vec::new();
+    for z in [0.0, 20.0] {
+        edges.extend([[20.0, 0.0, z], [20.0, 30.0, z], [0.0, 15.0, z], [40.0, 15.0, z]]);
+    }
+    edges.extend([[0.0, 0.0, 10.0], [40.0, 0.0, 10.0], [0.0, 30.0, 10.0], [40.0, 30.0, 10.0]]);
+    let all_edges: Vec<String> = edges.iter().map(|e| format!("edge through [{}, {}, {}]", e[0], e[1], e[2])).collect();
+    let cases: Vec<Mistake> = vec![
+        ("fillet", vec![serde_json::json!({ "type": "fillet", "name": "Fillet 1", "params": { "entities": all_edges, "radius": "12 mm" } })],
+            "Fillet 1", "error", "Fillet 1 did not regenerate properly: Failed to fillet selections.", 1),
+        ("chamfer", vec![serde_json::json!({ "type": "chamfer", "name": "Chamfer 1", "params": { "entities": all_edges, "width": "12 mm" } })],
+            "Chamfer 1", "error", "Chamfer 1 did not regenerate properly: Failed to chamfer selections.", 1),
+        ("shell", vec![serde_json::json!({ "type": "shell", "name": "Shell 1", "params": { "entities": ["face through [20, 15, 0]"], "thickness": "16 mm" } })],
+            "Shell 1", "error", "Shell 1 did not regenerate properly: Could not shell part with selections.", 1),
+        ("subtract-apart", [apart(60.0), vec![serde_json::json!({ "type": "booleanBodies", "name": "Boolean 1", "params": { "operationType": "SUBTRACTION", "targets": ["part 0"], "tools": ["part 1"] } })]].concat(),
+            "Boolean 1", "ok", "Boolean 1", 1),
+        ("union-apart", [apart(60.0), vec![serde_json::json!({ "type": "booleanBodies", "name": "Boolean 1", "params": { "operationType": "UNION", "tools": ["part 0", "part 1"] } })]].concat(),
+            "Boolean 1", "ok", "Boolean 1", 2),
+        ("mirror-no-plane", vec![serde_json::json!({ "type": "mirror", "name": "Mirror 1", "params": { "patternType": "PART", "entities": ["part 0"] } })],
+            "Mirror 1", "error", "Mirror 1 did not regenerate properly: Select a mirror plane.", 1),
+        ("union-consumed", [apart(30.0), vec![
+            serde_json::json!({ "type": "booleanBodies", "name": "Boolean 1", "params": { "operationType": "UNION", "tools": ["part 0", "part 1"] } }),
+            serde_json::json!({ "type": "booleanBodies", "name": "Boolean 2", "params": { "operationType": "UNION", "tools": ["part 0"] } }),
+        ]].concat(), "Boolean 2", "error", "Boolean 2 did not regenerate properly: Need at least two parts or surfaces for a Boolean operation.", 1),
+        ("extrude-open", vec![
+            // (Closed here, opened by `start_mistake`: its region stored, then gone.)
+            serde_json::json!({ "type": "newSketch", "name": "Open U", "plane": "Top", "shapes": [{ "line": [[50, 0], [50, 20]] }, { "line": [[50, 0], [70, 0]] }, { "line": [[70, 0], [70, 20]] }, { "line": [[50, 20], [70, 20]] }] }),
+            serde_json::json!({ "type": "extrude", "name": "Extrude open", "params": { "entities": ["Open U region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }),
+        ], "Extrude open", "error", "Extrude open did not regenerate properly: Select face or sketch region to extrude.\n1 missing selection", 1),
+    ];
+    cases.into_iter().map(|(n, extra, row, state, tip, parts)| (n, [block(), extra].concat(), row, state, tip, parts)).collect()
+}
+
+/// A mistake's studio; the open Extrude's sketch loses its closing line (y 20 mm) after its region was picked.
+fn start_mistake(cx: &mut TestAppContext, name: &str, features: Vec<serde_json::Value>) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = start(cx, &format!("mistake-{name}"), serde_json::json!({ "units": "mm", "features": features }));
+    if name != "extrude-open" {
+        return (window, view);
+    }
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            let id = v.studio(cx).unwrap().features.iter().find(|f| f.name == "Open U").unwrap().id;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Open the U", cx, |ps| {
+                    let f = ps.features.iter_mut().find(|f| f.id == id).unwrap();
+                    let Some(noshape_model::params::ParamValue::Sketch(mut arc)) = f.params.get("sketch").cloned() else { panic!("a sketch") };
+                    let d = std::sync::Arc::make_mut(&mut arc);
+                    let top = d.sketch.entities().find(|e| match e.geometry {
+                        noshape_sketch::Geometry::Line { start, end } => [start, end].iter().all(|p| d.sketch.point(*p).is_some_and(|p| (p.y - 0.02).abs() < 1e-9)),
+                        _ => false,
+                    }).unwrap().id;
+                    d.sketch.remove_entity(top);
+                    f.params.set("sketch", noshape_model::params::ParamValue::Sketch(arc));
+                })
+            });
+        })
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    (window, view)
+}
+
+#[gpui::test]
+fn first_hour_mistakes_rows_and_tooltips_as_live(cx: &mut TestAppContext) {
+    let cases = mistakes();
+    let mut diffs = Vec::new();
+    for (name, features, row, state, tip, parts) in cases {
+        let (window, view) = start_mistake(cx, name, features);
+        let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        let got_state = st["features"]["rows"].as_array().and_then(|r| r.iter().find(|r| r["name"] == row)).and_then(|r| r["state"].as_str()).map(str::to_string);
+        let got_tip = row_tooltip(cx, window, row);
+        let got_parts = cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count());
+        if (got_state.as_deref(), got_tip.as_deref(), got_parts) != (Some(state), Some(tip), parts) {
+            diffs.push(format!("{name}: ours ({got_state:?}, {got_tip:?}, {got_parts} parts), live ({state:?}, {tip:?}, {parts} parts)"));
+        }
+    }
+    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
+}
+
+/// Live qa/mistakes-1125: each mistake's edit dialog: the title red (only Booleans' info stays black), the message only in
+/// the title's tooltip, ✓ enabled; Shell's face and the open Extrude's region chips red, Mirror's empty plane field
+/// red; a new Hole with no point: ✓ disabled, its point field the active one, not red.
+#[gpui::test]
+fn first_hour_mistakes_dialogs_as_live(cx: &mut TestAppContext) {
+    // (the case, its title red, the query fields drawn red, the chips drawn red)
+    let want: &[(&str, bool, &[&str], &[&str])] = &[
+        ("fillet", true, &[], &[]),
+        ("chamfer", true, &[], &[]),
+        ("shell", true, &[], &["Face of Extrude 1"]),
+        ("subtract-apart", false, &[], &[]),
+        ("union-apart", false, &[], &[]),
+        ("mirror-no-plane", true, &["Mirror plane"], &[]),
+        // (Live's REST pick was the whole sketch, "Missing Faces of Open U"; ours its one region.)
+        ("extrude-open", true, &[], &["Missing Face of Open U"]),
+    ];
+    let mut diffs = Vec::new();
+    for (name, features, row, ..) in mistakes() {
+        let Some((_, red_title, red_fields, red_chips)) = want.iter().find(|w| w.0 == name) else { continue };
+        let (window, view) = start_mistake(cx, name, features);
+        let id = feature_id(cx, &view, row);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        let d = &st["dialog"];
+        let queries: Vec<&serde_json::Value> = d["fields"].as_array().into_iter().flatten().filter(|f| f["kind"] == "query").collect();
+        // (Drawn red: invalid and not the active field.)
+        let red: Vec<String> = queries.iter().filter(|f| f["state"] == "error" && f["active"] != true).filter_map(|f| f["label"].as_str().map(str::to_string)).collect();
+        let chips: Vec<String> = queries.iter().flat_map(|f| f["redItems"].as_array().cloned().unwrap_or_default()).filter_map(|v| v.as_str().map(str::to_string)).collect();
+        let got = (d["titleState"].as_str() == Some("error"), red, chips, d["ok"].as_str() == Some("disabled"));
+        let live = (*red_title, red_fields.iter().map(|s| s.to_string()).collect::<Vec<_>>(), red_chips.iter().map(|s| s.to_string()).collect::<Vec<_>>(), false);
+        if got != live {
+            diffs.push(format!("{name}: ours (title red, red fields, red chips, ✓ off) {got:?}, live {live:?}; fields {}", d["fields"]));
+        }
+    }
+    // A new Hole with nothing selected.
+    let (window, view) = start(cx, "mistake-dlg-hole", serde_json::json!({ "units": "mm", "features": mistakes()[0].1[..2].to_vec() }));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let d = &st["dialog"];
+    let red: Vec<String> = d["fields"].as_array().into_iter().flatten().filter(|f| f["kind"] == "query" && f["state"] == "error" && f["active"] != true).filter_map(|f| f["label"].as_str().map(str::to_string)).collect();
+    let tip = hover_tooltip(cx, window, "dialog-title");
+    let got = (d["titleState"].as_str() == Some("error"), red, d["ok"].as_str() == Some("disabled"), tip);
+    // (Live's "Ø 6.35 mm THRU" was that account's remembered End; std's default is Blind 12 mm: behaviours "Hole" dialog.)
+    let live = (true, Vec::<String>::new(), true, Some("Ø 6.35 mm ↧ 12 mm [Hole] did not regenerate properly: No hole points selected.".to_string()));
+    if got != live {
+        diffs.push(format!("hole: ours {got:?}, live {live:?}; fields {}", d["fields"]));
+    }
+    assert!(diffs.is_empty(), "{}", diffs.join("\n"));
+}
+
+/// Live mistakes-1125 batch 2: the failing Fillet (12 edges R12) fixed in its dialog (Radius 2 mm, Enter: the dialog stays
+/// open, its title black; ✓) is OK; Ctrl+Z brings the error back with the dialog closed, Ctrl+Y the fix, Ctrl+Z the error.
+#[gpui::test]
+fn undoing_a_fixed_fillet_brings_its_error_back(cx: &mut TestAppContext) {
+    let (name, features, row, ..) = mistakes().into_iter().find(|m| m.0 == "fillet").unwrap();
+    let (window, view) = start_mistake(cx, name, features);
+    let id = feature_id(cx, &view, row);
+    let row_state = |cx: &mut TestAppContext| {
+        let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        st["features"]["rows"].as_array().and_then(|r| r.iter().find(|r| r["name"] == row)).and_then(|r| r["state"].as_str()).unwrap_or("none").to_string()
+    };
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("radius", w, cx))).unwrap();
+    draw(cx, window);
+    keys(cx, window, &["2", "enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let after_enter = (cx.update(|cx| view.read(cx).edit.is_some()), st["dialog"]["titleState"].as_str().map(str::to_string));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let mut states = vec![row_state(cx)];
+    for undo in [true, false, true] {
+        cx.update(|cx| view.update(cx, |v, cx| v.doc.update(cx, |d, cx| if undo { d.undo(cx) } else { d.redo(cx) })));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        states.push(row_state(cx));
+    }
+    let closed = cx.update(|cx| view.read(cx).edit.is_none());
+    assert_eq!((after_enter, states, closed), ((true, Some("ok".to_string())), vec!["ok".to_string(), "error".into(), "ok".into(), "error".into()], true));
+}
+
+/// Live mistakes-1125 batch 2: a studio with only a surface exports (the full Export dialog); one with only a sketch has
+/// "Selected tab contains no supported geometry for export.".
+#[gpui::test]
+fn a_surface_exports_and_a_sketch_alone_has_no_geometry(cx: &mut TestAppContext) {
+    let u = serde_json::json!({ "type": "newSketch", "name": "Open U", "plane": "Top", "shapes": [{ "line": [[0, 0], [0, 20]] }, { "line": [[0, 0], [40, 0]] }, { "line": [[40, 0], [40, 20]] }] });
+    let surf = serde_json::json!({ "type": "extrude", "name": "Surface 1", "params": { "bodyType": "SURFACE", "surfaceOperationType": "NEW", "surfaceEntities": ["Open U edges"], "endBound": "BLIND", "depth": "30 mm" } });
+    let mut got = Vec::new();
+    for (name, features) in [("surf-only", vec![u.clone(), surf]), ("sketch-only", vec![u])] {
+        let (window, view) = start(cx, &format!("export-{name}"), serde_json::json!({ "units": "mm", "features": features }));
+        let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        got.push((cx.update(|cx| view.read(cx).has_export_geometry()), st["features"]["rows"].to_string()));
+    }
+    assert_eq!(got.iter().map(|g| g.0).collect::<Vec<_>>(), vec![true, false], "(surface only, sketch only) exportable: {got:?}");
+}

@@ -37,7 +37,7 @@ const LABEL_AFTER_CHECK: f32 = 4.;
 impl PartStudioView {
     /// The Export modal for `bodies` (all visible parts when empty).
     pub fn open_part_export(&mut self, bodies: Vec<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
-        if bodies.is_empty() && !self.has_parts() {
+        if bodies.is_empty() && !self.has_export_geometry() {
             open_no_geometry_modal(window, cx);
             return;
         }

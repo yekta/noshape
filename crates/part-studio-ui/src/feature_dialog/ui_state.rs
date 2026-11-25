@@ -221,13 +221,17 @@ impl FeatureDialog {
                 }
                 ParamKind::Query { .. } => {
                     let refs = values.query(s.id).to_vec();
-                    let items: Vec<String> = self.query_rows(s, &refs).into_iter().map(|r| r.0).collect();
-                    // Live (behaviours "psui (2144)"): a field the feature's error blames is invalid, empty or not (drawn
-                    // red only while another field is active), and so is one with missing picks.
-                    let missing = refs.iter().any(|r| self.ref_missing(r)) || self.field_error(s.id).is_some();
+                    let rows = self.query_rows(s, &refs);
+                    let red_items: Vec<&str> = rows.iter().filter(|r| r.1.iter().any(|i| self.entry_failing(s.id, &refs[*i]))).map(|r| r.0.as_str()).collect();
+                    let items: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
                     // (The field Create selection fills reads as not active while its panel is open: live
                     // mirror-face-create-selection.)
-                    fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id) && self.cs_target.as_deref() != Some(s.id), "state": if missing { "error" } else { "ok" } }));
+                    let active = self.active_query.as_deref() == Some(s.id) && self.cs_target.as_deref() != Some(s.id);
+                    // Live (behaviours "psui (2144)"): a field the feature's error blames is invalid, empty or not (drawn
+                    // red only while another field is active), and so is one with missing picks; `redItems` are the
+                    // entries drawn red.
+                    let missing = refs.iter().any(|r| self.ref_missing(r)) || self.field_error(s.id).is_some();
+                    fields.push(json!({ "label": label, "kind": "query", "items": items, "redItems": red_items, "active": active, "state": if missing { "error" } else { "ok" } }));
                 }
                 // A table (the Hole's type and size): one select per level, each with its own label (live's recorder
                 // since 1994: "Hole type", "Drill size", …, `lookup: true`).

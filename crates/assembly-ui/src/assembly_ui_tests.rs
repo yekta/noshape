@@ -2954,6 +2954,36 @@ fn a_reopened_inconsistent_mate_has_a_pale_check(cx: &mut TestAppContext) {
     assert!(!pale_with(&view, "Mate is not consistent.", cx), "creating, not consistent: green");
 }
 
+/// Live qa/mistakes-1125 batch 3: editing a Fastened and removing one connector with its × moves nothing; the one chip
+/// left is not red, the title is, "Fastened 1 did not regenerate properly: Mate needs two mate connectors.", and ✓
+/// stays enabled (ours drew it pale).
+#[gpui::test]
+fn an_edited_mate_down_to_one_connector_says_it_needs_two(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "mate-one-connector", |ctx| {
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(ctx, "Part 1 <1>"), top(ctx, "Part 2 <1>"));
+        call(ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+    });
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let id = cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates[0].id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_mate(id, w, cx))).unwrap();
+    cx.run_until_parked();
+    let dialog = cx.update(|cx| view.read(cx).mate.as_ref().expect("the mate dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.clear_slot(1, cx)));
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let d = dialog.read(cx);
+        assert_eq!(d.regen_error(cx).as_deref(), Some("Fastened 1 did not regenerate properly: Mate needs two mate connectors."));
+        assert!(!d.accept_pale(cx), "✓ stays enabled");
+        let state = view.read(cx).ui_state(cx);
+        let dlg = &state["dialog"];
+        assert_eq!((dlg["titleState"].clone(), dlg["ok"].clone()), (json!("error"), json!("enabled")), "{dlg}");
+        let field = dlg["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Mate connectors").cloned().expect("the connectors field");
+        assert_eq!((field["items"].as_array().map(Vec::len), field["state"].clone()), (Some(1), json!("ok")), "one chip left, not red: {field}");
+    });
+}
+
 /// qa's pin-block (err/c build.py): a 40 mm block with a Ø10 hole, fixed, and a Ø10 × 30 pin, Revolute 1 holding the
 /// pin in the hole.
 fn pin_block_document(cx: &mut TestAppContext, name: &str) -> std::path::PathBuf {

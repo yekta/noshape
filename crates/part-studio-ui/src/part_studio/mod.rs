@@ -549,9 +549,10 @@ impl Focusable for PartStudioView {
 }
 
 impl PartStudioView {
-    /// The Part Studio shows a part (its tab menu's Export… needs one: live 2409).
-    pub fn has_parts(&self) -> bool {
-        self.display.bodies.iter().any(|b| part_section(b) == "parts")
+    /// Parts or surfaces to export: its tab menu's Export… needs one (live 2409); a surface-only studio exports, a
+    /// sketch-only one has "no supported geometry" (live mistakes-1125).
+    pub fn has_export_geometry(&self) -> bool {
+        self.display.bodies.iter().any(|b| matches!(part_section(b), "parts" | "surfaces" | "composites"))
     }
 
     /// The 3D viewport (smoke test).

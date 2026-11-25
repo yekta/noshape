@@ -1785,7 +1785,7 @@ impl Workspace {
             let active = self.active == Some(id);
             // The open Part Studio without parts: its menu has no Export… (live2 fs-ps-show-code 11-15: an empty studio
             // has it while another tab is open).
-            let no_export = active && matches!(self.views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_parts());
+            let no_export = active && matches!(self.views.get(&id), Some(TabView::PartStudio(v)) if !v.read(cx).has_export_geometry());
             // Compare mode (live 952): a status dot after the name; drawings and
             // tabs only in the base are greyed and can't be opened.
             let compare = crate::compare_mode::tab_status(&self.doc, id, cx);
