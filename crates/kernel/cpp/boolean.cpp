@@ -6709,19 +6709,6 @@ bool fuse_trimmed(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_S
 // fuse_trimmed's (the plain fuse of so few isn't slow).
 static constexpr size_t plain_fuse_tools = 16;
 
-// Whether two of `t` have boxes that meet: instances that may overlap one another too.
-static bool tools_may_meet(const std::vector<TopoDS_Shape>& t)
-{
-  std::vector<Bnd_Box> boxes(t.size());
-  for (size_t i = 0; i < t.size(); ++i)
-    BRepBndLib::Add(t[i], boxes[i], false);
-  for (size_t i = 0; i < t.size(); ++i)
-    for (size_t j = i + 1; j < t.size(); ++j)
-      if (!boxes[i].IsOut(boxes[j]))
-        return true;
-  return false;
-}
-
 // fuse_trimmed with noshape's own Boolean throughout: each tool cut by the arguments, then the arguments fused with
 // what is left of the tools (they only touch now). False (nothing done) where any of them declines. `srcs`: the
 // arguments' and tools' shapes as the plain fuse had them (their bodies converted once: c2-impeller-loft's nine seats
@@ -10186,11 +10173,11 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
           done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true);
         }
         reach_in = !done && rust_last_decline() == "pattern instances overlapping";
-        // (Too few for the plain fuse to be slow, overlapping one another too: the plain fuse at once, as OCCT's below
-        // (plain_at_once). The trimmed tools of c2-impeller-loft's nine seats and c2-rings-loft's eight rings overlap
-        // each other: 0.7-0.9 s of cuts before the plain fuse. Apart, the trimmed fuse: its faces as recorded, the
-        // plain fuse's split where they reach in (nine apart: 65 faces, not 56).)
-        if (reach_in && (t.size() >= plain_fuse_tools || !tools_may_meet(t)))
+        // (Too few for the plain fuse to be slow: the plain fuse at once, as OCCT's below (plain_at_once), apart or
+        // not (c2-impeller-loft's Bohrungssitz seats 0.9 s trimmed -> 0.25 s). Its faces may stay split where the
+        // instances reach in (bool-corpus 58c61d5ddca8047a: 65, the trimmed fuse's 56); the feature's unify merges
+        // them (lead 11-25: a gate exception at the Boolean only).)
+        if (reach_in && t.size() >= plain_fuse_tools)
         {
           const KernelTimer trim("boolean.rust.trimmed");
           done = rust_fuse_trimmed(a, t, rs, opts, out, h);

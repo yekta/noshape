@@ -374,6 +374,27 @@ fn edges_ending_inside_a_face_stay_in_it() {
     assert!(inner > 0, "no INTERNAL edge");
 }
 
+/// Nine seats apart, a pattern's checked glue reaching into the part (bool-corpus 58c61d5ddca8047a, recorded): fused at
+/// once by noshape's Boolean, as any pattern of fewer than 16 copies (lead 11-25), its faces stay split where the seats
+/// reach in (65, the trimmed fuse's 56: a gate exception at the Boolean only); the feature's unify gives the recorded
+/// 56 faces and the same volume.
+#[test]
+fn nine_seats_apart_fused_at_once_unify_to_the_recorded_faces() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "58c61d5ddca8047a").expect("the recorded fuse");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let u = k::unify_same_domain(&r.shape).expect("unified").shape;
+    assert!(u.is_valid());
+    assert_eq!(u.count(k::ShapeType::Face), c.summary.faces);
+    let v = u.volume().unwrap();
+    assert!((v / c.summary.volume - 1.0).abs() < 1e-9, "{v} vs {}", c.summary.volume);
+}
+
 /// Arguments sharing sub-shapes (cf-box-dovetail-joint's Box Joint: a common of the part and a tool made from its
 /// faces, recorded): noshape's Boolean takes it, keeping what they share and nothing else meets as it was and remaking
 /// what the other argument's faces meet: OCCT's result and history (each shared vertex, edge and face Kept or Modified

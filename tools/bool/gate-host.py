@@ -42,6 +42,13 @@ SPEED = ["k25-15", "k25-25", "cf-spur-gear"]
 SHELLS = f"{CORPORA}/shellcorpus/cases"
 # The shells where ours already differs from OCCT's alone on main (11-19): fixed ones come off.
 SHELLS_KNOWN = set("""13186b07903d913d 17488d26389dbcfc 99b55ec93fe844a6 b64c8b4edacba88f b79e508bd50f0791 f815832ccf431fc5""".split())
+# Replay cases allowed to differ at the Boolean alone (the lead's ruling each; the feature's final result is pinned by a
+# T1): said, not failed.
+REPLAY_EXCEPTIONS = {
+    "58c61d5ddca8047a": "lead 11-25: a pattern's < 16 copies fused at once, apart too: 65 faces where they reach in, the "
+                        "trimmed fuse's 56; its feature's unify gives 56, the volume the same "
+                        "(bool_patterns::nine_seats_apart_fused_at_once_unify_to_the_recorded_faces)",
+}
 # (A case is named by its file: a recorded one by its 16-digit hash, a hand-made one (kall's k25x2) any way.)
 NAME = r"[\w.-]+"
 CASE = re.compile(rf"^({NAME})( \(|: failed)")
@@ -437,6 +444,8 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 unrunnable.append(f"{rn[2].split(',')[0]} {rn[1]}")
             elif sb == "noresult":
                 unknown.append(f"{rn[2].split(',')[0]} {rn[1]}: {rb[4]}")
+            elif sn in BAD and not (sb == sn and rounded(rb[4]) == rounded(rn[4])) and rn[1] in REPLAY_EXCEPTIONS:
+                info.append(f"exception {rn[1]}: {sn}: {rn[4]} ({REPLAY_EXCEPTIONS[rn[1]]})")
             elif sn in BAD and not (sb == sn and rounded(rb[4]) == rounded(rn[4])):
                 new_bad.append(f"{rn[2].split(',')[0]} {rn[1]}: {sn}: {rn[4]} (main: {sb} {rb[4]})".strip())
             elif sb in TAKEN and sn == "declined":
