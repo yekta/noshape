@@ -368,6 +368,64 @@ fn a_finished_sketch_is_one_undo_step(cx: &mut TestAppContext) {
     assert_eq!(state(cx), (n, Some(2)), "its Ctrl+Z takes the whole session back");
 }
 
+/// Live everyday-1125: a circle copied in Sketch 1 (Top) and pasted with Ctrl+V in Sketch 2 (Front) lands centred on
+/// the pointer in Sketch 2's plane with its radius, no constraint added; Ctrl+V outside a sketch does nothing.
+#[gpui::test]
+fn a_circle_pastes_into_another_sketch_under_the_pointer(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sk-paste-across", Tool::Circle);
+    click(cx, window, &view, (600., 400.));
+    click(cx, window, &view, (640., 400.));
+    keys(cx, window, &["escape"]);
+    // (the newest circle's centre and radius, the sketch's constraints)
+    let circle = |cx: &mut TestAppContext| cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx)?;
+        let c = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Circle).max_by_key(|e| e.id.0)?;
+        let centre = d.sketch.point(d.sketch.entity(c.id)?.center()?)?;
+        Some((c.id, centre, d.sketch.curve(c.id)?.length() / std::f64::consts::TAU, d.sketch.constraints().count()))
+    });
+    let (id, _, r, _) = circle(cx).expect("the circle");
+    cx.update(|cx| view.update(cx, |v, _| v.sketch.as_mut().unwrap().selection = vec![id]));
+    keys(cx, window, &["secondary-c"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    let features = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.len());
+    let before = features(cx);
+    keys(cx, window, &["secondary-v"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(features(cx), before, "Ctrl+V outside a sketch does nothing");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![Reference::Plane(DatumPlane::Front)];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_some());
+    let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let c = clock.clone();
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |vp, _| vp.set_clock(move || c.get())));
+    sketch_in_tool(cx, window, view.clone(), Tool::Select);
+    keys(cx, window, &["n"]);
+    for _ in 0..20 {
+        clock.set(clock.get() + std::time::Duration::from_millis(100));
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        draw(cx, window);
+    }
+    let at = DVec2::new(650., 420.);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+        })
+    })
+    .unwrap();
+    keys(cx, window, &["secondary-v"]);
+    let pointer = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|ed| ed.cursor)).expect("the pointer on Front");
+    let (_, centre, radius, constraints) = circle(cx).expect("the circle pasted in Sketch 2");
+    assert!(centre.distance(pointer) < 1e-9 && (radius - r).abs() < 1e-9, "centred on the pointer {pointer:?}: {centre:?}, r {radius} (copied {r})");
+    assert_eq!(constraints, 0, "no constraint added");
+}
+
 /// Live 1853: a sketch started with no plane, Top then picked: picking the
 /// plane is an undo step (Undo on), and Undo past the line un-picks it (the
 /// plane field empty again, out of the sketch editor).
