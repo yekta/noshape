@@ -13605,6 +13605,10 @@ std::unique_ptr<OcShape> section_plane(const OcShape& s, const PlaneF& plane)
   require_non_null(s.shape, "shape");
   BRepAlgoAPI_Section sec(s.shape, to_pln(plane), false);
   sec.Approximation(true);
+  // (With pcurves OCCT checks each curve's tolerance on them, not by projecting points on a B-spline face, an Extrema
+  // grid each: c2-surf-intro's Profile for Tail Fin 300 ms -> 24.)
+  sec.ComputePCurveOn1(true);
+  sec.ComputePCurveOn2(true);
   sec.SetRunParallel(bop_parallel());
   build_cancellable(sec);
   if (sec.HasErrors() || !sec.IsDone())
