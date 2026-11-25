@@ -3522,7 +3522,8 @@ impl AssemblyView {
                             cx.notify();
                         })
                     });
-                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_none().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().flex_1()).child(div().flex_none().w(px(153.)).mr(px(9.)).child(select)));
+                    // Live 06 s22: the underline 27 px in from the dialog's right edge (the label gives way), 3 px above the row's middle.
+                    body = body.child(h_flex().h(px(30.)).px(px(5.)).gap(px(6.)).child(div().flex_1().min_w_0().truncate().text_size(px(12.)).text_color(pal.text_muted).child(crate::ui::user_text(inp.name.clone()))).child(div().flex_none().w(px(153.)).mr(px(14.)).relative().top(px(-3.)).child(select)));
                 }
                 ConfigInputKind::Checkbox { .. } => {
                     let cur = effective.0.get(&inp.id).is_some_and(|v| v == "true");
@@ -3574,8 +3575,6 @@ impl AssemblyView {
             h_flex()
                 .h(px(40.))
                 .px(px(6.))
-                .border_b_1()
-                .border_color(pal.border)
                 .child(
                     v_flex()
                         .flex_1()
@@ -3649,6 +3648,7 @@ impl AssemblyView {
         }
         v_flex()
             .id("config-dialog")
+            .debug_selector(|| "config-dialog".into())
             // Feature-dialog keys: Tab walks the fields (committing them) and
             // leaves the dialog for the navbar past the last one; Enter ✓, Esc ✕.
             .key_context("FeatureDialog")

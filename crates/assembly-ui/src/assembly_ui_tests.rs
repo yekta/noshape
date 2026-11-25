@@ -3372,6 +3372,9 @@ fn change_configuration_of_a_list_has_no_generate_and_folds_under_its_caret(cx: 
         let select = vcx.debug_bounds(sel).expect("the Configuration list");
         assert_eq!(select.size.height, px(26.), "an underlined field, not the 34 px box");
         let caret = vcx.debug_bounds("cfg-caret").expect("the Part Studio row's caret");
+        // Live 06 s22: the 300 px dialog's underline ends 27 px from its right edge (x 367-519 of 246-546).
+        let dialog = vcx.debug_bounds("config-dialog").expect("the dialog");
+        assert_eq!((dialog.right() - select.right(), dialog.size.width, caret.left() - dialog.left()), (px(27.), px(300.), px(3.)), "the select's right edge, {select:?} in {dialog:?}");
         vcx.simulate_click(caret.center(), gpui_kit::Modifiers::none());
         draw(cx, window);
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
