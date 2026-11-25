@@ -40,7 +40,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   after another test on the thread), which stuck the held drag. Removed (463c22e0d); bisect 5a6910ab / b0d54bb83 /
   HEAD-without-wait all green in pairs (/root/psui-scratch/region/t23.sh). Lesson: never wait_until inside a drag.
 - Done: ring look (b0d54bb83), FEEL-MOVEFACE-PICKED-FACE-COLOUR = not a difference (active field rule), T1
-  move_faces_axis_field_active_lights_the_edge_not_the_face. Lead to be told after land.sh (ring look + these).
+  move_faces_axis_field_active_lights_the_edge_not_the_face.
+- QUEUED b976bdb5 19:3x (23 commits). Lead was >200k at queue time, not messaged: tell them ring look, flake fix,
+  face row not a difference, snaps test fix, b976bdb5.
 ## RESUME HERE (11-24 20:17 UTC; brief /root/lead-scratch/prompt-psui-1124.txt)
 - Stack re-queued as 5175c04d, batch 1 as aeddb0f4 (landed, edb5cd135 on main), batch 2 as e4612e55, batch 3 queued
   now (f22bb2b4f before rebase).
