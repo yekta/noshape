@@ -615,6 +615,8 @@ pub struct AssemblyView {
     ext_updates: HashMap<String, Option<crate::derived::VersionChoice>>,
     ext_checking: HashSet<String>,
     focus: FocusHandle,
+    /// A linear / circular pattern's flip icon, Tab's stop after Instance count.
+    pattern_flip_focus: FocusHandle,
     fitted_once: bool,
     _subs: Vec<Subscription>,
 }
@@ -845,6 +847,7 @@ impl AssemblyView {
             ext_updates: HashMap::new(),
             ext_checking: HashSet::new(),
             focus: cx.focus_handle(),
+            pattern_flip_focus: cx.focus_handle(),
             fitted_once: false,
             _subs: subs,
         };

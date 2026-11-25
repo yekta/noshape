@@ -1814,9 +1814,15 @@ impl AssemblyView {
             };
         // ✓ on once the dialog was changed, still red (live 63; the recorder's `ok`); an incomplete one says why.
         let ok_on = valid || (s.touched && !mirror_pending(s));
+        let flip_focus = self.pattern_flip_focus.clone();
         let toggle = |id: &'static str, icon: &'static str, on: bool, cx: &mut Context<Self>, f: fn(&mut Self)| {
+            let blue: Hsla = gpui_kit::rgb(0x1651b0).into();
             div()
                 .id(id)
+                // Tabbed to from Instance count: a 2 px #1651b0 underline (live wf23 04 s9 / 05 s18), as Part Studio's flips.
+                .when(id == "pat-opp", |d| {
+                    d.track_focus(&flip_focus).focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(-2.)), blur_radius: px(0.), spread_radius: px(0.), inset: true }]))
+                })
                 .flex_none()
                 .size(px(26.))
                 .flex()
@@ -1935,7 +1941,7 @@ impl AssemblyView {
                     .key_context("PatternCount")
                     .on_action(cx.listener(|this, _: &PatternCountTab, window, cx| {
                         this.ui.checkbox_focus = Some("");
-                        window.focus(&this.focus, cx);
+                        window.focus(&this.pattern_flip_focus, cx);
                         cx.notify();
                     }))
                     .child(value_row("Instance count", &s.count, 0))

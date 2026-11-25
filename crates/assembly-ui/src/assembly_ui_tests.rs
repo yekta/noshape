@@ -1798,6 +1798,36 @@ fn a_zero_pattern_distance_is_marked_invalid(cx: &mut TestAppContext) {
     assert!(!marked(cx, "Distance"), "10 mm clears it");
 }
 
+/// FEEL-TAB-TO-FLIP-FOCUS (live workflows-1123 04 s9, 05 s18): Tab from a linear / circular pattern's Instance count
+/// puts the keyboard on the flip icon beside it (its 2 px #1651b0 underline).
+#[gpui::test]
+fn tab_from_a_patterns_instance_count_focuses_its_flip(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    cx.update(|cx| {
+        cx.bind_keys(crate::actions::default_key_bindings());
+        super::bind_keys(cx);
+    });
+    let path = pattern_document(cx, "pattern-tab-flip");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    for kind in [super::PatternDialogKind::Linear, super::PatternDialogKind::Circular] {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.open_pattern(kind, w, cx);
+                let count = v.pattern.as_ref().unwrap().count.read(cx).state().read(cx).focus_handle(cx);
+                w.focus(&count, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus.is_focused(w));
+        assert!(!flip, "{kind:?}: the count has the keyboard first");
+        vcx.simulate_keystrokes("tab");
+        let flip = vcx.update(|w, cx| view.read(cx).pattern_flip_focus.is_focused(w));
+        assert!(flip, "{kind:?}: Tab from Instance count puts the keyboard on the flip");
+    }
+}
+
 /// Live snapmode-1118 / snap-diag-1118: Esc during a snap-mode drag doesn't cancel it; off every part the connector
 /// stays put and a release there moves nothing (no message); snap mode stays on.
 #[gpui::test]
