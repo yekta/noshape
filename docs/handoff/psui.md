@@ -118,7 +118,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
   stack re-queued as QUEUED f9cd315a (12 commits; lead at 898k, not told). Keep handoff edits in their own last commit.
   13:0x lead: assembly feel-coverage audit (docs/parity/asm-feel-coverage-audit.md): 60/69 -> 68/69 rules tested,
   7 tests; fixed rename Tab + graphics click not committing. Left: limit clamp on drag (solver; asm/skasm).
-  NEXT: LOOK-OUTLINE-WEIGHT when live answers REQUESTS 11:5x.
+  13:1x lead: EXPORT-ASM-STEP-MBD-FIELDS fixed (export.rs mbd_fields_shown(s, assembly); test
+  an_assembly_step_export_has_no_mbd_fields in sketch_ui_tests). Live answered edge ink (live/psui/edge-ink-1125):
+  numbers and plan in TICKETS LOOK-OUTLINE-WEIGHT. NEXT: LOOK-OUTLINE-WEIGHT (profile ours, then fs_line / width).
+  13:2x qa rescore 8b55eeb86 left PARTLY (mine): SKT-USE-HOVER (glyph 14x13 vs 8-9 px, hover no orange),
+  TRIAD-LOOK (sd 41 vs 12), CONFIG-FILTER-HELP (s3 title only); after LOOK-OUTLINE-WEIGHT.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
