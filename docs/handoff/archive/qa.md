@@ -2406,3 +2406,20 @@ selection, measure, section view; then P2 assembly and drawing passes; verify th
    driver's state-read redraw (all builds), so "settle" flips 200 / 800 ms; tabrel now reports psui's "tab drawn (2nd frame)" and the
    last frame over 10 returns (5 rounds), and lat-steps.py ends settle at the first "driver" event (logged once psui's 3de2cd04 lands;
    v0.4.53 has none, so compare the 2nd frame across builds). psui's A/B: 2nd frame fix 224 / 0.4.53 218 / green 321 ms.
+
+- 11-25 09:55 wf.sh fixed: quiet() clobbered the cell name $n with nproc (retries ran "8.json") and a failed retry replaced a good run; WF_HOST / WF_SLOT=1 (~/bin/slot) options.
+- 11-25 09:55 v0.4.69 (tag 8c8f54498) release smoke: unit qa-rel-0469 (bin/rel-0469.sh, log tmp/rel-0469.log, REL-0469 DONE): tag CLI built in qa-bisect (vibex7), rel-published.sh 0.4.69, rel-compat.sh 0.4.68 0.4.69, mac-smoke.sh 0.4.69 (osascript removed 11-25: CLI and open only; the default-app check is lsregister -dump), then rm vibex7 ~/agents/qa-bisect/target. Report to the lead.
+- 11-25 04:51 v0.4.69 cut: compat 2f02469be vs 0.4.68 GO in qa-alerts (compat/2f02469b.txt; dock B Govde 83->79 and cli-draft-hang Part 6 24->23 faces, same volume and statuses, from bool f88347407 unify merge). Rescore rs-4ae87476 (qa-rs-next, fired 02:44): TRIAD-LOOK scored (8641c8b2a, feel1122/manipnav/triadcore.py); 7e58aaae8: EXPR-AUTOCOMPLETE verified, SKT-USE-HOVER / PARTS-ROW-TOOLTIP / CONFIG-FILTER-HELP partly, BOX-DRAG unsettled again, 2 stale triad rows dropped. sk23 ana.py now adds the window offset (562,350) on 2560x1600 shots (before, ours read 0 px; ana2.py always had it). Hover matrix scored (b27f45603): crop2.sh hm-rs-4ae87476 score-4ae8/cmp; (cd score-d337 && bin/score.py <cmp>/pairs.txt) > score-4ae8/sc.txt: 130/137 =; MOVE-RING-RIMS partly (mc-selhover now ≠). RS-DONE 07:03; qa-rs-next2 now waits for psui 9c30ebbe. Then unit qa-rs-next2 (after qa-rs-next ends) runs rs-next.sh 95acb7f16 on the first green with psui 9c30ebbe (triad 4.5 px strokes): score manipnav m10 s11 with triadcore.py.
+- **v0.4.68 compat** (release/v0.4.68 57b74ac79 = 0c1d80e6c + asm/skasm fixes + Offset box, bool's Shell normal 7aa065004 reverted):
+  unit qa-cand-0468 (bin/cand-0468.sh: rel-cand.sh 0.4.67 v0468 in worktree qa-bisect (detached at 57b74ac79), CLI built on vibex7,
+  then the corpus) -> compat/cand-v0468.txt: GO 11:10, all 199 SAME incl. corpus (qa-alerts). Next: published check (rel-published.sh 0.4.68 <qa-bisect CLI>) when it ships; then rm vibex7 ~/agents/qa-bisect/target.
+  Green 9c2769a10 vs 0.4.67 (compat loop): impeller Fillet 3 Error (main still has bool's Shell change; the branch reverts it), knifehandle
+  Fillet 2 now Ok (blend eb313326a).
+- **Rescore done 11-24** (b93fb9add, 6a4b3b718): psui 6ca785d6d on green a9107b3a9 (runs from 11-23 rr-1de9): 5 verified, SKT-USE-HOVER /
+  ERR-CHROME-TIP-PLACEMENT (title 3 px low) / EDIT-BODY-SHADE region tint partly, ERR-LIST-TOOLTIP-CHROME wrap still open (400 px, clipped
+  on one line); hover matrix 115/125 (hm2/score-a910/sc8.txt). Studios b8b27ec6 stack on 9c2769a10 (bin/rs-9c27.sh, wf23 09-12+20 ->
+  hm2/out-wf23-9c27): 5 verified, 2 likely; not measured: DRW-DETAIL-ROTATION-ANGLE, DRW-TABLE-MID-HANDLES, DRW-SHEETS-CHEVRON-STATE.
+  bool cbf3444a9: rings edit unchanged (tmp/rf.sh, bin/cli_dimf.py now in vibex7 ~/agents/qa-keep). Plane border (FEEL-PS-BOX-DRAG-HOVER)
+  not rerun (feel1122/fieldsel).
+- New small tools: bin/boxcol.py, pxcount.py, closer.py (live vs new vs old diff in a box), chg.py (row bands that differ).
+- Lead decisions open: Line end dot, ASM-MENU-WRAP-REVERSED.
