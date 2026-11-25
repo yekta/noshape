@@ -370,6 +370,18 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
             }
             continue;
         }
+        // Live dl-bracket-1125: a mesh part is one face, which Offset offsets whole (its convex edges rounded).
+        if body.shape.is_mesh() && translate_dir.is_none() && !up_to {
+            let dist = ev.length("offsetDistance")? * sign;
+            if dist.abs() < 1e-12 {
+                continue;
+            }
+            let shape = body.shape.offset_mesh(dist).map_err(|_| fe(failed_msg))?;
+            let feature = ev.feature;
+            let names = shape.faces().iter().map(|_| Arc::new(TopoName::face(feature, Role::Offset(body.faces[faces[0]].clone())))).collect();
+            ev.replace_body(bi, shape, names);
+            continue;
+        }
         // Distance (blind or up to an entity).
         let c0 = shapes.first().ok_or_else(|| fe("Select faces to move."))?.centroid()?;
         let dist = if up_to {

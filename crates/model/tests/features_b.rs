@@ -1105,6 +1105,40 @@ fn import_foreign_mesh_parts() {
     assert!(info.closed && info.members.len() == 2 && comp.name == "Composite part 1", "{info:?} {}", comp.name);
 }
 
+/// Live dl-bracket-1125: an STL part is one face; Move face Offset offsets the whole mesh (1 mm on every side, no
+/// error) and Delete face removes the part.
+#[test]
+fn move_face_offsets_a_mesh_part_and_delete_face_removes_it() {
+    let dir = std::env::temp_dir().join(format!("noshape-featb-meshmove-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.stl");
+    let bx = noshape_kernel::make_box(&noshape_kernel::Plane::xy(), 0.01, 0.02, 0.03).unwrap();
+    noshape_kernel::write_stl(&bx, &path, 1e-4, noshape_kernel::StlFormat::Binary).unwrap();
+    let mesh = noshape_kernel::read_mesh_bodies(&path, noshape_kernel::LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(dir);
+    let brep = String::from_utf8(mesh.to_brep_bytes().unwrap()).unwrap();
+    let imported = || {
+        let mut s = Studio::new();
+        let b = brep.clone();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(b)));
+        let r = s.ok();
+        (s, Reference::Face((*r.context.bodies[0].faces[0]).clone()), r.context.bodies[0].shape.bounding_box(false).unwrap())
+    };
+    let (mut s, face, before) = imported();
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", ParamValue::Query(vec![face]));
+        p.set("offsetDistance", expr("1 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    assert!(b.shape.is_mesh() && b.faces.len() == 1);
+    let bb = b.shape.bounding_box(false).unwrap();
+    assert!((bb.min - before.min + DVec3::splat(1e-3)).length() < 1e-7 && (bb.max - before.max - DVec3::splat(1e-3)).length() < 1e-7, "{bb:?}");
+    let (mut s, face, _) = imported();
+    s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(vec![face])));
+    assert!(s.ok().context.bodies.is_empty());
+}
+
 /// An STL's open pieces are surfaces of their own, without a composite (live stl-split-1121: "Surface N" sheets; a mesh
 /// that closes is a solid, DECISIONS 11-22).
 #[test]

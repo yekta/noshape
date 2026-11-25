@@ -367,6 +367,11 @@ impl Shape {
         ffi::is_mesh(self.raw())
     }
 
+    /// A mesh body offset by `d` (outward when positive), convex edges rounded, as a mesh body again.
+    pub fn offset_mesh(&self, d: f64) -> Result<Shape> {
+        Shape::from_res(ffi::offset_mesh(self.raw(), d))
+    }
+
     /// Its mesh faces as planar triangle faces sharing their edges (a B-rep the CAD writers take); other faces kept.
     pub fn faceted(&self) -> Result<Shape> {
         Shape::from_res(ffi::faceted_mesh(self.raw()))

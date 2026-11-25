@@ -6,6 +6,17 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepClass3d_SolidClassifier.hxx>
+#include <BRepClass_FaceClassifier.hxx>
+#include <BRepFilletAPI_MakeFillet.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
+#include <functional>
+#include <BRepOffsetAPI_MakeOffsetShape.hxx>
+#include <TopExp_Explorer.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepLib.hxx>
 #include <BRep_Tool.hxx>
@@ -16,6 +27,7 @@
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
+#include <TopoDS_Iterator.hxx>
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
 #include <TopoDS_Vertex.hxx>
@@ -303,6 +315,182 @@ std::unique_ptr<OcShape> faceted_mesh(const OcShape& s)
   require_non_null(s.shape, "shape");
   MeshFacets m;
   return wrap(facet_mesh(s.shape, m));
+}
+
+// The sharp offset `r` (of planar faces) with its edges that are convex (outward, `d` > 0) or concave (inward)
+// rounded at |d|: the true offset, whose edges there are arcs about the original's edges. `r` when OCCT can't.
+static gp_Pnt edge_mid(const TopoDS_Edge& e)
+{
+  BRepAdaptor_Curve c(e);
+  return c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+}
+
+// `r`'s edges at `mids` rounded at `radius`; null when OCCT can't.
+static TopoDS_Shape fillet_at(const TopoDS_Shape& r, const std::vector<gp_Pnt>& mids, double radius)
+{
+  TopTools_IndexedMapOfShape edges;
+  TopExp::MapShapes(r, TopAbs_EDGE, edges);
+  BRepFilletAPI_MakeFillet fil(r);
+  int                      n = 0;
+  for (int i = 1; i <= edges.Extent(); ++i)
+  {
+    const gp_Pnt m = edge_mid(TopoDS::Edge(edges(i)));
+    if (std::any_of(mids.begin(), mids.end(), [&](const gp_Pnt& p) { return p.Distance(m) < 1e-9; }))
+    {
+      fil.Add(radius, TopoDS::Edge(edges(i)));
+      ++n;
+    }
+  }
+  if (n != (int)mids.size())
+    return {};
+  try
+  {
+    fil.Build();
+    if (fil.IsDone() && BRepCheck_Analyzer(fil.Shape()).IsValid())
+      return fil.Shape();
+  }
+  catch (const Standard_Failure&)
+  {
+  }
+  return {};
+}
+
+// The sharp offset `r` (of planar faces) with its edges that are convex (outward, `d` > 0) or concave (inward)
+// rounded at |d|: the true offset, whose edges there are arcs about the original's edges. All at once, else each
+// connected run of them that OCCT can round (a hole's rim of facets it can't stays sharp).
+static TopoDS_Shape rounded(const TopoDS_Shape& r, double d)
+{
+  TopTools_IndexedDataMapOfShapeListOfShape ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  BRepClass3d_SolidClassifier cls(r);
+  std::vector<TopoDS_Edge>    picked;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopTools_ListOfShape& fs = ef(i);
+    if (fs.Extent() != 2)
+      continue;
+    const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+    BRepAdaptor_Curve  c(e);
+    gp_Pnt             p;
+    gp_Vec             t;
+    c.D1(0.5 * (c.FirstParameter() + c.LastParameter()), p, t);
+    if (t.Magnitude() < 1e-12)
+      continue;
+    const double eps = 1e-3 * std::abs(d);
+    gp_XYZ       side(0, 0, 0);
+    bool         ok = true;
+    for (const TopoDS_Shape& fsh : fs)
+    {
+      const occ::handle<Geom_Plane> g = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(TopoDS::Face(fsh)));
+      if (g.IsNull())
+        return r;
+      gp_Vec                   in = gp_Vec(g->Pln().Axis().Direction()).Crossed(t).Normalized();
+      BRepClass_FaceClassifier fc(TopoDS::Face(fsh), p.Translated(in * eps), 1e-9);
+      if (fc.State() != TopAbs_IN)
+      {
+        in.Reverse();
+        BRepClass_FaceClassifier back(TopoDS::Face(fsh), p.Translated(in * eps), 1e-9);
+        ok = ok && back.State() == TopAbs_IN;
+      }
+      side += in.XYZ();
+    }
+    if (!ok || side.Modulus() < 1e-9)
+      continue;
+    cls.Perform(p.Translated(gp_Vec(side * (0.5 * eps))), 1e-9);
+    if ((cls.State() == TopAbs_IN) == (d > 0))
+      picked.push_back(e);
+  }
+  if (picked.empty())
+    return r;
+  std::vector<gp_Pnt> all;
+  for (const TopoDS_Edge& e : picked)
+    all.push_back(edge_mid(e));
+  const TopoDS_Shape once = fillet_at(r, all, std::abs(d));
+  if (!once.IsNull())
+    return once;
+  // Connected runs: edges sharing a vertex.
+  TopTools_IndexedMapOfShape verts;
+  std::vector<int>           parent(picked.size());
+  for (size_t i = 0; i < picked.size(); ++i)
+    parent[i] = (int)i;
+  std::function<int(int)> root = [&](int i) { return parent[i] == i ? i : parent[i] = root(parent[i]); };
+  std::map<int, int>      owner;
+  for (size_t i = 0; i < picked.size(); ++i)
+    for (TopExp_Explorer v(picked[i], TopAbs_VERTEX); v.More(); v.Next())
+    {
+      const int k  = verts.Add(v.Current());
+      auto      it = owner.find(k);
+      if (it == owner.end())
+        owner[k] = (int)i;
+      else
+        parent[root((int)i)] = root(it->second);
+    }
+  std::map<int, std::vector<gp_Pnt>> runs;
+  for (size_t i = 0; i < picked.size(); ++i)
+    runs[root((int)i)].push_back(all[i]);
+  TopoDS_Shape out = r;
+  for (const auto& [_, mids] : runs)
+  {
+    const TopoDS_Shape next = fillet_at(out, mids, std::abs(d));
+    if (!next.IsNull())
+      out = next;
+  }
+  return out;
+}
+
+// A mesh body offset by `d` as Onshape's Move face offsets its one face: the solid's true offset (convex edges
+// rounded, live dl-bracket-1125: 1 mm grows the box 1 mm on every side, 25800.854 mm³; ours 25822.709, the holes'
+// rims sharp), meshed back into a mesh body. OCCT's arc joins break on the facets: sharp joins, then fillets.
+std::unique_ptr<OcShape> offset_mesh(const OcShape& s, double d)
+{
+  require_non_null(s.shape, "shape");
+  MeshFacets   m;
+  TopoDS_Shape f = facet_mesh(s.shape, m);
+  ShapeUpgrade_UnifySameDomain u(f, true, true, false);
+  u.Build();
+  BRepOffsetAPI_MakeOffsetShape off;
+  off.PerformByJoin(u.Shape(), d, 1e-7, BRepOffset_Skin, true, false, GeomAbs_Intersection);
+  if (!off.IsDone())
+    throw std::runtime_error("mesh offset failed");
+  const TopoDS_Shape r = rounded(off.Shape(), d);
+  BRepMesh_IncrementalMesh(r, std::abs(d) * 0.01, false, 0.1);
+  std::vector<gp_Pnt>                     pts;
+  std::vector<std::array<int, 3>>         tris;
+  std::map<std::array<long long, 3>, int> index;
+  auto node = [&](const gp_Pnt& p) {
+    const std::array<long long, 3> k{std::llround(p.X() * 1e9), std::llround(p.Y() * 1e9), std::llround(p.Z() * 1e9)};
+    auto it = index.find(k);
+    if (it != index.end())
+      return it->second;
+    pts.push_back(p);
+    return index[k] = (int)pts.size() - 1;
+  };
+  for (TopExp_Explorer e(r, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face&              face = TopoDS::Face(e.Current());
+    TopLoc_Location                 l;
+    occ::handle<Poly_Triangulation> t = BRep_Tool::Triangulation(face, l);
+    if (t.IsNull())
+      throw std::runtime_error("mesh offset: a face not meshed");
+    const gp_Trsf at  = l.Transformation();
+    const bool    rev = face.Orientation() == TopAbs_REVERSED;
+    for (int k = 1; k <= t->NbTriangles(); ++k)
+    {
+      int a, b, c;
+      t->Triangle(k).Get(a, b, c);
+      if (rev)
+        std::swap(b, c);
+      const int ia = node(t->Node(a).Transformed(at)), ib = node(t->Node(b).Transformed(at)), ic = node(t->Node(c).Transformed(at));
+      if (ia != ib && ib != ic && ic != ia)
+        tris.push_back({ia, ib, ic});
+    }
+  }
+  if (tris.empty())
+    throw std::runtime_error("mesh offset: empty");
+  const TopoDS_Shape c = mesh_compound(mesh_bodies(pts, std::move(tris), 1e-7));
+  if (c.NbChildren() != 1)
+    throw std::runtime_error("mesh offset: not one body");
+  return wrap(TopoDS_Iterator(c).Value());
 }
 
 std::unique_ptr<OcShape> read_mesh(rust::Str path, uint32_t merge_limit)

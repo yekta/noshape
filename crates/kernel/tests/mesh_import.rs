@@ -358,3 +358,29 @@ fn mesh_pieces_close_into_solids_and_split_only_where_open() {
     let s = read(&cube(0.0, Some(1.0)), "f");
     assert_eq!((s.count(ShapeType::Solid), s.count(ShapeType::Face)), (0, 1), "an open box");
 }
+
+/// Move face Offset on a mesh part (live dl-bracket-1125: the whole mesh offset, 1 mm grows its box 1 mm on every
+/// side): the solid's true offset, its convex edges rounded, outward; inward a box's corners stay sharp.
+#[test]
+fn a_mesh_body_offsets_whole_with_rounded_convex_edges() {
+    let (a, b, c, d) = (0.02, 0.01, 0.005, 0.001);
+    let bx = make_box_corners(DVec3::ZERO, DVec3::new(a, b, c)).unwrap();
+    let dir = std::env::temp_dir().join(format!("noshape-meshoffset-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("box.stl");
+    write_stl(&bx, &path, 1e-4, StlFormat::Binary).unwrap();
+    let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    let out = s.offset_mesh(d).unwrap();
+    assert!(out.is_mesh() && out.is_valid() && out.count(ShapeType::Face) == 1);
+    let bb = out.bounding_box(false).unwrap();
+    assert!((bb.min - DVec3::splat(-d)).length() < 1e-6 && (bb.max - DVec3::new(a + d, b + d, c + d)).length() < 1e-6, "{bb:?}");
+    let pi = std::f64::consts::PI;
+    let rounded = a * b * c + 2.0 * (a * b + b * c + c * a) * d + pi * d * d * (a + b + c) + 4.0 / 3.0 * pi * d.powi(3);
+    let sharp = (a + 2.0 * d) * (b + 2.0 * d) * (c + 2.0 * d);
+    let v = volume_properties(&out).unwrap().mass;
+    assert!((v - rounded).abs() < 0.01 * (sharp - rounded), "volume {v}, rounded {rounded}, sharp {sharp}");
+    let inward = s.offset_mesh(-d).unwrap();
+    let vi = volume_properties(&inward).unwrap().mass;
+    assert!(inward.is_mesh() && (vi - (a - 2.0 * d) * (b - 2.0 * d) * (c - 2.0 * d)).abs() < 1e-12, "inward {vi}");
+}

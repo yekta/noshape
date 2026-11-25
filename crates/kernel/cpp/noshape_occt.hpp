@@ -1129,6 +1129,7 @@ rust::Vec<PvzInstance>   read_pvz_instances(rust::Str path);
 std::unique_ptr<OcShape> read_mesh_bodies(rust::Str path);
 bool                     is_mesh(const OcShape& s);
 std::unique_ptr<OcShape> faceted_mesh(const OcShape& s);
+std::unique_ptr<OcShape> offset_mesh(const OcShape& s, double d);
 bool                     has_triangulation(const OcShape& s);
 
 // ---- HLR (hlr.cpp)

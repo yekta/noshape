@@ -952,6 +952,7 @@ pub(crate) mod ffi {
         fn read_mesh_bodies(path: &str) -> Result<UniquePtr<OcShape>>;
         fn is_mesh(s: &OcShape) -> bool;
         fn faceted_mesh(s: &OcShape) -> Result<UniquePtr<OcShape>>;
+        fn offset_mesh(s: &OcShape, d: f64) -> Result<UniquePtr<OcShape>>;
         fn has_triangulation(s: &OcShape) -> bool;
 
         // ---- surfacing (wrap, isocline, surface fitting)
