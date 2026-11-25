@@ -14,14 +14,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   base; sketch crate, scene lib, part-studio sketch suites green. fz211 (qa fuzz, 438 ents, over-defined), probe
   (tprobe.sh + skasm-scratch/probes/speed-instrumented.diff): edit 1146 -> 225 ms / 431 -> 153 ms; ops T2: open
   457 -> 211 ms, change a dim 0.5-0.9 s -> 253 ms, drag step median 16, worst 452 -> 205 ms.
-- IN FLIGHT (lead 11-24 "off the UI thread"): a slow sketch (its feature's last regeneration >= 50 ms;
+- QUEUED 80c322df 11-25 00:02 (lead 11-24 "off the UI thread"): a slow sketch (its feature's last regeneration >= 50 ms;
   `sketch_solves_slowly`, tests force it with `ui.slow_sketch`) solves a typed dimension off the UI thread:
   scene `prepare_dimension` / `finish_dimension` (apply_dimension = both + the solve); sketch.rs commit_dimension
   spawns the solve, `ui.sketch_solve` holds the sketch (with_sketch -> None, viewport input but camera/hover and
   sketch keys ignored), pending (live's overlay past 0.9 s); regen_sync of a slow sketch -> schedule_regen (the
   async completion now also runs update_profile_issues). T1 latency_tests
   a_slow_sketch_solves_a_dimension_off_the_ui_thread. fz211 UI probe (skasm-scratch/probes/zz_probe_fz211_ui.rs):
-  commit_dimension on the UI thread 627-742 ms -> 3-5 ms, done 0.54-0.65 s later, same warning. Suites were running at 23:32 (~/tmp/skasm/toff3.log on this host: TOFF3DONE marks the end); land once green.
+  commit_dimension on the UI thread 627-742 ms -> 3-5 ms, done 0.54-0.65 s later, same warning. psui sketch suites 531 ok, scene 212 ok, clippy clean. Not covered (follow-ups): drags (fz211 worst ~205 ms), other tools' own solves stay on the UI thread.
   Not covered: drags (median 16 ms, worst ~205 ms on fz211), other tools' own solves (sync, regen async).
 - LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
 
