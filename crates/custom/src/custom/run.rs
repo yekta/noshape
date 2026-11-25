@@ -507,6 +507,21 @@ pub(crate) fn run_manipulator_change(
     call_and_diff(f, args, name, units, decls, &new_def, &news, &cx)
 }
 
+thread_local! {
+    /// The flag that drops a dialog function run on this thread ([`with_dialog_cancel`]).
+    static DIALOG_CANCEL: std::cell::RefCell<Option<Arc<std::sync::atomic::AtomicBool>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Run `f`, whose dialog functions (editing logic, manipulator changes) stop once `cancel` is raised: the dialog's
+/// values changed again and a newer run replaces this one (a depth edit's editing logic on the impeller kept a core
+/// busy 10 s after the next edit).
+pub fn with_dialog_cancel<T>(cancel: Arc<std::sync::atomic::AtomicBool>, f: impl FnOnce() -> T) -> T {
+    let outer = DIALOG_CANCEL.replace(Some(cancel));
+    let out = f();
+    DIALOG_CANCEL.set(outer);
+    out
+}
+
 /// Call `f` with `args` (a dialog's FeatureScript function: editing logic, a
 /// manipulator change function) on its own thread under the time limit, and
 /// return the parameters whose values differ from `new_def` in what it
@@ -516,14 +531,26 @@ fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Valu
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())), noshape_featurescript::value::Tag::NONE);
     let units = *units;
     let legacy = noshape_kernel::kernel_legacy();
-    // The kernel's cancel flag for the call, raised at the limit (a timer woken when the call ends).
+    let dropped = DIALOG_CANCEL.with_borrow(|c| c.clone());
+    // The kernel's cancel flag for the call, raised at the limit or when the run is dropped (a timer woken when the
+    // call ends, looking at the drop flag every 20 ms).
     let stop = std::sync::atomic::AtomicBool::new(false);
     let (done, timer) = std::sync::mpsc::channel::<()>();
     std::thread::scope(|s| {
         let stop_at_limit = &stop;
+        let watched = dropped.clone();
         s.spawn(move || {
-            if matches!(timer.recv_timeout(DIALOG_LIMIT), Err(std::sync::mpsc::RecvTimeoutError::Timeout)) {
-                stop_at_limit.store(true, std::sync::atomic::Ordering::Relaxed);
+            let end = Instant::now() + DIALOG_LIMIT;
+            let tick = if watched.is_some() { Duration::from_millis(20) } else { DIALOG_LIMIT };
+            loop {
+                let left = end.saturating_duration_since(Instant::now());
+                if !matches!(timer.recv_timeout(left.min(tick)), Err(std::sync::mpsc::RecvTimeoutError::Timeout)) {
+                    return;
+                }
+                if left <= tick || watched.as_ref().is_some_and(|w| w.load(std::sync::atomic::Ordering::Relaxed)) {
+                    stop_at_limit.store(true, std::sync::atomic::Ordering::Relaxed);
+                    return;
+                }
             }
         });
         let stop = &stop;
@@ -534,6 +561,7 @@ fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Valu
                 let _done = done;
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + DIALOG_LIMIT));
+                i.set_cancel(dropped.map(|c| Box::new(move || c.load(std::sync::atomic::Ordering::Relaxed)) as Box<dyn Fn() -> bool + Send>));
                 // NOSHAPE_FS_PROFILE=1: the call's time and its slowest std lines.
                 let profile = std::env::var_os("NOSHAPE_FS_PROFILE").is_some();
                 if profile {

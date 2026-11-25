@@ -596,6 +596,8 @@ pub struct UiState {
     /// std's editing logic running off the UI thread (std Extrude runs a
     /// whole trial extrude for its boolean heuristics).
     pub std_edit_task: Option<Task<()>>,
+    /// Raised to stop that run's FeatureScript and kernel work once a newer run or the dialog's close drops it.
+    pub std_edit_cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// A slow sketch's dimension solve running off the UI thread (sketch.rs `commit_dimension`): sketch input waits.
     pub sketch_solve: Option<Task<()>>,
     /// A slow sketch's drag step solving off the UI thread (sketch.rs `drag_off_thread`); the pointer's newest plane
@@ -1057,6 +1059,7 @@ impl UiState {
             std_remembered: Vec::new(),
             panel_check_focus: None,
             std_edit_task: None,
+            std_edit_cancel: None,
             sketch_solve: None,
             sketch_drag: None,
             drag_next: None,
@@ -4910,6 +4913,14 @@ impl PartStudioView {
 }
 
 impl PartStudioView {
+    /// Drop std's editing logic run in flight, stopping its work.
+    pub(super) fn drop_std_edit_run(&mut self) {
+        self.ui.std_edit_task = None;
+        if let Some(c) = self.ui.std_edit_cancel.take() {
+            c.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
     /// The std "Editing Logic Function" of a feature std runs (Tab: picking
     /// the profile fills "Flange to merge" and the subtraction offset, live
     /// qa5 4.2), on the model before the feature; fields the user set are
@@ -4957,16 +4968,22 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         let dialog = dialog.clone();
         let sent = params.clone();
+        self.drop_std_edit_run();
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.ui.std_edit_cancel = Some(cancel.clone());
         self.ui.std_edit_task = Some(cx.spawn_in(window, async move |this, cx| {
             let changed = cx
                 .background_spawn(async move {
                     let ctx = noshape_model::regen::with_sub_features(ctx, &with_subs, &units);
-                    noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating, &clicked)
+                    noshape_model::custom::run::with_dialog_cancel(cancel, || {
+                        noshape_model::custom::std_feature::editing_logic_in_clicked((*ctx).clone(), &ty, id, &name, &units, &old, &sent, &user_set, creating, &clicked)
+                    })
                 })
                 .await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 // Done (a newer run would have dropped this one): the studio is idle again ([`Self::ui_busy`]).
                 this.ui.std_edit_task = None;
+                this.ui.std_edit_cancel = None;
                 // The first run is in: a held preview runs now unless the changes below schedule their own.
                 let held = this.ui.std_logic_first.take() == Some(true);
                 let changes: Vec<(String, ParamValue)> = match changed {

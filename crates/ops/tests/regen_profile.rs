@@ -543,6 +543,36 @@ fn non_manifold_origin() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
+/// T2 bench: one feature's editing logic as a new dialog runs it after a field edit (the operation and scope left to
+/// std's Boolean heuristics): NOSHAPE_ELOGIC_DOC, NOSHAPE_ELOGIC_FEATURE (its name); each run's time and the
+/// operation it picks.
+#[test]
+#[ignore = "T2 bench: a document and feature from the environment"]
+fn bench_editing_logic_one() {
+    let (Some(doc), Some(name)) = (std::env::var_os("NOSHAPE_ELOGIC_DOC"), std::env::var("NOSHAPE_ELOGIC_FEATURE").ok()) else { return };
+    let tmp = std::env::temp_dir().join(format!("noshape-elogic1-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let copy = tmp.join("doc.noshape");
+    std::fs::copy(&doc, &copy).unwrap();
+    let s = noshape_ops::session::Session::open(&copy).unwrap();
+    let units = s.doc.settings.units;
+    let opts = RegenOptions { custom_features: Some(noshape_model::custom::DocumentScripts::from_document(&s.doc)), ..Default::default() };
+    for tab in &s.doc.tabs {
+        let TabContent::PartStudio(ps) = &tab.content else { continue };
+        let Some(i) = ps.features.iter().position(|f| f.name == name) else { continue };
+        let f = &ps.features[i];
+        let ctx = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions { upto: Some(i), ..opts.clone() }).context;
+        let specified: Vec<String> = f.params.0.keys().filter(|k| !["operationType", "booleanScope", "defaultScope"].contains(&k.as_str())).cloned().collect();
+        for _ in 0..2 {
+            let t = Instant::now();
+            let out = noshape_model::custom::std_feature::editing_logic_in((*ctx).clone(), &f.type_id, f.id, &f.name, &units, &Default::default(), &f.params, &specified, true);
+            let op = out.as_ref().and_then(|p| p.0.get("operationType").map(|v| format!("{v:?}")));
+            println!("editing logic {name}: {:.1} ms, operationType {op:?}", t.elapsed().as_secs_f64() * 1e3);
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
 /// T2 bench: every feature with std's (or a custom feature's) editing logic in the perf documents and NOSHAPE_PROFILE_DIR's
 /// (else ~/agents/profdocs), its logic run as a new dialog runs it (on the model just before it), best of 3: the ten
 /// slowest, one line each.

@@ -33,21 +33,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     concave edge, both ends on a piece's ends, tangent to it): 8 pieces + 2 arcs + 2 smooth edges -> rolling balls fail
     at blend_section rolling_ball's det ~ 0 ("tangent"): the arc lies on the groove's own 0.5 mm round, the ball is
     0.5 mm too, so it sits in it (degenerate contact). Live needs a vertex blend / setback there; not rolling balls.
-- **NOW (lead 11-25): Extrude editing logic's evCollision on the impeller (uncommitted in core-rf).** psui: a depth
-  change's Add/New auto-choice takes 10-15 s (DIALOG_LIMIT 15 s). Bench: regen_profile::bench_editing_logic_one
-  (new T2 test; NOSHAPE_ELOGIC_DOC/_FEATURE), .el.sh "Extrude Flansch" (ZZ_COLL timing prints in
-  crates/custom host/evaluate.rs: remove before landing). Before: 15.2 s, operationType None (cap hit); containment
-  common 1.1-2.7 s, face pairs Extrusion x Offset(-3 mm) ABUT sections 2.2-7.5 s each. Change: common_of (cached
-  commons, 4 pairs, thread-local) + crossing_in_common: a non-analytic touching face pair of two solids crosses iff
-  the solids' common has an edge between their images (history) with its midpoint off both faces' edges; analytic
-  pairs keep faces_cross's section. After: 3.6 s (1.8 s with the cached common). A/B: ZZ_COLL also runs the
-  uncapped section per fast pair and prints "coll: check fast X section Y [MISMATCH]" (el.txt on vibex7; the
-  before run el-A.txt was cut by the 15 s cap, not comparable). RESULT: 14 pairs agree, 1 pair (Extrusion x
-  Offset(-3 mm), section 6.9 s) MISMATCH: fast says crossing, the uncapped section says not (the old capped code
-  gave ABUT there too). Next: find which is right (the common's edge between them: midpoint, both faces' normals
-  there; tangent contact? a boundary within 1e-7?), tighten crossing_in_common, rerun .el.sh. Still to do: cheap
-  containment rejection (a vertex OUT => no common), cancel the stale run on a new depth (part-studio-ui
-  boolean_edit_logic / custom run.rs), tests (custom crate), land.
+- **Extrude editing logic's evCollision on the impeller (lead 11-25), landing.** psui: a depth change's Add/New
+  auto-choice took 10-15 s (DIALOG_LIMIT 15 s). Now 3.0 s (2.6 s with the cached common), bench
+  regen_profile::bench_editing_logic_one (T2; NOSHAPE_ELOGIC_DOC/_FEATURE; .el.sh "Extrude Flansch" in core-rf).
+  crates/custom host/evaluate.rs: common_of (4 cached commons, thread-local) + crossing_in_common (a non-analytic
+  touching face pair of two solids crosses iff the common has an edge between their images, off both faces' edges,
+  and not tangent along it: |nt x ng| > 1e-3 at 1/4, 1/2, 3/4; tangent -> the section decides); containment skips the
+  common when one of a solid's first 8 vertices is Outside. A/B vs uncapped sections: 14 of 15 pairs agree; the 15th
+  is a real 0.4-3.8 degree crossing the section misses. Stale runs: custom run.rs with_dialog_cancel (thread-local
+  flag -> call_and_diff's 20 ms timer + Interp::set_cancel); part-studio-ui ui.std_edit_cancel / drop_std_edit_run
+  (new run, dialog close). Left: the remaining ~2.6 s is the impeller x flange common itself.
 - **Concave balls landed (f8cec294c, 11-24):** fillet_in's last arm with_concave_balls(rolling_ball_blend): concave
   edges' balls added, no run-on for concave edges, oblique free ends trimmed (concave_end_walls), ledge drops trimmed
   (ledge_walls + trim_by_walls). Fresh-translation A/B (.pm2.sh sc9cbb|sc2d82 on vibex7 ~/tmp/core/pm): 9cbb0e Fillet 2

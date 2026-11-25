@@ -1058,14 +1058,10 @@ fn faces_cross_within(a: &k::Shape, b: &k::Shape, solids: bool, work: u64) -> bo
         Ok(sec) => sec,
         Err(e) => return e.to_string().contains("took too much work"),
     };
-    let interior = |f: &k::Shape, p: DVec3| {
-        let Ok(v) = k::make_vertex(p) else { return false };
-        f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-7))
-    };
     sec.shape.edges().iter().any(|e| {
         let Ok(info) = e.edge_info() else { return false };
         let Ok(m) = e.point_at(0.5 * (info.first_param + info.last_param)) else { return false };
-        interior(a, m) && interior(b, m)
+        off_edges(a, m) && off_edges(b, m)
     })
 }
 
@@ -1101,6 +1097,92 @@ const BOX_GAP: f64 = 1e-7;
 /// (the tight boxes' own error).
 const HOLD_GAP: f64 = 1e-6;
 
+/// Whether a face lies on a plane, cylinder, cone, sphere or torus (their sections are quick).
+fn analytic(f: &k::Shape) -> bool {
+    matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. } | k::Surface::Cone { .. } | k::Surface::Sphere { .. } | k::Surface::Torus { .. }))
+}
+
+/// Whether `p` lies off every edge of face `f`.
+fn off_edges(f: &k::Shape, p: DVec3) -> bool {
+    let Ok(v) = k::make_vertex(p) else { return false };
+    f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-7))
+}
+
+/// Two solids' common as [`crossing_in_common`] reads it: its volume, per face the faces of the first and of the
+/// second solid it comes from, and its edges with their faces.
+struct CommonOf {
+    volume: Option<f64>,
+    from: Vec<(Vec<u32>, Vec<u32>)>,
+    edges: Vec<(k::Shape, Vec<u32>)>,
+}
+
+/// Two solids and their common.
+type CommonEntry = (k::Shape, k::Shape, std::rc::Rc<Option<CommonOf>>);
+
+thread_local! {
+    /// The last few solid pairs' commons: an editing logic asks evCollision of the same bodies again (std's
+    /// faceToFaceCollisionsContainInterferences, one call a face pair).
+    static COMMONS: std::cell::RefCell<Vec<CommonEntry>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn common_of(a: &k::Shape, b: &k::Shape) -> std::rc::Rc<Option<CommonOf>> {
+    if let Some(c) = COMMONS.with_borrow(|cs| cs.iter().find(|(x, y, _)| x.is_same(a) && y.is_same(b)).map(|c| c.2.clone())) {
+        return c;
+    }
+    let made = k::common(a, b).ok().map(|r| {
+        let faces = r.shape.count(k::ShapeType::Face);
+        let mut from = vec![(Vec::new(), Vec::new()); faces];
+        for h in &r.history.records {
+            let image = matches!(h.relation, k::Relation::Modified | k::Relation::Kept);
+            if !image || h.input_kind != k::ShapeType::Face || h.output_kind != k::ShapeType::Face {
+                continue;
+            }
+            if let Some(f) = from.get_mut(h.output_index as usize) {
+                if h.arg == 0 { f.0.push(h.input_index) } else { f.1.push(h.input_index) }
+            }
+        }
+        let edges = r.shape.edges().into_iter().zip(r.shape.edge_faces().unwrap_or_default()).collect();
+        CommonOf { volume: r.shape.volume().ok(), from, edges }
+    });
+    let c = std::rc::Rc::new(made);
+    COMMONS.with_borrow_mut(|cs| {
+        if cs.len() >= 4 {
+            cs.remove(0);
+        }
+        cs.push((a.clone(), b.clone(), c.clone()));
+    });
+    c
+}
+
+/// Whether face `t` of solid `s` and face `g` of solid `o` cross (meet along a curve inside both), read from the
+/// solids' common: where two faces of solids cross, the common's boundary turns from one to the other, an edge of
+/// it. None when a face isn't found among its solid's, or the faces only touch tangentially along such an edge (the
+/// section decides). It also finds shallow crossings sections miss (the impeller's Extrude Flansch side and the
+/// shell's offset face, 0.4-3.8 degrees apart along 5.6 mm).
+fn crossing_in_common(c: &CommonOf, s: &k::Shape, o: &k::Shape, t: &k::Shape, g: &k::Shape) -> Option<bool> {
+    let ti = s.faces().iter().position(|f| f.is_same(t))? as u32;
+    let gi = o.faces().iter().position(|f| f.is_same(g))? as u32;
+    let of = |f: u32, first: bool, i: u32| c.from.get(f as usize).is_some_and(|(a, b)| if first { a.contains(&i) } else { b.contains(&i) });
+    let mut tangent = false;
+    for (e, fs) in &c.edges {
+        let [f1, f2] = fs[..] else { continue };
+        if !((of(f1, true, ti) && of(f2, false, gi)) || (of(f2, true, ti) && of(f1, false, gi))) {
+            continue;
+        }
+        let Ok(info) = e.edge_info() else { continue };
+        let at = |f: f64| e.point_at(info.first_param + f * (info.last_param - info.first_param));
+        if !at(0.5).is_ok_and(|m| off_edges(t, m) && off_edges(g, m)) {
+            continue;
+        }
+        let apart = |m: DVec3| t.normal_at_point(m).ok().zip(g.normal_at_point(m).ok()).is_some_and(|(nt, ng)| nt.cross(ng).length() > 1e-3);
+        if [0.25, 0.5, 0.75].into_iter().any(|f| at(f).is_ok_and(apart)) {
+            return Some(true);
+        }
+        tangent = true;
+    }
+    (!tangent).then_some(false)
+}
+
 fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let tools = super::query::evaluate_refs(i, &cx, &field(&a, "tools"))?;
@@ -1110,8 +1192,8 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let owners = field(&a, "owners").as_bool() == Some(true);
     // Per face, as live: a body's faces, each with its body (std Tab's
     // editing logic reads `tool`'s plane).
-    // (entity, its body, shape, of a solid)
-    type Hit = (crate::reference::Reference, Option<crate::reference::Reference>, k::Shape, bool);
+    // (entity, its body, shape, its solid's shape)
+    type Hit = (crate::reference::Reference, Option<crate::reference::Reference>, k::Shape, Option<k::Shape>);
     // The solid bodies among the inputs (for containment).
     type Solids = Vec<(crate::reference::Reference, k::Shape)>;
     let shapes = |refs: &[crate::reference::Reference]| -> (Vec<Hit>, Solids) {
@@ -1137,18 +1219,21 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                             solids.push((r.clone(), body.shape.clone()));
                         }
                         for (fi, f) in body.shape.faces().into_iter().enumerate() {
-                            out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f, solid(b)));
+                            out.push((q.to_ref(&Ent::Face(b, fi)), Some(r.clone()), f, solid(b).then(|| body.shape.clone())));
                         }
                         // A wire body: its edges (std Fill pattern finds the instances crossing the border so).
                         if body.kind == crate::display::BodyKind::Wire {
                             for (ei, e) in body.shape.edges().into_iter().enumerate() {
-                                out.push((q.to_ref(&Ent::Edge(b, ei)), Some(r.clone()), e, false));
+                                out.push((q.to_ref(&Ent::Edge(b, ei)), Some(r.clone()), e, None));
                             }
                         }
                     }
                     _ => {
                         let owner = q.owner(&e);
-                        let of_solid = matches!(owner, Some(Ent::Body(b)) if solid(b));
+                        let of_solid = match &owner {
+                            Some(Ent::Body(b)) if solid(*b) => Some(st.ctx.bodies[*b].shape.clone()),
+                            _ => None,
+                        };
                         if let Some(s) = q.shape(&e) {
                             out.push((r.clone(), owner.map(|o| q.to_ref(&o)), s, of_solid));
                         }
@@ -1193,10 +1278,15 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             }
             i.check_deadline()?;
             let (tt, gt) = (tt.get_or_init(|| tight(t)), gt.get_or_init(|| tight(g)));
-            if (!holds(tt, gt) && !holds(gt, tt)) || !k::distance(t, g).is_ok_and(|d| d.distance <= 1e-8) {
+            // A solid with a vertex outside the other isn't inside it (no common to build: 1-3 s on the impeller).
+            let out_of = |a: &k::Shape, b: &k::Shape| a.vertices().iter().take(8).any(|v| v.vertex_point().is_ok_and(|p| b.classify_point(p, 1e-7).is_ok_and(|c| c == k::PointClass::Outside)));
+            if !(holds(gt, tt) && !out_of(t, g)) && !(holds(tt, gt) && !out_of(g, t)) {
                 continue;
             }
-            let Some(common) = k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) else { continue };
+            if !k::distance(t, g).is_ok_and(|d| d.distance <= 1e-8) {
+                continue;
+            }
+            let Some(common) = common_of(t, g).as_ref().as_ref().and_then(|c| c.volume) else { continue };
             let (vt, vg) = (*tv.get_or_init(|| t.volume().unwrap_or(0.0).abs()), *gv.get_or_init(|| g.volume().unwrap_or(0.0).abs()));
             let near = |a: f64, b: f64| (a.abs() - b).abs() <= 1e-9 * b.max(1e-15);
             // (Equal solids overlap whole: the tool counts as inside, as live's Add of a Sweep that rebuilds the part.)
@@ -1225,6 +1315,7 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let mut touched = std::collections::HashSet::new();
     for (((tr, tb, t, ts_solid), tx), tp) in ts.iter().zip(&tbox).zip(&tplane) {
         for (((gr, gb, g, gs_solid), gx), gp) in gs.iter().zip(&gbox).zip(&gplane) {
+            let solids = ts_solid.as_ref().zip(gs_solid.as_ref());
             if t.is_same(g) || !meet(tx, gx) {
                 continue;
             }
@@ -1241,7 +1332,11 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let kind = if contained(tb, gb) {
                 "INTERFERE"
             } else if face_pair(t, g) {
-                if faces_cross(t, g, *ts_solid && *gs_solid) { "INTERFERE" } else { "ABUT_NO_CLASS" }
+                // Faces of two solids on curved surfaces whose sections are slow (B-spline, offset, swept): they
+                // cross where the solids' common has an edge between them (2.2-7.5 s a section on the impeller's
+                // offset faces, a depth edit of Extrude Flansch hit the dialog's 15 s limit).
+                let fast = solids.filter(|_| !(analytic(t) && analytic(g)) && !one_surface(t, g)).and_then(|(s, o)| crossing_in_common(common_of(s, o).as_ref().as_ref()?, s, o, t, g));
+                if fast.unwrap_or_else(|| faces_cross(t, g, solids.is_some())) { "INTERFERE" } else { "ABUT_NO_CLASS" }
             } else {
                 match k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) {
                     Some(v) if v > 1e-15 => "INTERFERE",
@@ -1735,5 +1830,25 @@ mod tests {
         stop.store(true, std::sync::atomic::Ordering::Relaxed);
         spinners.into_iter().for_each(|t| t.join().unwrap());
         assert_eq!(busy, quiet);
+    }
+
+    #[test]
+    fn crossing_read_from_the_common_as_sections_find_it() {
+        let cube = k::make_box_corners(DVec3::ZERO, DVec3::splat(2.0)).unwrap();
+        // A bar poking out of the cube's x = 2 side, and one touching that side from outside.
+        let poking = k::make_box_corners(DVec3::new(1.0, 0.5, 0.5), DVec3::new(3.0, 1.5, 1.5)).unwrap();
+        let touching = k::make_box_corners(DVec3::new(2.0, 0.5, 0.5), DVec3::new(3.0, 1.5, 1.5)).unwrap();
+        let face = |s: &k::Shape, n: DVec3, at: f64| s.faces().into_iter().find(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.normalize().abs() == n && (p.origin.dot(n) - at).abs() < 1e-9)).unwrap();
+        for (bar, pairs) in [(&poking, [((DVec3::X, 2.0), (DVec3::Y, 0.5)), ((DVec3::X, 0.0), (DVec3::Y, 0.5)), ((DVec3::X, 2.0), (DVec3::X, 3.0))]), (&touching, [((DVec3::X, 2.0), (DVec3::Y, 0.5)), ((DVec3::X, 2.0), (DVec3::Z, 1.5)), ((DVec3::Z, 2.0), (DVec3::Y, 0.5))])] {
+            let common = common_of(&cube, bar);
+            for ((tn, ta), (gn, ga)) in pairs {
+                let (t, g) = (face(&cube, tn, ta), face(bar, gn, ga));
+                let fast = crossing_in_common(common.as_ref().as_ref().unwrap(), &cube, bar, &t, &g);
+                assert_eq!(fast, Some(faces_cross(&t, &g, true)), "{tn} {ta} x {gn} {ga}");
+            }
+        }
+        // The poking bar's y = 0.5 side crosses the cube's x = 2 side.
+        let t = face(&cube, DVec3::X, 2.0);
+        assert_eq!(crossing_in_common(common_of(&cube, &poking).as_ref().as_ref().unwrap(), &cube, &poking, &t, &face(&poking, DVec3::Y, 0.5)), Some(true));
     }
 }

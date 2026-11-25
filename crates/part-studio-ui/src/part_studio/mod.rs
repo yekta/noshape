@@ -3315,7 +3315,7 @@ impl PartStudioView {
         if self.edit.take().is_some() {
             // The dialog's own background work goes with it: nothing it delivers late is applied, and std's editing
             // logic doesn't start a held preview (user P1 11-05: the spinner kept on after Esc).
-            self.ui.std_edit_task = None;
+            self.drop_std_edit_run();
             self.ui.std_logic_first = None;
             self.ui.std_edit_old = None;
             self.ui.std_remembered.clear();
