@@ -2168,6 +2168,61 @@ fn a_triad_drag_fades_the_other_handles_draws_its_dimension_and_esc_drops_the_bo
     .unwrap();
 }
 
+/// Live manip-feel-1118 (behaviours "manipulator drags, the gaps"): an arrow or ring drag shows a value box; the triad's
+/// plane square drags with none.
+#[gpui::test]
+fn a_triad_plane_square_drags_with_no_value_box(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "triad-plane");
+    for (handle, boxed) in [(ManipHandle::Axis(0), true), (ManipHandle::Ring(0), true), (ManipHandle::Plane(2), false)] {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.manip_value = None;
+                v.selected = vec![instance(v, "Part 1 <1>", cx)];
+                let d = triad_drag(v, handle, 0.004, cx);
+                v.open_manip_value(&d, w, cx);
+                assert_eq!(v.manip_value.is_some(), boxed, "{handle:?}: a value box {boxed}");
+            })
+        })
+        .unwrap();
+    }
+}
+
+/// Live (behaviours "mate limits per type … Keys in the open connector dialog", 11-18): in an open Mate connector
+/// dialog `a` flips its Z axis and `q` turns X / Y 90° about Z (four turns come back round).
+#[gpui::test]
+fn a_and_q_flip_and_turn_an_open_mate_connector(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mc-keys");
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.mc_at_instance_origin(pin, w, cx);
+        })
+    })
+    .unwrap();
+    let key = |cx: &mut TestAppContext, k: &str| {
+        cx.update_window(window, |_, w, cx| {
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(gpui_kit::Keystroke::parse(k).unwrap(), cx);
+            w.draw(cx).clear(cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+    };
+    let state = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).mc.as_ref().map(|m| (m.flip, m.reorient)));
+    let (flip, turns) = state(cx).expect("the Mate connector dialog open");
+    key(cx, "a");
+    assert_eq!(state(cx), Some((!flip, turns)), "a flips Z");
+    key(cx, "q");
+    assert_eq!(state(cx), Some((!flip, (turns + 1) % 4)), "q turns 90° about Z");
+    for _ in 0..3 {
+        key(cx, "q");
+    }
+    assert_eq!(state(cx), Some((!flip, turns)), "four turns: back round");
+}
+
 /// Live2 fields.json contextMenus.mixedSelection: instances, the Origin and a mate selected give a reduced menu
 /// (Hide… Isolate… … Clear selection); no Suppress, Fix, Copy, Export… or Delete.
 #[gpui::test]
@@ -2266,6 +2321,36 @@ fn closing_the_insert_dialog_after_esc_leaves_no_redo(cx: &mut TestAppContext) {
         assert!(!v.doc.read(cx).can_redo(), "no Redo left");
     });
     draw(cx, window);
+}
+
+/// Live feel/mates.json insert_dialog (behaviours "Insert dialog: Escape and ✓ with inserted instances"): ✓ with one
+/// instance dropped and one still on the pointer keeps both; one Ctrl+Z takes the whole session's instances away.
+#[gpui::test]
+fn insert_ok_keeps_the_dropped_and_the_pending_and_one_undo_takes_both(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "insert-ok-both");
+    let count = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).assembly(cx).unwrap().instances.len());
+    let before = count(cx);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_insert(w, cx);
+            let studio = v.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == "Part Studio 1").unwrap().id;
+            let first = v.insert_part(studio, None, cx).unwrap();
+            v.start_placing(vec![first], cx);
+            v.drop_placing(cx);
+            let second = v.insert_part(studio, None, cx).unwrap();
+            v.start_placing(vec![second], cx);
+            assert!(v.placing.is_some(), "the second on the pointer");
+            v.close_insert(w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let added = count(cx) - before;
+    assert!(added >= 2, "✓ keeps the dropped and the pending instance: {added} added");
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+    draw(cx, window);
+    assert_eq!(count(cx), before, "one undo takes the whole session's instances away");
 }
 
 /// Live2 asm-feel (1): a mate row's flyout heads with the mate's name and state, then shows its parameters read-only:
@@ -3940,6 +4025,73 @@ fn a_dragged_instance_row_drops_between_rows_in_one_undo_step(cx: &mut TestAppCo
     cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
     draw(cx, window);
     assert_eq!(order(cx), before, "one undo puts it back");
+}
+
+/// Live asm-feel3-1118 (behaviours "instance and mate list, Insert"): a pressed row drags only once the pointer has
+/// moved 8 px (none at 4 or 6).
+#[gpui::test]
+fn an_instance_row_drags_only_past_8_px(cx: &mut TestAppContext) {
+    let (window, _view) = list_assembly(cx, "row-drag-8");
+    draw(cx, window);
+    let from = row_at(cx, window, "Part 2 <1>");
+    let mut v = gpui_kit::VisualTestContext::from_window(window, cx);
+    v.simulate_mouse_move(from, None, gpui_kit::Modifiers::none());
+    v.simulate_mouse_down(from, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::none());
+    for dy in [2., 4., 6.] {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(from - gpui_kit::point(px(0.), px(dy)), Some(gpui_kit::MouseButton::Left), gpui_kit::Modifiers::none());
+        draw(cx, window);
+        assert!(!cx.update(|cx| cx.has_active_drag()), "no drag {dy} px from the press");
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(from - gpui_kit::point(px(0.), px(8.)), Some(gpui_kit::MouseButton::Left), gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert!(cx.update(|cx| cx.has_active_drag()), "a drag at 8 px");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(from, gpui_kit::MouseButton::Left, gpui_kit::Modifiers::none());
+    draw(cx, window);
+}
+
+/// Live asm-feel3-1118 (behaviours "instance and mate list, Insert"): a row's rename field opens with the whole name
+/// selected (typing replaces it); Esc keeps the old name; Enter, Tab and a click in the graphics commit.
+#[gpui::test]
+fn a_rows_rename_selects_the_name_esc_cancels_and_enter_tab_or_a_click_commit(cx: &mut TestAppContext) {
+    let (window, view) = list_assembly(cx, "row-rename");
+    draw(cx, window);
+    let name_of = |cx: &mut TestAppContext, id: InstanceId| cx.update(|cx| view.read(cx).assembly(cx).unwrap().instance(id).unwrap().name.clone());
+    let id = cx.update(|cx| instance(view.read(cx), "Part 1 <1>", cx));
+    let start = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_row_rename(super::behaviors::RenameRow::Instance(id), w, cx))).unwrap();
+        draw(cx, window);
+        cx.executor().advance_clock(std::time::Duration::from_millis(60));
+        cx.run_until_parked();
+        draw(cx, window);
+    };
+    start(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("x");
+    draw(cx, window);
+    let typed = cx.update(|cx| view.read(cx).ui.rename.as_ref().map(|(_, st, _)| st.read(cx).value().to_string()));
+    assert_eq!(typed.as_deref(), Some("x"), "the whole name was selected: typing replaced it");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.rename.is_none()), "Esc closes the field");
+    assert_eq!(name_of(cx, id), "Part 1 <1>", "Esc keeps the old name");
+
+    for (key, name) in [("enter", "a"), ("tab", "b")] {
+        start(cx);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes(name);
+        draw(cx, window);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes(key);
+        draw(cx, window);
+        assert!(cx.update(|cx| view.read(cx).ui.rename.is_none()), "{key} closes the field");
+        assert_eq!(name_of(cx, id), name, "{key} commits");
+    }
+
+    start(cx);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("c");
+    let graphics = gpui_kit::point(px(900.), px(500.));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(graphics, gpui_kit::Modifiers::none());
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.rename.is_none()), "a click in the graphics closes the field");
+    assert_eq!(name_of(cx, id), "c", "a click in the graphics commits");
 }
 
 /// Interaction-feel "Camera menu" (live qa5 VC8): the ▾ under the view cube opens Onshape's assembly list, the Part

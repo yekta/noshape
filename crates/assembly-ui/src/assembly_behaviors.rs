@@ -1131,6 +1131,12 @@ impl AssemblyView {
                         cx.notify();
                     }
                 }))
+                // Tab commits as Enter does (live asm-feel3-1118); it reaches the input as its IndentInline action.
+                .capture_action(cx.listener(|this, _: &gpui_kit::component::input::IndentInline, window, cx| {
+                    this.commit_row_rename(cx);
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                }))
                 .child(Input::new(st).xsmall())
                 .into_any_element()
         })

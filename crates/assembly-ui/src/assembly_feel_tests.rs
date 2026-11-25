@@ -775,6 +775,59 @@ fn esc_keeps_the_selection_and_an_empty_graphics_click_clears_it(cx: &mut TestAp
     assert_eq!(taken(cx), 0, "an empty graphics click clears it");
 }
 
+/// Live sel-gestures-1122 (assembly column): a press held long on a part still selects it at the release (the Part
+/// Studio's selects nothing); Space clears; with a part selected, a left-drag from empty space moves that part, no box.
+#[gpui::test]
+fn a_long_press_selects_space_clears_and_a_drag_from_empty_space_moves_the_selection(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "gestures-1122", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        call(ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>", "Part 2 <1>"], "fixed": false }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let selected = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let a = v.assembly(cx).unwrap();
+        v.selected.iter().map(|id| a.instances.iter().find(|i| i.id == *id).unwrap().name.clone()).collect::<Vec<_>>()
+    });
+    let centre = |cx: &mut TestAppContext, name: &str| {
+        let (lo, hi) = screen_box(cx, &view, name);
+        (lo + hi) * 0.5
+    };
+    let clock = std::rc::Rc::new(std::cell::Cell::new(cx.update(|cx| view.read(cx).viewport.read(cx).now())));
+    let c = clock.clone();
+    cx.update(|cx| view.update(cx, |v, cx| v.viewport.update(cx, |vp, _| vp.set_clock(move || c.get()))));
+
+    let on = centre(cx, "Part 2 <1>");
+    move_to(cx, window, &view, on);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    let w = at_window(cx, &view, on);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(w, MouseButton::Left, Modifiers::default());
+    clock.set(clock.get() + std::time::Duration::from_secs(4));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, Modifiers::default());
+    settle(cx, window, &view);
+    assert_eq!(selected(cx), vec!["Part 2 <1>".to_string()], "held 4 s: selected at the release, as a click");
+
+    press(cx, window, &view, crate::actions::ClearSelection);
+    assert!(selected(cx).is_empty() && cx.update(|cx| view.read(cx).ui.entity_sel.is_empty()), "Space clears");
+
+    cx.update(|cx| view.update(cx, |v, _| v.ui.last_click = None));
+    move_to(cx, window, &view, on);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.selected.is_empty());
+    settle(cx, window, &view);
+    let (part1, part2) = (centre(cx, "Part 1 <1>"), centre(cx, "Part 2 <1>"));
+    let empty = DVec2::new(30.0, 30.0);
+    drag(cx, window, &view, empty, empty + DVec2::new(60.0, 40.0));
+    wait_until(cx, window, &view, |v, _| v.drag.is_none());
+    let moved = centre(cx, "Part 2 <1>") - part2;
+    assert!((moved - DVec2::new(60.0, 40.0)).length() < 3.0, "the selected part follows the drag from empty space: {moved:?}");
+    assert!((centre(cx, "Part 1 <1>") - part1).length() < 0.5, "the other part stays");
+    assert_eq!(selected(cx), vec!["Part 2 <1>".to_string()], "no box: the selection is unchanged");
+}
+
 /// UIS-WORLD-TARGET: live's workflow scenarios aim at a model point `{"world": [x, y, z]}` (mm, assembly
 /// coordinates), on empty space or a manipulator; it shows where the same point of the model does.
 #[gpui::test]

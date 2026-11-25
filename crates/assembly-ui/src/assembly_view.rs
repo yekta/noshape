@@ -7680,6 +7680,12 @@ impl AssemblyView {
                 this.ui.checkbox_focus = None;
                 this.ui.number_focus = None;
                 this.ui.keyboard_away = false;
+                // A list row's rename field sits inside the view, so it never blurs: the press commits it (live
+                // asm-feel3-1118).
+                if this.ui.rename.is_some() {
+                    this.commit_row_rename(cx);
+                    window.focus(&this.focus, cx);
+                }
                 // As the view's own (see `render`), the front layer counting
                 // as inside it.
                 if !this.focus.contains_focused(window, cx) && !window.context_stack().iter().any(|c| c.contains("AssemblyFront")) {
