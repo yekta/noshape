@@ -2302,6 +2302,16 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
+    // (No face merged, only edges, leaving a face invalid: no order of the faces merges one, so none is tried
+    // (c2-impeller-loft's Remove Bohrung Ansaugflansch: the rod's faces broken three times, ~30 ms each).)
+    int merged_faces = 0;
+    for (TopExp_Explorer x(u.Shape(), TopAbs_FACE); x.More(); x.Next())
+      ++merged_faces;
+    if (merged_faces == (int)sf.size() && !new_faces_valid(in, u.Shape()))
+    {
+      t_usd_order_moot = true;
+      break;
+    }
     const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape(), diag, &memo, &known);
     // (Or every merged piece on its merged face's surface itself (within 1e-7 m), each an elementary surface, within
     // 1e-8 of the volume: the change then only its edges', as 850efe's Extrude 5, coaxial cylinders of one radius in
