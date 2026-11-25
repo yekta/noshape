@@ -1106,7 +1106,7 @@ fn import_foreign_mesh_parts() {
 }
 
 /// Live dl-bracket-1125: an STL part is one face; Move face Offset offsets the whole mesh (1 mm on every side, no
-/// error) and Delete face removes the part.
+/// error), Translate along the Top plane moves it whole (mesh-offset-1125) and Delete face removes the part.
 #[test]
 fn move_face_offsets_a_mesh_part_and_delete_face_removes_it() {
     let dir = std::env::temp_dir().join(format!("noshape-featb-meshmove-{}", std::process::id()));
@@ -1134,6 +1134,18 @@ fn move_face_offsets_a_mesh_part_and_delete_face_removes_it() {
     assert!(b.shape.is_mesh() && b.faces.len() == 1);
     let bb = b.shape.bounding_box(false).unwrap();
     assert!((bb.min - before.min + DVec3::splat(1e-3)).length() < 1e-7 && (bb.max - before.max - DVec3::splat(1e-3)).length() < 1e-7, "{bb:?}");
+    // Translate along the Top plane's normal moves the whole mesh.
+    let (mut s, face, before) = imported();
+    s.add("moveFace", move |p| {
+        p.set("moveFaces", ParamValue::Query(vec![face]));
+        p.set("moveFaceType", ParamValue::Enum("TRANSLATE".into()));
+        p.set("direction", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        p.set("translationDistance", expr("5 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let bb = b.shape.bounding_box(false).unwrap();
+    assert!(b.shape.is_mesh() && (bb.min - before.min - DVec3::new(0.0, 0.0, 5e-3)).length() < 1e-7 && (b.shape.volume().unwrap() - 6e-6).abs() < 1e-12, "{bb:?}");
     let (mut s, face, _) = imported();
     s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(vec![face])));
     assert!(s.ok().context.bodies.is_empty());
