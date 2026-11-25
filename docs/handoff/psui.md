@@ -33,12 +33,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## FIRST (lead 20:5x): b976bdb5 FAILED tests 20:08 (vibe2 ~/land/results/psui.log): the land queue's full run still
-hit move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between (dialogs_feel_tests ~l.2223); eaa44314
-will likely fail the same. Make it load/timing independent: no wall clock, no preview-build waits; drive the preview to
-done explicitly (and long press / LEFT_DRAG_TIME 50 ms in viewport.rs press_becomes_drag uses the real clock: set the
-viewport clock in the test, e.g. vp.set_clock advancing per move, as a_circles_rim does). Read the queue log's panic
-first. Then land.sh. Then the QUEUE below (sketch menu: check behaviours' sketch right-click menu first).
+## FIRST (11-25 21:43): snaps test fix + page-runner fix, verifying (t29.sh on vibex8), then land.sh
+- Snaps cause: schedule_regen's burst coalescing (requests < 100 ms apart on the REAL clock wait a 12 ms EXECUTOR
+  timer). Unloaded test moves were bursts -> no preview mid-drag; on the loaded queue they weren't -> the 2.8 deg preview
+  came, and revolve_arc's axis_of resolved "edge through [20,0,20]" in the turned preview's context (None) -> ring gone,
+  drag dead. Fix: axis_of resolves edges in ui.before_context (manipulators.rs); test advances the executor 12 ms per
+  move and draws until !ui_busy (each move's preview applied, deterministic).
+- Lead item (before combined hover), from qa: page scenarios (documents page) couldn't target a page-opened document's
+  graphics (page runner called locate with no views). ui_script.rs: page_locate / doc_workspace / settle_doc, follow()
+  sizes+activates a newly opened document window, redraw repaints its chrome+tab. T1 workspace_tests::
+  a_page_step_finds_the_graphics_of_a_document_the_page_opened. Tell qa after landing: flow 91 had no perf lines
+  because milestones need NOSHAPE_PERF=1; "no assembly frames" maybe the inactive new window (now activated).
 
 ## QUEUE (11-25 19:5x, lead + live)
 1. LOOK-OUTLINE-WEIGHT (qa row l.63): cause = a solid's curved outline drew BOTH the backface band and a centred
