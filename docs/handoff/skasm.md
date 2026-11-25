@@ -3,7 +3,7 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 19:43) — read first
+## NOW (11-25 20:33) — read first
 - QUEUED 69415bd6 (32 commits, rebased after 1db32be0's conflict with psui 5a6910ab; SKT timers dropped). A failure = fix forward.
 - P0 scissor 97ad5f (528c169ba) ANSWERED to lead, no regions change: the studio differs from live from Delete face 1 (ours
   Error both ways; live 1606.6 -> 1704.7 mm3), so Sketch 2 lands on another face. Old tolerances: Sketch 2 = one bogus
@@ -11,8 +11,19 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   +592 mm3). New: correct regions (148 mm2 strip + 838 mm2 face region, 6 holes); Extrude 2 up to a face behind it fails.
   Evidence vibex6 ~/tmp/skasm/sc (save/ new, save-old/ old, a0.log / a-old.log). Waiting on the lead (Delete face 1 owner).
 - Speed (now): pt0 (vibex6 ~/tmp/skasm/pt0/run.log) sketch case >=100 ms & >=2x: "Profile for Tail Fin" 195-285 ms vs live
-  19-24 in c2-surf-intro-{ruled,fill,mutualtrim,boundary}. SKT timers patch: /root/skasm-scratch/skt.patch (git apply).
-  The rest of pt0's >=2x list is fillets/Booleans/Derived (not mine). live is capturing user-action timings.
+  19-24 in c2-surf-intro-{ruled,fill,mutualtrim,boundary}. FOUND (11-25 20:30): ~all of it is sketch.rs section_face ->
+  kernel section_plane (BRepAlgoAPI_Section of 3 intersected faces: 122 + 44 + 26 ms; solve/imprint/update are us-level).
+  Tried, NO gain: Approximation(false); a plane face bounded to the face's box. Next: profile the section (Mac sample,
+  skasm-scratch/bin sample_*.py) or intersect surface x plane directly (only 13 samples / exact line-arc are needed,
+  SECTION_SAMPLES); a cache by face (keep the Shape, is_same) helps only repeat regens (sketch edits). Timers + both
+  switches: /root/skasm-scratch/skt2.patch (git apply; uncommitted, never land; scripts skt.sh / skt2.sh).
+  The rest of pt0's >=2x list is fillets/Booleans/Derived (not mine).
+- Live user-action timings: live/qa/speed-1125/index.md (median of 5, SwiftShader; compare ratios on a similar host).
+  Ours not measured as user actions yet; regen proxies show none >=2x (rings-loft rollback 20->31 ~220 ms ours vs 1335).
+  To do: T2 timings in part-studio-ui latency_tests.rs (S50/S200 drag + dim edit, DXF ✓) and assembly-ui (scissor Drive
+  part drag, Fastened/Revolute ✓); fix only >=100 ms and >=2x live.
+- P2 after speed (lead, qa green b1a672244): HINGE-LIMITS-EDIT-KEEPS-ANGLE: Limits 0/110 + ✓ on the hinge Revolute keeps
+  -36.52 deg in ours; live goes back to 0 deg.
 - Later: GLYPH-CIRCLE (live gl5): a lone glyph ~38 px from its point at an angle set by screen position (~15 deg from up on
   the left to ~84 deg on the right, flips left at the right edge); a taken spot moves round the same circle.
 
