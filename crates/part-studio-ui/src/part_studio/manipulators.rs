@@ -767,11 +767,10 @@ impl PartStudioView {
             }
             ViewportEvent::ToolDrag { position, .. } => {
                 let Some(m) = self.manip_drag else { return false };
-                // Fillet's handle does nothing for the first 5 px (live manip-1118b), as the section arrow (below); a length
-                // arrow for the first 3, then takes the full distance from the press (live feel/dialogs.json "Start").
-                let dead = if a.small { 5.0 } else { ARROW_DEAD_PX };
+                // Nothing for the first 5 px, then the full distance from the press (live manip-drag-1125), as the section
+                // arrow (below).
                 if a.param != super::section::SECTION_PARAM {
-                    if self.ui.arrow_press.is_some_and(|q| q.distance(*position) < dead) {
+                    if self.ui.arrow_press.is_some_and(|q| q.distance(*position) < ARROW_DEAD_PX) {
                         return true;
                     }
                     self.ui.arrow_press = None;
@@ -1343,9 +1342,9 @@ impl noshape_render::camera_geometry::CameraGeometry for ManipGeometry {
 /// A handle's stroke colours and widths (outline, core): idle a white core
 /// in a grey halo, hovered the halo blue, dragged one solid blue stroke
 /// (live psb 10-24: arrows and arcs alike).
-/// A length arrow's drag does nothing until the pointer is this far from the press (live feel/dialogs.json: nothing at
-/// 2-3 px, the full distance at 3-4).
-const ARROW_DEAD_PX: f64 = 3.0;
+/// An arrow's drag does nothing until the pointer is this far from the press, then takes the full distance (live
+/// manip-drag-1125: Extrude's depth, Move face's offset and Fillet's arrows unchanged through 4 px, the full 5 px at 5).
+const ARROW_DEAD_PX: f64 = 5.0;
 
 fn handle_style(hover: bool, dragging: bool) -> ([u8; 4], [u8; 4], f32, f32) {
     // Idle: live "psui (2026-10-27, P2) interaction 6.2" measured the halo

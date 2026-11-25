@@ -490,7 +490,7 @@ fn rows() -> Vec<Row> {
             }
             Ok(())
         } },
-        Row { id: "manipulators / an arrow drag does nothing for 3 px, then takes the full distance", live: "live feel/dialogs.json (11-13) Start: nothing for the first 2-3 px; at 3-4 px the value jumps to the full distance from the press (qa FEEL-MANIP-DEAD-ZONE: ours 25 -> 25.6 mm on 2 px)", gap: false, check: |cx| {
+        Row { id: "manipulators / an arrow drag does nothing through 4 px, then takes the full distance", live: "live manip-drag-1125: the Depth unchanged through 4 px; at 5 px it jumps to the full 5 px from the press (10 -> 11.5 mm) (qa FEEL-MANIP-DEAD-ZONE: ours 25 -> 25.6 mm on 2 px)", gap: false, check: |cx| {
             let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-dead-zone");
             wait_until(cx, window, |cx| !view.read(cx).ui_busy());
             draw(cx, window);
@@ -520,11 +520,13 @@ fn rows() -> Vec<Row> {
             let at_2 = depth(cx).ok_or("no Depth")?;
             move_to(cx, to(4.));
             let at_4 = depth(cx).ok_or("no Depth")?;
-            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: to(4.), modifiers: Modifiers::default(), click_count: 1 });
+            move_to(cx, to(5.));
+            let at_5 = depth(cx).ok_or("no Depth")?;
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: to(5.), modifiers: Modifiers::default(), click_count: 1 });
             draw(cx, window);
             let step = linear_step(mm_per_px * 0.001, 0.001) * 1000.;
-            let full = ((at_4 - start) - 4. * mm_per_px).abs() <= step * 0.5 + 1e-9;
-            expect((at_2, full), (start, true), &format!("(Depth after 2 px from {start} mm, after 4 px {at_4} mm = the full 4 px × {mm_per_px:.4} mm/px)"))
+            let full = ((at_5 - start) - 5. * mm_per_px).abs() <= step * 0.5 + 1e-9;
+            expect((at_2, at_4, full), (start, start, true), &format!("(Depth after 2 px from {start} mm, after 4 px, after 5 px {at_5} mm = the full 5 px × {mm_per_px:.4} mm/px)"))
         } },
         Row { id: "drag / the length step follows the zoom", live: "10^(round(log10(100 px in the unit)) − 2): 0.1 mm at 0.25 mm/px, 1 mm at 0.414", gap: false, check: |_| {
             let mm = 0.001;
@@ -2118,4 +2120,60 @@ fn the_flip_button_flips_on_click_takes_the_keyboard_and_ignores_space(cx: &mut 
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let kept = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").map(|f| matches!(f.params.get("oppositeDirection"), Some(noshape_model::params::ParamValue::Bool(true)))));
     assert_eq!((cx.update(|cx| view.read(cx).edit.is_none()), kept), (true, Some(!before)), "Enter commits the dialog, flipped");
+}
+
+/// Live manip-drag-1125 (Extrude's depth arrow): while dragging, the value shows only in the Depth field, focused with
+/// its whole text selected (no box of its own); Ctrl+Z in the dialog changes nothing; after ✓ one Part Studio undo
+/// takes the edit back and redo brings it again.
+#[gpui::test]
+fn an_arrow_drag_writes_its_field_and_undoes_in_one_step(cx: &mut TestAppContext) {
+    let (window, view, dialog) = edit_extrude(cx, "dlg-arrow-undo");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    let (at, along) = cx
+        .update(|cx| {
+            let vp = vp.read(cx);
+            let &(a, b, _) = vp.manipulators.first()?;
+            let (pa, pb) = (vp.project(a)?, vp.project(b)?);
+            let mid = (pa + pb) * 0.5;
+            let o = vp.origin();
+            Some((gpui_kit::point(o.x + px(mid.x as f32), o.y + px(mid.y as f32)), (pb - pa).normalize_or_zero()))
+        })
+        .expect("the depth arrow");
+    let to = |d: f64| gpui_kit::point(at.x + px((along.x * d) as f32), at.y + px((along.y * d) as f32));
+    let depth_param = |cx: &mut TestAppContext| cx.update(|cx| format!("{:?}", view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().params.get("depth")));
+    let before = depth_param(cx);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_event(gpui_kit::MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() });
+    vcx.simulate_event(gpui_kit::MouseDownEvent { button: gpui_kit::MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false });
+    let mut shown = Vec::new();
+    for d in [10., 20., 40.] {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: to(d), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+        draw(cx, window);
+        let (text, selected) = cx.update(|cx| dialog.read(cx).input_text("depth", cx)).unwrap_or_default();
+        let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        let focused = st["dialog"]["fields"].as_array().into_iter().flatten().any(|f| f["label"] == "Depth" && f["focused"] == true);
+        shown.push((text == selected && !text.is_empty(), focused));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseUpEvent { button: gpui_kit::MouseButton::Left, position: to(40.), modifiers: Modifiers::default(), click_count: 1 });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let dragged = cx.update(|cx| dialog.read(cx).input_text("depth", cx)).map(|t| t.0);
+    keys(cx, window, &["secondary-z"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let after_undo_key = cx.update(|cx| dialog.read(cx).input_text("depth", cx)).map(|t| t.0);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let committed = depth_param(cx);
+    cx.update(|cx| view.update(cx, |v, cx| v.doc.update(cx, |d, cx| d.undo(cx))));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let undone = depth_param(cx);
+    cx.update(|cx| view.update(cx, |v, cx| v.doc.update(cx, |d, cx| d.redo(cx))));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let redone = depth_param(cx);
+    assert_eq!(shown, vec![(true, true); 3], "(the Depth's whole text selected, the field focused) at 10, 20, 40 px");
+    assert_eq!(after_undo_key, dragged, "Ctrl+Z in the dialog after the drag");
+    assert!(committed != before && undone == before && redone == committed, "Depth: before {before}, committed {committed}, undone {undone}, redone {redone}");
 }
