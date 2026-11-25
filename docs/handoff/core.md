@@ -16,6 +16,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **NEXT after the bisect: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
   confirms, our UI must show the blue banner "Parameters have been overridden. Check input." (on reopen; live
   behaviours ~33077) and the feature row's Info state; today only the op reports Info (dialog, row OK, tooltip plain).
+- **then P2 STEP-EXPORT-FACE-APPEARANCE (lead 15:3x, qa 235120708)**: a user face appearance exports as live:
+  OVER_RIDING_STYLED_ITEM on the face named 'Face appearance 1', DRAUGHTING_PRE_DEFINED_COLOUR('green') when named.
 - **P1 MESH-MOVE-FACE (lead 11-25 14:4x, qa flow 5, live qa/dl-bracket-1125)**: Move face Offset on an STL part (1 mesh
   face) offsets the whole mesh: kernel `Shape::offset_mesh` (mesh_io.cpp: facets unified, OCCT sharp offset, then its
   convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
@@ -38,8 +40,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   styled_solid(): per face OVER_RIDING_STYLED_ITEM over the solid's STYLED_ITEM (STYLED_ITEM without a part colour);
   StepOptions/ExportSettings.face_colors (per part, MapShapes face index, sRGB) from BodyDisplay.face_colors
   (export::part_face_colors; ops export_parts + Part Studio Export). Mac-mini-2024: 166 + 2 styled items, re-import
-  152 + 14 face colours, as live (private copy deleted). Left: user-set Part Studio face appearances not exported;
-  COLOUR_RGB 17 vs live 14 (live shares colours across parts).
+  152 + 14 face colours, as live (private copy deleted). Left: face appearances (P2 above); COLOUR_RGB 17 vs live 14.
 - **P0 FLOW-HOLE-ON-FACE-SKETCH-NO-SCOPE: not a Hole bug.** qa's start "bracket-link" draws its R10 ends with ops
   `sketch_draw center_point_arc [[30,10],[30,0],[30,20]]`: scripted clicks went straight from start to end, a 180° turn
   the tool's sweep reads as clockwise, so both ends bulged in (region 885.8 mm² = 1200 − 100π, x ±30) and the point at
