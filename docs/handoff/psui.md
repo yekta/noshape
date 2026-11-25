@@ -100,7 +100,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - 11-25 11:4x display-mode pixels vs live display-modes-1125 (1): study hover_matrix_tests print_display_mode_pixels
   (T2, --ignored --nocapture; live's block, iso 0.290 mm/px). Faces + tangent edges = live; outline heavier ->
   TICKETS LOOK-OUTLINE-WEIGHT (P2, mine, open). Fixture note: a REMOVE extrude from Top needs "symmetric": true
-  (THROUGH_ALL / midplane missed the block). NEXT: asm rows left: IMP-ASM-ROW-ICON, ASM-PATTERN-PREVIEW-LATE.
+  (THROUGH_ALL / midplane missed the block). Live asked (REQUESTS 11-25 11:5x, edge ink profiles across slanted
+  edges) before touching the line shader. QUEUED: 8ff1c3dc (FLOW fix + asm batch), 16f8487c (named views); commits
+  7a13baed6 + 131779706 (study, ticket) local, land with the next change. Lead not told (was 865k): tell on next
+  report: lands + solver rows not taken + LOOK-OUTLINE-WEIGHT. NEXT: asm rows IMP-ASM-ROW-ICON, ASM-PATTERN-PREVIEW-LATE.
 - Queued d97311a3 (Use glyph, pills, readout #666 + the 460f1fe4 batch).
 - Re-landed after the rebase conflicts: QUEUED 460f1fe4 (11 commits: MC P0, count line, latency fixes, the two qa
   rows, handoffs). Result from the lead.
