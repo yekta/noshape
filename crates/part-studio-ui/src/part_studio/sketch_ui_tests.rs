@@ -1449,6 +1449,54 @@ fn another_tool_keeps_the_open_feature(cx: &mut TestAppContext) {
     assert_eq!(names(cx).len(), 3, "the unchanged Extrude 1 as it was: {:?}", names(cx));
 }
 
+/// Live skasm variables-1125 (1): renaming an edited Variable shows "Update all references" under its name, ticked:
+/// the references follow; unticked they keep the old name.
+#[gpui::test]
+fn renaming_a_variable_updates_its_references_unless_unticked(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "var-rename-refs", Some(block));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("assignVariable", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Variable dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("name", noshape_model::ParamValue::Text("a".into()), cx);
+        d.set_value("lengthValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("10 mm")), cx);
+    }));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let tab = view.read_with(cx, |v, _| v.tab);
+    let doc = view.read_with(cx, |v, _| v.doc.clone());
+    cx.update(|cx| doc.update(cx, |doc, cx| doc.edit_studio(tab, "Edit Extrude 1", cx, |ps| {
+        let e = ps.features.iter_mut().find(|f| f.name == "Extrude 1").unwrap();
+        e.params.set("depth", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("#a")));
+    })));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let depth = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().params.expr("depth").unwrap().text.clone());
+    let rename = |cx: &mut TestAppContext, to: &str, untick: bool| {
+        let var = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.type_id == "assignVariable").unwrap().id);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(var, w, cx))).unwrap();
+        let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("the Variable dialog").dialog.clone());
+        let before = cx.update(|cx| dialog.read(cx).var_rename.clone());
+        cx.update(|cx| dialog.update(cx, |d, cx| {
+            d.set_value("name", noshape_model::ParamValue::Text(to.into()), cx);
+            if untick {
+                d.var_rename.as_mut().unwrap().1 = false;
+            }
+        }));
+        draw(cx, window);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        before
+    };
+    let before = rename(cx, "b", false);
+    assert_eq!((before, depth(cx)), (Some(("a".to_string(), true)), "#b".to_string()), "(the box as the dialog opened, Extrude 1's depth) after a → b ticked");
+    rename(cx, "c", true);
+    assert_eq!(depth(cx), "#b", "b → c unticked: the reference keeps b");
+}
+
 /// Live (ui-parity shortcut-plane-shift-enter): Shift+Enter in Depth with "20" typed applies it and keeps the
 /// dialog; the next Shift+Enter accepts and opens the next one.
 #[gpui::test]

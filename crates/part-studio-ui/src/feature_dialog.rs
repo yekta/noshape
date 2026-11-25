@@ -329,6 +329,9 @@ pub struct FeatureDialog {
     pub configure_mode: bool,
     /// An in-feature mate connector's own editor beside its feature's dialog (live 1851): only ✕, not renamed.
     pub nested: bool,
+    /// An edited Variable's name when the dialog opened, and its "Update all references" box (shown once the name
+    /// changes, ticked; live skasm variables-1125 (1)).
+    pub var_rename: Option<(String, bool)>,
     /// This feature's configured parameters (`__suppressed` included): a
     /// dotted amber outline and the tooltip "Configured" (live psb 10-21 g).
     pub configured: std::collections::HashSet<String>,
@@ -449,6 +452,7 @@ impl FeatureDialog {
             pick_drop: None,
             configure_mode: false,
             nested: false,
+            var_rename: None,
             configured: Default::default(),
             configurable_inputs: false,
             active_query: None,
@@ -571,6 +575,9 @@ impl FeatureDialog {
     /// INITIAL_FOCUS_ON_EDIT is the active one (uihint.gen.fs), else the
     /// first visible one as for a new feature.
     pub fn focus_for_edit(&mut self) {
+        if self.feature.type_id == "assignVariable" {
+            self.var_rename = Some((self.feature.params.text("name").to_string(), true));
+        }
         let Some(s) = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && s.hints.has(Hints::INITIAL_FOCUS_ON_EDIT)) else { return };
         match s.kind {
             ParamKind::Query { .. } => self.active_query = Some(s.id.to_string()),
@@ -2733,6 +2740,11 @@ impl FeatureDialog {
                 }
                 (prev_query, prev_depth) = (is_query, depth);
                 rows.push((row, depth));
+                if prefix.is_none() && s.id == "name"
+                    && let Some(row) = self.render_update_references(cx)
+                {
+                    rows.push((row, depth));
+                }
             }
         }
         // Live (dialogs/mirror, delete-part): a query field ending the
@@ -2859,6 +2871,25 @@ impl FeatureDialog {
             Focus::Ring => d.focus(move |s| s.shadow(vec![BoxShadow { color: blue, offset: point(px(0.), px(0.)), blur_radius: px(0.), spread_radius: px(1.5), inset: false }])),
             Focus::Box => d,
         }
+    }
+
+    /// The edited Variable's "Update all references" checkbox, under its Name once that changed (live skasm
+    /// variables-1125 (1): ticked, the references follow; unticked they keep the old name).
+    fn render_update_references(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (initial, on) = self.var_rename.clone()?;
+        if self.feature.params.text("name").trim() == initial.trim() {
+            return None;
+        }
+        let cb = crate::ui::os_checkbox_focused(SharedString::from("var-update-refs"), "", on, false)
+            .child(div().flex_1().min_w_0().ml(px(-4.)).mr(px(6.)).truncate().child("Update all references"))
+            .rounded(px(2.))
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                if let Some((_, on)) = &mut this.var_rename {
+                    *on = !*on;
+                }
+                cx.notify();
+            }));
+        Some(h_flex().w_full().ml(px(-2.)).pr(px(12.)).min_h(px(self.live_h(LIVE_CHECKBOX_ROW))).child(cb).into_any_element())
     }
 
     #[allow(clippy::too_many_arguments)]

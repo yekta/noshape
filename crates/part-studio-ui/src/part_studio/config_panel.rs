@@ -648,13 +648,21 @@ impl PartStudioView {
             };
             self.ui.var_scope.insert(format!("pvar-value-{fid}"), (dim, scope.clone()));
             // Renaming to a taken name silently reverts (live 556–557).
+            let old = r.name.clone();
             let name_st = self.cell_input(format!("pvar-name-{fid}"), r.name.clone(), window, cx, move |this, v, cx| {
                 if v.trim().is_empty() {
                     return;
                 }
+                let mut renamed = false;
                 this.edit_config("Rename variable", cx, |ps| {
-                    let _ = noshape_model::variable_table::rename(ps, fid, &v);
+                    renamed = noshape_model::variable_table::rename(ps, fid, &v).is_ok();
                 });
+                // Live skasm variables-1125 (1b): the references follow, and a toast says so.
+                let new = v.trim().trim_start_matches('#');
+                if renamed && new != old.trim().trim_start_matches('#') {
+                    let text = format!("Renamed variable '{}' to '{new}'. Updated all feature and configuration variable references.", old.trim().trim_start_matches('#'));
+                    this.flash_for(noshape_model::display::FeatureStatus::Info, text, std::time::Duration::from_millis(6700), cx);
+                }
                 this.config_dirty(cx);
                 cx.notify();
             });

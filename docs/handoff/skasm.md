@@ -3,38 +3,21 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 10:50) — read first
-- IN FLIGHT, UNCOMMITTED in agent/skasm (lead P1 first: qa TICKETS FLOW-USE-OWN-FACE-REFUSED, then land all):
-  - FLOW-USE-OWN-FACE-REFUSED: CAUSE found (11-25 11:14, cell 58 replayed on vibex8 with a logging build): the click on
-    the 7 px rim, 3.6 px off its outer edge's middle, took that edge's Implicit Midpoint (live's 9 px square), which
-    use_reference refused. Fix: Use on an edge's midpoint uses the edge (ops use_reference + use_preview; live behaviours
-    "Use (U) on model edges"). Tests: psui use_on_a_shelled_boxs_rim_uses_its_outer_loop (rim hovered: 8 = 4 lines +
-    4 arcs), use_on_a_model_edges_midpoint_uses_the_edge; ops e2e use_on_the_sketchs_own_rim_face_projects_its_outer_loop.
-    qa's cell at that point now projects the one edge; clicking the rim off a midpoint gives the loop.
-  - Use on a face (and its preview) = OUTER loop only (sketch_use.rs outer_edge_refs; live behaviours "projected only its
-    4 outer edges").
-  - Use of a straight edge seen end-on = a point (pierce_point), live plane-use-1125 (12); e2e
-    sketch_use_intersection_and_model_references extended (fix after first try made a zero-length line: now checks
-    end-on Line before projecting; rerun pending).
-  - Lost Use source (live plane-use-1125 (10)): regen sketch.rs collects lost_ids, clears `external` on them in the
-    regenerated copy (free, blue, Under); points shared with still-used geometry stay; model sketch_assoc
-    a_lost_used_edge_stays_as_free_geometry PASSES.
-  - Menus (live spline-image-1125 (3),(9)): "Insert spline points" first on a selected spline (→ Tool::SplinePoint);
-    image edge selected or nothing hit on the picture: "Edit image", "Switch to <file tab>" after Confirm; no plane
-    items over the picture (scene `image_under` now pub). Edit image: SketchEditor.editing_image, picker opens on Current
-    document at the image's tab, pick → SketchData::replace_image (new bytes/name, LengthRatio retargeted to the new
-    aspect). ops `sketch_edit_image` + example + coverage rows (Edit image, Insert spline points); AGENT_API.md
-    regenerated (copied back from vibex6). UI test spline_and_image_menus_as_lives PASSES; model-data test extended.
-  - Checked, already as live: Line angle 0° (FS perpendicularVector, edge midpoint), Three point errors before 3rd
-    point, plane corner drag (rings only on a selected plane).
-  - Before land: rerun ops e2e sketch_use* + sketch_text_and_imports, part-studio-ui use_ + menu tests, clippy
-    (model-core, model, ops, scene, part-studio-ui); commit "skasm: Use on the sketch's own face …, spline/image menus,
-    lost Use source free, end-on edge a point"; land.
-- NEXT after this land: live/skasm/variables-1125 (live 11-25): sketch dim box refusing `5 deg`, `#a + 1`, `#a*2 + 5`
-  (no unit): Enter keeps the box open, pink (#f9ebec, inset #bd3039 underline), NO message (ours: dimension_applied's
-  last Err arm sets an Error message); `#nope`+Enter → Create variable; Esc drops the text. Variable renames follow, with
-  "Update all references" (ticked; unticked breaks them). Variable value `5 deg` accepted, Variable 1 ERROR
-  "Cannot use 5 deg (angle) as length.".
+## NOW (11-25 11:27) — read first
+- QUEUED 2e5a9eaf (11-25 11:20): Use own face/edge midpoint (FLOW-USE-OWN-FACE-REFUSED: qa's rim click took the outer
+  edge's Implicit Midpoint; Use on it now uses the edge), Use on a face = outer loop, end-on edge = point, lost Use
+  source free, spline/image menus + op sketch_edit_image. Reported to lead.
+- IN FLIGHT, UNCOMMITTED (live/skasm/variables-1125, live 11-25):
+  - (1a) Variable dialog "Update all references": FeatureDialog.var_rename (set in focus_for_edit for assignVariable),
+    row under Name once it differs (render_update_references), accept_edit runs variable_table::rename_refs when
+    ticked. (1b) Variable table rename toast "Renamed variable 'b' to 'a'. Updated all feature and configuration
+    variable references." (config_panel flash_for 6.7 s). UI test renaming_a_variable_updates_its_references_unless_
+    unticked; run ~/skasm-scratch/bin/tvar.sh (log ~/tmp/skasm/tvar.log). Then commit + land.
+  - (2) sketch dim box refusal already as live (pink, no message; length + bare number = DimensionMismatch). Esc: ours
+    two-step (behaviours ~6471), live 11-25 says one Esc closes: REQUESTS skasm 11-25 11:24 asks live which.
+  - (3) value `5 deg` on a Length variable: check our Variable row error text "Cannot use 5 deg (angle) as length."
+    (live: accepted, Variable 1 ERROR with that message; downstream Sketch WARNING, Extrude ERROR). Not checked yet.
+- NEXT: remaining planes/Use rows from live/skasm/plane-use-1125.
 - QUEUED 5657c008 (spline/image drags) — see git log.
 - QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
   plane resize after ✓ is already in behaviours "icons2 plane resize rules".

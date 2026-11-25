@@ -3264,6 +3264,9 @@ impl PartStudioView {
         }
         self.sync_manipulator(cx);
         let feature = e.dialog.read(cx).feature.clone();
+        // An edited Variable renamed with "Update all references" ticked: `#old` becomes `#new` everywhere (live skasm
+        // variables-1125 (1)).
+        let renamed = e.dialog.read(cx).var_rename.clone().filter(|(old, on)| *on && old.trim() != feature.params.text("name").trim()).map(|(old, _)| (old, feature.params.text("name").to_string()));
         let type_id = feature.type_id.clone();
         let name = feature.name.clone();
         let (index, is_new) = (e.index, e.is_new);
@@ -3276,6 +3279,9 @@ impl PartStudioView {
                 if is_new {
                     noshape_ops::studio::insert_feature(ps, feature, index);
                 } else {
+                    if let Some((old, new)) = &renamed {
+                        noshape_model::variable_table::rename_refs(ps, old.trim().trim_start_matches('#'), new.trim().trim_start_matches('#'));
+                    }
                     noshape_ops::studio::edit_feature(ps, index, feature, &config_values);
                 }
             });
