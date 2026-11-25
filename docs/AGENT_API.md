@@ -2802,7 +2802,7 @@ Examples:
 | `mate` | string |  | Edit this existing mate (id `mate:…` or name), as its Edit… dialog: fields not given keep their values. Without it a new mate is added (`type`, `a`, `b` required). |
 | `type` | one of `fastened`, `revolute`, `slider`, `planar`, `cylindrical`, `pinslot`, `ball`, `parallel`, `tangent`, `width` |  | Mate type. |
 | `a` | object |  | First connector (its instance moves). Width: the first tab connector. |
-| `b` | object |  | Second connector. Width: the first width connector. |
+| `b` | object |  | Second connector. Width: the first width connector. Tangent: may be left out, the mate is then made in error ("Tangent mate needs two entities."), as ✓ after one pick. |
 | `c` | object |  | Width: the second width connector. |
 | `d` | object |  | Width: the second tab connector (optional). |
 | `name` | string |  | Name (default "Fastened 1", ...). |

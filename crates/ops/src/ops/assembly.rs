@@ -103,7 +103,7 @@ pub fn ops() -> Vec<Op> {
                 opt("mate", s(), "Edit this existing mate (id `mate:…` or name), as its Edit… dialog: fields not given keep their values. Without it a new mate is added (`type`, `a`, `b` required)."),
                 opt("type", json!({ "type": "string", "enum": MateType::ALL.iter().map(|t| mate_type_id(*t)).collect::<Vec<_>>() }), "Mate type."),
                 opt("a", connector.clone(), "First connector (its instance moves). Width: the first tab connector."),
-                opt("b", connector.clone(), "Second connector. Width: the first width connector."),
+                opt("b", connector.clone(), "Second connector. Width: the first width connector. Tangent: may be left out, the mate is then made in error (\"Tangent mate needs two entities.\"), as ✓ after one pick."),
                 opt("c", connector.clone(), "Width: the second width connector."),
                 opt("d", connector, "Width: the second tab connector (optional)."),
                 opt("name", s(), "Name (default \"Fastened 1\", ...)."),
@@ -859,13 +859,14 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let (ca, cb) = match (conn("a")?, conn("b")?, &old) {
         (Some(x), Some(y), _) => (x, y),
+        (Some(x), None, None) if mate_type == MateType::Tangent => (x.clone(), x),
         (x, y, Some(m)) => (x.unwrap_or_else(|| m.a.clone()), y.unwrap_or_else(|| m.b.clone())),
         (None, _, None) => return Err(OpError::param("a", "required for a new mate")),
         (_, None, None) => return Err(OpError::param("b", "required for a new mate")),
     };
     // (Two parts of one flexible subassembly instance may mate at this level, live asm-tvc-mount's Fastened 3; in a rigid
     // one they are one body and the evaluation says so.)
-    if ca.instance == cb.instance && ca.path == cb.path && ca.instance != InstanceId::ORIGIN && mate_type != MateType::Width {
+    if ca.instance == cb.instance && ca.path == cb.path && ca.instance != InstanceId::ORIGIN && mate_type != MateType::Width && !(mate_type == MateType::Tangent && ca == cb) {
         return Err(OpError::param("b", "Mate connectors are on same instance."));
     }
     let id = editing.unwrap_or_else(|| MateId(asm.next_id()));

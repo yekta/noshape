@@ -393,6 +393,36 @@ fn a_pin_revoluted_into_a_fixed_block_lands_as_live() {
     }
 }
 
+/// Live tangent-one-entity-1123: a Tangent given one entity is made, in error ("Tangent mate needs two entities.", as
+/// ✓ after one pick); given its second entity it then holds.
+#[test]
+fn a_tangent_with_one_entity_is_made_in_error() {
+    let dir = std::env::temp_dir().join(format!("noshape-tangent-one-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("t.noshape");
+    let _ = std::fs::remove_file(&path);
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    studio(&mut ctx, "Part Studio 1", json!({ "tool": "corner_rectangle", "points": [[-50, -30], [50, 30]] }), "10 mm");
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "pin" }));
+    studio(&mut ctx, "pin", json!({ "tool": "circle", "points": [[0, 0], [5, 0]] }), "40 mm");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "pin", "part": "Part 1" }));
+    call(&mut ctx, "assembly_set_state", json!({ "instances": ["Part 1 <1>"], "fixed": true }));
+    call(&mut ctx, "assembly_transform", json!({ "instance": "Part 1 <2>", "translation": [80, 0, 0], "axis": [1, 0, 0], "angle": "90 deg" }));
+    let faces = call(&mut ctx, "assembly_entities", json!({ "instance": "Part 1 <2>", "kind": "faces", "surface": "cylinder" }));
+    let cyl = faces["faces"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_mate", json!({ "type": "tangent", "a": { "instance": "Part 1 <2>", "entity": cyl } }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let m = &list["mates"][0];
+    assert_eq!((m["name"].clone(), m["ok"].clone(), m["message"].clone()), (json!("Tangent 1"), json!(false), json!("Tangent mate needs two entities.")), "{m}");
+    let top = face(&mut ctx, "Part 1 <1>", [0.0, 0.0, 1.0]);
+    call(&mut ctx, "assembly_mate", json!({ "mate": "Tangent 1", "b": { "instance": "Part 1 <1>", "entity": top } }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    assert_eq!(list["mates"][0]["ok"], json!(true), "its second entity given: {}", list["mates"][0]);
+    let _ = std::fs::remove_file(&path);
+}
+
 /// A Tangent's flip is its own (live's flipAlignment, the dialog's button alone): a Ø10 × 40 pin laid on its side
 /// under the fixed plate's top face (z 10) rests on it, its axis at z 15, by default and unflipped (live
 /// asm-cov-tangent: flipAlignment false, the pin on the plate); flipped it sinks to the face's inside, axis at z 5.

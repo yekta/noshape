@@ -3,21 +3,18 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 12:55) — read first
-- QUEUED 1f00e732 (8 commits, 12:1x; rebased on core's knife fix 4ab5258b, both kept in model-core sketch.rs). If it fails:
-  fix forward, rebase, land.sh again.
-- TO LAND after 1f00e732: 4bdffff40 (+ handoff): ERR-MATE-OVERDEF-BOTH: eval's only_mate full check also reverts and
-  solves every mate when the full solve fails the new mate (`only_fails`; qa's pin top on block top: the preview
-  couldn't move the pin, so held_back-moved never fired). UI T1 a_new_tangent_fighting_a_revolute_is_red_while_created
-  (pin_block_document = qa's build.py) fails without it. Also: render_param's #[allow] (initial import, unowned)
-  replaced by `ParamRow` (lead 11-25).
-- OPEN residual (in TICKETS row): a Tangent on faces already flush with the same normal (two_parts_document tops +
-  Revolute on tops) leaves the Revolute OK even solving every mate: the solver blames only the Tangent; live red both.
-- NEXT ERR-MATE-TANGENT-WORDS: (a) reopened face-gone ops-built Tangent (qa err/c936 m_tan_missing; replay cell staged
-  vibex8 ~/tmp/skasm/errc/cells/m-tan-missing.json): the dialog preview shows NO error (committed: "Selection is
-  invalid."), so chips stay "Mate connector of" (field_text needs `unresolved`, set only from that message). Find why
-  the editing preview (only_mate, editing) resolves the gone face. (b) one entity ✓ enabled: lead has live answer asm's
-  REQUESTS 11-23 08:12 after the hinge reference.
+## NOW (11-25 13:11) — read first
+- LANDED 1f00e732 as af3f106e. QUEUED c579ea43 (Tangent creating fix, UI state dump as drawn, ParamRow). If it
+  fails: fix forward, rebase, land.sh again.
+- LANDING after it: ERR-MATE-TANGENT-WORDS one entity (live tangent-one-entity-1123): ✓ enabled after one pick
+  (`can_accept` via `to_committed_mate`); ✓/Enter commits the Tangent with that entity as a and b
+  (`Mate::lacks_second_entity`), eval fails it "Tangent mate needs two entities."; reopened, b is empty. Agent API:
+  assembly_mate tangent without b does the same. Tests: ui a_tangent_with_one_entity_picked_is_made_in_error, ops
+  mate_flip::a_tangent_with_one_entity_is_made_in_error. Face-gone chips: the dialog already drew live's (dump fixed).
+- ERR-MATE-OVERDEF-BOTH: eval's only_mate full check reverts + solves every mate when the full solve fails the new
+  mate (`only_fails`). OPEN residual: a Tangent on faces already flush with the same normal (two_parts_document tops +
+  Revolute on tops) leaves the Revolute OK: the solver blames only the Tangent; live red both.
+- NEXT: OVERDEF-BOTH replays (vibex8 errc cells m-tan-planes-c, m-slider-lim-c), then the other asm mate rows.
 - App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
   vibex8:tmp/skasm/` (vibex6 can't ssh vibex8). Probe-on-a-doc pattern: a temp gpui test opening a copied .noshape.
 - OPEN: (2) dim box Esc, one or two (REQUESTS skasm 11-25 11:24, awaiting live).

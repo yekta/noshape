@@ -2756,7 +2756,7 @@ impl AssemblyView {
         let Some(s) = &self.mate else { return };
         // Incomplete or limits crossed: ✓ is disabled and Enter does nothing, no message (live asm-cylindrical-pin-hole,
         // live2 errors-1119 a5).
-        let Some(m) = s.dialog.read(cx).to_mate(cx).filter(|_| s.dialog.read(cx).can_accept(cx)) else { return };
+        let Some(m) = s.dialog.read(cx).to_committed_mate(cx).filter(|_| s.dialog.read(cx).can_accept(cx)) else { return };
         let editing = s.editing;
         self.mate = None;
         self.ui.checkbox_focus = None;
@@ -2767,7 +2767,7 @@ impl AssemblyView {
         let values = self.ui.config_values.clone();
         // A new mate's preview moved its moving part alone; its mated group follows it rigidly (live
         // new-mate-preview-1119), so the full solve leaves the other side where it is.
-        let carry = editing.is_none().then(|| self.assembly(cx)).flatten().and_then(|a| {
+        let carry = editing.is_none().then(|| self.assembly(cx)).flatten().filter(|_| !m.lacks_second_entity()).and_then(|a| {
             let moving = noshape_ops::assembly::mate_preview_moving(a, &m);
             let other = if moving == m.a.instance { m.b.instance } else { m.a.instance };
             let group = self.result.prepared.mated_group(&moving, m.id, &other)?;

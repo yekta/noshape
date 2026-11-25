@@ -300,7 +300,8 @@ impl MateDialog {
         }));
         let use_offset = [&mate.offset_x, &mate.offset_y, &mate.offset_z, &mate.rotation].iter().any(|e| e.as_ref().is_some_and(|e| !e.text.trim().is_empty()));
         let use_limits = !mate.limits.is_empty();
-        let (a, b) = if is_new { (None, None) } else { (Some(mate.a.clone()), Some(mate.b.clone())) };
+        // (A Tangent made with one entity reopens with its second field empty.)
+        let (a, b) = if is_new { (None, None) } else { (Some(mate.a.clone()), (!mate.lacks_second_entity()).then_some(mate.b.clone())) };
         let (c, d) = if is_new { (None, None) } else { (mate.extra.first().cloned(), mate.extra.get(1).cloned()) };
         // Editing, the full field still takes picks (live asm-mate-edit-escape: "Mate connectors" active).
         let active = if a.is_none() { Some(0) } else if b.is_none() { Some(1) } else { Some(0) };
@@ -711,7 +712,17 @@ impl MateDialog {
     }
 
     pub fn can_accept(&self, cx: &App) -> bool {
-        self.to_mate(cx).is_some() && self.crossed_limits(cx).is_empty() && self.cone_out_of_range(cx).is_none()
+        self.to_committed_mate(cx).is_some() && self.crossed_limits(cx).is_empty() && self.cone_out_of_range(cx).is_none()
+    }
+
+    /// The mate ✓ makes: [`Self::to_mate`], or a Tangent with one entity picked, made in error (live
+    /// tangent-one-entity-1123: ✓ enabled after one pick, "Tangent mate needs two entities.").
+    pub fn to_committed_mate(&self, cx: &App) -> Option<Mate> {
+        if let Some(m) = self.to_mate(cx) {
+            return Some(m);
+        }
+        let one = self.a.clone().or_else(|| self.b.clone()).filter(|_| self.mate_type == MateType::Tangent)?;
+        self.mate_with(one.clone(), one, cx)
     }
 
     /// The mate as currently defined (None until both connectors are set).
@@ -719,7 +730,10 @@ impl MateDialog {
         if self.same_instance() {
             return None;
         }
-        let (a, b) = (self.a.clone()?, self.b.clone()?);
+        self.mate_with(self.a.clone()?, self.b.clone()?, cx)
+    }
+
+    fn mate_with(&self, a: MateConnectorRef, b: MateConnectorRef, cx: &App) -> Option<Mate> {
         let extra = if self.mate_type == MateType::Width { std::iter::once(self.c.clone()?).chain(self.d.clone()).collect() } else { vec![] };
         let (ox, oy, oz, orot) = offset_axes(self.mate_type);
         let off = |i: usize, allowed: bool| {

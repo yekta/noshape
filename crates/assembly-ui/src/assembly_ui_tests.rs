@@ -2850,6 +2850,45 @@ fn a_new_tangent_fighting_a_revolute_is_red_while_created(cx: &mut TestAppContex
     });
 }
 
+/// Live tangent-one-entity-1123: after one pick a Tangent's ✓ is enabled; ✓ makes "Tangent 1" in error, "Tangent mate
+/// needs two entities.", and it reopens with its second field empty.
+#[gpui::test]
+fn a_tangent_with_one_entity_picked_is_made_in_error(cx: &mut TestAppContext) {
+    let path = pin_block_document(cx, "tangent-one-entity");
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Tangent, w, cx);
+            let a = face_connector(v, "Part 2 <1>", true, cx);
+            v.deliver_connector(a, w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(cx.update(|cx| view.read(cx).mate.as_ref().unwrap().dialog.read(cx).can_accept(cx)), "✓ enabled after one pick");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_mate(w, cx))).unwrap();
+    cx.run_until_parked();
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    let id = cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.mate.is_none(), "the dialog closes");
+        let asm = v.assembly(cx).unwrap();
+        let m = asm.mates.iter().find(|m| m.mate_type == MateType::Tangent).expect("Tangent 1 made");
+        assert_eq!(m.name, "Tangent 1");
+        let st = v.result.mates.iter().find(|s| s.id == m.id).unwrap();
+        assert_eq!((st.ok, st.message.as_deref()), (false, Some("Tangent mate needs two entities.")));
+        m.id
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_mate(id, w, cx))).unwrap();
+    cx.run_until_parked();
+    cx.update(|cx| {
+        let d = view.read(cx).mate.as_ref().unwrap().dialog.read(cx);
+        assert!(d.a.is_some() && d.b.is_none(), "reopened with its second field empty");
+    });
+}
+
 /// Live errors-1123 mates: a Tangent's chips name its entities ("Face of Part 1 <1>"), not "Mate connector of …",
 /// for a mate made through the agent API too.
 #[gpui::test]

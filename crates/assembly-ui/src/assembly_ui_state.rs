@@ -370,7 +370,7 @@ impl AssemblyView {
                 json!({
                     "title": d.name, "titleState": if d.regen_error(cx).is_none() { "ok" } else { "error" }, "kind": "feature", "tabs": [],
                     "fields": d.ui_fields(cx),
-                    "error": null, "ok": if complete || d.touched { "enabled" } else { "disabled" }
+                    "error": null, "ok": if complete || d.touched || d.can_accept(cx) { "enabled" } else { "disabled" }
                 })
             })
             .into_iter()

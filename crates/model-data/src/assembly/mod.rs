@@ -444,6 +444,12 @@ fn default_true() -> bool {
 }
 
 impl Mate {
+    /// A Tangent committed with one entity picked (live tangent-one-entity-1123: ✓ makes it, in error): it holds that
+    /// entity in both places.
+    pub fn lacks_second_entity(&self) -> bool {
+        self.mate_type == MateType::Tangent && self.a == self.b
+    }
+
     pub fn new(id: MateId, name: String, mate_type: MateType, a: MateConnectorRef, b: MateConnectorRef) -> Self {
         Mate {
             id,

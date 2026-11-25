@@ -3709,6 +3709,10 @@ impl AssemblyEvaluator {
     /// Contact geometry for a tangent mate of `asm` (a flexible subassembly's at `prefix`, this assembly's when empty):
     /// (body a, body b, geometry in body coordinates).
     fn tangent_pair(&self, (asm, prefix): (&Assembly, &[InstanceId]), leaves: &[LeafInstance], prepared: &Prepared, stored: &HashMap<InstanceId, Frame>, m: &super::Mate, units: &UnitPrefs) -> Result<(usize, usize, TangentPair), String> {
+        // Live tangent-one-entity-1123: a Tangent made with one pick, "Tangent mate needs two entities.".
+        if m.lacks_second_entity() {
+            return Err("Tangent mate needs two entities.".into());
+        }
         let geom = |c: &MateConnectorRef| -> Result<(usize, TangentGeom, Vec<TangentFace>), String> {
             if c.connector.is_some() || c.instance == InstanceId::ORIGIN {
                 return Err("Geometry is not supported for tangent mate.".into());
