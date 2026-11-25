@@ -62,18 +62,31 @@ docs/DECISIONS.md (read first; it wins over anything here).
   .github/release/check_install_linux.sh from release.yml: the lead's workflow_dispatch dry run pending).
   FEEL-TAB-TO-FLIP-FOCUS QUEUED 6a116778 + the count line (pattern_flip_focus handle on "pat-opp", Tab focuses it; the 1 px blue
   count line via QuantityInput companion focus), count line QUEUED 3126085b.
-- NOW latency pass (lead 11-25 06:1x: app start to a usable window, open from the start page (small + 48-feature
-  impeller), Part Studio tab switch, saving; vs live where captured; fix >=100 ms and >=2x gaps and UI stalls; short
-  table). Live: open-times.json (18-40 s from navigation), qa-scratch/lat/score-lat.md (tab switch settled 1.7-3.0 s,
-  open toolbar 3.8 s / interactive 15.4 s); timing-1123 has no open/tab/save rows. Ours so far (local Xvfb :393/:394,
-  llvmpipe, /root/green/noshape 06:10, scripts /root/psui-scratch/lat2/{start,open,open-warm}.sh):
-  - live-30-features from the command line: open shown 0.78-0.94 s after process start; window 0.35 s.
-  - impeller cold (fresh cache): window 0.39 s, first viewport frame 0.73 s, full display 58-60 s = regen: Boolean
-    Flansch+Gehäuse 21.3 s, Delete face 1 30.8 s (kernel: SPEED-IMPELLER, blend/bool/core). Warm (cache kept) 0.57-0.68 s.
-  - UI stalls 103-203 ms during every open (first frames: ui cpu 113 ms in one, 14-20 ms in the others = waiting).
-  - Start page (no document): first frame 453-489 ms after exec (startpage.sh, frame log), no UI stalls.
-  - To do: open by a click on the page (ui_script page start
-    with a copied file), tab switch, edit commit (DocModel::flush -> session.commit on the UI thread?), the stalls.
+- NOW latency pass (lead 11-25 06:1x: start, open from the start page (small + impeller), Part Studio tab switch, save;
+  vs live; fix >=100 ms / >=2x gaps and UI stalls; short table to the lead). Live: open toolbar 3.8 s / interactive
+  15.4 s, tab switch settled 1.7-3.0 s (qa-scratch/lat/score-lat.md). Ours (local Xvfb :396, llvmpipe, debug builds):
+  - start page first frame 0.45-0.49 s; small doc from the command line shown 0.78-0.94 s; impeller warm 0.57-0.68 s,
+    cold 58-60 s (regen: Boolean Flansch+Gehäuse 21 s, Delete face 1 31 s: kernel SPEED-IMPELLER, tell the lead).
+  - tab switch (impeller PS1 <-> empty PS2, Assembly, revisit of the copy): click -> first frame 50-75 ms, idle 11-14
+    ms; first visit of a never-regenerated copy = its full regen (30-60 s). Rename part + Enter 56 ms, undo/redo
+    48-52 ms (dispatch 11-12 ms). No stalls after open.
+  - open from the documents page (small): BEFORE dispatch 163-192 ms (window +161-191 ms = GPUI builds all its
+    pipelines per window, WgpuRendererCore::new), AFTER pipeline cache: dispatch 13-16 ms, window +11-14 ms, full
+    display +558-627 (was +700-810). Remaining stalls 100-126 ms with low ui cpu = llvmpipe present/pipeline compile.
+  - impeller from the page: thumbnailer gave up waiting (MAX_WAIT 60 s) and regenerated the same studio, running on
+    59 s after the view finished: fix = ThumbnailJobs keeps the tab; regen_done stops it (stop_for_view, unit test ok).
+  - IN TREE, uncommitted (also /root/psui-scratch/lat3/latency-wip.patch): vendor/gpui-pre-wgpu cached_pipelines
+    (NOSHAPE PATCH), start_thumbnail stop_for_view + test, ui_script page start `"file"` key. REMOVE the TMPCOMMIT
+    log in crates/ops/src/session.rs (commit_tabs) before committing (it is only for the save timing: run
+    lat3/run.sh noshape-new uip/tabs.json tabs :396 and grep TMPCOMMIT). Binaries lat3/noshape-lat (before),
+    noshape-new (pipeline cache only); scripts lat3/{run.sh,ab.sh,prof.sh,uip/*.json}; Xvfb :396 running (pid in
+    lat3/xvfb.pid: kill it when done).
+  - Next: save timing (TMPCOMMIT), confirm the thumbnail fix on page-impeller, commit both fixes, land, send the
+    lead the short table. Then qa's partly rows: PARTS-ROW-TOOLTIP, CONFIG-FILTER-HELP (mine); SKT-USE-HOVER band
+    sizes (check owner: skasm?).
+- 11-25 07:1x P0 (lead): as-mc-selhover regression from ae3a5f96a fixed: PointSprite::FLAT_RING (2048) keeps the
+  old flat 18 px #6087bd ring on a selected mate connector; test mc_selected_hovered (60/0/58 px). QUEUED 3e10a3a2
+  (with the count line 3126085b and two handoffs), reported to the lead.
 - 11-25 05:3x TRIAD-LOOK round 3 (qa 8641c8b2a, a lighter px every ~7 cols): qa's "bluest px per column" is the
   outline rim, not the core. Live (psui/manip-feel-1122 transform-x-hover) ~4 px strokes, 1.45 px core, rim ~1.3 px
   each side, per-column rim sum median 334 sd 12 range 301-365; ours (3 / 1.5 px) a 0.75 px rim, never full. Now 4.5 /
