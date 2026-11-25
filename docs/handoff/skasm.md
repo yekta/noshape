@@ -3,7 +3,29 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 14:11) — read first
+## NOW (11-25 16:21) — read first
+- QUEUED 8886d746 (carries 15:51 stack + f3e0b4f37): mistakes-1125 sketch rows (model test over-defined/redundant →
+  Error "Sketch could not be solved."; feedback test row tooltip / red title / ✓ enabled; downstream Extrude 8000 →
+  Extrude 2 12000 as live overdefined-downstream-1125), hidden error tooltip "<name> did not regenerate properly:
+  <msg> (Hidden)" (mod.rs row tooltip), batch-2 T1 a_dimension_on_an_edge_the_sketch_already_fixes_as_live (passes
+  as live: Enter → driven; 45 → bubble; ✓ → red; Ctrl+Z removes the dim). SKT rows l.124-134 marked "fixed, to
+  verify". Live status word WARNING vs our Error: display only, downstream same as live (left as is).
+- UNCOMMITTED, untested (lead OK'd): screws translator, crates/ops/src/parity.rs: LiveRef gets `name` (the live
+  line's part name, set in refs_from_bodies); live_refs carries a BODY ref's geometry/name from the bodies-derived
+  ref when refs.jsonl lacks bodyType; the "BODY" resolution prefers our one part with live's name. Next: build +
+  run c2-config-parts-screws (skasm-scratch/bin/fin.sh <model> through rb.sh vibex6: builds release ops test + cli,
+  runs ONLY=<model>, SAVE docs to ~/tmp/skasm/fin) and a few BODY-heavy models (asm-robot-relations?,
+  c2-helical-sweep) for no regression; clippy ops; commit "skasm: parity translator: ..."; land.
+- lora: REQUESTS row "skasm 11-25 16:21" (refs capture; both region ids → one region without refs).
+- Geometry sweep 1124-2341 result (reported): 0 sketch causes; core told (Tail Fin derived vertex 0.39 µm, Loft
+  faces, Wrap lines), bool told (knife Revolve vertex).
+- THEN (lead 16:1x): sketch feel, docs/parity/interaction-feel.md l.706 "Not yet in the matrix": compare live
+  sketch-gaps2/3: pattern labels (3x / 1x, spacing, inline boxes near-black 16 px on opaque canvas-colour boxes),
+  Text's dash-dot rectangle + dialog layout (font list, n/250 characters), Search tools panel (Recently used, info
+  box). Each: a matrix row + T1, fix diffs.
+- Batch 2 of mistakes-1125: done (above). Old NOW below.
+
+## Earlier NOW (11-25 14:11)
 - LANDED: Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent (live tangent-one-entity-1123).
 - QUEUED (one stack): e846e605f (a) ERR-MATE-OVERDEF-BOTH flush residual: solver.rs held-back step reds a mate
   between the same two parts as one that can't hold (a part-wide rule broke oracle_asm f16/f76/f80/1798 a1);
