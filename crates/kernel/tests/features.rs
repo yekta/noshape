@@ -1336,6 +1336,22 @@ fn loft_side_faces_as_live() {
     }
 }
 
+/// c2-hunting-knife's Revolve 1 (live 10/27/19): a sphere cutting round a loft's one side face, a B-surface closed but
+/// not periodic (closed where its first section starts): the cut's ring (OCCT's two halves, between the loft's seam and
+/// the sphere's) keeps one vertex, where it crosses the loft's closure; none where it crosses the sphere's seam.
+#[test]
+fn a_ring_round_a_lofts_closure_keeps_a_vertex_there() {
+    let xy = Plane::xy();
+    let secs = [rounded_rect(&xy, 60.0, 40.0, 5.0), rounded_rect(&xy.offset(40.0), 40.0, 30.0, 5.0), rounded_rect(&xy.offset(80.0), 60.0, 40.0, 5.0)];
+    let l = loft(&secs, &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    let r = cut(&l, &make_sphere(&xy.offset(120.0), 60.0, 2.0 * PI).unwrap()).unwrap().shape;
+    assert!(r.is_valid());
+    let t = r.shown_topology().unwrap();
+    assert_eq!((t.face_count(), t.edge_count(), t.vertex_count()), (3, 9, 9), "the bottom section's 8 edges and vertices, the ring and its vertex");
+    let ring: Vec<DVec3> = r.vertices().iter().zip(&t.vertices).filter(|(_, s)| **s).filter_map(|(v, _)| v.vertex_point().ok()).filter(|p| p.z > 1.0).collect();
+    assert!(ring.len() == 1 && ring[0].y.abs() > 10.0, "on the loft's seam, not the sphere's (in y = 0): {ring:?}");
+}
+
 /// (d) of live 1784 / 1788: our section at z 20 against live's (1388.7098 mm², perimeter 138.9262).
 #[test]
 #[ignore = "T2: probe"]

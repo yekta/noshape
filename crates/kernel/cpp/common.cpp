@@ -1138,7 +1138,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         x = joins[x] = joins[joins[x]];
       return x;
     };
-    std::vector<bool> joint(vm.Extent() + 1, false);
+    std::vector<bool> joint(vm.Extent() + 1, false), kept(vm.Extent() + 1, false);
     auto faces_of = [&](int j) {
       std::vector<uint32_t> f(ef.second.begin() + ef.first[(size_t)j - 1], ef.second.begin() + ef.first[(size_t)j]);
       for (uint32_t& x : f)
@@ -1146,6 +1146,39 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       std::sort(f.begin(), f.end());
       f.erase(std::unique(f.begin(), f.end()), f.end());
       return f;
+    };
+    // Whether a seam through vertex i closes one of edge e's faces, a B-surface closed but not periodic that way, and
+    // starts at a vertex shown (its closure at a profile's vertex, not a ring's).
+    auto crosses_closure = [&](int i, int e) {
+      const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
+      for (uint32_t k = ve.first[(size_t)i - 1]; k < ve.first[(size_t)i]; ++k)
+      {
+        const int j = (int)ve.second[k] + 1;
+        const TopoDS_Edge& s = TopoDS::Edge(em(j));
+        if (out[(size_t)j - 1] != 0 || BRep_Tool::Degenerated(s))
+          continue;
+        for (uint32_t q = ef.first[(size_t)j - 1]; q < ef.first[(size_t)j]; ++q)
+        {
+          const uint32_t f = ef.second[q];
+          if (std::find(ef.second.begin() + ef.first[(size_t)e - 1], ef.second.begin() + ef.first[(size_t)e], f) == ef.second.begin() + ef.first[(size_t)e])
+            continue;
+          const TopoDS_Face& face = TopoDS::Face(fm((int)f + 1));
+          if (!BRep_Tool::IsClosed(s, face))
+            continue;
+          const BRepAdaptor_Surface su(face, false);
+          if (su.GetType() != GeomAbs_BSplineSurface && su.GetType() != GeomAbs_BezierSurface)
+            continue;
+          if (!(su.IsUClosed() && !su.IsUPeriodic()) && !(su.IsVClosed() && !su.IsVPeriodic()))
+            continue;
+          TopoDS_Vertex a, b;
+          TopExp::Vertices(s, a, b);
+          const int o = vm.FindIndex(a.IsSame(v) ? b : a);
+          for (uint32_t m = o > 0 ? ve.first[(size_t)o - 1] : 0; o > 0 && m < ve.first[(size_t)o]; ++m)
+            if (open[(size_t)ve.second[m] + 1])
+              return true;
+        }
+      }
+      return false;
     };
     for (int i = 1; i <= vm.Extent(); ++i)
     {
@@ -1182,6 +1215,14 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       const std::vector<uint32_t> fa = faces_of(two[0]), fb = faces_of(two[1]);
       if (fa.size() != 2 || fa != fb)
         continue;
+      // A ring round a B-surface closed but not periodic (a loft through a chain of curves, closed where it starts at a
+      // profile's vertex) keeps a vertex where it crosses the closure: Parasolid's edge doesn't run across it
+      // (c2-hunting-knife's Revolve 1: the sphere's cut round the loft handle, live 10/27/19).
+      if (loop && seams > 0 && crosses_closure(i, two[0]))
+      {
+        kept[(size_t)i] = true;
+        continue;
+      }
       // No seam through it: only B-spline or ellipse pieces the curve tests below find one curve, a seam a unify took
       // away with them left apart (c2-rings-loft's Extrude 5: 7 edges more than live), never a sketch's arcs or lines of
       // one curve, which live keeps apart (c2-impeller-loft's Loft Gehäuse: 3 arcs round its end, 10 edges).
@@ -1309,7 +1350,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         if (out[(size_t)j - 1] != 0 && std::find(shown_edges.begin(), shown_edges.end(), j) == shown_edges.end())
           shown_edges.push_back(j);
       }
-      if (!joint[(size_t)i] && shown_edges.size() == 2 && joins[(size_t)shown_edges[0] - 1] == joins[(size_t)shown_edges[1] - 1])
+      if (!joint[(size_t)i] && !kept[(size_t)i] && shown_edges.size() == 2 && joins[(size_t)shown_edges[0] - 1] == joins[(size_t)shown_edges[1] - 1])
         joint[(size_t)i] = true;
     }
     for (int i = 1; i <= vm.Extent(); ++i)
