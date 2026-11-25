@@ -2103,10 +2103,21 @@ fn an_overridden_hole_diameter_shows_the_blue_banner(cx: &mut TestAppContext) {
         cx.executor().advance_clock(std::time::Duration::from_millis(20));
         draw(cx, window);
     }
+    assert_eq!(banner(cx), None, "no banner once accepted");
+    // The row as a healthy one: its name not red, no info in its tooltip (live: REST INFO, row #333).
+    let (status, message) = cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.message.clone()))).expect("the Hole's state");
+    assert!(!crate::part_studio::row_reads_red(status, message.as_deref()), "the row's name not red");
+    let name = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.id == id).unwrap().name.clone());
+    let tip = super::feedback::row_tooltip(cx, window, &name).expect("the row's tooltip");
+    assert!(!tip.contains(OVERRIDDEN), "no info in the row's tooltip: {tip}");
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     draw(cx, window);
     assert_eq!(banner(cx), Some(noshape_model::display::FeatureStatus::Info), "the blue banner on reopening the Hole");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.cancel_edit(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    assert_eq!(banner(cx), None, "no banner after Esc");
 }
 
 /// Live2 qv-fillets (11-17): the Query variable dialog shows no count: with a face selected it opens with the face in

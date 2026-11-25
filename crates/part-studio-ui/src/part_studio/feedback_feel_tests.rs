@@ -16,7 +16,7 @@ fn start(cx: &mut TestAppContext, name: &str, json: serde_json::Value) -> (AnyWi
 }
 
 /// The tooltip shown 500 ms after the pointer comes onto `row`.
-fn row_tooltip(cx: &mut TestAppContext, window: AnyWindowHandle, row: &str) -> Option<String> {
+pub(super) fn row_tooltip(cx: &mut TestAppContext, window: AnyWindowHandle, row: &str) -> Option<String> {
     let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds(Box::leak(format!("feature:{row}").into_boxed_str()))?;
     let at = point(b.origin.x + px(40.), b.center().y);
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
