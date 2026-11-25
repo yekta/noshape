@@ -7083,6 +7083,52 @@ fn use_on_a_corner_from_above_offers_an_edge_across_the_screen(cx: &mut TestAppC
     assert!(span.max_element() > 20.0 && span.x >= span.y, "{edge:?}: on screen {span:?}, an edge running across it (live: the edge along x)");
 }
 
+/// Live sketch-tools-1123 use-convert (qa SKT-USE-HOVER use-3-hover-used-edge): hovering an already-used edge's middle
+/// lights its use glyph (light orange 11 x 11), not the edge; a click there uses the edge again (a second, coincident
+/// use).
+#[gpui::test]
+fn use_over_a_used_edges_glyph_lights_the_glyph_not_the_edge(cx: &mut TestAppContext) {
+    let (window, view, _edge, pick, a, b) = sketch_on_top_face(cx, "use-used-edge-glyph", Tool::Use);
+    cx.update(|cx| view.update(cx, |v, cx| v.viewport.update(cx, |vp, cx| {
+        vp.camera.set_view(noshape_render::StandardView::Top);
+        vp.request_frame(cx);
+    })));
+    draw(cx, window);
+    let centre = block_centre(cx, &view);
+    let (mid, away) = (on_screen(cx, &view, (a + b) * 0.5), on_screen(cx, &view, centre));
+    let hover = |cx: &mut TestAppContext, at: DVec2, id: Option<u32>| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(at));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: at, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(id), w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let press = |cx: &mut TestAppContext, at: DVec2| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::ToolDown { position: at, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::ToolUp { position: at, modifiers: Modifiers::default() }, w, cx);
+        }))
+        .unwrap();
+        draw(cx, window);
+    };
+    let used = |cx: &mut TestAppContext| view.read_with(cx, |v, cx| v.sketch_data(cx).map_or(0, |d| d.sketch.entities().filter(|e| e.external && e.kind() == noshape_sketch::EntityKind::Line).count()));
+    hover(cx, mid, Some(pick));
+    press(cx, mid);
+    let first = used(cx);
+    hover(cx, away, None);
+    hover(cx, mid, Some(pick));
+    let lit = view.read_with(cx, |v, _| {
+        let ed = v.sketch.as_ref().unwrap();
+        (ed.hover_constraint.and_then(crate::sketch_mode::use_glyph_entity).is_some(), v.hover.is_some())
+    });
+    press(cx, mid);
+    assert_eq!((first, lit, used(cx)), (1, (true, false), 2), "(lines used by the first click, (its glyph lit, the edge lit) back on its middle, after a second click)");
+}
+
 /// A sketch on the block's top face, with `tool`; and one of that face's edges: its reference, its pick id and its two
 /// ends in the sketch plane.
 fn sketch_on_top_face(cx: &mut TestAppContext, name: &str, tool: Tool) -> (AnyWindowHandle, Entity<PartStudioView>, Reference, u32, DVec2, DVec2) {

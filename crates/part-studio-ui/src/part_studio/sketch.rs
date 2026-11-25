@@ -1255,6 +1255,17 @@ impl PartStudioView {
             {
                 r = Some(e);
             }
+            // Over a used edge's glyph the glyph lights, not the edge (live sketch-tools-1123 use-convert); a press there
+            // takes the edge under the pointer and uses it again.
+            let glyph = self.glyph_under(vp.read(cx).pointer_position()).0.filter(|c| crate::sketch_mode::use_glyph_entity(*c).is_some());
+            if let Some(ed) = &mut self.sketch {
+                if glyph.is_some() {
+                    ed.hover_constraint = glyph;
+                    r = None;
+                } else if ed.hover_constraint.is_some_and(|c| crate::sketch_mode::use_glyph_entity(c).is_some()) {
+                    ed.hover_constraint = None;
+                }
+            }
             self.hover = r;
             self.update_use_preview();
             self.refresh_scene(false, cx);
@@ -4980,7 +4991,10 @@ impl PartStudioView {
             .into_iter()
             .filter(|_| !dragging)
             .filter(|g| {
+                // A used entity's own use glyph always (live sketch-tools-1123 use-convert: one at a used edge's middle,
+                // none at its ends).
                 show_all
+                    || crate::sketch_mode::use_glyph_entity(g.constraint) == Some(g.entity)
                     || hovered == Some(g.entity)
                     || recent.contains(&g.entity)
                     || badged.contains(&g.entity)
@@ -4989,8 +5003,11 @@ impl PartStudioView {
             })
             .collect();
         // Glyphs per entity laid out next to it (dragged ones aside).
+        // Show constraints off, a used curve's own use glyph sits centred on its middle (live sketch-tools-1123
+        // use-convert: 10 x 8 on the edge), out of its row.
+        let on_curve = |g: &crate::sketch_mode::GlyphInfo| !show_all && !g.on_point && crate::sketch_mode::use_glyph_entity(g.constraint) == Some(g.entity);
         let mut counts: HashMap<u32, usize> = HashMap::new();
-        for g in glyphs.iter().filter(|g| g.offset.is_none()) {
+        for g in glyphs.iter().filter(|g| g.offset.is_none() && !on_curve(g)) {
             *counts.entry(g.entity.0).or_default() += 1;
         }
         // A line's side for its glyphs (screen unit normal): below a
@@ -5022,6 +5039,10 @@ impl PartStudioView {
                 Some(o) => {
                     let Some((x, y)) = project(g.anchor + o) else { continue };
                     (x, y, -9.0, -9.0)
+                }
+                None if on_curve(&g) => {
+                    let Some((x, y)) = project(g.anchor) else { continue };
+                    (x, y, -10.0, -10.0)
                 }
                 None => {
                     // A hovered line's row (Show constraints off) at the pointer's spot on it.
