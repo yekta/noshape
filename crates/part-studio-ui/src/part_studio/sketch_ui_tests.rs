@@ -5668,6 +5668,35 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     assert_eq!((asm.format, asm.y_up), (PartFormat::Parasolid, true));
 }
 
+/// qa EXPORT-ASM-STEP-MBD-FIELDS (behaviours "Part Studio / Assembly › Export…": "(Part Studio only)", live
+/// hobbyist-1125 Hinge 68): an Assembly's STEP export has no derived tolerances or MBD text height boxes.
+#[gpui::test]
+fn an_assembly_step_export_has_no_mbd_fields(cx: &mut TestAppContext) {
+    struct Page;
+    impl Render for Page {
+        fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+            div().size_full()
+        }
+    }
+    cx.update(gpui_kit::init);
+    crate::part_studio_hooks::register_for_tests();
+    let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) })), ..Default::default() };
+    let (window, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Page))).unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let _prefs = OwnExportPrefs::new("asm-step-mbd");
+    let d = ExportDialog { window, exported: Default::default() };
+    for assembly in [false, true] {
+        d.open(cx, assembly);
+        d.pick(cx, "ex-format", "STEP");
+        assert!(d.bounds(cx, "ex-latest").is_some(), "STEP's version rows");
+        for id in ["ex-tol", "ex-mbd"] {
+            assert_eq!(d.bounds(cx, id).is_some(), !assembly, "{id} in a Part Studio's STEP only (assembly: {assembly})");
+        }
+        d.export(cx);
+    }
+}
+
 /// Live import-export-1118: the Export dialog opens with the focus on the dialog, not in File name (a key typed
 /// changes no name); Esc closes it and exports nothing; Enter in File name exports at once, with the name typed.
 #[gpui::test]
