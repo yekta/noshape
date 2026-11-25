@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 14:01 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 14:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -139,7 +139,13 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    suite vibex7 ~/qa-parity/models.log (11:37, qa 1125-0803), asm-scissor-lift studios (my slabs run, vibex7
    ~/tmp/core/sc/pa-slabs.out). Skipped (parked): scissor 9cbb0e F18/F19/F23, impeller "Fillet Stevenrohr zum Halter".
    Own (the blend is its studio's first divergence), most ordinary first:
-   a. scissor 2d82a0 Chamfer 2 (first diff; then Fillets 4-7/13/21/25/28/30/31/37, Chamfer 6 likely cascade)
+   a. scissor 2d82a0 Chamfer 2: FIXED, QUEUED 3a19cf4d (features.cpp chamfer_ring_fill: concave circle between a
+      plane and a coaxial cylinder, chamfer wider than the face: ring fill clipped by the neighbours' outer sides;
+      T1 blend::a_chamfer_wider_than_a_counterbores_step_meets_the_through_hole). Then Fillets 4-7/13/21/25/28/30/31/37,
+      Chamfer 6: re-check on the fresh run (vibex7 ~/tmp/core/sc/pa-now.out, saved doc ~/tmp/core/sc/fresh/; the
+      core-keep scissor.noshape is stale: Draft 1 / Move face 1 fail only there). Probes: core-scratch/sc st.py
+      (failing features per studio), fe.py (a feature's params + edges); NOSHAPE_DUMP_OPS=<dir> NOSHAPE_DUMP_ONLY=chamfer
+      dumps blend inputs (.brep + .txt edge indices) for a kernel replay example.
    b. scissor 184ad0 Fillet 5 (+ Fillet 3 "Unfilleted edge overlapped")
    c. scissor b7e381 Fillet 4
    d. scissor 9cbb0e Fillet 2 (then Chamfer 6)
