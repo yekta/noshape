@@ -58,6 +58,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   are opaque black, width 1.0 (PART_EDGE_WIDTH, fs_line's plain branch returns the colour, MSAA does the AA): the core
   goes to #000000 and the 30° column sums ~1.5 where a 1 px line gives 1.15. Next: profile ours across the same
   edges (vertical and ±30°) to split the colour (live's peak ~0.77) from the slanted footprint, then fix the shader.
+  psui 11-25 13:3x: fixed, to verify. Profiled ours on live's 7 edges (print_display_mode_pixels `ink` lines,
+  ~/psui-scratch/ink/score.py): the footprint was right (perpendicular quad), the core opaque black: ink across
+  (column x cos) 1.11 px mean vs live 0.94, peaks 1.00 vs 0.62-0.77; live's core darkens each channel in the same
+  proportion (#181d20 over #677f8c = x0.23), i.e. black at ~0.8. Unlit part edges now draw at PART_EDGE_INK 0.85
+  (Instance::part_edges, Part Studio + assembly; lit, query, error and a selected part's amber stay opaque): ~0.97 px
+  mean vs live 0.94, peaks 0.64-0.87 vs 0.62-0.77. The back-face band adds only ~0.08 on the outline (band-off run);
+  the rest of its column is the face's share of the boundary pixel, as in live's #383a3c.
 
 ## qa 11-25 10:3x: hobbyist enclosure flow (lead 11-25) on green 2d91090e7 / bd448e76c: hm2/wf/57-62-encl-*.json (start encl-shell in wf/starts.json), hm2/out-flow5-1125 (vibex7)
 
