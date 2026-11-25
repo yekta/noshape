@@ -33,6 +33,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
+## FIRST (lead 20:5x): b976bdb5 FAILED tests 20:08 (vibe2 ~/land/results/psui.log): the land queue's full run still
+hit move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between (dialogs_feel_tests ~l.2223); eaa44314
+will likely fail the same. Make it load/timing independent: no wall clock, no preview-build waits; drive the preview to
+done explicitly (and long press / LEFT_DRAG_TIME 50 ms in viewport.rs press_becomes_drag uses the real clock: set the
+viewport clock in the test, e.g. vp.set_clock advancing per move, as a_circles_rim does). Read the queue log's panic
+first. Then land.sh. Then the QUEUE below (sketch menu: check behaviours' sketch right-click menu first).
+
 ## QUEUE (11-25 19:5x, lead + live)
 1. LOOK-OUTLINE-WEIGHT (qa row l.63): cause = a solid's curved outline drew BOTH the backface band and a centred
    opaque silhouette line (ours 808080 + 27343C: half the face px dark; live ~0.7 px all outside). DONE d9c41793c,
