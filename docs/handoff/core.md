@@ -124,17 +124,19 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
 
 ## Next, in order
-0. P1 SPEED-ASM-OPEN-SCISSOR (WIP, core-rmx branch core-slabs, commits 7a9c1af8 + cb5c5ec6; diff also
-   /root/core-scratch/slabs-wip2.diff is older). offset_by_slabs now unifies a COPY (the null OCCT fallback was unify
-   editing the input's shared edges), history = compose(inputs, h, copy+unify) with moved faces/edges/vertices ->
-   their slab copies' images (ReplaceModified) and solid -> solid. T1 kernel core::a_face_moved_between_square_
-   neighbours_is_the_part_and_its_slab passes. Temporary NOSHAPE_NO_SLABS switch in op_offset_faces (drop before
-   landing) for A/B. Scissor open (vibex7, load 13): 71 s slabs vs 75 s OCCT. BLOCKER: slab mode breaks downstream
-   refs: Studio 665cf3 features 0-7 same status, Extrude 1 (feature 8) "Select a face to terminate" (OCCT Ok); also
-   9cbb0e/56d3a6/fed22d Mirror/Fillet "Select ..." cascades; assembly 4 instances fail to resolve. Next: find which
-   offset differs before 665cf3's Extrude 1 (its Derived 1 source studio's Move faces?), compare decoded face names
-   (tn.py probe kit) slab vs OCCT. Tools on vibex7 ~/tmp/core/sc (pruned after 12 h): fd.py (per-studio feature/part
-   diff of both modes, raw fd-slabs/fd-occt.jsonl), b.jsonl, od.out; scripts .sc*.sh/.ab.sh/.fd.sh in core-rmx.
+0. P1 SPEED-ASM-OPEN-SCISSOR (WIP, lead 11-25 11:50: time-box ~2 h, land only if nothing downstream breaks; core-rmx
+   branch core-slabs, 7a9c1af8 + cb5c5ec6 + uncommitted naming fix). offset_by_slabs (features.cpp) unifies a copy,
+   history = compose(inputs, h, copy+unify), moved faces -> slab copies' images. 12:1x NAMING FIX: OCCT's offset reports
+   every face of the part GENERATED from the one it was (names "Offset of" each face, all 67 faces of 665cf3's moved
+   part); the slab path reported Modified (plain names) -> now ReplaceGenerated for each face's images; T1
+   core::a_face_moved_between_square_neighbours_is_the_part_and_its_slab asserts it. 665cf3's Extrude 1 cascade fixed.
+   Left in the saved doc (~/agents/core-keep/sc/scissor.noshape): 9cbb0e Fillet 6 now Ok (live Ok, OCCT failed) and
+   then Sketch 13 / Extrude 16 / Draft 5 / Mirror 3,6,9 lose refs (Sketch 13's plane is a vertex-blend face named on
+   the OCCT-mode model: the saved doc's refs were mapped while Fillet 6 failed); fed22d mostly better (Extrude 18,
+   Fillet 18/22, Sketch 24/26 Ok), Move face 8 fails. Verdict needs a FRESH import: .pa.sh (parity_assemblies on
+   asm-scissor-lift, both modes, vibex7 ~/tmp/core/sc/pa-*.out). Then corpus A/B: ~/tmp/core/ud/cli-slab vs
+   cli-occt (wrapper, NOSHAPE_NO_SLABS=1). Probes: core-scratch/sc fn.py/fn2.py (refs + faces above a feature, both
+   modes), dec.py (decode face ids: urlsafe-b64 raw deflate JSON). Drop NOSHAPE_NO_SLABS before landing.
    Unify can't merge a fuse slab's walls with rounded-corner cylinders / hole walls (unowned faces, slab path refuses,
    OCCT fallback runs, gives a Shell there as main): not axis direction, not tolerance, DirectModification breaks the
    solid; maybe u-range offset by the period. Then Delete face 2 (op_defeature 1.15 s).
