@@ -2528,6 +2528,42 @@ fn move_faces_rotate_ring_keeps_60_px_from_its_axis(cx: &mut TestAppContext) {
     assert!((mm_in - 15.0).abs() < 1e-6 && px_in > 60.0, "zoomed in: std's 15 mm ({mm_in} mm, {px_in} px)");
 }
 
+/// Live manip-ring-1125 (isometric, 0.3234 mm/px; the pointer stepped out from the head until it unlit): Move face's
+/// Rotate head grabs to 2-3 px past its drawn tip (40 px up from the radius line) and 12 px either side of its stem.
+#[gpui::test]
+fn move_faces_ring_grabs_its_head_and_3_px_round_it(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "moveFace", "name": "Move face 1", "params": { "moveFaces": ["face through [15, 15, 20]"], "moveFaceType": "ROTATE", "axis": ["edge through [20, 0, 20]"], "angle": "0 deg" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "dlg-moveface-ring-reach", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    cx.update(|cx| vp.update(cx, |vp, cx| {
+        let forward = glam::DVec3::new(-1.0, 1.0, -1.0).normalize();
+        vp.camera.rotation = noshape_render::Camera::look_rotation(forward, (glam::DVec3::Z - forward * glam::DVec3::Z.dot(forward)).normalize());
+        vp.camera.projection = noshape_render::Projection::Orthographic;
+        vp.camera.distance = 0.3234e-3 * vp.size().y / (2.0 * (vp.camera.fov_y * 0.5).tan());
+        cx.notify();
+    }));
+    cx.update(|cx| view.update(cx, |_, cx| cx.notify()));
+    draw(cx, window);
+    let grabs = |cx: &mut TestAppContext, up: f64, side: f64| {
+        cx.update(|cx| {
+            let vp = vp.read(cx);
+            let foot = vp.project(vp.manipulators[0].0).expect("on screen");
+            vp.manipulator_index_at(foot + glam::DVec2::new(side, -up)).is_some()
+        })
+    };
+    assert!(grabs(cx, 42.0, 0.0) && !grabs(cx, 46.0, 0.0), "to 2-3 px past the tip (40 px up)");
+    assert!(grabs(cx, 24.0, 11.0) && grabs(cx, 24.0, -11.0) && !grabs(cx, 24.0, 13.0) && !grabs(cx, 24.0, -13.0), "12 px either side");
+}
+
 /// Live manip-ring-1125 (std getDirectEditManipulatorPlane) and manip-drag-1125 part 2's frame (the shaft at x 1160,
 /// 9 px right of the click at (15, 15, 20)): Move face's Offset arrow starts at the face's middle (20, 15, 20), not
 /// where the face was clicked; at 5 mm its tip is (20, 15, 25).

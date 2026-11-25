@@ -3,7 +3,7 @@
 //! Revolve angle arc (also Move face: offset/translate arrow, rotate arc).
 
 use super::PartStudioView;
-use crate::viewport::ViewportEvent;
+use crate::viewport::{MANIP_REACH_ACROSS_PX, ViewportEvent};
 use glam::{DVec2, DVec3};
 use noshape_model::params::ParamValue;
 use noshape_model::reference::Reference;
@@ -79,6 +79,14 @@ impl ArcHandle {
         self.origin + glam::DQuat::from_axis_angle(self.axis, a) * self.radial
     }
 
+    /// Its stem past the arc's end, its head's length and width, and its radius line past the end, in px.
+    fn glyph_px(&self) -> (f64, f64, f64, f64) {
+        if self.min_px > 0.0 {
+            return (RING_STEM_PX, RING_HEAD_PX, RING_HEAD_W_PX, RING_LINE_PAST_PX);
+        }
+        (ARC_STEM_PX * if self.secondary { 0.5 } else { 1.0 }, ARC_HEAD_PX, ARC_HEAD_PX, 0.0)
+    }
+
     /// The arc as drawn and hit in `view`: its radius at least [`Self::min_px`] long on screen (as projected).
     fn at_scale(&self, view: &noshape_render::camera_geometry::View) -> ArcHandle {
         if self.min_px <= 0.0 {
@@ -95,6 +103,14 @@ impl ArcHandle {
 /// Live manip-ring-1125: Move face's Rotate head sits at std's radius (the face's middle projected to the axis, never
 /// the click), pushed out to about 60 px on screen when that is shorter.
 const MOVE_FACE_RING_MIN_PX: f64 = 60.;
+/// Its glyph (live manip-ring-1125, isometric: 24.5 px of stem, a head 16.5 px long and 17 wide, the radius line 15.5 px
+/// past the stem as wide as it): stem, head length and width, the line past the stem, world px as the arrows'.
+const RING_STEM_PX: f64 = 30.;
+const RING_HEAD_PX: f64 = 18.;
+const RING_HEAD_W_PX: f64 = 17.;
+const RING_LINE_PAST_PX: f64 = 19.;
+/// Live grabs it from the drawn head + 1-3 px: 12 px either side of its stem.
+const RING_REACH_ACROSS_PX: f64 = 12.;
 
 // Built per frame and per event for the one edited feature, copied around by value: the handles' array
 // outweighing the triad and section variants costs nothing worth a box.
@@ -663,19 +679,32 @@ impl PartStudioView {
             let h = h.at_scale(&view);
             let end = h.point(h.angle);
             let tangent = (h.axis.cross(end - h.origin) * if h.angle < 0.0 { -1.0 } else { 1.0 }).normalize_or_zero();
-            (end, end + tangent * 1e-3, ARC_STEM_PX + ARC_HEAD_PX)
+            if h.min_px <= 0.0 {
+                return ((end, end + tangent * 1e-3, ARC_STEM_PX + ARC_HEAD_PX), MANIP_REACH_ACROSS_PX);
+            }
+            // Move face's ring (live manip-ring-1125): its stem and head as drawn, to 3 px past the tip.
+            let (stem, head, _, _) = h.glyph_px();
+            let wpp = view.world_per_px(end).unwrap_or(0.0);
+            let drawn = view.project(end + tangent * (stem + head) * wpp).zip(view.project(end)).map_or(stem + head, |(a, b)| (a - b).length());
+            ((end, end + tangent * 1e-3, drawn + 3.0), RING_REACH_ACROSS_PX)
         };
+        // How far across each grabs (none: an arrow's).
+        let mut across = Vec::new();
         // In handle order (Viewport::manipulator_index_at: 0 the first, 1 the second end's).
         let handles: Vec<(DVec3, DVec3, f64)> = match self.current_manip(cx) {
             // The arrow glyph at the end of the length (see manipulator_overlay).
-            Some(Manip::Handles(hs)) => hs
-                .into_iter()
-                .flatten()
-                .map(|h| match h {
-                    Handle::Arrow(a) | Handle::StdArrow(a, _) => arrow(&a),
-                    Handle::Arc(h) | Handle::StdArc(h, _) => arc(&h),
-                })
-                .collect(),
+            Some(Manip::Handles(hs)) => {
+                let (handles, reach): (Vec<_>, Vec<_>) = hs
+                    .into_iter()
+                    .flatten()
+                    .map(|h| match h {
+                        Handle::Arrow(a) | Handle::StdArrow(a, _) => (arrow(&a), MANIP_REACH_ACROSS_PX),
+                        Handle::Arc(h) | Handle::StdArc(h, _) => arc(&h),
+                    })
+                    .unzip();
+                across = reach;
+                handles
+            }
             Some(Manip::Triad(t)) => {
                 // Routing curve's other points can be clicked (made active).
                 let mut h = self.triad_hit_segments(&t, cx);
@@ -692,7 +721,10 @@ impl PartStudioView {
         // Datum boxes can be dragged too.
         let mut handles = handles;
         handles.extend(self.annotation_handles(cx));
-        self.viewport.update(cx, |v, _| v.manipulators = handles);
+        self.viewport.update(cx, |v, _| {
+            v.manipulators = handles;
+            v.manipulator_across = across;
+        });
     }
 
     /// The active manipulator's glyph, built by the renderer for every
@@ -1464,9 +1496,11 @@ fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::
     let sign = if h.angle < 0.0 { -1.0 } else { 1.0 };
     let tangent = (h.axis.cross(end - h.origin) * sign).try_normalize().unwrap_or(h.axis);
     let side = tangent.cross(view.direction()).try_normalize().unwrap_or_else(|| tangent.any_orthonormal_vector());
-    let stem = ARC_STEM_PX * if h.secondary { 0.5 } else { 1.0 } * wpp;
-    let head_base = end + tangent * stem;
-    let heads = head_polylines(head_base, tangent, side, ARC_HEAD_PX * wpp, ARC_HEAD_PX * wpp, h.secondary);
+    let (stem, head, head_w, past) = h.glyph_px();
+    let head_base = end + tangent * stem * wpp;
+    let heads = head_polylines(head_base, tangent, side, head * wpp, head_w * wpp, h.secondary);
+    // Move face's radius line runs past the stem, as wide as it.
+    let (line_end, line_w) = if past > 0.0 { (end + (end - h.origin).normalize_or_zero() * past * wpp, 1.0) } else { (end, 0.75) };
     let n = ((h.angle.abs().to_degrees() / 4.0).ceil() as usize).clamp(2, 90);
     let arc: Vec<[f32; 3]> = (0..=n).map(|i| f(h.point(h.angle * i as f64 / n as f64))).collect();
     // Transform's idle arc #89A3B4 and radius lines #A8B2B8 (live #A4AEB4..#ACB5BB; qa hm7-rot-radius: ours white).
@@ -1479,7 +1513,7 @@ fn arc_glyph(h: &ArcHandle, hover: bool, dragging: bool, view: &noshape_render::
         data.push_polyline(&arc, arc_color, 0, w, LineSegment::ON_TOP);
         data.push_polyline(&[f(end), f(head_base)], arc_color, 0, w, LineSegment::ON_TOP);
         data.push_polyline(&[f(h.origin), f(h.point(0.0))], radius_color, 0, w * 0.75, LineSegment::ON_TOP);
-        data.push_polyline(&[f(h.origin), f(end)], radius_color, 0, w * 0.75, LineSegment::ON_TOP);
+        data.push_polyline(&[f(h.origin), f(line_end)], radius_color, 0, w * line_w, LineSegment::ON_TOP);
         for p in &heads {
             data.push_polyline(&p.iter().map(|v| f(*v)).collect::<Vec<_>>(), color, 0, w, LineSegment::ON_TOP);
         }

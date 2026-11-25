@@ -162,6 +162,9 @@ fn pick_radius_px(scale: f32) -> i32 {
     (PICK_RADIUS * f64::from(scale)).round() as i32
 }
 
+/// How far across its axis a manipulator handle grabs, CSS px (live feel/dialogs.json "grabReach": an arrow, 14).
+pub const MANIP_REACH_ACROSS_PX: f64 = 14.0;
+
 /// How far an edge (picked at its drawn width) reaches while the pointer is over a face, CSS px: live reach-px-1119
 /// lights it from 7 px over its face, from 5 over the background ([`pick_radius_px`]).
 const EDGE_OVER_FACE_REACH: f64 = 7.0;
@@ -526,6 +529,8 @@ pub struct Viewport {
     /// Manipulator hit areas: world segments, or (with a length in pixels)
     /// a screen-sized glyph from the first point towards the second.
     pub manipulators: Vec<(DVec3, DVec3, f64)>,
+    /// Per handle of [`Self::manipulators`], how far across its axis it grabs in px (none: [`MANIP_REACH_ACROSS_PX`]).
+    pub manipulator_across: Vec<f64>,
     /// Pick ids that win ties in the pick radius (edges/points over faces).
     pub pick_priority: Arc<dyn Fn(u32) -> i32 + Send + Sync>,
     /// Which pick ids are edges and faces: over a face an edge is taken from [`EDGE_OVER_FACE_REACH`] px.
@@ -843,6 +848,7 @@ impl Viewport {
             step_rotations: Vec::new(),
             step_clock: None,
             manipulators: Vec::new(),
+            manipulator_across: Vec::new(),
             pick_priority: Arc::new(|_| 0),
             pick_class: Arc::new(|_| noshape_render::PickClass::Other),
             box_by_pick: true,
@@ -1051,12 +1057,13 @@ impl Viewport {
             }
             // Live (feel/dialogs.json "grabReach"): within 14 px across the drawn arrow, from 4 px behind its base to
             // its tip; nothing past the tip.
+            let reach = self.manipulator_across.get(i).copied().unwrap_or(MANIP_REACH_ACROSS_PX);
             let d = b - a;
             let len = d.length();
             let dir = d / len.max(1e-9);
             let along = (p - a).dot(dir);
             let across = ((p - a) - dir * along).length();
-            if (-4.0..=len).contains(&along) && across <= 14.0 && best.is_none_or(|(_, x)| across < x) {
+            if (-4.0..=len).contains(&along) && across <= reach && best.is_none_or(|(_, x)| across < x) {
                 best = Some((i, across));
             }
         }

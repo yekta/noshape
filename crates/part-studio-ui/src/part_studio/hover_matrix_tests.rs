@@ -3104,3 +3104,61 @@ fn print_display_mode_pixels(cx: &mut TestAppContext) {
         }
     }
 }
+
+/// Live manip-ring-1125 (isometric at 0.3234 mm/px, three setups and two zooms): Move face's Rotate head is a stem
+/// 24.5 px up from the radius line and a hollow head to 40 px, 17 px across, white in grey as the arrows; the radius
+/// line runs 15.5 px past the stem; hovered, the line lights with the head.
+#[gpui::test]
+fn move_faces_ring_head_is_drawn_as_live(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "moveFace", "name": "Move face 1", "params": { "moveFaces": ["face through [15, 15, 20]"], "moveFaceType": "ROTATE", "axis": ["edge through [20, 0, 20]"], "angle": "0 deg" } }
+    ] });
+    let m = matrix_studio_from(cx, "hm-moveface-ring", start);
+    cx.update(|cx| {
+        let vp = m.view.read(cx).viewport.clone();
+        vp.update(cx, |vp, cx| {
+            let forward = DVec3::new(-1.0, 1.0, -1.0).normalize();
+            vp.camera.rotation = noshape_render::Camera::look_rotation(forward, (DVec3::Z - forward * DVec3::Z.dot(forward)).normalize());
+            vp.camera.distance = 0.3234e-3 * vp.size().y / (2.0 * (vp.camera.fov_y * 0.5).tan());
+            vp.request_frame(cx);
+        });
+    });
+    let id = cx.update(|cx| m.view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().id);
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, m.window, |cx| !m.view.read(cx).ui_busy());
+    m.park(cx);
+    let (axis, foot) = {
+        let foot = cx.update(|cx| m.view.read(cx).viewport.read(cx).manipulators[0].0) * 1e3;
+        (m.exact(cx, [foot.x, 0.0, 20.0]), m.exact(cx, foot.to_array()))
+    };
+    let (w, h, px) = m.frame(cx);
+    // The glyph's white core (the background, faces and edges around it are not white).
+    let white = |p: DVec2| {
+        (-1..=1).flat_map(|dx| (-1..=1).map(move |dy| (p.x.round() as i64 + dx, p.y.round() as i64 + dy))).any(|(x, y)| {
+            (0..w as i64).contains(&x) && (0..h as i64).contains(&y) && px[(y * w as i64 + x) as usize].iter().all(|&c| c >= 0xf0)
+        })
+    };
+    let reach = |from: DVec2, dir: DVec2| (1..80).take_while(|&k| white(from + dir * k as f64)).last().unwrap_or(0) as f64;
+    let radial = (foot - axis).normalize();
+    let past = reach(foot, radial);
+    // (The head is hollow: its tip is the last white up the stem's line.)
+    let tip = (1..60).rfind(|&k| white(foot - DVec2::Y * k as f64)).unwrap_or(0) as f64;
+    let base = foot.y - 24.5;
+    let across = reach(DVec2::new(foot.x, base), DVec2::X) + reach(DVec2::new(foot.x, base), -DVec2::X);
+    assert!((past - 15.5).abs() <= 2.0, "the radius line {past} px past the stem (live 15.5)");
+    assert!((tip - 40.0).abs() <= 2.0, "the head's tip {tip} px up from the line (live 40)");
+    assert!((across - 17.0).abs() <= 2.5, "the head's base {across} px across (live 17)");
+    // Hovered, the head and the radius line light blue together.
+    let lit = |(w, _, px): (u32, u32, Vec<[u8; 3]>)| {
+        [foot - DVec2::Y * 10.0, axis.lerp(foot, 0.5)].map(|p| {
+            let c = px[(p.y.round() as i64 * w as i64 + p.x.round() as i64) as usize];
+            i32::from(c[2]) - i32::from(c[0]) > 40
+        })
+    };
+    assert_eq!(lit((w, h, px)), [false, false], "idle, the stem and the line white in grey");
+    m.pointer.move_to(cx, &m.view, foot - DVec2::Y * 20.0);
+    assert_eq!(lit(m.frame(cx)), [true, true], "hovered, the stem and the line light");
+}
