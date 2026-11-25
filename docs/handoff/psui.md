@@ -154,7 +154,21 @@ docs/DECISIONS.md (read first; it wins over anything here).
   propagates to the workspace's Undo, so the PS-only test window can't take the key); asm: fixed-part drag adds no
   step, one undo takes a Fastened mate and its move (tests, landed after 14539067); Insert session one step was
   already covered (asm-feel-coverage-audit). Full assembly-ui lib green (212).
-  NEXT: queue empty; ask the lead for the next row.
+  STATE 17:12: mistakes rows + manip dead zone COMMITTED (7af9d907f code + mate, 46cc1c84a arrows, 23d3c0564 TICKETS
+  MISTAKES-ROWS / MANIP-DRAG-DEAD-ZONE "fixed, to verify"); t9 green (app check, part-studio-ui lib 614, model 61),
+  t10 green (an_arrow_drag_writes_its_field_and_undoes_in_one_step, the_dialogs_matrix, an_edited_mate_down_to_one_
+  connector_says_it_needs_two, a_reopened_inconsistent_mate_has_a_pale_check). Landed with this handoff (see below).
+  Mistakes: failing_alone (detail.rs: a failed Fillet/Chamfer blames only picks that fail alone, <=24 retries, not in
+  scratch runs); ui_state query "redItems"; has_export_geometry (parts/surfaces/composites); mate dialog clear_slot
+  (x on an edited mate = touched: ✓ enabled, title "Mate needs two mate connectors."). Hole title "↧ 12 mm" = std's
+  default (live's THRU was the account's remembered End).
+  NEXT: 1) manip-drag P0 open item: live's Move face arrow sits at the click point (15,15,20), ours at face_anchor
+  (centroid-ish); needs the pick's world point kept with the selection (none is kept today): a design step, ask the
+  lead whether before parts 3+ (Move face ring, triad, assembly drags) arrive. Live also commits Extrude's dragged
+  depth as the 1-decimal value ("30.3*mm") and Fillet's at full precision: check ours writes the same. 2) LOOK-OUTLINE-
+  WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
+  vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
+  (~l.785 split-button ▾, 812 arrow outline, 828-831 filter popover / Tab focus).
   Parts-list menu: Edit material… / Show center of mass with a material (mod.rs; test
   a_part_with_a_material_offers_edit_material_and_its_center_of_mass in list_feel_tests, green).
   To compare (live, no ask yet): live/psui/everyday-1125 (undo scopes: sketch ✓ one step, re-entered sketch
