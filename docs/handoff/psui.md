@@ -198,11 +198,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Ring (live manip-ring-1125): POSITION done (commit "Move face's Rotate ring sits at least 60 px...": ArcHandle.min_px,
   at_scale(view) on projected length, re-synced in render_viewport_underlay; test move_faces_rotate_ring_keeps_60_px_from_its_axis).
   Arrow: d133237f4 (click point) REVERTED (live's frame shows the shaft at x 1160, 9 px right of the click = the face's
-  middle); test move_faces_arrow_starts_at_the_faces_middle. TICKETS MANIP-DRAG-DEAD-ZONE row still says "Move face
-  arrow at the click" (ac0cfe0a8): correct it. NEXT: ring LOOK (TICKETS MOVE-FACE-RING-POS "Still open"): live's head =
-  fixed ~47 px arc from the radius point toward +z (angle direction) + thin line from the axis, no sweep/chevrons;
-  unhovered ~(165-179,172-185,178-189), line (160,176,186); hovered both (100,142,191); reach = head + 1-3 px
-  (ours: 14 px across the last stretch). arc_glyph / arc hit in manipulators.rs; Move face only (min_px > 0).
+  middle); test move_faces_arrow_starts_at_the_faces_middle (TICKETS MANIP-DRAG-DEAD-ZONE note corrected).
+  Ring LOOK done 19:0x (593effc30): live's "47 px arc" is a straight stem + hollow head (iso: stem 24.5, tip 40 px up,
+  17 across), radius line as wide as the stem, 15.5 px past it; ArcHandle::glyph_px (RING_* world px, min_px > 0
+  only), viewport.manipulator_across (per handle; arrows MANIP_REACH_ACROSS_PX 14, ring 12), reach = drawn + 3 px.
+  Tests move_faces_ring_head_is_drawn_as_live (hover_matrix, GPU) + move_faces_ring_grabs_its_head_and_3_px_round_it
+  (t18.sh). Revolve/Draft arcs unchanged (no live reach data). Seen in passing: in our Move face dialog the picked top
+  face turns a4bebf with orange edges, live keeps 9bc2d9 (b1 frames): unchecked, maybe a combined-state row.
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
