@@ -500,8 +500,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), Some(&offset_role));
         ev.replace_body(bi, res.shape, names);
     }
-    // A part moved to nothing (live mf-side-through: a side offset the part's length in) fails.
-    if moved.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.kind == BodyKind::Solid && b.shape.volume().is_ok_and(|v| v <= 1e-15))) {
+    // A part moved to nothing (live mf-side-through: a side offset the part's length in) fails. (Its volume by the
+    // plain estimate first: the exact one took 135 ms of a threaded screw's Move face.)
+    let nothing = |s: &Shape| k::volume_estimate(s).is_ok_and(|v| v <= 1e-12) && s.volume().is_ok_and(|v| v <= 1e-15);
+    if moved.iter().any(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.kind == BodyKind::Solid && nothing(&b.shape))) {
         return err(failed_msg);
     }
     Ok(())

@@ -1622,6 +1622,14 @@ P3 props_volume_centre_estimate(const OcShape& s)
   return P3{c.X(), c.Y(), c.Z()};
 }
 
+double props_volume_estimate(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  GProp_GProps out;
+  BRepGProp::VolumeProperties(s.shape, out);
+  return out.Mass();
+}
+
 // The volume `b` has more than `a`: only the faces either has that the other doesn't (a Boolean's untouched faces are
 // the same faces) integrated, by one divergence field, so the shared faces' terms cancel exactly; milliseconds where
 // two whole volumes took ~0.5 s on a 180-face part (asm-isaac-ball's Extrude 41).

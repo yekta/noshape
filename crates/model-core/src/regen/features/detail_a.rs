@@ -276,6 +276,15 @@ pub(super) fn reblend(ev: &mut EvalCtx, bi: usize, modified: &[usize], blends: &
             supports.push((a, b, r, body.faces[bf].clone()));
         }
     }
+    // (None to roll again (a threaded screw's head cone beside the moved faces, tangent to neither neighbour): the
+    // operation alone, nothing deleted (OCCT's defeaturing of it took 0.3-0.5 s).)
+    if supports.is_empty() {
+        let shapes: Vec<Shape> = drafted.iter().filter(|f| !removed.contains(f)).map(|&f| faces[f].clone()).collect();
+        let res = op(&body.shape, &shapes).map_err(|_| fe(failed))?;
+        let names = ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None);
+        ev.replace_body(bi, res.shape, names);
+        return Ok(());
+    }
     let del: Vec<Shape> = blends.iter().map(|f| faces[*f].clone()).collect();
     let res = k::delete_faces(&body.shape, &del).map_err(|_| fe(failed))?;
     let n1 = crate::regen::eval::names_for(&res.shape, ev.name_result(&[&body.shape_names()], &res.history, &res.shape, &BTreeMap::new(), None));
