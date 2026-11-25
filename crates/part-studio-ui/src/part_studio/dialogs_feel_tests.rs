@@ -2367,6 +2367,8 @@ fn move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between(cx: &m
     let mut d = 2.0f64.sqrt() * 2.0;
     while d < 90.0 {
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: to(d), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
+        // (Each move's preview first: a loaded host's builds lag the moves.)
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
         draw(cx, window);
         let (text, selected) = cx.update(|cx| dialog.read(cx).input_text("angle", cx)).unwrap_or_default();
         let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
@@ -2526,6 +2528,48 @@ fn move_faces_rotate_ring_keeps_60_px_from_its_axis(cx: &mut TestAppContext) {
     draw(cx, window);
     let (mm_in, px_in) = ring(cx);
     assert!((mm_in - 15.0).abs() < 1e-6 && px_in > 60.0, "zoomed in: std's 15 mm ({mm_in} mm, {px_in} px)");
+}
+
+/// Live manip-ring-1125 b1 (Move face › Rotate, the Axis field active after its edge pick): the picked top face keeps
+/// the part's light blue (#9bc2d9), only the axis edge is lit, as live's rule that a dialog highlights only its active
+/// field's picks (behaviours psui 10-26). Ours draws the face selected (amber tint, #ffa90a boundary) only while the
+/// Faces field is the active one, as live does then.
+#[gpui::test]
+fn move_faces_axis_field_active_lights_the_edge_not_the_face(cx: &mut TestAppContext) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "moveFace", "name": "Move face 1", "params": { "moveFaces": ["face through [15, 15, 20]"], "moveFaceType": "ROTATE", "axis": ["edge through [20, 0, 20]"], "angle": "0 deg" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "dlg-moveface-axis-lit", Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Move face 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let d = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Move face dialog").dialog.clone());
+    let (face, edge) = cx.update(|cx| {
+        let p = &d.read(cx).feature.params;
+        (p.query("moveFaces").first().cloned().expect("the face"), p.query("axis").first().cloned().expect("the axis"))
+    });
+    let selected = |cx: &mut TestAppContext, r: &Reference| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let scene = v.viewport.read(cx).scene();
+            v.built.as_ref().is_some_and(|b| b.picks.ids_for(r).iter().any(|&id| scene.states.get(id as usize).is_some_and(|st| st & noshape_render::state::SELECTED != 0)))
+        })
+    };
+    let mut got = Vec::new();
+    for field in ["axis", "moveFaces"] {
+        // As a click on the field: its tab stop takes the keyboard, which makes it the active field.
+        let h = cx.update(|cx| d.read(cx).tab_stop_handle(&format!("q:{field}"))).unwrap_or_else(|| panic!("no tab stop for {field}"));
+        cx.update_window(window, |_, w, cx| w.focus(&h, cx)).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        got.push((field, selected(cx, &face), selected(cx, &edge)));
+    }
+    // (With the Faces field active the axis edge is lit too: it bounds the selected face.)
+    assert_eq!(got, [("axis", false, true), ("moveFaces", true, true)], "(active field, face lit, axis edge lit)");
 }
 
 /// Live manip-ring-1125 (isometric, 0.3234 mm/px; the pointer stepped out from the head until it unlit): Move face's

@@ -400,8 +400,9 @@ pub struct Viewport {
     drag: Drag,
     press_pos: DVec2,
     /// When the press was, and how far the pointer has got from it since (live: a right press orbits from its
-    /// first pixel and still opens the menu on release within 4 px and 1 s).
-    press_at: Instant,
+    /// first pixel and still opens the menu on release within 4 px and 1 s). None before any press (a view's tests
+    /// that send their own events hold nothing).
+    press_at: Option<Instant>,
     /// The clock the press rules (a drag's 50 ms, the menu's hold, a double middle release) and camera animations
     /// read; tests drive it.
     clock: Rc<dyn Fn() -> Instant>,
@@ -788,7 +789,7 @@ impl Viewport {
             pick_hover_dirty: false,
             drag: Drag::None,
             press_pos: DVec2::ZERO,
-            press_at: Instant::now(),
+            press_at: None,
             clock: Rc::new(Instant::now),
             exec: cx.background_executor().clone(),
             middle_released: None,
@@ -973,7 +974,7 @@ impl Viewport {
     }
 
     fn press_held(&self) -> Duration {
-        (self.clock)().saturating_duration_since(self.press_at)
+        self.press_at.map_or(Duration::ZERO, |at| (self.clock)().saturating_duration_since(at))
     }
 
     /// The left press being released was held long enough to select nothing (`long_press_cancels`).
@@ -2671,7 +2672,7 @@ impl Viewport {
         self.box_plane = self.hover.filter(|&id| (self.pick_class)(id) == noshape_render::PickClass::Plane);
         // Whether it pressed on empty space, as the pick there says now (the cache moves on with the pointer).
         self.press_empty = self.pick_at(p).map(|x| x.is_none());
-        self.press_at = (self.clock)();
+        self.press_at = Some((self.clock)());
         self.press_travel = 0.0;
         self.box_waits_from = None;
         self.box_pick_pending = false;

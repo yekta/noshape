@@ -2515,6 +2515,9 @@ fn a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach(cx: &
     .unwrap();
     draw(cx, window);
     assert_eq!(cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().hover), Some(circle), "the circle lights, not its centre");
+    // A second after the viewport opened (a loaded land server, 11-25): a click sent without a press is no long press.
+    let later = std::time::Instant::now() + std::time::Duration::from_secs(1);
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |vp, _| vp.set_clock(move || later)));
     cx.update_window(window, |_, w, cx| {
         view.update(cx, |v, cx| {
             let vp = v.viewport.clone();
