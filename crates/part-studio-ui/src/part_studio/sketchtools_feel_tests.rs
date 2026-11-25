@@ -383,6 +383,21 @@ fn rows() -> Vec<Row> {
                 "'Recently used', newest first, the first row highlighted, its info pane",
             )
         } },
+        Row { id: "search / no Recently used in a sketch", live: "sketch-feel-1125: in a sketch Alt+C, 'fil', Enter (Fillet), Esc, Alt+C again: no 'Recently used', only 'Start typing to search tools' (the Part Studio's lists it)", gap: false, check: |cx| {
+            let (window, view) = sketch_with(cx, "st-search-no-recent", Tool::Select);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();
+            draw(cx, window);
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_input("fil");
+            draw(cx, window);
+            keys(cx, window, &["enter"]);
+            let fillet = cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| ed.tool));
+            keys(cx, window, &["escape"]);
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();
+            draw(cx, window);
+            let heading = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("tool-search-recent").is_some();
+            let items = cx.update(|cx| view.read(cx).palette_items(cx).len());
+            expect((fillet, heading, items), (Some(Tool::Fillet), false, 0), "Fillet run from the panel; then no 'Recently used', nothing listed")
+        } },
         Row { id: "search / the found tool lit in the sketch toolbar", live: "search-tools-1118: Alt+C in a sketch; 'f' lights Fillet's button yellow (its group's face), a member under a ⌄ lights the ⌄ (Fix: the test window's collapsed constraints), Highlight tool in toolbar off lights nothing", gap: false, check: |cx| {
             let (window, view) = sketch_with(cx, "st-search-lit", Tool::Select);
             cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.toggle_palette(w, cx))).unwrap();

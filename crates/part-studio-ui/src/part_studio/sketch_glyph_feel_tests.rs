@@ -436,3 +436,45 @@ fn a_selected_points_glyph_sits_above_it(cx: &mut TestAppContext) {
     assert!(two.iter().all(|c| (c.y + 40.0).abs() <= 1.5) && (two[1].x - two[0].x - 22.0).abs() <= 0.5, "a row 22 px apart, 40 px up: {two:?}");
     assert!((-13.0..=-5.0).contains(&two[0].x) && (fix_x - two[1].x).abs() <= 0.5, "Coincident left, Fix right: {two:?}, Fix at {fix_x}");
 }
+
+/// Live glyph-taken-1125: two points 9-37 px apart selected (Show constraints off; live: a rectangle's top corners), the
+/// first's glyph stays above it, the second's spot is taken and its row goes left, past the first: (-40, -12) px from it.
+#[gpui::test]
+fn a_second_points_glyph_goes_left_when_its_spot_is_taken(cx: &mut TestAppContext) {
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "glyph-point-taken", Tool::Select);
+    // Two fixed points 9 px apart, level on screen (the layout is in screen space).
+    let (o, dx, dy) = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().screen_map.unwrap());
+    let plane = |q: DVec2| o + glam::DMat2::from_cols(dx, dy) * q;
+    let (a1, a2) = (DVec2::new(450., 300.), DVec2::new(459., 300.));
+    let (t1, t2) = cx
+        .update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| {
+            let (t1, t2) = (data.sketch.add_point(plane(a1)), data.sketch.add_point(plane(a2)));
+            for e in [t1, t2] {
+                data.sketch.add_constraint(noshape_sketch::ConstraintKind::Fix { entity: e }).unwrap();
+            }
+            (t1, t2)
+        })))
+        .expect("in a sketch");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let (a1, a2) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        let data = v.sketch_data(cx).unwrap();
+        let at = |e| v.viewport.read(cx).project(ed.frame.to_world(data.sketch.point(e).unwrap())).unwrap();
+        (at(t1), at(t2))
+    });
+    assert!((a2.x - a1.x - 9.0).abs() < 1.0 && (a2.y - a1.y).abs() < 1.0, "9 px apart, level: {a1} {a2}");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let ed = v.sketch.as_mut().expect("sketch mode");
+        ed.set_show_constraints(false);
+        ed.selection = vec![t1, t2];
+        cx.notify();
+    }));
+    draw(cx, window);
+    let centre = |cx: &mut TestAppContext, e, at: DVec2| cx.update(|cx| view.read(cx).ui.glyph_boxes.iter().filter(|b| b.1 == e).map(|b| DVec2::new(f64::from(b.2) + 10.0, f64::from(b.3) + 10.0) - at).collect::<Vec<_>>());
+    let (one, two) = (centre(cx, t1, a1), centre(cx, t2, a2));
+    assert!(one.len() == 1 && (3.0..=9.0).contains(&one[0].x) && (one[0].y + 40.0).abs() <= 1.5, "the first above its point: {one:?}");
+    assert!(two.len() == 1 && (two[0].x + 40.0).abs() <= 1.0 && (two[0].y + 12.0).abs() <= 1.0, "the second at (-40, -12): {two:?}");
+    assert!(a2.x + two[0].x < a1.x, "left, past the first point");
+}

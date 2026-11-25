@@ -5163,6 +5163,11 @@ impl PartStudioView {
         };
         let mut per_entity: HashMap<u32, usize> = HashMap::new();
         let mut boxes = Vec::new();
+        // Selected points' rows in the order they were picked: a later one whose spot is taken moves (below).
+        let mut glyphs = glyphs;
+        glyphs.sort_by_key(|g| if g.on_point { ed.selection.iter().position(|e| *e == g.entity).unwrap_or(usize::MAX) } else { usize::MAX });
+        let mut point_rows: Vec<(f32, f32, f32)> = Vec::new();
+        let mut row_left: HashMap<u32, (f32, f32)> = HashMap::new();
         for g in glyphs {
             // Dragged glyphs sit centered on their stored offset. Live
             // (sketch/28; SKETCH-GLYPH-LAYOUT-LOST, 45690459 re-applied):
@@ -5195,7 +5200,17 @@ impl PartStudioView {
                     if g.on_point && !show_all {
                         // Show constraints off: a centred row straight above the point, ~40 px up, in screen space
                         // (live, behaviours "skasm point glyph placement": 1 glyph (+4..+9, -39), 2 (-11 / +11, -39)).
-                        (x, y, -6.0 - 11.0 * (n - 1.0) + 22.0 * kf, -50.0)
+                        // Its spot taken by an earlier selected point's row (6 px apart or less), the row goes left
+                        // of the point, its last glyph centred at (-40, -12) (live glyph-taken-1125: past the first).
+                        let (left, top) = *row_left.entry(g.entity.0).or_insert_with(|| {
+                            let (l, t) = (-6.0 - 11.0 * (n - 1.0), -50.0);
+                            let w = 22.0 * n - 2.0;
+                            let taken = point_rows.iter().any(|&(rl, rr, rt)| (y + t - rt).abs() < 20.0 && x + l < rr + 6.0 && x + l + w > rl - 6.0);
+                            let (l, t) = if taken { (-50.0 - 22.0 * (n - 1.0), -22.0) } else { (l, t) };
+                            point_rows.push((x + l, x + l + w, y + t));
+                            (l, t)
+                        });
+                        (x, y, left + 22.0 * kf, top)
                     } else if g.on_point {
                         leader = true;
                         (x, y, -27.0 - 22.0 * kf, -26.0)
@@ -6826,21 +6841,21 @@ const PATTERN_LABEL_PAD: f32 = 6.;
 
 /// A sketch pattern's count or spacing label centred on `y` (live sketch-gaps2 / 3): black 16 px regular text on an
 /// opaque box `h` px high (the count 28, the spacing 26) in the sketch plane's colour, which masks the dimension
-/// line and the grid under it; as a dimension's label, tan when hovered and orange once a click picked it (live
-/// 11-04 pattern manipulators).
+/// line and the grid under it; as a dimension's label, tan (213, 189, 158) when hovered and orange
+/// (213, 163, 100) once a click picked it (live 11-04 pattern manipulators, sketch-feel-1125).
 fn pattern_label_box(y: f32, h: f32, picked: bool) -> Div {
     use crate::theme::{pick, viewport as l, viewport_dark as d};
-    let fill = if picked { rgb(0xd9a566) } else { gpui_kit::rgb_static(pick(0xf5f8fa, 0x3d3d3d)) };
+    let fill = if picked { rgb(0xd5a364) } else { gpui_kit::rgb_static(pick(0xf5f8fa, 0x3d3d3d)) };
     let text = if picked { rgb(0x000000) } else { gpui_kit::rgb_static(pick(l::SKETCH_FULL, d::SKETCH_FULL)) };
     let label = div().absolute().top(px(y - h * 0.5)).h(px(h)).px(px(PATTERN_LABEL_PAD)).flex().items_center().bg(fill).text_size(px(16.)).text_color(text);
-    if picked { label } else { label.hover(|s| s.bg(rgb(0xd9bfa0)).text_color(rgb(0x000000))) }
+    if picked { label } else { label.hover(|s| s.bg(rgb(0xd5bd9e)).text_color(rgb(0x000000))) }
 }
 
 fn dimension_label_colors(ed: &SketchEditor, cid: noshape_sketch::ConstraintId, driving: bool) -> (Option<Rgba>, Rgba) {
     if ed.selected_constraints.contains(&cid) {
-        (Some(rgb(0xd9a566)), rgb(0x000000))
+        (Some(rgb(0xd5a364)), rgb(0x000000))
     } else if ed.hover_constraint == Some(cid) {
-        (Some(rgb(0xd9bfa0)), rgb(0x000000))
+        (Some(rgb(0xd5bd9e)), rgb(0x000000))
     } else {
         // Dark (live dk-933): white values, driven #ccc, conflicts #ff6b6b.
         use crate::theme::{pick, viewport as l, viewport_dark as d};
