@@ -374,7 +374,9 @@ impl PartStudioView {
                 ((b - a).length() > 1e-12).then(|| (a, (b - a).normalize()))
             }
             Reference::Edge(_) => {
-                let ctx = self.context.as_ref()?;
+                // In the model before the feature, as its references are: Move face's rotated preview has no edge
+                // through the query's point any more, and the ring went from under the drag once that preview came.
+                let ctx = self.ui.before_context.as_ref().or(self.context.as_ref())?;
                 let e = noshape_model::regen::measure::resolve_shapes(ctx, r).into_iter().next()?;
                 match e.edge_curve().ok()? {
                     noshape_kernel::Curve::Line { origin, direction } => Some((origin, direction.normalize())),

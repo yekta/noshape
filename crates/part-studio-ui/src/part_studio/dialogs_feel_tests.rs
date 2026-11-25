@@ -2368,6 +2368,16 @@ fn move_faces_rotate_ring_snaps_by_5_degrees_and_shows_7_decimals_between(cx: &m
     while d < 90.0 {
         gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(gpui_kit::MouseMoveEvent { position: to(d), pressed_button: Some(gpui_kit::MouseButton::Left), modifiers: Modifiers::default() });
         draw(cx, window);
+        // Each move's preview applied before the next, whatever the host's pace: the burst coalescing's wait
+        // (schedule_regen: 12 ms on the executor's clock, only for requests under 100 ms apart) let go, then drawn until
+        // idle. The ring stays on the model before the feature, not on the turned preview's (the queue's loaded runs).
+        cx.executor().advance_clock(std::time::Duration::from_millis(12));
+        let mut draws = 0;
+        while cx.update(|cx| view.read(cx).ui_busy()) && draws < 12000 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            draw(cx, window);
+            draws += 1;
+        }
         let (text, selected) = cx.update(|cx| dialog.read(cx).input_text("angle", cx)).unwrap_or_default();
         let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
         let focused = st["dialog"]["fields"].as_array().into_iter().flatten().any(|f| f["label"] == "Rotation angle" && f["focused"] == true);
