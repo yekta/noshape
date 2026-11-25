@@ -39,7 +39,6 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // A sketch that held before its used geometry moved (a feature above edited) follows it with the least change of
     // the whole sketch: c2-hunting-knife's Extrude 1 0.02 mm deeper slid Sketch 6's mirrored groove 2.3 mm along the
     // blade under the one-at-a-time placement, and Extrude 3 then cut away the corner Sketches 7, 8 and 11 use.
-    let skt0 = std::time::Instant::now(); // SKT
     let held = !(data.external_refs.is_empty() && data.intersections.is_empty()) && sk.holds();
     let mut lost_ids = Vec::new();
     let mut silhouettes: BTreeMap<String, Vec<noshape_sketch::Curve2>> = BTreeMap::new();
@@ -159,7 +158,6 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
     }
-    let skt1 = std::time::Instant::now(); // SKT
     // Re-section intersected faces so intersection curves follow the model.
     let mut lost = 0;
     for link in &data.intersections {
@@ -248,7 +246,6 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     }
     changed.sort();
     changed.dedup();
-    let skt2 = std::time::Instant::now(); // SKT
     let last_solved = sk.clone();
     let report = match changed.as_slice() {
         [] if held => sk.solve_with(&noshape_sketch::SolveOptions { analyze: !sk.analysis_current(), ..Default::default() }),
@@ -265,7 +262,6 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         _ if sk.analysis_current() => sk.solve_with(&noshape_sketch::SolveOptions { analyze: false, constructive: true, ..Default::default() }),
         _ => sk.solve_with(&noshape_sketch::SolveOptions { constructive: true, ..Default::default() }),
     };
-    let skt3 = std::time::Instant::now(); // SKT
     // Live (qa4 DIM-UNSOLVED-GEOM): a sketch that can't be solved keeps its
     // last solved shape, not the rest solved around the conflict.
     // (Nor one whose solve fails: live errors-1118's triangle with a side typed longer than the other two, the row red.)
@@ -276,9 +272,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // Text glyph outlines follow their (solved) text boxes.
     data.add_text_outlines(&mut sk);
     let (regions, imprinted, split) = imprint(ev, &frame, &sk, sk.regions());
-    let skt4 = std::time::Instant::now(); // SKT
     let wires = sk.wires();
-    if std::env::var_os("NOSHAPE_SKT").is_some() { eprintln!("SKT {:?}: refs {:?} sections {:?} solve {:?} imprint {:?}", ev.feature, skt1 - skt0, skt2 - skt1, skt3 - skt2, skt4 - skt3); } // SKT
     let mut dimension_text = BTreeMap::new();
     for c in sk.constraints() {
         if let Some(v) = c.kind.value() {
