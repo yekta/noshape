@@ -3,7 +3,7 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 02:43) — read first
+## NOW (11-25 05:26) — read first
 - QUEUED 9102b99e 11-25 02:40 (3 commits): (1) "free geometry joined to a conflict drags": `Sketch::drag` retries a
   Failed drag with `SolveOptions::unheld` = `unheld_constraints(1e-9)` unless the handle is FullyConstrained (fz211
   stuck free entities 161 -> 3; open: lines 92, 95, fit spline 215; T1 misc free_geometry_joined_to_a_conflict_drags).
@@ -17,9 +17,10 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   `with_sketch` sets it while `sketch_solves_slowly`; toggle_driving / add_dimension solve_with(default);
   refresh_analysis always analyzes (begin_drag keeps the drag gate right). fz211 probe (zz_probe_tools.rs, PROBE_QUICK):
   split 124 -> 27, delete 128 -> 35, trim 130 -> 37, Line 2nd click 131 -> 39, circular 135 -> 37 ms.
-- NEXT: linear pattern on fz211 still 172-188 ms with quick solves (was 250-295): it's apply_pattern ->
-  linear_grid_pattern (+ link_linear_pattern's PatternLinks) -> finish_create's solve; break it down (sketch crate
-  linear_pattern_groups vs the solve) and get it < 100 ms or off the UI thread.
+- QUEUED (11-25 05:26) "linear pattern ... quick": the 172-188 ms was add_dimension's analysed solve (100-178 ms) of
+  the spacing dimension; link_linear_pattern now adds that Length driving directly (fresh instances, nothing else fixes
+  it). fz211 linear pattern 32-37 ms (all probed tools now < 50 ms). T1 a_linear_pattern_draws_its_direction_line_as_live
+  checks driving + label + no redundancy. Same analysed add_dimension remains in slot width / conic rho (not probed).
 - QUEUED (11-25, after 9102b99e) "constraints beside a conflict solve" (live sk-conflict-add-1125: everything added
   beside a red conflict is kept and solves): `Sketch::solved_beside_conflicts(before, around)` (unheld constraints
   all elsewhere and already unheld before) keeps solve_after_constraint's and the fillet radius edit's solve.

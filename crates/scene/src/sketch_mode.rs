@@ -8412,8 +8412,12 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
     } else if step.x.abs() < 1e-12 {
         let _ = sk.add_constraint(ConstraintKind::Vertical { a: line, b: None });
     }
+    // Nothing else fixes the spacing (the instances are new, held only by their links): driving at once, without
+    // add_dimension's analysed solve (100–180 ms in a big sketch); the caller solves.
     let label = p0 + step * 0.5 + step.try_normalize().unwrap_or(DVec2::X).perp() * wpp * 24.0;
-    add_dimension(data, ConstraintKind::Length { curve: line, value: step.length() }, Some(label), None);
+    if let Ok(c) = sk.add_constraint(ConstraintKind::Length { curve: line, value: step.length() }) {
+        data.dimension_labels.insert(c.0, [label.x, label.y]);
+    }
     Some(line)
 }
 
@@ -13057,8 +13061,11 @@ mod tests {
         let on = |p: EntityId| d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, .. } if a == p));
         assert!(on(a) && on(b), "{kinds:?}");
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == line)));
-        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Length { curve, value } if curve == line && (value - 0.01).abs() < 1e-12)));
-        assert!(d.sketch.solve().is_solved());
+        // The spacing dimension drives, with its label (added without an analysed solve).
+        let spacing = d.sketch.constraints().find(|c| matches!(c.kind, ConstraintKind::Length { curve, value } if curve == line && (value - 0.01).abs() < 1e-12)).unwrap();
+        assert!(spacing.driving && d.dimension_labels.contains_key(&spacing.id.0));
+        let report = d.sketch.solve();
+        assert!(report.is_solved() && report.redundant.is_empty(), "{report:?}");
         // The instances keep the seed's radius through the pattern itself.
         d.sketch.add_constraint(ConstraintKind::Radius { curve: c, value: 0.003 }).unwrap();
         assert!(d.sketch.solve().is_solved());
