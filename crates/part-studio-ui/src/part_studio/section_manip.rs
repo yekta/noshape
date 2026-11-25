@@ -618,8 +618,8 @@ pub(super) fn section_glyph(s: &SectionManip, hover: Option<SectionHandle>, drag
     let mut draw = |pts: &[DVec3], h: SectionHandle| {
         let (edge, core) = colors(h);
         let p: Vec<[f32; 3]> = pts.iter().map(|q| f(*q)).collect();
-        back.push_polyline(&p, edge, 0, 3.0, LineSegment::ON_TOP);
-        front.push_polyline(&p, core, 0, 1.5, LineSegment::ON_TOP);
+        back.push_polyline(&p, edge, 0, 3.0, LineSegment::ON_TOP | LineSegment::SMOOTH);
+        front.push_polyline(&p, core, 0, 1.5, LineSegment::ON_TOP | LineSegment::SMOOTH);
     };
     draw(&s.base_circle(bw, view.direction()), SectionHandle::Base);
     for k in 0..2 {
