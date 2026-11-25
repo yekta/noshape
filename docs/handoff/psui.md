@@ -182,7 +182,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (hits 1175/1185,435 = half the face box diagonal? std's on-axis branch), ours at the face anchor's radius (15 mm
   here): needs a live probe of the ring at other clicks before changing. Live's "plain click on a part picks nothing
   in Transform until hovered" is lost input (DECISIONS 11-07): not copied. Triad: no field focused + dialog Ctrl+Z
-  resets dx already ours (dialogs tests); asm drag 2.5 px (live 3: 2 none, 3 moves), no box, one undo (asm tests).
+  resets the drag in one step: ours, tested (the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus); asm drag 2.5 px (live 3: 2 none, 3 moves), no box, one undo (asm tests).
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
