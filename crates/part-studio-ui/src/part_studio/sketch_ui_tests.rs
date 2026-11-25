@@ -6182,6 +6182,86 @@ fn sketch_entity_menus_as_lives(cx: &mut TestAppContext) {
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }
 
+/// Live skasm spline-image-1125 (3), (9): a selected spline's menu starts with Insert spline points; an image's edge,
+/// or the picture with nothing hit, has Edit image and Switch to <its file tab> after Confirm (no plane items); Edit
+/// image's pick replaces the picture in its box.
+#[gpui::test]
+fn spline_and_image_menus_as_lives(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sketch-spline-image-menus", Tool::Select);
+    let png = |w: u32, h: u32| noshape_scene::png::encode_png(vec![255; (w * h * 4) as usize], w, h, w, h).unwrap();
+    let (feature, spline, edge, img) = cx
+        .update_window(window, |_, _, cx| {
+            view.update(cx, |v, cx| {
+                let bytes = png(4, 2);
+                v.doc.update(cx, |d, cx| {
+                    d.edit_document("Import pic.png", cx, |d| {
+                        noshape_ops::import::add_file_tab(d, noshape_model::file_tab::FileTab::new("pic.png", &bytes, 0), None, None);
+                    })
+                });
+                let (spline, img) = v
+                    .with_sketch(cx, |_, data| {
+                        let s = data.sketch.add_fit_spline_with_handles(&[DVec2::new(-0.04, 0.0), DVec2::new(-0.03, 0.01), DVec2::new(-0.02, 0.0)]).unwrap();
+                        let img = data.add_image("pic.png", &bytes, DVec2::new(0.01, 0.01), 0.02, 2.0).unwrap();
+                        data.sketch.solve();
+                        (s, img)
+                    })
+                    .unwrap();
+                let d = v.sketch_data(cx).unwrap();
+                let edge = noshape_sketch::EntityId(d.images[0].box_lines[0]);
+                (v.sketch.as_ref().unwrap().feature, spline, edge, img)
+            })
+        })
+        .unwrap();
+    let menu = |cx: &mut TestAppContext, over: Option<noshape_sketch::EntityId>, selected: Vec<noshape_sketch::EntityId>, at: DVec2| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                if let Some(ed) = &mut v.sketch {
+                    ed.selection = selected.clone();
+                    ed.cursor = Some(at);
+                }
+                v.hover = over.map(|e| Reference::SketchEntity { sketch: feature, entity: e.0 });
+                v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), None, w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let labels: Vec<String> = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+        cx.update(|cx| view.update(cx, |v, cx| v.close_context_menu(cx)));
+        labels.into_iter().filter(|l| l != "———").collect::<Vec<_>>()
+    };
+    let got = menu(cx, Some(spline), vec![spline], DVec2::new(-0.03, 0.01));
+    assert_eq!(got[..2], ["Insert spline points", "Confirm Sketch 1"], "{got:?}");
+    let got = menu(cx, Some(edge), vec![edge], DVec2::new(0.03, 0.01));
+    assert_eq!(got[..3], ["Confirm Sketch 1", "Edit image", "Switch to pic.png"], "{got:?}");
+    let got = menu(cx, None, vec![], DVec2::new(0.03, 0.02));
+    assert_eq!(got[..4], ["Confirm Sketch 1", "Edit image", "Switch to pic.png", "Copy sketch"], "{got:?}");
+    assert!(!got.iter().any(|l| l == "Hide Top plane"), "{got:?}");
+    let got = menu(cx, None, vec![], DVec2::new(-0.01, -0.03));
+    assert!(!got.iter().any(|l| l == "Edit image"), "{got:?}");
+    // Edit image: the picker, on Current document; its file replaces the picture in the same box, at its aspect.
+    cx.update(|cx| view.update(cx, |v, cx| v.edit_image(img, cx)));
+    draw(cx, window);
+    let on_libraries = cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.insert_dialog_open());
+        v.ui_ref().and_then(|u| u.insert_panel.as_ref()).map(|(p, _)| p.read(cx).in_libraries())
+    });
+    assert_eq!(on_libraries, Some(false));
+    let (name, aspect, tool) = cx
+        .update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.load_image_bytes("tall.png".into(), png(2, 4), w, cx);
+                let d = v.sketch_data(cx).unwrap();
+                let pts: Vec<DVec2> = d.images[0].box_points.iter().map(|p| d.sketch.point(noshape_sketch::EntityId(*p)).unwrap()).collect();
+                let size = pts[2] - pts[0];
+                (d.images[0].name.clone(), size.x / size.y, v.sketch.as_ref().unwrap().tool)
+            })
+        })
+        .unwrap();
+    assert_eq!((name.as_str(), tool), ("tall.png", Tool::Select));
+    assert!((aspect - 0.5).abs() < 1e-6, "{aspect}");
+}
+
 /// Live psui 2160 (sketch-dim-rclick-menu): a right-click on a dimension's label gives Change to driven dimension, then
 /// the sketch's rows (Confirm, Copy sketch, Show all, analysis, Select, Select other…, Zoom to fit, View normal) and
 /// Delete dimension last (Add comment, a cloud item, left out).
@@ -7084,6 +7164,135 @@ fn use_on_a_corner_from_above_offers_an_edge_across_the_screen(cx: &mut TestAppC
         (edge, (ends[1] - ends[0]).abs())
     });
     assert!(span.max_element() > 20.0 && span.x >= span.y, "{edge:?}: on screen {span:?}, an edge running across it (live: the edge along x)");
+}
+
+/// qa FLOW-USE-OWN-FACE-REFUSED (live behaviours "Use (u) on the face projected only its 4 outer edges"): in a sketch
+/// on the block's top face, Use with the pointer inside that face uses its outer loop.
+#[gpui::test]
+fn use_inside_the_sketchs_own_face_uses_its_outline(cx: &mut TestAppContext) {
+    let (window, view, _, _, _, _) = sketch_on_top_face(cx, "use-own-face", Tool::Use);
+    let c = block_centre(cx, &view);
+    let p = on_screen(cx, &view, c);
+    // The face the sketch is on, as the GPU picks it under the pointer.
+    let face_pick = cx.update(|cx| {
+        let v = view.read(cx);
+        let frame = v.sketch.as_ref().unwrap().frame;
+        let body = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let top = body.face_refs.iter().find(|r| v.frame_of_ref(r).is_some_and(|f| (f.origin - frame.origin).dot(frame.normal).abs() < 1e-9 && f.normal.dot(frame.normal).abs() > 0.999)).expect("the top face").clone();
+        v.built.as_ref().unwrap().picks.ids_for(&top).first().copied().expect("the top face is pickable")
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(p));
+            v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: p, modifiers: Modifiers::default() }, w, cx);
+            v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(face_pick)), w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let hovered = cx.update(|cx| {
+        let v = view.read(cx);
+        let gpu = v.ui.sketch_gpu_hover;
+        let refs = gpu.map(|(g, r)| [g, r].map(|i| i.and_then(|i| v.built.as_ref()?.picks.get(i).map(|t| t.reference.clone()))));
+        format!("hover {:?}, gpu {gpu:?} -> {refs:?}", v.hover)
+    });
+    click(cx, window, &view, (p.x, p.y));
+    let (lines, message) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let lines = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && e.external).count();
+        (lines, v.sketch.as_ref().unwrap().message.clone())
+    });
+    assert_eq!((lines, message), (4, None), "{hovered}");
+}
+
+/// qa FLOW-USE-OWN-FACE-REFUSED (flow 58-encl-lip): in a sketch on a filleted, shelled box's rim, Use on the rim uses its
+/// outer loop (4 lines, 4 arcs).
+#[gpui::test]
+fn use_on_a_shelled_boxs_rim_uses_its_outer_loop(cx: &mut TestAppContext) {
+    let (window, view, rim) = sketch_on_shelled_rim(cx, "use-shelled-rim");
+    let (used, message, hovered) = use_at(cx, window, &view, glam::DVec3::new(0.001, 0.02, 0.03), &rim);
+    assert_eq!((used, message), (8, None), "{hovered}");
+}
+
+/// qa FLOW-USE-OWN-FACE-REFUSED (cell 58 replayed: the click on the 7 px rim took its outer edge's midpoint, 3.6 px
+/// off): Use on a model edge's midpoint uses the edge (live behaviours "Use (U) on model edges": the midpoint dot lights
+/// with its edge; a click projects it).
+#[gpui::test]
+fn use_on_a_model_edges_midpoint_uses_the_edge(cx: &mut TestAppContext) {
+    let (window, view, _) = sketch_on_shelled_rim(cx, "use-edge-midpoint");
+    let edge = cx.update(|cx| {
+        let v = view.read(cx);
+        let body = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        let (r, _) = body.edge_refs.iter().zip(&body.mesh.edges).find(|(_, pl)| pl.iter().all(|p| p[0].abs() < 1e-7 && (p[2] - 0.03).abs() < 1e-7)).expect("the rim's outer edge at x = 0");
+        r.clone()
+    });
+    let mid = Reference::Implicit { on: Box::new(edge), inference: noshape_model::reference::Inference::Midpoint };
+    // (Its pick is made once the edge is lit: what a click with it hovered runs.)
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.use_reference(mid, w, cx))).unwrap();
+    draw(cx, window);
+    let (used, message) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        (d.sketch.entities().filter(|e| e.external && e.kind() == noshape_sketch::EntityKind::Line).count(), v.sketch.as_ref().unwrap().message.clone())
+    });
+    assert_eq!((used, message), (1, None), "(lines used, message)");
+}
+
+/// A sketch on the rim of qa's enclosure (60 x 40 x 30 box, vertical edges R5, shelled 2 mm with its top removed), in
+/// the Use tool; and the rim's reference.
+fn sketch_on_shelled_rim(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>, Reference) {
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [0, 0, 15]", "edge through [60, 0, 15]", "edge through [60, 40, 15]", "edge through [0, 40, 15]"], "radius": "5 mm" } },
+        { "type": "shell", "name": "Shell 1", "params": { "entities": ["face through [30, 20, 30]"], "thickness": "2 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, name, Some(start));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.bodies.iter().any(|b| b.kind == noshape_model::display::BodyKind::Solid));
+    let rim = cx.update(|cx| {
+        let v = view.read(cx);
+        let body = v.display.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        body.face_refs.iter().find(|r| v.frame_of_ref(r).is_some_and(|f| (f.origin.z - 0.03).abs() < 1e-9 && f.normal.z > 0.999)).expect("the rim").clone()
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![rim.clone()];
+        v.start_feature("sketch", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Use, w, cx))).unwrap();
+    draw(cx, window);
+    (window, view, rim)
+}
+
+/// Use clicked at model point `at` with `target` hovered there (tests get no GPU picks): the used lines and arcs, the
+/// sketch's message, and what was hovered.
+fn use_at(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, at: glam::DVec3, target: &Reference) -> (usize, Option<String>, String) {
+    let (p, pick) = cx.update(|cx| {
+        let v = view.read(cx);
+        let p = v.viewport.read(cx).project(at).unwrap();
+        (p, v.built.as_ref().unwrap().picks.ids_for(target).first().copied().expect("the target is pickable"))
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        vp.update(cx, |vp, _| vp.place_pointer(p));
+        v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: p, modifiers: Modifiers::default() }, w, cx);
+        v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(pick)), w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let hovered = cx.update(|cx| format!("hover {:?} (target {target:?})", view.read(cx).hover));
+    click(cx, window, view, (p.x, p.y));
+    let (used, message) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let used = d.sketch.entities().filter(|e| e.external && matches!(e.kind(), noshape_sketch::EntityKind::Line | noshape_sketch::EntityKind::Arc)).count();
+        (used, v.sketch.as_ref().unwrap().message.clone())
+    });
+    (used, message, hovered)
 }
 
 /// Live sketch-tools-1123 use-convert (qa SKT-USE-HOVER use-3-hover-used-edge): hovering an already-used edge's middle

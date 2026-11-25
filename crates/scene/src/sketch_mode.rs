@@ -839,6 +839,8 @@ pub struct SketchEditor {
     pattern_label_wpp: f64,
     /// Insert image: the chosen file (name, bytes, width / height) waiting for its rectangle.
     pub pending_image: Option<(String, Vec<u8>, f64)>,
+    /// Edit image: the image the picker's file replaces (instead of a new one placed).
+    pub editing_image: Option<u32>,
     /// Insert DXF: meters per drawing unit (`None`: the file's units, else millimeters).
     pub dxf_unit_scale: Option<f64>,
     /// Insert DXF: keep the file origin at the sketch origin (else center the drawing).
@@ -1660,6 +1662,7 @@ impl SketchEditor {
             extend_crossed: false,
             extend_end: None,
             pending_image: None,
+            editing_image: None,
             dxf_unit_scale: None,
             dxf_use_origin: false,
             editing_pattern: None,
@@ -1729,6 +1732,9 @@ impl SketchEditor {
         if self.tool.draws() || self.tool == Tool::Dimension || left_pattern {
             self.selection.clear();
             self.selected_constraints.clear();
+        }
+        if self.tool != Tool::InsertImage {
+            self.editing_image = None;
         }
         self.clicks.clear();
         self.chain_end = None;
@@ -8473,7 +8479,7 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
 }
 
 /// The image whose picture covers `p`: its bottom box line and its box corners where they are.
-fn image_under(data: &SketchData, p: DVec2) -> Option<(EntityId, Vec<(EntityId, DVec2)>)> {
+pub fn image_under(data: &SketchData, p: DVec2) -> Option<(EntityId, Vec<(EntityId, DVec2)>)> {
     data.images.iter().rev().find_map(|img| {
         let points: Vec<(EntityId, DVec2)> = img.box_points.iter().filter_map(|q| Some((EntityId(*q), data.sketch.point(EntityId(*q))?))).collect();
         let n = points.len();

@@ -131,6 +131,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("sketch_text", &[r##"{"sketch": "Sketch 1", "text": "REV A", "corner": [0, 0], "height": "5 mm"}"##]),
     ("sketch_insert_dxf", &[r##"{"sketch": "Sketch 1", "file": "/tmp/outline.dxf", "units": "Millimeter"}"##]),
     ("sketch_insert_image", &[r##"{"sketch": "Sketch 1", "file": "/tmp/logo.png", "points": [[0, 0], [40, 20]]}"##]),
+    ("sketch_edit_image", &[r##"{"sketch": "Sketch 1", "entity": "entity:…", "file": "/tmp/logo2.png"}"##]),
     // variables, configurations
     ("sheetmetal_table", &[r##"{}"##, r##"{"model": "Sheet metal model 1"}"##]),
     ("sheetmetal_edit_bend", &[r##"{"bend": "Bend A", "radius": "3 mm"}"##, r##"{"bend": 0, "k_factor": 0.45}"##]),

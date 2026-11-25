@@ -40,7 +40,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     // the whole sketch: c2-hunting-knife's Extrude 1 0.02 mm deeper slid Sketch 6's mirrored groove 2.3 mm along the
     // blade under the one-at-a-time placement, and Extrude 3 then cut away the corner Sketches 7, 8 and 11 use.
     let held = !(data.external_refs.is_empty() && data.intersections.is_empty()) && sk.holds();
-    let mut missing = 0;
+    let mut lost_ids = Vec::new();
     let mut silhouettes: BTreeMap<String, Vec<noshape_sketch::Curve2>> = BTreeMap::new();
     for (eid, r) in &data.external_refs {
         let id = noshape_sketch::EntityId(*eid);
@@ -55,7 +55,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                 Some(c) => {
                     let _ = sk.set_point(id, frame.to_local(c.origin));
                 }
-                None => missing += 1,
+                None => lost_ids.push(id),
             }
             continue;
         }
@@ -65,7 +65,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                 Some(p) => {
                     let _ = sk.set_point(id, frame.to_local(p));
                 }
-                None => missing += 1,
+                None => lost_ids.push(id),
             }
             continue;
         }
@@ -77,7 +77,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         if !curved_face && let Some(pl) = (!matches!(r, crate::reference::Reference::Edge(_))).then(|| ev.resolve_plane(r)).flatten() {
             match plane_trace(&pl, &frame) {
                 Some((p, d)) => update_trace(&mut sk, id, p, d),
-                None => missing += 1,
+                None => lost_ids.push(id),
             }
             continue;
         }
@@ -89,17 +89,15 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                 silhouettes.insert(key.clone(), sil);
             }
             let cands: Vec<SectionCurve> = silhouettes[&key].iter().cloned().map(SectionCurve::Exact).collect();
-            if cands.is_empty() {
-                missing += 1;
-            } else {
-                missing += update_intersection(&mut sk, &[*eid], &cands);
+            if cands.is_empty() || update_intersection(&mut sk, &[*eid], &cands) > 0 {
+                lost_ids.push(id);
             }
             continue;
         }
         // Entities of other sketches are used like model edges / vertices.
         let edge = if let crate::reference::Reference::SketchEntity { .. } = r {
             let Some(shape) = crate::regen::measure::resolve_shapes(&ev.ctx, r).into_iter().next() else {
-                missing += 1;
+                lost_ids.push(id);
                 continue;
             };
             if let Ok(p) = shape.vertex_point() {
@@ -110,7 +108,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
         } else {
             let edges = ev.resolve_edges(std::slice::from_ref(r));
             let Some(&(bi, ei)) = edges.first() else {
-                missing += 1;
+                lost_ids.push(id);
                 continue;
             };
             let Ok(edge) = ev.edge_shape(bi, ei) else { continue };
@@ -123,7 +121,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                     let (t0, t1) = c.domain();
                     let _ = sk.set_point(id, c.point(if at_end { t1 } else { t0 }));
                 }
-                _ => missing += 1,
+                _ => lost_ids.push(id),
             }
             continue;
         }
@@ -133,7 +131,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                 Some(p) => {
                     let _ = sk.set_point(id, p);
                 }
-                None => missing += 1,
+                None => lost_ids.push(id),
             }
             continue;
         }
@@ -143,6 +141,21 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
                 update_intersection(&mut sk, &[*eid], &[sampled]);
             }
             None => {}
+        }
+    }
+    // Live (skasm plane-use-1125 (10)): a used entity whose source is gone stays where it was, as free geometry (drawn
+    // blue); points it shares with geometry still used stay fixed.
+    let missing = lost_ids.len();
+    if missing > 0 {
+        let lost: std::collections::HashSet<_> = lost_ids.iter().copied().collect();
+        let kept: std::collections::HashSet<_> = sk.entities().filter(|e| e.external && !lost.contains(&e.id)).flat_map(|e| e.point_refs()).collect();
+        for id in lost_ids {
+            let points = sk.entity(id).map(|e| e.point_refs()).unwrap_or_default();
+            for p in points.into_iter().filter(|p| !held.contains(p)).chain([id]) {
+                if let Some(e) = sk.entity_mut(p) {
+                    e.external = false;
+                }
+            }
         }
     }
     // Re-section intersected faces so intersection curves follow the model.

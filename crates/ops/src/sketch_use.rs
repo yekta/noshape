@@ -108,6 +108,11 @@ impl Model<'_> {
     /// Use tool preview of a hovered reference: the projected curves,
     /// tessellated to `tol`.
     pub fn use_preview(&self, r: &Reference, tol: f64) -> Vec<Vec<DVec2>> {
+        if let Reference::Implicit { on, inference: Inference::Midpoint } = r
+            && matches!(**on, Reference::Edge(_))
+        {
+            return self.use_preview(on, tol);
+        }
         let frame = self.frame;
         let mut out = Vec::new();
         // A curved face previews its silhouettes.
@@ -117,7 +122,7 @@ impl Model<'_> {
             }
             return out;
         }
-        let refs = if matches!(r, Reference::SketchEntity { .. }) { vec![r.clone()] } else { self.edge_refs(r) };
+        let refs = if matches!(r, Reference::SketchEntity { .. }) { vec![r.clone()] } else { self.outer_edge_refs(r) };
         for er in refs {
             let shapes = self.shapes(&er);
             match shapes.first().and_then(|e| sk_feat::project_edge_any(e, frame)) {
@@ -175,6 +180,9 @@ pub fn external_entity(data: &mut SketchData, model: Model, world_per_px: f64, c
             Made::Point(frame.to_local(p))
         } else if pierce {
             Made::Point(sk_feat::pierce_point(&sh, frame)?)
+        } else if sh.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && (frame.to_local(i.end) - frame.to_local(i.start)).length() < 1e-9) {
+            // Live (skasm plane-use-1125 (12)): a straight edge seen end-on is used as a point, where it meets the plane.
+            Made::Point(sk_feat::pierce_point(&sh, frame)?)
         } else {
             Made::Curves(vec![sk_feat::project_edge_any(&sh, frame)?])
         }
@@ -214,9 +222,12 @@ pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cur
         Reference::Origin | Reference::Vertex(_) | Reference::MeshPoint { .. } | Reference::SketchEntity { .. } | Reference::Edge(_) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         // A circular edge's centre (live: a point Use on a hole's centre, bracket03-mattie's Sketch 2).
         Reference::Implicit { on, inference: Inference::Center | Inference::CenterRim | Inference::CenterOutward } if matches!(**on, Reference::Edge(_)) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
+        // Live (behaviours "Use (U) on model edges": the midpoint dot lights with its edge; a click projects the edge).
+        Reference::Implicit { on, inference: Inference::Midpoint } if matches!(**on, Reference::Edge(_)) => use_reference(data, model, world_per_px, cursor, on),
         Reference::Face(_) if model.curved_face(r) => external_entity(data, model, world_per_px, cursor, r, false, false).is_some(),
         Reference::Face(_) => {
-            let made: Vec<EntityId> = model.edge_refs(r).iter().filter_map(|er| external_entity(data, model, world_per_px, cursor, er, false, false)).collect();
+            // Live (behaviours "Use (u) on the face projected only its 4 outer edges"): the outer loop, not the holes.
+            let made: Vec<EntityId> = model.outer_edge_refs(r).iter().filter_map(|er| external_entity(data, model, world_per_px, cursor, er, false, false)).collect();
             join_loop_ends(data, &made);
             !made.is_empty()
         }

@@ -2,7 +2,7 @@
 //! dimensions, links to external 3D geometry, text boxes and UI placement).
 
 use crate::reference::Reference;
-use noshape_sketch::{EntityId, Sketch};
+use noshape_sketch::{ConstraintKind, EntityId, Sketch};
 use noshape_units::ExprValue;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -302,6 +302,22 @@ impl SketchData {
         Ok(id)
     }
 
+    /// Edit image: image `id` shows another file in the same box, which takes
+    /// the new file's aspect ratio.
+    pub fn replace_image(&mut self, id: u32, name: &str, bytes: &[u8], aspect: f64) -> Result<(), String> {
+        if bytes.is_empty() {
+            return Err("The image file is empty".into());
+        }
+        let img = self.images.iter_mut().find(|i| i.id == id).ok_or("The image no longer exists")?;
+        img.name = name.to_string();
+        img.data_base64 = base64_encode(bytes).into();
+        let Some(c) = img.ratio_constraint.map(noshape_sketch::ConstraintId) else { return Ok(()) };
+        let Some(ConstraintKind::LengthRatio { a, b, .. }) = self.sketch.constraint(c).map(|c| c.kind.clone()) else { return Ok(()) };
+        self.sketch.retarget_constraint(c, ConstraintKind::LengthRatio { a, b, ratio: aspect }).map_err(|e| e.to_string())?;
+        self.sketch.solve();
+        Ok(())
+    }
+
     /// The image whose box contains entity `e`.
     pub fn image_of_entity(&self, e: EntityId) -> Option<u32> {
         self.images.iter().find(|i| i.box_points.contains(&e.0) || i.box_lines.contains(&e.0)).map(|i| i.id)
@@ -405,6 +421,12 @@ mod image_tests {
         d.sketch.solve();
         let bb = d.sketch.bbox();
         assert!((bb.size().x - 0.04).abs() < 1e-9 && (bb.size().y - 0.02).abs() < 1e-9);
+        // Edit image: the new file in the same box, at its aspect.
+        d.replace_image(id, "b.png", &[4, 5], 0.5).unwrap();
+        d.sketch.solve();
+        let bb = d.sketch.bbox();
+        assert_eq!((d.images[0].name.as_str(), &*d.images[0].data_base64), ("b.png", &*base64_encode(&[4, 5])));
+        assert!((bb.size().x / bb.size().y - 0.5).abs() < 1e-6, "{:?}", bb.size());
         d.sketch.remove_entities(&[EntityId(img.box_lines[1])]);
         d.prune_images();
         assert!(d.images.is_empty());

@@ -830,6 +830,12 @@ fn sketch_use_intersection_and_model_references() {
     let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": ["origin"] }));
     let p = created(&used, "point");
     assert!(p.len() == 1 && p[0]["external"] == true && near(&p[0]["at"], 0.0, 0.0), "{used}");
+    // A vertical edge (seen end-on) used: a point at its foot, linked to it (live skasm plane-use-1125 (12)).
+    let upright = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }))["edges"].as_array().unwrap().iter().find(|e| num(&e["direction"][2]).abs() > 0.99).unwrap()["id"].as_str().unwrap().to_string();
+    let used = call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [upright] }));
+    let p = created(&used, "point");
+    assert!(p.len() == 1 && p[0]["external"] == true && created(&used, "line").is_empty(), "{used}");
+    assert!((num(&p[0]["at"][0]).abs() - 10.0).abs() < 1e-6 && (num(&p[0]["at"][1]).abs() - 10.0).abs() < 1e-6, "{used}");
     // A boss's centre used (a circular edge's implicit centre): a point there, linked to it.
     let s5 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top", "name": "Boss" }))["sketch"].as_str().unwrap().to_string();
     call(&mut ctx, "sketch_draw", json!({ "sketch": s5, "tool": "circle", "points": [[3, 4], [5, 4]] }));
@@ -864,6 +870,35 @@ fn sketch_use_intersection_and_model_references() {
     // Its history entry names the feature (live ver-history-entry-per-edit).
     let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
     assert!(last.ends_with(":: Suppress : Extrude 1"), "{last}");
+}
+
+/// qa FLOW-USE-OWN-FACE-REFUSED (enclosure flow): Use on the sketch's own face, the rim of a shelled box, projects its
+/// outer loop only (live behaviours "Use (u) on the face projected only its 4 outer edges").
+#[test]
+fn use_on_the_sketchs_own_rim_face_projects_its_outer_loop() {
+    // Plain, and with qa's R5 corner fillets before the Shell.
+    for fillet in [false, true] {
+        let mut ctx = Ctx::new();
+        let sk = new_sketch(&mut ctx, &format!("use-rim-{fillet}.noshape"), "plane:top");
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "30 mm" } }));
+        if fillet {
+            let edges = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "line" }));
+            let vertical: Vec<String> = edges["edges"].as_array().unwrap().iter().filter(|e| num(&e["direction"][2]).abs() > 0.99).map(|e| e["id"].as_str().unwrap().to_string()).collect();
+            call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": vertical, "radius": "5 mm" } }));
+        }
+        let top = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "shell", "params": { "entities": [top], "thickness": "2 mm" } }));
+        let rim = call(&mut ctx, "query_entities", json!({ "kind": "faces", "normal": [0, 0, 1], "near": [1, 15, 30] }))["faces"][0]["id"].as_str().unwrap().to_string();
+        let s2 = call(&mut ctx, "sketch_create", json!({ "plane": rim.clone() }))["sketch"].as_str().unwrap().to_string();
+        let used = try_call(&mut ctx, "sketch_use", json!({ "sketch": s2, "references": [rim] })).unwrap_or_else(|e| panic!("fillet {fillet}: {}", e.to_json()));
+        let (lines, arcs) = (created(&used, "line"), created(&used, "arc"));
+        assert!(lines.len() == 4 && arcs.len() == if fillet { 4 } else { 0 } && lines.iter().all(|l| l["external"] == true), "fillet {fillet}: {used}");
+        let side = if fillet { 30.0 } else { 40.0 };
+        let long = lines.iter().filter(|l| ((num(&l["end"][0]) - num(&l["start"][0])).hypot(num(&l["end"][1]) - num(&l["start"][1])) - side).abs() < 1e-6).count();
+        assert_eq!(long, 2, "fillet {fillet}: the outer loop, not the inner one: {used}");
+    }
 }
 
 /// Offset of model edges (live: the sketch Offset tool on a block's top edges): the copies stay linked to the edges
@@ -956,6 +991,16 @@ fn sketch_text_and_imports() {
     call(&mut ctx, "sketch_insert_image", json!({ "sketch": sk, "file": img.to_str().unwrap(), "points": [[0, -20], [8, -16]] }));
     let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
     assert_eq!(st["images"][0]["name"], "pic.png", "{st}");
+    // Edit image: another file in the same box, at its aspect (1:2 here).
+    let png = noshape_scene::png::encode_png(vec![255; 2 * 4 * 4], 2, 4, 2, 4).unwrap();
+    let img2 = scratch("pic2.png");
+    std::fs::write(&img2, png).unwrap();
+    let edge = st["images"][0]["box_lines"][0].clone();
+    call(&mut ctx, "sketch_edit_image", json!({ "sketch": sk, "entity": edge, "file": img2.to_str().unwrap() }));
+    let st = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    assert_eq!(st["images"][0]["name"], "pic2.png", "{st}");
+    let e = try_call(&mut ctx, "sketch_edit_image", json!({ "sketch": sk, "entity": created(&d, "line")[0]["id"].clone(), "file": img2.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("entity"));
     let e = try_call(&mut ctx, "sketch_insert_image", json!({ "sketch": sk, "file": "/nonexistent.png", "points": [[0, 0], [1, 1]] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("file"));
 }

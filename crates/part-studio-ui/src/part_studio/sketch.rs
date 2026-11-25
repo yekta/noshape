@@ -3706,7 +3706,10 @@ impl PartStudioView {
             return None;
         }
         if self.ui_ref().is_some_and(|u| u.insert_panel.is_none()) {
+            // Edit image opens on Current document, at the image's file tab (live spline-image-1125 (9)).
+            let editing = self.sketch.as_ref().and_then(|e| e.editing_image).and_then(|id| Some(self.sketch_data(cx)?.images.iter().find(|i| i.id == id)?.name.clone()));
             let doc = self.doc.read(cx);
+            let value = editing.and_then(|name| doc.session.doc.tabs.iter().find(|t| matches!(&t.content, noshape_model::document::TabContent::File(f) if f.file_name == name)).map(|t| t.id.to_string())).unwrap_or_default();
             let setup = crate::select_item::PanelSetup {
                 mode: crate::select_item::PanelMode::Reference(if image { noshape_model::params::ReferenceKind::Image } else { noshape_model::params::ReferenceKind::Drawing2d }),
                 sources: crate::fs_reference::sources(&doc.session.doc, "", |_| Vec::new()),
@@ -3714,7 +3717,7 @@ impl PartStudioView {
                 doc_path: Some(doc.session.path.clone()),
                 except: String::new(),
                 gpu: None,
-                value: String::new(),
+                value,
                 // Live 1726: Insert image's Libraries (Onshape images ›
                 // Environment maps).
                 libraries: image,
@@ -3748,7 +3751,7 @@ impl PartStudioView {
                             this.insert_file_tab(&v, window, cx);
                         }
                     }
-                    E::LibraryImage(name) => this.insert_library_image(name, cx),
+                    E::LibraryImage(name) => this.insert_library_image(name, window, cx),
                     E::PickedAll(_) => {}
                     E::Close => this.set_tool(Tool::Select, cx),
                     E::ImportFile => this.import_insert_file(image, window, cx),
@@ -3822,7 +3825,7 @@ impl PartStudioView {
         let Some(f) = self.insert_source(key, cx) else { return };
         let Some(bytes) = f.bytes() else { return };
         if self.sketch.as_ref().is_some_and(|e| e.tool == Tool::InsertImage) {
-            self.load_image_bytes(f.file_name.clone(), bytes, cx);
+            self.load_image_bytes(f.file_name.clone(), bytes, window, cx);
         } else {
             self.insert_dxf_bytes(&bytes, window, cx);
         }
@@ -3830,12 +3833,12 @@ impl PartStudioView {
 
     /// Libraries › Environment maps › [Done]: the image goes to "Draw image
     /// rectangle." as a file's would; no tab is added (live 1726).
-    fn insert_library_image(&mut self, name: &str, cx: &mut Context<Self>) {
+    fn insert_library_image(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let Some(img) = crate::part_studio::environment_maps::generate(name) else { return };
         let Some(buf) = image::RgbaImage::from_raw(img.width, img.height, img.rgba) else { return };
         let mut png = Vec::new();
         if buf.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).is_ok() {
-            self.load_image_bytes(format!("{name}.png"), png, cx);
+            self.load_image_bytes(format!("{name}.png"), png, window, cx);
         }
     }
 
@@ -3858,7 +3861,7 @@ impl PartStudioView {
                             noshape_ops::import::add_file_tab(d, tab, None, None);
                         }));
                         if image {
-                            this.load_image_bytes(name, bytes, cx);
+                            this.load_image_bytes(name, bytes, window, cx);
                         } else {
                             this.insert_dxf_bytes(&bytes, window, cx);
                         }
@@ -3894,10 +3897,33 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn load_image_bytes(&mut self, name: String, bytes: Vec<u8>, cx: &mut Context<Self>) {
+    /// Edit image: the Insert image picker again; the file picked replaces image `id` in its box.
+    fn edit_image(&mut self, id: u32, cx: &mut Context<Self>) {
+        self.set_tool(Tool::InsertImage, cx);
+        if let Some(ed) = &mut self.sketch
+            && ed.tool == Tool::InsertImage
+        {
+            ed.editing_image = Some(id);
+        }
+    }
+
+    fn load_image_bytes(&mut self, name: String, bytes: Vec<u8>, window: &mut Window, cx: &mut Context<Self>) {
         match image::load_from_memory(&bytes).map(|img| img.to_rgba8()) {
             Ok(img) if img.width() > 0 && img.height() > 0 => {
                 let (w, h) = (img.width(), img.height());
+                if let Some(id) = self.sketch.as_ref().and_then(|e| e.editing_image) {
+                    let aspect = w as f64 / h as f64;
+                    let done = self.with_sketch(cx, |ed, data| {
+                        ed.set_tool(Tool::Select);
+                        data.replace_image(id, &name, &bytes, aspect)
+                    });
+                    match done {
+                        Some(Err(e)) => self.message = Some((FeatureStatus::Error, e)),
+                        Some(Ok(())) => self.apply_outcome(EditOutcome { changed: true, redraw: true }, window, cx),
+                        None => {}
+                    }
+                    return;
+                }
                 let picture = noshape_render::ImageData { corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], width: w, height: h, rgba: img.into_raw() };
                 IMAGE_PREVIEW.with_borrow_mut(|p| *p = Some((bytes.as_ptr() as usize, picture, None)));
                 if let Some(ed) = &mut self.sketch {
@@ -5936,7 +5962,13 @@ impl PartStudioView {
         // A plane under the cursor (live ui-parity sketch-empty-rclick-menu: the Front plane behind the sketch). The
         // sketch's own plane never hovers, yet with nothing else there it takes the right-click and is lit while the
         // menu is open (live qa walk 5 b-rclick-75-40, ctx-menus-1117 sk-empty, sk-tool-line-active).
-        let own_plane = self.hover.is_none().then(|| self.own_plane_under_pointer(cx)).flatten();
+        // A picture covers the plane: its own menu (live spline-image-1125 (9)).
+        let image_at_cursor = self.sketch_data(cx).and_then(|d| {
+            let ed = self.sketch.as_ref()?;
+            let (bottom, _) = crate::sketch_mode::image_under(&d, ed.cursor?)?;
+            d.image_of_entity(bottom)
+        });
+        let own_plane = (self.hover.is_none() && image_at_cursor.is_none()).then(|| self.own_plane_under_pointer(cx)).flatten();
         // While a spline is drawn no plane is lit (live2 11-17 tools-planes), yet its menu is the plane's under the
         // pointer (live sketch-spline-menu-confirm: Hide Front plane): the pick there.
         let drawing = self.sketch.as_ref().is_some_and(|s| s.tool.draws());
@@ -5978,6 +6010,18 @@ impl PartStudioView {
         let all_curves = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_some())));
         let only_endpoints = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_none() && !d.sketch.users_of_point(*e).is_empty())));
         let has_clip = Self::clipboard_has_sketch_entities(cx);
+        // Live (spline-image-1125): a selected spline's menu starts with Insert spline points; an image's (its edge
+        // selected, or nothing hit on the picture) has Edit image and Switch to <its file tab> after Confirm.
+        let (spline_sel, image_menu) = self.sketch_data(cx).zip(self.sketch.as_ref()).map(|(d, ed)| {
+            let spline = n == 1 && !tool_active && matches!(d.sketch.kind(ed.selection[0]), Some(noshape_sketch::EntityKind::FitSpline | noshape_sketch::EntityKind::BSpline));
+            let image = if n == 0 { image_at_cursor.filter(|_| hovered.is_none() && dim.is_none()) } else { ed.selection.iter().find_map(|e| d.image_of_entity(*e)) };
+            let image = image.filter(|_| !tool_active).and_then(|id| {
+                let name = d.images.iter().find(|i| i.id == id)?.name.clone();
+                let tab = self.doc.read(cx).session.doc.tabs.iter().find(|t| matches!(&t.content, noshape_model::document::TabContent::File(f) if f.file_name == name)).map(|t| (t.id, t.name.clone()));
+                Some((id, tab))
+            });
+            (spline, image)
+        }).unwrap_or_default();
         if let Some(h) = added
             && let Some(ed) = &mut self.sketch
         {
@@ -6041,7 +6085,16 @@ impl PartStudioView {
                 };
                 m = if tool == Tool::Spline { m.item(item("Confirm spline", confirm())) } else { m.item(item("Confirm bezier", confirm())) };
             }
+            if spline_sel {
+                m = m.item(item("Insert spline points", Box::new(|this, _, cx| this.set_tool(Tool::SplinePoint, cx))));
+            }
             m = m.item(item(&format!("Confirm {sketch_name}"), Box::new(|this, window, cx| this.accept_edit(false, window, cx))));
+            if let Some((id, tab)) = image_menu.clone() {
+                m = m.item(item("Edit image", Box::new(move |this, _, cx| this.edit_image(id, cx))));
+                if let Some((tab, name)) = tab {
+                    m = m.item(item(&format!("Switch to {name}"), Box::new(move |_, _, cx| cx.emit(super::PartStudioEvent::ActivateTab(tab)))));
+                }
+            }
             m = m.separator();
             // Live Onshape order (sketch/31, 37, 204): Confirm | Use | copy &
             // transform | analysis | selection | zoom & view | delete.

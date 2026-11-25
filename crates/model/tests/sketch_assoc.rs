@@ -385,6 +385,46 @@ fn a_used_edge_follows_the_model_and_the_face_sketch_rises_with_it() {
     assert!((len - 0.12).abs() < 1e-9 && (y + 0.025).abs() < 1e-9, "it follows the wider block: len {len} y {y}");
 }
 
+/// Live (skasm plane-use-1125 (10)): a used edge whose source is gone (its extrude suppressed) stays where it was, as
+/// free geometry drawn blue (not external), and the sketch warns.
+#[test]
+fn a_lost_used_edge_stays_as_free_geometry() {
+    let (mut ps, units) = block();
+    let r = regen(&ps, &units);
+    let frame = PlaneFrame::TOP;
+    let (edge, line) = r.context.bodies[0].edges.iter().find_map(|n| {
+        let shape = noshape_model::regen::measure::resolve_shapes(&r.context, &Reference::Edge((**n).clone())).into_iter().next()?;
+        let c = noshape_model::regen::features::sketch::project_edge(&shape, &frame)?;
+        let (a, b) = (frame.to_world(c.start_point()), frame.to_world(c.end_point()));
+        ((a.y + 0.025).abs() < 1e-9 && (b.y + 0.025).abs() < 1e-9 && (a - b).length() > 0.05).then(|| ((**n).clone(), c))
+    }).expect("a front edge");
+    let mut sk = noshape_sketch::Sketch::new();
+    let used = sk.add_line(line.start_point(), line.end_point());
+    sk.set_external(used, true).unwrap();
+    let data = SketchData { sketch: sk, external_refs: [(used.0, Reference::Edge(edge))].into_iter().collect(), ..Default::default() };
+    let mut s2 = ps.new_feature("sketch", &units).unwrap();
+    s2.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    s2.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
+    let s2_id = s2.id;
+    ps.features.push(s2);
+    let shown = |r: &noshape_model::regen::RegenResult| {
+        let d = r.display.sketches.iter().find(|s| s.feature == s2_id).unwrap();
+        let c = d.curves.iter().find(|c| c.entity == used.0).unwrap();
+        (c.external, c.state)
+    };
+    assert!(regen(&ps, &units).context.sketches.iter().any(|s| s.feature == s2_id));
+    assert!(shown(&regen(&ps, &units)).0, "used: external");
+    ps.features[1].suppressed = true;
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let f = r.display.features.iter().find(|f| f.id == s2_id).unwrap();
+    assert_eq!((f.status, f.message.as_deref()), (FeatureStatus::Warning, Some("Some external references are missing.")));
+    let (external, state) = shown(&r);
+    assert!(!external && state == noshape_model::display::SketchEntityState::Under, "lost: free, {state:?}");
+    let s = r.context.sketches.iter().find(|s| s.feature == s2_id).unwrap();
+    let c = s.sketch.curve(used).unwrap();
+    assert!((c.start_point() - line.start_point()).length() < 1e-9 && (c.end_point() - line.end_point()).length() < 1e-9, "kept where it was");
+}
+
 /// Live (skasm spline-image-1125 (4)): a spline whose end was dropped on its own start, not closed, warns.
 #[test]
 fn a_spline_ending_on_its_own_start_warns_as_live() {

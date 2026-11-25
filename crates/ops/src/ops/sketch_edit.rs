@@ -193,6 +193,13 @@ pub fn ops() -> Vec<Op> {
             vec![opt("file", s(), "Path of the image."), opt("image", s(), "An image of your images library (its `value`), instead of `file`."), req("points", json!({ "type": "array", "items": point(), "minItems": 2, "maxItems": 2 }), "[corner, opposite corner].")],
             insert_image,
         ),
+        op(
+            "edit_image",
+            "Show another file in an inserted image (Edit image)",
+            "The image's box stays where it is and takes the new file's aspect ratio (its height kept).",
+            vec![req("entity", s(), "An edge or corner of the image's box."), opt("file", s(), "Path of the new image."), opt("image", s(), "An image of your images library (its `value`), instead of `file`.")],
+            edit_image,
+        ),
     ]
 }
 
@@ -762,6 +769,21 @@ fn insert_image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         changed |= ed.tool_up(&mut t.data, *p).changed;
     }
     finish(od, t, &ed, changed, &before)
+}
+
+fn edit_image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let mut t = target(od, tab, a)?;
+    let before = existing(&t);
+    let e = parse_entity(a.get("entity").expect("required"), &mut t, false, false).map_err(|e| e.with_param("entity"))?;
+    let id = t.data.image_of_entity(e).ok_or_else(|| OpError::param("entity", "not an edge or corner of an image"))?;
+    let (name, bytes, aspect) = match a.opt_str("image")? {
+        Some(v) => library_image(v)?,
+        None => sm::load_image(std::path::Path::new(a.str("file")?)).map_err(|m| OpError::param("file", &m))?,
+    };
+    t.data.replace_image(id, &name, &bytes, aspect).map_err(|m| OpError::param("entity", &m))?;
+    let ed = editor(&t);
+    finish(od, t, &ed, true, &before)
 }
 
 /// An image of the user's images library, by its value: its file name, bytes and aspect.

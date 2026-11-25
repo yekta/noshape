@@ -3,24 +3,39 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 10:06) — read first
-- LANDED/QUEUED: 2d91090e, dc6357ae, 1ef716fa (variables wording, image width click, used-edge test).
-- IN FLIGHT (spline/image vs live/skasm/spline-image-1125): sketch solver `spline_bend` (a spline body drag bends:
-  least-change of unheld points/handles/CPs so the grabbed curve point follows; test constraints_more
-  a_splines_body_drag_bends_it_as_live); scene point_drop_target: the ORIGIN is always a level/plumb candidate (not when a
-  sibling point sits on it), a handle tip aligns with its spline end, own handle arms aren't drop targets (test
-  spline_and_bezier_drags_snap_as_live; curves_drag_as_lives count ignores the origin stand-in); Entity.image_box
-  (solid box lines, no region; model-data images_follow_their_box); image 50 % alpha outside edit (builder); image
-  middle press = DragState::Text (moves / scales when pinned; click selects nothing), box edges drag as lines; first
-  click snapped = COINCIDENT corner (test an_images_drags_scale_and_move_it_as_live); regen warning "Some of the
-  geometry intersects itself or is degenerate." for a handled spline ending on its start (model sketch_assoc
-  a_spline_ending_on_its_own_start_warns_as_live). Run bin/tspl3.sh -> ~/tmp/skasm/tspl3.log, then commit + land.
-- NEXT: spline/image right-click menus (Insert spline points, Edit image, Switch to <file>; + ops coverage); the
-  self-closed spline's edge not built (live); live plane-use-1125 answers (REQUESTS 08:52): Line angle 0° = plane through
-  the edge perpendicular to the top face, INFO bubble; Mid plane: one edge valid, edge+vertex error "Mid plane requires 2
-  points, 2 planes or 1 open edge."; 3-point no preview before 3rd point; lost Use source stays at its STORED place,
-  drawn free-blue; Use of a vertical edge = a point, slanted = projected line; plane corner drag = box select, drawn
-  size = face + ~5 mm per side.
+## NOW (11-25 10:50) — read first
+- IN FLIGHT, UNCOMMITTED in agent/skasm (lead P1 first: qa TICKETS FLOW-USE-OWN-FACE-REFUSED, then land all):
+  - FLOW-USE-OWN-FACE-REFUSED: CAUSE found (11-25 11:14, cell 58 replayed on vibex8 with a logging build): the click on
+    the 7 px rim, 3.6 px off its outer edge's middle, took that edge's Implicit Midpoint (live's 9 px square), which
+    use_reference refused. Fix: Use on an edge's midpoint uses the edge (ops use_reference + use_preview; live behaviours
+    "Use (U) on model edges"). Tests: psui use_on_a_shelled_boxs_rim_uses_its_outer_loop (rim hovered: 8 = 4 lines +
+    4 arcs), use_on_a_model_edges_midpoint_uses_the_edge; ops e2e use_on_the_sketchs_own_rim_face_projects_its_outer_loop.
+    qa's cell at that point now projects the one edge; clicking the rim off a midpoint gives the loop.
+  - Use on a face (and its preview) = OUTER loop only (sketch_use.rs outer_edge_refs; live behaviours "projected only its
+    4 outer edges").
+  - Use of a straight edge seen end-on = a point (pierce_point), live plane-use-1125 (12); e2e
+    sketch_use_intersection_and_model_references extended (fix after first try made a zero-length line: now checks
+    end-on Line before projecting; rerun pending).
+  - Lost Use source (live plane-use-1125 (10)): regen sketch.rs collects lost_ids, clears `external` on them in the
+    regenerated copy (free, blue, Under); points shared with still-used geometry stay; model sketch_assoc
+    a_lost_used_edge_stays_as_free_geometry PASSES.
+  - Menus (live spline-image-1125 (3),(9)): "Insert spline points" first on a selected spline (→ Tool::SplinePoint);
+    image edge selected or nothing hit on the picture: "Edit image", "Switch to <file tab>" after Confirm; no plane
+    items over the picture (scene `image_under` now pub). Edit image: SketchEditor.editing_image, picker opens on Current
+    document at the image's tab, pick → SketchData::replace_image (new bytes/name, LengthRatio retargeted to the new
+    aspect). ops `sketch_edit_image` + example + coverage rows (Edit image, Insert spline points); AGENT_API.md
+    regenerated (copied back from vibex6). UI test spline_and_image_menus_as_lives PASSES; model-data test extended.
+  - Checked, already as live: Line angle 0° (FS perpendicularVector, edge midpoint), Three point errors before 3rd
+    point, plane corner drag (rings only on a selected plane).
+  - Before land: rerun ops e2e sketch_use* + sketch_text_and_imports, part-studio-ui use_ + menu tests, clippy
+    (model-core, model, ops, scene, part-studio-ui); commit "skasm: Use on the sketch's own face …, spline/image menus,
+    lost Use source free, end-on edge a point"; land.
+- NEXT after this land: live/skasm/variables-1125 (live 11-25): sketch dim box refusing `5 deg`, `#a + 1`, `#a*2 + 5`
+  (no unit): Enter keeps the box open, pink (#f9ebec, inset #bd3039 underline), NO message (ours: dimension_applied's
+  last Err arm sets an Error message); `#nope`+Enter → Create variable; Esc drops the text. Variable renames follow, with
+  "Update all references" (ticked; unticked breaks them). Variable value `5 deg` accepted, Variable 1 ERROR
+  "Cannot use 5 deg (angle) as length.".
+- QUEUED 5657c008 (spline/image drags) — see git log.
 - QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
   plane resize after ✓ is already in behaviours "icons2 plane resize rules".
 - DROPPED (lead 11-25): the ops center_point_arc P1; core fixed it in db2fd8e7 (my ops edits reverted).
