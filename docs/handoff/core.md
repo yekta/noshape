@@ -11,8 +11,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Running (bg, ~50 min from 15:2x): branch **core-bis** in core-rf (HEAD = probe commit "BISECT PROBE (never land)",
   then this handoff commit), .pa2.sh on vibex7: arm keep (NOSHAPE_BIS_KEEP_USE=1) then free; results
   ~/tmp/core/sc/d-keep, d-free, pa-*.out. Keep fixes them -> hand to skasm (ids roster.md) with the evidence; else
-  bisect the other commits 57be5890b..bed5d200b. Afterwards: git checkout core-trial, cherry-pick this handoff commit
-  only (never the probe), delete core-bis. CLI st.py on the saved doc is NOT usable (in-context refs lost on save).
+  bisect the other commits 57be5890b..bed5d200b. Afterwards: git checkout core-trial, cherry-pick the handoff commits
+  (git log core-trial..core-bis -- docs; never the probe ac54df4ef), delete core-bis. CLI st.py on the saved doc is NOT usable (in-context refs lost on save).
 - **NEXT after the bisect: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
   confirms, our UI must show the blue banner "Parameters have been overridden. Check input." (on reopen; live
   behaviours ~33077) and the feature row's Info state; today only the op reports Info (dialog, row OK, tooltip plain).
@@ -154,9 +154,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (3 plain Ø2.2 holes, 3704.237 -> 3745.156 mm³, offset faces 454.835 -> 454.462 mm²); at false live leaves the part
   unchanged; ours offsets at false (dx's translation). Check our offset against the true numbers once dx has that input.
   Shell 1 is dx's. Extrude 55 (3.8 s vs 333 ms) is bool's fuse / unify.
-- **e53bba:** bool's slit re-cut; then re-test the band-end patch vibe5 (down 11-17) ~/agents/core-keep/e53bba-band-end.patch.
-- **c2-hunting-knife feature 24:** live's own lines disagree (16-23 LINE, 24 OTHER, no geometry change); live asked
-  in REQUESTS.md (11-15 00:45) to refetch 15-24 in one session.
+- **c2-hunting-knife f24:** live's lines disagree (16-23 LINE, 24 OTHER); refetch 15-24 asked (REQUESTS 11-15 00:45).
 
 ## Next, in order
 0. **BLEND-FAILS-1125** (lead 11-25 14:1x; blend parked): Fillets/Chamfers that fail in ours and build in live. Sources: model

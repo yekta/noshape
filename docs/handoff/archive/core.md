@@ -4937,3 +4937,5 @@ skasm meanwhile; I'll list what I change here before landing.
    psui/studios commits: rebased with --onto (only core's). Green on vibex7: model 628, model-core, model-data, scene,
    custom, psui 526, ops e2e. After it lands: tell qa to rescore errors-1123 core rows + APPEAR-SPLIT/PATTERN; ask dx
    to rerun the hose x_t.
+
+- (moved 11-25) **e53bba:** bool's slit re-cut; then re-test the band-end patch vibe5 (down 11-17) ~/agents/core-keep/e53bba-band-end.patch.
