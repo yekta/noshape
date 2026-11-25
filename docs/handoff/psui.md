@@ -189,10 +189,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (f6da23b36 PART_EDGE_INK 0.85), "fixed, to verify" for qa; nothing left for me.
   maker-io-1125 DONE (queued 86ade867): Derived multi-part pick fixed ("tab#p1,p2"); names/Custom fields tested;
   bubble no change; core rows routed by the lead. Open: live's click on an already-picked part (ours: no change).
-  18:37 (lead 18:3x): FIRST-WEEK-ISOLATE: PS Isolate already = live (panel controls, others pale at
-  isolate_alpha(knob) 0.27 vs live ~0.30, Esc restores); test isolate_pales_the_other_parts_and_esc_gives_their_colours_back.
-  FEEL-ASM-ORIGIN-ROW-HOVER: fixed by asm ede393a3b, feel doc row was stale -> "="; test
-  hovering_the_origin_row_lights_the_origin. Next: the ring when live answers REQUESTS "psui 11-25 18:10".
+  18:37: FIRST-WEEK-ISOLATE + FEEL-ASM-ORIGIN-ROW-HOVER already = live, T1s added (queued 5a6910ab).
+  18:4x (lead): hover matrix 7 cells (qa b27f45603 on green e34c6b838): as-mc-selhover already fixed 950a10c7e and
+  qa-verified 13:2x (131/137); the other 6 (b1-mid-hovered[-other-selected], ps-linemid-hovered[...], ps-arc-hovered[...])
+  are live's single-jump cells (feel doc: "not scored"; behaviours l.270-273): qa should score them with a stepped
+  approach (live mid-paths shots). Combined states: rows in interaction-feel.md "Combined states" (2 = live b3, 10 "?")
+  + REQUESTS "psui 11-25 18:41: hover in combined states" -> fill + qa scores when live answers.
+  Ring (live manip-ring-1125): POSITION done (commit "Move face's Rotate ring sits at least 60 px...": ArcHandle.min_px,
+  at_scale(view) on projected length, re-synced in render_viewport_underlay; test move_faces_rotate_ring_keeps_60_px_from_its_axis).
+  Arrow: d133237f4 (click point) REVERTED (live's frame shows the shaft at x 1160, 9 px right of the click = the face's
+  middle); test move_faces_arrow_starts_at_the_faces_middle. TICKETS MANIP-DRAG-DEAD-ZONE row still says "Move face
+  arrow at the click" (ac0cfe0a8): correct it. NEXT: ring LOOK (TICKETS MOVE-FACE-RING-POS "Still open"): live's head =
+  fixed ~47 px arc from the radius point toward +z (angle direction) + thin line from the axis, no sweep/chevrons;
+  unhovered ~(165-179,172-185,178-189), line (160,176,186); hovered both (100,142,191); reach = head + 1-3 px
+  (ours: 14 px across the last stretch). arc_glyph / arc hit in manipulators.rs; Move face only (min_px > 0).
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
