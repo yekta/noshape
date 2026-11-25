@@ -1180,6 +1180,40 @@ mod text_expression_tests {
         assert!((r.context.sketches[0].sketch.curve(c).unwrap().length() - before).abs() < 1e-9, "the last shape stays");
     }
 
+    /// Live mistakes-1125: a rectangle dimensioned 40 x 20 with a third length on its opposite side, conflicting (30)
+    /// or only redundant (40), fails as a whole: the row red with "Sketch could not be solved.".
+    #[test]
+    fn an_over_defining_or_redundant_dimension_fails_the_sketch() {
+        use crate::configuration::ConfigValues;
+        use crate::display::FeatureStatus;
+        use crate::partstudio::PartStudio;
+        use crate::reference::{DatumPlane, Reference};
+        use crate::regen::{RegenOptions, Regenerator};
+        use crate::sketch_feature::SketchData;
+        use glam::DVec2;
+        let units = noshape_units::UnitPrefs::default();
+        for top in [0.03, 0.04] {
+            let mut sk = noshape_sketch::Sketch::new();
+            let p: Vec<_> = [(0.0, 0.0), (0.04, 0.0), (0.04, 0.02), (0.0, 0.02)].iter().map(|q| sk.add_point(DVec2::new(q.0, q.1))).collect();
+            let l: Vec<_> = (0..4).map(|i| sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap()).collect();
+            for (i, &line) in l.iter().enumerate() {
+                sk.add_constraint(if i % 2 == 0 { ConstraintKind::Horizontal { a: line, b: None } } else { ConstraintKind::Vertical { a: line, b: None } }).unwrap();
+            }
+            sk.add_constraint(ConstraintKind::Length { curve: l[0], value: 0.04 }).unwrap();
+            sk.add_constraint(ConstraintKind::Length { curve: l[1], value: 0.02 }).unwrap();
+            sk.add_constraint(ConstraintKind::Length { curve: l[2], value: top }).unwrap();
+            let mut ps = PartStudio::new();
+            let mut f = ps.new_feature("sketch", &units).unwrap();
+            let id = f.id;
+            f.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+            f.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(SketchData { sketch: sk, ..Default::default() })));
+            ps.features.push(f);
+            let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+            let st = r.display.feature_state(id).unwrap();
+            assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Sketch could not be solved.")), "top {top}: {st:?}");
+        }
+    }
+
     #[test]
     fn plane_trace_of_perpendicular_planes() {
         use crate::display::PlaneFrame;

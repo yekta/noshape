@@ -345,3 +345,49 @@ fn an_under_defined_sketchs_row_says_so(cx: &mut TestAppContext) {
     ] }));
     assert_eq!(row_tooltip(cx, window, "Sketch 1").as_deref(), Some("Sketch 1 is not fully defined"));
 }
+
+/// Live qa/mistakes-1125: a rectangle dimensioned 40 x 20 with a third length on the opposite side, conflicting (30) or
+/// only redundant (40): the row red, its tooltip "<name> did not regenerate properly: Sketch could not be solved.";
+/// opened, the sketch's title red and ✓ enabled.
+#[gpui::test]
+fn an_over_defined_sketchs_row_and_dialog_as_live(cx: &mut TestAppContext) {
+    use noshape_model::display::FeatureStatus;
+    for (name, top) in [("Sketch conflict", "30 mm"), ("Sketch redundant", "40 mm")] {
+        let start = serde_json::json!({ "units": "mm", "features": [
+            { "type": "newSketch", "name": name, "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 20]] }] },
+        ] });
+        let (window, view) = part_studio_with(cx, &format!("fb-overdefined-{}", &name[7..]), |path| {
+            let mut ctx = noshape_ops::Ctx::new();
+            noshape_ops::ui_parity::build_start(&mut ctx, path, &start).unwrap();
+            let mut call = |tool: &str, args: serde_json::Value| {
+                let op = noshape_ops::registry::by_tool_name(tool).unwrap();
+                noshape_ops::registry::run(&mut ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {}", e.to_json())).value
+            };
+            let g = call("sketch_get", serde_json::json!({ "sketch": name }));
+            let line = |a: [f64; 2], b: [f64; 2]| {
+                let at = |p: &serde_json::Value, q: [f64; 2]| (p[0].as_f64().unwrap() - q[0]).abs() < 1e-6 && (p[1].as_f64().unwrap() - q[1]).abs() < 1e-6;
+                g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "line")
+                    .find(|e| (at(&e["start"], a) && at(&e["end"], b)) || (at(&e["start"], b) && at(&e["end"], a)))
+                    .unwrap_or_else(|| panic!("no line {a:?}-{b:?}"))["id"].clone()
+            };
+            let (bottom, left, upper) = (line([0., 0.], [40., 0.]), line([0., 0.], [0., 20.]), line([0., 20.], [40., 20.]));
+            call("sketch_dimension", serde_json::json!({ "sketch": name, "entities": [bottom], "value": "40 mm", "label": [20, -8] }));
+            call("sketch_dimension", serde_json::json!({ "sketch": name, "entities": [left], "value": "20 mm", "label": [-8, 10] }));
+            call("sketch_dimension", serde_json::json!({ "sketch": name, "entities": [upper], "value": top, "label": [20, 28] }));
+            crate::session::Session::open(path).unwrap()
+        });
+        cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let id = feature_id(cx, &view, name);
+        let status = cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.message.clone())));
+        assert_eq!(status, Some((FeatureStatus::Error, Some("Sketch could not be solved.".to_string()))), "{name}: the row red");
+        let tip = row_tooltip(cx, window, name);
+        assert_eq!(tip, Some(format!("{name} did not regenerate properly: Sketch could not be solved.")), "{name}: the row's tooltip");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        draw(cx, window);
+        let state = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+        let d = &state["dialog"];
+        assert_eq!((d["titleState"].as_str(), d["ok"].as_str()), (Some("error"), Some("enabled")), "{name}: the sketch's title red, ✓ enabled: {d}");
+    }
+}
