@@ -3307,9 +3307,25 @@ impl Ctx<'_> {
             }
             None => self.occt_sections(src, a, b)?,
         };
+        let other = [fs, ft].into_iter().find(|&f| self.copies.get(self.faces[f].arg as usize).copied().flatten().is_none());
+        // (None from that pair, its faces apart (the member past the other face's end: c2-impeller-loft's seats in a
+        // row along a flange's round, the first beyond the round): nothing said of these; their own sections.)
+        let first_apart = |cx: &mut Self, (x, y): ((u32, u32), (u32, u32))| {
+            let at = |k: (u32, u32)| Some(cx.faces.partition_point(|g| (g.arg, g.index) < k)).filter(|&i| cx.faces.get(i).is_some_and(|g| (g.arg, g.index) == k));
+            let (Some(i), Some(j)) = (at(x), at(y)) else { return false };
+            let (f, g) = (&cx.faces[i], &cx.faces[j]);
+            !boxes_meet(f.lo, f.hi, g.lo, g.hi, GREY * cx.band(i, j)) || cx.faces_apart(i, j)
+        };
+        let moved = match moved {
+            Some((canon, _)) if secs.is_empty() && other.is_some() && first_apart(self, canon) => {
+                secs = self.occt_sections(src, a, b)?;
+                froms.clear();
+                None
+            }
+            m => m,
+        };
         // (Moved onto a face of another argument: only where they stay inside it (and the curves they were moved
         // from); else from another member (up to the third), else made for these.)
-        let other = [fs, ft].into_iter().find(|&f| self.copies.get(self.faces[f].arg as usize).copied().flatten().is_none());
         if let (Some((mut canon, mut r)), Some(f)) = (moved, other)
             && canon != (a, b)
         {

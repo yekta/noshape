@@ -413,6 +413,32 @@ fn a_gears_tooth_gaps_turned_a_hair_off_its_axis_cut_its_rim() {
     assert!(crate::brep_replay::same_records(&crate::brep_replay::records(&r), &crate::brep_replay::records(&o)), "history unlike OCCT's");
 }
 
+/// A row of seats fused onto a rod along the row (c2-impeller-loft's Extrude Bohrungssitz: seats on a flange, its
+/// round along them), the first seat past the rod's end, the others crossing its top: each seat's section with the
+/// rod its own (was the first's moved to it, none: the seats' walls whole, a non-manifold result, declined): OCCT's.
+#[test]
+fn a_row_of_seats_on_a_rod_past_the_first_cross_it() {
+    let _ = k::set_working_scale(1000.0);
+    let mm = 1e-3;
+    let rod = k::make_cylinder(&k::Plane::new(DVec3::new(6.0, 39.2, -3.2) * mm, DVec3::X, DVec3::Y), 0.8 * mm, 76.4 * mm, TAU).unwrap();
+    let seat = k::make_cylinder(&z_frame(DVec3::new(-19.0, 35.0, -5.0) * mm), 4.75 * mm, 5.0 * mm, TAU).unwrap();
+    let seats: Vec<k::Shape> = (0..3).map(|i| k::transform(&seat, &k::Transform::Translate(DVec3::X * 50.0 * mm * i as f64), true).unwrap().shape).collect();
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&rod), &seats, &opts).expect("OCCT's fuse");
+    k::set_rust_boolean(None);
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&rod), &seats, &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    for kind in [k::ShapeType::Solid, k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex] {
+        assert_eq!(r.shape.count(kind), o.shape.count(kind), "{kind:?}");
+    }
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!(r.shape.is_valid() && (v - w).abs() <= 1e-7 * w, "valid {}, volume {v} against OCCT's {w}", r.shape.is_valid());
+}
+
 /// Three rings revolved whole (a recorded fuse of a revolve's regions), each two tori, the inner one the ring's hollow:
 /// tori whose frames are left-handed (normals in where their faces aren't reversed) are told solid or void by where
 /// their normal points; voids in a result of several solids noshape's Boolean leaves to OCCT: three solids (were six,
