@@ -2177,3 +2177,34 @@ fn an_arrow_drag_writes_its_field_and_undoes_in_one_step(cx: &mut TestAppContext
     assert_eq!(after_undo_key, dragged, "Ctrl+Z in the dialog after the drag");
     assert!(committed != before && undone == before && redone == committed, "Depth: before {before}, committed {committed}, undone {undone}, redone {redone}");
 }
+
+/// Live manip-drag-1125 part 2: Move face opened on the block's top face clicked at (15, 15, 20) has its one arrow at
+/// the click point, along the normal, Offset 5 mm (ours sat on the face's anchor whatever the click).
+#[gpui::test]
+fn move_faces_arrow_starts_where_the_face_was_clicked(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-moveface-click");
+    let mm = 1e-3;
+    let (id, anchor) = cx.update(|cx| {
+        let v = view.read(cx);
+        let ctx = v.context.clone().expect("the studio's context");
+        let top = v.display.bodies.iter().flat_map(|b| b.face_refs.iter()).find(|r| v.face_anchor(&ctx, r).is_some_and(|(_, n)| n.z > 0.99)).cloned().expect("the top face");
+        (*v.built.as_ref().unwrap().picks.ids_for(&top).first().expect("its pick"), v.face_anchor(&ctx, &top).unwrap().0)
+    });
+    let clicked = glam::DVec3::new(10.0, 10.0, 10.0) * mm;
+    assert!(clicked.distance(anchor) > 5.0 * mm, "the click is away from the anchor {anchor:?}");
+    let at = cx.update(|cx| view.read(cx).viewport.read(cx).project(clicked)).expect("on screen");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            v.on_viewport_event(&vp, &ViewportEvent::Click { pick: Some(id), position: at, modifiers: Modifiers::default() }, w, cx);
+            v.start_feature("moveFace", w, cx);
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let arrow = cx.update(|cx| view.read(cx).param_arrow(cx)).expect("Move face's arrow");
+    assert_eq!(arrow.param, "offsetDistance");
+    assert!(arrow.base.distance(clicked) < 0.05 * mm && arrow.dir.z > 0.99, "at the click, along the normal: {:?} {:?}", arrow.base, arrow.dir);
+    assert!((arrow.length - 5.0 * mm).abs() < 1e-9, "Offset 5 mm: {}", arrow.length);
+}

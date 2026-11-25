@@ -2155,6 +2155,23 @@ impl PartStudioView {
         Some(scene_builder::PickTarget { reference: r, kind: PickKind::Face, anchor: None })
     }
 
+    /// Keeps where a click on a face met it, on the model before the open feature's preview (`face_click_point`).
+    fn note_face_click(&mut self, t: &scene_builder::PickTarget, position: glam::DVec2, cx: &App) {
+        const KEPT: usize = 32;
+        if t.kind != PickKind::Face {
+            return;
+        }
+        let (o, d) = self.viewport.read(cx).ray(position);
+        let display = self.ui.preview_before.as_ref().unwrap_or(&self.display);
+        let Some(depth) = face_depths(display, Some(&t.reference), o, d).into_iter().min_by(f64::total_cmp) else { return };
+        let clicks = &mut self.ui.face_clicks;
+        clicks.retain(|(r, _)| *r != t.reference);
+        if clicks.len() >= KEPT {
+            clicks.remove(0);
+        }
+        clicks.push((t.reference.clone(), o + d * depth));
+    }
+
     /// Where the pointer is on the open feature's own preview: the face the model before it has there, nearest first
     /// (live 10-27 PREVIEW-SELF-PICK: a Fillet's band hovers and picks the original top or front face), unless the
     /// dialog holds it already (live walk6-2: nothing new lights on the picked face inside an Extrude's preview).
@@ -2774,6 +2791,7 @@ impl PartStudioView {
                         if t.kind == PickKind::Plane && !self.ui.planes_picked_in_graphics.contains(&t.reference) {
                             self.ui.planes_picked_in_graphics.push(t.reference.clone());
                         }
+                        self.note_face_click(&t, *position, cx);
                         self.pick(t, cx)
                     }
                     // Clicking empty space clears the selection, but never a
