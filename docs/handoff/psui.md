@@ -187,28 +187,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (live/psui/manip-ring-1125; then make revolve_arc's moveFace anchor match). Asm 2.5 px threshold kept: live's band
   is (2, 3] (2 none, 3 drags), tested by app-core presses_drag_and_open_the_menu_as_live. LOOK-OUTLINE-WEIGHT: on main
   (f6da23b36 PART_EDGE_INK 0.85), "fixed, to verify" for qa; nothing left for me.
-  IN FLIGHT (lead 18:2x, dx parked): live/dx/maker-io-1125 (behaviours "Maker import/export…") vs ours; fix diffs
-  with T1 + ops e2e; model-side diffs to core (2nd Derived of the same studio errors; whole-studio Derived follows
-  the part count, part-picked keeps its parts; Update… re-imports in place).
-  Checked so far (code read, no test yet): 1) names: part-studio-ui export.rs open_part_export (one row "<tab> -
-  <part>", else tab), ops export.rs file_ext (individual -> zip), write_export entries "<tab> - <part>.<ext>" = live.
-  2) Custom: CUSTOM_FIELDS + stl_mm/custom_text convert on a Units change (format_number 6 dp: Inch 0.002362 / 0.001
-  = live); 3MF Coarse prefill 0.00024 / 12.5 / 10 (ops PRESETS) = live. No GUI test of either found yet: write T1s
-  (Units switch Fine -> Inch texts; 3MF Custom labels + values; file names for 1 row / 2 rows / individual).
-  3) bubble: ours shows at once (export_preparing -> flash 5 s); live's lasts ~5 s but shows 0.8-1.4 s late
-  (server latency, DECISIONS 11-07 + feedback within a frame): no change, say so to the lead.
-  4) DIFF, to fix next: feature_dialog.rs pick_derived_source sets parts = [the clicked part] (replaces); live: a
-  plain click on another part of the same studio ADDS it (Parts (2), both rows #b2ddf6, studio row clear), a studio
-  click = all parts (parts []). derived_reference_value encodes only one part ("tab#part") as the panel's value
-  (fs_reference.rs open_reference_picker -> PanelSetup.value -> SelectItemPanel highlight): make it carry several
-  (e.g. tab#p1,p2) and the panel light every picked part; field text must stay the studio name only (check
-  render_reference_field's display of "tab#part"). Unknown in live: a click on an already-picked part (toggle off?):
-  ask live in REQUESTS if needed. Then T1 (feature_dialog tests: two part picks -> parts query 2, field text = studio
-  name) and ops e2e only if an op changes (derived op already takes parts list? check crates/ops derived).
-  Core rows (route, not mine): 2nd Derived of the same source+configuration errors "Creating multiple Derived
-  features from the same source and configuration is not allowed. Consider editing the previous Derived feature.";
-  whole-studio Derived follows the part count, part-picked keeps its parts; blob Update… re-imports in place.
-  1)+2) still need T1s (see above).
+  maker-io-1125 (lead 18:2x) DONE 18:28, landing 3e32049bf: 1) file names = live (ops test now also checks one
+  "<tab> - Part N" zip entry per part); 2) Custom fields = live (part_studio::export::tests custom_fields_in_the_chosen_units);
+  3) bubble: no change (live's 0.8-1.4 s delay is server latency); 4) FIXED: Derived's panel value is "tab#p1,p2"
+  (fs_reference parts_value / value_parts); a part click on the picked studio adds the part, a studio click takes
+  all, a picked part clicked again adds nothing (live unknown: toggle off?); panel lights every picked part; test
+  ui_tests::dialogs::derived_part_clicks_add_parts_and_a_studio_click_takes_them_all. Derived op takes a parts list
+  already (no op change). Core rows sent to the lead: 2nd Derived of the same source+configuration errors; whole-studio
+  Derived follows the part count, part-picked keeps its parts; blob Update… re-imports in place.
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
