@@ -82,6 +82,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
   #333 at 0.5). New list matrix rows: undo/redo of a reorder, a rollback move, a menu Delete with dependents.
 - LANDING: readout #666, drag pills, Use glyph landed. 26251e31 (shortcuts) failed on a rebase conflict (09:24);
   rebased clean at 10:06 and queued as b8e0a0b5 (rim test, shortcuts matrix, featurelist rows + handoffs). Await the lead.
+- 11-25 10:49 lead: a38d25e2 (asm UI batch) + b8e0a0b5 (shortcuts) FAILED on a rebase conflict: rebase + re-land
+  right after the FLOW fix below (git fetch, rebase origin/main, fix conflicts, read diff --stat, land.sh).
+- IN FLIGHT P1 FLOW-REGION-UNDER-FACE-PICK (TICKETS 8d93663a3, qa enclosure cell 61). Cause found: after the first
+  region is picked, Extrude's preview body (Part 2, extruded from Sketch 2's big region) covers the rim from the iso
+  view; apply_hover_pick (mod.rs ~2090) sees preview_hides (made_by) and swaps in before_face_under (mod.rs ~2154),
+  which ray-casts only FACES of preview_before -> the rim face wins over the sketch region lying on it. FIX TO WRITE:
+  in before_face_under also ray-cast self.display.sketches' (not hidden) region triangles (positions/indices, 1 um
+  above the plane) and return the region (PickKind::SketchRegion) when its t <= nearest face t + 5e-5, unless the
+  dialog holds it; same for the click path (check how the click resolves, likely the same hover). face_hits at
+  mod.rs:8872, ray_triangle in section_manip.rs:518 (make pub(super) or copy). Test written, UNCOMMITTED:
+  sketch_hover_feel_tests.rs a_sketch_region_on_a_rim_face_wins_over_the_face (ops-built box 60x40x30, fillet 5,
+  shell 2, Sketch 2 rect -2..62 on the rim; clicks opening then rim): REMOVE its 3 "DBG" eprintln lines first. Run
+  /root/psui-scratch/rim/t.sh (drop the PSUI_DBG=1 prefix) via rb.sh vibex8; currently fails as qa saw.
+- Named views vs live display-modes-1125 parked as /root/psui-scratch/nv-wip.patch (git apply): 700 ms restore
+  (CAMERA_NAMED_VIEW_ANIMATION, nav_feel row, asm uses animate_to_named_view), dialog new_view_name() + NAME_IN_USE
+  alert + Props.taken, "+" #999/#333 and trim. Still to do on the hosts (view_tools.rs ~400-530, assembly_view.rs
+  ~7357-7450): blank name refused silently (no "View N"; fix a_named_view_is_no_undo_step to type a name), duplicate
+  -> taken=true and text kept, cleared when the field empties; creation order (drop the sort); Shift+V/menu open-only
+  (focus the field if open). Display modes: compare menu rows per mode (Shaded without edges hides Hidden + Tangent
+  rows, Translucent hides Hidden) and mode per tab, session only.
 - asm UI batch (lead 10:0x: asm's open P0/P1 UI/feel rows, no solver internals) committed: Insert split button white,
   row untinted under it (quiet ids in item_row), OsSelect hover = blue underline only (set_hover_underline(false) for
   Insert config selects); mate dialog accept_pale() (reopened "not consistent" pale) and field_text() (Tangent's
