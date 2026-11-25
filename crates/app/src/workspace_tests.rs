@@ -653,3 +653,52 @@ fn a_page_step_finds_the_graphics_of_a_document_the_page_opened(cx: &mut TestApp
     cx.update_window(w, |_, window, _| window.remove_window()).unwrap();
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Live maker-io-1125 (qa MAKER-IMPORT-UPDATE-NEW-TAB): CAD Imports › ‹file› › Update… with a new version of the file
+/// updates the Part Studio imported from it in place (2 parts → 3, the same tab), no "maker-set (1)" tab.
+#[gpui::test]
+fn a_file_update_reimports_into_the_same_part_studio(cx: &mut TestAppContext) {
+    let (w, ws, [_, _, _, c]) = workspace(cx, "file-update");
+    let dir = std::env::temp_dir().join(format!("noshape-workspace-file-update-{}", std::process::id()));
+    let step = |version: &str, parts: &[[f64; 4]]| {
+        let d = dir.join(version);
+        std::fs::create_dir_all(&d).unwrap();
+        let file = d.join("maker-set.step");
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": d.join("src.noshape").to_str().unwrap() }));
+        for (i, [x0, y0, x1, y1]) in parts.iter().enumerate() {
+            let sketch = format!("Sketch {}", i + 1);
+            call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+            call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[x0, y0], [x1, y1]] }));
+            let region = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }))["regions"][0]["id"].clone();
+            call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm", "operationType": "NEW" } }));
+        }
+        call(&mut ctx, "export_parts", json!({ "format": "STEP", "file": file.to_str().unwrap() }));
+        file
+    };
+    let v1 = step("v1", &[[0.0, 0.0, 40.0, 30.0], [60.0, 0.0, 80.0, 20.0]]);
+    let v2 = step("v2", &[[0.0, 0.0, 40.0, 30.0], [60.0, 0.0, 80.0, 20.0], [-40.0, 0.0, -20.0, 20.0]]);
+    let doc = cx.update(|cx| ws.read(cx).doc.clone());
+    cx.update(|cx| crate::import_dialog::import(&doc, std::slice::from_ref(&v1), Default::default(), Some(c), true, cx));
+    cx.run_until_parked();
+    draw(cx, w);
+    let tabs = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.doc.ordered_tabs().iter().map(|t| (t.name.clone(), t.id)).collect::<Vec<_>>());
+    let before = tabs(cx);
+    let id_of = |tabs: &[(String, TabId)], n: &str| tabs.iter().find(|t| t.0 == n).map(|t| t.1);
+    let (studio, file) = (id_of(&before, "maker-set").expect("the imported Part Studio"), id_of(&before, "maker-set.step").expect("the file in CAD Imports"));
+    let parts = |cx: &mut TestAppContext| {
+        let path = doc.read_with(cx, |d, _| d.session.path.clone());
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+        call(&mut ctx, "query_parts", json!({ "tab": "maker-set" }))["parts"].as_array().map_or(0, Vec::len)
+    };
+    assert_eq!(parts(cx), 2);
+    cx.update(|cx| noshape_app_core::file_tab_view::update_with(&doc, file, v2.clone(), cx));
+    cx.run_until_parked();
+    draw(cx, w);
+    let after = tabs(cx);
+    assert_eq!(after.len(), before.len(), "no new tab: {after:?}");
+    assert_eq!(id_of(&after, "maker-set"), Some(studio), "the same Part Studio");
+    assert_eq!(parts(cx), 3, "its parts follow the new file");
+    let _ = std::fs::remove_dir_all(dir);
+}
