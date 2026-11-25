@@ -4492,3 +4492,21 @@ fn a_loft_profile_of_a_ring_and_the_disk_in_its_hole_is_the_disk() {
     let want = std::f64::consts::PI * 30.0 * (400.0 + 200.0 + 100.0) / 3.0;
     assert!((volume(&res) - want).abs() < 0.5, "{} mm³, want {want}", volume(&res));
 }
+
+/// qa 11-25 (FLOW-SHELL-AFTER-FILLET): an 80 x 20 mm obround link, 5 mm thick, its top loop filleted 1 mm, shelled
+/// 1 mm with the bottom face removed: a shell, a little under a third of the solid.
+#[test]
+fn a_filleted_obrounds_shell_without_its_bottom_works() {
+    let mut t = T::new();
+    let (_, regions) = t.sketch(&[&[(-30.0, 0.0), (30.0, 0.0), (30.0, 20.0), (-30.0, 20.0)]], &[((-30.0, 10.0), 10.0), ((30.0, 10.0), 10.0)]);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
+    let top = t.edges_where(|i| (i.start.z - 0.005).abs() < 1e-9 && (i.end.z - 0.005).abs() < 1e-9);
+    assert_eq!(top.len(), 4, "the top loop: two lines and two arcs");
+    t.fillet(top, "1 mm");
+    let bottom = t.faces_where(|c| c.z.abs() < 1e-6);
+    assert_eq!(bottom.len(), 1);
+    let s = t.shell(bottom, "1 mm");
+    let r = t.ok(s);
+    let v = volume(&r);
+    assert!((2000.0..2400.0).contains(&v), "{v} mm³");
+}
