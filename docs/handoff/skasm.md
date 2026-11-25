@@ -3,19 +3,24 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 16:3x) — read first
-- IN TEST (vibex6, ~/tmp/skasm/finscrews2.log): (1) screws translator (parity.rs: LiveRef.name from live's line;
-  a typeless BODY ref keeps the line's kind/name; the name breaks only bbox ties: the first try (name first) broke
-  c2-duct-multipart Boolean 1). Screws 28 -> 33 (first diff now Move face 3). (2) API status: an unsolvable sketch is
-  "Warning" in ops replies (ops/mod.rs `api_status`; feature_list, failed lists, ui.rs), the row stays red (lead:
-  live REST WARNING); e2e a_dimension_value_the_sketch_cant_take_is_kept_driving expects Warning. (3) l.706 sketch
-  feel: pattern labels pick on a click / open on a double-click + tan hover (sketch.rs `pattern_label_clicked`),
-  Text dialog layout as live's DOM (flips #1651b0, 6 px apart, 2 px above the counter), T1s
-  pattern_labels_pick_on_a_click_and_open_on_a_double_click_as_live, the_text_dialog_is_laid_out_as_live, sketch tools
-  matrix row "search / Recently used and the info box"; interaction-feel.md rows replace l.706. Then commit, land.
-- REQUESTS skasm 11-25 16:30 (1x by default? count label click? Recently used in a sketch); 16:21 lora refs.
-- Routed to core 16:2x (from bool): knife Revolve 1 vertex = shown_topology's closed-edge rule.
-- QUEUED 8886d746 (mistakes-1125 sketch rows, hidden tooltip, batch-2 T1); handoff fd47e5bbb.
+## NOW (11-25 17:0x) — read first
+- QUEUED 18d00b55 (carries 8886d746): screws translator (28 -> 33; name breaks bbox ties only, duct-multipart back to
+  full), ops "Warning" for an unsolvable sketch (`api_status`, e2e expects Warning; the row stays red), l.706 sketch
+  feel (pattern labels pick/double-click/tan hover, Text dialog as live's DOM, Search tools Recently used row; T1s,
+  interaction-feel rows). Open REQUESTS skasm 11-25 16:30 (1x default? count label click? Recently used in a sketch),
+  16:21 lora refs. Knife Revolve vertex routed to core (shown_topology closed edge).
+- IN FLIGHT, P0 SKETCH-DRAG-SOLVE (lead; live psui/sketch-drag-1125, behaviours "Sketch drags…"), UNCOMMITTED:
+  scene sketch_mode.rs: DRAG_START_PX 5 -> 3 (`a_press_drags_from_3_px`); `drag_grab` (a dragged point keeps its
+  offset from the pointer: drag_step / drag_stepped) + T1 `a_dragged_point_keeps_its_grab_offset`; T1
+  `under_defined_drags_solve_as_live` (corner/rim/arc end/spline as live: they already matched; arc R = chord/2;
+  no hover orange mid-drag). psui: `sketch_drags_hide_the_fills_and_undo_one_at_a_time_as_live` (2 px nothing,
+  opts.sketch_dragging during, draft_undo one drag, redo, after ✓ one doc undo reverts both);
+  sketch_label_feel_tests label drag 4 px now drags. Run: skasm-scratch/bin/tdrag.sh via rb.sh vibex6 (scene
+  sketch_mode::, psui sketch, clippy); log ~/tmp/skasm/tdrag.log (first run predates drag_grab: rerun). Then
+  commit "skasm: sketch drags as live (sketch-drag-1125): 3 px start, grab offset kept; tests", land, report.
+- Open note: our labels are stored as absolute positions; live stores labelDistance/labelRatio (a label drop = the
+  drop point in both). Whether a label follows its dragged line is unchecked.
+- NEXT after the P0: remaining l.706 answers from live (REQUESTS 16:30); the WARNING status word (done in ops, landing).
 
 ## Earlier NOW (11-25 14:11)
 - LANDED: Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent (live tangent-one-entity-1123).
