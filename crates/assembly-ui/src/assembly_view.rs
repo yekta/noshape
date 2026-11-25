@@ -430,6 +430,12 @@ fn ring_snap(angle: f64, radius_px: f64) -> f64 {
     if (n - n.round()).abs() <= 0.4 * (1.0 + level as f64 / 3.0) { n.round() * step } else { angle }
 }
 
+/// An instance row's "Has degrees of freedom" glyph: a free top-level instance's, never a subassembly's (live
+/// behaviours "DOF display": not even with no mates; qa IMP-ASM-ROW-ICON, an imported assembly of subassemblies).
+fn shows_dof_glyph(kind: NodeKind, dof: Option<usize>, fixed_or_dyn_suppressed: bool) -> bool {
+    dof.is_some_and(|d| d > 0) && !fixed_or_dyn_suppressed && kind != NodeKind::Assembly
+}
+
 /// A triad arrow drag's distance: snapped to `step`, or as dragged with Shift held (live manip-feel-1118: 3.827 mm;
 /// Ctrl changes nothing).
 fn triad_arrow_value(s: f64, step: Option<f64>, shift: bool) -> f64 {
@@ -1167,10 +1173,7 @@ impl AssemblyView {
         }
         if !self.fitted_once && let Some(bounds) = self.result.bounds() {
             self.fitted_once = true;
-            // The panel over the view's left: the 300 px Insert dialog
-            // (qa5 1.4: the first insert was fitted under it), else a 220 px
-            // feature dialog.
-            let inset = if self.insert_open { 300.0 + 2.0 * 12.0 } else if self.ui.left_open { 220.0 + 2.0 * 12.0 } else { 0.0 };
+            let inset = self.fit_inset();
             self.viewport.update(cx, |vp, cx| {
                 (vp.fit_bounds, vp.fit_inset_left) = (Some(bounds), inset);
                 vp.camera.set_view(StandardView::Trimetric);
@@ -1910,7 +1913,7 @@ impl AssemblyView {
         let (count, snapping, fixed_drag) = (self.selected.len(), self.snap_drag.as_ref().is_some_and(|s| s.target.is_some()), self.ui.fixed_drag.is_some());
         // Zoom to fit: the visible instances (the scene's bounds lag a new
         // insert: qa5 A1 cropped the first part), clear of the dialog.
-        let (fit_bounds, fit_inset) = (self.result.bounds(), if self.ui.left_open { 220.0 + 2.0 * 12.0 } else { 0.0 });
+        let (fit_bounds, fit_inset) = (self.result.bounds(), self.fit_inset());
         let camera_geometry: Vec<std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>> = marks.into_iter().chain(connector_glyphs).chain(first_pick).chain(mate_glyphs).chain(screen_triads).chain(ground).collect();
         #[cfg(test)]
         {
@@ -4445,6 +4448,12 @@ impl AssemblyView {
         .detach();
     }
 
+    /// What zoom to fit leaves out at the view's left: a 220 px feature dialog, not the Insert dialog (live fits the first
+    /// insert to the whole graphics area: qa ASM-INSERT-FIRST-FIT-BESIDE-DIALOG, workflows 06 s19, 07 s25).
+    fn fit_inset(&self) -> f64 {
+        if self.ui.left_open && !self.insert_open { 220.0 + 2.0 * 12.0 } else { 0.0 }
+    }
+
     /// A triad arrow drag's snap step (metres), from what 100 px spans along the arrow ([`arrow_snap_step_for`]).
     fn arrow_snap_step(&self, at: DVec3, axis: DVec3, cx: &App) -> Option<f64> {
         let vp = self.viewport.read(cx);
@@ -4822,7 +4831,7 @@ impl AssemblyView {
             })
             .when(dyn_suppressed && is_top, |d| d.child(svg().path(icon_path("function")).size(px(14.)).flex_none().text_color(pal.text_faint)))
             // Live (extras-1118 and every capture): "Has degrees of freedom", no count.
-            .when_some(dof.filter(|d| *d > 0 && !fixed && !dyn_suppressed), |d, _| {
+            .when(shows_dof_glyph(kind, dof, fixed || dyn_suppressed), |d| {
                 d.child(div().id(SharedString::from(format!("dof-{}", top.0))).flex_none().child(crate::assets::icon(&icon_path("list-free"), 20., cx)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new("Has degrees of freedom").build(w, cx)))
             })
             // In-context arrows (Assembly contexts of its Part Studio).

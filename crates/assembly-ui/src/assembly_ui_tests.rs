@@ -120,6 +120,11 @@ fn open_tab_with_front(cx: &mut TestAppContext, path: &std::path::Path, name: &s
 /// A block (Part 1) and a pin (Part 2) in "Sub", whose instance "Sub <1>"
 /// is Assembly 1's only instance.
 fn sub_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    sub_assembly_with(cx, name, |_| {})
+}
+
+/// [`sub_assembly`], then `more` on its document.
+fn sub_assembly_with(cx: &mut TestAppContext, name: &str, more: impl FnOnce(&mut Ctx)) -> (AnyWindowHandle, Entity<AssemblyView>) {
     cx.update(gpui_kit::init);
     crate::assembly_hooks::register_for_tests();
     let dir = std::env::temp_dir().join(format!("noshape-asm-ui-{name}-{}", std::process::id()));
@@ -139,8 +144,36 @@ fn sub_assembly(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity
         call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
         call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 2" }));
         call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+        more(&mut ctx);
     }
     open_assembly(cx, &path)
+}
+
+/// Live (behaviours "DOF display"; qa IMP-ASM-ROW-ICON, an imported assembly of subassemblies): "Has degrees of
+/// freedom" shows on an unmated top-level part's row, never on a subassembly's, even with no mates.
+#[gpui::test]
+fn an_unmated_subassembly_row_has_no_dof_glyph(cx: &mut TestAppContext) {
+    let (_window, view) = sub_assembly_with(cx, "sub-dof", |ctx| {
+        call(ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    });
+    for _ in 0..600 {
+        if cx.update(|cx| view.read(cx).ui.real_result_in) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let glyph = |name: &str| {
+            let n = v.result.nodes.iter().find(|n| n.name == name).unwrap_or_else(|| panic!("no {name}"));
+            assert!(n.dof.is_some_and(|d| d > 0), "{name} is free: {:?}", n.dof);
+            super::shows_dof_glyph(n.kind, n.dof, n.fixed)
+        };
+        assert!(glyph("Part 1 <1>"), "the loose part shows Has degrees of freedom");
+        assert!(!glyph("Sub <1>"), "no glyph on the subassembly's row");
+    });
 }
 
 fn instance(v: &AssemblyView, name: &str, cx: &gpui_kit::App) -> InstanceId {
@@ -2182,6 +2215,24 @@ fn insert_ok_deselects_the_first_instance_and_selecting_it_again_shows_the_triad
     })
     .unwrap();
     draw(cx, window);
+}
+
+/// qa ASM-INSERT-FIRST-FIT-BESIDE-DIALOG (live workflows 06 s19, 07 s25): with the Insert dialog open, zoom to fit
+/// frames the whole graphics area (the first insert was fitted right of the dialog, ~160 px off live's).
+#[gpui::test]
+fn zoom_to_fit_with_the_insert_dialog_open_uses_the_whole_graphics_area(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "insert-fit");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.toggle_insert(w, cx);
+            v.ui.left_open = true;
+            assert!(v.insert_open);
+            assert_eq!(v.fit_inset(), 0.0, "nothing left out for the Insert dialog");
+            v.insert_open = false;
+            assert_eq!(v.fit_inset(), 244.0, "a feature dialog's 220 px and margins left out");
+        })
+    })
+    .unwrap();
 }
 
 /// Live asm-insert-esc-pending: Esc drops the instance on the pointer (Redo offered, the dialog stays); a second Esc
