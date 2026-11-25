@@ -1094,6 +1094,10 @@ impl GroundGlyph {
             pen.poly(s, DARK, 1.4);
         }
         pen.outline([(10.0, 0.0), (36.0, 0.0), (36.0, 12.0), (10.0, 12.0)]);
+        // Smooth edges as live's (qa FEEL-ASM-FIXED-GLYPH-AA).
+        for s in &mut lines.segments {
+            s.style |= LineSegment::SMOOTH;
+        }
         (lines, points)
     }
 }

@@ -454,6 +454,24 @@ fn a_dragged_fixed_part_shows_the_ground_glyph_where_the_drag_started(cx: &mut T
         let at = v.viewport.read(cx).project(first.origin).unwrap();
         assert!((at.y - from.y).abs() <= 1.0 && at.x > from.x && at.x <= from.x + 60.0, "on the face under the pointer: {at:?} for {from:?}");
     });
+    // Its edges smooth as live's (qa FEEL-ASM-FIXED-GLYPH-AA): where the dark hatch strokes meet the white box, the
+    // pixels take many shares of the two (in linear light), not multisampling's few steps.
+    let (px, _) = frame_pixels(cx, window, &view);
+    let lin = |v: u8| {
+        let c = f64::from(v) / 255.0;
+        if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+    };
+    let (white, dark) = (1.0, lin(0x33));
+    let mut levels = std::collections::BTreeMap::<i64, usize>::new();
+    for c in px.as_chunks::<4>().0 {
+        let l: Vec<f64> = c[..3].iter().map(|&v| lin(v)).collect();
+        let t = (white - l[1]) / (white - dark);
+        if t > 0.03 && t < 0.97 && l.iter().all(|&v| (v - (white - t * (white - dark))).abs() <= 0.01) {
+            *levels.entry((t * 32.0).round() as i64).or_default() += 1;
+        }
+    }
+    let many = levels.values().filter(|&&n| n >= 5).count();
+    assert!(many >= 20, "{many} shares of white and dark at the glyph's edges (multisampling alone gives a few) (31 levels; without, 6): {levels:?}");
     let w = at_window(cx, &view, from + DVec2::new(60.0, 0.0));
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(w, MouseButton::Left, Modifiers::default());
     settle(cx, window, &view);
