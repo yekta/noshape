@@ -351,10 +351,12 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // and area, a sketch's line as its `mid` and `length` (live 2313, `bodyType` SKETCH).
         let point = f3(&v["point"]).or_else(|| f3(&v["origin"])).or_else(|| f3(&v["centroid"])).or_else(|| f3(&v["mid"]));
         let bbox = v["box"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?]));
+        // `body`: the part live names the entity's owner (cf-surface-pattern's Split 1: the Thicken's cap on Part 1, not
+        // the surface it kept under it); a sketch's is no part.
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false, name: None };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: v["body"].as_str().filter(|_| v["bodyType"] != "SKETCH" && v["kind"] != "BODY").map(str::to_string), parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false, name: None };
         let key = (k as usize, id.to_string());
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
@@ -5199,6 +5201,14 @@ impl<'a> Translator<'a> {
             "FACE" if r.sketch => self.region_at(p, r.measure, r.sketch_of.as_deref()).or_else(|e| if r.sketch_of.is_some() { self.region_at(p, r.measure, None) } else { Err(e) }),
             "FACE" | "PLANE" => {
                 let part = self.part_of(k, &r);
+                if part.is_none()
+                    && let Some(plane) = self.datum_plane_of(&r)
+                {
+                    return Ok(plane);
+                }
+                if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+                    eprintln!("TRACE face {id} at {k}: live body {:?}, ours {part:?}", r.body);
+                }
                 self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
             }
             // A sketch's line or arc: that one of ours (a part's edge of its length may lie beside it).
@@ -5372,6 +5382,25 @@ impl<'a> Translator<'a> {
         self.by_geometry(k, &body).ok()
     }
 
+    /// A construction plane's face (live's `qCreatedBy(<Plane feature>, FACE)`, its body no part): our default plane or
+    /// Plane feature through live's point and parallel to it, when no planar face of ours there has live's area
+    /// (c2-opt-loft-continuity's Sketch 2 on Plane 1 at z 30, not the block's cap at z 10 the nearest face).
+    fn datum_plane_of(&mut self, r: &LiveRef) -> Option<String> {
+        let (o, n) = (r.point?, r.normal?);
+        let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let on = |c: [f64; 3], m: [f64; 3]| dot(m, n).abs() > 1.0 - 1e-6 && dot([c[0] - o[0], c[1] - o[1], c[2] - o[2]], n).abs() < 1e-7;
+        let d = self.call("query_datums", json!({})).ok()?;
+        let k = per_unit(&d["units"]);
+        let plane = d["planes"].as_array()?.iter().find(|p| f3(&p["frame"]["origin"]).zip(f3(&p["frame"]["normal"])).is_some_and(|(c, m)| on(c.map(|v| v * k), m)))?["id"].as_str()?.to_string();
+        let faces = self.call("query_entities", json!({ "kind": "faces", "surface": "plane", "normal": n, "near": mm(o), "limit": 200 })).ok()?;
+        let k = per_unit(&faces["units"]);
+        let live_area = r.measure.unwrap_or(0.0);
+        let a_face_of_lives_area = faces["faces"].as_array()?.iter().any(|f| {
+            f3(&f["centroid"]).zip(f3(&f["normal"])).is_some_and(|(c, m)| on(c.map(|v| v * k), m)) && f["area"].as_f64().is_some_and(|a| (a * k * k - live_area).abs() <= 1e-3 * live_area)
+        });
+        (!a_face_of_lives_area).then_some(plane)
+    }
+
     /// `part`: the part of ours live's is on, which decides between equally good ones (two parts with a hole in
     /// one place: cf-fill-pattern's sheet metal part and its solid).
     /// The planar face of ours on live's plane (`r.point` its origin, `r.normal`), the nearest to live's area: a plane's
@@ -5459,7 +5488,10 @@ impl<'a> Translator<'a> {
         let within = |tol: f64| move |e: &&Value| r.measure.zip(e[key].as_f64()).is_some_and(|(m, ours)| (ours * scale - m).abs() <= tol * m.abs() + 1e-12);
         let id = |e: &Value| e["id"].as_str().map(str::to_string);
         let exact: Vec<&Value> = found.iter().filter(within(1e-5)).collect();
-        if let Some(e) = exact.iter().find(|e| part.is_some_and(|p| e["part"] == p)).or(exact.first()) {
+        // Another part's exact face loses to one of live's part within the tolerance below (cf-surface-pattern's Split 1:
+        // live's refs give the Thicken's cap the area of the surface it kept, exact for the surface only).
+        let on_lives_part_near = found.iter().filter(within(2e-3)).any(|e| part.is_some_and(|p| e["part"] == p));
+        if let Some(e) = exact.iter().find(|e| part.is_some_and(|p| e["part"] == p)).or(exact.first().filter(|_| !on_lives_part_near)) {
             return id(e);
         }
         // Within the tolerance, the one whose centroid is nearest live's point

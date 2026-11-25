@@ -2844,6 +2844,90 @@ fn a_sketch_plane_by_a_stale_id_is_the_face_on_lives_frame() {
     assert!((o[2].as_f64().unwrap() - 10.0).abs() < 1e-6 && (n[2].as_f64().unwrap() - 1.0).abs() < 1e-9, "on the top cap: origin {o}, normal {n}");
 }
 
+/// A sketch on a Plane feature (c2-opt-loft-continuity's Sketch 2 on Plane 1, Top offset 30 mm): live's reference is the
+/// plane's own face (its body no part, 150 x 150 mm at z 30): our Plane 1, not the block's top cap at z 10 below it.
+#[test]
+fn a_sketch_on_a_plane_feature_is_on_that_plane_not_the_nearest_face() {
+    let sketch = "FS1";
+    let entities = json!([segment("b", (0.0, 0.0), (0.02, 0.0)), segment("r", (0.02, 0.0), (0.02, 0.02)), segment("t", (0.02, 0.02), (0.0, 0.02)), segment("l", (0.0, 0.02), (0.0, 0.0))]);
+    let region = json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": sketch, "queryString": format!("query = qSketchRegion(id + \"{sketch}\", false);") });
+    let block = json!({ "name": "Part 1", "bodyType": "SOLID", "faces": 6, "edges": 12, "vertices": 8, "volume": 0.02 * 0.02 * 0.01 });
+    let (mut doc, mut live) = one_extrude(sketch, entities, region, block.clone());
+    let fs = doc["features"].as_array_mut().unwrap();
+    fs.push(json!({ "btType": "BTMFeature-134", "featureType": "cPlane", "featureId": "FP1", "name": "Plane 1", "parameters": [
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"], "queryString": "query=qCreatedBy(makeId(\"Top\"), EntityType.FACE);" }] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "cplaneType", "value": "OFFSET" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "offset", "expression": "30 mm" }] }));
+    fs.push(json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2",
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JIC"], "queryString": "query=qCreatedBy(makeId(\"FP1\"), EntityType.FACE);" }] }],
+        "entities": [circle("c", 0.005, (0.01, 0.01))], "constraints": [] }));
+    doc["sketches"] = json!({ "sketches": [{ "featureId": "FS2", "transformMatrix": [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.03, 0.0, 0.0, 0.0, 1.0] }] });
+    live.push(json!({ "index": 2, "status": "OK", "parts": [block.clone()] }));
+    live.push(json!({ "index": 3, "status": "OK", "parts": [block] }));
+    let refs = r#"{"index":3,"feature":"Sketch 2","parameter":"sketchPlane","id":"JIC","deterministicIds":["JIC"],"area":0.0225,"body":"JID","box":[[-0.075,-0.075,0.03],[0.075,0.075,0.03]],"kind":"FACE","normal":[0,0,1],"point":[0,0,0.03],"surfaceType":"PLANE","query":0}"#;
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("sketch-on-plane-feature.noshape"), &doc, live_refs(&live, refs)).unwrap();
+    let mut ours = None;
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+        ours = s.ours.clone();
+    }
+    let made = t.call("sketch_get", json!({ "sketch": ours.unwrap() })).unwrap();
+    let o = made["frame"]["origin"].clone();
+    assert!((o[2].as_f64().unwrap() - 30.0).abs() < 1e-6, "on Plane 1 at z 30 mm, not the cap at 10: origin {o}");
+}
+
+/// A face live names on its part (refs.jsonl `body`) is that part's, though another part's beside it has live's area
+/// exactly (cf-surface-pattern's Split 1: the Thicken's cap on Part 1, not Surface 1 under it, whose area live's ref
+/// gives): Split 1 splits Part 1's side (7 faces), Part 2 keeps its 6.
+#[test]
+fn a_face_live_names_on_its_part_is_that_parts_not_an_exact_area_beside_it() {
+    let rect = |pre: &str, (x0, y0): (f64, f64), (x1, y1): (f64, f64)| json!([
+        segment(&format!("{pre}b"), (x0, y0), (x1, y0)), segment(&format!("{pre}r"), (x1, y0), (x1, y1)),
+        segment(&format!("{pre}t"), (x1, y1), (x0, y1)), segment(&format!("{pre}l"), (x0, y1), (x0, y0))]);
+    let region = |sk: &str| json!({ "btType": "BTMIndividualSketchRegionQuery-140", "featureId": sk, "queryString": format!("query = qSketchRegion(id + \"{sk}\", false);") });
+    let part = |id: &str, name: &str, faces: u32| json!({ "partId": id, "name": name, "bodyType": "solid", "faces": faces, "edges": 12, "vertices": 8 });
+    let (mut doc, mut live) = one_extrude("FS1", rect("a", (0.0, 0.0), (0.02, 0.02)), region("FS1"), part("JHD", "Part 1", 6));
+    // Part 2, 1 mm off Part 1's y = 0 side: its sides there 0.01 % longer (20.002 mm).
+    let fs = doc["features"].as_array_mut().unwrap();
+    fs.push(json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2",
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+        "entities": rect("b", (0.0, -0.003), (0.020002, -0.001)), "constraints": [] }));
+    fs.push(json!({ "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE2", "name": "Extrude 2", "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+        { "btType": "BTMParameterEnum-145", "parameterId": "operationType", "value": "NEW" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [region("FS2")] },
+        { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+        { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "10 mm" }] }));
+    // A line across Part 1's side, on Front (sketch y = world z).
+    fs.push(json!({ "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS3", "name": "Sketch 3",
+        "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JCC"], "queryString": "query=qCreatedBy(makeId(\"Front\"), EntityType.FACE);" }] }],
+        "entities": [segment("v", (0.01, -0.005), (0.01, 0.015))], "constraints": [] }));
+    fs.push(json!({ "btType": "BTMFeature-134", "featureType": "splitPart", "featureId": "FSP", "name": "Split 1", "parameters": [
+        { "btType": "BTMParameterEnum-145", "parameterId": "splitType", "value": "FACE" },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "faceTargets", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JHF"] }] },
+        { "btType": "BTMParameterQueryList-148", "parameterId": "faceTools", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=sketchEntityQuery(id+\"FS3.wireOp\",EntityType.EDGE,\"v\");" }] }] }));
+    let two = |p1: u32| json!([part("JHD", "Part 1", p1), part("JID", "Part 2", 6)]);
+    live.push(json!({ "index": 2, "status": "OK", "parts": [part("JHD", "Part 1", 6)] }));
+    live.push(json!({ "index": 3, "status": "OK", "parts": two(6) }));
+    // Sketch 3's line: Part 1 by its faces' boxes (its y = 0 side JHF, its top).
+    live.push(json!({ "index": 4, "status": "OK", "parts": two(6), "bodies": [{ "id": "JHD", "type": "SOLID", "faces": [
+        { "id": "JHF", "area": 0.0002, "box": { "min": [0.0, 0.0, 0.0], "max": [0.02, 0.0, 0.01] } },
+        { "id": "JHT", "area": 0.0004, "box": { "min": [0.0, 0.0, 0.01], "max": [0.02, 0.02, 0.01] } }] }] }));
+    live.push(json!({ "index": 5, "status": "OK", "parts": two(7) }));
+    let refs = r#"{"index":5,"feature":"Split 1","parameter":"faceTargets","id":"JHF","deterministicIds":["JHF"],"area":0.00020002,"body":"JHD","box":[[0,0,0],[0.02,0,0.01]],"kind":"FACE","normal":[0,-1,0],"point":[0.01,0,0.005],"surfaceType":"PLANE","query":0}"#;
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("face-on-lives-part.noshape"), &doc, live_refs(&live, refs)).unwrap();
+    for k in 0..t.len() {
+        let s = t.step(k);
+        assert!(s.ours.is_some() && s.status.as_deref() == Some("Ok"), "{}: {:?} {:?} {:?}", s.name, s.status, s.message, s.problems);
+    }
+    let parts = t.call("query_parts", json!({})).unwrap();
+    let faces: Vec<(String, u64)> = parts["parts"].as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap().to_string(), p["faces"].as_u64().unwrap())).collect();
+    assert_eq!(faces, [("Part 1".to_string(), 7), ("Part 2".to_string(), 6)], "Part 1's side split");
+}
+
 /// A Variable whose value a List configures (c2-config-parts-sprockets' #dr, #r, #g by pitch): ours configured on its
 /// typed value parameter, each configuration's value set (was refused: "Variable 3 has no parameter `value`").
 #[test]
@@ -4551,14 +4635,28 @@ fn parity_assemblies() {
     let read = |p: &Path| std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
     let (mut docs, mut matching, mut mates, mut mates_matching, mut occurrences, mut occurrences_matching) = (0, 0, 0, 0, 0, 0);
     let (mut bom_rows, mut bom_matching) = (0, 0);
+    // Each document's assembly, then its other top-level assemblies (source.json "extraAssemblies": <dir>/assembly.json
+    // etc., the document's studios shared), named <document>+<assembly name> ("asm-scissor-lift+assembly-3").
+    // NOSHAPE_PARITY_ONLY=<name>[,<name>…]: those alone.
+    let only = std::env::var("NOSHAPE_PARITY_ONLY").ok();
+    let mut cases: Vec<(PathBuf, String, PathBuf, Option<std::collections::HashSet<String>>)> = Vec::new();
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
-        let Some(mut asm) = read(&dir.join("assembly.json")) else {
+        cases.push((dir.clone(), name.clone(), dir.clone(), None));
+        for (_, extra) in read(&dir.join("source.json")).and_then(|s| s["extraAssemblies"].as_object().cloned()).into_iter().flatten() {
+            let (Some(sub), Some(title)) = (extra["dir"].as_str(), extra["name"].as_str()) else { continue };
+            let studios = extra["studios"].as_array().into_iter().flatten().filter_map(|s| s.as_str()?.split_whitespace().next().map(str::to_string)).collect();
+            cases.push((dir.clone(), format!("{name}+{}", title.to_lowercase().replace(' ', "-")), dir.join(sub), Some(studios)));
+        }
+    }
+    cases.retain(|(_, name, _, _)| only.as_deref().is_none_or(|o| o.split(',').any(|x| x == name)));
+    for (dir, name, asm_dir, only_studios) in cases {
+        let Some(mut asm) = read(&asm_dir.join("assembly.json")) else {
             println!("{name}: unreadable assembly.json");
             continue;
         };
         // Live's multi-level BOM (live 11-15 19:49: GET …/bom?indented=true&multiLevel=true).
-        if let Some(bom) = read(&dir.join("bom.json")) {
+        if let Some(bom) = read(&asm_dir.join("bom.json")) {
             asm["liveBom"] = bom;
         }
         // Its subassemblies' own properties (live 11-17: studios/<element>.asm-metadata.json, by configuration).
@@ -4571,7 +4669,7 @@ fn parity_assemblies() {
             }
         }
         // Live's mate messages and unresolved connectors (live / live2 11-15: `mate-messages.json`).
-        if let Some(m) = read(&dir.join("mate-messages.json")) {
+        if let Some(m) = read(&asm_dir.join("mate-messages.json")).or_else(|| read(&asm_dir.join("mate-statuses.json"))) {
             asm["liveMateMessages"] = m;
         }
         // Studios no instance uses whose sketch a Frame elsewhere takes as its profile: built too, with no parts.
@@ -4610,6 +4708,9 @@ fn parity_assemblies() {
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
             let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass") && !s.ends_with(".sketches") && !s.ends_with(".metadata")) else { continue };
+            if only_studios.as_ref().is_some_and(|o| !o.contains(element)) {
+                continue;
+            }
             // Live's per-feature lines (<element>.live.jsonl, live's layout, 1842).
             let live: Vec<Value> = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).map(|t| t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect()).unwrap_or_default();
             // Its parts: <element>.parts.json, else the last state of live's lines (a suppressed feature's line lists
