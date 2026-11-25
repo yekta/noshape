@@ -4510,7 +4510,7 @@ impl PartStudioView {
             let pal = p();
             let item = |(label, text): (String, String)| {
                 let value = match text.split_once(' ') {
-                    Some((num, unit)) if num.parse::<f64>().is_ok() => h_flex().gap(px(2.)).child(crate::ui::measure_value(num.to_string()).text_color(pal.text)).child(div().child(unit.to_string())).into_any_element(),
+                    Some((num, unit)) if num.parse::<f64>().is_ok() => h_flex().gap(px(2.)).child(crate::ui::measure_value(num.to_string()).text_color(pal.text_muted)).child(div().child(unit.to_string())).into_any_element(),
                     _ => div().font_family("monospace").child(text).into_any_element(),
                 };
                 h_flex().gap_1().child(format!("{label}:")).child(value)

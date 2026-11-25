@@ -1307,7 +1307,7 @@ impl PartStudioView {
             let (num, unit) = text.split_once(' ').map(|(n, u)| (n.to_string(), u.to_string())).unwrap_or((text, String::new()));
             h_flex()
                 .gap(px(2.))
-                .child(crate::ui::measure_value(num).text_color(pal.text))
+                .child(crate::ui::measure_value(num).text_color(pal.text_muted))
                 .child(div().child(unit))
         };
         // A value clicked to 5 decimals: its number selected, white on blue (live workflow 20 step 4).
@@ -1381,7 +1381,7 @@ impl PartStudioView {
                         h_flex()
                             .id(SharedString::from(format!("coincident-{label}")))
                             .gap(px(2.))
-                            .child(h_flex().child(crate::ui::measure_value(num).text_color(pal.text)).child(div().child("*")))
+                            .child(h_flex().child(crate::ui::measure_value(num).text_color(pal.text_muted)).child(div().child("*")))
                             .child(div().child(unit))
                             .tooltip(crate::ui::tooltip(tip)),
                     )
