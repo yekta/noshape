@@ -2915,7 +2915,11 @@ impl Ctx<'_> {
             (Surf::Cyl { o, a: ax, r0, k: slope, .. }, Geo::Arc { k, .. }) => {
                 let w = k.c - *o;
                 let h = w.dot(*ax);
-                Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= on && (k.r - (r0 + slope * h)).abs() <= on)
+                // (Turned off the axis by a hair (a pattern's copy 1e-5 off a gear blank's): on it within r A² / 2 (and
+                // along a cone's rulings r A k), its heights within the grey band of its centre's.)
+                let s = k.n.cross(*ax).length();
+                let tilted = s <= 1e-9 || (k.r * s * (0.5 * s + slope.abs()) <= 0.1 * on && k.r * s <= GREY * on);
+                Ok(tilted && (w - *ax * h).length() <= on && (k.r - (r0 + slope * h)).abs() <= on)
             }
             (_, Geo::Apex { .. }) => Ok(false),
             (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. } | Geo::Ell { .. }) => match self.on_surface.get(&(e, f)) {
@@ -4220,7 +4224,25 @@ impl Ctx<'_> {
         let Surf::Cyl { o: o1, a: a1, x, y, r: r1, r0: r01, k: k1, th0, .. } = self.faces[f1].s else { unreachable!() };
         let Surf::Cyl { o: o2, a: a2, r: r2, r0: r02, k: k2, .. } = self.faces[f2].s else { unreachable!() };
         let tol = self.band(f1, f2);
-        if a1.cross(a2).length() > 1e-12 {
+        // (Along each other within the tolerance over the faces (a pattern's copy turned 1e-5 off the part's axis, a
+        // gear blank's rim and its tooth tools' of one radius): on one axis, the second's through its point at the
+        // faces' middle; OCCT's ellipses there are r / sin(A / 2) long, kilometres. Only a hair off: faces at an angle
+        // whose boxes barely overlap (fillets meeting at a corner) are within it over that overlap too.)
+        let (lo, hi) = (self.faces[f1].lo.max(self.faces[f2].lo), self.faces[f1].hi.min(self.faces[f2].hi));
+        let mid = (lo + hi) * 0.5;
+        let om = o2 + a2 * (mid - o2).dot(a2);
+        let along = k1 == 0.0 && k2 == 0.0 && a1.cross(a2).length() <= 1e-4 && {
+            let w = (om - o1) - a1 * (om - o1).dot(a1);
+            let off = |p: DVec3| {
+                let q1 = o1 + a1 * (p - o1).dot(a1);
+                let d = om + a2 * (q1 - om).dot(a2) - q1;
+                (d - a1 * d.dot(a1) - w).length()
+            };
+            let most = (0..8).map(|i| off(DVec3::new([lo.x, hi.x][i & 1], [lo.y, hi.y][(i >> 1) & 1], [lo.z, hi.z][i >> 2]))).fold(0.0, f64::max);
+            most <= tol
+        };
+        let o2 = if along { om } else { o2 };
+        if a1.cross(a2).length() > 1e-12 && !along {
             if k1 != 0.0 || k2 != 0.0 {
                 if self.src.is_some() {
                     return self.nurbs_pair(f1, f2);

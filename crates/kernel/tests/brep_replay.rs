@@ -43,7 +43,7 @@ fn halfway(x: &Shape) -> Option<DVec3> {
 }
 
 /// Each history record as text, with its output's place (micrometres; sorted).
-fn records(r: &OpResult) -> Vec<(String, [i64; 3])> {
+pub(crate) fn records(r: &OpResult) -> Vec<(String, [i64; 3])> {
     let q = |x: f64| (x * 1e6).round() as i64;
     let mut v: Vec<(String, [i64; 3])> = r
         .history
@@ -87,7 +87,7 @@ fn shells(x: &Shape) -> Vec<(usize, usize)> {
 }
 
 /// The same records, places within 2 µm (a centroid rounded the other way).
-fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
+pub(crate) fn same_records(a: &[(String, [i64; 3])], b: &[(String, [i64; 3])]) -> bool {
     let mut used = vec![false; b.len()];
     a.len() == b.len()
         && a.iter().all(|(k, p)| {

@@ -391,6 +391,28 @@ fn arguments_sharing_sub_shapes_keep_them_as_occt() {
     assert_eq!(k::bool_corpus::Summary::of(&r).differences(&c.summary), Vec::<String>::new());
 }
 
+/// A spur gear's tooth gaps cut from its blank (cf-spur-gear, recorded: 20 tools, a pattern's copies turned 1e-5 rad
+/// off the blank's axis, their rims of the blank's radius): noshape's Boolean takes it, the rims on one axis within
+/// the tolerance and the blank's circles on the tools' rims (were OCCT's ellipses 4.5 km long, declined, OCCT 1.4 s):
+/// OCCT's result, its history's places within 2 µm of OCCT's run here.
+#[test]
+fn a_gears_tooth_gaps_turned_a_hair_off_its_axis_cut_its_rim() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "53c631d536b07bba").expect("the recorded cut");
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's cut");
+    k::set_rust_boolean(None);
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let d = k::bool_corpus::Summary::of(&r).differences(&c.summary);
+    assert!(d.iter().all(|x| x == "history differs"), "{d:?}");
+    assert!(crate::brep_replay::same_records(&crate::brep_replay::records(&r), &crate::brep_replay::records(&o)), "history unlike OCCT's");
+}
+
 /// Three rings revolved whole (a recorded fuse of a revolve's regions), each two tori, the inner one the ring's hollow:
 /// tori whose frames are left-handed (normals in where their faces aren't reversed) are told solid or void by where
 /// their normal points; voids in a result of several solids noshape's Boolean leaves to OCCT: three solids (were six,
