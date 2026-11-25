@@ -10091,3 +10091,72 @@ fn a_hole_at_a_point_sketched_on_a_face_merges_into_its_part(cx: &mut TestAppCon
     let scope = cx.update(|cx| dialog.read(cx).feature.params.get("scope").cloned());
     assert!(matches!(&scope, Some(noshape_model::ParamValue::Query(q)) if !q.is_empty()), "Merge scope: {scope:?}");
 }
+
+/// Live qa/mistakes-1125 batch 2: a rectangle dimensioned 40 x 20, then its top edge dimensioned too. Accepted with
+/// Enter, the new dimension is driven and the sketch stays solved; 45 typed into its box instead keeps it driving, the
+/// bubble says "Sketch could not be solved.", ✓ leaves the row red with that tooltip, and one Ctrl+Z takes the whole
+/// dimension away (40 / 20 only, solved again).
+#[gpui::test]
+fn a_dimension_on_an_edge_the_sketch_already_fixes_as_live(cx: &mut TestAppContext) {
+    use noshape_model::display::FeatureStatus;
+    for typed in [None, Some(["4", "5", "enter"])] {
+        let (window, view) = sketch_with(cx, if typed.is_none() { "dim-fixed-enter" } else { "dim-fixed-45" }, Tool::CornerRect);
+        let at = |cx: &mut TestAppContext, x: f64, y: f64| { let p = on_screen(cx, &view, DVec2::new(x, y)); (p.x, p.y) };
+        let (a, b) = (at(cx, 0.01, 0.01), at(cx, 0.05, 0.03));
+        click(cx, window, &view, a);
+        click(cx, window, &view, b);
+        keys(cx, window, &["escape"]);
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+        draw(cx, window);
+        let dimension = |cx: &mut TestAppContext, line: (f64, f64), place: (f64, f64), keys_in: &[&str]| {
+            let (l, p) = (at(cx, line.0, line.1), at(cx, place.0, place.1));
+            click(cx, window, &view, l);
+            click(cx, window, &view, p);
+            assert!(cx.update(|cx| view.read(cx).dim_input.is_some()), "the box opens");
+            keys(cx, window, keys_in);
+            draw(cx, window);
+            wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        };
+        dimension(cx, (0.03, 0.01), (0.03, 0.002), &["enter"]);
+        dimension(cx, (0.01, 0.02), (0.002, 0.02), &["enter"]);
+        let dims = |cx: &mut TestAppContext| cx.update(|cx| {
+            let data = view.read(cx).sketch_data(cx).unwrap();
+            let mut v: Vec<(i64, bool)> = data.sketch.constraints().filter(|c| c.kind.is_dimension()).filter_map(|c| Some(((c.value()? * 1e4).round() as i64, c.driving))).collect();
+            v.sort();
+            v
+        });
+        assert_eq!(dims(cx), vec![(200, true), (400, true)], "40 x 20");
+        let id = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+        // Committed as 40 x 20, then opened again for the third dimension (live's order).
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+        draw(cx, window);
+        let row = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.message.clone())));
+        let bubble = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).message.as_ref().map(|m| m.1.clone()));
+        dimension(cx, (0.03, 0.03), (0.03, 0.038), typed.as_ref().map_or(&["enter"][..], |t| &t[..]));
+        let Some(_) = typed else {
+            assert_eq!(dims(cx), vec![(200, true), (400, false), (400, true)], "Enter: the top's 40 driven");
+            assert_eq!((row(cx).map(|r| r.0), bubble(cx)), (Some(FeatureStatus::Ok), None), "Enter: solved, no bubble");
+            continue;
+        };
+        assert_eq!(dims(cx).iter().filter(|d| d.1).count(), 3, "45: driving, {:?}", dims(cx));
+        assert_eq!(bubble(cx).as_deref(), Some("Sketch could not be solved."), "45: the bubble");
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+        assert_eq!(row(cx), Some((FeatureStatus::Error, Some("Sketch could not be solved.".to_string()))), "✓: the row red");
+        let doc = cx.update(|cx| view.read(cx).doc.clone());
+        cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let stored = cx.update(|cx| {
+            let Some(f) = view.read(cx).studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id).cloned()) else { return vec![-1] };
+            let Some(noshape_model::ParamValue::Sketch(data)) = f.params.get("sketch") else { return vec![] };
+            let mut v: Vec<i64> = data.sketch.constraints().filter(|c| c.kind.is_dimension()).filter_map(|c| c.value()).map(|x| (x * 1e4).round() as i64).collect();
+            v.sort();
+            v
+        });
+        assert_eq!((stored, row(cx).map(|r| r.0)), (vec![200, 400], Some(FeatureStatus::Ok)), "Ctrl+Z: the dimension gone, solved");
+    }
+}
