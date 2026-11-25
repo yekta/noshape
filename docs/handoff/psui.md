@@ -140,8 +140,23 @@ docs/DECISIONS.md (read first; it wins over anything here).
   draws that (selected #fab601). Green; QUEUED with cd7a6606 (carried) at 15:0x.
   15:0x lead (qa b92222847): FLOW-REGION-UNDER-FACE-PICK partly: opening + rim regions pick as live, but a click
   on the outer ring region beside the box (-1, 20, 30) still adds "Face of Extrude 1" (live: Face of Sketch 2): a
-  region outside the part (over nothing or a side face) must win too. NEXT (in order): FLOW-REGION-UNDER-FACE-PICK,
-  TRIAD-LOOK, CONFIG-FILTER-HELP, then live everyday PS / asm / first-user captures vs ours.
+  region outside the part (over nothing or a side face) must win too.
+  15:1x: fixed (preview_region_under in mod.rs: under a preview the GPU pick there was empty and the click's reach
+  took the side face; hover + click now take the region when no before-face is in front). FEEL-TAB-TO-FLIP-FOCUS
+  second direction fixed (assembly pattern_flip_focus is [FocusHandle; 3]). Both tests green on vibex8.
+  16:2x: committed 0a0afebb2 (code) + a3a594b9d (TICKETS) + handoff, landed with land.sh (result from the lead):
+  FLOW-REGION outer ring, pattern Tab per direction, part paste under the pointer (waits for its first solve:
+  ui.drop_on_result), suppressed menu keeps Where used…, IMP-FACE-APPEARANCE-ROWS (appearance.rs
+  imported_face_rows, one row per import and colour), TOAST-QUEUE (app-core toasts.rs ToastQueue + pump in each
+  view's render; workspace time_toast), Edit/Assign material… literal labels (coverage: 0a53127fc in be01ac8f's
+  stack lacked them). Full part-studio-ui lib green (608) before the last batch; the batch's tests + clippy green.
+  Capture items checked: BOM (bom.rs walk: suppressed out, hidden in) = live; new-doc units from Preferences
+  (user_units::new_document) = live; sketch undo scope = live (test
+  a_finished_sketch_is_one_undo_step_and_a_reentered_one_starts_empty, via DocModel::undo).
+  OPEN: in that test Ctrl+Z by key after ✓ did not reach the document undo (focus in the test window?); check in the
+  app that Ctrl+Z right after a sketch ✓ undoes it. Left from asm-everyday-1125: fixed-part drag adds no step, Insert
+  session one step, Fastened mate undo restores the move (not yet compared).
+  NEXT: the OPEN item above, then the lead's next row.
   Parts-list menu: Edit material… / Show center of mass with a material (mod.rs; test
   a_part_with_a_material_offers_edit_material_and_its_center_of_mass in list_feel_tests, green).
   To compare (live, no ask yet): live/psui/everyday-1125 (undo scopes: sketch ✓ one step, re-entered sketch
