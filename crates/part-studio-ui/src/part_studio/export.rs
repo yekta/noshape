@@ -55,7 +55,9 @@ impl PartStudioView {
         };
         let values = crate::export_naming::values(&self.doc.read(cx).name(), &self.studio_name(cx), &name, props.as_ref());
         let base = crate::export_naming::default_name(element, ExportSettings::default().format.label(), &values, base);
-        let parts_only = !bodies.is_empty();
+        // One row's own dialog; several rows get the tab's (live dx/maker-io-1125: the tab's file name, no Inspection
+        // list, "Export unique parts as individual files"), exporting those parts.
+        let parts_only = bodies.len() == 1;
         open_export_modal_with(base, false, parts_only, Rc::new(move |s, name, window, cx| {
             let bodies = bodies.clone();
             view.update(cx, |this, cx| this.run_part_export(s, name, bodies, window, cx));

@@ -35,6 +35,26 @@ fn num(v: &Value) -> f64 {
 
 /// An ellipse axis dimension reads Ø its axis (qa AGENT-ELLIPSE-DIM-VALUE:
 /// it read Ø60 for a 30 mm axis), by `auto` or `diameter`.
+/// Live dx/maker-io-1125 m1 (EXPORT-MULTI-ROW-INDIVIDUAL): two of three parts exported as individual files: a zip of
+/// "<tab> - Part 1.stl" and "<tab> - Part 3.stl", not Part 2.
+#[test]
+fn two_of_three_parts_export_as_individual_files() {
+    let mut ctx = Ctx::new();
+    let path = scratch("multi-row-individual.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    for x in [0, 30, 60] {
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+        call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[x, 0], [x + 20, 10]] }));
+        let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm", "operationType": "NEW" } }));
+    }
+    let z = call(&mut ctx, "export_parts", json!({ "format": "STL", "parts": ["Part 1", "Part 3"], "individual": true, "file": scratch("multi-row-individual").to_str().unwrap() }));
+    let zip = std::path::PathBuf::from(z["file"].as_str().unwrap());
+    assert_eq!((zip.extension().and_then(|e| e.to_str()), z["parts"].as_u64()), (Some("zip"), Some(2)), "{z}");
+    let bytes = String::from_utf8_lossy(&std::fs::read(&zip).unwrap()).to_string();
+    assert!(bytes.contains("Part Studio 1 - Part 1.stl") && bytes.contains("Part Studio 1 - Part 3.stl") && !bytes.contains("Part 2.stl"), "the zip's entries");
+}
+
 #[test]
 fn ellipse_axis_dimension_reads_its_diameter() {
     let mut ctx = Ctx::new();

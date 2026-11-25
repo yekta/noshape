@@ -5894,6 +5894,32 @@ impl ExportDialog {
     }
 }
 
+/// Live dx/maker-io-1125 (EXPORT-MULTI-ROW-INDIVIDUAL): one part row's Export has no "Export unique parts as
+/// individual files"; two rows' has it, as the tab's.
+#[gpui::test]
+fn two_part_rows_export_offers_individual_files(cx: &mut TestAppContext) {
+    let _prefs = OwnExportPrefs::new("multi-row");
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [20, 10]] }, { "corner_rectangle": [[30, 0], [50, 10]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0", "Sketch 1 region 1"], "depth": "5 mm", "operationType": "NEW" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "export-multi-row", Some(start));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.len() >= 2 && !view.read(cx).ui_busy());
+    let bodies: Vec<noshape_model::BodyId> = cx.update(|cx| view.read(cx).display.bodies.iter().map(|b| b.id.clone()).collect());
+    let mut shown = Vec::new();
+    for n in [1, 2] {
+        let some = bodies[..n].to_vec();
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_part_export(some, w, cx))).unwrap();
+        draw(cx, window);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        shown.push(vcx.debug_bounds("ex-individual").is_some());
+        let cancel = vcx.debug_bounds("modal-cancel").expect("Cancel");
+        vcx.simulate_click(cancel.center(), Modifiers::default());
+        draw(cx, window);
+    }
+    assert_eq!(shown, [false, true], "the box with one row, with two");
+}
+
 /// Live (the client's saveExportOptions / getExportSolidOptions, user setting exportSolidOptions): Export opens on the
 /// last export's format and options, each format keeping its own (STEP's version stays across a switch to Parasolid
 /// and back, Parasolid's is still the latest); Cancel keeps nothing.
