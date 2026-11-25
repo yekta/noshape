@@ -183,6 +183,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   here): needs a live probe of the ring at other clicks before changing. Live's "plain click on a part picks nothing
   in Transform until hovered" is lost input (DECISIONS 11-07): not copied. Triad: no field focused + dialog Ctrl+Z
   resets the drag in one step: ours, tested (the_translate_triads_xy_square_drags_x_and_y_and_keeps_the_focus); asm drag 2.5 px (live 3: 2 none, 3 moves), no box, one undo (asm tests).
+  18:1x (lead): Transform plain-click = lost input, agreed not copied. Ring position filed: REQUESTS "psui 11-25 18:10"
+  (live/psui/manip-ring-1125; then make revolve_arc's moveFace anchor match). Asm 2.5 px threshold kept: live's band
+  is (2, 3] (2 none, 3 drags), tested by app-core presses_drag_and_open_the_menu_as_live. LOOK-OUTLINE-WEIGHT: on main
+  (f6da23b36 PART_EDGE_INK 0.85), "fixed, to verify" for qa; nothing left for me.
   NEXT: 2) LOOK-OUTLINE-
   WEIGHT: our fix (e8b29bf7b, PART_EDGE_INK 0.85) is in the queued stack (land jobs cd7a6606 .. b0e47f46 pending on
   vibe2; origin/main still 9996450a4 15:39 at 17:0x); verify after it lands. 3) PARTLY TICKETS rows
