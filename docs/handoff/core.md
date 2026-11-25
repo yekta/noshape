@@ -5,6 +5,17 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
+- **P0 SCISSOR REGRESSION BISECT (lead 15:1x, first)**: new vs the slabs run (d-slab 12:51) in parity d-now (14:42):
+  97ad5f Extrude 2 / Boolean 2 / Fillet 3 / Move face 1, fed22d Extrude 18/28/38 / Fillet 18 / Move face 7 (97ad5f
+  Sketch 2 fails in both). Suspect skasm ad2024d69 + af3f106e6 (sketch.rs: lost Use entities turned free, were fixed).
+  Running (bg, ~50 min from 15:2x): branch **core-bis** in core-rf (HEAD = probe commit "BISECT PROBE (never land)",
+  then this handoff commit), .pa2.sh on vibex7: arm keep (NOSHAPE_BIS_KEEP_USE=1) then free; results
+  ~/tmp/core/sc/d-keep, d-free, pa-*.out. Keep fixes them -> hand to skasm (ids roster.md) with the evidence; else
+  bisect the other commits 57be5890b..bed5d200b. Afterwards: git checkout core-trial, cherry-pick this handoff commit
+  only (never the probe), delete core-bis. CLI st.py on the saved doc is NOT usable (in-context refs lost on save).
+- **NEXT after the bisect: HOLE OVERRIDE BANNER (lead 15:2x, qa 4903a4ed6 cell 71)**: if live hole-override-1125
+  confirms, our UI must show the blue banner "Parameters have been overridden. Check input." (on reopen; live
+  behaviours ~33077) and the feature row's Info state; today only the op reports Info (dialog, row OK, tooltip plain).
 - **P1 MESH-MOVE-FACE (lead 11-25 14:4x, qa flow 5, live qa/dl-bracket-1125)**: Move face Offset on an STL part (1 mesh
   face) offsets the whole mesh: kernel `Shape::offset_mesh` (mesh_io.cpp: facets unified, OCCT sharp offset, then its
   convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
