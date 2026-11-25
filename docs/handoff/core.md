@@ -1,10 +1,22 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 14:26 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 15:02 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
+- **P1 MESH-MOVE-FACE (lead 11-25 14:4x, qa flow 5, live qa/dl-bracket-1125)**: Move face Offset on an STL part (1 mesh
+  face) offsets the whole mesh: kernel `Shape::offset_mesh` (mesh_io.cpp: facets unified, OCCT sharp offset, then its
+  convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
+  (live 35320.926): the holes' facet rims stay sharp (OCCT can't fillet them). Delete face already removed the part.
+  T1 mesh_import::a_mesh_body_offsets_whole_with_rounded_convex_edges, features_b::move_face_offsets_a_mesh_part_….
+- **P1 HOLE Ø5 "overridden"**: NOT changed. std hole.fs reports HOLE_PARAMS_OVERRIDDEN_INFO for Ø5 on Drilled 1/4, and
+  behaviours L52 / prize-wheel-tim show it as the blue banner over the graphics area (qa checked dialog/toast/tooltip
+  only). Asked live (REQUESTS hole-override-1125); change only if live shows no INFO featureState.
+- **Scissor parity 11-25 14:3x** (core-scratch/pa-now-1125.out, saved doc vibex7 ~/tmp/core/sc/fresh): 2d82a0
+  Chamfer 2 fixed. New vs the slabs run, not from the chamfer (it only runs after OCCT fails): fed22d Extrude
+  18/28/38 + Fillet 18 + Move face 7, 97ad5f Extrude 2/Boolean 2/Fillet 3/Move face 1, 665cf3 Fillet 2/3, 57725f
+  Fillet 2: from main since then; check before working b–d.
 - **HOLE vs live hole-1125** (lead 11-25 13:4x): probe core-scratch/hole/hp.py (40x30x20 block, face + Top-plane
   sketches, via MCP). Same as live: lists (T1 hole_tables::tests::lists_are_lives: 170 inch / 157 metric drills,
   42 taps M1-M68, PEM® only Simple, defaults), tap drill M5 4.2, merge scope = the part on face and plane sketches,
