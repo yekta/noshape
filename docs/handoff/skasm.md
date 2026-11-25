@@ -3,27 +3,17 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 17:4x) — read first
-- FIX FORWARD (lead 17:3x): all lands since 16:16 failed. e4458668 failed ops e2e
-  `two_parts_of_a_flexible_subassembly_mate_in_its_parent` (expected a part-with-itself mate refused; 7417afb1e makes it,
-  flagged): test updated (uncommitted), run skasm-scratch/bin/te2e.sh. 18d00b55/8886d746/f3e0b4f3/80c0df76/3ffd041e/
-  deaba572: rebase conflict with psui b0e47f46 in sketch_ui_tests.rs (both added an undo-scope test at one spot):
-  when b0e47f46 is on origin/main, rebase and keep psui's `a_finished_sketch_is_one_undo_step_and_a_reentered_one_
-  starts_empty`, drop my `a_finished_sketch_is_one_undo_step` (trial in ~/tmp/skasm/rbtry: only that conflict).
-- P0 SKETCH-DRAG-SOLVE, UNCOMMITTED, commit with the fix: scene DRAG_START_PX 5 -> 3, `drag_grab` (point keeps its grab
-  offset), T1s `a_press_drags_from_3_px`, `a_dragged_point_keeps_its_grab_offset`, `under_defined_drags_solve_as_live`
-  (corner/rim/arc end/spline already matched live); psui `sketch_drags_hide_the_fills_and_undo_one_at_a_time_as_live`
-  (also: no hover orange mid-drag via highlighted_hover; entity hover isn't in the scene overlay). tdrag.sh: scene 221
-  ok, drag+label 4 ok. Commit "skasm: sketch drags as live (sketch-drag-1125): 3 px start, grab offset kept; tests".
+## NOW (11-25 18:0x) — read first
+- QUEUED 7ec8a1b3 (23 commits; replaces c9f9e1ac, failed on a feedback_feel_tests.rs conflict with psui 8a62f4834:
+  both tests kept). Carries: screws translator, API Warning, l.706 sketch feel, e2e same-part mate made in error,
+  SKETCH-DRAG-SOLVE (3 px start, grab offset kept; latency slow-drag test expects the offset), centre point arc
+  start/end VERTICAL/HORIZONTAL to its own centre (ARC_CENTRE placeholder, not offered when the centre is on a point),
+  glyph-taken (a later selected point's row whose spot is taken, 6 px margin, goes to (-40,-12)), pattern tiles in
+  live's colours (213,189,158 / 213,163,100), no Recently used in a sketch's Alt+C (row + T1).
+- Routed: lora f39 "Ribs" to core (translator checked: 26 profiles, sketch lines to 0.000 mm; 4 r1.1 circles).
+- Open: glyph-taken at 30+ px unmeasured (live 9/16/25 px moved); live's centre "woken" for the arc H/V (ours always).
 - Open note: labels stored absolute; live labelDistance/labelRatio; whether a label follows a dragged line unchecked.
-- NEXT (live posted, lead 17:4x), after the above:
-  1) lora: refs in; c2-lora 39/46, first diff f39 "Ribs" (191/474/277 vs live 177/444/265, vol -3.46 mm3).
-  2) live/skasm/sketch-feel-1125: 2nd-direction arrow + "1x" shown by default; count label tan hover, orange click,
-     double-click opens the box (ours matches); a sketch's Alt+C has NO "Recently used" (fix ours + the row/T1).
-  3) live/skasm/glyph-taken-1125: the 2nd corner's glyph row goes left past the 1st, about (-40,-12) px.
-  4) live/skasm/infer-arc-circle-1125: circle r-point gives TANGENT .perimeterSnap0 but a line end beats tangent;
-     3-point arc near a semicircle gives MIDPOINT(center); centre-point arc end stores HORIZONTAL to a woken centre
-     (corrects the catalogue); `t` = Tangent constraint.
+- NEXT: ask the lead.
 
 ## Earlier NOW (11-25 14:11)
 - LANDED: Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent (live tangent-one-entity-1123).
