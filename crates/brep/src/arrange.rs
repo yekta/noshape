@@ -1,9 +1,10 @@
 //! The regions a set of curves divides a face's parameter plane into (a face split by the edges on it).
 
-use crate::curve2::{inside, ray_misses_box, SpanBoxes, C2};
+use crate::curve2::{inside_with, ray_misses_box, SpanBoxes, C2};
 use crate::Decline;
 use glam::DVec2;
 use std::f64::consts::{PI, TAU};
+use std::sync::OnceLock;
 
 /// A bounded region: its outer loop (counter-clockwise), its holes (clockwise), each a list of (curve,
 /// reversed), and a point strictly inside it.
@@ -133,6 +134,9 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         .iter()
         .map(|cs| cs.iter().try_fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(lo, hi), c| c.quick_box().map(|(a, b)| (lo.min(a), hi.max(b)))))
         .collect();
+    // (Each cycle's curves' boxes and sample points, made when first asked: every hole's point asks the same
+    // cycles' (cf-surface-pattern's 85-tool cut).)
+    let cycle_spans: Vec<OnceLock<Vec<SpanBoxes>>> = (0..cycles.len()).map(|_| OnceLock::new()).collect();
     let mut members: Vec<Vec<usize>> = vec![Vec::new(); regions.len()];
     for (ci, c) in cycles.iter().enumerate() {
         if areas[ci] > 0.0 {
@@ -149,7 +153,7 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
             if cycle_box[cj].is_some_and(|(lo, hi)| q.x < lo.x || q.y < lo.y || q.x > hi.x || q.y > hi.y) {
                 continue;
             }
-            if inside(q, &cycle_curves[cj]) {
+            if inside_with(q, &cycle_curves[cj], cycle_spans[cj].get_or_init(|| cycle_curves[cj].iter().map(C2::span_boxes2).collect())) {
                 best = Some(cj);
             }
         }
@@ -226,9 +230,9 @@ pub(crate) fn deeper(segs: &[([u32; 2], C2)], r: &Region, enough: f64) -> DVec2 
             let m = c.at(t);
             let dir = c.tangent(t).perp();
             let mut hits = Vec::new();
-            for (g, b) in curves.iter().zip(&boxes) {
+            for ((g, b), sp) in curves.iter().zip(&boxes).zip(&spans) {
                 if !b.is_some_and(|b| ray_misses_box(b, m, dir)) {
-                    g.ray_hits(m, dir, &mut hits);
+                    g.ray_hits_by(m, dir, &mut hits, Some(sp));
                 }
             }
             let nearest = hits.into_iter().filter(|&s| s > 1e-9 * len).fold(f64::INFINITY, f64::min);

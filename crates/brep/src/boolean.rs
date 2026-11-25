@@ -4674,6 +4674,7 @@ impl Ctx<'_> {
                     }
                 }
                 let gb = if hits.is_empty() { &[][..] } else { self.bound(f)? };
+                let gs = if hits.is_empty() { &[][..] } else { self.bound_spans(f)? };
                 // (On a face whose angles go round: a crossing a whole turn over too, where Newton's parameters fell
                 // the other side of its seam (a sphere's u 3e-5 below 0: the knob on prize-wheel's top, a sliver kept).)
                 let turns: Vec<DVec2> = match (&g.s, g.ns.as_deref()) {
@@ -4691,7 +4692,7 @@ impl Ctx<'_> {
                     // (Within the tolerance: on the face. Past it, within the grey band, a crossing as any other: a sheet
                     // metal part's flange 20 um off a tool's face (tolerance 1e-5) declined, OCCT keeping them apart.)
                     if t.abs() <= tol {
-                        if distance2(g.to2(p), gb) > tol && inside2(g.to2(p), gb) {
+                        if distance_with(g.to2(p), gb, gs) > tol && inside_with(g.to2(p), gb, gs) {
                             return Err(Decline("a piece's point on another solid's face"));
                         }
                         continue;
@@ -4700,11 +4701,11 @@ impl Ctx<'_> {
                         continue;
                     }
                     let q0 = at.unwrap_or_else(|| g.to2(p + r * t));
-                    let q = std::iter::once(q0).chain(turns.iter().flat_map(|&d| [q0 + d, q0 - d])).find(|&q| inside2(q, gb)).unwrap_or(q0);
-                    if distance2(q, gb) <= GREY * tol {
+                    let q = std::iter::once(q0).chain(turns.iter().flat_map(|&d| [q0 + d, q0 - d])).find(|&q| inside_with(q, gb, gs)).unwrap_or(q0);
+                    if distance_with(q, gb, gs) <= GREY * tol {
                         continue 'dirs;
                     }
-                    if inside2(q, gb) {
+                    if inside_with(q, gb, gs) {
                         odd = !odd;
                         if nearest.is_none_or(|x| t < x.0) {
                             nearest = Some((t, f, p + r * t));
@@ -5986,6 +5987,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let curves = par_map(cx.faces.len(), &|f| if firsts[f].is_some() { Ok((Vec::new(), Vec::new())) } else { curves_of(f) })?;
     // (Each face's curves' lengths, found once when asked.)
     let lengths: Vec<Vec<std::sync::OnceLock<f64>>> = curves.iter().map(|c| c.as_ref().map_or(Vec::new(), |x| (0..x.0.len()).map(|_| Default::default()).collect())).collect();
+    // (Each face's curves' sample points, made once for their crossings with all the others (cf-surface-pattern's
+    // 85-tool cut: 85k times).)
+    let samples: Vec<Vec<crate::curve2::Samples>> = curves.iter().map(|c| c.as_ref().map_or(Vec::new(), |x| (0..x.0.len()).map(|_| Default::default()).collect())).collect();
     let mut items: Vec<(usize, usize)> = Vec::new();
     for (f, c) in curves.iter().enumerate() {
         if let Ok((c2, ..)) = c {
@@ -6008,7 +6012,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             {
                 continue;
             }
-            for (t, u) in c2[i].intersections(&c2[j], tol) {
+            for (t, u) in c2[i].intersections_with(&c2[j], tol, &samples[f][i], &samples[f][j]) {
                 let (li, lj) = (*lengths[f][i].get_or_init(|| cx.seg_length(&segs[i])), *lengths[f][j].get_or_init(|| cx.seg_length(&segs[j])));
                 if t * li > tol && (1.0 - t) * li > tol && u * lj > tol && (1.0 - u) * lj > tol {
                     out.push((i, j, t, u));

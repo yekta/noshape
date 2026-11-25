@@ -633,8 +633,10 @@ impl C2 {
     fn nearest_sample(&self, p: DVec2, boxes: Option<&SpanBoxes>) -> (f64, f64) {
         let n = self.samples();
         let mut best = (0, f64::INFINITY);
+        // (Its sample points where rays already made them.)
+        let kept = boxes.and_then(|b| b.points.get()).filter(|x| x.len() == n + 1);
         let look = |k: usize, best: &mut (usize, f64)| {
-            let d = (self.at(k as f64 / n as f64) - p).length();
+            let d = (kept.map_or_else(|| self.at(k as f64 / n as f64), |x| x[k]) - p).length();
             if d < best.1 || (d == best.1 && k < best.0) {
                 *best = (k, d);
             }
