@@ -1,10 +1,16 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 13:31 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-25 13:59 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
+- **HOLE vs live hole-1125** (lead 11-25 13:4x): probe core-scratch/hole/hp.py (40x30x20 block, face + Top-plane
+  sketches, via MCP). Same as live: lists (T1 hole_tables::tests::lists_are_lives: 170 inch / 157 metric drills,
+  42 taps M1-M68, PEM® only Simple, defaults), tap drill M5 4.2, merge scope = the part on face and plane sketches,
+  callout title/list name (interaction::hole_name), cbore/csink/tapped volumes. Fixed: Tap type labels (QUEUED
+  15da59b1). Open: live's default depth 8 mm vs std's 12 mm, likely the account's remembered value (we remember on
+  ✓, live 1987): asked live in REQUESTS (hole-remember-1125). Not captured: preview timing, errors.
 - **STEP-EXPORT-FACE-COLOURS: QUEUED f87d9280** (lead 11-25 13:1x; I own export while dx is parked). step_out.rs
   styled_solid(): per face OVER_RIDING_STYLED_ITEM over the solid's STYLED_ITEM (STYLED_ITEM without a part colour);
   StepOptions/ExportSettings.face_colors (per part, MapShapes face index, sRGB) from BodyDisplay.face_colors
