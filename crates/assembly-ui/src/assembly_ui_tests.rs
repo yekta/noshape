@@ -4711,3 +4711,63 @@ fn a_picked_pattern_direction_previews_at_once(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// qa FEEL-MC-ARC-PICK-VERTEX-ASM (live hobbyist-1125 "Hinge", a knuckle's 270 degree arc): the connector previewed
+/// and taken over an arc edge is its centre, even 3 mm from the arc's end (ours took the end vertex).
+#[gpui::test]
+fn an_arc_edges_connector_is_its_centre_near_its_end(cx: &mut TestAppContext) {
+    use noshape_scene::{asm_scene::AsmPickTarget, builder::PickKind};
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-arc-centre-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap(), "length_unit": "mm" }));
+        let extrude = |ctx: &mut Ctx, shape: Value, op: &str| {
+            let sk = call(ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+            let d = call(ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [shape] }));
+            let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+            call(ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": op, "symmetric": op == "REMOVE", "endBound": if op == "REMOVE" { "THROUGH_ALL" } else { "BLIND" } } }));
+        };
+        extrude(&mut ctx, json!({ "tool": "circle", "points": [[0, 0], [5, 0]] }), "NEW");
+        extrude(&mut ctx, json!({ "tool": "corner_rectangle", "points": [[0, 0], [10, 10]] }), "REMOVE");
+        call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    }
+    let (window, view) = open_assembly(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.start_mate(MateType::Fastened, w, cx);
+            let id = instance(v, "Part 1 <1>", cx);
+            let occ = v.result.occurrences.iter().position(|o| o.top() == id).unwrap();
+            let (transform, arc) = {
+                let o = &v.result.occurrences[occ];
+                let edges = o.context.body(&o.body).unwrap().shape.edges();
+                // The top 270 degree arc (r 5 mm at z 10 mm).
+                let k = edges
+                    .iter()
+                    .position(|e| e.endpoints().is_ok_and(|(a, b)| a.z > 0.009 && b.z > 0.009) && e.length().is_ok_and(|l| (l - 0.0075 * std::f64::consts::PI).abs() < 1e-6))
+                    .unwrap_or_else(|| panic!("the top arc: {:?}", edges.iter().map(|e| (e.endpoints().ok(), e.length().ok())).collect::<Vec<_>>()));
+                (o.transform, o.edge_refs[k].clone())
+            };
+            let centre = glam::DVec3::new(0.0, 0.0, 0.01);
+            // 3 mm along it from its end at (5, 0).
+            let near_end = glam::DVec3::new(0.005 * (-0.6f64).cos(), 0.005 * (-0.6f64).sin(), 0.01);
+            v.pointer = v.viewport.read(cx).project(transform.transform_point3(near_end)).expect("on screen");
+            v.hover = Some(AsmPickTarget { path: vec![id], reference: arc, kind: PickKind::Edge, occ, anchor: None });
+            v.update_inference(cx);
+            let (_, _, cands) = v.infer.clone().expect("the arc's points");
+            let c = &cands[v.infer_choice.expect("a choice")];
+            assert!(c.frame.origin.distance(centre) < 1e-6, "the arc's centre, not its end: {:?} ({:?})", c.frame.origin, c.reference);
+            // The click takes what the preview shows.
+            let units = v.units(cx);
+            let taken = v.result.connector_world(&c.connector(&[id]), &units).expect("the connector");
+            assert!(taken.origin.distance(transform.transform_point3(centre)) < 1e-6, "taken at the centre: {:?}", taken.origin);
+        })
+    })
+    .unwrap();
+}
