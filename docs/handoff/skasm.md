@@ -4,7 +4,7 @@ Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
 ## NOW (11-25 07:41) — read first
-- IN TEST (11-25 07:41) bracket everyday check (lead 11-25): psui `a_bracket_drawn_step_by_step_as_live` draws lines, a
+- QUEUED 1290c4f1 (11-25 07:50) bracket everyday check (lead 11-25): psui `a_bracket_drawn_step_by_step_as_live` draws lines, a
   tangent arc, a hole, 3 dimensions, a mirror and a trim step by step against live's tool specs (behaviours 18337-18403,
   15793); all as live but one: a tangent / 3 point arc ended level with its own start took a HORIZONTAL. Fixed in `infer`
   (`own_start`: only Line, Midpoint line, Inscribed polygon align with their own first click, behaviours ~40336); scene
@@ -12,7 +12,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   Open: the hole's centre tie (Coincident vs Concentric) and trim's offspring constraints not checked against live.
 - QUEUED 9102b99e 11-25 02:40 (3 commits): (1) "free geometry joined to a conflict drags": `Sketch::drag` retries a
   Failed drag with `SolveOptions::unheld` = `unheld_constraints(1e-9)` unless the handle is FullyConstrained (fz211
-  stuck free entities 161 -> 3; open: lines 92, 95, fit spline 215; T1 misc free_geometry_joined_to_a_conflict_drags).
+  stuck free entities 161 -> 3; T1 misc free_geometry_joined_to_a_conflict_drags). The 3 (lines 92, 95, fit spline 215)
+  are bodies held by Fix'd points (92 via c51 to 93's Fix c122; 215 has 4 Fix'd fit points): live leaves such a body
+  still (REQUESTS 3074 fromOrigin-body); each free point of theirs drags 0.4-6.8 mm (probe zz_probe_fz211_three). Closed.
   (2) Insert DXF/DWG as live (live/skasm/dxf-insert-1125): `insert_drawing` no longer joins ends (0 constraints);
   `DxfDrawing::unrecognized` counts texts/hatches/faces/leaders; scene `insert_dxf` drops POINTs, returns
   (ids, Some(DXF_UNRECOGNIZED)); `DXF_UNREADABLE` for unparseable files; psui insert selects nothing, no message,
