@@ -23,6 +23,16 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
   the plane; render overlay.rs `world_fills`); the open sketch's labels are GPUI text at viewport px (sketch.rs
   PlacedDimension) and the arrowheads screen-px in scene sketch_mode.rs. Plan: size = px x (mm/px at the label anchor),
   laid along the sketch x / y, so n view is unchanged (12 px upright) and iso foreshortens; keep the label's hit box.
+  Found: arrowheads are already in-plane (scene sketch_mode.rs `arrow`, 16 x 7 px times world_per_px), so only the
+  text moves. Plan: (1) sketch.rs ~1294 (CameraChanged path, where ed.world_per_px is set) computes oblique =
+  |camera.forward . ed.frame.normal| < 0.999 || |camera.right . ed.frame.x| < 0.999, kept in ui.sketch_dims_in_plane,
+  cx.notify() when it flips. (2) oblique: sketch_dimension_overlay (sketch.rs ~4365) keeps each row_box Label for the
+  hit test but drops its masks and makes its quads transparent; (3) new sketch_dimension_fills() pushed with
+  shown_dims_fills in render_viewport_underlay (mod.rs ~7073): per PlacedDimension (not the edited one) the text via
+  plane_text in the plane, asc = 16 x 1.069 x wpp, centred on `anchor` along ed.frame.x / .y (as shown_dims.rs
+  ShownLabel: origin = anchor - x w/2 - y DIGIT_H asc/2), fg color; the hover/selected bg as an in-plane quad; the
+  "ƒx" marker in its grey first, 4 px gap. Test: iso camera, the label's fill contours span is ~0.82 along screen x
+  and its height ~0.5-0.6 of the n view's; n view keeps the screen label (masks present).
 - LANDING e4458668 (lead at 96% context, not messaged): dim box Esc, OPS-TANGENT-MATE A ("Mate is invalid." for a
   same-instance Tangent is live's text, errors-1123), pattern row mark; phone stand (cc40754f) not on main at 15:1x.
 - Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
