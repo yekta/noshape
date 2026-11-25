@@ -278,6 +278,17 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
     if unsolved {
         ev.warnings.push("Sketch could not be solved.".into());
     }
+    // Live (spline-image-1125 (4)): a spline whose end lies on its own start without being closed is degenerate.
+    let closes_on_itself = sk.entities().any(|e| match &e.geometry {
+        noshape_sketch::Geometry::FitSpline { points, handles: Some(_) } => match (points.first(), points.last()) {
+            (Some(a), Some(b)) if a != b => sk.point(*a).zip(sk.point(*b)).is_some_and(|(p, q)| (p - q).length() < 1e-9),
+            _ => false,
+        },
+        _ => false,
+    });
+    if closes_on_itself {
+        problems.push("Some of the geometry intersects itself or is degenerate.".into());
+    }
     if !problems.is_empty() {
         ev.warnings.push(problems.join("; "));
     }

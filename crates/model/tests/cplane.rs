@@ -508,3 +508,26 @@ fn a_sketch_on_a_plane_takes_std_newsketchs_frame() {
         }
     }
 }
+
+/// Live (skasm plane-use-1125 (2)): a Mid plane of one edge is valid; an edge with a vertex says what Mid plane takes.
+#[test]
+fn mid_plane_of_an_edge_and_a_point_says_what_it_needs() {
+    let mut s = Studio::new();
+    let (_, pts) = points_sketch(&mut s, &[(40.0, 0.0)]);
+    let mut sk = noshape_sketch::Sketch::new();
+    let l = sk.add_line(DVec2::ZERO, DVec2::new(mm(50.0), 0.0)).0;
+    let lsid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let line = Reference::SketchEntity { sketch: lsid, entity: l };
+    let one = s.plane(|p| {
+        p.set("cplaneType", en("MID_PLANE"));
+        p.set("entities", qs(vec![line.clone()]));
+    });
+    assert_eq!(s.regen().display.feature_state(one).unwrap().status, FeatureStatus::Ok);
+    let two = s.plane(|p| {
+        p.set("cplaneType", en("MID_PLANE"));
+        p.set("entities", qs(vec![line, pts[0].clone()]));
+    });
+    let r = s.regen();
+    let st = r.display.feature_state(two).unwrap();
+    assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Mid plane requires 2 points, 2 planes or 1 open edge.")));
+}

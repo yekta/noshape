@@ -507,3 +507,38 @@ fn ellipse_held_at_its_major_ends_keeps_its_minor_radius() {
     assert!((minor - 16.6299).abs() < 1e-9, "minor {minor}");
     assert!((center - v(0.0, -7.1249)).length() < 1e-9 && (major.length() - 20.6713).abs() < 1e-9, "{center} {major}");
 }
+
+/// Live (skasm spline-image-1125 (2), (5)): a spline's body drag bends it toward the pointer, it doesn't move whole
+/// (nor stay put with its start held): every free point and both handles move, the held start stays; a Bezier's
+/// control points all move, by their weight at the grab, across the drag only.
+#[test]
+fn a_splines_body_drag_bends_it_as_live() {
+    let mm = |x: f64, y: f64| v(x / 1000.0, y / 1000.0);
+    let mut sk = Sketch::new();
+    let s = sk.add_fit_spline_with_handles(&[mm(0.0, 0.0), mm(30.0, 20.0), mm(60.0, 0.0), mm(90.0, 20.0)]).unwrap();
+    let refs = sk.entity(s).unwrap().point_refs().to_vec();
+    sk.add_constraint(ConstraintKind::Fix { entity: refs[0] }).unwrap();
+    solved(&mut sk);
+    let before: Vec<DVec2> = refs.iter().map(|p| sk.point(*p).unwrap()).collect();
+    let (_, grab, _) = sk.curve(s).unwrap().closest(mm(46.0, 16.0));
+    let to = grab + mm(0.0, 10.0);
+    let r = sk.drag(&[(DragHandle::Entity { id: s, grab }, to)]);
+    assert!(r.is_solved(), "{r:?}");
+    let after: Vec<DVec2> = refs.iter().map(|p| sk.point(*p).unwrap()).collect();
+    assert!((after[0] - before[0]).length() < 1e-12, "the held start stays");
+    assert!(after.iter().zip(&before).skip(1).all(|(a, b)| (*a - *b).length() > 1e-5), "every free point and handle moves: {before:?} -> {after:?}");
+    assert!(sk.curve(s).unwrap().closest(to).2 < 5e-4, "the curve follows the pointer");
+    // A Bezier: the control points' moves follow their Bernstein weights at the grab, x untouched.
+    let mut sk = Sketch::new();
+    let b = sk.add_bspline(&[mm(0.0, -30.0), mm(20.0, 0.0), mm(40.0, -30.0), mm(60.0, -10.0)], 3).unwrap();
+    let ctrl = sk.entity(b).unwrap().point_refs().to_vec();
+    solved(&mut sk);
+    let before: Vec<DVec2> = ctrl.iter().map(|p| sk.point(*p).unwrap()).collect();
+    let (u, grab, _) = sk.curve(b).unwrap().closest(mm(28.5, -16.0));
+    sk.drag(&[(DragHandle::Entity { id: b, grab }, grab + mm(0.0, 10.0))]);
+    let d: Vec<DVec2> = ctrl.iter().zip(&before).map(|(p, q)| sk.point(*p).unwrap() - *q).collect();
+    assert!(d.iter().all(|d| d.x.abs() < 1e-9 && d.y > 1e-4), "{d:?}");
+    let w = [(1.0 - u).powi(3), 3.0 * u * (1.0 - u).powi(2), 3.0 * u * u * (1.0 - u), u.powi(3)];
+    let near = |i: usize| ((d[i].y / d[3].y) / (w[i] / w[3]) - 1.0).abs() < 0.02;
+    assert!(near(0) && near(1) && near(2), "{d:?} {w:?}");
+}

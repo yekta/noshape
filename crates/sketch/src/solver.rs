@@ -134,7 +134,7 @@ pub enum DragHandle {
     /// A point entity, moved to the target.
     Point(EntityId),
     /// A curve grabbed at `grab` (the cursor position of the previous drag
-    /// step). Lines/splines translate, circles/arcs change radius.
+    /// step). Lines translate, splines bend, circles/arcs change radius.
     Entity { id: EntityId, grab: DVec2 },
 }
 
@@ -2144,18 +2144,83 @@ impl Sketch {
     /// fixed, external, or coincident with a fixed or external point.
     fn body_drag_held(&self, id: EntityId) -> bool {
         let Some(e) = self.entity(id) else { return false };
-        if matches!(e.geometry, Geometry::Point { .. } | Geometry::Circle { .. } | Geometry::Arc { .. } | Geometry::Ellipse { .. }) {
+        // Splines bend instead (`spline_bend`).
+        if matches!(e.geometry, Geometry::Point { .. } | Geometry::Circle { .. } | Geometry::Arc { .. } | Geometry::Ellipse { .. } | Geometry::BSpline { .. } | Geometry::FitSpline { .. }) {
             return false;
         }
-        let fixed = |p: EntityId| self.entity(p).is_some_and(|x| x.external) || self.constraints().any(|c| matches!(c.kind, ConstraintKind::Fix { entity } if entity == p || entity == id));
-        e.point_refs().iter().any(|&p| {
-            fixed(p)
-                || self.constraints().any(|c| match c.kind {
-                    ConstraintKind::Coincident { a, b } if a == p => fixed(b),
-                    ConstraintKind::Coincident { a, b } if b == p => fixed(a),
-                    _ => false,
-                })
-        })
+        e.point_refs().iter().any(|&p| self.point_pinned(p, id))
+    }
+
+    /// Point `p` of curve `curve` is held where it is: external, fixed (or the curve is), or coincident with such.
+    fn point_pinned(&self, p: EntityId, curve: EntityId) -> bool {
+        let fixed = |p: EntityId| self.entity(p).is_some_and(|x| x.external) || self.constraints().any(|c| matches!(c.kind, ConstraintKind::Fix { entity } if entity == p || entity == curve));
+        fixed(p)
+            || self.constraints().any(|c| match c.kind {
+                ConstraintKind::Coincident { a, b } if a == p => fixed(b),
+                ConstraintKind::Coincident { a, b } if b == p => fixed(a),
+                _ => false,
+            })
+    }
+
+    /// Live (skasm spline-image-1125 (2), (5)): a spline's body drag bends it rather than moving it whole: the curve's
+    /// point under the grab follows the pointer by the least change of its unheld points (fit points and handle tips,
+    /// or control points). The points' new places; `None` for other curves.
+    fn spline_bend(&self, id: EntityId, grab: DVec2, target: DVec2) -> Option<Vec<(EntityId, DVec2)>> {
+        let e = self.entity(id)?;
+        let mut refs = e.point_refs().to_vec();
+        refs.sort();
+        refs.dedup();
+        let at = |pos: &[DVec2], q: EntityId| refs.binary_search(&q).ok().map(|i| pos[i]);
+        let build = |pos: &[DVec2]| -> Option<crate::nurbs::Nurbs> {
+            match &e.geometry {
+                Geometry::BSpline { control, degree, knots, weights } => {
+                    let ctrl = control.iter().map(|q| at(pos, *q)).collect::<Option<Vec<_>>>()?;
+                    Some(crate::nurbs::Nurbs { degree: *degree, knots: knots.clone(), ctrl, weights: weights.clone() })
+                }
+                Geometry::FitSpline { points, handles } => {
+                    let pts = points.iter().map(|q| at(pos, *q)).collect::<Option<Vec<_>>>()?;
+                    match handles {
+                        Some((h0, h1)) => crate::nurbs::Nurbs::interpolate_with_handles(&pts, at(pos, *h0)?, at(pos, *h1)?),
+                        None if points.len() > 3 && points.first() == points.last() => crate::nurbs::Nurbs::interpolate_periodic(&pts),
+                        None => crate::nurbs::Nurbs::interpolate(&pts),
+                    }
+                }
+                _ => None,
+            }
+        };
+        let pos = refs.iter().map(|q| self.point(*q)).collect::<Option<Vec<_>>>()?;
+        let base = build(&pos)?;
+        let (u, ..) = crate::geom::Curve2::Nurbs(base.clone()).closest(grab);
+        let p0 = base.point(u);
+        let eps = 1e-7;
+        // Each unheld coordinate's pull on the curve's point at `u`.
+        let mut cols = Vec::new();
+        for (i, q) in refs.iter().enumerate() {
+            if self.point_pinned(*q, id) {
+                continue;
+            }
+            for axis in [DVec2::X, DVec2::Y] {
+                let mut moved = pos.clone();
+                moved[i] += axis * eps;
+                cols.push((i, axis, (build(&moved)?.point(u) - p0) / eps));
+            }
+        }
+        // Least change: delta = J^T (J J^T)^-1 d.
+        let (mut a, mut b, mut c) = (0.0, 0.0, 0.0);
+        for (.., j) in &cols {
+            (a, b, c) = (a + j.x * j.x, b + j.x * j.y, c + j.y * j.y);
+        }
+        let det = a * c - b * b;
+        if det.abs() < 1e-18 {
+            return None;
+        }
+        let d = target - grab;
+        let l = DVec2::new(c * d.x - b * d.y, a * d.y - b * d.x) / det;
+        let mut out = pos.clone();
+        for (i, axis, j) in &cols {
+            out[*i] += *axis * j.dot(l);
+        }
+        Some(refs.into_iter().zip(out).collect())
     }
 
     /// A drag's `light` / `still`: dimensioned curves (a Length, Radius or
@@ -2234,6 +2299,12 @@ impl Sketch {
                             }
                         }
                         _ => {
+                            if let Some(bent) = self.spline_bend(id, grab, *target) {
+                                for (p, q) in bent {
+                                    push_pt(&mut out, p, q);
+                                }
+                                continue;
+                            }
                             let mut refs = e.point_refs().to_vec();
                             refs.sort();
                             refs.dedup();

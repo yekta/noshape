@@ -3,26 +3,24 @@
 Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-25 09:45) — read first
-- QUEUED 2d91090e (11-25 08:45): image fit + dash-dot preview, spline arm test, circle centre on a line = trim boundary.
-- LANDING (lead 11-25, parametric basics): ours re-solves sketches on a variable edit, renames follow, unknown #name in
-  a feature = live's "Variable not found, is suppressed, or has not been set."; first dimension scales the sketch (live).
-  Fix: units EvalError texts in live's words ("Cannot use angle as length.", "Cannot add angle and length.", "Cannot
-  apply cos to length.", number for unitless) so ops/feature messages match the app (bin/tunits.sh -> tunits.log).
-  REQUESTS skasm 11-25 09:30 (rename follows?, dimension box errors, table cell wrong unit, field errors, re-solve).
-- LANDING: image placement per live spline-image-1125 (answers REQUESTS 07:55): the 2nd click sets the WIDTH only,
-  height = width / aspect (image_box; scene test an_images_second_click_sets_its_width_as_live; bin/timg2.sh ->
-  ~/tmp/skasm/timg2.log, then commit with the units wording fix once tunits.log is green).
-- NEXT from live/skasm/spline-image-1125/index.md (check ours, fix each with a test):
-  image: box lines SOLID sketch-blue (not construction); placement COINCIDENT first click->origin when snapped +
-  HORIZONTAL bottom; ~50 % opacity outside edit (Part Studio, other sketches); interior not hover/pickable; middle
-  drag translates (scales about the pinned corner when Coincident to the origin), corner/edge drags scale, aspect
-  always kept; bottom Length 100 -> 100 x 66.67; Fix on bottom stops drags; right-click menus verbatim (Edit image,
-  Switch to <file>, no opacity/lock). Spline: interior point drag moves only that point (end derivatives kept);
-  body drag bends (free points + derivatives move); handle drag scales the derivative, no length text, H/V snap adds
-  a constraint on the handle end; no curvature handle; end dropped on start = no periodic, no Coincident, sketch
-  WARNING "Some of the geometry intersects itself or is degenerate."; Bezier CP drag keeps the other CPs, body drag
-  moves all CP y; menus verbatim (index.md (3)).
+## NOW (11-25 10:06) — read first
+- LANDED/QUEUED: 2d91090e, dc6357ae, 1ef716fa (variables wording, image width click, used-edge test).
+- IN FLIGHT (spline/image vs live/skasm/spline-image-1125): sketch solver `spline_bend` (a spline body drag bends:
+  least-change of unheld points/handles/CPs so the grabbed curve point follows; test constraints_more
+  a_splines_body_drag_bends_it_as_live); scene point_drop_target: the ORIGIN is always a level/plumb candidate (not when a
+  sibling point sits on it), a handle tip aligns with its spline end, own handle arms aren't drop targets (test
+  spline_and_bezier_drags_snap_as_live; curves_drag_as_lives count ignores the origin stand-in); Entity.image_box
+  (solid box lines, no region; model-data images_follow_their_box); image 50 % alpha outside edit (builder); image
+  middle press = DragState::Text (moves / scales when pinned; click selects nothing), box edges drag as lines; first
+  click snapped = COINCIDENT corner (test an_images_drags_scale_and_move_it_as_live); regen warning "Some of the
+  geometry intersects itself or is degenerate." for a handled spline ending on its start (model sketch_assoc
+  a_spline_ending_on_its_own_start_warns_as_live). Run bin/tspl3.sh -> ~/tmp/skasm/tspl3.log, then commit + land.
+- NEXT: spline/image right-click menus (Insert spline points, Edit image, Switch to <file>; + ops coverage); the
+  self-closed spline's edge not built (live); live plane-use-1125 answers (REQUESTS 08:52): Line angle 0° = plane through
+  the edge perpendicular to the top face, INFO bubble; Mid plane: one edge valid, edge+vertex error "Mid plane requires 2
+  points, 2 planes or 1 open edge."; 3-point no preview before 3rd point; lost Use source stays at its STORED place,
+  drawn free-blue; Use of a vertical edge = a point, slanted = projected line; plane corner drag = box select, drawn
+  size = face + ~5 mm per side.
 - QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
   plane resize after ✓ is already in behaviours "icons2 plane resize rules".
 - DROPPED (lead 11-25): the ops center_point_arc P1; core fixed it in db2fd8e7 (my ops edits reverted).

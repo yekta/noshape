@@ -556,7 +556,7 @@ fn tolerance(boxes: &[BBox]) -> f64 {
 fn sketch_curves(sk: &Sketch) -> Vec<(EntityId, Curve2)> {
     let mut out = Vec::new();
     for e in sk.entities() {
-        if e.construction || e.kind() == EntityKind::Point {
+        if e.construction || e.image_box || e.kind() == EntityKind::Point {
             continue;
         }
         let Some(c) = sk.curve(e.id) else { continue };

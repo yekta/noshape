@@ -106,6 +106,10 @@ pub struct Entity {
     /// A sketch pattern's copy of a Use'd curve: its ends reach other ends as a Use'd curve's do (regions).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_copy: bool,
+    /// An inserted image's box line: solid, picked and constrained as a line, but it bounds no region (live
+    /// spline-image-1125: the box gives the Part Studio 4 wire edges and no face).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub image_box: bool,
 }
 
 /// A held-direction line shorter than this (m) has no direction of its own: it keeps [`Entity::held_direction`].

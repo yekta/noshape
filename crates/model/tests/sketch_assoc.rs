@@ -384,3 +384,26 @@ fn a_used_edge_follows_the_model_and_the_face_sketch_rises_with_it() {
     assert!((z - 0.04).abs() < 1e-9, "the used line rose with the face: z {z}");
     assert!((len - 0.12).abs() < 1e-9 && (y + 0.025).abs() < 1e-9, "it follows the wider block: len {len} y {y}");
 }
+
+/// Live (skasm spline-image-1125 (4)): a spline whose end was dropped on its own start, not closed, warns.
+#[test]
+fn a_spline_ending_on_its_own_start_warns_as_live() {
+    let units = UnitPrefs::default();
+    let mut ps = PartStudio::new();
+    let mut data = SketchData::default();
+    let s = data.sketch.add_fit_spline_with_handles(&[DVec2::new(0.0, 0.0), DVec2::new(0.03, 0.02), DVec2::new(0.06, 0.0), DVec2::new(0.09, 0.02)]).unwrap();
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data.clone())));
+    let id = sketch.id;
+    ps.features.push(sketch);
+    let message = |ps: &PartStudio| {
+        let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+        r.display.features.iter().find(|f| f.id == id).map(|f| (f.status, f.message.clone()))
+    };
+    assert_eq!(message(&ps), Some((FeatureStatus::Ok, None)));
+    let end = data.sketch.entity(s).unwrap().point_refs()[3];
+    data.sketch.set_point(end, DVec2::ZERO).unwrap();
+    ps.features[0].params.set("sketch", ParamValue::Sketch(std::sync::Arc::new(data)));
+    assert_eq!(message(&ps), Some((FeatureStatus::Warning, Some("Some of the geometry intersects itself or is degenerate.".to_string()))));
+}

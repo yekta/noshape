@@ -2873,22 +2873,26 @@ impl SketchEditor {
                     return if self.begin_text_edit(data, id) { EditOutcome::redraw() } else { EditOutcome::none() };
                 }
                 match hovered {
-                    // Text: glyphs and box lines move the whole box (corners resize it).
-                    Some(e) if !is_point(&data.sketch, e) && (data.text_of_entity(e).is_some() || data.image_of_entity(e).is_some()) => {
-                        let box_points: Vec<u32> = match data.text_of_entity(e) {
-                            Some(tid) => data.texts.iter().find(|t| t.id == tid).map(|t| t.box_points.clone()).unwrap_or_default(),
-                            None => data.image_of_entity(e).and_then(|i| data.images.iter().find(|x| x.id == i)).map(|x| x.box_points.clone()).unwrap_or_default(),
-                        };
+                    // Text: glyphs and box lines move the whole box (corners resize it). An image's box lines and
+                    // corners drag as lines and points: the box scales, its aspect kept (live spline-image-1125 (7)).
+                    Some(e) if !is_point(&data.sketch, e) && data.text_of_entity(e).is_some() => {
+                        let box_points = data.text_of_entity(e).and_then(|tid| data.texts.iter().find(|t| t.id == tid)).map(|t| t.box_points.clone()).unwrap_or_default();
                         let points: Vec<(EntityId, DVec2)> = box_points.iter().filter_map(|q| data.sketch.point(EntityId(*q)).map(|pos| (EntityId(*q), pos))).collect();
                         self.drag = Some(DragState::Text { entity: e, start: p, points, moved: false });
                     }
                     Some(e) => {
                         self.drag = Some(DragState::Pending { entity: e, start: p });
                     }
+                    // The picture's middle: hovers and selects nothing, but a drag moves the whole image (scales it
+                    // about a pinned corner) (live spline-image-1125 (6), (7)).
                     None => {
-                        self.drag = Some(DragState::Box { start: p });
-                        self.box_end = Some(p);
-                        self.box_remove = false;
+                        if let Some((line, points)) = image_under(data, p) {
+                            self.drag = Some(DragState::Text { entity: line, start: p, points, moved: false });
+                        } else {
+                            self.drag = Some(DragState::Box { start: p });
+                            self.box_end = Some(p);
+                            self.box_remove = false;
+                        }
                     }
                 }
                 EditOutcome::none()
@@ -4412,7 +4416,14 @@ impl SketchEditor {
                     return EditOutcome::redraw();
                 }
                 match data.add_image(&name, &bytes, origin, height, aspect) {
-                    Ok(_) => {
+                    Ok(id) => {
+                        // Live (spline-image-1125): the first click snapped onto a point (the origin) pins that corner,
+                        // COINCIDENT.
+                        let corner = data.images.iter().find(|i| i.id == id).and_then(|i| i.box_points.iter().map(|q| EntityId(*q)).find(|q| data.sketch.point(*q).is_some_and(|c| (c - first.pos).length() < 1e-9)));
+                        if let Some(corner) = corner {
+                            let autos: Vec<AutoConstraint> = first.inference.as_ref().map(|i| i.constraints.iter().copied().filter(|a| matches!(a, AutoConstraint::CoincidentPoint(_))).collect()).unwrap_or_default();
+                            Self::apply_auto(&mut data.sketch, corner, None, &autos);
+                        }
                         data.sketch.solve();
                         self.pending_image = None;
                         self.set_tool(Tool::Select);
@@ -5198,13 +5209,16 @@ impl SketchEditor {
         if let Some((e, q, _)) = best_pt {
             return Some((e, q, Drop::Merge));
         }
-        // The sketch origin (a fixed point is created on drop).
-        if in_point(pos, r_point).is_some() && !sk.entity(id).is_some_and(|e| e.external) {
+        // The sketch origin (a fixed point is created on drop); not where a point of the same curve sits on it (live
+        // spline-image-1125 (4): a spline's end dropped on its start at the origin takes nothing).
+        let sibling_at_origin = siblings.iter().any(|s| *s != id && sk.point(*s).is_some_and(|q| q.length() < 1e-12));
+        if in_point(pos, r_point).is_some() && !sk.entity(id).is_some_and(|e| e.external) && !sibling_at_origin {
             return Some((noshape_sketch::ORIGIN, DVec2::ZERO, Drop::Merge));
         }
         // Nor a curve the point was on when the drag began (live sk2-1121 polygon-corner-drag: an inscribed polygon's
         // side midpoint takes no MIDPOINT on its side or COINCIDENT on its circle on release).
-        let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.point_refs().contains(&id) && !self.drag_held.contains(&e.id));
+        // (Nor a handle arm of a spline the point is on.)
+        let curves = || sk.entities().filter(|e| e.kind() != EntityKind::Point && !users.contains(&e.id) && !e.handle_of.is_some_and(|c| users.contains(&c)) && !e.point_refs().contains(&id) && !self.drag_held.contains(&e.id));
         // Live (audit 1969): by a line's midpoint the drop takes it (MIDPOINT).
         let mid = curves()
             .filter_map(|e| {
@@ -5235,14 +5249,21 @@ impl SketchEditor {
                 let arc_end = sk.entities().find_map(|e| match e.geometry {
                     noshape_sketch::Geometry::Arc { start, end, .. } if start == id => Some(end),
                     noshape_sketch::Geometry::Arc { start, end, .. } if end == id => Some(start),
+                    // A spline's handle tip with its end: the handle snaps level or plumb (live spline-image-1125 (3)).
+                    noshape_sketch::Geometry::FitSpline { ref points, handles: Some((h0, _)) } if h0 == id => points.first().copied(),
+                    noshape_sketch::Geometry::FitSpline { ref points, handles: Some((_, h1)) } if h1 == id => points.last().copied(),
                     _ => None,
                 });
-                let woken = self.woken.iter().copied().filter(|w| *w != id && !siblings.contains(w) && sk.point(*w).is_some());
+                let woken = self.woken.iter().copied().filter(|w| *w != id && !siblings.contains(w)).filter_map(|w| Some((w, sk.point(w)?)));
+                // The sketch origin always, as when drawing (live spline-image-1125: a Bezier control point dragged
+                // level with it takes HORIZONTAL, a spline's handle swung plumb above it VERTICAL).
+                let origin = (!sk.entity(id).is_some_and(|e| e.external) && !sibling_at_origin).then_some((noshape_sketch::ORIGIN, DVec2::ZERO));
                 arc_end
+                    .and_then(|o| Some((o, sk.point(o)?)))
                     .into_iter()
                     .chain(woken)
-                    .filter_map(|other| {
-                        let q = sk.point(other)?;
+                    .chain(origin)
+                    .filter_map(|(other, q)| {
                         let (dy, dx) = (seen(DVec2::new(0.0, pos.y - q.y)), seen(DVec2::new(pos.x - q.x, 0.0)));
                         [(dy, DVec2::new(pos.x, q.y), true), (dx, DVec2::new(q.x, pos.y), false)].into_iter().filter(|(d, ..)| *d <= r).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(d, at, h)| (d, other, at, h))
                     })
@@ -5500,6 +5521,8 @@ impl SketchEditor {
                 if moved {
                     data.sketch.solve();
                     EditOutcome::changed()
+                } else if data.image_of_entity(entity).is_some() {
+                    EditOutcome::none()
                 } else {
                     self.toggle_text_selection(data, entity);
                     EditOutcome::redraw()
@@ -8449,6 +8472,20 @@ fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<
     Some(line)
 }
 
+/// The image whose picture covers `p`: its bottom box line and its box corners where they are.
+fn image_under(data: &SketchData, p: DVec2) -> Option<(EntityId, Vec<(EntityId, DVec2)>)> {
+    data.images.iter().rev().find_map(|img| {
+        let points: Vec<(EntityId, DVec2)> = img.box_points.iter().filter_map(|q| Some((EntityId(*q), data.sketch.point(EntityId(*q))?))).collect();
+        let n = points.len();
+        if n < 3 {
+            return None;
+        }
+        let sides: Vec<f64> = (0..n).map(|k| (points[(k + 1) % n].1 - points[k].1).perp_dot(p - points[k].1)).collect();
+        let inside = sides.iter().all(|c| *c >= 0.0) || sides.iter().all(|c| *c <= 0.0);
+        inside.then(|| Some((EntityId(*img.box_lines.first()?), points))).flatten()
+    })
+}
+
 /// Lower-left corner and height of an image rectangle dragged from `a` to `b` with its aspect ratio (width / height)
 /// locked, from `a` towards `b`.
 fn image_box(a: DVec2, b: DVec2, aspect: f64) -> (DVec2, f64) {
@@ -10044,6 +10081,49 @@ mod tests {
             ed.tool_drag(data, a.lerp(b, k as f64 / 4.0));
         }
         ed.tool_up(data, b);
+    }
+
+    /// Live (skasm spline-image-1125 (3)-(5)): a spline's handle swung near plumb snaps exactly vertical with a
+    /// VERTICAL; its end dropped on its start (on the origin) takes no constraint; a Bezier control point dragged level
+    /// with the origin takes HORIZONTAL.
+    #[test]
+    fn spline_and_bezier_drags_snap_as_live() {
+        let mm = |x: f64, y: f64| v(x / 1000.0, y / 1000.0);
+        let (mut ed, mut d) = editor(Tool::Spline);
+        for p in [mm(0.0, 0.0), mm(30.0, 20.0), mm(60.0, 0.0)] {
+            click(&mut ed, &mut d, p);
+        }
+        ed.tool_down(&mut d, mm(90.0, 20.0), None, false, false);
+        ed.tool_up(&mut d, mm(90.0, 20.0));
+        ed.tool_down(&mut d, mm(90.0, 20.0), None, false, true);
+        ed.tool_up(&mut d, mm(90.0, 20.0));
+        ed.set_tool(Tool::Select);
+        let s = d.sketch.entities().find(|e| e.kind() == EntityKind::FitSpline).unwrap().clone();
+        let refs = s.point_refs();
+        let (h0, _) = s.spline_handles().unwrap();
+        let (hp, start) = (d.sketch.point(h0).unwrap(), d.sketch.point(refs[0]).unwrap());
+        let len = (hp - start).length();
+        let a = 89.07f64.to_radians();
+        drag(&mut ed, &mut d, hp, start + v(a.cos(), a.sin()) * len);
+        assert!((d.sketch.point(h0).unwrap().x - start.x).abs() < 1e-12, "plumb: {}", d.sketch.point(h0).unwrap());
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { a, b: Some(b) } if a == h0 && b == refs[0])));
+        let n = d.sketch.constraints().count();
+        let end = d.sketch.point(refs[3]).unwrap();
+        drag(&mut ed, &mut d, end, start);
+        assert_eq!(d.sketch.constraints().count(), n, "the end dropped on its start takes nothing");
+        let (mut ed, mut d) = editor(Tool::Bezier);
+        for p in [mm(0.0, -30.0), mm(20.0, -10.0), mm(40.0, -30.0), mm(60.0, -10.0)] {
+            click(&mut ed, &mut d, p);
+        }
+        let _ = ed.escape_commit(&mut d);
+        ed.set_tool(Tool::Select);
+        let ctrl = d.sketch.entities().find(|e| e.kind() == EntityKind::BSpline).unwrap().point_refs();
+        let others: Vec<DVec2> = [0, 2, 3].iter().map(|i| d.sketch.point(ctrl[*i]).unwrap()).collect();
+        let c1 = d.sketch.point(ctrl[1]).unwrap();
+        drag(&mut ed, &mut d, c1, c1 + mm(0.0, 9.6));
+        assert!(d.sketch.point(ctrl[1]).unwrap().y.abs() < 1e-12, "level with the origin");
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: Some(_) } if a == ctrl[1])));
+        assert_eq!([0, 2, 3].iter().map(|i| d.sketch.point(ctrl[*i]).unwrap()).collect::<Vec<_>>(), others, "the other control points stay");
     }
 
     fn count(data: &SketchData, k: EntityKind) -> usize {
@@ -11701,6 +11781,40 @@ mod tests {
         }
     }
 
+    /// Live (skasm spline-image-1125 (6), (7)): an image's middle selects nothing; dragged, it moves the image whole,
+    /// or scales it about its corner pinned to the origin; an edge drag scales it; the aspect always kept.
+    #[test]
+    fn an_images_drags_scale_and_move_it_as_live() {
+        let place = |at: DVec2| {
+            let (mut ed, mut d) = editor(Tool::InsertImage);
+            ed.pending_image = Some(("guide.png".into(), vec![1, 2, 3], 1.5));
+            click(&mut ed, &mut d, at);
+            click(&mut ed, &mut d, at + v(0.06, 0.01));
+            (ed, d)
+        };
+        let corners = |d: &SketchData| d.images[0].box_points.iter().map(|p| d.sketch.point(EntityId(*p)).unwrap()).collect::<Vec<_>>();
+        let size = |d: &SketchData| {
+            let c = corners(d);
+            ((c[1] - c[0]).length(), (c[3] - c[0]).length())
+        };
+        let (mut ed, mut d) = place(v(0.0, 0.0));
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { .. })), "pinned to the origin");
+        click(&mut ed, &mut d, v(0.03, 0.02));
+        assert!(ed.selection.is_empty(), "the middle selects nothing");
+        drag(&mut ed, &mut d, v(0.03, 0.02), v(0.04, 0.03));
+        let (w, h) = size(&d);
+        assert!(corners(&d)[0].length() < 1e-9 && w > 0.065 && (w / h - 1.5).abs() < 1e-6, "scaled about the pin: {w} x {h}");
+        drag(&mut ed, &mut d, v(w, h / 2.0), v(w + 0.015, h / 2.0));
+        let (w2, h2) = size(&d);
+        assert!(corners(&d)[0].length() < 1e-9 && w2 > w + 0.01 && (w2 / h2 - 1.5).abs() < 1e-6, "the right edge scales: {w2} x {h2}");
+        let (mut ed, mut d) = place(v(-0.1, -0.07));
+        let (before, s0) = (corners(&d), size(&d));
+        drag(&mut ed, &mut d, v(-0.07, -0.05), v(-0.06, -0.04));
+        let (after, s1) = (corners(&d), size(&d));
+        assert!((s1.0 - s0.0).abs() < 1e-9 && (s1.1 - s0.1).abs() < 1e-9, "the same size");
+        assert!(after.iter().zip(&before).all(|(a, b)| (*a - *b - v(0.01, 0.01)).length() < 1e-9), "moved whole: {before:?} -> {after:?}");
+    }
+
     /// Live circle-trim-cons-1125: a circle's centre clicked on a point, a line's end or another circle's centre is
     /// COINCIDENT with it (never Concentric); on a line's midpoint MIDPOINT; on a line or a circle elsewhere, on that
     /// curve. The radius click in free space adds nothing.
@@ -12063,7 +12177,7 @@ mod tests {
             o
         };
         let (sk, o) = run(&chain, (0.0, -59.912), (0.0, -d));
-        assert!(near(sk.point(o), (0.0, -70.707)) && sk.entities().filter(|e| e.kind() == EntityKind::Point).filter(|e| e.id != o).count() == 2, "shared end");
+        assert!(near(sk.point(o), (0.0, -70.707)) && sk.entities().filter(|e| e.kind() == EntityKind::Point && !e.reference_only).filter(|e| e.id != o).count() == 2, "shared end");
         // (d) A LENGTH 40 line: an end along or across translates it; with its start fixed it swings (along: stays).
         let sized = |fixed: bool| {
             move |sk: &mut Sketch| {

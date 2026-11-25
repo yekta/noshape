@@ -1107,7 +1107,9 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let (x, y) = (lr - ll, ul - ll);
                 let z = x.cross(y).normalize_or_zero();
                 let m = glam::Mat4::from_cols(x.extend(0.0), y.extend(0.0), z.extend(0.0), ll.extend(1.0));
-                scene.instances.push(Instance::new(Drawable::Image(handle)).with_transform(m).ignore_clip().layer(8));
+                // Live (spline-image-1125 (6)): full colour while its sketch is edited, ~50 % opacity otherwise.
+                let alpha = if editing { 1.0 } else { 0.5 };
+                scene.instances.push(Instance::new(Drawable::Image(handle)).with_transform(m).with_color([1.0, 1.0, 1.0, alpha]).ignore_clip().layer(8));
             }
             let plane = sk.frame.normal.as_vec3();
             let curves = Instance::new(Drawable::Lines(up.upload_lines(&lines))).per_primitive_color().ignore_clip().pick_plane(plane).layer(10);

@@ -286,6 +286,10 @@ impl SketchData {
             return Err("The image file is empty".into());
         }
         let tb = self.sketch.add_text_box(origin, height, aspect).map_err(|_| "The image rectangle could not be created with the selected points.".to_string())?;
+        // Live (spline-image-1125): the box lines are solid, not construction.
+        for l in tb.lines {
+            let _ = self.sketch.set_image_box(l);
+        }
         let id = self.images.iter().map(|t| t.id + 1).max().unwrap_or(1);
         self.images.push(SketchImage {
             id,
@@ -395,6 +399,9 @@ mod image_tests {
         let img = d.images[0].clone();
         assert_eq!(img.id, id);
         assert_eq!(d.image_of_entity(EntityId(img.box_lines[0])), Some(id));
+        // Live (spline-image-1125): solid box lines, which bound no region.
+        assert!(img.box_lines.iter().all(|l| !d.sketch.entity(EntityId(*l)).unwrap().construction));
+        assert!(d.sketch.regions().is_empty());
         d.sketch.solve();
         let bb = d.sketch.bbox();
         assert!((bb.size().x - 0.04).abs() < 1e-9 && (bb.size().y - 0.02).abs() < 1e-9);

@@ -431,8 +431,9 @@ pub fn plane_feature(ev: &mut EvalCtx) -> FResult<()> {
                 }
                 plane_n((a + b) * 0.5, normal)
             } else if edges.len() == 1 {
+                // Live (skasm plane-use-1125 (2)): an edge with one more entity is told what Mid plane takes.
                 if n > 1 {
-                    return fail(TOO_MANY_MSG);
+                    return fail(if n == 2 { MIDPLANE_MSG } else { TOO_MANY_MSG });
                 }
                 let Some((a, b)) = edge_of(ev, edges[0]).and_then(|e| e.endpoints().ok()) else { return fail(MIDPLANE_MSG) };
                 let normal = b - a;
