@@ -12,6 +12,8 @@ pub(super) fn gpu_pointer() -> Option<parking_lot::MutexGuard<'static, ()>> {
         eprintln!("feel: GPU pointer tests skipped: {e}");
         return None;
     }
+    // Pixel checks on one frame per view, whatever the runner's speed (no software rasteriser's 1x frame, settled later).
+    noshape_render::worker::full_frames_only(true);
     use noshape_render::{Camera, Drawable, Instance, PointData, PointSprite, RenderParams, Renderer, Scene, StandardView, Style};
     let mut r = Renderer::new().ok()?;
     let points = PointData { points: vec![PointSprite { position: [0.0; 3], color: [0, 0, 255, 255], pick_id: 7, size: 6.0, style: 2, _pad: 0 }] };

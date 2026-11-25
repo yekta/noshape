@@ -53,6 +53,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   everyday_interactions_on_a_corpus_part, NOSHAPE_LATENCY_DOC; timed_applied). Extrude evCollision slowness → core.
   Mac numbers: impeller hover 8.5 / click 3.8 / dialog 17 / field preview regen 215 / ✓ 6.7 s (core regen) / undo 9.
   Corpus doc: vibex8 ~/tmp/psui/impeller.noshape, Mac ~/noshape-host/psui-keep/impeller.noshape.
+- NOW (lead 11-25, release blocker): nightly Windows-only UI test failures (runs 45490384199, 45520180334; macOS fails
+  kernel features::a_lofts_added_vertices_stay_for_good, not mine, told lead). (1) a_short_press_..._triads_ball: pressed
+  before the ball's hover pick came back, the press dragged the part (triad on it at the pointer): wait for
+  manip_hover == Center first. (2) a_cleared_hover_shows_the_frame_drawn_before / (3) the_second_pick_outlines_...:
+  Windows CI renders in software: render worker's Settle draws 1x frames, full ones 150 ms later, so which one a test
+  reads depends on runner speed. render::worker::full_frames_only(true) in both crates' gpu_pointer. Unexplained:
+  (3)'s frame had no amber band at all (scene state had it) - check a 1x frame draws the body band. Real minor bug
+  (not fixed): the frame cache keeps a seq's 1x image (frame_keys dropped at its first present), a reused frame is
+  jaggy till the settled redraw.
 - 11-25 01:0x-01:3x, all awaiting qa: TRIAD-LOOK queued ec758926 (LineSegment::SMOOTH, render: a line antialiased
   across its width; the triad's strokes); FEEL-ASM-FIXED-GLYPH-AA + FEEL-ASM-MOVE-RING-RIMS queued together (asm parked;
   lead 11-25: take parked agents' Part Studio/assembly viewport feel rows of the same renderer class first). Ring:
