@@ -2788,6 +2788,25 @@ fn chamfer_wider_than_its_face_overflows_like_onshape() {
     }
 }
 
+/// Live (core/dialogs-1125): a 50 mm fillet on the top front edge of a 40 × 30 × 20 block succeeds, its round running
+/// past the front and top faces: the part keeps what lies within the R50 circle tangent to both (centre y 50, z −30),
+/// y 10–30, z 0–15.83.
+#[test]
+fn fillet_wider_than_its_faces_overflows_like_onshape() {
+    let mut t = T::new();
+    t.block(40.0, 30.0, 20.0);
+    let front_top = t.edges_where(|i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z > 0.01999 && i.end.z > 0.01999);
+    assert_eq!(front_top.len(), 1);
+    let f = t.fillet(front_top, "50 mm");
+    let (st, msg, v) = status(&mut t, f);
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    let b = t.regen().context.bodies[0].shape.bounding_box(true).unwrap();
+    assert!((b.min.y - 0.010).abs() < 1e-6 && (b.max.y - 0.030).abs() < 1e-6, "y {} – {}", b.min.y, b.max.y);
+    assert!(b.min.z.abs() < 1e-6 && (b.max.z - (2100f64.sqrt() - 30.0) * 1e-3).abs() < 1e-6, "z {} – {}", b.min.z, b.max.z);
+    // 40 mm × the circle's segment over y 10–30: 7458.616 mm³.
+    assert!((v - 7458.616).abs() < 0.05, "volume {v}");
+}
+
 /// qa FEATURE-PATTERN-ADD-Y, as live (behaviours "qa (2026-10-27)
 /// FEATURE-PATTERN-ADD-Y"): a Ø10 boss 10 high at (20, 20) on a 300 × 200 × 3
 /// plate, Feature pattern without Reapply. The plate's left edge points −Y

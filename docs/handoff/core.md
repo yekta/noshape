@@ -11,28 +11,22 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
-- **P0 (lead 09:0x): lands FAILED 08:44** (b017adb5 + 7d738fb0; db2fd8e7 superseded) on one psui GPUI test,
-  sketch::ui_tests::a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach (:2263, the click selected
-  nothing; that run took 1374 s). None of my commits touch psui picking; main green 08:44. STL fin repair committed
-  (clippy clean, kernel 598/598, ops export 17/17). Next: run that test on the rebased branch, re-land all four.
-- **Queue after STL (lead):** live dialogs-1125 geometry: Fillet r50 / Chamfer 25 on the block's top edge and
-  Circular pattern 0° all already succeed in ours (ops probe: y 10-30 z 0-15.826; y 5-30; OK). Only open: 0° pattern
-  makes 4 coincident parts (REQUESTS (9) asks live's count). Check the app dialogs too (the preview / ✓) if the lead
-  means the UI.
-- **housing-draft STL vs live** (/root/parity/exchange/c2-housing-draft/live-opt-*.stl, params in live-opt-self.json):
-  live Coarse 924 tris / 460 verts, Medium(yup) 1772, Fine 6644, Custom(0.01 mm, 2.5°, 0.01) 6612, text-inch Medium
-  3214 (?), all watertight. Export ours at each, compare counts (core-scratch/bin/stlcheck.py).
-- **STL/3MF (lead 11-25):** impeller Medium STL Part 1's fin (one triangle on both windings at z=0, (23.6, 0) mm) is
-  BRepMesh's own (no repair stage made it): mesh_repair::drop_cancelling_pairs drops such pairs in tessellate_closed and
-  tessellate_export (kernel test a_triangle_pair_wound_both_ways_is_dropped); impeller Medium now 0 open / non-manifold
-  / misoriented. CustomResolution comment fixed. Speed fine (10 parts 148/190/321 ms, 3MF 196 ms). Open: housing-draft
-  Coarse 337 vs live 460 vertices; REQUESTS "core 11-25 08:28" (impeller counts/time per resolution, Custom, Text, 3MF;
-  (9) circular pattern Angle 0 part count: ours 4 coincident parts).
-- **live dialogs-1125 checked by ops probe:** Fillet r50 (y 10-30, z 0-15.826), Chamfer 25 (y 5-30), Shell 20 and
-  Extrude 0 messages, Union disjoint Info: all as live. Instance count 0: ops says "out of range 1..2500" (the dialog's
-  field error is psui's).
-
-## In flight (11-20)
+- **Re-landed 09:0x: QUEUED 86e2d541** (fillet crash fix, docs, ops arc fix, STL fin repair, handoff). The 08:44
+  failure (psui a_circles_rim_lights_and_selects_the_circle_not_its_centre_beyond_reach, a 1374 s loaded run) passes
+  3/3 on the rebased branch: flaky under load, not ours.
+- **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
+  core-scratch/bin/stlz.py rings): ours 678 / 1348 / 5428 / Custom 5514 triangles vs live 924 / 1772 / 6644 / 6612,
+  all watertight, ~140 ms each. Every circle has live's segment count exactly except two: R13 at z 1.5 and R12.5 at
+  z 1.8 (the narrow drafted strip between them), where live has twice ours at every resolution (59/115/285 vs
+  29/58/143), unevenly spaced. Our sag there 0.076 mm < 0.24. REQUESTS core 11-25 08:28 (10) asks live that face's
+  surface / edge curve types; if SPLINE, mesh spline faces as Parasolid does. Impeller Medium: 0 defects after the
+  fin repair.
+- **live dialogs-1125:** Fillet r50 (test kernel_robustness::fillet_wider_than_its_faces_overflows_like_onshape, T1:
+  y 10-30, z to sqrt(2100)-30, 7458.616 mm³), Chamfer 25 (T2 chamfer_wider_than_its_face_overflows_like_onshape),
+  Shell 20 / Extrude 0 messages, Union disjoint Info, Part Studio Circular angle 0 OK: all as live. Open: 0° pattern
+  makes 4 coincident parts (REQUESTS (9) live's count). Count 0: the app's field says live's "A parameter value is not
+  valid." (feature_dialog VALUE_NOT_VALID); ops names the range. behaviours E13 "angle 0 → must be positive" is the
+  assembly pattern.
 - **LANDED 18:41 771be348 (core-rf, target moved to vibex8 core-rp): c2-replace-face-exercise Replace face 1 (dx):** ERROR -> 85/184/112, 688456.9 mm3 (live
   85/184/104, 688437.672); doc 0 -> 6/8. rounds.rs takes OCCT's free-form corner patches; Replace face rolls its fillets
   again (reblend + replace_by_prism: onto_plane tweak, onto_cylinder = sewn pocket solid on the face's side of the
