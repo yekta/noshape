@@ -39,9 +39,9 @@ pub(super) struct ShownLabel {
 type DimsGeometry = (Vec<ShownLabel>, Vec<(u32, [DVec3; 2])>);
 
 /// Live's 16 px labels: Noto Sans' ascender is 1.069 em.
-const LABEL_ASC_PX: f64 = 16.0 * 1.069;
+pub(super) const LABEL_ASC_PX: f64 = 16.0 * 1.069;
 /// Digits' height over the ascender (cap height 0.714 em).
-const DIGIT_H: f64 = 0.714 / 1.069;
+pub(super) const DIGIT_H: f64 = 0.714 / 1.069;
 /// The dimension line's gap on each side of its label.
 const LABEL_GAP_PX: f64 = 4.0;
 /// Hovered: the lines gold, the label on a tan box (live part-studio/41:

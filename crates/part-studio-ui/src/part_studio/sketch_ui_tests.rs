@@ -9590,6 +9590,75 @@ fn a_new_sketch_keeps_the_view_and_n_turns_it_normal(cx: &mut TestAppContext) {
     assert!(normal.distance(glam::DVec3::NEG_Z) < 1e-6, "N: normal to Top: {normal:?}");
 }
 
+/// Live dim-iso-1125: normal to the sketch a dimension's value is the 16 px screen label; in iso it lies in the sketch
+/// plane at the same size (its baseline along the projected sketch x, its height foreshortened: 12 -> 6-7 px), the screen
+/// box left only to hover and press; zooming keeps its screen size; after ✓ no dimension is drawn.
+#[gpui::test]
+fn sketch_dimension_text_lies_in_the_plane_in_iso(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "dim-iso", Tool::Line);
+    let clock = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let c = clock.clone();
+    cx.update(|cx| view.read(cx).viewport.clone().update(cx, |vp, _| vp.set_clock(move || c.get())));
+    let settle = |cx: &mut TestAppContext| {
+        for _ in 0..20 {
+            clock.set(clock.get() + std::time::Duration::from_millis(100));
+            cx.executor().advance_clock(std::time::Duration::from_millis(100));
+            draw(cx, window);
+        }
+    };
+    keys(cx, window, &["n"]);
+    settle(cx);
+    click(cx, window, &view, (500., 400.));
+    click(cx, window, &view, (640., 360.));
+    keys(cx, window, &["5", "0", "enter", "escape", "escape"]);
+    settle(cx);
+    // (in the plane; the screen labels' hit ids; the in-plane fills' screen box (w, h); their largest distance off the plane).
+    // (The test text system rasterizes no masks to look at.)
+    let state = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let v = view.read(cx);
+            let labels: Vec<(bool, bool)> = v.sketch_dimension_overlay(w, cx).iter().map(|l| (v.sketch_dims_in_plane(cx), l.hit.is_some())).collect();
+            let fills = v.sketch_dimension_fills(cx);
+            let vp = v.viewport.read(cx);
+            let frame = v.sketch.as_ref().map(|ed| ed.frame);
+            let pts: Vec<glam::DVec3> = fills.iter().flat_map(|f| f.contours.iter().flatten().copied()).collect();
+            let off = frame.map_or(0.0, |fr| pts.iter().map(|p| (*p - fr.origin).dot(fr.normal).abs()).fold(0.0, f64::max));
+            let screen: Vec<glam::DVec2> = pts.iter().filter_map(|p| vp.project(*p)).collect();
+            let lo = screen.iter().fold(glam::DVec2::INFINITY, |m, p| m.min(*p));
+            let hi = screen.iter().fold(glam::DVec2::NEG_INFINITY, |m, p| m.max(*p));
+            (labels, (!screen.is_empty()).then(|| hi - lo), off)
+        })
+        .unwrap()
+    };
+    let (labels, fills, _) = state(cx);
+    assert_eq!((labels, fills), (vec![(false, true)], None), "normal to Top: the screen label");
+    view.update(cx, |v, cx| v.view(noshape_render::StandardView::Isometric, cx));
+    settle(cx);
+    let (labels, iso, off) = state(cx);
+    assert_eq!(labels, vec![(true, true)], "iso: the screen box only hit tests");
+    let iso = iso.expect("iso: the value in the plane");
+    assert!(off < 1e-9, "in the sketch plane: {off}");
+    // "50" is about 18 x 12 px upright; in the plane its run slants down along the sketch x and the digits flatten (live's
+    // "40": 17 x 10 px together, each glyph 6-7 px high).
+    assert!(iso.x > 15.0 && iso.x < 24.0 && iso.y > 8.0 && iso.y < 15.0, "iso box {iso:?}");
+    let wpp = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().world_per_px);
+    let before = wpp(cx);
+    for _ in 0..2 {
+        let wheel = gpui_kit::ScrollWheelEvent { position: gpui_kit::point(px(700.), px(450.)), delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -3.)), ..Default::default() };
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_event(wheel);
+        settle(cx);
+    }
+    assert!((wpp(cx) / before - 1.0).abs() > 0.05, "zoomed: {before} -> {}", wpp(cx));
+    let (_, zoomed, _) = state(cx);
+    let zoomed = zoomed.unwrap();
+    assert!((zoomed - iso).abs().max_element() < 1.5, "constant screen size: {iso:?} -> {zoomed:?}");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_none());
+    settle(cx);
+    let (labels, fills, _) = state(cx);
+    assert_eq!((labels, fills), (vec![], None), "after ✓ no dimension is drawn");
+}
+
 /// Live (dxf-insert-1125): ✓ on a drawing inserts its curves at once, unconstrained, with nothing selected and no
 /// message; its POINT and TEXT are dropped with a warning bubble; one Ctrl+Z removes the whole insert.
 #[gpui::test]

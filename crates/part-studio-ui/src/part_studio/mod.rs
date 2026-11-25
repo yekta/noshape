@@ -7071,6 +7071,8 @@ impl PartStudioView {
         }
         // Shown dimensions' labels, in their sketch plane.
         fills.extend(self.shown_dims_fills(cx));
+        // An open sketch's dimension labels in an oblique view.
+        fills.extend(self.sketch_dimension_fills(cx));
         // The sketch's name, in its plane.
         let name = self.sketch_name_contours(cx);
         if !name.is_empty() {

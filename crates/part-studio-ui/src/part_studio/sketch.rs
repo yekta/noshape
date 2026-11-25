@@ -1314,6 +1314,11 @@ impl PartStudioView {
                     self.refresh_scene(false, cx);
                     cx.notify();
                 }
+                // The labels go into the plane (or back on screen) as the view turns off (onto) the sketch.
+                let in_plane = self.sketch_dims_in_plane(cx);
+                if std::mem::replace(&mut self.ui.sketch_dims_in_plane, in_plane) != in_plane {
+                    cx.notify();
+                }
                 // The view moved the sketch under the resting pointer: what lit by reach is resolved again.
                 if let Some((gpu, resolved)) = self.ui.sketch_gpu_hover
                     && self.sketch_hover_id(gpu, cx) != resolved
@@ -4362,12 +4367,62 @@ impl PartStudioView {
     /// follow the camera without a window redraw; hover and presses come
     /// back as `ViewportEvent::LabelHover` / `LabelDown`): what
     /// `render_sketch_labels` would lay out, painted the same way.
+    /// Whether the open sketch's dimension labels lie in its plane: in any view but one square on to the sketch, its x to
+    /// the right, live draws their text and box like geometry in the plane, at the screen label's size (dim-iso-1125).
+    pub(super) fn sketch_dims_in_plane(&self, cx: &App) -> bool {
+        let Some(ed) = self.sketch.as_ref() else { return false };
+        let cam = &self.viewport.read(cx).camera;
+        cam.forward().dot(ed.frame.normal).abs() < 0.999 || cam.right().dot(ed.frame.x).abs() < 0.999
+    }
+
+    /// The dimension labels in the sketch plane (`sketch_dims_in_plane`): glyph outlines at the 16 px label's size along
+    /// the sketch x / y, centred on the label's anchor, on the hover / selected box (27 px high, 4 px padding).
+    pub(super) fn sketch_dimension_fills(&self, cx: &App) -> Vec<noshape_render::overlay::WorldFill> {
+        use super::shown_dims::{DIGIT_H, LABEL_ASC_PX};
+        if !crate::overlay_labels::frame_sketch_labels() || !self.sketch_dims_in_plane(cx) {
+            return Vec::new();
+        }
+        let (Some(ed), Some(data)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Vec::new() };
+        let editing = self.dim_input.as_ref().map(|(c, _, _)| *c);
+        let (wpp, x, y) = (ed.world_per_px, ed.frame.x, ed.frame.y);
+        let asc = LABEL_ASC_PX * wpp;
+        let fill = |contours: Vec<Vec<DVec3>>, c: Rgba| noshape_render::overlay::WorldFill { contours: std::sync::Arc::new(contours), color: [c.r, c.g, c.b, c.a] };
+        let rect = |c: DVec3, hw: f64, hh: f64| vec![c - x * hw - y * hh, c + x * hw - y * hh, c + x * hw + y * hh, c - x * hw + y * hh];
+        let mut out = Vec::new();
+        for PlacedDimension { cid, anchor, text, driving, configured, .. } in self.placed_dimension_labels(&data, cx) {
+            if editing == Some(cid) {
+                continue;
+            }
+            let (bg, fg) = dimension_label_colors(ed, cid, driving);
+            let (marker, rest) = dim_label_marker(&text);
+            let marker = marker.map(|(t, color)| (super::plane_text(t), rgb(color)));
+            let rest = super::plane_text(rest);
+            let marker_w = marker.as_ref().map_or(0.0, |(t, _)| t.width * asc + 4.0 * wpp);
+            let (hw, hh) = (0.5 * (marker_w + rest.width * asc) + 4.0 * wpp, 13.5 * wpp);
+            if configured {
+                out.push(fill(vec![rect(anchor, hw, hh), rect(anchor, hw - wpp, hh - wpp).into_iter().rev().collect()], rgb(0xffc20e)));
+            }
+            if let Some(bg) = bg {
+                out.push(fill(vec![rect(anchor, hw - if configured { wpp } else { 0.0 }, hh - if configured { wpp } else { 0.0 })], bg));
+            }
+            let mut origin = anchor - x * (hw - 4.0 * wpp) - y * (0.5 * DIGIT_H * asc);
+            let glyphs = |t: &super::PlaneText, at: DVec3| t.polylines.iter().filter(|c| c.len() >= 3).map(|c| c.iter().map(|q| at + x * (q.x * asc) + y * (q.y * asc)).collect()).collect::<Vec<_>>();
+            if let Some((t, color)) = &marker {
+                out.push(fill(glyphs(t, origin), *color));
+                origin += x * marker_w;
+            }
+            out.push(fill(glyphs(&rest, origin), fg));
+        }
+        out
+    }
+
     pub(super) fn sketch_dimension_overlay(&self, window: &Window, cx: &App) -> Vec<noshape_render::overlay::Label> {
         if !crate::overlay_labels::frame_sketch_labels() {
             return Vec::new();
         }
         let (Some(ed), Some(data)) = (self.sketch.as_ref(), self.sketch_data(cx)) else { return Vec::new() };
         let editing = self.dim_input.as_ref().map(|(c, _, _)| *c);
+        let in_plane = self.active_vp.is_none() && self.sketch_dims_in_plane(cx);
         let mut out = Vec::new();
         for PlacedDimension { cid, anchor, text, driving, configured, .. } in self.placed_dimension_labels(&data, cx) {
             if editing == Some(cid) {
@@ -4398,6 +4453,11 @@ impl PartStudioView {
                 // (live sk-hover-matrix-1123 TL / TD).
                 if ed.tool.draws() || ed.tool == Tool::Dimension {
                     l.hit = None;
+                }
+                // Drawn in the plane (`sketch_dimension_fills`): the screen box stays to hover and press.
+                if in_plane {
+                    l.masks.clear();
+                    l.quads.iter_mut().for_each(|q| (q.background, q.border_color) = ([0.0; 4], [0.0; 4]));
                 }
                 out.push(l);
             }
