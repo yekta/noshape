@@ -4712,6 +4712,61 @@ fn a_picked_pattern_direction_previews_at_once(cx: &mut TestAppContext) {
     .unwrap();
 }
 
+/// Live qa/mistakes-1125 batch 3: a Fastened whose connector doesn't resolve (its face gone) is in error ("Mate cannot
+/// resolve mate connectors."); reopened, that chip reads "Missing mate connector of <instance>" in red and ✓ is off.
+#[gpui::test]
+fn an_unresolved_mates_chips_say_missing_mate_connector_of_their_instance(cx: &mut TestAppContext) {
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let dir = std::env::temp_dir().join(format!("noshape-asm-ui-unresolved-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("asm.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    {
+        let mut ctx = Ctx::new();
+        call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap(), "length_unit": "mm" }));
+        for (tool, points) in [("corner_rectangle", json!([[0, 0], [40, 30]])), ("circle", json!([[70, 15], [75, 15]]))] {
+            let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+            let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": tool, "points": points }));
+            let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r.get("id").unwrap_or(r).clone()).collect();
+            call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+        }
+        for part in ["Part 1", "Part 2"] {
+            call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": part }));
+        }
+        let top = |ctx: &mut Ctx, i: &str| call(ctx, "assembly_entities", json!({ "instance": i, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        let (a, b) = (top(&mut ctx, "Part 1 <1>"), top(&mut ctx, "Part 2 <1>"));
+        call(&mut ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": a }, "b": { "instance": "Part 2 <1>", "entity": b } }));
+        // A taller, wider boss added over the pin: its top face (Part 2's connector) is gone.
+        let sk = call(&mut ctx, "sketch_create", json!({ "tab": "Part Studio 1", "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[70, 15], [78, 15]] }));
+        let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r.get("id").unwrap_or(r).clone()).collect();
+        call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": "extrude", "params": { "entities": regions, "depth": "20 mm", "operationType": "ADD" } }));
+    }
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let message = cx.update(|cx| view.read(cx).result.mates.first().map(|m| (m.ok, m.message.clone())));
+    assert_eq!(message, Some((false, Some("Mate cannot resolve mate connectors.".to_string()))), "the mate in error");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let id = v.result.mates[0].id;
+        v.edit_mate(id, w, cx);
+    }))
+    .unwrap();
+    // The reopened mate's evaluation (its debounce) comes back.
+    cx.executor().advance_clock(std::time::Duration::from_millis(100));
+    cx.run_until_parked();
+    let (chips, pale) = cx.update(|cx| {
+        let d = view.read(cx).mate.as_ref().expect("the mate's dialog").dialog.read(cx);
+        let chips: Vec<(String, bool)> = (0..2).filter_map(|i| d.field(i).map(|c| (d.field_text(i, c).to_string(), d.unresolved.contains_key(&i)))).collect();
+        (chips, d.accept_pale(cx))
+    });
+    let red = |s: &str| (s.to_string(), true);
+    assert!(chips.contains(&red("Missing mate connector of Part 2 <1>")) && chips.iter().filter(|c| c.1).count() == 1, "(chip, red): {chips:?}");
+    assert!(pale, "✓ off");
+}
+
 /// qa FEEL-MC-ARC-PICK-VERTEX-ASM (live hobbyist-1125 "Hinge", a knuckle's 270 degree arc): the connector previewed
 /// and taken over an arc edge is its centre, even 3 mm from the arc's end (ours took the end vertex).
 #[gpui::test]

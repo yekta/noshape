@@ -3201,7 +3201,7 @@ impl PartStudioView {
             }
         };
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
-        let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.len())).collect();
+        let region_counts: std::collections::HashMap<FeatureId, usize> = self.display.sketches.iter().map(|s| (s.feature, s.regions.iter().filter(|r| !r.imprinted).count())).collect();
         let vertex_sets: std::collections::HashMap<FeatureId, Vec<Reference>> = self.display.sketches.iter().map(|s| (s.feature, sketch_points(s))).collect();
         let studio_view = cx.entity().downgrade();
         let whole_sketches = std::mem::take(&mut self.ui.row_sketches);

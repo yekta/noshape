@@ -137,9 +137,9 @@ pub struct MateDialog {
     /// Slots on an instance whose part is gone, with the instance's name
     /// (live E15: red chips; Tangent's read "Missing entity of <instance>").
     pub lost: HashMap<usize, String>,
-    /// Slots whose connector can't resolve (live errors-1123 mates: a red "Mate connector") and slots on a suppressed
-    /// instance (grey).
-    pub unresolved: Vec<usize>,
+    /// Slots whose connector can't resolve, with the instance's name (live mistakes-1125: red "Missing mate connector
+    /// of <instance>"), and slots on a suppressed instance (grey).
+    pub unresolved: HashMap<usize, String>,
     pub dimmed: Vec<usize>,
     units: noshape_units::UnitPrefs,
     variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
@@ -340,7 +340,7 @@ impl MateDialog {
             labeler,
             status: None,
             lost: HashMap::new(),
-            unresolved: Vec::new(),
+            unresolved: HashMap::new(),
             dimmed: Vec::new(),
             inactive: None,
             units,
@@ -436,7 +436,7 @@ impl MateDialog {
         for (label, slots) in boxes {
             // The chips as drawn ("Face of …", a lost one red "Missing entity of …", live errors-1123 mates).
             let items: Vec<String> = slots.iter().filter_map(|f| self.slot(*f).as_ref().map(|c| self.field_text(*f, c).to_string())).collect();
-            let missing = slots.iter().any(|f| self.slot(*f).is_some() && (self.lost.contains_key(f) || self.unresolved.contains(f)));
+            let missing = slots.iter().any(|f| self.slot(*f).is_some() && (self.lost.contains_key(f) || self.unresolved.contains_key(f)));
             let active = self.box_active(slots);
             fields.push(json!({ "label": label, "kind": "query", "items": items, "active": active, "state": if missing { "error" } else { "ok" } }));
         }
@@ -932,8 +932,8 @@ impl MateDialog {
         if self.mate_type == MateType::Tangent && let Some(inst) = self.lost.get(&field) {
             return format!("Missing entity of {inst}").into();
         }
-        if self.unresolved.contains(&field) {
-            return "Mate connector".into();
+        if let Some(inst) = self.unresolved.get(&field) {
+            return format!("Missing mate connector of {inst}").into();
         }
         match &c.reference {
             Reference::Implicit { on, .. } if self.mate_type == MateType::Tangent => (self.labeler)(&MateConnectorRef { reference: (**on).clone(), ..c.clone() }).into(),
@@ -951,7 +951,7 @@ impl MateDialog {
         for &field in fields {
             let Some(c) = self.slot(field) else { continue };
             let lost = self.lost.get(&field);
-            let unresolved = self.unresolved.contains(&field);
+            let unresolved = self.unresolved.contains_key(&field);
             let text = self.field_text(field, c);
             let text_del = text.clone();
             // Live (qa5 MT3): "Mate connector of Part 1 <3> (Click to edit)".

@@ -12513,3 +12513,50 @@ fn a_hole_at_a_point_on_an_obround_links_top_face() {
     let g = call(&mut ctx, "feature_get", json!({ "feature": h["feature"] }));
     assert_eq!(g["params"]["scope"].as_array().map(Vec::len), Some(1), "Merge scope: {}", g["params"]["scope"]);
 }
+
+/// Live qa/mistakes-1125 batch 3 (block 40×30×10, pin Ø10×20 at (70, 15)): the block inserted twice is two instances
+/// with no error, the second 1/8 of its box on as the Insert dialog places it (live qa5 A18; live's REST insert, the
+/// one the capture used, leaves both at the origin); a Fastened from the block's top face to the pin's top face is OK and moves
+/// the first-picked block by (50, 0, 10); deleting the pin takes its mate with it, and one undo brings both back.
+#[test]
+fn first_hour_assembly_mistakes_as_live() {
+    let dir = std::env::temp_dir().join(format!("noshape-asm-mistakes-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("m.noshape");
+    for ext in ["", "-wal", "-shm"] {
+        let _ = std::fs::remove_file(format!("{}{ext}", path.display()));
+    }
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap(), "length_unit": "mm" }));
+    for (tool, points, depth) in [("corner_rectangle", json!([[0, 0], [40, 30]]), "10 mm"), ("circle", json!([[70, 15], [75, 15]]), "20 mm")] {
+        let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+        let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": tool, "points": points }));
+        let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r.get("id").unwrap_or(r).clone()).collect();
+        call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": depth, "operationType": "NEW" } }));
+    }
+    let block = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }))["instance"].clone();
+    let twice = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }))["instance"].clone();
+    let pin = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }))["instance"].clone();
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let inst = |list: &Value, id: &Value| list["instances"].as_array().unwrap().iter().find(|i| i["id"] == *id).cloned().unwrap_or_else(|| panic!("no {id}: {list}"));
+    let place = |list: &Value, id: &Value| {
+        let i = inst(list, id);
+        ([0, 1, 2].map(|k| num(&i["translation"][k])), i["rotation"].clone(), i["error"].clone())
+    };
+    assert_eq!((inst(&list, &block)["name"].clone(), inst(&list, &twice)["name"].clone()), (json!("Part 1 <1>"), json!("Part 1 <2>")), "{list}");
+    let (first, second) = (place(&list, &block), place(&list, &twice));
+    assert_eq!((first.0, second.0, second.2), ([0.0; 3], [5.0, 3.75, 1.25], Value::Null), "(first, second, the second's error)");
+    let top = |ctx: &mut Ctx, instance: &Value, at: [f64; 3]| call(ctx, "assembly_entities", json!({ "instance": instance, "kind": "faces", "at": [at] }))["faces"][0]["id"].clone();
+    let (block_top, pin_top) = (top(&mut ctx, &block, [20.0, 15.0, 10.0]), top(&mut ctx, &pin, [70.0, 15.0, 20.0]));
+    let m = call(&mut ctx, "assembly_mate", json!({ "type": "fastened", "a": { "instance": block, "entity": block_top }, "b": { "instance": pin, "entity": pin_top } }));
+    assert_eq!(m["mate_ok"], true, "the wrong faces still mate: {m}");
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    let (moved, pin_at) = (place(&list, &block).0, place(&list, &pin).0);
+    assert!(moved.iter().zip([50.0, 0.0, 10.0]).all(|(a, b)| (a - b).abs() < 1e-6) && pin_at.iter().all(|v| v.abs() < 1e-6), "the first-picked block moves by (50, 0, 10): block {moved:?}, pin {pin_at:?}");
+    call(&mut ctx, "assembly_delete", json!({ "instances": [pin] }));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    assert_eq!((list["instances"].as_array().unwrap().len(), list["mates"].as_array().unwrap().len()), (2, 0), "the pin and its mate gone: {list}");
+    call(&mut ctx, "history_undo", json!({}));
+    let list = call(&mut ctx, "assembly_list", json!({}));
+    assert_eq!((list["instances"].as_array().unwrap().len(), list["mates"].as_array().unwrap().len()), (3, 1), "one undo brings both back: {list}");
+}

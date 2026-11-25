@@ -1940,6 +1940,87 @@ fn a_mirror_across_a_side_face_adds_into_its_seed(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count()), 1, "one part after ✓");
 }
 
+/// Live qa/first-week-1125 FIRST-WEEK-PLANE: a new Plane opens Offset, 25 mm, Entities empty and ✓ disabled; the top
+/// face picked, its chip "Face of Extrude 1" and ✓ enabled; one committed as Mid plane (top and bottom faces), the
+/// next Plane opens on Mid plane.
+#[gpui::test]
+fn a_new_plane_opens_offset_25_mm_then_on_the_last_type(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-plane");
+    let (top, _) = block_face_centre(cx, &view, glam::DVec3::Z);
+    let (bottom, _) = block_face_centre(cx, &view, -glam::DVec3::Z);
+    let open = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("cPlane", w, cx))).unwrap();
+        wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+        let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Plane dialog").dialog.clone());
+        let state = cx.update(|cx| {
+            let d = dialog.read(cx);
+            let p = &d.feature.params;
+            (p.enum_("cplaneType").to_string(), p.expr("offset").map(|e| e.text.clone()), p.query("entities").len(), d.can_submit())
+        });
+        (dialog, state)
+    };
+    let (dialog, state) = open(cx);
+    assert_eq!(state, ("OFFSET".to_string(), Some("25 mm".to_string()), 0, false), "(type, offset, entities, ✓) on opening");
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("entities");
+        d.add_pick(top.clone(), cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let label = cx.update(|cx| view.read(cx).labeler(cx)(&top));
+    assert_eq!((label.as_str(), cx.update(|cx| dialog.read(cx).can_submit())), ("Face of Extrude 1", true), "(chip, ✓) after the face");
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.set_value("cplaneType", noshape_model::ParamValue::Enum("MID_PLANE".into()), cx);
+        d.user_focus_query("entities");
+        d.add_pick(bottom.clone(), cx);
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
+    let planes = cx.update(|cx| view.read(cx).display.planes.iter().filter(|p| p.name == "Plane 1").count());
+    assert_eq!(planes, 1, "Plane 1 made");
+    let (_, state) = open(cx);
+    assert_eq!(state.0, "MID_PLANE", "the next Plane opens on the last type used");
+}
+
+/// Live qa/first-week-1125 FIRST-WEEK-TEXT-EMBOSS: a text sketch "Lbl" on the block's top face, its row selected,
+/// Extrude: "Faces of Lbl", Add, Merge scope the part (not Merge with all); ✓ keeps one part, the letters raised.
+#[gpui::test]
+fn a_text_sketchs_extrude_on_a_part_adds_into_it(cx: &mut TestAppContext) {
+    let (window, view) = part_studio_with(cx, "dlg-emboss", |path| {
+        let call = |ctx: &mut noshape_ops::Ctx, tool: &str, args: serde_json::Value| {
+            let op = noshape_ops::registry::by_tool_name(tool).unwrap_or_else(|| panic!("no tool {tool}"));
+            noshape_ops::registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value
+        };
+        {
+            let ctx = &mut noshape_ops::Ctx::new();
+            noshape_ops::ui_parity::build_start(ctx, path, &serde_json::from_str::<serde_json::Value>(include_str!("../../../../tests/ui-parity/starts.json")).unwrap()["block"]).unwrap();
+            let top = call(ctx, "query_entities", serde_json::json!({ "kind": "faces", "at": [[20, 15, 10]] }))["faces"][0]["id"].clone();
+            let sk = call(ctx, "sketch_create", serde_json::json!({ "plane": top, "name": "Lbl" }))["sketch"].clone();
+            call(ctx, "sketch_text", serde_json::json!({ "sketch": sk, "text": "Op8", "corner": [5, 10], "height": "10 mm" }));
+        }
+        crate::session::Session::open(path).unwrap()
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).display.sketches.len() == 2 && !view.read(cx).display.bodies.is_empty());
+    let (sketch, part) = cx.update(|cx| {
+        let d = &view.read(cx).display;
+        (d.sketches.iter().find(|s| s.name == "Lbl").expect("Lbl").feature, Reference::Body(d.bodies.first().expect("the part").id.clone()))
+    });
+    view.update(cx, |v, _| v.selected_features = vec![sketch]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Extrude dialog").dialog.clone());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && dialog.read(cx).feature.params.enum_("operationType") == "ADD");
+    let labels = cx.update(|cx| dialog.read(cx).chip_labels("entities"));
+    assert_eq!(labels, vec!["Faces of Lbl".to_string()], "the selected sketch's chip");
+    let state = cx.update(|cx| {
+        let p = &dialog.read(cx).feature.params;
+        (p.enum_("operationType").to_string(), p.bool("defaultScope"), p.query("booleanScope").to_vec())
+    });
+    assert_eq!(state, ("ADD".to_string(), false, vec![part]), "(operation, Merge with all, merge scope)");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_edit(false, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).edit.is_none());
+    assert_eq!(cx.update(|cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count()), 1, "one part after ✓");
+}
+
 /// Live2 pattern-hole-1118 (P0): a new Linear pattern of the part shows no instance until its Direction is picked; the
 /// edge picked, the preview has the instance with nothing else done.
 #[gpui::test]

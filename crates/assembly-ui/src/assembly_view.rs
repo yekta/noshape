@@ -1197,13 +1197,11 @@ impl AssemblyView {
             let off: Vec<InstanceId> = self.assembly(cx).map(|a| a.instances.iter().filter(|i| i.suppressed).map(|i| i.id).collect()).unwrap_or_default();
             s.dialog.update(cx, |d, cx| {
                 d.lost = (0..4).filter_map(|i| d.field(i).and_then(|c| lost.get(&c.instance)).map(|n| (i, n.clone()))).collect();
-                d.unresolved = (0..4).filter(|&i| unresolvable && d.field(i).is_some_and(|c| !self.result.pick_resolves(c, &units))).collect();
+                let name = |c: &MateConnectorRef| self.result.node(&[c.instance]).map(|n| n.name.clone()).unwrap_or_default();
+                d.unresolved = (0..4).filter_map(|i| d.field(i).filter(|c| unresolvable && !self.result.pick_resolves(c, &units)).map(|c| (i, name(c)))).collect();
                 // A Tangent's lost face: "Missing entity of <instance>" (live errors-1123 mates).
                 if d.mate_type == MateType::Tangent {
-                    for i in std::mem::take(&mut d.unresolved) {
-                        let name = d.field(i).and_then(|c| self.result.node(&[c.instance])).map(|n| n.name.clone()).unwrap_or_default();
-                        d.lost.insert(i, name);
-                    }
+                    d.lost.extend(std::mem::take(&mut d.unresolved));
                 }
                 d.dimmed = (0..4).filter(|&i| d.field(i).is_some_and(|c| off.contains(&c.instance))).collect();
                 if d.a.is_some() && d.b.is_some() {
