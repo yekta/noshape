@@ -1,19 +1,19 @@
 //! Insert dialog thumbnails (Onshape shows a 70x40 picture of each Part
 //! Studio and part): rendered offscreen in the background with the
-//! document-thumbnail look, cached per Part Studio content hash.
+//! document-thumbnail look, cached per Part Studio content hash and chosen
+//! configuration (live wf07 s21: the pictures follow the configuration).
 
 use super::*;
 use noshape_model::drawing::views::{SourceKey, source_hash};
 
-/// (Part Studio, part or None for the whole studio).
-type ThumbKey = (TabId, Option<BodyId>);
+/// (Part Studio, configuration, part or None for the whole studio).
+type ThumbKey = (TabId, ConfigValues, Option<BodyId>);
 
 #[derive(Default)]
 pub struct InsertThumbs {
-    /// (Part Studio, part or None for the whole studio) -> picture.
     pub images: HashMap<ThumbKey, Arc<RenderImage>>,
-    /// Content hash each studio's pictures were made for.
-    pub made_for: HashMap<TabId, u64>,
+    /// Content hash each (studio, configuration)'s pictures were made for.
+    pub made_for: HashMap<(TabId, ConfigValues), u64>,
     pub busy: bool,
     /// Other documents' Part Studios (external key, part) -> picture, and
     /// the keys being rendered or done.
@@ -22,8 +22,28 @@ pub struct InsertThumbs {
 }
 
 impl AssemblyView {
-    pub(super) fn insert_thumb(&self, tab: TabId, part: Option<&BodyId>) -> Option<Arc<RenderImage>> {
-        self.ui.thumbs.images.get(&(tab, part.cloned())).cloned()
+    pub(super) fn insert_thumb(&self, tab: TabId, config: &ConfigValues, part: Option<&BodyId>) -> Option<Arc<RenderImage>> {
+        self.ui.thumbs.images.get(&(tab, config.clone(), part.cloned())).cloned()
+    }
+
+    /// The Insert dialog's picture: in the configuration chosen for the studio.
+    pub(super) fn insert_dialog_thumb(&self, tab: TabId, part: Option<&BodyId>) -> Option<Arc<RenderImage>> {
+        self.insert_thumb(tab, &self.insert_config_of(tab), part)
+    }
+
+    fn insert_config_of(&self, tab: TabId) -> ConfigValues {
+        self.ui.insert_config.get(&tab).cloned().unwrap_or_default()
+    }
+
+    /// Studios whose pictures in their chosen configuration are missing or
+    /// older than their content.
+    pub(super) fn stale_insert_thumbs(&self, doc: &Document) -> Vec<(TabId, ConfigValues, u64)> {
+        self.catalog
+            .studios
+            .iter()
+            .filter_map(|s| source_hash(doc, &SourceKey::studio(s.tab)).map(|h| (s.tab, self.insert_config_of(s.tab), h)))
+            .filter(|(t, c, h)| self.ui.thumbs.made_for.get(&(*t, c.clone())) != Some(h))
+            .collect()
     }
 
     /// Render the pictures of studios that changed since the last time
@@ -33,13 +53,7 @@ impl AssemblyView {
             return;
         }
         let doc = self.doc.read(cx).session.doc.clone();
-        let todo: Vec<(TabId, u64)> = self
-            .catalog
-            .studios
-            .iter()
-            .filter_map(|s| source_hash(&doc, &SourceKey::studio(s.tab)).map(|h| (s.tab, h)))
-            .filter(|(t, h)| self.ui.thumbs.made_for.get(t) != Some(h))
-            .collect();
+        let todo = self.stale_insert_thumbs(&doc);
         if todo.is_empty() {
             return;
         }
@@ -49,8 +63,8 @@ impl AssemblyView {
             let made = cx
                 .background_spawn(async move {
                     let mut out: Vec<(ThumbKey, Arc<RenderImage>)> = Vec::new();
-                    for (tab, _) in &todo {
-                        let Some(result) = evaluator.lock().studio(&doc, *tab, &ConfigValues::default()) else { continue };
+                    for (tab, config, _) in &todo {
+                        let Some(result) = evaluator.lock().studio(&doc, *tab, config) else { continue };
                         let display = &result.display;
                         let parts: Vec<Option<BodyId>> = std::iter::once(None).chain(display.bodies.iter().filter(|b| matches!(b.kind, BodyKind::Solid | BodyKind::Surface) && !b.hidden).map(|b| Some(b.id.clone()))).collect();
                         for part in parts {
@@ -68,7 +82,7 @@ impl AssemblyView {
                             let camera = crate::start_thumbnail::fit_camera(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64);
                             let Ok(png) = gpu.render_thumbnail(Arc::new(built.scene), camera, crate::start_thumbnail::thumbnail_style()).await else { continue };
                             if let Some(img) = decode(&png) {
-                                out.push(((*tab, part), img));
+                                out.push(((*tab, config.clone(), part), img));
                             }
                         }
                         // Sketches (Sketches filter): each sketch alone, seen
@@ -90,7 +104,7 @@ impl AssemblyView {
                             let camera = fit_camera_normal(lo.as_dvec3(), hi.as_dvec3(), w as f64 / h as f64, &sk.frame);
                             let Ok(png) = gpu.render_thumbnail(Arc::new(built.scene), camera, crate::start_thumbnail::thumbnail_style()).await else { continue };
                             if let Some(img) = decode(&png) {
-                                out.push(((*tab, Some(noshape_model::assembly::eval::sketch_body_id(sk.feature))), img));
+                                out.push(((*tab, config.clone(), Some(noshape_model::assembly::eval::sketch_body_id(sk.feature))), img));
                             }
                         }
                     }
@@ -100,9 +114,9 @@ impl AssemblyView {
             let _ = this.update(cx, |this: &mut Self, cx| {
                 let (todo, out) = made;
                 this.ui.thumbs.busy = false;
-                for (tab, h) in todo {
-                    this.ui.thumbs.images.retain(|(t, _), _| *t != tab);
-                    this.ui.thumbs.made_for.insert(tab, h);
+                for (tab, config, h) in todo {
+                    this.ui.thumbs.images.retain(|(t, c, _), _| (*t, c) != (tab, &config));
+                    this.ui.thumbs.made_for.insert((tab, config), h);
                 }
                 this.ui.thumbs.images.extend(out);
                 cx.notify();

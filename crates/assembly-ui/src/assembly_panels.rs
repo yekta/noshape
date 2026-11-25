@@ -3578,7 +3578,7 @@ impl AssemblyView {
                     cx.notify();
                 }));
             list = list.child(
-                thumb_row("cfg-studio".into(), 14., "part-studio", self.insert_thumb(e.tab, None), e.name.clone(), true, cx)
+                thumb_row("cfg-studio".into(), 14., "part-studio", self.insert_thumb(e.tab, &ConfigValues::default(), None), e.name.clone(), true, cx)
                     .relative()
                     .child(caret)
                     .children(cfg_button)
@@ -3617,7 +3617,7 @@ impl AssemblyView {
         }
         if let Some(e) = entry.as_ref().filter(|_| !collapsed) {
             for (k, part) in e.parts.iter().enumerate() {
-                list = list.child(thumb_row(SharedString::from(format!("cfg-part-{k}")), 40., if part.3 { "surface-body" } else { "part" }, self.insert_thumb(e.tab, Some(&part.0)), part.1.clone(), true, cx));
+                list = list.child(thumb_row(SharedString::from(format!("cfg-part-{k}")), 40., if part.3 { "surface-body" } else { "part" }, self.insert_thumb(e.tab, &ConfigValues::default(), Some(&part.0)), part.1.clone(), true, cx));
             }
             for (k, (_, name)) in e.sketches.iter().enumerate() {
                 list = list.child(thumb_row(SharedString::from(format!("cfg-sketch-{k}")), 40., "sketch", None, name.clone(), true, cx));

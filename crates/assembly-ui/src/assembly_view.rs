@@ -6283,7 +6283,7 @@ impl AssemblyView {
                         .into_any_element()
                 });
                 let cfg_button = self.insert_config_button(s.tab, cx);
-                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_thumb(s.tab, None), s.name.clone(), cx).children(cfg_button.map(|b| h_flex().flex_none().child(b).child(div().w(px(4.))))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
+                body = body.child(item_row(SharedString::from(format!("ins-ps-{}", s.tab)), 0., expander, "part-studio", self.insert_dialog_thumb(s.tab, None), s.name.clone(), cx).children(cfg_button.map(|b| h_flex().flex_none().child(b).child(div().w(px(4.))))).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_studio_parts(s2.clone(), cx))));
                 if open && let Some(el) = self.render_insert_config(s.tab, cx) {
                     body = body.child(div().pl(px(50.)).pr_2().child(el));
                 }
@@ -6292,7 +6292,7 @@ impl AssemblyView {
                         let part2 = part.clone();
                         let tab = s.tab;
                         body = body.child(
-                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if s.composites.contains(&part.0) { "composite-part" } else if part.3 { "surface-body" } else { "part" }, self.insert_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
+                            item_row(SharedString::from(format!("ins-part-{}-{}", s.tab, part.0)), 22., None, if s.composites.contains(&part.0) { "composite-part" } else if part.3 { "surface-body" } else { "part" }, self.insert_dialog_thumb(s.tab, Some(&part.0)), part.1.clone(), cx)
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_and_place(tab, Some(part2.clone()), cx))),
                         );
                     }
@@ -6300,7 +6300,7 @@ impl AssemblyView {
                     for (feature, name) in sketches {
                         let tab = s.tab;
                         let n2 = name.clone();
-                        let thumb = self.insert_thumb(s.tab, Some(&noshape_model::assembly::eval::sketch_body_id(feature)));
+                        let thumb = self.insert_dialog_thumb(s.tab, Some(&noshape_model::assembly::eval::sketch_body_id(feature)));
                         body = body.child(
                             item_row(SharedString::from(format!("ins-sk-{}-{}", s.tab, feature.0)), 22., None, "sketch", thumb, name, cx)
                                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.insert_sketch(tab, feature, n2.clone(), cx))),

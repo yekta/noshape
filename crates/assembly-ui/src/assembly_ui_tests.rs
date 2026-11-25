@@ -2988,6 +2988,40 @@ fn a_configured_rows_split_button_keeps_its_row_untinted(cx: &mut TestAppContext
     cx.update(|cx| assert!(view.read(cx).ui.insert_cfg_btn_hover.is_none(), "the row's name under the pointer"));
 }
 
+/// Live workflows-1123 07 s19-21 (qa ASM-INSERT-THUMB-CONFIG): once a configuration is chosen for a Part Studio in
+/// Insert, its pictures are those of that configuration: made anew for it, kept apart from the default ones.
+#[gpui::test]
+fn insert_thumbnails_follow_the_chosen_configuration(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "insert-thumb-cfg", |ctx| {
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Configuration" }));
+    });
+    let (_window, view) = open_assembly_with_front(cx, &path);
+    let pic = || std::sync::Arc::new(gpui_kit::RenderImage::new(vec![image::Frame::new(image::RgbaImage::new(1, 1))]));
+    let (default_pic, chosen_pic) = (pic(), pic());
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let doc = v.doc.read(cx).session.doc.clone();
+            let studio = v.catalog.studios.iter().find(|s| s.name == "Part Studio 1").expect("Part Studio 1 listed").tab;
+            let stale = v.stale_insert_thumbs(&doc);
+            let (_, cfg, h) = stale.iter().find(|(t, _, _)| *t == studio).cloned().expect("pictures to make");
+            assert!(cfg.is_empty(), "nothing chosen yet: the default configuration");
+            v.ui.thumbs.made_for.insert((studio, cfg.clone()), h);
+            v.ui.thumbs.images.insert((studio, cfg, None), default_pic.clone());
+            assert!(!v.stale_insert_thumbs(&doc).iter().any(|(t, _, _)| *t == studio));
+
+            let chosen = noshape_model::configuration::ConfigValues([("Configuration".to_string(), "Option 2".to_string())].into());
+            v.ui.insert_config.insert(studio, chosen.clone());
+            assert!(v.insert_dialog_thumb(studio, None).is_none(), "no default picture under a chosen configuration");
+            let stale = v.stale_insert_thumbs(&doc);
+            assert!(stale.iter().any(|(t, c, _)| *t == studio && *c == chosen), "the chosen configuration's pictures are made: {stale:?}");
+            v.ui.thumbs.images.insert((studio, chosen, None), chosen_pic.clone());
+            assert!(v.insert_dialog_thumb(studio, None).is_some_and(|p| std::sync::Arc::ptr_eq(&p, &chosen_pic)));
+            v.ui.insert_config.remove(&studio);
+            assert!(v.insert_dialog_thumb(studio, None).is_some_and(|p| std::sync::Arc::ptr_eq(&p, &default_pic)), "back to the default one, kept");
+        })
+    });
+}
+
 /// Live workflows-1123 06 s22 (qa ASM-CHANGE-CONFIG-PANEL-LOOK): Change configuration of a Part Studio with a list
 /// input alone has no Generate button (live qa5 cf-052 greys one with a typed input); the list is an underlined field
 /// (26 px), not a box; a ▾ at the Part Studio row's left folds the inputs and parts.
