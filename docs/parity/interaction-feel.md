@@ -1045,6 +1045,24 @@ Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf
 | Fastened field, vertex hovered | a white disc with a #FFC685 rim, no triad | a filled disc and the full connector triad | = (qa 21:4x verified, green a08754b16, psui 613b06bb7) |
 | Dimension tool: line, its midpoint, a point, the circle | the #FFC685 band with the blue curve's darker line through, no midpoint marker; the point's ring fills #FFD8AC | the same | = |
 
+Combined states (lead 11-25 18:4x, USER P0; block doc after `f`; live: hover-matrix-1121 b3/ where it has the cell,
+else REQUESTS "psui 11-25 18:41: hover in combined states"; qa to score ours once live answers):
+
+| Cell | Live | Ours | Status |
+|---|---|---|---|
+| Fillet field active, the picked edge hovered | = picked: the #FFA90A strip of the 1.3 mm preview, no #FFC685 band (b3) | = our picked | = (qa 21:4x verified, green a08754b16) |
+| Fillet field active, a face hovered over the fillet preview (an edge picked) | the picked edge stays #FFA90A; the face boundary 2 px #FFC685 (b3) | the same | = (qa 11-24, score-a910) |
+| Fillet field active, a picked face hovered | ? (requested) | to score | ? |
+| Plane field active, a picked vertex hovered | ? (requested) | to score | ? |
+| Extrude region field active, the picked region hovered | ? (requested) | to score | ? |
+| A part selected before the dialog (it fills the field), then hovered with the field active | ? (requested) | to score | ? |
+| Sketch edit, a model edge selected (Select tool), the edge hovered | ? (requested) | to score | ? |
+| Sketch edit, a model face selected, a sketch line on it hovered | ? (requested) | to score | ? |
+| Sketch edit, a model vertex selected, the vertex hovered; and a sketch point over it | ? (requested) | to score | ? |
+| Extrude (New) preview: a face of the part behind the preview body hovered | ? (requested) | to score | ? |
+| Extrude (Remove) preview: a face inside the cut hovered | ? (requested) | to score | ? |
+| Shell / Fillet preview: an edge of the previewed part hovered | ? (requested) | to score | ? |
+
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 
 Every feel finding recorded in onshape-research/live/behaviours.md on 11-17 and 11-18 for the Part Studio, with the
