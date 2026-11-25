@@ -1406,7 +1406,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         const EDGE: [u8; 4] = [0x96, 0x9d, 0xa3, 255];
         const CORE: [u8; 4] = [0xf7, 0xf7, 0xf8, 255];
         const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
-        const CENTER_HOVER: [u8; 4] = [0x60, 0x87, 0xbd, 255];
+        const CENTER_HOVER: [u8; 4] = [0x3a, 0x6b, 0xa8, 255];
         const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
         // A hovered explode handle keeps its hollow stroke, slate edged with a blue core (live workflow 24 s04).
         const EXPLODE_HOVER: ([u8; 4], [u8; 4]) = ([92, 114, 131, 255], [117, 152, 200, 255]);
@@ -1477,14 +1477,14 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let chl = *hovered == Some(ManipHandle::Center);
         let o: [f32; 3] = p3(f.origin);
         // Live hover-matrix-1121 as2 (qa FEEL-ASM-MANIPULATOR-RING): a hollow ring, ~18 px, the pick showing through
-        // its ~12 px middle; hovered the same ring blue (#6087bd..#85a3d0).
-        let (color, style) = if chl { (CENTER_HOVER, PointSprite::STROKE_RING | PointSprite::SOFT_CORE) } else { (edge, PointSprite::STROKE_RING) };
-        op.points.push(PointSprite { position: o, color, pick_id: cid, size: 18.0, style: LineSegment::ON_TOP | style, _pad: 0 });
+        // its ~12 px middle; hovered a 20 px blue stroke, #3a6ba8 rims round a #99b2da core (qa FEEL-ASM-MOVE-RING-RIMS).
+        let (color, style, ring_px) = if chl { (CENTER_HOVER, PointSprite::STROKE_RING | PointSprite::SOFT_CORE, 20.0) } else { (edge, PointSprite::STROKE_RING, 18.0) };
+        op.points.push(PointSprite { position: o, color, pick_id: cid, size: ring_px, style: LineSegment::ON_TOP | style, _pad: 0 });
         // Over the selected edges' band (below): idle it shows through a fifth, hovered it lies over the band (live
         // as2-edge-selected_s / selhover_f, qa FEEL-ASM-RING-OVER-BAND).
         if !h.selected_entities.is_empty() {
             let a = if chl { 255 } else { 51 };
-            sel_pts.points.push(PointSprite { position: o, color: [color[0], color[1], color[2], a], pick_id: 0, size: 18.0, style: LineSegment::ON_TOP | style, _pad: 0 });
+            sel_pts.points.push(PointSprite { position: o, color: [color[0], color[1], color[2], a], pick_id: 0, size: ring_px, style: LineSegment::ON_TOP | style, _pad: 0 });
         }
         scene.set_state(cid, 0);
     }

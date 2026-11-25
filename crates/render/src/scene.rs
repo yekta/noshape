@@ -214,7 +214,7 @@ impl PointSprite {
     /// A stroked ring (the move manipulator's centre, live hover-matrix-1121 as2: ~18 px, see-through inside ~12 px):
     /// rims of the colour, its middle white.
     pub const STROKE_RING: u32 = 512;
-    /// With [`Self::STROKE_RING`]: the middle only lighter than the rims (hovered: blue throughout).
+    /// With [`Self::STROKE_RING`] (hovered): a wider middle, its core the hovered stroke's light #99b2da between the rims.
     pub const SOFT_CORE: u32 = 1024;
 }
 

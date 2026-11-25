@@ -332,6 +332,10 @@ fn hovered_centre_ring_over_band(cx: &mut TestAppContext) {
     let ring: Vec<[u8; 3]> = [-8.0, -7.0, -6.0, 6.0, 7.0, 8.0].into_iter().map(at).collect();
     let blue = |cs: &[[u8; 3]]| cs.iter().any(|c| c[2] > c[0] + 40);
     assert!(blue(&ring[..3]) && blue(&ring[3..]), "the blue ring over the band on both sides: {ring:?}");
+    // A hollow blue stroke as live's (qa FEEL-ASM-MOVE-RING-RIMS): #3a6ba8 rims round a #99b2da core (live 17 / 16 px
+    // within 8 in this crop, ours 120 / 16: our rims less blended at their edges; before, one flat #6087bd).
+    let (rims, core) = (crop.iter().filter(|c| close(**c, 0x3a6ba8, 8)).count(), crop.iter().filter(|c| close(**c, 0x99b2da, 8)).count());
+    assert!(rims >= 10 && core >= 10, "{rims} rim px, {core} core px (live 17 / 16)");
 }
 
 /// Live triad-depth-1122 t1 (hover matrix batch 4: "#ffa033 once selected"): a face selected selects its instance too,
