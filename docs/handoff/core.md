@@ -7,41 +7,27 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 ## Now (11-25)
 - **RE-LAND 11-25 22:5x**: 1bd337a6 FAILED 22:04 (rebase conflict, workspace_tests.rs: qa's page-open test beside my
   Update… test, kept both); rebased, QUEUED 52c8f9ce (Ribs, Update…, mesh Translate + handoff). Lead reports it.
-- **GATE PASSED, LANDING (11-26 02:14)**: 4826656b7 solver, b3785098f cPlane, 0d10fa156 translator: models gate
-  base 131/189 docs 2111/2681 features, branch 132/189 2118/2681; only doc changed
-  c2-lora-enclosure-ribs 39 -> 46/46 (52c8f9ce's Ribs, in the stack); none worse. Queued with land.sh; lead reports.
-  The 90-min suite stall was NOT a hang in the fixes: 97ad5f Linear pattern 1 fused six wrong 114-face parts while
-  the source was still off (Extrude 2 up to the wrong face); with the Plane-feature refs the suite runs 942 s.
-- **QUEUE (lead 11-25 23:xx)**: (1) scissor parse_refs fix through the models gate (core-base/.gof.sh pair), (2) scissor
-  97ad5f Delete face 1, (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
+- **QUEUED a730d3fd (11-26 02:3x)**: 4826656b7 solver, b3785098f cPlane, 0d10fa156 translator (+ 52c8f9ce's stack):
+  models gate base 131/189 docs 2111/2681, branch 132/189 2118/2681, only c2-lora-enclosure-ribs 39 -> 46/46; lead
+  reports the land. (e51c898c failed on a rebase conflict; rebased clean, re-queued.)
+- **BOOL GATE IN FLIGHT (11-26 03:28)**: 44abb6438 (boolean.cpp planes_meet_within_zero_length: merge_planar and
+  same_domain_candidates take faces sharing an edge as one plane when angle <= 1e-5 and angle x joint bbox diagonal
+  <= 1e-8 m; T1 core::coplanar_faces_within_live_zero_length_merge_in_a_union, fails 7 != 6 without). Scissor 264eb3
+  Linear pattern 1 WAGO 44 -> 41 faces as live. Lead: land only after tools/bool/gate.sh (corpora, parity56, model
+  suite) has 0 new differences or a live reason for each; bool told (no conflict; NOT on vibex8, bool's till 06:00).
+  Run: tools/bool/gate.sh 44abb6438 --host vibex7 > /root/core-scratch/gate-zl.out (VERDICT line at the end).
+  Next after it: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck with the merge.
+- **QUEUE (lead 11-25 23:xx)**: (1) parse_refs (queued a730d3fd), (2) 97ad5f Delete face 1 (= live;
+  merge gate above), (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
   (qa suites/gaps-1125). Then skasm's sweep items, BLEND-FAILS b-d.
   (3) status 01:5x: not the sweep's tolerance (1000 segments builds at 4.2e-9: same 6.172), not the path length
   (40.0385 vs live 40.0318 mm), caps equal (0.002027), end cap normal 1.4° off: the profile's tilt against the
   path (~21° ours vs ~9° live by the side areas) = the Routing curve's end condition (curves.rs fit_spline_edge ->
   sketch fit_3d_ends vs std opFitSpline). REQUESTS core 11-26 01:53 asks live's evCurveDefinition of RKBB.
   Saved doc vibex7 ~/tmp/core/lg; probes core-scratch/sc rc.py (curve), sw.py (sweep faces/normals).
-- **SCISSOR 264eb3 WIP (uncommitted in core-rf, 11-26 01:0x)**: (a) sketch solver (crates/sketch solver.rs): an
-  over-determined component (more equations than unknowns) whose least-squares minimum is within 1e-8 m (live's
-  zeroLength) is solved: Sketch 1 (arcs through Mesh points, tangent to lines: 7e-10 m) Ok; T1 constraints_more::
-  an_arc_through_three_projected_points…; sketch tests 177 ok. (b) cplane.rs: a MeshPoint is a vertex (Plane 2
-  Point-Plane); T1 in features_b::move_face_offsets_a_mesh_part… (passes). (c) parity.rs: parse_refs merges repeated
-  ids' parameters (24 Mesh points on one face); fetched_derived_sources passes the studio's refs (97ad5f's Derived 1
-  at a version = the "(1)" tab had none); LiveRef.created_by (method qCreatedBy(makeId)) -> a cPlane's face is that
-  plane (Extrude 2 up to Plane 1 = mid-plane y=-9: ours took WAGO's y=-18 face, Part 3 23.616 vs live 11.808).
-  Live per feature: studios/264eb3….live.jsonl (Extrude 2 11.808, Replace face 2.099, Move face 2.624, Mirror 5.248,
-  Linear pattern WAGO 41 f 1704.726, Hole 43 f 1660.251 (ours cut the mesh Part 1), Extrude 3 47 f, Chamfer 51 f).
-  HANG: with (c) the suite stalled >30 min (11 GB) on 97ad5f Linear pattern 1 (PART ADD x6 of two wrong 114-face
-  parts); perf bug to look at if it stays after the source is right. Run .t11.sh (suite with NOSHAPE_PARITY_TRACE,
-  then sc6.py probe on ~/tmp/core/sc/new); probes core-scratch/sc hp.py, fg.py (feature_get by tab name);
-  mid-run doc copy ~/tmp/core/sc/hang. No ptrace on vibex7 (no gdb attach).
-  RESULT 01:21 (.t11): source 264eb3 = live per feature (volumes to Chamfer 1 1606.626), suite 942 s, no hang;
-  scissor 24/41 mates (was 21/40), 64/87 BOM. Committed 4826656b7 (solver), b3785098f (cPlane), 0d10fa156
-  (translator); models gate running (core-cache @ merge-base 3f2251379, .gof.sh base1126 / rf1126 -> vibex7
-  ~/tmp/core/g/run-*.log). Left in 97ad5f (pf.py per feature vs live): +3 faces from the source's Linear pattern 1
-  ADD: the tab copies' slanted tops (3 x 4.0 mm², normal (0.1736,0,0.9848)) stay apart from WAGO's coplanar 10.08 mm²
-  face (live one 22.08 face); both from Sketch 1 lines through the same Mesh points (32 and its duplicate 36). Then
-  97ad5f Linear pattern 1 (PART ADD x6, pitch #x = 11.2 mm as live) fuses copies live keeps apart (INFO "no geometry
-  change"): check after the merge. Delete face 1 (queue item 2) now matches live.
+- **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
+  BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
+  matches live. Saved doc vibex7 ~/tmp/core/sc/new; probes core-scratch/sc pf.py (per feature), fc.py, nm.py (normals).
 - **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
   (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
