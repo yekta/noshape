@@ -14890,6 +14890,34 @@ mod tests {
         assert_eq!(on, 3);
     }
 
+    /// Live "spec: skasm sketch tools" (10-27): an aligned rectangle is a chain of 4 lines with one PERPENDICULAR, two
+    /// PARALLELs and its corners chained, no HORIZONTAL / VERTICAL; a 3 point arc with its ends level gets no constraint.
+    #[test]
+    fn aligned_rectangle_and_three_point_arc_constraint_sets_as_live() {
+        let (mut ed, mut d) = editor(Tool::AlignedRect);
+        for p in [v(0.031, 0.027), v(0.056, 0.0195), v(0.0535, 0.007)] {
+            click(&mut ed, &mut d, p);
+        }
+        let n = |d: &SketchData, f: fn(&ConstraintKind) -> bool| d.sketch.constraints().filter(|c| f(&c.kind)).count();
+        assert_eq!(count(&d, EntityKind::Line), 4);
+        assert_eq!(n(&d, |k| matches!(k, ConstraintKind::Perpendicular { .. })), 1);
+        assert_eq!(n(&d, |k| matches!(k, ConstraintKind::Parallel { .. })), 2);
+        assert_eq!(n(&d, |k| matches!(k, ConstraintKind::Horizontal { .. } | ConstraintKind::Vertical { .. })), 0);
+        // Ours shares the corner points (live's 4 COINCIDENTs): a closed chain, free to turn (5 degrees of freedom).
+        let lines: Vec<EntityId> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).collect();
+        for (i, l) in lines.iter().enumerate() {
+            let next = lines[(i + 1) % 4];
+            assert_eq!(d.sketch.endpoints(*l).unwrap().1, d.sketch.endpoints(next).unwrap().0, "a chain: {i}");
+        }
+        assert_eq!(d.sketch.solve().dof, Some(5));
+        let (mut ed, mut d) = editor(Tool::Arc3);
+        for p in [v(-0.03, 0.02), v(-0.005, 0.02), v(-0.0175, 0.0287)] {
+            click(&mut ed, &mut d, p);
+        }
+        assert_eq!(count(&d, EntityKind::Arc), 1);
+        assert_eq!(d.sketch.constraints().count(), 0, "ends level, no horizontal");
+    }
+
     /// Live sk2-1121 3pt-circle-on-points: a circle through a line's ends, the first at the Origin, passes through the
     /// line's own start (no point of its own there): one construction point, four coincidents and the horizontal.
     #[test]
