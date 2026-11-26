@@ -1,19 +1,23 @@
 {
  "scenario": "asm-face-menu-view-normal-to",
- "recorded": "2026-11-07T00:45:15.856Z",
+ "recorded": "2026-11-26T02:14:28.049Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "b7a9a16cf55b358feb36731e",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "1bb72095cd82a817a315fecc",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -133,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -150,12 +182,16 @@
     }
    },
    "ok": true,
+   "ti": 24863,
+   "tmove": 25320,
+   "moves": 1,
    "hover": [
     "JKK"
    ],
+   "tdown": 26630,
    "at": [
-    1388,
-    691
+    1407,
+    702
    ],
    "state": {
     "focus": {
@@ -163,6 +199,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -178,13 +215,14 @@
       "Use best available tessellation",
       "Copy Part 2 <1>",
       "Create Drawing of Part 2…",
-      "Create Drawing of start two-blocks asm Copy 2…",
+      "Create Drawing of start two-blocks asm Copy 1…",
       "Export…",
       "Edit in context",
       "Find in instance list",
       "Add mate connector to instance origin…",
       "Replace Part 2 <1>…",
       "Switch to start two-blocks",
+      "Where used for Part 2…",
       "Select other…",
       "Add comment",
       "Zoom to fit",
@@ -192,7 +230,7 @@
       "View normal to",
       "Delete Part 2 <1>"
      ],
-     "highlighted": 24,
+     "highlighted": 25,
      "disabled": []
     },
     "selection": {
@@ -306,9 +344,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 52048
+   "t": 29052,
+   "te": 29052
   },
   {
    "step": 2,
@@ -319,9 +385,13 @@
     }
    },
    "ok": true,
+   "ti": 29052,
+   "tmove": 29097,
+   "moves": 2,
+   "tdown": 30144,
    "at": [
-    1513,
-    660
+    1531,
+    670
    ],
    "state": {
     "focus": {
@@ -329,6 +399,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -441,9 +512,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      0,
+      0,
+      -1
+     ],
+     "up": [
+      0,
+      1,
+      0
+     ],
+     "target_mm": [
+      70,
+      10,
+      0
+     ],
+     "eye_mm": [
+      70,
+      10,
+      64.991
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 57265
+   "t": 32421,
+   "te": 32422
   }
- ]
+ ],
+ "t0_epoch_ms": 1795659248992
 }
