@@ -1,124 +1,28 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-23 08:4x UTC (restarted 11-17 09:20). Read docs/DECISIONS.md
+Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-26 00:12) — read first
+## RESUME HERE (11-26 05:16 UTC) — read first
 
-Queued 732800a1 (carries 423d6b45): hinge edit-home (hinge-limits-1125), translator extraAssemblies (asm-scissor-lift+assembly-3:
-37/49 occ, 18/22 mates, 12/14 BOM; saved vibex6 ~/agents/skasm-keep/pa3/), sketch on a Plane feature (loft-continuity 6/13),
-refs keep live's body (surface-pattern 36/39), speed-1125 T2s. qa told.
+Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
+--name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
+> ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &).
 
-Speed-1125, ours vs live, vibex6 medians: S50 drag release 18.6 (654), move 11.8 (<=54), width+Enter 15.1 (667); S200 29.9
-(1049) / 14.9 / 20.3 (758); DXF gear 10.0 (802); scissor move 7 (~280), release 172 (1305), Fastened 173 (1048), Revolute 176
-(1291). None >=100 ms and >=2x. Tail Fin profile: bool's (dd95fa415), dropped.
+QUEUED ada3263b (3 commits, rebased on origin/main; the old WIP is NOT in it):
+- label drag: a lit sketch point under a dimension label takes the press (S50 drag oddity); T1 a_lit_point_under_a_dimension_label_drags.
+- IGES export: io.cpp step_bsurfaces re-cuts only closed directions and shifts the face's p-curves by the whole periods
+  Segment moved the cut (c2-rings-loft band was written V 0.0471 > 0.0032). Verified: bounds.py 0 faults of 40; live
+  imports ours.igs (skasm-scratch/igs/fix2) as 4 parts, ring 440.5 mm³ (live's 440.8). T2 rings_iges_bsurfaces_run_forward_inside_their_knots.
+- Assembly (lead 11-26: asm-face-menu*, asm-fastened-offset/-two-faces step 3): the ui-parity driver now waits on
+  AssemblyView::ui_busy (eval, scene, pick) / ui_frame_pending via Workspace::ui_busy. T1s a_cold_* (assembly_feel_tests,
+  idle() before the cold press). qa told 11-26 to rerun those once it lands.
+WIP (drag traces, hover_paused, Cadenas x_t fixtures + Parasolid test; not for landing) is in branch **skasm-wip2**
+(= 908540c59 + 11-26 work); cherry-pick the Cadenas fixtures/test from it for the Parasolid reader.
 
-Next, from the sketch T2's notes (latency_tests.rs live_speed_1125_sketch_rows; NOSHAPE_SPEED_NO_DIM=1 skips the width edit,
-same result, so not the edit):
-1. One move per drag set takes 410-470 ms (worst) vs medians 12-17: find which (first move of a drag?) and fix if a hitch.
-2. Release moves the corner 0.9-2.2 mm from its last drag place, and the released sketch reads back with new ids.
-3. Run 1's reverse drag (-3,-2 px/step) leaves the corner where it is though it is hovered.
-Then GLYPH-CIRCLE.
-
-## Earlier NOW (11-25 14:11)
-- LANDED: Tangent creating fix, UI state dump as drawn, ParamRow, one-entity Tangent (live tangent-one-entity-1123).
-- QUEUED (one stack): e846e605f (a) ERR-MATE-OVERDEF-BOTH flush residual: solver.rs held-back step reds a mate
-  between the same two parts as one that can't hold (a part-wide rule broke oracle_asm f16/f76/f80/1798 a1);
-  (b) P0 FEEL-MC-ARC-PICK-VERTEX-ASM: inference::choose keeps an arc's centre wherever along it; fa234aead P1
-  FLOW-VAR-UNDERDEFINED-SKETCH-MOVES: constructive.rs `carried_between` (an H/V line on the line a changed
-  line-to-line Distance moved, its H/V chain reaching the Distance's other line, keeps its shape even when
-  end_carried; the chain's last line stretches). If it fails: fix forward.
-- Replays (vibex8 errc, 13:13 binary): m-tan-planes-c both red once complete, m-slider-lim-c Revolute OK, as live.
-  (A new mate's row/title red before both picks is live's, not a bug.)
-- 11-25 15:0x in this land: dim box Esc as live dimbox-esc-1125 (dim_box_escape; capture_action on the input's Escape,
-  which put the committed text back first; ui.dim_box_typed), OPS-TANGENT-MATE A (ops make a same-instance mate, flagged
-  by the evaluation), UIS-MATE-PATTERN-ROW (pattern row marked `mate:<name>`).
-- 11-25 15:35 QUEUED with the handoffs: iso dimension text as live dim-iso-1125 (sketch.rs sketch_dims_in_plane /
-  sketch_dimension_fills: off the sketch's normal the values lie in the plane along the sketch x at the 16 px size, the
-  screen Label kept for the hit only; CameraChanged notifies on the flip). Arrowheads were already in-plane. Then the
-  Offset preview's "5" in the plane the same way (its screen box kept for hover / click), landing next.
-- Live's everyday notes (behaviours "Everyday assembly" / "Everyday Part Studio") already hold in ours; pinned by T1s
-  the_undo_steps_of_everyday_assembly_work_as_lives, a_finished_sketch_is_one_undo_step,
-  a_circle_pastes_into_another_sketch_under_the_pointer (landing with the iso text). Still unchecked from those notes:
-  the parts-list menu (Where used… · Create task…; Edit material… / Show center of mass once a material is set),
-  Copy part + Ctrl+V in an Assembly inserting "Part 1 <1>" under the pointer (psui/asm own those, not me).
-- LANDING e4458668 (lead at 96% context, not messaged): dim box Esc, OPS-TANGENT-MATE A ("Mate is invalid." for a
-  same-instance Tangent is live's text, errors-1123), pattern row mark; phone stand (cc40754f) not on main at 15:1x.
-- Live notes for later: behaviours "Everyday assembly" (one Ctrl+Z removes a mate and restores the part) and
-  "Everyday Part Studio" (sketch undo scope, paste on the pointer).
-- App replays: vibex8 ~/tmp/skasm/errc (run.sh, GLOB=cells); binary copy: `scp -3 vibex6:tmp/skasm/noshape-skasm
-  vibex8:tmp/skasm/` (vibex6 can't ssh vibex8). Probe-on-a-doc pattern: a temp gpui test opening a copied .noshape.
-- OPEN: (2) dim box Esc, one or two (REQUESTS skasm 11-25 11:24, awaiting live).
-- QUEUED 5657c008 (spline/image drags) — see git log.
-- QUEUED 3201e38d: construction geometry test (Use follows the model). REQUESTS skasm 11-25 08:52 (planes, Use edits);
-  plane resize after ✓ is already in behaviours "icons2 plane resize rules".
-- DROPPED (lead 11-25): the ops center_point_arc P1; core fixed it in db2fd8e7 (my ops edits reverted).
-- LANDING Insert image as live G13: `image_box` fits INSIDE the dragged rect (min side, was max); preview
-  = dash-dot rect to the pointer + the picture inside (`SketchEditor::image_preview`, psui sketch_overlay draws it via
-  thread_local IMAGE_PREVIEW decoded once in load_image_bytes). Scene tests `an_image_fits_inside_its_dragged_rectangle_as_live`,
-  `a_spline_closed_on_its_first_point_is_one_periodic_curve_as_live` (both pass, scene 216 ok). psui test
-  `a_spline_arm_clicked_reads_its_length_as_live` (2187: arm alone selected, status "Length: x mm") NOT yet run.
-  All green (sketch 175, scene 217, psui arm + bracket + trim): LANDING with the trim fix below.
-- LANDING circle/trim vs live circle-trim-cons-1125: probe showed ours matches (end/middle trim, Length
-  dropped, offspring no H, Radius kept) but for one gap: a circle/arc centre on the curve is now a trim boundary (`cuts`,
-  sketch test `a_circles_centre_on_a_line_is_a_trim_boundary_as_live`, bin/ttrim2.sh -> ~/tmp/skasm/ttrim2.log). Circle
-  centre snap = Coincident passes (scene). Bracket test hole tie tightened to Coincident only (run with tarm). Not done:
-  circle->arc shares the line ends (live: point-point COINCIDENTs; same to the user); link_centre_snap on MODEL edges
-  still ConcentricTo (live answer covered sketch circles only).
-- NEXT splines/image (lead 11-25): REQUESTS skasm 11-25 07:55 filed (fit point / body / handle drags, curvature handle,
-  end onto start, Bezier edits; image look, drags, scale by dimension, right-click opacity/lock). Known live already
-  covered: 2175 closing, 2187 arm, G13 placement, Bezier Deg label, Esc commits.
-- QUEUED 1290c4f1 (11-25 07:50) bracket everyday check (lead 11-25): psui `a_bracket_drawn_step_by_step_as_live` draws lines, a
-  tangent arc, a hole, 3 dimensions, a mirror and a trim step by step against live's tool specs (behaviours 18337-18403,
-  15793); all as live but one: a tangent / 3 point arc ended level with its own start took a HORIZONTAL. Fixed in `infer`
-  (`own_start`: only Line, Midpoint line, Inscribed polygon align with their own first click, behaviours ~40336); scene
-  test `arcs_take_no_alignment_with_their_own_start`. psui sketch suites 534 ok; clippy + ops sketch rerun (tbr4.sh).
-  Open: the hole's centre tie (Coincident vs Concentric) and trim's offspring constraints not checked against live.
-- QUEUED 9102b99e 11-25 02:40 (3 commits): (1) "free geometry joined to a conflict drags": `Sketch::drag` retries a
-  Failed drag with `SolveOptions::unheld` = `unheld_constraints(1e-9)` unless the handle is FullyConstrained (fz211
-  stuck free entities 161 -> 3; T1 misc free_geometry_joined_to_a_conflict_drags). The 3 (lines 92, 95, fit spline 215)
-  are bodies held by Fix'd points (92 via c51 to 93's Fix c122; 215 has 4 Fix'd fit points): live leaves such a body
-  still (REQUESTS 3074 fromOrigin-body); each free point of theirs drags 0.4-6.8 mm (probe zz_probe_fz211_three). Closed.
-  (2) Insert DXF/DWG as live (live/skasm/dxf-insert-1125): `insert_drawing` no longer joins ends (0 constraints);
-  `DxfDrawing::unrecognized` counts texts/hatches/faces/leaders; scene `insert_dxf` drops POINTs, returns
-  (ids, Some(DXF_UNRECOGNIZED)); `DXF_UNREADABLE` for unparseable files; psui insert selects nothing, no message,
-  Warning bubble (live's is yellow, text with "\n\n"); op returns `warning`. Tests: psui
-  insert_dxf_drops_points_and_texts_and_undoes_in_one_step, e2e sketch_text_and_imports, dwg
-  a_drawings_meeting_ends_stay_unconstrained. Parity row G11b (lenient parser noted; open: Units not preselected from
-  $INSUNITS). (3) quick solves: `Sketch::set_quick_solves` (cache flag) makes `solve()` skip the DOF analysis; psui
-  `with_sketch` sets it while `sketch_solves_slowly`; toggle_driving / add_dimension solve_with(default);
-  refresh_analysis always analyzes (begin_drag keeps the drag gate right). fz211 probe (zz_probe_tools.rs, PROBE_QUICK):
-  split 124 -> 27, delete 128 -> 35, trim 130 -> 37, Line 2nd click 131 -> 39, circular 135 -> 37 ms.
-- QUEUED (11-25 05:26) "linear pattern ... quick": the 172-188 ms was add_dimension's analysed solve (100-178 ms) of
-  the spacing dimension; link_linear_pattern now adds that Length driving directly (fresh instances, nothing else fixes
-  it). fz211 linear pattern 32-37 ms (all probed tools now < 50 ms). T1 a_linear_pattern_draws_its_direction_line_as_live
-  checks driving + label + no redundancy.
-- QUEUED (11-25) slot width / conic rho the same way (`add_own_dimension`: measured, driving, no solve): fz211 slot
-  preview 240 -> 60 ms, conic 3rd click 172 -> 41 ms. T1 slot_previews_until_... checks the width drives, not redundant.
-- QUEUED (11-25, after 9102b99e) "constraints beside a conflict solve" (live sk-conflict-add-1125: everything added
-  beside a red conflict is kept and solves): `Sketch::solved_beside_conflicts(before, around)` (unheld constraints
-  all elsewhere and already unheld before) keeps solve_after_constraint's and the fillet radius edit's solve.
-  T1 scene constraints_beside_a_conflict_solve. Open from live: a dimension on B's top made nothing (live's kit?).
-- LEAD 11-24 TASK: sketch speed + robustness as felt. S300 T2 (latency_tests a_300_line_sketch_keeps_up_with_the_hand,
-  321 lines, 483 constraints): open 33 ms (live 1.2-1.9 s), drag step to frame 15 (UI 13), release 23, dim edit 55
-  (live ~1.1 s), unsolvable value warned 67, ✓ 16 (live 0.24 s). Model sketches <= 5 ms.
-- Solver speed-up (commit "a broken sketch's edits 2-4x quicker", landing with the T2 test): failed trial solves
-  (no exclusion) skip the DOF analysis; the post-placement solve runs without analysis first (analysed again only
-  when kept); hold_the_base returns at once when the piece fails with nothing held; conflict_dims + redundant_nearby
-  probes run side by side (par_keep, std::thread::scope; INSIDE set in each thread). Fuzz probes 1-20 identical to
-  base; sketch crate, scene lib, part-studio sketch suites green. fz211 (qa fuzz, 438 ents, over-defined), probe
-  (tprobe.sh + skasm-scratch/probes/speed-instrumented.diff): edit 1146 -> 225 ms / 431 -> 153 ms; ops T2: open
-  457 -> 211 ms, change a dim 0.5-0.9 s -> 253 ms, drag step median 16, worst 452 -> 205 ms.
-- QUEUED 80c322df 11-25 00:02 (lead 11-24 "off the UI thread"): a slow sketch (its feature's last regeneration >= 50 ms;
-  `sketch_solves_slowly`, tests force it with `ui.slow_sketch`) solves a typed dimension off the UI thread:
-  scene `prepare_dimension` / `finish_dimension` (apply_dimension = both + the solve); sketch.rs commit_dimension
-  spawns the solve, `ui.sketch_solve` holds the sketch (with_sketch -> None, viewport input but camera/hover and
-  sketch keys ignored), pending (live's overlay past 0.9 s); regen_sync of a slow sketch -> schedule_regen (the
-  async completion now also runs update_profile_issues). T1 latency_tests
-  a_slow_sketch_solves_a_dimension_off_the_ui_thread. fz211 UI probe (skasm-scratch/probes/zz_probe_fz211_ui.rs):
-  commit_dimension on the UI thread 627-742 ms -> 3-5 ms, done 0.54-0.65 s later, same warning. psui sketch suites 531 ok, scene 212 ok, clippy clean. Not covered (follow-ups): drags (fz211 worst ~205 ms), other tools' own solves stay on the UI thread.
-  Not covered: drags (median 16 ms, worst ~205 ms on fz211), other tools' own solves (sync, regen async).
-- LEAD 11-24: sheet metal PARKED; focus = sketching as an individual user meets it. Landed today: ce1aefee (b33ec97e).
+Next: speed T2 rerun (tsk9.sh, timeout 5400, needs skasm-wip2's speed traces?) -> Parasolid T1
+cadenas_misumi_vendor_parts_read (asm-xdev-subs) -> sketch + sheet-metal feel-coverage audit (counts) -> IGES reader
+splitting more than live (16 docs, live/corpus-gaps-1125.md) -> GLYPH-CIRCLE.
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
@@ -273,7 +177,7 @@ Thread ids only in /root/lead-scratch/roster.md (lead 11-19 23:00): read it befo
 ## Hosts and rules (mine; DECISIONS.md has the general ones)
 - Builds and crate tests on the Mac: `NOSHAPE_RB_HOST=mac tools/tiers/rb.sh bash -c '…'` (one slot; rb.sh keeps file
   times: touch an edited file inside the command when a result looks cached). No suites, pairs or app runs there.
-- Suites and A/B pairs on vibex6 (or vibex7) through `~/bin/slot <cmd>` there. ~/tmp on vibe hosts is pruned after
+- Suites and A/B pairs on vibex7 (lead 11-26; not vibex6) through `~/bin/slot <cmd>` there. ~/tmp on vibe hosts is pruned after
   6-12 h: lasting binaries in ~/agents/skasm-keep (cli-*, ops-a / ops-b).
 - Any change touching projection / Use: userdocs check (hats hat8 / hat15 / hat15b, dock) on vibe5 against 0.4.52
   (~/qa-rel/0.4.52/noshape-cli) before landing: candidate CLI built on vibex6 (buildcli.sh), copied with `scp -3` via
