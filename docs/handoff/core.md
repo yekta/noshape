@@ -57,7 +57,13 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   checked chain): ball on the kept face's plane EXTENDED + the next face, prism of the corner cut + unify touched:
   80 faces, 64593.2110 (live .228). T1 kernel blend::a_round_running_off_a_nose_onto_its_tangent_hollow_rolls_on_it
   (main: 210.6 mm3 taken vs 164.5). Corpus 127 ALL-SAME.
-  NEXT after: Fillet 18 (r 0.8 x 8, fails), 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  9cbb0e now (cli 18:42, tab 53427fa107a5c69d): Fillet 17 = live, Fillet 16 = live (64528.94 vs .96), input of
+  FILLET 18 = live (95 faces, 64657.748 vs .765). FILLET 18 (r 0.8, 42 edges; live 95 -> 141 faces, -6.93 mm3) fails.
+  Per edge (probe core-scratch/f18-probe.patch on vibex7 ~/tmp/core/rt/fillet-18.brep+txt, output
+  core-scratch/f18-per-edge.out): the y +-8 chains OK alone (100 faces, -4.754), y +-11 edge 11/39 OK (98, -1.84),
+  31/33 OK (+3.49); the y +-11 chain through Fillet 17's round (x -78..-15, edges 7,8,9,10,12-17 / -11 side 1,6,20-24,
+  35,40) FAILS ("fillet failed" / "invalid solid" on the -11 side). Next: find where on that chain OCCT fails (its
+  corners at (-78,-31) and (-73,-21) by edge 11; the arc 9 over Fillet 17's round), then Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
   surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
