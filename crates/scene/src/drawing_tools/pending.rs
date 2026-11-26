@@ -132,8 +132,13 @@ impl SheetPick<'_> {
             }
             Tool::Dimension { kind: kind @ (DimTool::Radius | DimTool::Diameter), picks } => {
                 let [Pick::Circle { view, center, radius, r }] = picks.as_slice() else { return None };
-                let cs = self.placement(*view)?.to_sheet(*center);
+                let pl = self.placement(*view)?;
+                let cs = pl.to_sheet(*center);
+                // A click within half the radius of the centre: the text halfway out at 0° (live drw-triage-1126 (3)).
+                let rs = len(sub(pl.to_sheet([center[0] + radius, center[1]]), cs));
+                let c = if len(sub(c, cs)) < rs / 2.0 { [cs[0] + rs / 2.0, cs[1]] } else { c };
                 let d = sub(c, cs);
+                let ann = |kind, refs| Annotation { position: c, ..ann(kind, refs) };
                 Some(ann(AnnotationKind::RadialDimension { view: *view, center: *center, radius: *radius, diameter: *kind == DimTool::Diameter, angle: d[1].atan2(d[0]), dim_line: *kind == DimTool::Diameter && self.drawing.radial_dim_lines(), knee: self.radial_knee(*view, *center, *radius, c) }, vec![(0, r.clone())]))
             }
             Tool::Dimension { kind: DimTool::Angle3, picks } => {

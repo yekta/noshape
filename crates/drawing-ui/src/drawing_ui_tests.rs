@@ -663,6 +663,39 @@ fn an_opening_drawing_says_what_it_is_loading_until_a_view_is_drawn(cx: &mut Tes
     assert_eq!(cx.update(|cx| editor.read(cx).loading_message()), Some("Loading graphics…"), "a second in, nothing drawn, sources in");
 }
 
+/// Live drw-triage-1126 (3; drw-dimension-foreshorten s3, drw-dimension-radius-place-inside-*): a radius placed by a
+/// click within half the radius of the hole's centre has its text halfway out at 0°; a click further out, at the click.
+#[gpui::test]
+fn a_radius_placed_near_the_centre_has_its_text_halfway_out(cx: &mut TestAppContext) {
+    use noshape_scene::drawing_tools::{DimTool, Tool};
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "radius-inside");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    let (center, radius) = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.placements.iter().find_map(|pl| {
+            let (c, r, _) = e.geoms.get(&pl.id)?.circles().into_iter().next()?;
+            Some((pl.to_sheet(c), pl.len_to_sheet(r)))
+        }).expect("a view showing the hole")
+    });
+    let at = |cx: &mut TestAppContext, d: [f64; 2]| {
+        cx.update(|cx| editor.update(cx, |e, cx| {
+            let pick = e.circle_pick([center[0] + radius, center[1]]).expect("the hole's circle");
+            e.set_tool(Tool::Dimension { kind: DimTool::Radius, picks: vec![pick] }, cx);
+            e.cursor = [center[0] + d[0] * radius, center[1] + d[1] * radius];
+            e.pending_annotation().expect("the radius preview").position
+        }))
+    };
+    let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-6;
+    let p = at(cx, [-0.2, 0.2]);
+    assert!(near(p, [center[0] + radius / 2.0, center[1]]), "0.28 r from the centre: halfway out at 0°, got {p:?}");
+    let p = at(cx, [-0.4, -0.4]);
+    assert!(near(p, [center[0] - 0.4 * radius, center[1] - 0.4 * radius]), "0.57 r out: at the click, got {p:?}");
+}
+
 /// Live2 feel/drawing.json (tables_live2_1013 centerlines): with Centermark, a circle lights from 6 px outside it and
 /// shows the preview cross; not from further; a circle that has a centermark gets nothing more.
 #[gpui::test]
