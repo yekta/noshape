@@ -1,0 +1,103 @@
+{
+ "name": "sketch-image-place",
+ "about": "doc-files: sketch on Top, Insert image: Current document tab, dx-image.png placed by two clicks (60,0) and (100,20); Escape; sketch \u2713",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1b)",
+ "start": "doc-files",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert DXF or DWG",
+    "menu": "Insert image"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Current document"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "dx-image.png"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     60,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     100,
+     20
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

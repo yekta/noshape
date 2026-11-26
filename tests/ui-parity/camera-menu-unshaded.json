@@ -1,0 +1,48 @@
+{
+ "name": "camera-menu-unshaded",
+ "about": "block: Camera and render options, hover Shaded with edges, Unshaded; the menu again, Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Shaded with edges"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unshaded"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

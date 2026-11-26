@@ -1,0 +1,131 @@
+{
+ "name": "sketch-spline-insert-points-escape",
+ "about": "empty: straight 3-point spline on Top, confirmed; its menu: Insert spline points, then Escape at once (no point added); a click at x 10 only selects",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1b)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     0
+    ]
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     50,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Confirm spline"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Insert spline points"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

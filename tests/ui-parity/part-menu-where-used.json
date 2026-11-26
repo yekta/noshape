@@ -1,0 +1,35 @@
+{
+ "name": "part-menu-where-used",
+ "about": "block: Part 1's row menu, Where used\u2026 (the left panel for a part used nowhere), then Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Where used\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

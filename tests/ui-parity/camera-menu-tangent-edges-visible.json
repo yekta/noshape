@@ -1,0 +1,72 @@
+{
+ "name": "camera-menu-tangent-edges-visible",
+ "about": "block-fillet: Tangent edges phantom, then back to Tangent edges visible; menu reopened, Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1b)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Tangent edges visible"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Tangent edges phantom"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Tangent edges phantom"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Tangent edges visible"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

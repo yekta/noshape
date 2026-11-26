@@ -1,0 +1,35 @@
+{
+ "name": "asm-instance-menu-where-used",
+ "about": "two-blocks: Part 2 <1>'s instance menu, Where used\u2026 (the left panel), then Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Where used\u2026"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 2500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 500
+  }
+ ]
+}

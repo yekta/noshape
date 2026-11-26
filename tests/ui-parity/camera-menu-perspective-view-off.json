@@ -1,0 +1,68 @@
+{
+ "name": "camera-menu-perspective-view-off",
+ "about": "block: Perspective view on, then the same menu item again turns it off (back to orthographic); menu reopened, Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1b)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Perspective view"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Perspective view"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

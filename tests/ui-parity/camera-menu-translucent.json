@@ -1,0 +1,48 @@
+{
+ "name": "camera-menu-translucent",
+ "about": "block: Camera and render options, hover Shaded with edges, Translucent; the menu again (no hidden-edges row, a tangent row), Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Shaded with edges"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Translucent"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "name": "feature-menu-unconfigure-suppression",
+ "about": "block: configuration input added, Extrude 1 Configure suppression, then its menu: Unconfigure suppression",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1b)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure suppression"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unconfigure suppression"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1000
+  }
+ ]
+}

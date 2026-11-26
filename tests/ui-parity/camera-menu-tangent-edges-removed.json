@@ -1,0 +1,48 @@
+{
+ "name": "camera-menu-tangent-edges-removed",
+ "about": "block-fillet: Camera and render options, hover Tangent edges visible, Tangent edges removed; the menu again, Escape",
+ "area": "psui",
+ "source": "live 11-26 coverage gaps (lead: ops coverage x takes, batch 1)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Tangent edges visible"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Tangent edges removed"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 400
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
