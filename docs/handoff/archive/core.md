@@ -5036,3 +5036,13 @@ skasm meanwhile; I'll list what I change here before landing.
   rows; then parity_models evaluates each row (config_activate, parts / bbox / volume).
 - **bool-land7 e3078f89:** tell bool if a model result moves. Singularity loft / Loft 3 / Fill G0 open (core-scratch/sing, fill/).
 
+
+## 11-26 (moved 15:55, both landed)
+- **BODY DRAFT 1**: QUEUED c5619f82 13:2x (carries 799ae65a). detail_a.rs body_draft: draftOnSelf errors only for Parts
+  scope (live 2, 1664 d); Faces/Edges -> OK, part unchanged. Live capture asked (REQUESTS core 11-26 13:24).
+- **SPLIT PIECE ORDER (committed 13:4x, land.sh)**: split.rs face_creation_order: a body several features made orders its
+  faces by maker (list place), then that Extrude's own order (was: tool-side order). body-draft Split 2 + bottle-split
+  Split 1 now name parts as live; 14-doc check (vibex7 ~/tmp/core/fb/sn.sh, .sn.sh <tag> [cli]; sn-a/sn-b.out) no
+  regressions. Duct-multipart Split 1/2 still swapped (2 rows, as before): our Extrude side order (sketch entity id) is
+  not live's there (big piece holds our "first" side entity 2; live puts it last). T1 features_a::a_split_part_two_
+  extrudes_made_puts_the_first_extrudes_piece_first.

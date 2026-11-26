@@ -1,22 +1,14 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 15:01 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 15:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf 11-26**: 799ae65a, c5619f82 LANDED 14:22 (082a6b31). QUEUED 56131f3c 15:1x (carries 2b8aa8ed: Split, MF1 + 254d5fa5c: 9cbb0e MF2, b58244 MF6, tweak trim fix).
+- **LANDING core-rf 11-26**: 2b8aa8ed LANDED 15:11. QUEUED 15:5x: 56131f3c (9cbb0e MF2, b58244 MF6, tweak trim fix) + be8307ce4 (speed: inside-out fillet repaired before the retries; tool_only seed re-runs).
 - **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
   fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
   need a FRESH parity run (save/ copies keep old references): .bd2.sh.
-- **BODY DRAFT 1**: QUEUED c5619f82 13:2x (carries 799ae65a). detail_a.rs body_draft: draftOnSelf errors only for Parts
-  scope (live 2, 1664 d); Faces/Edges -> OK, part unchanged. Live capture asked (REQUESTS core 11-26 13:24).
-- **SPLIT PIECE ORDER (committed 13:4x, land.sh)**: split.rs face_creation_order: a body several features made orders its
-  faces by maker (list place), then that Extrude's own order (was: tool-side order). body-draft Split 2 + bottle-split
-  Split 1 now name parts as live; 14-doc check (vibex7 ~/tmp/core/fb/sn.sh, .sn.sh <tag> [cli]; sn-a/sn-b.out) no
-  regressions. Duct-multipart Split 1/2 still swapped (2 rows, as before): our Extrude side order (sketch entity id) is
-  not live's there (big piece holds our "first" side entity 2; live puts it last). T1 features_a::a_split_part_two_
-  extrudes_made_puts_the_first_extrudes_piece_first.
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
 - **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
@@ -28,17 +20,29 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   edge) gets its basis curve back -> re-trimmed (box top then side: 1440 vs 1560 mm3 before). Tests: features_a
   move_face_offset_rolls_a_round_again_on_the_arc_wall_it_runs_along (fails on old code), move_face_offset_of_floors_
   facing_two_ways (guard only: synthetic OCCT offset stays valid), kernel offset::histories_followed_through_two_tweaks.
-- **Fresh scissor run 14:37** (.pa2.sh, vibex7 ~/tmp/core/sc d-1126 = 13:37 baseline, d-now): 213/239 occ, 27/41 mates,
-  63/87 BOM. Fixed rows: 404ddb MF1/MF2/Fillet 1/5/14/Chamfer 1, 9cbb0e MF2, 2d82a0 Fillet 4/5/7, MF1/3/9, RF2. New rows
-  (downstream of now-working features: references matched at import while those failed, or real): 404ddb Hole 2,
-  Mirror 1, Split 1 (Standard_NullObject), Extrude 5-8, Boolean 1/2, Fillet 13; 9cbb0e Move face 7, Chamfer 11. 2d82a0
-  now fails from "Position" (sketch/region regression, skasm's P0 bisect). TAB IDS CHANGE PER IMPORT: now 404ddb
-  3e4201fa396e07ca, 9cbb0e bd4d5e98ff402bd7, 2d82a0 8a437c048c49570a, b58244 e14c1dc1b84dfdc3 (vibex7
-  ~/tmp/core/sc/st.sh <tabs> lists failing features; mfq.sh / dmp.sh take tab + feature). b58244 next: Plane 1 Error
-  (likely import-time ref): re-run .pa2.sh after these land, then 404ddb Hole 2 / Split 1, 9cbb0e MF7, Drafts
-  2d82a0 D1 / b7e381 D2 (item 1 of the lead's list: 404ddb Fillet 2 refs: check in that re-run).
-- **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
-  11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
+- **Fresh scissor run 15:3x** (.pa2.sh compares d-prev = 14:37 with d-now): only change b58244 MF6 fixed; NO new rows,
+  so the downstream rows are real (the import matches refs against our build). Tab ids now: 404ddb 544d4be22b1974ab,
+  9cbb0e ba43fd52006aef05, b58244 ef415f8715d2b8a5, 2d82a0 0e42b5e59678dc59, 92138f c945c4d3bdad506d, b7e381
+  f44c9b9bedd247e3 (st.sh / mfq.sh / dmp.sh; ~/tmp/core/fb/cli = cli-new 15:40). 404ddb Fillet 2 = live now
+  (73853.40 vs .06; lead item 1 done). Sorted:
+  (a) b58244 (~70 rows): IMPORT GAP, not geometry: live Sketch 3's sketchPlane is a qCompressed query with no
+  deterministicIds and no refs.jsonl row; we fall back to Front (y 0) where live's is a face at y -2 mm, so Extrude 4
+  (+0.5 mm boss, live +61.3 mm3) is contained (Info) and Plane 1.. cascade. Ours = live through Move face 1 (21721.72).
+  Reported to the lead (capture/importer owner).
+  (b) 404ddb Hole 2 (then Mirror 1, Split 1, Extrude 5-8, Booleans): Ø8.2 x 42 blind coaxial with the r14 bar from its
+  x 59 end face; the input = live (73840.04 vs .83). Ours "Hole creates invalid geometry": the profile shows only the ray
+  common (boolean.rust) and op_revol, no cut recorded or OCCT build: looks like the own Boolean's cut errors with no
+  fallback. Handed to bool: vibex7 ~/agents/core-keep/hole2-bool (README, mode 600 copy).
+  (c) 9cbb0e Fillet 18 (r 0.8, 8 edges, tangent prop; live Foot 95 -> 141 faces, 64657.765 -> 64650.834): next; then
+  Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
+- **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
+  surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
+  inside-out round, 3 failing retries before the repair -> repair first (~320 ms; rest = as_is 63 + scaled 82 +
+  ShapeFix ~110). sm-rocker Mirror 3 (227 vs 8) mirrors Mirrors 1+2: seed_tool re-ran their face patterns (discarded)
+  -> EvalCtx.tool_only skips them (~350 -> ~210 ms loaded host); rest = 4 OCCT Booleans on a 2204-face body (bool's).
+  Left: impeller Delete face 2 (1409 ms, Error: downstream of failing fillets); parting-line Draft 1/2 (op_draft_parting_curve
+  ~400 ms: OCCT intersecting ruled B-spline sheets) and Split 3 (629: OCCT face-face 500 ms): deep, not started.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise)**: landed 83082091 (reblend adds curved edges first: 4 spheres).
   Left -2 mm3: live keeps the RIM; our blends_to_reapply propagates floor fillets -> spheres -> vertical fillets -> rim
   and rolls it again. Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case. Probe:
