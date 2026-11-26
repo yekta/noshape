@@ -14061,6 +14061,73 @@ mod tests {
         assert!((d.sketch.point(start).unwrap() - a).length() < 1e-9, "the spline's end stays");
     }
 
+    /// Live 2187: a spline's start arm takes Vertical, Parallel, Perpendicular, Tangent, Coincident (a point; a line:
+    /// collinear), Equal and Midpoint as a line does. Its default tip is live's (sketch-tools-1123 tx2 g0: start +
+    /// startDerivative × the first knot step / 3, the natural end derivative over centripetal knots on [0, 1]).
+    #[test]
+    fn a_spline_handle_arm_takes_every_line_constraint_as_live() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let setup = || {
+            let mut sk = Sketch::new();
+            let s = sk.add_fit_spline_with_handles(&[mm(0.0, 0.0), mm(30.0, 20.0), mm(60.0, 0.0)]).unwrap();
+            let line = sk.add_line(mm(0.0, -20.0), mm(40.0, -20.0));
+            let circle = sk.add_circle(mm(80.0, 20.0), 0.01);
+            let arm = sk.handle_arms(s)[0].unwrap();
+            (sk, arm, line, circle)
+        };
+        fn ends(sk: &Sketch, l: EntityId) -> (DVec2, DVec2) {
+            let (a, b) = sk.endpoints(l).unwrap();
+            (sk.point(a).unwrap(), sk.point(b).unwrap())
+        }
+        fn off_arm(sk: &Sketch, arm: EntityId, p: DVec2) -> f64 {
+            let (a, b) = ends(sk, arm);
+            (b - a).normalize().perp_dot(p - a).abs()
+        }
+        let mut sk = Sketch::new();
+        let s = sk.add_fit_spline_with_handles(&[mm(20.0595, 20.0595), mm(40.119, 35.1041), mm(60.1785, 20.0595), mm(80.2379, 35.1041)]).unwrap();
+        let [Some(start), Some(end)] = sk.handle_arms(s)[..] else { panic!("arms") };
+        for (arm, tip) in [(start, mm(26.746, 28.4176)), (end, mm(73.5515, 26.746))] {
+            let (a, b) = ends(&sk, arm);
+            let t = if (a - tip).length() < (b - tip).length() { a } else { b };
+            assert!((t - tip).length() < 1e-7, "the default tip: {:?} mm", t * 1e3);
+        }
+        type Check = fn(&Sketch, EntityId, EntityId, EntityId) -> bool;
+        let cases: [(ConstraintTool, &str, Check); 8] = [
+            (ConstraintTool::Vertical, "a", |sk, arm, _, _| sk.curve(arm).is_some_and(|c| matches!(c, Curve2::Line { a, b } if (a.x - b.x).abs() < 1e-9))),
+            (ConstraintTool::Parallel, "al", |sk, arm, l, _| {
+                let ((a, b), (c, d)) = (ends(sk, arm), ends(sk, l));
+                (b - a).normalize().perp_dot((d - c).normalize()).abs() < 1e-9
+            }),
+            (ConstraintTool::Perpendicular, "la", |sk, arm, l, _| {
+                let ((a, b), (c, d)) = (ends(sk, arm), ends(sk, l));
+                (b - a).normalize().dot((d - c).normalize()).abs() < 1e-9
+            }),
+            (ConstraintTool::Tangent, "ac", |sk, arm, _, c| {
+                let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { return false };
+                let (a, b) = ends(sk, arm);
+                ((b - a).normalize().perp_dot(center - a).abs() - radius).abs() < 1e-9
+            }),
+            (ConstraintTool::Coincident, "ap", |sk, arm, l, _| off_arm(sk, arm, ends(sk, l).0) < 1e-9),
+            (ConstraintTool::Coincident, "al", |sk, arm, l, _| off_arm(sk, arm, ends(sk, l).0) < 1e-9 && off_arm(sk, arm, ends(sk, l).1) < 1e-9),
+            (ConstraintTool::Equal, "al", |sk, arm, l, _| {
+                let ((a, b), (c, d)) = (ends(sk, arm), ends(sk, l));
+                ((b - a).length() - (d - c).length()).abs() < 1e-9
+            }),
+            (ConstraintTool::Midpoint, "ap", |sk, arm, l, _| {
+                let (a, b) = ends(sk, arm);
+                ends(sk, l).0.distance((a + b) * 0.5) < 1e-9
+            }),
+        ];
+        for (tool, picks, holds) in cases {
+            let (mut sk, arm, line, circle) = setup();
+            let p = sk.endpoints(line).unwrap().0;
+            let ids: Vec<EntityId> = picks.chars().map(|c| match c { 'a' => arm, 'l' => line, 'c' => circle, _ => p }).collect();
+            assert_eq!(apply_constraint(&mut sk, tool, &ids), Ok(1), "{tool:?} {picks}");
+            assert!(sk.solve().is_solved(), "{tool:?} {picks}");
+            assert!(holds(&sk, arm, line, circle), "{tool:?} {picks}: {:?} {:?}", ends(&sk, arm), ends(&sk, line));
+        }
+    }
+
     /// Live 2270: a constraint pressed with a selection it can't take refuses with std's words, clears the selection
     /// and starts no tool (a spline's handle arm too); Midpoint on two points and Symmetric on two lines start their
     /// tool with them; Fix applies.
