@@ -5100,3 +5100,15 @@ skasm meanwhile; I'll list what I change here before landing.
   the apex closed apart (or a guided ThruSections), compare area with 21477.23 mm2.
 - core-rp's 11-20 batch LANDED 00:10 as f9ad07b5 (details archived 11-21 02:08). Face blend on top:
   /root/core-scratch/fb-on-top-detail_a.diff + fb-on-top-test.rs (FBDBG to strip).
+
+## Moved from the handoff 11-26 19:56
+- **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
+  surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
+  inside-out round, 3 failing retries before the repair -> repair first (~320 ms; rest = as_is 63 + scaled 82 +
+  ShapeFix ~110). sm-rocker Mirror 3 (227 vs 8) mirrors Mirrors 1+2: seed_tool re-ran their face patterns (discarded)
+  -> EvalCtx.tool_only skips them (~350 -> ~210 ms loaded host); rest = 4 OCCT Booleans on a 2204-face body (bool's).
+  Left: impeller Delete face 2 (1409 ms, Error: downstream of failing fillets); parting-line Draft 1/2 (op_draft_parting_curve
+  ~400 ms: OCCT intersecting ruled B-spline sheets) and Split 3 (629: OCCT face-face 500 ms): deep, not started.
+- **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 landed (+0 -0). Next there: recheck 97ad5f Linear pattern 1 (fuses copies live keeps apart).
+- **P0 SPEED**: c927ff4e QUEUED (core-spd): hose, radiator = 0.4.68; profile kit vibex7 ~/tmp/core/spd (m/ models,
+  pft.py, spd-prof.sh, ~/qa-rel/<v>/noshape-cli). Impeller: no regression on main (old-base test builds).

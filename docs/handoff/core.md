@@ -91,13 +91,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there.
   19:2x probes: core-scratch/f18cde-probe.patch (f18c/d/e.out); state in the P0 entry above.  (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
-- **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
-  surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
-  inside-out round, 3 failing retries before the repair -> repair first (~320 ms; rest = as_is 63 + scaled 82 +
-  ShapeFix ~110). sm-rocker Mirror 3 (227 vs 8) mirrors Mirrors 1+2: seed_tool re-ran their face patterns (discarded)
-  -> EvalCtx.tool_only skips them (~350 -> ~210 ms loaded host); rest = 4 OCCT Booleans on a 2204-face body (bool's).
-  Left: impeller Delete face 2 (1409 ms, Error: downstream of failing fillets); parting-line Draft 1/2 (op_draft_parting_curve
-  ~400 ms: OCCT intersecting ruled B-spline sheets) and Split 3 (629: OCCT face-face 500 ms): deep, not started.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise)**: landed 83082091 (reblend adds curved edges first: 4 spheres).
   Left -2 mm3: live keeps the RIM; our blends_to_reapply propagates floor fillets -> spheres -> vertical fillets -> rim
   and rolls it again. Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case. Probe:
@@ -108,9 +101,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (cli-hist). (2) knifehandle settle fix + T1 settle test: core-rf tip commit (land.sh after 66dba573); slow cuts
   handed to bool 06:5x: vibex7 ~/agents/core-keep/kh-bool (Fillet 3 cut 244416f8 667 ms, Fillet 1 cut 856a411e 3.2 s).
   (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands. (4) loft-guide Sweep 1: CLOSED, not a target (live's approximation; archive).
-- **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 landed (+0 -0). Next there: recheck 97ad5f Linear pattern 1 (fuses copies live keeps apart).
-- **P0 SPEED**: c927ff4e QUEUED (core-spd): hose, radiator = 0.4.68; profile kit vibex7 ~/tmp/core/spd (m/ models,
-  pft.py, spd-prof.sh, ~/qa-rel/<v>/noshape-cli). Impeller: no regression on main (old-base test builds).
 - **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
   ~225 ms (closed/trimmed run-on), 1632 projections ~360 ms. Probe: gdb -x ~/tmp/core/spd/w/k/g.gdb.
 - **LEAD 11-26 08:0x: blend FAILURES first (ranked by documents hit), native blend faces only planned, then skasm's
