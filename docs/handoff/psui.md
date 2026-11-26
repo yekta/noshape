@@ -183,7 +183,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Our listed position (82.9, 93.0) vs live (84.5, 94.1) is within the comparison's tolerance.
 
 ## NEXT
-- SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Older: radial drag rule. qa 18:0x (from 70): the Hole rows 'Ø 5 mm THRU' / field Diameter are not shown.
+- SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Radial placed inside a hole: both takes match (verify13, branch and green), closed. Queue empty (19:4x). qa's 70 (Hole rows 'Ø 5 mm THRU' / field
+  Diameter): answered 19:4x, a flow-script issue (THRU = the account's remembered seed; live's diameter box is unlabelled).
 
 ## Agents
 
