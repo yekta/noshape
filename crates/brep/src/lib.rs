@@ -20,6 +20,7 @@ mod curve2;
 mod fxhash;
 /// Free-form faces' surfaces (NURBS, tori, spheres, sweeps) as the Boolean evaluates them.
 pub mod freeform;
+pub mod march;
 /// NURBS curves and surfaces: points, derivatives, a point's parameters.
 pub mod nurbs;
 /// Arguments that are rigid copies of each other, found from their geometry.

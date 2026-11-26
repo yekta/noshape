@@ -858,6 +858,7 @@ pub(crate) mod ffi {
         fn op_gtransform(s: &OcShape, m: &[f64]) -> Result<OpOut>;
         fn op_section(a: &OcShape, b: &OcShape) -> Result<OpOut>;
         fn section_plane(s: &OcShape, plane: &PlaneF) -> Result<UniquePtr<OcShape>>;
+        fn face_pair_sections(a: &OcShape, b: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn section_caps(s: &OcShape, plane: &PlaneF) -> Result<UniquePtr<OcShape>>;
         fn project_along(curves: &OcShape, target: &OcShape, dir: P3)
         -> Result<UniquePtr<OcShape>>;

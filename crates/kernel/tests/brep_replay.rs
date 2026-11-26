@@ -1133,3 +1133,196 @@ fn steps_of_a_few_microns_from_a_sketch_off_by_two_are_dropped() {
     let v = volume_properties(&u).unwrap().mass;
     assert!(u.is_valid() && (v - 950.513e-9).abs() < 0.02e-9, "{v}");
 }
+
+/// The marcher (`noshape_brep::march`, not used by the Boolean yet) against OCCT on every pair of free-form faces, an
+/// object's and a tool's, whose boxes meet, over the corpora in NOSHAPE_BOOL_CORPORA (`:`-separated; or
+/// NOSHAPE_BOOL_CORPUS; NOSHAPE_BREP_ONLY=<name> one case): OCCT's sections of the two faces
+/// (`face_pair_sections`: what the Boolean gets) against ours. A pair matches where each of 65 points along each of
+/// OCCT's curves and of ours that is on both faces (the stretches the Boolean keeps) is within 1 µm of the other's
+/// curves; none where neither has such a point. Points within 10 µm of an edge of each face count apart: OCCT keeps or
+/// drops a section along both faces' edges by whether its marching finds it (same faces kept in one case, dropped in
+/// another), so a pair whose sections differ only there, or that ours declines as `OnEdges`, is its own family. Prints
+/// the pairs that differ (and why), then the counts and both times.
+#[test]
+#[ignore = "T2: the Boolean corpora (outside the repo, NOSHAPE_BOOL_CORPORA)"]
+fn free_sections_vs_occt() {
+    use noshape_brep::freeform::FreeSurface;
+    use noshape_brep::march;
+    const NEAR: f64 = 1e-6;
+    let dirs = std::env::var("NOSHAPE_BOOL_CORPORA").or_else(|_| std::env::var("NOSHAPE_BOOL_CORPUS")).unwrap_or_default();
+    let only = std::env::var("NOSHAPE_BREP_ONLY").ok();
+    let mut seen: HashSet<String> = HashSet::new();
+    const ALONG: f64 = 1e-5;
+    let (mut pairs, mut empty, mut matched, mut differ, mut occt_failed) = (0usize, 0usize, 0usize, 0usize, 0usize);
+    // (Pairs whose sections, ours or OCCT's, all run along an edge of each face: OCCT keeps or drops those by whether
+    // its marching finds them.)
+    let mut on_edges = 0usize;
+    // (Edges as polylines of 1024 pieces, and a point's distance to the nearest piece: OCCT's edge distance gave false
+    // gaps.)
+    let polylines = |edges: &[Shape]| -> Vec<Vec<DVec3>> {
+        edges
+            .iter()
+            .filter_map(|e| {
+                let info = e.edge_info().ok()?;
+                (0..=1024).map(|k| e.point_at(info.first_param + (info.last_param - info.first_param) * k as f64 / 1024.0).ok()).collect()
+            })
+            .collect()
+    };
+    let near = |lines: &[Vec<DVec3>], p: DVec3| {
+        lines.iter().flat_map(|l| l.windows(2)).fold(f64::INFINITY, |m, w| {
+            let ab = w[1] - w[0];
+            let t = if ab.length_squared() > 0.0 { ((p - w[0]).dot(ab) / ab.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+            m.min((w[0] + ab * t - p).length())
+        })
+    };
+    let mut fails: BTreeMap<String, usize> = BTreeMap::new();
+    // (Ours and OCCT's ms: over the pairs matched with curves, and over all compared.)
+    let (mut ms_matched, mut ms_all) = ((0.0f64, 0.0f64), (0.0f64, 0.0f64));
+    let (mut worst, mut worst_at) = (0.0f64, String::new());
+    type Side = Vec<(usize, Shape, march::Face, BoundingBox)>;
+    let side = |args: &[Shape]| -> Side {
+        let mut out = Vec::new();
+        for a in args {
+            let Ok(body) = brep_body(a) else { continue };
+            for (i, f) in a.faces().into_iter().enumerate() {
+                let Some(d) = march::face_domain(&body, i) else { continue };
+                let Ok(bb) = f.bounding_box(false) else { continue };
+                out.push((i, f, d, bb));
+            }
+        }
+        out
+    };
+    for dir in dirs.split(':').filter(|d| !d.is_empty()).map(Path::new) {
+        for name in cases(dir) {
+            if only.as_ref().is_some_and(|o| *o != name) || !seen.insert(name.clone()) {
+                continue;
+            }
+            let Some(c) = load(dir, &name) else { continue };
+            let (objs, tools) = (side(&c.objects), side(&c.tools));
+            for (ia, fa, da, ba) in &objs {
+                for (ib, fb, db, bb) in &tools {
+                    if (ba.min - DVec3::splat(NEAR)).cmpgt(bb.max).any() || (bb.min - DVec3::splat(NEAR)).cmpgt(ba.max).any() {
+                        continue;
+                    }
+                    pairs += 1;
+                    let t = Instant::now();
+                    let occt = face_pair_sections(fa, fb);
+                    let t_occt = t.elapsed().as_secs_f64() * 1e3;
+                    let t = Instant::now();
+                    let ours = march::sections(da.domain(), db.domain());
+                    let t_ours = t.elapsed().as_secs_f64() * 1e3;
+                    let Ok(occt) = occt else {
+                        occt_failed += 1;
+                        continue;
+                    };
+                    let edges = occt.edges();
+                    let ours = match ours {
+                        Ok(o) => o,
+                        Err(march::Fail::OnEdges) => {
+                            on_edges += 1;
+                            continue;
+                        }
+                        Err(e) => {
+                            *fails.entry(format!("{e:?}")).or_default() += 1;
+                            eprintln!("  {name} a{ia} b{ib}: ours {e:?} ({t_ours:.1} ms), OCCT {} curves ({t_occt:.1} ms)", edges.len());
+                            continue;
+                        }
+                    };
+                    // (Each side's points on both faces (the stretches the Boolean keeps; either side's sections run on
+                    // past the faces) against the other's.)
+                    let on_both = |p: DVec3| fa.contains_point(p, 1e-7).unwrap_or(false) && fb.contains_point(p, 1e-7).unwrap_or(false);
+                    let (rims_a, rims_b) = (polylines(&fa.edges()), polylines(&fb.edges()));
+                    let along = |p: DVec3| near(&rims_a, p) <= ALONG && near(&rims_b, p) <= ALONG;
+                    // (d: over all points on both faces; d1, d2: those off the faces' edges.)
+                    let (mut d1, mut n1, mut n_along, mut d) = (0.0f64, 0, 0, 0.0f64);
+                    for e in &edges {
+                        let Ok(info) = e.edge_info() else { continue };
+                        for k in 0..=64 {
+                            let Ok(p) = e.point_at(info.first_param + (info.last_param - info.first_param) * k as f64 / 64.0) else { continue };
+                            if !on_both(p) {
+                                continue;
+                            }
+                            let off = ours.iter().map(|s| s.curve.param_of(p).1).fold(f64::INFINITY, f64::min);
+                            d = d.max(off);
+                            if along(p) {
+                                n_along += 1;
+                                continue;
+                            }
+                            n1 += 1;
+                            d1 = d1.max(off);
+                        }
+                    }
+                    let lines = polylines(&edges);
+                    let (mut d2, mut n2) = (0.0f64, 0);
+                    for s in &ours {
+                        for k in 0..=64 {
+                            let p = s.curve.at(s.t0 + (s.t1 - s.t0) * k as f64 / 64.0);
+                            if !on_both(p) {
+                                continue;
+                            }
+                            let off = near(&lines, p);
+                            d = d.max(off);
+                            if along(p) {
+                                n_along += 1;
+                                continue;
+                            }
+                            n2 += 1;
+                            d2 = d2.max(off);
+                        }
+                    }
+                    ms_all.0 += t_ours;
+                    ms_all.1 += t_occt;
+                    if n1 == 0 && n2 == 0 && n_along == 0 {
+                        empty += 1;
+                    } else if d > NEAR && d1 <= NEAR && d2 <= NEAR {
+                        on_edges += 1;
+                    } else if d <= NEAR {
+                        matched += 1;
+                        if d > worst {
+                            (worst, worst_at) = (d, format!("{name} a{ia} b{ib}"));
+                        }
+                        ms_matched.0 += t_ours;
+                        ms_matched.1 += t_occt;
+                    } else {
+                        differ += 1;
+                        eprintln!("  {name} a{ia} b{ib}: ours {} curves ({t_ours:.1} ms), OCCT {} ({t_occt:.1} ms): OCCT's off ours {d1:.1e}, ours off OCCT's {d2:.1e}", ours.len(), edges.len());
+                        // (NOSHAPE_BREP_DIFF=1: where ours end, on both faces' boxes, and where OCCT's do.)
+                        if std::env::var_os("NOSHAPE_BREP_DIFF").is_some() {
+                            let kind = |f: &FreeSurface| match f {
+                                FreeSurface::Nurbs(n) => format!("nurbs {}x{} deg {}x{}", n.nu, n.nv, n.udegree, n.vdegree),
+                                FreeSurface::Torus { .. } => "torus".into(),
+                                FreeSurface::Sphere { .. } => "sphere".into(),
+                                FreeSurface::Extrusion { .. } => "extrusion".into(),
+                                FreeSurface::Revolution { .. } => "revolution".into(),
+                            };
+                            eprintln!("    a {} {:?}, b {} {:?}", kind(&da.s), da.uv, kind(&db.s), db.uv);
+                            for s in &ours {
+                                let (qa, qb) = (|t: f64| s.on[0].at(t).truncate(), |t: f64| s.on[1].at(t).truncate());
+                                // (The least sine between the two normals along it: how near touching.)
+                                let sine = (0..=32)
+                                    .map(|k| {
+                                        let t = s.t0 + (s.t1 - s.t0) * k as f64 / 32.0;
+                                        let (a, b) = (qa(t), qb(t));
+                                        let (ea, eb) = (da.s.derivs(a.x, a.y), db.s.derivs(b.x, b.y));
+                                        ea[1].cross(ea[2]).normalize().cross(eb[1].cross(eb[2]).normalize()).length()
+                                    })
+                                    .fold(f64::INFINITY, f64::min);
+                                eprintln!("    ours{} sine {sine:.1e} {:?} a {:?} b {:?} -> {:?} a {:?} b {:?}", if s.closed { " closed" } else { "" }, s.curve.at(s.t0), qa(s.t0), qb(s.t0), s.curve.at(s.t1), qa(s.t1), qb(s.t1));
+                            }
+                            for e in &edges {
+                                if let Ok((p, q)) = e.endpoints() {
+                                    eprintln!("    OCCT {p:?} -> {q:?}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    eprintln!(
+        "free x free pairs {pairs}: both none {empty}, differ only along both faces' edges {on_edges}, matched {matched} (worst {worst:.1e}, {worst_at}), differ {differ}, ours failed {fails:?}, OCCT failed {occt_failed}\n\
+         times: matched with curves ours {:.0} ms vs OCCT {:.0} ms; all compared ours {:.0} ms vs OCCT {:.0} ms (OCCT: the Boolean's own per-pair sections, as made ahead)",
+        ms_matched.0, ms_matched.1, ms_all.0, ms_all.1
+    );
+}

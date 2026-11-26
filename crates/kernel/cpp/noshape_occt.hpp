@@ -1060,6 +1060,7 @@ OpOut op_transform(const OcShape& s, rust::Slice<const double> m, bool copy);
 OpOut op_gtransform(const OcShape& s, rust::Slice<const double> m);
 OpOut op_section(const OcShape& a, const OcShape& b);
 std::unique_ptr<OcShape> section_plane(const OcShape& s, const PlaneF& plane);
+std::unique_ptr<OcShape> face_pair_sections(const OcShape& a, const OcShape& b);
 std::unique_ptr<OcShape> section_caps(const OcShape& s, const PlaneF& plane);
 std::unique_ptr<OcShape> project_along(const OcShape& curves, const OcShape& target,
                                        P3 dir);

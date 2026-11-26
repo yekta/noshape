@@ -17,6 +17,7 @@
 #include <NCollection_DataMap.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepCheck_Analyzer.hxx>
@@ -6451,6 +6452,58 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
   for (Job& j : jobs)
     if (j.done)
       t_free->ahead.emplace(j.key, std::move(j.lines));
+}
+
+// The sections occt_ahead makes for faces `a` and `b` (each a face shape), as edges of their curves: what the Boolean
+// gets from OCCT for that pair (brep_replay::free_sections_vs_occt checks noshape's marcher against them). None where
+// OCCT throws.
+std::unique_ptr<OcShape> face_pair_sections(const OcShape& a, const OcShape& b)
+{
+  require_non_null(a.shape, "first face");
+  require_non_null(b.shape, "second face");
+  const TopoDS_Face           fa = TopoDS::Face(a.shape), fb = TopoDS::Face(b.shape);
+  std::vector<IntTools_Curve> lines;
+  ExactBoxes                  exact;
+  try
+  {
+    if (boolean_sections(fa, fb, lines, exact))
+      lines = off_shared_edges(fa, fb, lines);
+    else if (std::optional<std::vector<IntTools_Curve>> first = seam_first(fa, fb))
+      lines = off_shared_edges(fa, fb, *first);
+    else
+    {
+      lines.clear();
+      IntTools_FaceFace ff;
+      ff.SetParameters(true, true, true, 1e-7);
+      ff.Perform(fa, fb);
+      if (ff.IsDone())
+      {
+        for (const IntTools_Curve& ic : ff.Lines())
+          lines.push_back(refined_section(ic, fa, fb));
+        if (std::optional<std::vector<IntTools_Curve>> past = sections_past_seam(fa, fb, lines))
+          lines = std::move(*past);
+        lines = off_shared_edges(fa, fb, lines);
+      }
+    }
+  }
+  catch (const Standard_Failure&)
+  {
+    lines.clear();
+  }
+  TopoDS_Compound c;
+  BRep_Builder    bb;
+  bb.MakeCompound(c);
+  for (const IntTools_Curve& ic : lines)
+  {
+    double f = 0, l = 0;
+    gp_Pnt p, q;
+    if (ic.Curve().IsNull() || !ic.Bounds(f, l, p, q))
+      continue;
+    BRepBuilderAPI_MakeEdge me(ic.Curve(), f, l);
+    if (me.IsDone())
+      bb.Add(c, me.Edge());
+  }
+  return wrap(c);
 }
 
 // OCCT's face/face section of `fa` and `fb` walked from start points between `ends` (where the faces' boundaries

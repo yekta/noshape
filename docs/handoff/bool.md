@@ -19,26 +19,45 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (state 11-26 14:22 UTC)
-- LANDED 12:44 304e6ca4 (screws, wrap-text, gate "a gap" fix, loft-paths). QUEUED 6ac2fd63 13:40: SEED fix (seeded_sections
-  stops once 5 steps come no closer; impeller Fillet 4's cut 1662 -> 189 ms). Gate/knurls clean (its 17-doc CHECK = gap hints).
+## NEXT (state 11-26 21:40 UTC)
+- LANDED c31e98add (asm-scissor-lift Hole 2 falls back). Cleanup due: vibex7 + vibex8 ~/tmp/bool/hole2,
+  /root/bool-scratch/h2, vibex7 ~/tmp/bool/knfb, bool-fb's target.
 - MARCHER (lead 11-26 decision, DECISIONS): own free x free sections, staged: (1) standalone intersector + replay-pair check
   vs OCCT, landed unused (time-box ~2 days from 11-26 13:45, then report whether to go on); (2) on per pair family only at 0
   differences in gate + parity56 + knurls; (3) numbers each stage: pairs matched, time vs OCCT, documents moved.
-  Worktree bool-march, branch bool-ffm (WIP commits, squash before land). crates/brep/src/march.rs: face_domain(body, face),
-  branches/sections(Domain a, Domain b): seeds from overlapping cell boxes (to 1/16 of each box) + 4-unknown Newton; walk
-  along na x nb, corrector in the plane across the tangent, box exit solved on the side; cubic Hermite fit (triple knots).
-  T1: march::tests (sphere x plane circle, two crossing cylinders). Harness brep_replay::free_sections_vs_occt
-  (NOSHAPE_BOOL_CORPORA, NOSHAPE_BREP_DIFF=1 for piece ends/sines/kinds). Build: bool-mf detached at bool-march's merge-base, `git diff $mb HEAD -- crates` + `git diff -- crates` applied
-  (warm vibex8 target), kt-mf-run.sh -> vibex8 ~/tmp/bool/kt-slow; run on rec-imp:rec-lp (197 pairs).
-  Numbers 14:20 vs face_pair_sections (vibex8 ~/tmp/bool/ff2.out): 197 pairs, 103 both none, 35 matched (worst 3.9e-8;
-  ours 85 ms vs OCCT 589 ms), 28 differ, 30 Tangent, 1 Lost. Breakdown: 22 "ours Tangent, OCCT 0" (OCCT's off_shared_edges
-  drops curves along a shared edge: NEXT skip tangent seeds on both boxes' sides, keep Tangent for interior/walk hits);
-  8 "ours 0, OCCT 1" (some = C1 joints of one profile: tangent, ours finds no seed: report Tangent); 7 "ours 1, OCCT 0";
-  7 + 3 extent differences (sections along both box sides fragment: exit slack 1e-7 in, re-check e49bd/e74bf/9040230e;
-  offset faces' fitted range, ae73 a3 b0). Uncommitted-then-committed: normal() fallback at degenerate points (pole,
-  collapsed side). After those: run all gate corpora (~/agents/bool-corpora: bool-corpus corpus2-6 direct-corpus sh-new2
-  parity56 ...) with NOSHAPE_BOOL_CORPORA, and the stage-1 report to the lead (pairs matched, time vs OCCT).
+  Worktree bool-march, branch bool-ffm (WIP commits, squash before land). crates/brep/src/march.rs (seeds, walk, Hermite
+  fit, Fail::{Tangent, Coincident, OnEdges, Crowded, Lost, Unfit}); harness brep_replay::free_sections_vs_occt.
+  STATE 16:10 (committed in bool-march with this handoff): along_both = ALL 31 points along an edge of each face (was 2
+  in a row); fit: pieces under SHORT 1e-5 of the box not split (degenerate spot: b's pcurve tangent unbounded), a branch
+  not fitting in 12 rounds = Fail::Unfit (was silently dropped: the "ours 0 / OCCT 1" pairs 1963 a3 b2, 424e a1/a3 b2,
+  ae73 a1 b6, e49bd a30 b2); TOUCH_SIN 1e-2: a section whose normals come within that sine -> Fail::Tangent (9040230e
+  a10 b2 sine 1.8e-4, ae73 a1/a3 b1 4e-3, OCCT 0; costs 4 matched at 5.4e-4: not separable; 11-19 ruling: declining
+  beats differing). Harness: points within 10 um of an edge of EACH face counted apart ("differ only along both faces'
+  edges": OCCT keeps/drops those by its marching: same geometry 1963 a0 b1 OCCT 0 vs 424e a0 b1 OCCT 1), OnEdges
+  declines counted there; worst pair named. Tried + dropped: OnEdges for sections along ONE face's edge (matched 6).
+  Numbers rec-imp+rec-lp (vibex8 ~/tmp/bool/ff20.out): 197 pairs: none 121, edges-only 24, matched 25 (worst 9.9e-7 at
+  1963 a3 b2, the degenerate one: inside 1 um, check whose), DIFFER 0, declined Coincident 11 / Tangent 14 / Lost 2;
+  matched ours 87 ms vs OCCT 525 ms (6x), all compared 575 vs 1988 ms. Clippy brep+kernel clean (16:00).
+  STAGE 1 REPORTED 21:30, lead approved: land unused through the gate (squashed: branch bool-ffm = one commit on
+  main; the WIP history kept as branch bool-ffm-wip). All 23 corpora (fix rerun ff23 in flight, vibex8 unit bool-ff23 ->
+  ~/tmp/bool/ff23-<corpus>.out): 884 pairs: none 406, edges-only 71, matched 324, declined 79 (Coincident 37, Tangent
+  29, Lost 7, Unfit 4, Crowded 2), DIFFER 4; matched ours 1588 vs OCCT 2194 ms. The 4: sp-cut 990256f0 a0 b0 (ours adds
+  a stretch up to 54 um off OCCT's curve, on both faces to 1e-11; a3 b0 there was a harness polyline artifact) and
+  shfall 08547623 a13 x b129 (ours 1 / OCCT 0), b163 (0 / 2), b166 (0 / 1). Hang fixed: shfall 05997f93 / 08547623
+  seed search split cells forever (two smallness tests disagreeing by ulps): one test, VISITS 2^20 cap, T1
+  a_sphere_cut_by_a_plane_with_offset_parameters_is_one_circle (hangs on the old code).
+  STAGE 2 (lead 21:35): switch on only the pair families with 0 differences over all corpora + parity56 + knurls; the 4
+  differing pairs' families and every declined pair stay OCCT's until settled; report user documents moved and time vs
+  OCCT per family. Order: land stage 1, then gamma/wire-clip, nuts Sweep 1, Rib 1 interleaved with stage 2;
+  correctness first.
+  Open: e74bf Tangent x5 / Lost, 79058 a3 b2 Lost, 730b Tangent (edge-on-edge).
+- AFTER THE MARCHER REPORT (lead 11-26, from skasm):
+  (a) c2-gamma-imported and c2-wire-clip-imported first differ at Boolean 2 (imported bodies) after live's data refill:
+  ours or the import? (vibex8 ~/parity/models/<doc>; NOSHAPE_BOOL_RUST=1 vs 0.)
+  (b) nuts Sweep 1: a thread strip comes out a B-spline where live has a cylinder; made exact (skasm's patch
+  /root/skasm-scratch/nuts-helical-cyl.patch) the cut fails non-manifold: our cylinder merging.
+  (c) parting-line Rib 1: edge merging after the union: we merge each side wall's edge into one where live splits it in
+  two, and split off a 0.224 mm piece near the base at x -21.5 where live keeps one line.
 - Coverage ranking DONE: every decline >= 100 ms parked: partial-fillet 7340044b (pf-secant-order-probes.patch; 57 um micro edge),
   tangent family beb5d239, setback df44fb85, loft-paths e74bf29d (tb-probe.patch), body-draft e13ba873 (tool B-spline index 2
   lies on target plane y 14.58 mm along a straight stretch of its profile, then leaves it C2 past a knot: the overlap's edge is a

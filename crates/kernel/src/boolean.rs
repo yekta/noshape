@@ -658,6 +658,12 @@ pub fn section(a: &Shape, b: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_section(a.raw(), b.raw()))?))
 }
 
+/// The sections of faces `a` and `b` the Boolean gets from OCCT for that pair (as it makes them ahead), as a
+/// compound of edges (tests: the marcher's reference).
+pub fn face_pair_sections(a: &Shape, b: &Shape) -> Result<Shape> {
+    Shape::from_res(ffi::face_pair_sections(a.raw(), b.raw()))
+}
+
 /// Planar cross-section: a compound of section edges.
 pub fn section_plane(shape: &Shape, plane: &Plane) -> Result<Shape> {
     Shape::from_res(ffi::section_plane(shape.raw(), &plane.ffi()))
