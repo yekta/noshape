@@ -1418,6 +1418,8 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             cut_edges.push(chain[ci].index);
         }
     }
+    // (A convex round on a line run past its faces: crossing ones checked below.)
+    let mut past_faces = false;
     for &(lo, hi, held) in ranges.iter().filter(|_| !ball) {
     if general || held {
         const N: usize = 64;
@@ -1749,9 +1751,17 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                 let (e0, e1) = (reach(c.start + d * a, -d, e0)?, reach(c.start + d * b, d, e1)?);
                 let p0 = c.start + d * (a - e0);
                 let (face, edges3, convex) = section_face(p0, &fr, spec, side1_first)?;
-                // (Overflow's run-on is a concave round's; a convex one past its faces fails, as live's.)
+                // (Overflow's run-on is a concave round's. A convex one between planes taller than one of them runs past
+                // its far edge, the faces beyond trimming it (qa FILLET-R12-BLOCK-OVERFLOW: live's R12 on a 10 mm high
+                // block's top edges); one within its faces fails, as live's.)
                 if spec.overflow && convex {
-                    return Err(fail("a convex edge's round with overflow"));
+                    let (s1, s2) = setbacks(&fr, spec, side1_first)?;
+                    let line_dist = |q: DVec3| (q - c.start - d * (q - c.start).dot(d)).length();
+                    let reach = |fi: &Shape| fi.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(line_dist).fold(0.0, f64::max);
+                    if !ff.iter().all(|fi| fi.is_planar()) || !ff.iter().zip([s1, s2]).any(|(fi, sb)| sb > reach(fi) + scale * 1e-7) {
+                        return Err(fail("a convex edge's round with overflow"));
+                    }
+                    past_faces = true;
                 }
                 let tool = k::extrude(&face, d * (b - a + e0 + e1))?;
                 let names = tool_names(feature, &tool, &face, &edges3[1], &ename);
@@ -1811,6 +1821,27 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             adds.push(named);
         }
     }
+    }
+    // (Rounds run past their faces that cross in the part away from a corner they share fail, as live's: R12 on a 40 x
+    // 20 x 10 block's top edges, the top's two rounds crossing.)
+    if past_faces {
+        let ends = |e: usize| -> FResult<[DVec3; 2]> {
+            let i = shape.sub_shape(ShapeType::Edge, e)?.edge_info()?;
+            Ok([i.start, i.end])
+        };
+        for i in 0..cuts.len() {
+            for j in i + 1..cuts.len() {
+                let (a, b) = (ends(cut_edges[i])?, ends(cut_edges[j])?);
+                if a.iter().any(|p| b.iter().any(|q| p.distance(*q) < scale * 1e-7)) || k::distance(&cuts[i].shape, &cuts[j].shape)?.distance > scale * 1e-7 {
+                    continue;
+                }
+                let both = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&cuts[i].shape), std::slice::from_ref(&cuts[j].shape), &k::BooleanOptions::default())?.shape;
+                let inside = k::boolean(k::BooleanOp::Common, std::slice::from_ref(shape), std::slice::from_ref(&both), &k::BooleanOptions::default())?.shape;
+                if inside.volume().unwrap_or(0.0) > scale.powi(3) * 1e-9 {
+                    return Err(fail("rounds past their faces crossing"));
+                }
+            }
+        }
     }
     // Held blends (hold lines) built directly where they can be: the loft's sides only approximate a curved wall, and a
     // cut by them leaves slivers (c2-variable-fillet-faceblend's rounded ends).

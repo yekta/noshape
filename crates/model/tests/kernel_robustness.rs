@@ -2807,6 +2807,26 @@ fn fillet_wider_than_its_faces_overflows_like_onshape() {
     assert!((v - 7458.616).abs() < 0.05, "volume {v}");
 }
 
+/// qa FILLET-R12-BLOCK-OVERFLOW (ui-parity mistake-fillet-r12-overflows): R12 on the 4 top edges of a 40×30×10 block
+/// regenerates in live (taller than the sides: each round runs past them to the bottom, the rounds meeting in mitres).
+/// At height z the part is the base shrunk by 12 - √(144 - (z + 2)²) each side: 8351.859 mm³.
+#[test]
+fn a_round_taller_than_a_blocks_sides_runs_past_them_to_the_bottom() {
+    let mut t = T::new();
+    t.block(40.0, 30.0, 10.0);
+    let top = t.edges_where(|i| i.start.z > 0.00999 && i.end.z > 0.00999);
+    assert_eq!(top.len(), 4);
+    let f = t.fillet(top, "12 mm");
+    let (st, msg, v) = status(&mut t, f);
+    assert_eq!(st, FeatureStatus::Ok, "{msg:?}");
+    assert!((v - 8351.859).abs() < 0.05, "volume {v}");
+    let shape = &t.regen().context.bodies[0].shape;
+    assert_eq!(shape.count(noshape_kernel::ShapeType::Face), 6, "top, 4 rounds, bottom");
+    let b = shape.bounding_box(true).unwrap();
+    let d = 12.0 - 140f64.sqrt();
+    assert!((b.min.x - d * 1e-3).abs() < 1e-6 && (b.max.y - (30.0 - d) * 1e-3).abs() < 1e-6, "{b:?}");
+}
+
 /// qa FEATURE-PATTERN-ADD-Y, as live (behaviours "qa (2026-10-27)
 /// FEATURE-PATTERN-ADD-Y"): a Ø10 boss 10 high at (20, 20) on a 300 × 200 × 3
 /// plate, Feature pattern without Reapply. The plate's left edge points −Y
