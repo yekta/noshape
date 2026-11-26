@@ -4414,8 +4414,11 @@ impl FeatureDialog {
                     div()
                         .id(SharedString::from(format!("numf-{path}")))
                         .debug_selector(|| format!("numf-{path}"))
-                        // Named as shown: a row drawn with an icon instead of its label has no name (live 1991).
-                        .map(|d| crate::ui_script::mark(d, || format!("field:{}", if param_icon(self.ty.id, s.id).is_some() { String::new() } else { crate::i18n::spec(s.label).to_string() })))
+                        // Named as shown: a row drawn with an icon instead of its label has no name (live 1991), only its order.
+                        .map(|d| crate::ui_script::mark(d, || match param_icon(self.ty.id, s.id) {
+                            Some(_) => format!("field:#{}", self.icon_field_index(s.id)),
+                            None => format!("field:{}", crate::i18n::spec(s.label)),
+                        }))
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
                         .map(|d| crate::quantity_field::invalid_field_tip(d, invalid, invalid_tip))

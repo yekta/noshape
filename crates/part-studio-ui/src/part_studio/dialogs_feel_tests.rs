@@ -2679,3 +2679,15 @@ fn move_faces_arrow_starts_at_the_faces_middle(cx: &mut TestAppContext) {
     let tip = cx.update(|cx| view.read(cx).viewport.read(cx).manipulators.first().map(|m| m.0)).expect("the arrow");
     assert!((tip * 1000.0 - glam::DVec3::new(20.0, 15.0, 25.0)).length() < 1e-6, "the tip at {:?} mm", tip * 1000.0);
 }
+
+/// qa RUNNER-UNLABELLED-FIELD-INDEX: the Hole's value boxes drawn with an icon (no label) are the runner's
+/// `{"field": "", "index": n}` in the order drawn: the diameter #0, the depth #1.
+#[gpui::test]
+fn a_holes_unlabelled_boxes_go_by_their_order(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-hole-index");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    let index = cx.update(|cx| ["holeDiameterV3", "holeDepthV3"].map(|id| dialog.read(cx).icon_field_index(id)));
+    assert_eq!(index, [0, 1], "(diameter, depth)");
+}

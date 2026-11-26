@@ -70,6 +70,13 @@ impl FeatureDialog {
         }
     }
 
+    /// Which of the dialog's unlabelled value boxes (rows drawn with an icon) `id` is, from 0: the runner's
+    /// `{"field": "", "index": n}` (qa RUNNER-UNLABELLED-FIELD-INDEX: the Hole's diameter box).
+    pub(crate) fn icon_field_index(&self, id: &str) -> usize {
+        let boxed = |p: &ParamSpec| param_icon(self.ty.id, p.id).is_some() && !matches!(p.kind, ParamKind::Enum { .. });
+        self.shown_params().into_iter().filter(|p| boxed(p)).position(|p| p.id == id).unwrap_or(0)
+    }
+
     /// The top-level parameters the dialog draws, in order: visible ones outside folded groups (as
     /// `render_params`: a group holds the parameters its header hides when off).
     fn shown_params(&self) -> Vec<&'static ParamSpec> {
