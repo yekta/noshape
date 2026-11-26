@@ -3271,7 +3271,11 @@ impl Ctx<'_> {
             return false;
         }
         let samples = self.face_samples(f);
-        samples.len() >= 8 && samples.iter().rev().all(|&p| free::whole_surface_distance_first(&self.faces[g], p) <= self.tol)
+        // (And their normals parallel there: a plane's samples are its edges' points, all on a B-spline wall
+        // lofted up from its outline (c2-loft-paths-guides' boss on a slot's top).)
+        samples.len() >= 8
+            && samples.iter().rev().all(|&p| free::whole_surface_distance_first(&self.faces[g], p) <= self.tol)
+            && samples.iter().all(|&p| self.normal_at(f, p).dot(self.normal_at(g, p)).abs() >= 1.0 - 1e-3)
     }
 
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
