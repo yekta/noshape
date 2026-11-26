@@ -7,7 +7,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 ## qa 11-26 12:3x: live's 34 new ui-parity scenarios (45f31f16b + f37581e4c) on green f393d8ee4: 12/34, 221/319 states
 (suites/uipnew-1126 score.log; per-step diffs: qa-scratch/bin/uipsteps.py. plane-remembers-last-type matches: cPlane honoured.)
-- [ ] P1 **FILLET-R12-BLOCK-OVERFLOW (core)** (mistake-fillet-r12-overflows s6-s10): Fillet R12 of the 4 top edges of the 40x30x10 block (start "block"): live regenerates OK, the round runs onto the sides; ours: red title, Fillet 1 row red, "Failed to fillet selections". Chamfer 12 mm on the same edges matches live.
+- [ ] fixed (core 813432936, land bd7f4d31), to verify (qa-uipr12) P1 **FILLET-R12-BLOCK-OVERFLOW (core)** (mistake-fillet-r12-overflows s6-s10): Fillet R12 of the 4 top edges of the 40x30x10 block (start "block"): live regenerates OK, the round runs onto the sides; ours: red title, Fillet 1 row red, "Failed to fillet selections". Chamfer 12 mm on the same edges matches live.
 - [ ] P2 **ASM-MATE-ONE-CONNECTOR-RED (psui)** (mistake-asm-mate-one-connector s8; the rest of MISTAKES-ROWS): editing Fastened 1 and × on one Mate connectors chip: live's title turns red and the Fastened 1 row red at once; ours keeps both ok.
 - [ ] P2 **ASM-HIDDEN-ROW-TOOLTIP (psui)** (asm-hover-hidden-instance-row s4): hovering a hidden instance's row: live's tooltip "Part 2 <1> (Hidden)", ours "Part 2 <1>".
 - [ ] P2 **SHELL-TOO-THICK-FIELD-RED (psui)** (mistake-shell-too-thick s6-s7): Shell 16 mm on the 10 mm block, Enter: live's Shell thickness field turns red (title red too); ours' title is red, the field stays ok.
