@@ -1,34 +1,33 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 19:56 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 22:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
-- **9cbb0e FILLET 18 (lead 19:2x; uncommitted in core-rf, 20:2x)**: live's line 71 (corpus) read: at the x -15.09
-  cusps (wall y +-11 thinning to 0 between convex edge 1 and the concave arc of a round tangent to the plate) live runs
-  the concave rounds to the tip and the convex ball rolls onto them (2 OTHER faces). Code: features/cusp_blend.rs
-  cusp_wall_round (hooked in detail.rs' fillet Err chain): raise the wall (fuse box), OCCT concave rounds, cut the
-  plate's top back, OCCT the rest; on the OLD translation (16:20, pre-Fillet 17 fix) it built 147 faces / 64653.24
-  (live 141 / 64650.83), cusp faces within ~4% of live's. Found: (1) the fresh/ doc was stale: its Fillet 18 refs
-  SHBFB/SHBBB (lines 6.571 on y 7.75/-8.25, x -20.14) were "2 missing selections"; (2) propagate_tangent ran over
-  FOLDS (edges leaving a vertex the same way, |dot| test): at x -73.8 it added the concave arcs RFBF/RFBp (4 tori)
-  live leaves sharp. Fix in detail.rs TangentLinks::neighbours: leaving directions; a fold is skipped only between a
-  convex and a concave edge of one face (sliver()); first try (all folds) regressed fed22d Fillet 2/24, Extrude 32/35,
-  bdddaf Fillet 1/5, 665cf3 Fillet 1/2... (.pa2.sh; vibex7 ~/tmp/core/sc/d-fold; baseline d-1621), narrowed version
-  RUNNING 20:3x (background rb.sh .pa2.sh -> /root/core-scratch/pa3.out; compare `comm` vs d-1621, d-fold). Re-translated
-  (all folds skipped): 9cbb0e Fillet 18 no longer a difference. T1 written (uncommitted): detail.rs tests::
-  tangent_propagation_stops_where_a_wall_thins_to_a_cusp; .f18t.sh runs it + fails-without (sliver() off) -- run only
-  AFTER pa3 finishes (it edits detail.rs on the host). Next: pa3 result; Fillet 18 faces vs live (.f18cmp.sh, uses
-  fresh/ = new translation; .f18diff.py); corpus A/B .f18ab.sh (A = .detail.orig.rs/.mod.orig.rs); drop the debug
-  eprintlns (cusp_blend entry/pair, detail.rs overrun); land. Then Fillet 19/23, MF7, Chamfer 11.
+- **9cbb0e FILLET 18 (uncommitted in core-rf; 22:1x)**: live's line 71: at the x -15.09 cusps live runs the concave
+  rounds to the tip, the convex ball rolls onto them. features/cusp_blend.rs cusp_wall_round (hooked in detail.rs'
+  fillet Err chain). detail.rs TangentLinks::neighbours: leaving directions (tangent_at + a step's sign; derivatives_at
+  dropped: D3 throws on offset curves) and sliver() = a fold between a convex and a concave edge of one face is cut.
+  CLEAN A/B (same translation, HEAD vs mine, vibex7 ~/tmp/core/sc d-base vs d-tan): fixes 9cbb0e F18, fed22d F4/F25,
+  97ad5f F2; REGRESSES bdddaf Fillet 5 + fed22d Fillet 2 (665cf3 etc. were never mine: d-1621 was another translation).
+  Toggle probe (.rg2.sh): NOSHAPE_PROP_NOSLIVER=1 fixes both regressions but loses F4/F25 -> sliver() must be sharper.
+  Cut folds all look alike (rg3.out: convex line + concave circle/ellipse tangent where a plane face thins to 0).
+  RUNNING 22:0x: .rg4.sh -> /root/core-scratch/rg4.out: per feature, chain with/without sliver + cut folds per feature
+  (studios bdddaf 51425d5bdf945e8a, fed22d aa4ecb577fd8a5c0, 9cbb0e 0640599f0bc42c52 in fresh/ doc = HEAD's translation).
+  PROBE CODE in detail.rs to remove before landing: env NOSHAPE_PROP_ONEEND / NOSHAPE_PROP_NOSLIVER / NOSHAPE_NO_CUSP,
+  NOSHAPE_FOLD_DEBUG prints (sliver() + "FOLD feature" after chain); clean copy w/o probes: /root/core-scratch/ab/
+  detail.new.rs (has tangent fix, no toggles). Then: T1 .f18t.sh, .f18cmp.sh/.f18diff.py vs live, corpus .f18ab.sh, land.
+  Then Fillet 19/23, MF7, Chamfer 11.
+- **IMPELLER SPEED (lead 21:3x: regression vs own release = P0 at any ratio)**: same-host alternating A/B vibex7 21:48
+  (core-p0 detached at origin/main c444ac1d5, cli LTO off vs qa-rel 0.4.71 release cli; .impab.sh): main FASTER every
+  pair (medians 26.7 vs 29.5 s). Only slower feature: Move face 1 69 -> ~650 ms (Error in both, live OK): two
+  offset_by_booleans tries (freeform branch + after OCCT offset error 3) each ~310 ms, our OWN fuse returns EMPTY (0
+  faces); NOSHAPE_BOOL_RUST=0 -> Move face 1 Ok. Sent to bool 22:0x with inputs vibex7 ~/agents/core-keep/mf1-bool/
+  (mf-body-38 + mf-tool-38-0, Fuse). Mine if bool declines: skip the second identical booleans try (saves ~310 ms).
+  qa sees 27.2 vs 19.7 s: told qa to rerun as one same-host alternating A/B with same build profile.
 - P1 PATTERN-AFTER-INSERTED-CHAMFER (lead 19:5x): already fixed by 6a8e411db (11-19); TICKETS row marked (b4dc6e1cf).
-- **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): QUEUED 01c87462 19:16** (core-rf, carries Fillet 17; qa + lead told): my a5e0075bb sent Move faces
-  of planes facing several ways down the one-way-at-a-time tweak (neighbours keep names) instead of OCCT's offset
-  (every face Offset(old)): the derived source's Move face 1 vertices renamed, Part Studio 1's Transform 1 by two
-  vertices lost them. Now several ways only after OCCT's offset fails (before the booleans); reblend fallback as was.
-  T1 features_a::move_face_offset_of_planes_facing_two_ways_keeps_occts_vertex_names (fails without). Both docs
-  ALL-SAME vs 0.4.71, corpus A/B only those 2 change (vibex7 ~/tmp/core/tr, mode 700: delete when landed).
+- TRANSFORM-TRANSLATE-DISTANCE: LANDED 662228ffc, qa verified 21:5x (hem docs SAME); delete vibex7 ~/tmp/core/tr.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
@@ -162,6 +161,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **c2-hunting-knife f24:** live's lines disagree (16-23 LINE, 24 OTHER); refetch 15-24 asked (REQUESTS 11-15 00:45).
 
 ## Next, in order
+000. Lead 11-26 22:0x, after scissor: screws Move face 3 (Split 4, Offset surfaces 1, knife F8, knifehandle MT1: skasm).
 00. P1 PATTERN-AFTER-INSERTED-CHAMFER: already fixed (6a8e411db, v0.4.60): 29505.03 = live on core-rf 20:1x; TICKETS row marked for qa.
 0. **BLEND-FAILS-1125** (lead 11-25 14:1x; blend parked): Fillets/Chamfers that fail in ours and build in live. Sources: model
    suite vibex7 ~/qa-parity/models.log (11:37, qa 1125-0803), asm-scissor-lift studios (my slabs run, vibex7
