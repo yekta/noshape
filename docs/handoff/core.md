@@ -10,12 +10,20 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **QUEUED a730d3fd (11-26 02:3x)**: 4826656b7 solver, b3785098f cPlane, 0d10fa156 translator (+ 52c8f9ce's stack):
   models gate base 131/189 docs 2111/2681, branch 132/189 2118/2681, only c2-lora-enclosure-ribs 39 -> 46/46; lead
   reports the land. (e51c898c failed on a rebase conflict; rebased clean, re-queued.)
-- **BOOL GATE IN FLIGHT (11-26 03:28)**: 44abb6438 (boolean.cpp planes_meet_within_zero_length: merge_planar and
-  same_domain_candidates take faces sharing an edge as one plane when angle <= 1e-5 and angle x joint bbox diagonal
-  <= 1e-8 m; T1 core::coplanar_faces_within_live_zero_length_merge_in_a_union, fails 7 != 6 without). Scissor 264eb3
-  Linear pattern 1 WAGO 44 -> 41 faces as live. Lead: land only after tools/bool/gate.sh (corpora, parity56, model
-  suite) has 0 new differences or a live reason for each; bool told (no conflict; NOT on vibex8, bool's till 06:00).
-  Run: tools/bool/gate.sh 44abb6438 --host vibex7 > /root/core-scratch/gate-zl.out (VERDICT line at the end).
+- **P0 SPEED (lead 11-26 05:2x, live/speed-audit-1126.md)**: v0.4.69 regressions found by profiles (NOSHAPE_KERNEL_PROFILE,
+  vibex7 ~/tmp/core/spd: m/ models, pft.py, spd-prof.sh <doc> <0.4.68|new>, ~/qa-rel/<v>/noshape-cli): (a) 7a39ced92
+  chains_overlap built every chain pair's trial chamfers + volumes; (b) 43e1e6945 ring_sweep cut (Rust Boolean
+  sections_ahead 450 ms). Fix LANDING from worktree core-spd (branch core-spd, land.sh run 05:5x): reach boxes (edges +
+  faces at chain ends + d; the notch test needs the end faces: 7 d), volumes only for pairs left, trial chamfers
+  in parallel; hose sewn from walls + rings (tube_between). Under load 19: hose ~130 ms and radiator chamfers ~35 ms
+  = v0.4.68; mattie Chamfer 1 217-348 vs v0.4.68 ~100 (v0.4.69 740): re-time quiet; if still 2x, idea: decide overlap
+  from `together`'s history (chamfer faces of two chains adjacent) instead of trial chamfers. 12b323a9c, 3dc691949,
+  947b179c6 not involved. Then: impeller Fillet 3 (5512 vs live 100), knifehandle Fillet 3 (1345 vs 11).
+- **BOOL GATE 2 IN FLIGHT (11-26 05:24)**: 420fd5d01 (zero-length plane merge + vertex-offset fix; first gate 44abb6438
+  FAILED 2 kernel step tests: parallel faces a micron apart merged; all 608 kernel tests pass now). Gate 1 otherwise:
+  replay +0 -0, suite 132 -> 132, the only doc change lora's untranslated note gone (translator, benign). Running:
+  tools/bool/gate.sh 420fd5d01 --host vibex7 > /root/core-scratch/gate-zl2.out (VERDICT at end); PASS -> land.sh
+  core-rf (44abb6438 + 420fd5d01, rebase first). bool told (no conflict). Scissor 264eb3 WAGO 44 -> 41 faces as live.
   Next after it: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck with the merge.
 - **QUEUE (lead 11-25 23:xx)**: (1) parse_refs (queued a730d3fd), (2) 97ad5f Delete face 1 (= live;
   merge gate above), (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
