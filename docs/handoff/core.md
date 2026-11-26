@@ -5,6 +5,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
+- **NEW P0 (lead 11-26 ~19:0x, FIRST after the compaction): TRANSFORM-TRANSLATE-DISTANCE**: qa compat check (main
+  08856ae6 vs 0.4.71): c2-sm-hem-plus and cf-sheet-metal-hem Transform 1 Ok -> Error "Translation by distance...".
+  Not in v0.4.72 (cut from 8fe0407e5, GO). Find the commit (git log 8fe0407e5..08856ae6 on transform / sheet-metal
+  files; userdocs.py on ~/qa/corpus copies), fix with a T1, tell qa. Then 9cbb0e Fillet 18 (below).
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
