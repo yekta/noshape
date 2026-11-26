@@ -14395,6 +14395,29 @@ mod tests {
         assert!((c.start_point() - v(0.031, 0.027)).length() < 1e-9, "live: from the clicked end");
     }
 
+    /// Live (behaviours "skasm (2026-10-27) sketch polygon side count"): the count follows the pointer's distance from
+    /// the centre (a sideways move counts through it), Enter commits with the tool kept, Esc creates nothing.
+    #[test]
+    fn polygon_side_count_follows_the_radial_distance_enter_commits_esc_discards() {
+        let (mut ed, mut d) = editor(Tool::Polygon);
+        let c = v(0.011, 0.013);
+        click(&mut ed, &mut d, c);
+        click(&mut ed, &mut d, c + v(PX * 109.0, 0.0));
+        for (down, out, sides) in [(30.0, 0.0, 6), (60.0, 0.0, 7), (60.0, 30.0, 10), (0.0, 65.0, 12), (0.0, -45.0, 3), (0.0, 0.0, 6)] {
+            ed.pointer_move(&mut d, c + v(PX * (109.0 + out), -PX * down), false, false);
+            assert_eq!(ed.polygon_sides, sides, "{down} px down, {out} px out");
+        }
+        ed.cancel();
+        assert_eq!(count(&d, EntityKind::Line), 0, "Esc discards the pending polygon");
+        ed.set_tool(Tool::Polygon);
+        click(&mut ed, &mut d, c);
+        click(&mut ed, &mut d, c + v(PX * 109.0, 0.0));
+        ed.pointer_move(&mut d, c + v(PX * 144.0, 0.0), false, false);
+        ed.finish_polygon(&mut d);
+        assert_eq!(count(&d, EntityKind::Line), 9, "Enter commits the count shown");
+        assert_eq!((ed.tool, ed.clicks.len(), ed.polygon_sides), (Tool::Polygon, 0, 9), "the tool stays, the next polygon starts at 9");
+    }
+
     /// Live (behaviours "skasm (2026-10-27) sketch value boxes right after
     /// drawing"): a center point circle's Ø box sits opposite the rim click,
     /// on that axis, its near side ~14 px off the rim.

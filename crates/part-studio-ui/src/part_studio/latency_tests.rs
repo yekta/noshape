@@ -92,6 +92,17 @@ fn timed(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStu
     }
 }
 
+/// A pointer move's time to its first drawn frame. The hover pick that follows reads back off the UI thread (120-260 ms
+/// on the software renderer), so it isn't part of the move.
+fn timed_frame(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<PartStudioView>, go: impl FnOnce(&mut TestAppContext)) -> f64 {
+    let t0 = Instant::now();
+    go(cx);
+    cx.update(|cx| view.read(cx).gpu.deliver_frames());
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    t0.elapsed().as_secs_f64() * 1000.0
+}
+
 /// [`timed`] to the moment `done` first held (the state applied; its frame follows within one): the test runs
 /// background tasks on its own thread, so a slow one started by the same change (std's editing logic, a selection's
 /// measurement), which the app runs beside it, would otherwise count.
@@ -757,9 +768,15 @@ fn live_speed_1125_sketch_rows(cx: &mut TestAppContext) {
             for k in 1..=20 {
                 let to = pointer.window_point(cx, s0px + dir * k as f64);
                 let t0 = Instant::now();
-                ms[1].push(timed(cx, window, &view, |cx| {
+                let took = timed_frame(cx, window, &view, |cx| {
                     gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(to, Some(left), Modifiers::default());
-                }, |_| true));
+                });
+                if took > 54.0 {
+                    notes.push(format!("{name} run {run} move {k}: drawn {took:.1} ms"));
+                }
+                ms[1].push(took);
+                // The drag's first move draws within live's frame (lead 11-26: a stall there is a P0).
+                assert!(k > 1 || took <= 54.0, "{name} run {run}: the drag's first move drawn in {took:.1} ms (live <= 54)");
                 if let Some(rest) = Duration::from_millis(16).checked_sub(t0.elapsed()) {
                     pump(cx, window, &view, rest);
                 }
