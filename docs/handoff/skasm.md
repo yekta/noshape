@@ -3,16 +3,16 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 21:0x UTC) — read first
+## RESUME HERE (11-26 21:55 UTC) — read first
 
-Queued: df113102 (Mirror skips the sketch's regions, mirror-no-line s11 28/28) and 8742ccbc (parity connector, 14->15/27).
-NOW (lead 21:0x, core told): c2-hunting-knife Split 4 and c2-surf-intro-offset Offset surfaces 1 (first differences after
-the refill), against live's per-feature geometry with T1s; brep / kernel Boolean changes go through bool's gate. Trace:
-bin/corp1.sh <doc> <grep> on vibex7 (~/tmp/skasm/corp/one.log); edge-by-edge compare as in the Rib 1 note below
-(temporary SKDBG edge writer in parity.rs our_parts: query_entities edges -> edges-N.json, matched to live.jsonl's
-bodies[].edges by midPoint/length).
-Trace 21:1x: hunting-knife 48/52, Split 4 "HANDLE" 14/31/18 vs live 14/31/19 (one vertex more in live, same edges:
-a closed edge live splits with a second vertex? compare vertices/edges as for Rib 1); then Fillet 8 16/34/20 vs 15/37/25.
+Queued: df113102 (Mirror skips the sketch's regions), 8742ccbc (parity connector, 14->15/27), 0a0a16acf (kernel
+shown_topology: crosses_closure walks the seam past later rings' vertices; hunting-knife Split 4 48 -> 51/52; the full
+corpus run with a print showed only hunting-knife takes the new path; T1 a_ring_round_a_lofts_closure_keeps_a_vertex_there).
+hunting-knife next: Fillet 8 "HANDLE" 16/34/20 vs live 15/37/25 (fillet: core's, report).
+NOW: c2-surf-intro-offset Offset surfaces 1: one sheet face, live 9590.995 mm2, ours 9588.568; offset 1.1 in of the
+Derived part's face JpK (8515.58 mm2, box x -58.8..0, y 0..254); live's sheet box x -86.742..0, y -27.94..268.271,
+z -12.251..34.033. Debug: git apply /root/skasm-scratch/skdbg-parity.patch (SKDBG writes edges/vertices/faces-N.json per
+traced feature), bin/edgedbg.sh <doc> on vibex7 (~/tmp/skasm/corp/edges), bin/edgecmp.py (scp to vibex7) matches edges.
 Lead 21:xx: nuts Sweep 1 + parting-line Rib 1. Both are NOT sketch/translation: reported back for core/bool.
 - nuts Sweep 1: profile + helix right; live 3 cylinders/2 other, ours 2/3: the thread's flat (a profile line parallel
   to the axis, r 2.0 mm) sweeps a multi-turn helical strip on a cylinder, ours a B-spline. Patch
