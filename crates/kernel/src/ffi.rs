@@ -853,6 +853,10 @@ pub(crate) mod ffi {
         /// Makes OCCT's sections of these pairs (a_arg, a_face, b_arg, b_face each) ahead, on all threads, for
         /// `brep_occt_sections` to give.
         fn brep_occt_ahead(pairs: &[u32]);
+        /// During noshape's own Boolean: noshape's own section of face `a_face` of `a_arg` and `b_face` of `b_arg`
+        /// (`data`: its range and accuracy, then its curve and its curves on the two faces as push_curve lays them
+        /// out) kept as OCCT's are: its id and tolerance; empty if its curves on the faces aren't on them.
+        fn brep_own_section(a_arg: u32, a_face: u32, b_arg: u32, b_face: u32, data: &[f64]) -> Vec<f64>;
         fn op_enclose(shapes: &OcShapeList) -> Result<OpOut>;
         fn op_transform(s: &OcShape, m: &[f64], copy: bool) -> Result<OpOut>;
         fn op_gtransform(s: &OcShape, m: &[f64]) -> Result<OpOut>;

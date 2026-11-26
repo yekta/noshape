@@ -995,6 +995,42 @@ fn brep_free_form_cases_match_occt() {
     assert!(accepted >= 1, "{accepted} of {n} taken:\n{report}");
 }
 
+/// A vase turned from a spline (a surface of revolution) cut by a prism with a spline side (a surface of extrusion):
+/// noshape's own Boolean takes the two spline faces' sections from its own marcher (`march::own`), and its result is
+/// the one with OCCT's sections, and OCCT's own Boolean's (volume within 1e-6 of it, the same faces).
+#[test]
+fn brep_own_sections_give_occts_result() {
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    let cubic = |poles: Vec<DVec2>| Segment2d::BSpline { poles, weights: None, knots: vec![0.0, 1.0], mults: vec![4, 4], degree: 3, periodic: false };
+    let side = cubic(vec![mm(20.0, 0.0), mm(28.0, 10.0), mm(14.0, 22.0), mm(20.0, 30.0)]);
+    let profile = [Segment2d::Line { a: mm(0.0, 0.0), b: mm(20.0, 0.0) }, side, Segment2d::Line { a: mm(20.0, 30.0), b: mm(0.0, 30.0) }, Segment2d::Line { a: mm(0.0, 30.0), b: mm(0.0, 0.0) }];
+    let vase = revolve(&make_face_2d(&Plane::xz(), &profile, &[]).unwrap(), DVec3::ZERO, DVec3::Z, std::f64::consts::TAU).unwrap().shape;
+    let wavy = cubic(vec![mm(12.0, -30.0), mm(4.0, -10.0), mm(22.0, 10.0), mm(12.0, 30.0)]);
+    let base = Plane::new(DVec3::new(0.0, 0.0, 0.005), DVec3::Z, DVec3::X);
+    let outline = [wavy, Segment2d::Line { a: mm(12.0, 30.0), b: mm(40.0, 30.0) }, Segment2d::Line { a: mm(40.0, 30.0), b: mm(40.0, -30.0) }, Segment2d::Line { a: mm(40.0, -30.0), b: mm(12.0, -30.0) }];
+    let prism = extrude(&make_face_2d(&base, &outline, &[]).unwrap(), DVec3::new(0.0, 0.0, 0.040)).unwrap().shape;
+    let cut = |rust: Option<bool>, march: Option<bool>| {
+        set_rust_boolean_only(rust == Some(true));
+        set_rust_boolean(rust);
+        set_boolean_march(march);
+        let r = boolean(BooleanOp::Cut, std::slice::from_ref(&vase), std::slice::from_ref(&prism), &BooleanOptions::default());
+        let marched = last_marched();
+        set_rust_boolean_only(false);
+        set_rust_boolean(None);
+        set_boolean_march(None);
+        let r = r.unwrap_or_else(|e| panic!("rust {rust:?} march {march:?}: {e} ({})", last_rust_decline())).shape;
+        assert!(r.is_valid(), "rust {rust:?} march {march:?}: invalid");
+        (r.volume().unwrap(), r.count(ShapeType::Face), marched)
+    };
+    let (ours, theirs, occt) = (cut(Some(true), Some(true)), cut(Some(true), Some(false)), cut(Some(false), None));
+    assert!(ours.2 >= 1, "no pair marched");
+    assert_eq!(theirs.2, 0);
+    for (what, x) in [("with OCCT's sections", theirs), ("OCCT's Boolean", occt)] {
+        assert!((ours.0 - x.0).abs() <= 1e-6 * x.0.abs(), "volume {} vs {} {what}", ours.0, x.0);
+        assert_eq!(ours.1, x.1, "faces vs {what}");
+    }
+}
+
 /// A cone (a countersink's frustum) cut by a plane at an angle to its axis, through it off the axis: an ellipse
 /// whose centre is off the axis; noshape's own Boolean takes them as OCCT.
 #[test]
@@ -1176,6 +1212,9 @@ fn free_sections_vs_occt() {
         })
     };
     let mut fails: BTreeMap<String, usize> = BTreeMap::new();
+    // (Per family, the two surfaces' kinds: pairs, both none, along both faces' edges, matched, differ, declined, and
+    // ours / OCCT's ms over the matched.)
+    let mut family: BTreeMap<String, ([usize; 6], f64, f64)> = BTreeMap::new();
     // (Ours and OCCT's ms: over the pairs matched with curves, and over all compared.)
     let (mut ms_matched, mut ms_all) = ((0.0f64, 0.0f64), (0.0f64, 0.0f64));
     let (mut worst, mut worst_at) = (0.0f64, String::new());
@@ -1205,6 +1244,8 @@ fn free_sections_vs_occt() {
                         continue;
                     }
                     pairs += 1;
+                    let fam = family.entry(march::family(&da.s, &db.s)).or_default();
+                    fam.0[0] += 1;
                     let t = Instant::now();
                     let occt = face_pair_sections(fa, fb);
                     let t_occt = t.elapsed().as_secs_f64() * 1e3;
@@ -1220,10 +1261,12 @@ fn free_sections_vs_occt() {
                         Ok(o) => o,
                         Err(march::Fail::OnEdges) => {
                             on_edges += 1;
+                            fam.0[2] += 1;
                             continue;
                         }
                         Err(e) => {
                             *fails.entry(format!("{e:?}")).or_default() += 1;
+                            fam.0[5] += 1;
                             eprintln!("  {name} a{ia} b{ib}: ours {e:?} ({t_ours:.1} ms), OCCT {} curves ({t_occt:.1} ms)", edges.len());
                             continue;
                         }
@@ -1274,10 +1317,15 @@ fn free_sections_vs_occt() {
                     ms_all.1 += t_occt;
                     if n1 == 0 && n2 == 0 && n_along == 0 {
                         empty += 1;
+                        fam.0[1] += 1;
                     } else if d > NEAR && d1 <= NEAR && d2 <= NEAR {
                         on_edges += 1;
+                        fam.0[2] += 1;
                     } else if d <= NEAR {
                         matched += 1;
+                        fam.0[3] += 1;
+                        fam.1 += t_ours;
+                        fam.2 += t_occt;
                         if d > worst {
                             (worst, worst_at) = (d, format!("{name} a{ia} b{ib}"));
                         }
@@ -1285,7 +1333,8 @@ fn free_sections_vs_occt() {
                         ms_matched.1 += t_occt;
                     } else {
                         differ += 1;
-                        eprintln!("  {name} a{ia} b{ib}: ours {} curves ({t_ours:.1} ms), OCCT {} ({t_occt:.1} ms): OCCT's off ours {d1:.1e}, ours off OCCT's {d2:.1e}", ours.len(), edges.len());
+                        fam.0[4] += 1;
+                        eprintln!("  {name} a{ia} b{ib} ({}): ours {} curves ({t_ours:.1} ms), OCCT {} ({t_occt:.1} ms): OCCT's off ours {d1:.1e}, ours off OCCT's {d2:.1e}", march::family(&da.s, &db.s), ours.len(), edges.len());
                         // (NOSHAPE_BREP_DIFF=1: where ours end, on both faces' boxes, and where OCCT's do.)
                         if std::env::var_os("NOSHAPE_BREP_DIFF").is_some() {
                             let kind = |f: &FreeSurface| match f {
@@ -1325,4 +1374,7 @@ fn free_sections_vs_occt() {
          times: matched with curves ours {:.0} ms vs OCCT {:.0} ms; all compared ours {:.0} ms vs OCCT {:.0} ms (OCCT: the Boolean's own per-pair sections, as made ahead)",
         ms_matched.0, ms_matched.1, ms_all.0, ms_all.1
     );
+    for (f, (n, ours, occt)) in &family {
+        eprintln!("family {f}: pairs {}, both none {}, along edges {}, matched {} (ours {ours:.0} ms, OCCT {occt:.0} ms), differ {}, declined {}", n[0], n[1], n[2], n[3], n[4], n[5]);
+    }
 }

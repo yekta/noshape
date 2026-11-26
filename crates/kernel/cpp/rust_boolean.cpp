@@ -7290,6 +7290,128 @@ void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
   }
 }
 
+// A curve as brep_bridge's push_curve lays it out from `d[at]` (`at` moved past it): its degree, its knots without
+// repeats and their multiplicities, its poles (x y z) and its weights if rational; false if malformed.
+struct FlatCurve
+{
+  int                 degree = 0;
+  std::vector<double> knots;
+  std::vector<int>    mults;
+  std::vector<gp_Pnt> poles;
+  std::vector<double> weights;
+};
+
+static bool flat_curve(rust::Slice<const double> d, size_t& at, FlatCurve& c)
+{
+  if (at + 6 > d.size() || d[at + 1] != 3.0)
+    return false;
+  c.degree             = static_cast<int>(d[at + 2]);
+  const size_t nk      = static_cast<size_t>(d[at + 3]);
+  const size_t np      = static_cast<size_t>(d[at + 4]);
+  const bool rational  = d[at + 5] != 0;
+  const size_t end     = at + 6 + nk + 3 * np + (rational ? np : 0);
+  if (c.degree < 1 || np < 2 || nk != np + static_cast<size_t>(c.degree) + 1 || end > d.size())
+    return false;
+  const double* k = &d[at + 6];
+  for (size_t i = 0; i < nk; ++i)
+  {
+    if (i > 0 && k[i] < k[i - 1])
+      return false;
+    if (i > 0 && k[i] == k[i - 1])
+      ++c.mults.back();
+    else
+    {
+      c.knots.push_back(k[i]);
+      c.mults.push_back(1);
+    }
+  }
+  const double* p = k + nk;
+  for (size_t i = 0; i < np; ++i)
+    c.poles.emplace_back(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+  if (rational)
+    c.weights.assign(p + 3 * np, p + 4 * np);
+  at = end;
+  return true;
+}
+
+// noshape's own section of faces a and b (the marcher's, brep::march::own) kept as OCCT's are (t_free's curves, its
+// id for the Boolean's edges): its curve and its curves on the faces as B-splines, checked at 17 points to lie on
+// them (each face's surface at its curve on it within twice its accuracy, at least 1 um).
+static rust::Vec<double> own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> d)
+{
+  rust::Vec<double> out;
+  if (t_free == nullptr || t_free->srcs == nullptr || d.size() < 3)
+    return out;
+  const double t0 = d[0], t1 = d[1], accuracy = d[2];
+  size_t       at = 3;
+  FlatCurve    c[3];
+  for (FlatCurve& x : c)
+    if (!flat_curve(d, at, x))
+      return out;
+  auto array = [](const auto& v) {
+    NCollection_Array1<std::decay_t<decltype(v[0])>> a(1, static_cast<int>(v.size()));
+    for (size_t i = 0; i < v.size(); ++i)
+      a(static_cast<int>(i) + 1) = v[i];
+    return a;
+  };
+  auto planar = [](const std::vector<gp_Pnt>& v) {
+    NCollection_Array1<gp_Pnt2d> a(1, static_cast<int>(v.size()));
+    for (size_t i = 0; i < v.size(); ++i)
+      a(static_cast<int>(i) + 1) = gp_Pnt2d(v[i].X(), v[i].Y());
+    return a;
+  };
+  occ::handle<Geom_BSplineCurve>   c3;
+  occ::handle<Geom2d_BSplineCurve> on[2];
+  try
+  {
+    c3 = c[0].weights.empty() ? new Geom_BSplineCurve(array(c[0].poles), array(c[0].knots), array(c[0].mults), c[0].degree)
+                              : new Geom_BSplineCurve(array(c[0].poles), array(c[0].weights), array(c[0].knots), array(c[0].mults), c[0].degree);
+    for (int i = 0; i < 2; ++i)
+    {
+      const FlatCurve& x = c[i + 1];
+      on[i] = x.weights.empty() ? new Geom2d_BSplineCurve(planar(x.poles), array(x.knots), array(x.mults), x.degree)
+                                : new Geom2d_BSplineCurve(planar(x.poles), array(x.weights), array(x.knots), array(x.mults), x.degree);
+    }
+  }
+  catch (const Standard_Failure&)
+  {
+    return out;
+  }
+  const TopoDS_Face fa = TopoDS::Face(input(*t_free->srcs, a_arg, TopAbs_FACE, a_face));
+  const TopoDS_Face fb = TopoDS::Face(input(*t_free->srcs, b_arg, TopAbs_FACE, b_face));
+  const occ::handle<Geom_Surface> s[2] = {BRep_Tool::Surface(fa), BRep_Tool::Surface(fb)};
+  const double within = std::max(2 * accuracy, 1e-6);
+  for (int k = 0; k <= 16; ++k)
+  {
+    const double t = t0 + (t1 - t0) * k / 16;
+    const gp_Pnt p = c3->Value(t);
+    for (int i = 0; i < 2; ++i)
+    {
+      const gp_Pnt2d q = on[i]->Value(t);
+      if (s[i].IsNull() || s[i]->Value(q.X(), q.Y()).Distance(p) > within)
+        return out;
+    }
+  }
+  const IntTools_Curve ic(occ::handle<Geom_Curve>(c3), occ::handle<Geom2d_Curve>(on[0]), occ::handle<Geom2d_Curve>(on[1]), std::max(accuracy, Precision::Confusion()));
+  out.push_back(static_cast<double>(t_free->curves.size()));
+  out.push_back(section_tol(ic, fa, fb));
+  t_free->curves.push_back({{fa, fb}, ic});
+  t_free->moved.emplace_back();
+  return out;
+}
+
+rust::Vec<double> brep_own_section(uint32_t a_arg, uint32_t a_face, uint32_t b_arg, uint32_t b_face, rust::Slice<const double> data)
+{
+  try
+  {
+    return own_section(a_arg, a_face, b_arg, b_face, data);
+  }
+  catch (...)
+  {
+    return rust::Vec<double>();
+  }
+}
+
 // Whether a solid is inside out (its faces' normals pointing in): a planar face whose plane holds the solid's
 // vertices at one extreme says it cheaply, its normal pointing away from them, or at them with its box there too;
 // none such: its volume's sign.

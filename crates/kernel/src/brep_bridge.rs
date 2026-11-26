@@ -5,10 +5,10 @@
 use crate::ffi::ffi::{self as raw, BrepBody, BrepResult, BrepSections, OcShapeList, OpOut};
 use crate::{bool_corpus, BooleanOp, BooleanOptions, OpResult, Shape};
 use noshape_brep::nurbs::{NurbsCurve, NurbsSurface};
-use noshape_brep::{Body, Curve, Decline, Edge, Face, Kind, Op, Origin, PCurve, Relation, SectionCurve, SectionSource, Solid, Surface, Use};
+use noshape_brep::{march, Body, Curve, Decline, Edge, Face, FacePair, Kind, Op, Origin, PCurve, Relation, SectionCurve, SectionSource, Solid, Surface, Use};
 use std::collections::HashMap;
 use std::cell::{Cell, RefCell};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 thread_local! {
     /// This thread's switch: None as NOSHAPE_BOOL_RUST says.
@@ -19,6 +19,21 @@ thread_local! {
     static SLAB: Cell<bool> = const { Cell::new(false) };
     /// This thread's OCCT fuses run at once, not as a tree ([`set_boolean_no_tree`]).
     static NO_TREE: Cell<bool> = const { Cell::new(false) };
+    /// This thread's switch of noshape's own sections ([`set_boolean_march`]): None as NOSHAPE_BOOL_MARCH says.
+    static MARCH: Cell<Option<bool>> = const { Cell::new(None) };
+    /// The pairs of faces this thread's last Boolean took noshape's own sections of ([`last_marched`]).
+    static MARCHED: Cell<usize> = const { Cell::new(0) };
+}
+
+/// Turns noshape's own sections of free-form faces (`march::own`'s pairs) on or off for this thread's Booleans
+/// (`None`: as NOSHAPE_BOOL_MARCH says, on unless 0); off, OCCT's are taken for every pair.
+pub fn set_boolean_march(on: Option<bool>) {
+    MARCH.with(|m| m.set(on));
+}
+
+/// How many pairs of faces this thread's last Boolean of noshape's took noshape's own sections of.
+pub fn last_marched() -> usize {
+    MARCHED.with(|m| m.get())
 }
 
 /// With `on`, this thread's Booleans run noshape's own Boolean only: one it declines fails
@@ -354,11 +369,53 @@ fn occt_sections(a: (u32, u32), b: (u32, u32), ends: &[f64]) -> Result<Vec<Secti
     Ok(out.curves.chunks(8).map(|c| SectionCurve { curve: curve(c[3]), t0: c[1], t1: c[2], on: [curve(c[4]), curve(c[5])], id: c[0] as u32, tol: c[6], accuracy: c[7] }).collect())
 }
 
-/// Free-form faces' sections from OCCT (rust_boolean.cpp keeps its curves for building the result's edges).
-struct Occt;
+/// Free-form faces' sections from OCCT (rust_boolean.cpp keeps its curves for building the result's edges), or for
+/// the pairs `march::own` takes, noshape's own (kept there as OCCT's are) unless NOSHAPE_BOOL_MARCH=0.
+struct Occt<'a> {
+    args: &'a [&'a Body],
+    /// Whether to march ([`marching`] on the Boolean's thread).
+    march: bool,
+    /// The pairs whose sections are noshape's own, by pair (the earlier argument's face first; its curves on the
+    /// faces in that order).
+    own: Mutex<HashMap<FacePair, Vec<SectionCurve>>>,
+}
 
-impl SectionSource for Occt {
+fn marching() -> bool {
+    static ENV: OnceLock<bool> = OnceLock::new();
+    MARCH.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_MARCH").as_deref() != Ok("0")))
+}
+
+/// The pair (`a`, `b`) with the earlier argument's face first, and whether that swapped them.
+fn ordered(a: (u32, u32), b: (u32, u32)) -> (FacePair, bool) {
+    if b < a { ((b, a), true) } else { ((a, b), false) }
+}
+
+/// Noshape's own sections of `pair` kept as OCCT's are (`brep_own_section`), or None if one isn't on the faces.
+fn own_sections(pair: FacePair, secs: Vec<march::Section>) -> Option<Vec<SectionCurve>> {
+    let ((aa, af), (ba, bf)) = pair;
+    let mut out = Vec::with_capacity(secs.len());
+    for s in secs {
+        let mut data = vec![s.t0, s.t1, s.accuracy];
+        for c in [&s.curve, &s.on[0], &s.on[1]] {
+            push_curve(&mut data, c);
+        }
+        let kept = raw::brep_own_section(aa, af, ba, bf, &data);
+        let [id, tol] = kept[..] else { return None };
+        out.push(SectionCurve { curve: s.curve, t0: s.t0, t1: s.t1, on: s.on, id: id as u32, tol, accuracy: s.accuracy });
+    }
+    Some(out)
+}
+
+impl SectionSource for Occt<'_> {
     fn sections(&self, a: (u32, u32), b: (u32, u32)) -> Result<Vec<SectionCurve>, Decline> {
+        let (pair, swap) = ordered(a, b);
+        if let Some(secs) = self.own.lock().expect("own sections").get(&pair) {
+            let mut secs = secs.clone();
+            if swap {
+                secs.iter_mut().for_each(|s| s.on.swap(0, 1));
+            }
+            return Ok(secs);
+        }
         occt_sections(a, b, &[])
     }
 
@@ -378,8 +435,19 @@ impl SectionSource for Occt {
         Ok(out)
     }
 
-    fn ahead(&self, pairs: &[noshape_brep::FacePair]) {
-        let flat: Vec<u32> = pairs.iter().flat_map(|&(a, b)| [a.0, a.1, b.0, b.1]).collect();
+    fn ahead(&self, pairs: &[FacePair]) {
+        let mut rest: Vec<FacePair> = pairs.to_vec();
+        if self.march {
+            let mut own = self.own.lock().expect("own sections");
+            let new: Vec<FacePair> = pairs.iter().map(|&(a, b)| ordered(a, b).0).filter(|p| !own.contains_key(p)).collect();
+            for (&pair, secs) in new.iter().zip(march::own(self.args, &new)) {
+                if let Some(secs) = secs.and_then(|s| own_sections(pair, s)) {
+                    own.insert(pair, secs);
+                }
+            }
+            rest.retain(|&(a, b)| !own.contains_key(&ordered(a, b).0));
+        }
+        let flat: Vec<u32> = rest.iter().flat_map(|&(a, b)| [a.0, a.1, b.0, b.1]).collect();
         raw::brep_occt_ahead(&flat);
     }
 }
@@ -447,9 +515,11 @@ pub(crate) fn brep_boolean(op: u8, args: &[BrepBody], shared: &[u32], tol: f64, 
     };
     let bodies: Vec<Body> = args.iter().map(body_of).collect();
     let refs: Vec<&Body> = bodies.iter().collect();
+    let source = Occt { args: &refs, march: marching(), own: Mutex::default() };
     // (A panic here crossed into the C++ call and aborted the process, qa RUST-BOOL-CLAMP-ABORT / CRASH-1036: a
     // decline instead, so OCCT's Boolean builds it.)
-    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| noshape_brep::with_shared(shared_of(shared), || noshape_brep::with_fuzzy(fuzzy, || noshape_brep::with_scaled_inputs(scaled_inputs, || noshape_brep::with_one_band(one_band, || noshape_brep::with_plain_if_overlapping(or_plain, || noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&Occt))))))))).unwrap_or(Err(Decline("noshape's Boolean panicked")));
+    let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| noshape_brep::with_shared(shared_of(shared), || noshape_brep::with_fuzzy(fuzzy, || noshape_brep::with_scaled_inputs(scaled_inputs, || noshape_brep::with_one_band(one_band, || noshape_brep::with_plain_if_overlapping(or_plain, || noshape_brep::boolean_with(op, &refs, tol, touching_only, Some(&source))))))))).unwrap_or(Err(Decline("noshape's Boolean panicked")));
+    MARCHED.with(|m| m.set(source.own.lock().map_or(0, |o| o.len())));
     let r = match r {
         Ok(r) => r,
         Err(d) => {

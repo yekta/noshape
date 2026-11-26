@@ -3,7 +3,8 @@
 //! both surfaces), each traced both ways along the cross product of the two normals, a step's end brought back onto
 //! both surfaces in the plane across its tangent; to where either box ends, or round to the start. Each branch is
 //! then a cubic through its stations (their tangents: C1), with its curves on both surfaces likewise.
-//! (Not used by the Boolean yet: `brep_replay::free_sections_vs_occt` checks it against OCCT's sections.)
+//! The Boolean takes its sections for pairs of [`FAMILIES`] ([`own`]); `brep_replay::free_sections_vs_occt` checks it
+//! against OCCT's sections.
 
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
@@ -354,6 +355,12 @@ impl Marcher<'_> {
         (1..32).map(|k| sec.curve.at(sec.t0 + (sec.t1 - sec.t0) * k as f64 / 32.0)).all(|p| near(&self.edges[0], p) && near(&self.edges[1], p))
     }
 
+    /// Whether any of 33 points of `sec` (its ends too) lies within [`ALONG`] of an edge of each face.
+    fn near_both(&self, sec: &Section) -> bool {
+        let near = |es: &[Edge3], p: DVec3| es.iter().any(|e| e.near_box(p, ALONG) && e.dist(p) <= ALONG);
+        (0..=32).map(|k| sec.curve.at(sec.t0 + (sec.t1 - sec.t0) * k as f64 / 32.0)).any(|p| near(&self.edges[0], p) && near(&self.edges[1], p))
+    }
+
     /// The least sine between the two normals at 31 points inside `sec`.
     fn least_sine(&self, sec: &Section) -> f64 {
         (1..32)
@@ -693,11 +700,50 @@ impl Marcher<'_> {
     }
 }
 
+/// A pair's family: its two surfaces' kinds, in name order ("nurbs x torus").
+pub fn family(a: &FreeSurface, b: &FreeSurface) -> String {
+    let kind = |s: &FreeSurface| match s {
+        FreeSurface::Nurbs(n) if !n.weights.is_empty() && n.weights.iter().any(|&w| (w - n.weights[0]).abs() > 1e-12) => "rational nurbs",
+        FreeSurface::Nurbs(_) => "nurbs",
+        FreeSurface::Torus { .. } => "torus",
+        FreeSurface::Sphere { .. } => "sphere",
+        FreeSurface::Extrusion { .. } => "extrusion",
+        FreeSurface::Revolution { .. } => "revolution",
+    };
+    let (x, y) = (kind(a), kind(b));
+    if x <= y { format!("{x} x {y}") } else { format!("{y} x {x}") }
+}
+
 /// Each branch as a [`Section`]: cubic pieces between its stations from their tangents (the curve's and, from them,
 /// both surfaces' parameters'), by chord length; a piece whose middle is farther than [`FIT`] from either surface
 /// split at a station between.
 pub fn sections(a: Domain, b: Domain) -> Result<Vec<Section>, Fail> {
-    let m = Marcher::new(a, b);
+    sections_of(&Marcher::new(a, b))
+}
+
+/// The pair families whose sections the Boolean takes from here rather than OCCT: none of their pairs' sections
+/// differing from OCCT's over the corpora, parity56 and the knurls (`brep_replay::free_sections_vs_occt`, lead 11-26).
+pub const FAMILIES: [&str; 4] = ["extrusion x extrusion", "extrusion x nurbs", "extrusion x revolution", "rational nurbs x torus"];
+
+/// Each pair's sections (faces of `bodies`, by argument) where they are this marcher's for the Boolean: a pair of
+/// [`FAMILIES`] marched without failing, no section of it coming within [`ALONG`] of an edge of each face anywhere
+/// (OCCT keeps or drops those by its own marching); None where OCCT's.
+pub fn own(bodies: &[&crate::Body], pairs: &[crate::FacePair]) -> Vec<Option<Vec<Section>>> {
+    let one = |k: usize| {
+        let ((ia, fa), (ib, fb)) = pairs[k];
+        let a = face_domain(bodies.get(ia as usize)?, fa as usize)?;
+        let b = face_domain(bodies.get(ib as usize)?, fb as usize)?;
+        if !FAMILIES.contains(&family(&a.s, &b.s).as_str()) {
+            return None;
+        }
+        let m = Marcher::new(a.domain(), b.domain());
+        let secs = sections_of(&m).ok()?;
+        (!secs.iter().any(|s| m.near_both(s))).then_some(secs)
+    };
+    crate::boolean::par_map(pairs.len(), &one).unwrap_or_else(|_| vec![None; pairs.len()])
+}
+
+fn sections_of(m: &Marcher) -> Result<Vec<Section>, Fail> {
     let mut out = Vec::new();
     for br in m.branches()? {
         let mut st = br.stations.clone();
@@ -706,7 +752,7 @@ pub fn sections(a: Domain, b: Domain) -> Result<Vec<Section>, Fail> {
         }
         let mut round = 0;
         let sec = loop {
-            let (sec, bad) = fit(&m, &st, br.closed)?;
+            let (sec, bad) = fit(m, &st, br.closed)?;
             if bad.is_empty() {
                 break sec;
             }
