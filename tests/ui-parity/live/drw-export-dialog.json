@@ -1,18 +1,23 @@
 {
  "scenario": "drw-export-dialog",
- "recorded": "2026-11-05T15:38:20.915Z",
+ "recorded": "2026-11-26T14:02:32.666Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.1 backfilled"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "00e3b97bec6108dce5f4f09b",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "7d213ddfae84f81cb8fc7f56",
   "start": "block-drawing",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +26,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -39,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (3)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -49,30 +55,63 @@
     {
      "name": "Front",
      "kind": "base",
+     "position": [
+      81,
+      81
+     ],
      "parent": null,
-     "scale": "1:1"
+     "scale": "1:1",
+     "brokenOut": 0
     },
     {
      "name": "Isometric",
      "kind": "isometric",
+     "position": [
+      198.4,
+      160.8
+     ],
      "parent": "Front",
-     "scale": "1:1"
+     "scale": "1:1",
+     "brokenOut": 0
     },
     {
      "name": "Right",
      "kind": "projected",
+     "position": [
+      198.4,
+      81
+     ],
      "parent": "Front",
-     "scale": "1:1"
+     "scale": "1:1",
+     "brokenOut": 0
     },
     {
      "name": "Top",
      "kind": "projected",
+     "position": [
+      81,
+      160.8
+     ],
      "parent": "Front",
-     "scale": "1:1"
+     "scale": "1:1",
+     "brokenOut": 0
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     432,
+     110,
+     1526,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25539
+   }
   }
  },
  "steps": [
@@ -85,8 +124,12 @@
     }
    },
    "ok": true,
+   "ti": 202085,
+   "tmove": 202158,
+   "moves": 1,
+   "tdown": 202474,
    "at": [
-    775,
+    817,
     976
    ],
    "state": {
@@ -95,6 +138,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -104,11 +148,10 @@
       "Properties…",
       "Duplicate",
       "Copy to clipboard",
-      "Change to version…",
       "Select as document thumbnail",
       "Move to document…",
       "Export…",
-      "Release…"
+      "Create task…"
      ],
      "highlighted": null,
      "disabled": []
@@ -130,7 +173,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -140,33 +183,67 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 182641
+   "t": 229015,
+   "te": 229015
   },
   {
    "step": 2,
@@ -177,14 +254,18 @@
     }
    },
    "ok": true,
+   "ti": 229015,
+   "tmove": 230309,
+   "moves": 2,
+   "tdown": 231429,
    "at": [
-    806,
-    926
+    849,
+    928
    ],
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "div"
+     "tag": "iframe"
     },
     "dialog": {
      "kind": "modal",
@@ -234,9 +315,11 @@
      "buttons": [
       "Export",
       "Cancel"
-     ]
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list Version 1.4 1.5 1.6 1.7 Overridden dimensions Show underlines Hide underlines Text Normal Selectable Color Color Black and white Grayscale Options Download Download and store file in a new tab Email with file download link Store file in a new tab Hide inspection items"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -265,33 +348,67 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1879,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.15488
+     }
     }
    },
-   "t": 197060
+   "t": 265480,
+   "te": 265480
   },
   {
    "step": 3,
@@ -300,10 +417,11 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 265480,
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "div"
+     "tag": "iframe"
     },
     "dialog": {
      "kind": "modal",
@@ -353,9 +471,11 @@
      "buttons": [
       "Export",
       "Cancel"
-     ]
+     ],
+     "text": "File name View export rules Format PDF DWG DXF DWT SVG PNG JPEG TIFF Inspection list Drawing definition list Version 1.4 1.5 1.6 1.7 Overridden dimensions Show underlines Hide underlines Text Normal Selectable Color Color Black and white Grayscale Options Download Download and store file in a new tab Email with file download link Store file in a new tab Hide inspection items"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -384,33 +504,67 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       75,
+       80,
+       1879,
+       959
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.15488
+     }
     }
    },
-   "t": 215701
+   "t": 306909,
+   "te": 306909
   },
   {
    "step": 4,
@@ -421,6 +575,10 @@
     }
    },
    "ok": true,
+   "ti": 306909,
+   "tmove": 308064,
+   "moves": 1,
+   "tdown": 308375,
    "at": [
     1212,
     677
@@ -432,6 +590,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -460,33 +619,68 @@
       {
        "name": "Front",
        "kind": "base",
+       "position": [
+        81,
+        81
+       ],
        "parent": null,
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Isometric",
        "kind": "isometric",
+       "position": [
+        198.4,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Right",
        "kind": "projected",
+       "position": [
+        198.4,
+        81
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       },
       {
        "name": "Top",
        "kind": "projected",
+       "position": [
+        81,
+        160.8
+       ],
        "parent": "Front",
-       "scale": "1:1"
+       "scale": "1:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 230547
+   "t": 334603,
+   "te": 334603
   }
- ]
+ ],
+ "t0_epoch_ms": 1795701565200
 }

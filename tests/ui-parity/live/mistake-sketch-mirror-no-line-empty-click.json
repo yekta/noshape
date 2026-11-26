@@ -1,6 +1,6 @@
 {
  "scenario": "mistake-sketch-mirror-no-line-empty-click",
- "recorded": "2026-11-26T09:44:58.326Z",
+ "recorded": "2026-11-26T14:15:04.345Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "4a7961bcdcc8ab9f8e502727",
+  "element": "f5a83f7879d79d7cad2d6b8e",
   "start": "empty",
   "startElement": "4eec9edd3fdbccf544498d1e",
   "runner": "live2 .nstate-uip-4.json"
@@ -83,10 +83,10 @@
     }
    },
    "ok": true,
-   "ti": 30377,
-   "tmove": 30555,
+   "ti": 25393,
+   "tmove": 25459,
    "moves": 2,
-   "tdown": 30942,
+   "tdown": 25766,
    "at": [
     155,
     58
@@ -207,8 +207,8 @@
     },
     "measure": null
    },
-   "t": 35527,
-   "te": 35527
+   "t": 28843,
+   "te": 28844
   },
   {
    "step": 2,
@@ -219,10 +219,10 @@
     }
    },
    "ok": true,
-   "ti": 35527,
-   "tmove": 35756,
+   "ti": 28844,
+   "tmove": 28908,
    "moves": 3,
-   "tdown": 37428,
+   "tdown": 29811,
    "at": [
     1083,
     568
@@ -347,8 +347,8 @@
     },
     "measure": null
    },
-   "t": 41148,
-   "te": 41148
+   "t": 32496,
+   "te": 32496
   },
   {
    "step": 3,
@@ -357,7 +357,7 @@
     "key": "c"
    },
    "ok": true,
-   "ti": 41148,
+   "ti": 32496,
    "pointer": {
     "at": [
      1889,
@@ -366,8 +366,8 @@
     "hover": [],
     "element": "button.btn.btn-secondary"
    },
-   "tdown": 41169,
-   "tmove": 43616,
+   "tdown": 32505,
+   "tmove": 34598,
    "moves": 1,
    "state": {
     "focus": {
@@ -489,8 +489,8 @@
     },
     "measure": null
    },
-   "t": 44266,
-   "te": 44266
+   "t": 35071,
+   "te": 35071
   },
   {
    "step": 4,
@@ -504,12 +504,12 @@
     }
    },
    "ok": true,
-   "ti": 44266,
-   "tmove": 44397,
+   "ti": 35071,
+   "tmove": 35119,
    "moves": 2,
    "hover": [],
-   "tdown": 50250,
-   "tup": 50393,
+   "tdown": 39759,
+   "tup": 39878,
    "at": [
     1164,
     521
@@ -634,8 +634,8 @@
     },
     "measure": null
    },
-   "t": 53241,
-   "te": 53241
+   "t": 42068,
+   "te": 42068
   },
   {
    "step": 5,
@@ -649,12 +649,12 @@
     }
    },
    "ok": true,
-   "ti": 53241,
-   "tmove": 53369,
+   "ti": 42068,
+   "tmove": 42153,
    "moves": 2,
    "hover": [],
-   "tdown": 60398,
-   "tup": 60510,
+   "tdown": 47203,
+   "tup": 47303,
    "at": [
     1179,
     526
@@ -755,11 +755,11 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -792,8 +792,8 @@
     },
     "measure": null
    },
-   "t": 63732,
-   "te": 63732
+   "t": 49277,
+   "te": 49277
   },
   {
    "step": 6,
@@ -802,16 +802,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 63732,
+   "ti": 49277,
    "pointer": {
     "at": [
      1179,
-     525
+     526
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 63744,
+   "tdown": 49283,
    "state": {
     "focus": {
      "kind": "none"
@@ -908,11 +908,11 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -945,8 +945,8 @@
     },
     "measure": null
    },
-   "t": 67459,
-   "te": 67459
+   "t": 52719,
+   "te": 52719
   },
   {
    "step": 7,
@@ -955,16 +955,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 67459,
+   "ti": 52719,
    "pointer": {
     "at": [
      1179,
-     525
+     526
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 67474,
+   "tdown": 52726,
    "state": {
     "focus": {
      "kind": "none"
@@ -1061,11 +1061,11 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -1098,8 +1098,8 @@
     },
     "measure": null
    },
-   "t": 71097,
-   "te": 71097
+   "t": 56268,
+   "te": 56268
   },
   {
    "step": 8,
@@ -1113,14 +1113,14 @@
     }
    },
    "ok": true,
-   "ti": 71097,
-   "tmove": 71194,
+   "ti": 56268,
+   "tmove": 56356,
    "moves": 2,
    "hover": [
     "JFB"
    ],
-   "tdown": 73644,
-   "tup": 73756,
+   "tdown": 58495,
+   "tup": 58596,
    "at": [
     1179,
     526
@@ -1227,11 +1227,11 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -1266,15 +1266,15 @@
      "readout": [
       {
        "name": "Diameter",
-       "value": "9.852",
+       "value": "9.928",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 76578,
-   "te": 76578
+   "t": 60701,
+   "te": 60701
   },
   {
    "step": 9,
@@ -1285,10 +1285,10 @@
     }
    },
    "ok": true,
-   "ti": 76578,
-   "tmove": 76692,
+   "ti": 60701,
+   "tmove": 60751,
    "moves": 1,
-   "tdown": 77380,
+   "tdown": 61317,
    "at": [
     828,
     58
@@ -1395,11 +1395,11 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -1434,15 +1434,15 @@
      "readout": [
       {
        "name": "Diameter",
-       "value": "9.852",
+       "value": "9.928",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 79886,
-   "te": 79886
+   "t": 63467,
+   "te": 63468
   },
   {
    "step": 10,
@@ -1452,7 +1452,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 79886,
+   "ti": 63468,
    "state": {
     "focus": {
      "kind": "none"
@@ -1555,11 +1555,11 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -1594,15 +1594,15 @@
      "readout": [
       {
        "name": "Diameter",
-       "value": "9.852",
+       "value": "9.928",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 82789,
-   "te": 82789
+   "t": 66126,
+   "te": 66126
   },
   {
    "step": 11,
@@ -1616,14 +1616,14 @@
     }
    },
    "ok": true,
-   "ti": 82789,
-   "tmove": 82878,
+   "ti": 66126,
+   "tmove": 66170,
    "moves": 2,
    "hover": [
     "JCC"
    ],
-   "tdown": 85490,
-   "tup": 85639,
+   "tdown": 68002,
+   "tup": 68099,
    "at": [
     1238,
     511
@@ -1727,21 +1727,21 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       },
       {
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         -10.4369
+         19.9679,
+         -10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -1774,8 +1774,8 @@
     },
     "measure": null
    },
-   "t": 88949,
-   "te": 88949
+   "t": 70073,
+   "te": 70073
   },
   {
    "step": 12,
@@ -1785,7 +1785,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 88949,
+   "ti": 70073,
    "state": {
     "focus": {
      "kind": "none"
@@ -1885,21 +1885,21 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       },
       {
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         -10.4369
+         19.9679,
+         -10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -1932,8 +1932,8 @@
     },
     "measure": null
    },
-   "t": 91947,
-   "te": 91947
+   "t": 72698,
+   "te": 72698
   },
   {
    "step": 13,
@@ -1942,16 +1942,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 91947,
+   "ti": 72698,
    "pointer": {
     "at": [
-     1237,
+     1238,
      511
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 91962,
+   "tdown": 72705,
    "state": {
     "focus": {
      "kind": "none"
@@ -2051,21 +2051,21 @@
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         10.4369
+         19.9679,
+         10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       },
       {
        "kind": "circle",
        "points": [
         [
-         19.7294,
-         -10.4369
+         19.9679,
+         -10.5745
         ]
        ],
-       "radius": 4.9259
+       "radius": 4.9642
       }
      ]
     },
@@ -2098,9 +2098,9 @@
     },
     "measure": null
    },
-   "t": 95679,
-   "te": 95680
+   "t": 76104,
+   "te": 76104
   }
  ],
- "t0_epoch_ms": 1795686276419
+ "t0_epoch_ms": 1795702485387
 }

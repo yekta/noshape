@@ -1,6 +1,6 @@
 {
  "scenario": "sketch-drag-circle-rim",
- "recorded": "2026-11-26T08:11:36.830Z",
+ "recorded": "2026-11-26T14:34:21.832Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "5fe97240a99b886d1d8bba7f",
+  "element": "e72cda03c23288961a604ddb",
   "start": "empty",
   "startElement": "4eec9edd3fdbccf544498d1e",
   "runner": "live2 .nstate-uip-4.json"
@@ -83,10 +83,10 @@
     }
    },
    "ok": true,
-   "ti": 21985,
-   "tmove": 22023,
+   "ti": 27098,
+   "tmove": 27176,
    "moves": 2,
-   "tdown": 22305,
+   "tdown": 27483,
    "at": [
     155,
     58
@@ -207,8 +207,8 @@
     },
     "measure": null
    },
-   "t": 25180,
-   "te": 25180
+   "t": 30503,
+   "te": 30503
   },
   {
    "step": 2,
@@ -219,10 +219,10 @@
     }
    },
    "ok": true,
-   "ti": 25180,
-   "tmove": 25209,
+   "ti": 30503,
+   "tmove": 30557,
    "moves": 3,
-   "tdown": 25892,
+   "tdown": 31451,
    "at": [
     1083,
     568
@@ -347,8 +347,8 @@
     },
     "measure": null
    },
-   "t": 28234,
-   "te": 28234
+   "t": 33939,
+   "te": 33939
   },
   {
    "step": 3,
@@ -357,7 +357,7 @@
     "key": "c"
    },
    "ok": true,
-   "ti": 28234,
+   "ti": 33939,
    "pointer": {
     "at": [
      1889,
@@ -366,8 +366,8 @@
     "hover": [],
     "element": "button.btn.btn-secondary"
    },
-   "tdown": 28241,
-   "tmove": 30090,
+   "tdown": 33949,
+   "tmove": 35945,
    "moves": 1,
    "state": {
     "focus": {
@@ -489,8 +489,8 @@
     },
     "measure": null
    },
-   "t": 30548,
-   "te": 30548
+   "t": 36429,
+   "te": 36429
   },
   {
    "step": 4,
@@ -504,12 +504,12 @@
     }
    },
    "ok": true,
-   "ti": 30548,
-   "tmove": 30583,
+   "ti": 36429,
+   "tmove": 36485,
    "moves": 2,
    "hover": [],
-   "tdown": 34627,
-   "tup": 34736,
+   "tdown": 40935,
+   "tup": 41071,
    "at": [
     1321,
     567
@@ -634,8 +634,8 @@
     },
     "measure": null
    },
-   "t": 36684,
-   "te": 36685
+   "t": 43465,
+   "te": 43465
   },
   {
    "step": 5,
@@ -649,12 +649,12 @@
     }
    },
    "ok": true,
-   "ti": 36685,
-   "tmove": 36757,
+   "ti": 43465,
+   "tmove": 43514,
    "moves": 2,
    "hover": [],
-   "tdown": 41437,
-   "tup": 41536,
+   "tdown": 48366,
+   "tup": 48468,
    "at": [
     1346,
     574
@@ -755,11 +755,11 @@
        "kind": "circle",
        "points": [
         [
-         69.5611,
-         10.5904
+         70.0749,
+         10.2512
         ]
        ],
-       "radius": 8.1733
+       "radius": 7.8901
       }
      ]
     },
@@ -792,8 +792,8 @@
     },
     "measure": null
    },
-   "t": 43515,
-   "te": 43515
+   "t": 50524,
+   "te": 50524
   },
   {
    "step": 6,
@@ -802,16 +802,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 43515,
+   "ti": 50524,
    "pointer": {
     "at": [
-     1345,
+     1346,
      574
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 43523,
+   "tdown": 50531,
    "state": {
     "focus": {
      "kind": "none"
@@ -908,11 +908,11 @@
        "kind": "circle",
        "points": [
         [
-         69.5611,
-         10.5904
+         70.0749,
+         10.2512
         ]
        ],
-       "radius": 8.1733
+       "radius": 7.8901
       }
      ]
     },
@@ -945,8 +945,8 @@
     },
     "measure": null
    },
-   "t": 46874,
-   "te": 46874
+   "t": 53970,
+   "te": 53970
   },
   {
    "step": 7,
@@ -966,11 +966,11 @@
     }
    },
    "ok": true,
-   "ti": 46874,
-   "tmove": 46945,
+   "ti": 53970,
+   "tmove": 54062,
    "moves": 16,
-   "tdown": 47381,
-   "tup": 50228,
+   "tdown": 54517,
+   "tup": 57555,
    "at": [
     [
      1346,
@@ -1077,11 +1077,11 @@
        "kind": "circle",
        "points": [
         [
-         69.5611,
-         10.5904
+         70.0749,
+         10.2512
         ]
        ],
-       "radius": 12.0958
+       "radius": 12.0902
       }
      ]
     },
@@ -1114,9 +1114,9 @@
     },
     "measure": null
    },
-   "t": 52107,
-   "te": 52107
+   "t": 59530,
+   "te": 59530
   }
  ],
- "t0_epoch_ms": 1795680680199
+ "t0_epoch_ms": 1795703640812
 }

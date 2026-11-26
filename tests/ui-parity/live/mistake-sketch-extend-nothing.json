@@ -1,6 +1,6 @@
 {
  "scenario": "mistake-sketch-extend-nothing",
- "recorded": "2026-11-26T09:29:17.709Z",
+ "recorded": "2026-11-26T14:29:15.040Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "60a80b263572b03917357305",
+  "element": "6068d92c394158037bf05dc4",
   "start": "empty",
   "startElement": "4eec9edd3fdbccf544498d1e",
   "runner": "live2 .nstate-uip-4.json"
@@ -83,10 +83,10 @@
     }
    },
    "ok": true,
-   "ti": 32830,
-   "tmove": 32907,
+   "ti": 34845,
+   "tmove": 34938,
    "moves": 2,
-   "tdown": 33270,
+   "tdown": 35260,
    "at": [
     155,
     58
@@ -207,8 +207,8 @@
     },
     "measure": null
    },
-   "t": 37447,
-   "te": 37448
+   "t": 39269,
+   "te": 39270
   },
   {
    "step": 2,
@@ -219,10 +219,10 @@
     }
    },
    "ok": true,
-   "ti": 37448,
-   "tmove": 37573,
+   "ti": 39270,
+   "tmove": 39367,
    "moves": 3,
-   "tdown": 39046,
+   "tdown": 40609,
    "at": [
     1083,
     568
@@ -347,8 +347,8 @@
     },
     "measure": null
    },
-   "t": 42809,
-   "te": 42809
+   "t": 43660,
+   "te": 43660
   },
   {
    "step": 3,
@@ -357,7 +357,7 @@
     "key": "l"
    },
    "ok": true,
-   "ti": 42809,
+   "ti": 43660,
    "pointer": {
     "at": [
      1889,
@@ -366,8 +366,8 @@
     "hover": [],
     "element": "button.btn.btn-secondary"
    },
-   "tdown": 42826,
-   "tmove": 45010,
+   "tdown": 43673,
+   "tmove": 45739,
    "moves": 1,
    "state": {
     "focus": {
@@ -489,8 +489,8 @@
     },
     "measure": null
    },
-   "t": 45547,
-   "te": 45548
+   "t": 46229,
+   "te": 46229
   },
   {
    "step": 4,
@@ -504,14 +504,14 @@
     }
    },
    "ok": true,
-   "ti": 45548,
-   "tmove": 45622,
+   "ti": 46229,
+   "tmove": 46296,
    "moves": 2,
    "hover": [
     "IB"
    ],
-   "tdown": 50771,
-   "tup": 50949,
+   "tdown": 49989,
+   "tup": 50127,
    "at": [
     1083,
     519
@@ -636,8 +636,8 @@
     },
     "measure": null
    },
-   "t": 53316,
-   "te": 53317
+   "t": 52331,
+   "te": 52331
   },
   {
    "step": 5,
@@ -651,12 +651,12 @@
     }
    },
    "ok": true,
-   "ti": 53317,
-   "tmove": 53419,
+   "ti": 52331,
+   "tmove": 52400,
    "moves": 2,
    "hover": [],
-   "tdown": 59500,
-   "tup": 59610,
+   "tdown": 57390,
+   "tup": 57492,
    "at": [
     1177,
     546
@@ -764,7 +764,7 @@
          0
         ],
         [
-         29.7137,
+         29.9521,
          0
         ]
        ]
@@ -800,8 +800,8 @@
     },
     "measure": null
    },
-   "t": 62325,
-   "te": 62325
+   "t": 59549,
+   "te": 59549
   },
   {
    "step": 6,
@@ -810,16 +810,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 62325,
+   "ti": 59549,
    "pointer": {
     "at": [
-     1176,
+     1177,
      546
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 62334,
+   "tdown": 59556,
    "state": {
     "focus": {
      "kind": "none"
@@ -923,7 +923,7 @@
          0
         ],
         [
-         29.7137,
+         29.9521,
          0
         ]
        ]
@@ -959,8 +959,8 @@
     },
     "measure": null
    },
-   "t": 65896,
-   "te": 65896
+   "t": 62961,
+   "te": 62961
   },
   {
    "step": 7,
@@ -969,16 +969,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 65897,
+   "ti": 62961,
    "pointer": {
     "at": [
-     1176,
+     1177,
      546
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 65909,
+   "tdown": 62968,
    "state": {
     "focus": {
      "kind": "none"
@@ -1082,7 +1082,7 @@
          0
         ],
         [
-         29.7137,
+         29.9521,
          0
         ]
        ]
@@ -1118,8 +1118,8 @@
     },
     "measure": null
    },
-   "t": 69844,
-   "te": 69844
+   "t": 66453,
+   "te": 66453
   },
   {
    "step": 8,
@@ -1128,16 +1128,16 @@
     "key": "x"
    },
    "ok": true,
-   "ti": 69844,
+   "ti": 66453,
    "pointer": {
     "at": [
-     1176,
+     1177,
      546
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 69856,
+   "tdown": 66460,
    "state": {
     "focus": {
      "kind": "none"
@@ -1241,7 +1241,7 @@
          0
         ],
         [
-         29.7137,
+         29.9521,
          0
         ]
        ]
@@ -1277,8 +1277,8 @@
     },
     "measure": null
    },
-   "t": 72328,
-   "te": 72328
+   "t": 68469,
+   "te": 68469
   },
   {
    "step": 9,
@@ -1292,15 +1292,15 @@
     }
    },
    "ok": true,
-   "ti": 72328,
-   "tmove": 72469,
+   "ti": 68469,
+   "tmove": 68544,
    "moves": 2,
    "hover": [
     "JFE",
     "JFB"
    ],
-   "tdown": 77059,
-   "tup": 77211,
+   "tdown": 70958,
+   "tup": 71063,
    "at": [
     1171,
     544
@@ -1414,7 +1414,7 @@
          0
         ],
         [
-         29.7137,
+         29.9521,
          0
         ]
        ]
@@ -1452,15 +1452,15 @@
      "readout": [
       {
        "name": "Length",
-       "value": "29.714",
+       "value": "29.952",
        "units": "mm"
       }
      ],
      "panel": null
     }
    },
-   "t": 80100,
-   "te": 80100
+   "t": 73147,
+   "te": 73147
   },
   {
    "step": 10,
@@ -1469,16 +1469,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 80100,
+   "ti": 73147,
    "pointer": {
     "at": [
-     1170,
+     1171,
      544
     ],
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 80123,
+   "tdown": 73153,
    "state": {
     "focus": {
      "kind": "none"
@@ -1582,7 +1582,7 @@
          0
         ],
         [
-         29.7137,
+         29.9521,
          0
         ]
        ]
@@ -1618,9 +1618,9 @@
     },
     "measure": null
    },
-   "t": 83906,
-   "te": 83906
+   "t": 76935,
+   "te": 76935
   }
  ],
- "t0_epoch_ms": 1795685332201
+ "t0_epoch_ms": 1795703327867
 }

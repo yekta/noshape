@@ -1,18 +1,23 @@
 {
  "scenario": "asm-insert-open-escape",
- "recorded": "2026-11-07T00:05:04.730Z",
+ "recorded": "2026-11-26T13:56:18.350Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "cac3012d64b720dd43bedbd3",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "6a1886ce2d2f42d3436f4dd2",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -132,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -144,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 32268,
+   "tmove": 32349,
+   "moves": 1,
+   "tdown": 32690,
    "at": [
     190,
     58
@@ -152,8 +189,64 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Insert parts and assemblies",
+     "text": [
+      "Current document",
+      "Other documents",
+      "Standard content",
+      "noshape ui parity lane4-1115",
+      "Part Studios",
+      "Assemblies",
+      "(Search Part Studios)",
+      "audit 1943 parts",
+      "audit 1990",
+      "block 1995",
+      "frames 1989 c1",
+      "frames 1989 c2",
+      "frames 1989 c3",
+      "frames 1989 c4",
+      "frames 1989 c5",
+      "hole 1987 A",
+      "live2 2233 case 1",
+      "live2 2233 case 2",
+      "live2 2233 case 3",
+      "live2 2233 case r6",
+      "live2 2233 case r10",
+      "live2 2233 case r50",
+      "Part Studio 1",
+      "Part Studio 1 Copy 1",
+      "q flat ops",
+      "Sketch audit 1969",
+      "start block",
+      "start block Copy 1",
+      "start block-broken",
+      "start block-fillet"
+     ],
+     "fields": [
+      {
+       "label": "Name: A → Z",
+       "kind": "input",
+       "value": ""
+      }
+     ]
+    },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "assembly-insert-dialog",
+      "title": "Insert parts and assemblies",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "inserted": 0,
+      "inputs": [
+       {
+        "placeholder": "Search Part Studios",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -266,9 +359,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25027
+   "t": 36858,
+   "te": 36859
   },
   {
    "step": 2,
@@ -277,12 +398,23 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 36859,
+   "pointer": {
+    "at": [
+     189,
+     58
+    ],
+    "hover": [],
+    "element": "span.tool-label"
+   },
+   "tdown": 36867,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -395,9 +527,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 28781
+   "t": 40940,
+   "te": 40940
   }
- ]
+ ],
+ "t0_epoch_ms": 1795701353252
 }
