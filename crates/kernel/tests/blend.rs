@@ -1983,3 +1983,35 @@ fn a_chamfer_wider_than_a_counterbores_step_meets_the_through_hole() {
     assert_eq!(steps, 0, "the step is chamfered away");
     assert!(r.history.records.iter().any(|h| h.relation == Relation::Generated && h.input_kind == ShapeType::Edge && h.output_kind == ShapeType::Face), "the cone from its edge");
 }
+
+/// A round wider than the face it runs off, that face running on tangent into a hollow (asm-scissor-lift 9cbb0e's
+/// Fillet 17, live 79 -> 80 faces): r 8 on a nose 3.8 mm tall over an r 9 hollow, its top 5 mm wide before a 2 mm step
+/// down. The ball rolls on the top's plane, past the step, and the hollow; the nose and the top go, the round ends on the
+/// step (OCCT extended the nose face into the part: 28% more taken here, 60% and three faces more there).
+#[test]
+fn a_round_running_off_a_nose_onto_its_tangent_hollow_rolls_on_it() {
+    setup();
+    let p = |x: f64, y: f64| DVec2::new(x, y) * MM;
+    let a = 9.0 - 9.0 * std::f64::consts::FRAC_1_SQRT_2;
+    let segs = [
+        Segment2d::Line { a: p(-30.0, -40.0), b: p(30.0, -40.0) },
+        Segment2d::Line { a: p(30.0, -40.0), b: p(30.0, -12.8) },
+        Segment2d::Line { a: p(30.0, -12.8), b: p(9.0, -12.8) },
+        Segment2d::Arc3 { a: p(9.0, -12.8), mid: p(a, -3.8 - 9.0 + a), b: p(0.0, -3.8) },
+        Segment2d::Line { a: p(0.0, -3.8), b: p(0.0, 0.0) },
+        Segment2d::Line { a: p(0.0, 0.0), b: p(-5.0, 0.0) },
+        Segment2d::Line { a: p(-5.0, 0.0), b: p(-5.0, -2.0) },
+        Segment2d::Line { a: p(-5.0, -2.0), b: p(-30.0, -2.0) },
+        Segment2d::Line { a: p(-30.0, -2.0), b: p(-30.0, -40.0) },
+    ];
+    let profile = make_face_from_wire(&make_wire_2d(&Plane::xy(), &segs).unwrap(), true).unwrap();
+    let part = extrude(&profile, DVec3::Z * 16.0 * MM).unwrap().shape;
+    let before = vol_mm3(&part);
+    let nose = edges_where(&part, |i| i.start.x.abs() < 1e-9 && i.start.y.abs() < 1e-9 && i.end.x.abs() < 1e-9 && i.end.y.abs() < 1e-9);
+    assert_eq!((nose.len(), part.faces().len()), (1, 11));
+    let out = fillet_checked(&part, &nose, &[8.0 * MM]).unwrap().shape;
+    assert!(out.is_valid());
+    // The corner outside the ball touching the top's plane and the hollow, up to the step: 10.2835 mm² of section.
+    assert_eq!(out.faces().len(), 10, "the nose and the top gone, the round in their place");
+    assert!((before - vol_mm3(&out) - 10.2835 * 16.0).abs() < 0.01, "{} mm³ taken", before - vol_mm3(&out));
+}

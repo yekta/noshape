@@ -9025,35 +9025,24 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_rim_as_cut(const Top
   return std::make_pair(cut.Shape(), h);
 }
 
-// Whether a fillet that failed would have to roll past the faces it touches
-// (Parasolid's "Unfilleted edge overlapped by fillet."; live "kern blend
-// sweep" 2a: R1 round a Ø6 hole whose rim lies on an R8 fillet, where the
-// rim meets that fillet at 29° the ball can't sit). Along each edge, the ball
-// centre at distance r from both surfaces (Newton in the plane across the
-// edge): where there is none, the fillet can't stay on its faces.
-bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs)
+namespace {
+
+// A face's surface with its projector, made once for all its points (OCCT keeps a B-spline's sample grid between
+// them: the impeller's Fillet Ansaugflansch zum Gehaeuse made it at each of ~2,500 Newton steps, 500 ms).
+struct BallSide
 {
-  ShapeAncMap e2f;
-  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
-  // A face's surface with its projector, made once for all its points (OCCT keeps a B-spline's sample grid between
-  // them: the impeller's Fillet Ansaugflansch zum Gehaeuse made it at each of ~2,500 Newton steps, 500 ms).
-  struct Side
+  TopoDS_Face                f;
+  occ::handle<Geom_Surface>  sf;
+  GeomAPI_ProjectPointOnSurf pr;
+  explicit BallSide(const TopoDS_Face& face) : f(face), sf(BRep_Tool::Surface(face))
   {
-    TopoDS_Face                f;
-    occ::handle<Geom_Surface>  sf;
-    GeomAPI_ProjectPointOnSurf pr;
-    explicit Side(const TopoDS_Face& face) : f(face), sf(BRep_Tool::Surface(face))
-    {
-      double u0, u1, v0, v1;
-      sf->Bounds(u0, u1, v0, v1);
-      pr.Init(sf, u0, u1, v0, v1, Precision::Confusion());
-    }
-  };
-  // Signed distance into the material from face f's surface, its foot and gradient.
-  auto dist = [](Side& s, const gp_Pnt& c, gp_Pnt2d& uv, gp_Vec& grad) {
-    const TopoDS_Face&               f  = s.f;
-    const occ::handle<Geom_Surface>& sf = s.sf;
-    GeomAPI_ProjectPointOnSurf&      pr = s.pr;
+    double u0, u1, v0, v1;
+    sf->Bounds(u0, u1, v0, v1);
+    pr.Init(sf, u0, u1, v0, v1, Precision::Confusion());
+  }
+  // Signed distance into the material from the face's surface, its foot and gradient.
+  double dist(const gp_Pnt& c, gp_Pnt2d& uv, gp_Vec& grad)
+  {
     pr.Perform(c);
     if (pr.NbPoints() == 0)
       return std::numeric_limits<double>::quiet_NaN();
@@ -9071,14 +9060,60 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
       n.Reverse();
     grad = -n; // into the material
     return gp_Vec(c, p).Dot(n);
-  };
+  }
+};
+
+// The centre of a ball of radius r touching both faces' surfaces (extended past the faces) across a convex edge at P
+// (tangent t), by Newton in the plane across the edge; uv1 / uv2 its feet on them. Null where there is none.
+std::optional<gp_Pnt> ball_centre(BallSide& f1, BallSide& f2, const gp_Pnt& P, const gp_Vec& t, double r, gp_Pnt2d& uv1,
+                                  gp_Pnt2d& uv2)
+{
+  gp_Vec g1, g2;
+  if (t.Magnitude() < 1e-12 || std::isnan(f1.dist(P, uv1, g1)) || std::isnan(f2.dist(P, uv2, g2)))
+    return std::nullopt;
+  // Convex edges only (the ball inside the material, between the faces).
+  const gp_Vec bis = g1 + g2;
+  if (bis.Magnitude() < 1e-9)
+    return std::nullopt;
+  gp_Pnt       C = P.Translated(bis.Normalized() * r);
+  const gp_Vec u = (g1 - t.Normalized() * g1.Dot(t.Normalized())).Normalized();
+  const gp_Vec v = t.Normalized().Crossed(u);
+  for (int it = 0; it < 40; ++it)
+  {
+    const double d1 = f1.dist(C, uv1, g1), d2 = f2.dist(C, uv2, g2);
+    if (std::isnan(d1) || std::isnan(d2))
+      return std::nullopt;
+    const double e1 = d1 - r, e2 = d2 - r;
+    if (std::abs(e1) < 1e-9 * (1 + r) && std::abs(e2) < 1e-9 * (1 + r))
+      return C;
+    const double a = g1.Dot(u), b = g1.Dot(v), cc = g2.Dot(u), d = g2.Dot(v), det = a * d - b * cc;
+    if (std::abs(det) < 1e-12)
+      return std::nullopt;
+    const double su = (-e1 * d + e2 * b) / det, sv = (-a * e2 + cc * e1) / det;
+    C.Translate(u * su + v * sv);
+    if (C.Distance(P) > 100 * r)
+      return std::nullopt;
+  }
+  return std::nullopt;
+}
+} // namespace
+
+// Whether a fillet that failed would have to roll past the faces it touches
+// (Parasolid's "Unfilleted edge overlapped by fillet."; live "kern blend
+// sweep" 2a: R1 round a Ø6 hole whose rim lies on an R8 fillet, where the
+// rim meets that fillet at 29° the ball can't sit). Along each edge, the ball
+// centre at distance r from both surfaces: where there is none, the fillet can't stay on its faces.
+bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs)
+{
+  ShapeAncMap e2f;
+  TopExp::MapShapesAndAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
   for (size_t i = 0; i < es.size(); ++i)
   {
     const double     r  = rs.size() == 1 ? rs[0] : rs[i];
     const ShapeList* fl = e2f.Seek(es[i]);
     if (fl == nullptr || fl->Extent() != 2)
       continue;
-    Side              f1(TopoDS::Face(fl->First())), f2(TopoDS::Face(fl->Last()));
+    BallSide          f1(TopoDS::Face(fl->First())), f2(TopoDS::Face(fl->Last()));
     BRepAdaptor_Curve c(es[i]);
     for (int k = 0; k < 16; ++k)
     {
@@ -9086,43 +9121,15 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
       gp_Pnt       P;
       gp_Vec       t;
       c.D1(par, P, t);
-      if (t.Magnitude() < 1e-12)
-        continue;
       gp_Pnt2d uv1, uv2;
       gp_Vec   g1, g2;
-      if (std::isnan(dist(f1, P, uv1, g1)) || std::isnan(dist(f2, P, uv2, g2)))
+      if (t.Magnitude() < 1e-12 || std::isnan(f1.dist(P, uv1, g1)) || std::isnan(f2.dist(P, uv2, g2))
+          || (g1 + g2).Magnitude() < 1e-9)
         continue;
-      // Convex edges only (the ball inside the material, between the faces).
-      const gp_Vec bis = g1 + g2;
-      if (bis.Magnitude() < 1e-9)
-        continue;
-      gp_Pnt C = P.Translated(bis.Normalized() * r);
-      const gp_Vec u = (g1 - t.Normalized() * g1.Dot(t.Normalized())).Normalized();
-      const gp_Vec v = t.Normalized().Crossed(u);
-      bool ok = false;
-      for (int it = 0; it < 40; ++it)
-      {
-        const double d1 = dist(f1, C, uv1, g1), d2 = dist(f2, C, uv2, g2);
-        if (std::isnan(d1) || std::isnan(d2))
-          break;
-        const double e1 = d1 - r, e2 = d2 - r;
-        if (std::abs(e1) < 1e-9 * (1 + r) && std::abs(e2) < 1e-9 * (1 + r))
-        {
-          ok = true;
-          break;
-        }
-        const double a = g1.Dot(u), b = g1.Dot(v), cc = g2.Dot(u), d = g2.Dot(v), det = a * d - b * cc;
-        if (std::abs(det) < 1e-12)
-          break;
-        const double su = (-e1 * d + e2 * b) / det, sv = (-a * e2 + cc * e1) / det;
-        C.Translate(u * su + v * sv);
-        if (C.Distance(P) > 100 * r)
-          break;
-      }
       // (A contact beyond its face isn't it: Parasolid lets the fillet run
       // over onto the next face, and fails otherwise with its general
       // message, live F2: R12 on a 10 mm block's top edges.)
-      if (!ok)
+      if (!ball_centre(f1, f2, P, t, r, uv1, uv2))
         return true;
     }
   }
@@ -9887,6 +9894,263 @@ static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_over_smaller_blends(
   return std::make_pair(small.Shape(), h);
 }
 
+// A round whose ball runs off one of its faces over that face's tangent edge on its far side (asm-scissor-lift
+// 9cbb0e's Fillet 17: r 8 on a nose whose 3.8 mm face runs on tangent into an r 9 hollow): Parasolid's ball rolls on
+// the kept face's plane and the next face, its round cut off where it leaves the part (live -154.8 mm³, -72.6 mm²);
+// OCCT extends the overrun face past that edge into the material (-250.7 mm³, three faces more), and won't roll on
+// once the kept face is gone from under the ball. Lines between faces running along them, ended by walls across them:
+// the corner the ball leaves, cut away as a prism, its round face Generated from the edge. Null when no face is overrun
+// so (the ball's feet: out of it beyond that edge, in the next face and on the kept face's side away from it), the
+// prism's other sides aren't in the air, or the cut fails.
+static std::optional<std::pair<TopoDS_Shape, HHist>> fillet_over_smooth_faces(
+    const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es, const std::vector<double>& rs)
+{
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(input, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto other = [&](const TopoDS_Edge& e, const TopoDS_Shape& f) {
+    const ShapeList* l = ef.Seek(e);
+    if (l == nullptr || l->Extent() != 2)
+      return TopoDS_Face();
+    return TopoDS::Face(l->First().IsSame(f) ? l->Last() : l->First());
+  };
+  auto line_along = [](const TopoDS_Edge& e, const gp_Dir& d) {
+    const BRepAdaptor_Curve c(e);
+    return c.GetType() == GeomAbs_Line && c.Line().Direction().IsParallel(d, 1e-9);
+  };
+  // A face's surface runs along d: a plane holding it, a cylinder round an axis along it.
+  auto along = [](const TopoDS_Face& f, const gp_Dir& d) {
+    const BRepAdaptor_Surface a(f, false);
+    if (a.GetType() == GeomAbs_Plane)
+      return a.Plane().Axis().Direction().IsNormal(d, 1e-9);
+    return a.GetType() == GeomAbs_Cylinder && a.Cylinder().Axis().Direction().IsParallel(d, 1e-9);
+  };
+  // Per edge: the face it keeps and the face its ball rolls on to (null when it overruns none), and the fill.
+  std::vector<std::pair<TopoDS_Face, TopoDS_Face>> onto(es.size());
+  std::vector<TopoDS_Shape>                        tools, rounds;
+  ShapeIMap                                        off, kept;
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    const ShapeList* fl = ef.Seek(es[i]);
+    const BRepAdaptor_Curve ce(es[i]);
+    if (fl == nullptr || fl->Extent() != 2 || ce.GetType() != GeomAbs_Line)
+      return std::nullopt;
+    const double  r = rs.size() == 1 ? rs[0] : rs[i];
+    TopoDS_Vertex a, b;
+    TopExp::Vertices(es[i], a, b);
+    const gp_Pnt A = BRep_Tool::Pnt(a), B = BRep_Tool::Pnt(b);
+    if (A.Distance(B) < Precision::Confusion())
+      return std::nullopt;
+    const gp_Dir d(gp_Vec(A, B));
+    for (const bool first : {true, false})
+    {
+      const TopoDS_Face f = TopoDS::Face(first ? fl->First() : fl->Last());
+      const TopoDS_Face o = TopoDS::Face(first ? fl->Last() : fl->First());
+      const BRepAdaptor_Surface sf_(f, false), so_(o, false);
+      if (sf_.GetType() != GeomAbs_Plane || so_.GetType() != GeomAbs_Plane || !along(f, d) || !along(o, d))
+        continue;
+      // f's edges: this one, a line along it tangent to the next face, and two across it on walls square to it.
+      TopoDS_Edge rim;
+      TopoDS_Face next;
+      int         n = 0, walls = 0, edges = 0;
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next(), ++edges)
+      {
+        const TopoDS_Edge e = TopoDS::Edge(x.Current());
+        const TopoDS_Face g = other(e, f);
+        if (e.IsSame(es[i]) || g.IsNull())
+          continue;
+        TopoDS_Vertex c, dv;
+        TopExp::Vertices(e, c, dv);
+        const BRepAdaptor_Surface sg(g, false);
+        if (sg.GetType() == GeomAbs_Plane && sg.Plane().Axis().Direction().IsParallel(d, 1e-9)
+            && std::abs(gp_Vec(BRep_Tool::Pnt(c), BRep_Tool::Pnt(dv)).Dot(gp_Vec(d))) < Precision::Confusion())
+          ++walls;
+        else if (!g.IsSame(o) && line_along(e, d) && along(g, d) && tangent_across(e, f, g))
+        {
+          rim  = e;
+          next = g;
+          ++n;
+        }
+      }
+      if (n != 1 || walls != 2 || edges != 4)
+        continue;
+      // The fill's section where the edge starts: the edge, where the kept face's plane meets the next face's surface
+      // (nearest, on f's outer side), and the rim.
+      gp_Pnt        p0;
+      gp_Vec        du, dv;
+      sf_.D1(0, 0, p0, du, dv);
+      gp_Vec nf = du.Crossed(dv);
+      if (f.Orientation() == TopAbs_REVERSED)
+        nf.Reverse();
+      const gp_Lin  rl  = BRepAdaptor_Curve(rim).Line();
+      const gp_Pnt  D0  = rl.Location().Translated(gp_Vec(d) * gp_Vec(rl.Location(), A).Dot(gp_Vec(d)));
+      const gp_Dir  wo  = gp_Dir(gp_Vec(d).Crossed(gp_Vec(so_.Plane().Axis().Direction())));
+      const BRepAdaptor_Surface sn_(next, false);
+      std::vector<double> ss; // V' = A + s wo
+      if (sn_.GetType() == GeomAbs_Plane)
+      {
+        const gp_Vec nn(sn_.Plane().Axis().Direction());
+        const double den = gp_Vec(wo).Dot(nn);
+        if (std::abs(den) > 1e-9)
+          ss.push_back(gp_Vec(A, D0).Dot(nn) / den);
+      }
+      else
+      {
+        const gp_Cylinder cy = sn_.Cylinder();
+        const gp_Pnt      c0 = cy.Location().Translated(gp_Vec(d) * gp_Vec(cy.Location(), A).Dot(gp_Vec(d)));
+        const gp_Vec      q(c0, A);
+        const double      bq = q.Dot(gp_Vec(wo)), cq = q.SquareMagnitude() - cy.Radius() * cy.Radius(), disc = bq * bq - cq;
+        if (disc > 0)
+          for (const double sg : {-1.0, 1.0})
+            ss.push_back(-bq + sg * std::sqrt(disc));
+      }
+      std::optional<gp_Pnt> V;
+      for (const double sv : ss)
+      {
+        const gp_Pnt p = A.Translated(gp_Vec(wo) * sv);
+        if (gp_Vec(A, p).Dot(nf) > Precision::Confusion() && (!V || A.Distance(p) < A.Distance(*V)))
+          V = p;
+      }
+      if (!V || D0.Distance(*V) < Precision::Confusion() || A.Distance(D0) < Precision::Confusion())
+        continue;
+      BallSide                sf(f), so(o), sn(next);
+      BRepTopAdaptor_FClass2d in_f(f, BRep_Tool::Tolerance(f)), in_next(next, BRep_Tool::Tolerance(next));
+      bool                    all = true;
+      for (double w : {0.25, 0.5, 0.75})
+      {
+        gp_Pnt P;
+        gp_Vec t;
+        ce.D1(ce.FirstParameter() + (ce.LastParameter() - ce.FirstParameter()) * w, P, t);
+        gp_Pnt2d uf, uo, un;
+        if (!ball_centre(sf, so, P, t, r, uf, uo) || in_f.Perform(uf) != TopAbs_OUT)
+        {
+          all = false;
+          break;
+        }
+        // Beyond the rim: across it from the edge.
+        const gp_Pnt foot = sf.sf->Value(uf.X(), uf.Y());
+        if (P.Distance(foot) < Precision::Confusion())
+        {
+          all = false;
+          break;
+        }
+        const BRepExtrema_DistShapeShape across(rim, BRepBuilderAPI_MakeEdge(P, foot).Edge());
+        // Rolling on: its foot in the next face, and on the kept face's side away from the fill (all of it taken).
+        if (!across.IsDone() || across.Value() > 0.05 * r || !ball_centre(sn, so, P, t, r, un, uo) || in_next.Perform(un) != TopAbs_IN
+            || gp_Vec(P, so.sf->Value(uo.X(), uo.Y())).Dot(gp_Vec(A, *V)) > 0)
+        {
+          all = false;
+          break;
+        }
+      }
+      if (!all)
+        continue;
+      // The corner the ball leaves where the edge starts: its feet on the kept and the next face and the arc between,
+      // closed a little out in the air (checked) over the edge.
+      gp_Pnt2d                    uo, un;
+      const std::optional<gp_Pnt> C = ball_centre(sn, so, A, gp_Vec(d), r, un, uo);
+      if (!C)
+        continue;
+      const gp_Pnt To = so.sf->Value(uo.X(), uo.Y()), Tn = sn.sf->Value(un.X(), un.Y());
+      const gp_Vec vo(*C, To), vn(*C, Tn), vm = vo + vn;
+      if (vm.Magnitude() < 0.1 * r || vo.Angle(vn) > M_PI - 0.1 || nf.Magnitude() < 1e-12)
+        continue;
+      const double  air = 0.25 * r;
+      const gp_Vec  m   = nf.Normalized() + vo.Normalized();
+      if (m.Magnitude() < 1e-6)
+        continue;
+      const gp_Pnt Q1 = Tn.Translated(vn.Normalized() * air), Q2 = A.Translated(m.Normalized() * air),
+                   Q3 = To.Translated(vo.Normalized() * air);
+      BRepClass3d_SolidClassifier cls(input);
+      bool                        clear = true;
+      const std::array<std::pair<gp_Pnt, gp_Pnt>, 4> legs{{{Tn, Q1}, {Q1, Q2}, {Q2, Q3}, {Q3, To}}};
+      for (const auto& [p, q] : legs)
+        for (int k = 1; k < 8 && clear; ++k)
+        {
+          cls.Perform(p.Translated(gp_Vec(p, q) * (k / 8.0) + gp_Vec(A, B) * 0.5), Precision::Confusion());
+          clear = cls.State() == TopAbs_OUT;
+        }
+      if (!clear)
+        continue;
+      const occ::handle<Geom_Curve> arc(GC_MakeArcOfCircle(To, C->Translated(vm.Normalized() * r), Tn).Value());
+      BRepBuilderAPI_MakeWire       wire;
+      const TopoDS_Edge             swept = BRepBuilderAPI_MakeEdge(arc).Edge();
+      wire.Add(swept);
+      for (const auto& [p, q] : legs)
+        wire.Add(BRepBuilderAPI_MakeEdge(p, q).Edge());
+      if (!wire.IsDone())
+        continue;
+      BRepBuilderAPI_MakeFace sec(gp_Pln(A, d), wire.Wire());
+      if (!sec.IsDone())
+        continue;
+      BRepPrimAPI_MakePrism prism(sec.Face(), gp_Vec(A, B));
+      if (!prism.IsDone())
+        continue;
+      tools.push_back(prism.Shape());
+      rounds.push_back(prism.Generated(swept).First());
+      off.Add(f);
+      kept.Add(o);
+      onto[i] = {o, next};
+      break;
+    }
+    if (onto[i].first.IsNull())
+      return std::nullopt;
+  }
+  // A face cut away that another round keeps: not this.
+  for (int k = 1; k <= off.Extent(); ++k)
+    if (kept.Contains(off(k)))
+      return std::nullopt;
+  BRepAlgoAPI_Cut cut;
+  cut.SetArguments(single(input));
+  cut.SetTools(to_list(tools));
+  cut.SetRunParallel(false);
+  cut.Build(new_cancel_indicator()->Start());
+  if (cut.HasErrors() || !valid_shape(cut.Shape()))
+    return std::nullopt;
+  std::vector<TopoDS_Shape> args{input};
+  args.insert(args.end(), tools.begin(), tools.end());
+  const HHist hc = history_of(args, cut);
+  // Faces the cut split or made merge with their like neighbours (the walls' new pieces), no others.
+  ShapeIMap touched;
+  for (const TopoDS_Shape& a : args)
+    for (TopExp_Explorer x(a, TopAbs_FACE); x.More(); x.Next())
+      for (const TopoDS_Shape& y : hc->Modified(x.Current()))
+        touched.Add(y);
+  ShapeAncMap cef, cvf;
+  TopExp::MapShapesAndUniqueAncestors(cut.Shape(), TopAbs_EDGE, TopAbs_FACE, cef);
+  TopExp::MapShapesAndUniqueAncestors(cut.Shape(), TopAbs_VERTEX, TopAbs_FACE, cvf);
+  ShapeUpgrade_UnifySameDomain u(cut.Shape(), true, true, false);
+  for (int k = 1; k <= cef.Extent(); ++k)
+    if (std::any_of(cef(k).begin(), cef(k).end(), [&](const TopoDS_Shape& x) { return !touched.Contains(x); }))
+      u.KeepShape(cef.FindKey(k));
+  for (int k = 1; k <= cvf.Extent(); ++k)
+    if (std::any_of(cvf(k).begin(), cvf(k).end(), [&](const TopoDS_Shape& x) { return !touched.Contains(x); }))
+      u.KeepShape(cvf.FindKey(k));
+  u.Build();
+  if (!valid_shape(u.Shape()))
+    return std::nullopt;
+  const HHist h = compose(input, hc, u.History());
+  for (size_t i = 0; i < es.size(); ++i)
+  {
+    ShapeList cutr = hc->Modified(rounds[i]);
+    if (cutr.IsEmpty() && !hc->IsRemoved(rounds[i]))
+      cutr.Append(rounds[i]);
+    ShapeIMap made;
+    for (const TopoDS_Shape& g : cutr)
+    {
+      const ShapeList& m = u.History()->Modified(g);
+      if (m.IsEmpty() && !u.History()->IsRemoved(g))
+        made.Add(g);
+      for (const TopoDS_Shape& x : m)
+        made.Add(x);
+    }
+    if (made.IsEmpty())
+      return std::nullopt;
+    for (const TopoDS_Shape& g : made)
+      h->AddGenerated(es[i], g);
+  }
+  return std::make_pair(u.Shape(), h);
+}
+
 // A fillet along a closed edge that OCCT can't take all the way round (skb:
 // the 0.002 in mouth of the #8 flat countersunk Type VI recess, a closed
 // B-spline with its seam vertex on a lobe): the same fillet with the edge
@@ -10455,6 +10719,15 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   if (checked && !legacy_blend_finish())
   {
     std::optional<std::pair<TopoDS_Shape, HHist>> by;
+    {
+      const KernelTimer timer("blend.over_smooth_faces");
+      by = fillet_over_smooth_faces(in, es, rs);
+    }
+    if (by)
+    {
+      tighten_new_tolerances(in, by->first, accurate(in));
+      return make_result({in}, by->first, by->second.get());
+    }
     {
       const KernelTimer timer("blend.by_tools");
       by = fillet_by_tools(in, es, rs);
