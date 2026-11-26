@@ -4991,3 +4991,9 @@ skasm meanwhile; I'll list what I change here before landing.
   wall (it hides the floor in that view): Sketch 3 on y = 0, extrude along -y, lip top parallel. Replay kit: vibex8
   ~/tmp/core/upto (wf/run.sh copy + 58k cell; the app's doc is /tmp/noshape-uip-<pid>/encl-shell.noshape, run.sh's keep
   copies nothing), core-scratch/upto/inspect*.py (MCP: Extrude 3 params, region areas, faces). T1 test stays.
+- **Impeller STL vs live (live/core/stl-impeller-1125; ours .ex6.sh on vibex7 with ~/tmp/core/ud/cli-fix):** our doc
+  = live's Impellergehaeuse tab (b9a28c38). Triangles ours / live: Coarse 14 830 / 16 292, Medium 38 424 / 49 570,
+  Fine 178 808 / 316 872, Custom(0.01/2/0.01) 272 474 / 492 184; all ours watertight (0 defects). Presets match live's;
+  circles were tuned to exact segment counts, freeform (loft) faces come out coarser. Next: sag vs live's Custom mesh
+  (live raw/s6-bin-custom.stl as reference: centroid-to-mesh distance of ours vs live's per resolution; numpy/scipy
+  are local only, not on vibex7), then decide whether to densify B-spline faces (export mesh_params in ops/export.rs).

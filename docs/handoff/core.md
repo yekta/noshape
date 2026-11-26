@@ -87,12 +87,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
-- **Impeller STL vs live (live/core/stl-impeller-1125; ours .ex6.sh on vibex7 with ~/tmp/core/ud/cli-fix):** our doc
-  = live's Impellergehaeuse tab (b9a28c38). Triangles ours / live: Coarse 14 830 / 16 292, Medium 38 424 / 49 570,
-  Fine 178 808 / 316 872, Custom(0.01/2/0.01) 272 474 / 492 184; all ours watertight (0 defects). Presets match live's;
-  circles were tuned to exact segment counts, freeform (loft) faces come out coarser. Next: sag vs live's Custom mesh
-  (live raw/s6-bin-custom.stl as reference: centroid-to-mesh distance of ours vs live's per resolution; numpy/scipy
-  are local only, not on vibex7), then decide whether to densify B-spline faces (export mesh_params in ops/export.rs).
 - **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
   (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
 - **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
