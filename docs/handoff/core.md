@@ -19,7 +19,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   k::split_on(shape,[BC,CA]); flood from the corner' face, stopping at AB/BC/CA, drop that region; k::fill_surface(AB
   G1/G2 JSO, BC JSC, CA JSe); k::sew(.., true); names as canal_corner (corner face = old corner's name). A, B = the
   neighbours' contacts at the joints on the non-folding support; C = their fold-side contact lines' meeting point
-  (pinch_point in core-scratch/pinch-probe.patch).
+  (pinch_point in core-scratch/pinch-probe.patch). Hooks: compute A,B,C in sections()' pieces loop (folds[pi] with line
+  neighbours; `let nudge` ~l.1545), declared before the `ranges` loop like past_faces; run it before the final validity check.
 - **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
   11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
