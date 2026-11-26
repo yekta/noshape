@@ -99,7 +99,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Part 2 moved onto Part 1). Ours column filled. Alt diff narrowed: Alt over a ghost WITH an instance behind lights
   that instance (as live PS); over a ghost alone Alt lights the ghost (live PS: nothing). If live (5) confirms, fix:
   drop `|| self.ui.alt_through` for Isolate/Make transparent ghosts (assembly_view.rs ~1279; keep Alt for appearance
-  transparency) and add the Alt asserts to the faded test. Not covered yet: mate preview (4) and MC in a mate dialog (3).
+  transparency) and add the Alt asserts to the faded test. MC in a mate dialog (3): combined_hover_mate_connector_in_a_mate_dialog
+  (hover_matrix_tests.rs; the glyph wins over the corner dot). Not covered yet: mate preview (4): wait for live.
 - Note: add_exploded_view refits the camera and the Explode panel narrows the test viewport to 249 px: fit_top after.
 
 ## Agents
