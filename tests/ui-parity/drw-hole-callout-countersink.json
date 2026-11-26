@@ -1,0 +1,66 @@
+{
+ "name": "drw-hole-callout-countersink",
+ "about": "Hole/thread callout on Hole 3 (countersink 6.6 mm, csink 13 x 90 deg, through) in Top, picked on the csink circle, placed up-right of the plate",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "live first-week drawing audit 11-26 (gap-audit-drw-1126; qa DRW-FIRST-WEEK-CALLOUTS)",
+ "start": "hole-types-plate-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole/thread callout"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      54.5962,
+      34.5962,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      72,
+      50,
+      0
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1200
+  }
+ ]
+}
