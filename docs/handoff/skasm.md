@@ -9,30 +9,18 @@ Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /r
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
 > ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &).
 
-LANDED ada3263b as a476fa14 (label drag, IGES export of c2-rings-loft, assembly UI-script waits).
-QUEUED 8efe6acf (07:10, 6 commits): Parasolid Cadenas (30a11b8f8, T2 export::cadenas_misumi_vendor_parts_read with
-NOSHAPE_XT_VENDOR=~/agents/skasm-keep/xt on vibex7); REPLICATE-INSTANCE-ORDER (bb80b7ad2: matched_targets sorts copies
-by distance from the seed's target, then code); IGES reader (02c05864d: io.rs merged_faces styles only faces whose colour
-differs from the part's; boolean.cpp same_torus + share_bspline_surfaces groups trimmed tori, bool told). exchange
-round trip on vibex7: all 22 live.igs match live (were 16 diffs); STEP/x_t 49/50, c2-rings-loft STEP 762 vs 767 edges
-predates this (same with the colour rule off). Lead told 07:10. Main RED 78dea5ae7 = ops parity a_face_* (flaky, not mine).
+LANDED 8efe6acf. 93a23c55 (GLYPH-CIRCLE lone glyph, inference-1866 test, LabelHover label fix) queued 09:00 (lead reports).
+Landing now: 9b5dc85d9 speed T2 fix (the frame-label LabelHover and the label div yield to a picked sketch point; a dim
+line hover gives way to own geometry; S50 run 3 was the label hovered AFTER the pick reached the corner). Speed T2
+passes: S50 release 13.9 ms median (live 654), move 13.9, typed 22.8; S200 35.5 / 16.6 / 25.8 (live 1049 / - / 758);
+worst moves 712 / 377 ms (first drag). e41979117: hovered pattern glyph lights its construction line orange; drag-onto-
+line 7/9 px test. GLYPH-CIRCLE taken spot: not pinned, left as is (TICKETS note, /root/skasm-scratch/glyph/taken.py).
 
-LANDED 8efe6acf. QUEUED 93a23c55 (09:00, 7 commits: GLYPH-CIRCLE lone glyph 38.5 px at right angles to the pointer,
-upper side; inference-1866 test; a point under a hovered label (ViewportEvent::LabelHover path) takes the hover). Lead told.
-
-Speed T2 (sp.sh, vibex7, sp-full.log there) STILL FAILS: S50 run 3, the corner not lit: hover_constraint = 14 while the
-GPU pick (62) is already the corner, so sketch_hover never reruns. UNCOMMITTED in the worktree: (a) the dim label div's
-on_hover records ui.label_hover and yields to a picked sketch point; (b) sketch_hover clears a dimension LINE hover
-(ui.dim_line_hover) when own geometry is picked; T1 a_point_under_a_hovered_label_takes_the_hover extended (passes);
-(c) latency_tests.rs:752 diagnostic prints constraint 14's kind, label_hover, dim_line_hover, glyph_under, pointer vs s0px.
-Run bpbks8af6 has that diagnostic: read `ssh vibex7 'grep -n panicked -A3 ~/tmp/skasm/sp-full.log | cut -c1-900'`, find
-which path sets 14 (and keep only the needed parts of (a)/(b)), fix it there, rerun sp.sh, then commit + land with the
-speed table.
-
-Sketch feel-coverage audit (started 08:15): 221 sketch sections in behaviours.md, 126 cited by code (script
-/root/skasm-scratch/audit-sections.txt; key = capture dir / ticket id / title, case-insensitive), 95 not. Spot-checked 9
-uncited: 8 covered under other names, 1 gap (inference-1866 midpoint-up PERPENDICULAR/VERTICAL): test f469d778b, ours
-already right. psui-owned rows (Hide other sketches, readouts) skipped. Continue down the list.
+Sketch feel-coverage audit: 221 sketch sections in behaviours.md, 126 cited by code (/root/skasm-scratch/audit-sections.txt),
+95 not. Checked 12: 9 covered under other names; gaps fixed/tested: inference-1866 (f469d778b), user-P1 snapping
+(drag onto a line 7/9 px test), icons2 glyph colours (pattern construction line orange, e41979117). Next in the list:
+"sketch value boxes: Tab", "polygon side count", "Copy/paste inside a sketch", "spline end handle arm (2187)",
+"len-2022", "search-2025", "Extend in Top view (2992)", "big-sketch-1119". psui-owned rows skipped.
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
