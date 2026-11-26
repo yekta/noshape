@@ -4205,3 +4205,28 @@ fn the_first_split_piece_keeps_the_targets_first_face_not_both_keep() {
         assert!((mins[0] - first_min).abs() < 1e-6, "{base:?} {at}: {mins:?}");
     }
 }
+
+/// A part two Extrudes made, split at the first one's top (c2-body-draft-naming's Split 2): the piece with the earlier
+/// Extrude's faces is Part 1 (live), though the tool faces the boss.
+#[test]
+fn a_split_part_two_extrudes_made_puts_the_first_extrudes_piece_first() {
+    {
+        let mut t = T::new();
+        let part = {
+            t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+            t.ok().context.bodies[0].id.clone()
+        };
+        let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+        let s = t.sketch(Reference::FeaturePlane(top), rect(0.01, 0.01, 0.03, 0.02));
+        let r = t.regions(s)[0].clone();
+        t.extrude(r, "15 mm", "ADD");
+        let at = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+        t.add("splitPart", &[("targets", q(vec![body_ref(&part)])), ("tool", q(vec![Reference::FeaturePlane(at)])), ("keepBothSides", b(true))]);
+        let r = t.ok();
+        let zs: Vec<f64> = r.context.bodies.iter().map(|b| b.shape.bounding_box(true).unwrap().min.z * 1e3).collect();
+        assert_eq!(zs.len(), 2, "{zs:?}");
+        assert!(zs[0].abs() < 1e-6 && (zs[1] - 10.0).abs() < 1e-6, "the block first, then the boss: {zs:?}");
+        let names: Vec<&str> = r.display.bodies.iter().map(|b| b.name.as_str()).collect();
+        assert_eq!(names, ["Part 1", "Part 2"]);
+    }
+}

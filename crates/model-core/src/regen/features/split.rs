@@ -216,6 +216,40 @@ fn project_onto(curve: &Shape, face: &Shape, dir: Option<DVec3>) -> FResult<Vec<
 /// SPLIT_FACE_NO_CHANGE; std Jog's `ownExistingImprints` split expects it).
 pub const NO_SPLIT: &str = "Selected entities do not split selected faces.";
 
+/// A body's faces in creation order: by the feature that made each (its place in the list), then in that Extrude's own
+/// order. `None` when no face's maker is known.
+fn face_creation_order(ev: &EvalCtx, faces: &[Name]) -> Option<Vec<usize>> {
+    if let Some(order) = crate::naming::extrude_face_order(faces) {
+        return Some(order);
+    }
+    let made: Vec<Option<usize>> = faces.iter().map(|f| f.creator().and_then(|c| ev.features.order_of(c))).collect();
+    if made.iter().all(Option::is_none) {
+        return None;
+    }
+    let mut rank = vec![usize::MAX; faces.len()];
+    let mut makers: Vec<usize> = made.iter().flatten().copied().collect();
+    makers.sort_unstable();
+    makers.dedup();
+    for m in makers {
+        let mine: Vec<usize> = (0..faces.len()).filter(|&i| made[i] == Some(m)).collect();
+        let mut roots: Vec<Name> = Vec::new();
+        for &i in &mine {
+            let r = Arc::new(faces[i].root().clone());
+            if !roots.contains(&r) {
+                roots.push(r);
+            }
+        }
+        let within = crate::naming::extrude_face_order(&roots).unwrap_or_else(|| (0..roots.len()).collect());
+        for &i in &mine {
+            let r = roots.iter().position(|x| **x == *faces[i].root()).unwrap_or(0);
+            rank[i] = within.iter().position(|&w| w == r).unwrap_or(r);
+        }
+    }
+    let mut order: Vec<usize> = (0..faces.len()).collect();
+    order.sort_by_key(|&i| (made[i].unwrap_or(usize::MAX), rank[i], i));
+    Some(order)
+}
+
 pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("splitType", "FACE") {
         return split_faces(ev);
@@ -302,8 +336,10 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         let q = |x: f64| (x * 1e9).round() as i64;
         pieces.sort_by(|a, b| q(b.0).cmp(&q(a.0)).then(q(a.1.x).cmp(&q(b.1.x))).then(q(a.1.y).cmp(&q(b.1.y))).then(q(a.1.z).cmp(&q(b.1.z))));
         // Live split-order-1123: the piece keeping the target's first face (in its creation order) that not every
-        // piece keeps comes first, whichever way the tool faces and however big the pieces.
-        if let Some(order) = crate::naming::extrude_face_order(&target.faces) {
+        // piece keeps comes first, whichever way the tool faces and however big the pieces. A body several features
+        // made: the earlier feature's faces first (c2-body-draft-naming's Split 2: Extrude 1's box is Part 1, the boss
+        // Part 2).
+        if let Some(order) = face_creation_order(ev, &target.faces) {
             let holds = |p: &NamedShape, i: usize| p.names.faces.iter().any(|f| f.descends_from(&target.faces[i]));
             let keys: Vec<usize> = pieces.iter().map(|p| order.iter().position(|&i| holds(&p.2, i) && !pieces.iter().all(|o| holds(&o.2, i))).unwrap_or(usize::MAX)).collect();
             let mut keyed: Vec<_> = keys.into_iter().zip(pieces).collect();

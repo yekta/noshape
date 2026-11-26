@@ -1,26 +1,30 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 13:2x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 13:4x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
 - **LANDING core-rf 11-26**: QUEUED 799ae65a 13:1x (6 commits: f8890c9d cov2 face blends, 9a9df3ee fold-check P0 + T2 guard
   regen_profile::impeller_failing_fillets_stay_under_their_budget, 81343293 qa R12 overflow, handoffs, 1916587c4 Fill 1).
-- **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner (A, B, C in the pieces loop) + fill_pinched_corner (after the
-  unify): neighbours cut UV-straight A-C / B-C (14.7412 mm, live 14.7414), corner + sliver + run-ons dropped, rim filled as
-  our Fill does (G2 asked: OCCT plate declines "continuity is not G0 G1 or G2" -> fair_g1_fill), sewn, named by old faces.
-  body-draft: Fillet 2 12/27 as live, Fill 1 + Intersection curve 1 OK. Left: G1 fill 120.347 vs live's G2 121.947 mm2
-  (Fillet 2 38233.07 vs 38239.53); a fair G2 fill would fix both (our Fill feature too). T1 features_a::a_round_across_a_
-  tighter_rounds_end_folds_and_holds (3-sided corner, edge lengths, area band). Parity docs need a FRESH parity run
-  (references in save/ copies were matched to old geometry): .bd2.sh (ops parity_models NOSHAPE_PARITY_ONLY).
-- **BODY DRAFT 1 (lead 13:2x, committed + land.sh 13:3x; out: /root/core-scratch/land-bd.out)**: detail_a.rs body_draft: draftOnSelf errors only for the
-  Parts scope (live 2, 1664 d); Faces/Edges scope -> OK, part unchanged (live body-draft-naming Body draft 1: a side wall,
-  pull up). Test features_c::body_draft_as_live (faces + draft on self = 8000, 6 faces). `draft` filter 20 passed;
-  land.sh runs clippy. TODO: file a live capture request (block wall, Faces, Draft on self 5 deg:
-  status/volume) in live/REQUESTS.md to confirm.
-- **SCISSOR RUN**: .pa.sh n1126 (vibex7 ~/tmp/core/sc/pa-n1126.out, local /root/core-scratch/pa-n1126.out): then rank
-  BLEND-FAILS b-d (184ad0 F5, b7e381 F4, 9cbb0e F2).
+- **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
+  fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
+  need a FRESH parity run (save/ copies keep old references): .bd2.sh.
+- **BODY DRAFT 1**: QUEUED c5619f82 13:2x (carries 799ae65a). detail_a.rs body_draft: draftOnSelf errors only for Parts
+  scope (live 2, 1664 d); Faces/Edges -> OK, part unchanged. Live capture asked (REQUESTS core 11-26 13:24).
+- **SPLIT PIECE ORDER (committed 13:4x, land.sh)**: split.rs face_creation_order: a body several features made orders its
+  faces by maker (list place), then that Extrude's own order (was: tool-side order). body-draft Split 2 + bottle-split
+  Split 1 now name parts as live; 14-doc check (vibex7 ~/tmp/core/fb/sn.sh, .sn.sh <tag> [cli]; sn-a/sn-b.out) no
+  regressions. Duct-multipart Split 1/2 still swapped (2 rows, as before): our Extrude side order (sketch entity id) is
+  not live's there (big piece holds our "first" side entity 2; live puts it last). T1 features_a::a_split_part_two_
+  extrudes_made_puts_the_first_extrudes_piece_first.
+- **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
+  39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
+- **SCISSOR RUN 11-26 13:37** (.pa.sh n1126; full list /root/core-scratch/sc-fails-1126.txt, 251 Studio rows): fixed
+  since slabs run: 0139f2 F1, 184ad0 F3/F5, 264eb3 C1, 2d82a0 C2/C6/F6/F21/F31/F37, 37a1a7 F3, 57725f. Still failing blends: 2d82a0 F4/F5/F7/F13/F25/F28/F30, 37a1a7 F5, 404ddb F1/F5/
+  F14/C1, 665cf3 C1/F2/F3, 92138f F1/F6, 97ad5f F2, 9cbb0e F18/F19/F23 (parked), fed22d C2/F4/F5/F24/F25/F30; b58244's
+  are "Select edges" (references). NEW since slabs: 608/Roller/Long Bar occurrences moved ~5-8 mm by our mates, BOM 72
+  vs 87 rows: check whether a fix upstream changed mate connector geometry. Rank these next.
 - **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
   11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
@@ -159,16 +163,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    suite vibex7 ~/qa-parity/models.log (11:37, qa 1125-0803), asm-scissor-lift studios (my slabs run, vibex7
    ~/tmp/core/sc/pa-slabs.out). Skipped (parked): scissor 9cbb0e F18/F19/F23, impeller "Fillet Stevenrohr zum Halter".
    Own (the blend is its studio's first divergence), most ordinary first:
-   a. scissor 2d82a0 Chamfer 2: FIXED, QUEUED 3a19cf4d (features.cpp chamfer_ring_fill: concave circle between a
-      plane and a coaxial cylinder, chamfer wider than the face: ring fill clipped by the neighbours' outer sides;
-      T1 blend::a_chamfer_wider_than_a_counterbores_step_meets_the_through_hole). Then Fillets 4-7/13/21/25/28/30/31/37,
-      Chamfer 6: re-check on the fresh run (vibex7 ~/tmp/core/sc/pa-now.out, saved doc ~/tmp/core/sc/fresh/; the
-      core-keep scissor.noshape is stale: Draft 1 / Move face 1 fail only there). Probes: core-scratch/sc st.py
-      (failing features per studio), fe.py (a feature's params + edges); NOSHAPE_DUMP_OPS=<dir> NOSHAPE_DUMP_ONLY=chamfer
-      dumps blend inputs (.brep + .txt edge indices) for a kernel replay example.
-   b. scissor 184ad0 Fillet 5 (+ Fillet 3 "Unfilleted edge overlapped")
-   c. scissor b7e381 Fillet 4
-   d. scissor 9cbb0e Fillet 2 (then Chamfer 6)
+   a-d. 2d82a0 C2 landed 45db5d099; 184ad0 F3/F5, C6 build now. Ranking now from the 11-26 run (Now: SCISSOR RUN). Probes:
+      core-scratch/sc st.py (failing features per studio), fe.py (params + edges); NOSHAPE_DUMP_OPS=<dir>
+      NOSHAPE_DUMP_ONLY=chamfer dumps blend inputs. Saved doc: vibex7 ~/tmp/core/sc/fresh/.
    e. c2-body-draft-naming #7 Fillet 1 (builds, 15→19 lines / 6→2 other edges vs live) then #8 Fillet 2 fails (draft body)
    After an upstream difference (fix upstream first; re-check after):
    f. c2-lora-enclosure-ribs #19 USB C Port Chamfer Base (#16 USB Base Extrude Remove differs)
