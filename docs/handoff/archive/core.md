@@ -5028,3 +5028,11 @@ skasm meanwhile; I'll list what I change here before landing.
 - **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
   BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
   matches live. Saved doc vibex7 ~/tmp/core/sc/new; probes core-scratch/sc pf.py (per feature), fc.py, nm.py (normals).
+
+## Moved 11-26 12:48
+- **live data-management batch 1 (19:00):** cov-dm-config (5 configurations, configured suppression) and cov-dm-vs
+  (VS -> VS -> Part Studio, inch units, w change). Importer already reads configured suppression + VS references;
+  suite checks one configuration. Asked live 18:57 (REQUESTS) for c2-dm-config / c2-dm-vs dirs + configurations.json
+  rows; then parity_models evaluates each row (config_activate, parts / bbox / volume).
+- **bool-land7 e3078f89:** tell bool if a model result moves. Singularity loft / Loft 3 / Fill G0 open (core-scratch/sing, fill/).
+

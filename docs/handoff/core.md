@@ -5,8 +5,23 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf**: 6ea74721 LANDED 09:49 (158ab4c2: knifehandle settle + Face blend 2/3); Fillet 2 fold fix QUEUED
-  10b134ab 10:4x; Replace face corner fix QUEUED 0bda5d83 11:1x (below).
+- **LANDING core-rf 11-26**: f8890c9d QUEUED 12:2x (cov2 Face blend 3 / asym side / partial chain start; tests in
+  features_a). Then QUEUED 12:5x: 9a9df3ee (P0: fold check only on edges bending tighter than twice their setback;
+  impeller Flansch 21 -> 6-7.5 s, Ansaugflansch 7.5 -> 4 s; T2 guard regen_profile::impeller_failing_fillets_stay_under_
+  their_budget, doc vibex7 ~/agents/core-keep/c2-impeller-loft.noshape) and 81343293 (qa P1 FILLET-R12-BLOCK-OVERFLOW:
+  convex line rounds taller than a planar face run past it, crossing ones fail as live's 40x20; test kernel_robustness::
+  a_round_taller_than_a_blocks_sides_runs_past_them_to_the_bottom, 8351.859 mm3). Tell qa when queued (done in report).
+- **FILL 1 (c2-body-draft-naming) PLAN (11-26 12:3x)**: live's Fill 1 = the 3 edges of Fillet 2's corner JSi (JSR on
+  JSO = Fillet 1's face, JSN on JSC = y-round, JSJ on JSe = z-round), G2; its area 121.9466 = live's corner face area, so
+  live's corner IS a fill of AB/BC/CA. All our faces but {JSC 211.865 (live 197.503), JSe 564.654 (550.292), corner
+  97.367 + sliver 0.169 (121.947)} already match live. Post-process (after the Boolean, like canal_corner): BC = the
+  UV-straight line on JSC' from B to C (live: x,z on the profile, y linear; check length 14.7414), CA likewise on JSe';
+  k::split_on(shape,[BC,CA]); flood from the corner' face, stopping at AB/BC/CA, drop that region; k::fill_surface(AB
+  G1/G2 JSO, BC JSC, CA JSe); k::sew(.., true); names as canal_corner (corner face = old corner's name). A, B = the
+  neighbours' contacts at the joints on the non-folding support; C = their fold-side contact lines' meeting point
+  (pinch_point in core-scratch/pinch-probe.patch).
+- **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
+  11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
   fillets rolled again (detail_a::reblend) at the cylinder floor: OCCT built 1-2 of the 4 corners (3 equal r 12.7
   fillets) as plate patches, not spheres, whenever the free-form stripe (drafted wall x cylinder floor) was the 2nd of
@@ -43,19 +58,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   point; exact C) -> loft valid but tolerance 0.12 mm at the apex, every cut order open/invalid; fuzzy 1e-5 cut =
   live's 12/27/17, 38249.2 (live 38239.5) but tol 0.12 mm; a hair off C: open, or 1.3 s and Fill 1 still fails.
   => needs the corner as its own face (native blend face work). Doc's first diff: Fillet 1's edge kinds (live 'other').
-  (3) c2-cov2-face-blend-partial-fillet: IN FLIGHT 11-26 12:2x, UNCOMMITTED in core-rf (no Fillet 3 failure any more):
-  a) detail_a::grow_side: Adjacent/Custom propagation only along edges as convex/concave as the picked ones (Face
-  blend 3, L inner corner: 16 -> 9 faces, 17880 -> 18024.534, live 18024.575 = its B-spline fit); b) blend_section
-  radius_first: an asymmetric round's radius on the face LEFT of the edge's own direction (station + Line + Circle
-  paths; setbacks swaps when !first_is_side1): c2-opt-fillet-partial-asym-smooth F2 and cov2 F2 faces now = live
-  (top 2076/1745, back 840/960); c) Partial.from_edge + chain_from: a partial chain starts at the first picked edge's
-  free end (std constructPaths): cov2 F3 +78 -> +0.37 mm3 (17 faces vs 16: sliver at the curve/top-edge joint).
-  Tests added (features_a): adjacent_propagation_keeps_an_l_corners_blend_in_the_corner, an_asymmetric_fillets_radius_
-  lies_on_the_top_of_a_blocks_back_edge, a_partial_fillets_propagated_chain_runs_from_the_picked_edges_free_end.
-  .ft1.sh (core-scratch/ft1.out): all 3 new + face_blend 13, fillet 35, partial 4, blend 18, T2 fillet_options OK;
-  T2 std_oracle boolean/loft/transform FAIL (not blends: check they fail on main too). Next: clippy, commit, land. Left (not targets): FB1 conic
-  and FB3/asym volumes = live's surface fits (rho 0.59990 / 0.41448 vs 0.41426: no consistent rule). Probe scripts
-  vibex7 ~/tmp/core/fb: pf.sh <doc> (per-feature vol/faces vs live), qp.sh <doc> <feature> <part>, save/ (2 docs).
+  (3) c2-cov2-face-blend-partial-fillet: QUEUED f8890c9d (Fillet 3 OK; left FB1/FB3/asym volumes = live's fits, not
+  targets; F3 17 faces vs 16: sliver at the curve/top-edge joint). T2 std_oracle boolean/loft/transform fail on error
+  texts ("Cannot resolve entities." / guides Info), not blends: check on main. Probes vibex7 ~/tmp/core/fb (pf.sh, qp.sh).
   (4) asm-scissor-lift studios (BLEND-FAILS b-d below); after upstream fixes: genesis #72, impeller Stevenrohr #29.
 - **NATIVE BLEND FACES PLAN (for the lead's later decision)**: scope: section_blend's rolling-ball path (blend_section.rs
   ball_tools -> 35-section loft tools -> closed_run_on splits -> Boolean with the body) replaced by the blend face
@@ -132,12 +137,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   the apex closed apart (or a guided ThruSections), compare area with 21477.23 mm2.
 - core-rp's 11-20 batch LANDED 00:10 as f9ad07b5 (details archived 11-21 02:08). Face blend on top:
   /root/core-scratch/fb-on-top-detail_a.diff + fb-on-top-test.rs (FBDBG to strip).
-- **live data-management batch 1 (19:00):** cov-dm-config (5 configurations, configured suppression) and cov-dm-vs
-  (VS -> VS -> Part Studio, inch units, w change). Importer already reads configured suppression + VS references;
-  suite checks one configuration. Asked live 18:57 (REQUESTS) for c2-dm-config / c2-dm-vs dirs + configurations.json
-  rows; then parity_models evaluates each row (config_activate, parts / bbox / volume).
-- **bool-land7 e3078f89:** tell bool if a model result moves. Singularity loft / Loft 3 / Fill G0 open (core-scratch/sing, fill/).
-
 ## Waiting on others
 - c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),
   outer corners chamfered (sketches.json). Already in skasm's handoff (translator takes Sketch 3 back). Variables OK.
