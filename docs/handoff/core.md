@@ -7,12 +7,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 ## Now (11-25)
 - **RE-LAND 11-25 22:5x**: 1bd337a6 FAILED 22:04 (rebase conflict, workspace_tests.rs: qa's page-open test beside my
   Update… test, kept both); rebased, QUEUED 52c8f9ce (Ribs, Update…, mesh Translate + handoff). Lead reports it.
-- **GATE IN FLIGHT (11-26 02:0x)**: branch rf1126 (4826656b7 solver, b3785098f cPlane, 0d10fa156 translator) done:
-  132/189 docs, 2118/2681 features (vibex7 ~/tmp/core/g/run-rf1126.log); base1126 (core-cache @ 3f2251379, task
-  output /root/core-scratch/gate-base.out) running after it in the slot. Next: compare SAME-PER-DOC (each doc's
-  "features match" line, base vs rf); no doc worse -> land.sh (52c8f9ce queued before: lead reports). The 90-min
-  suite stall was NOT a hang in the fixes: 97ad5f Linear pattern 1 fused six wrong 114-face parts while the source
-  was still off (Extrude 2 up to the wrong face); with the Plane-feature refs the suite runs 942 s.
+- **GATE PASSED, LANDING (11-26 02:14)**: 4826656b7 solver, b3785098f cPlane, 0d10fa156 translator: models gate
+  base 131/189 docs 2111/2681 features, branch 132/189 2118/2681; only doc changed
+  c2-lora-enclosure-ribs 39 -> 46/46 (52c8f9ce's Ribs, in the stack); none worse. Queued with land.sh; lead reports.
+  The 90-min suite stall was NOT a hang in the fixes: 97ad5f Linear pattern 1 fused six wrong 114-face parts while
+  the source was still off (Extrude 2 up to the wrong face); with the Plane-feature refs the suite runs 942 s.
 - **QUEUE (lead 11-25 23:xx)**: (1) scissor parse_refs fix through the models gate (core-base/.gof.sh pair), (2) scissor
   97ad5f Delete face 1, (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
   (qa suites/gaps-1125). Then skasm's sweep items, BLEND-FAILS b-d.
