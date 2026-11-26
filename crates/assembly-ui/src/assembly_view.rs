@@ -1275,8 +1275,8 @@ impl AssemblyView {
             o.dim_alpha = self.ui.transparency;
         }
         if self.isolate.is_some() || self.ui.transparent.is_some() {
-            // Select transparent geometry / Alt+click: pick through.
-            o.pick_dimmed = self.ui.select_transparent || self.ui.alt_through;
+            // Only with Select transparent geometry: Alt doesn't pick faded instances (live asm-hover-combined-1126 (5)).
+            o.pick_dimmed = self.ui.select_transparent;
         }
         if let Some(s) = &self.snap_drag
             && s.started
@@ -3603,14 +3603,6 @@ impl AssemblyView {
                 if self.ui.placed_at.is_some_and(|p| p != *position) {
                     self.ui.placed_at = None;
                     self.refresh_scene(false, cx);
-                }
-                // Alt: transparent instances become pickable (Onshape Alt+click).
-                if modifiers.alt != self.ui.alt_through {
-                    self.ui.alt_through = modifiers.alt;
-                    if self.isolate.is_some() || self.ui.transparent.is_some() {
-                        // Pickability changes: the pick buffer must be redrawn.
-                        self.rebuild_scene(true, cx);
-                    }
                 }
                 self.pointer = *position;
                 if self.manip_click.is_some_and(|(at, _)| at != *position) {

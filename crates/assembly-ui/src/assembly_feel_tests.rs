@@ -2597,9 +2597,9 @@ fn combined_hover_on_a_selected_instance(cx: &mut TestAppContext) {
     assert_eq!(face_states(cx, &view, "Part 1 <1>") & (HOVER | SELECTED), HOVER | SELECTED, "its own face: hover over selected");
 }
 
-/// Live behaviours "Shift+I (Isolate)" and psui 10-28 (c): an isolated assembly's faded instances take no hover while
-/// "Select transparent geometry" is off; the instance behind one lights through it. Make transparent's part alike
-/// (live REQUESTS 07:02 (5) to confirm), and a hidden instance: nothing where it was, its list row lights nothing.
+/// Live asm-hover-combined-1126 (5), (6): an isolated assembly's faded instances take no hover while "Select transparent
+/// geometry" is off, Alt held or not; the instance behind one lights through it. Make transparent's part alike. A
+/// hidden instance: nothing where it was (its hovered row's outline there: TICKETS ASM-HIDDEN-ROW-HOVER-OUTLINE).
 #[gpui::test]
 fn combined_hover_through_faded_and_hidden_instances(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -2614,6 +2614,15 @@ fn combined_hover_through_faded_and_hidden_instances(cx: &mut TestAppContext) {
     settle(cx, window, &view);
     assert_eq!(at(cx, c), None, "Isolate: the faded Part 2 takes no hover");
     assert_eq!(at(cx, b).as_deref(), Some("Part 1 <1>"), "Isolate: Part 1 lights through the faded Part 2");
+    let alt = Modifiers { alt: true, ..Default::default() };
+    for (p, want) in [(c, None), (b, Some("Part 1 <1>"))] {
+        for k in 0..2 {
+            let w = at_window(cx, &view, p + DVec2::new(f64::from(k), 0.0));
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(w, None, alt);
+            settle(cx, window, &view);
+        }
+        assert_eq!(hovered_face(cx, &view).as_deref(), want, "Isolate, Alt held: the faded Part 2 still takes no hover (live asm-hover-combined-1126 (5))");
+    }
     move_to(cx, window, &view, a);
     cx.update(|cx| view.update(cx, |v, cx| {
         v.isolate = None;
@@ -2631,12 +2640,6 @@ fn combined_hover_through_faded_and_hidden_instances(cx: &mut TestAppContext) {
     settle(cx, window, &view);
     assert_eq!(at(cx, b).as_deref(), Some("Part 1 <1>"), "Part 2 hidden: Part 1 lights where it was");
     assert_eq!(at(cx, c), None, "Part 2 hidden: nothing where it was over nothing");
-    cx.update(|cx| view.update(cx, |v, cx| {
-        v.ui.list_hover = Some(p2);
-        v.refresh_scene(false, cx);
-    }));
-    settle(cx, window, &view);
-    assert_eq!(face_states(cx, &view, "Part 2 <1>") & noshape_render::state::HOVER, 0, "the hidden instance's row lights nothing");
 }
 
 /// Live REQUESTS 07:02 (7) to confirm: while Explode 1 is edited, faces light as outside it; a clicked instance shows

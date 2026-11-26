@@ -520,10 +520,8 @@ pub struct AsmUi {
     pub named_view_taken: bool,
     /// The Graphics preferences the scene is built with (kept current).
     pub graphics: crate::graphics_prefs::GraphicsPrefs,
-    /// Isolate dialog › Select transparent geometry; Alt held (pick through
-    /// transparent instances).
+    /// Isolate dialog › Select transparent geometry.
     pub select_transparent: bool,
-    pub alt_through: bool,
     /// BOM Table: the cell being typed in.
     pub bom_edit: Option<super::bom_panel::BomEdit>,
     /// BOM Table: the selected cell (row, column) and expanded Structured items.
