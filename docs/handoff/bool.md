@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-26 04:45 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-26 05:15 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -41,11 +41,15 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   (vibex8 ~/tmp/bool/p0/rec) taken; volumes = slice integration (x0-20 15587.68099, x1-20 15559.81505, x4.9-20
   15468.10594 mm3; x5-20 check 15465.83). T1 bool_patterns::a_cylinder_along_a_shelled_boxs_wall_fuses_through_its_corner_rounds
   (data/booleans 7bf937 / 1582a3 / b81914). T1 PASSES, small cases 78/78 0 differ (t1.sh, vibex8 ~/tmp/bool/p0/kt).
-  GATE (03:38, P0 + item 1 as ONE stack: 2c051fbee cherry-picked onto bool-flush-p0 as 1a04f549d; the 2c051 gate had
-  waited 00:51-03:37 for vibex8's slot (qa's parity held it), stopped): unit bool-gate-p0s -> /root/bool-hat-scratch/
-  chain-1a04f549d.out (built 04:30; its run waits in vibex8's slot behind qa/live jobs). Then knurls (chainf16.sh pattern: copy both gate trees' all-96c035059fc28abb to vibex7
-  ~/tmp/bool/<dir>, kn-run.sh), land from bool-flush (NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh: lands both), tell qa
-  (roster id, qa moved 11-26) + lead. OCCT stays wrong on these (fallback only). bool-slow (2c051fbee) then obsolete.
+  GATE DONE 05:08 (1a04f549d = P0 + item 1 2c051fbee as ONE stack, bool-flush): replay 3113 -> 3113, differing 3 -> 3,
+  model suite 132 -> 132 to the end, 2106/2669 same, speed 1.00x, shells 6 = 6, crate tests pass. KNURLS + LAND run
+  unattended: unit bool-knp0 (/root/bool-scratch/chainp0k.sh) -> /root/bool-scratch/knp0.out: knurls on vibex7
+  ~/tmp/bool/kn1a04 (kn-run.sh), then IF all 5 corpora "diff-lines 0" it runs land.sh from bool-flush (lands both
+  commits; "LAND rc N"), else "NOT LANDED". NEXT: read knp0.out; landed -> tell qa (roster id) + lead (<= 5 lines:
+  BOOL-ADD-FLUSH fixed 8b52d16a6 + Bohrungssitz one run); differs -> look at the knurl diff. bool-slow then obsolete.
+  THEN (lead 11-26 05:10): move from speed to COVERAGE: ours is ~86.5 % of parity56; take the most common reasons
+  cases still fall back to OCCT, first shapes makers hit (fillets, shells, holes on curved faces), raise coverage,
+  usual gate. (SP3 attribution if ever: the Mac's `sample`, skasm-scratch/bin sample_*.py, via the gated Mac slot.)
   UNIFY SCOPE TRY (11-26 03:40, PARKED, /root/bool-scratch/unify-clean-full.patch): every op_unify result marked
   clean (unify twice = same on all 19 readable impeller dumps), solids inherit it (sub_shapes/list_get), t_built.scoped
   for free-form results. Impeller: only 4 of 24 unifies scoped, Bohrungssitz still whole (the mark is lost elsewhere),
