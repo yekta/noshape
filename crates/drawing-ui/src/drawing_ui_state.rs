@@ -256,7 +256,9 @@ impl DrawingEditor {
                 // Onshape::Dimension::Ordinate "ordinate", Onshape::SurfaceFinishSymbol "surfacefinishsymbol".)
                 let k = match variant {
                     "OrdinateDimension" | "OrdinateGroup" => "ordinate",
-                    v if v.ends_with("Dimension") || v.starts_with("Foreshortened") => "dimension",
+                    // (A foreshortened diameter isn't read: live drw-dimension-foreshorten-cylinder s8.)
+                    "ForeshortenedDiameter" => "foreshortened",
+                    v if v.ends_with("Dimension") || v == "ForeshortenedRadial" => "dimension",
                     "Note" => "note",
                     "Centermark" => "centermark",
                     v if v.contains("Centerline") => "centerline",
@@ -341,7 +343,7 @@ impl DrawingEditor {
         let mut annotations: Vec<(&str, String, Option<[i64; 2]>)> = self
             .ui_annotations()
             .into_iter()
-            .filter(|(_, k, _)| *k != "datumtarget")
+            .filter(|(_, k, _)| !matches!(*k, "datumtarget" | "foreshortened"))
             .map(|(id, k, t)| (k, t, self.ui_position(k, |p| matches!(p, PickTarget::Annotation(x) if *x == id))))
             .collect();
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
