@@ -715,8 +715,9 @@ bool poles_off_plane(const occ::handle<Geom_Surface>& g)
 }
 
 // Two planar faces sharing an edge whose normals differ by more than 1e-9 rad still lie on one plane when, across
-// both, they part by no more than live's zero length (1e-8 m): a face through STL Mesh points (float coordinates)
-// beside its exact copy (asm-scissor-lift 264eb3's Linear pattern 1: three tab tops 3e-7 rad off WAGO's face).
+// both (each one's vertices on the other's plane, the tilt over their box), they part by no more than live's zero
+// length (1e-8 m): a face through STL Mesh points (float coordinates) beside its exact copy (asm-scissor-lift
+// 264eb3's Linear pattern 1: three tab tops 3e-7 rad off WAGO's face).
 bool planes_meet_within_zero_length(const TopoDS_Face& a, const gp_Pln& pa, const TopoDS_Face& b, const gp_Pln& pb, bool either_way)
 {
   double ang = pa.Axis().Direction().Angle(pb.Axis().Direction());
@@ -724,10 +725,16 @@ bool planes_meet_within_zero_length(const TopoDS_Face& a, const gp_Pln& pa, cons
     ang = std::min(ang, M_PI - ang);
   if (ang > 1e-5)
     return false;
+  const auto on = [](const TopoDS_Face& f, const gp_Pln& p) {
+    for (TopExp_Explorer x(f, TopAbs_VERTEX); x.More(); x.Next())
+      if (p.Distance(BRep_Tool::Pnt(TopoDS::Vertex(x.Current()))) > 1e-8)
+        return false;
+    return true;
+  };
   Bnd_Box box;
   BRepBndLib::Add(a, box, false);
   BRepBndLib::Add(b, box, false);
-  return !box.IsVoid() && ang * std::sqrt(box.SquareExtent()) <= 1e-8;
+  return !box.IsVoid() && ang * std::sqrt(box.SquareExtent()) <= 1e-8 && on(a, pb) && on(b, pa);
 }
 
 bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullptr)
