@@ -58,16 +58,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
    face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
    Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
 3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
-4. IN FLIGHT 11-26 00:14: interaction-suite triage (lead). Before 20 failing; run r17 after first fixes: 10/15 of the
-   lead's 17 (gusset x2 skipped) match. Commits (unlanded, on top of queued b00920fe): 3a08ed5ef (perp reach to the
-   segment, lone point no Construction, no Previous/Next in states), next commit (offset label yields to a picked curve,
-   protection checkbox mark on the box, runner presses mods after the approach). Rerun r18 started 00:1x (results: task output lost at compaction; read vibex8 ~/tmp/psui/r18/run.log, states r18/*.json, compare with uipx/cmp.py <name> <dir>). FIRST AFTER COMPACTION: read r18, fix what's left, run the touched crates' tests, land.sh, give qa the after count (before 20; agent_status first, qa >200k -> via lead)
-   (uipx/run5.sh -> vibex8 ~/tmp/psui/r18). Left: sketch-fully-defined (T1 a_click_on_the_right_planes_outline... PASSES
-   in GPU test, scenario still placed the length: check r18 / UIP logs), sketch-entity-copy-paste step 9 (rclick (15,20):
-   ours opens the menu WITH a constraint (dim Some: "Delete sketch entity" row, no planes) - find which glyph/label is
-   there; live: Front plane menu), mate-connector (live hovers the top edge at 6 px, takes the edge's end: "Edge of";
-   ours "Vertex of": recheck after runner change). P0 the_dimension_tool_flow red = old long-press flake (fixed
-   c710e20b0), lead told 23:3x.
+4. IN FLIGHT 11-26 00:56: interaction-suite triage (lead). Before 20 failing. r18 (vibex8 ~/tmp/psui/r18, copy in
+   /root/psui-scratch/r18): 6/9 rerun scenarios match (offset, ver-protection, coincident, refusals, routing, rclick-menu);
+   so 12 of the lead's 15 (gusset x2 skipped) match. Then fixed (commit "psui: interaction suite: ..." after e7fae29e2):
+   sketch-fully-defined (the outline pick also runs over no face: sketch.rs sketch_hover `None | Some(plane)`; T1
+   a_click_just_outside_the_right_planes_outline...), mate-connector (an edge-end origin reads as the edge, not its
+   secondary: feature_dialog.rs query_rows point_of only on a Face; T1 a_shift_click_6_px_inside_an_edge...).
+   LEFT: sketch-entity-copy-paste step index 9 (rclick at window (1165,501) = sketch (15,20)): ours opens a CONSTRAINT
+   glyph's menu (rows ... "Show all" ... "Delete sketch entity"; Some(cid) from the glyph div's right mouse-down,
+   sketch.rs ~5370, or LabelDown/dim_line_hover, both impossible: no dimensions), live the Front plane menu (hover JCC).
+   T1 a_right_click_beside_a_copied_line_opens_the_sketch_menu replays it at the scenario's scale and PASSES (one glyph
+   box, Horizontal, at origin+(25,-41) px, 20 px square; pointer at origin+(83,-18)): the scenario differs. Next: run
+   uipx/run19.sh (copy-paste only) with an eprintln of glyph_boxes / dim at open_sketch_context_menu and the glyph
+   right-press, read the run's .stderr (killed once at a compaction).
+   NEXT after this step (lead 11-26 00:5x): LOOK-OUTLINE-WEIGHT partly fixed (qa, green 23e5d26f7): vertical
+   silhouettes 1 px as live but lighter/greyer (616569 vs live 484c4f, 5a5e60 vs 637783), and a new 1 px 151a1e run
+   over 63 rows.
    Original item (lead 23:1x): use live's triage (live/REQUESTS.md "11-25 23:09"). 5 plane-* recordings
    were stale (being re-recorded, abaedadb). The other 17 match live today, so they're OUR fixes, most-used first, each with a T1:
    sketch-entity x4 (Hide rows done in b00920fe; check the rest), sketch-coincident-constraint, sketch-constraint-refusals,
