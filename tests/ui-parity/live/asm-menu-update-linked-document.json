@@ -1,6 +1,6 @@
 {
  "scenario": "asm-menu-update-linked-document",
- "recorded": "2026-11-26T02:54:26.953Z",
+ "recorded": "2026-11-26T06:53:20.300Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -12,11 +12,11 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a5efb8ddae9ac735b425ad63",
-  "workspace": "4a1656f57c8ae39ef661dca7",
-  "element": "5b3c1ab569e9ebb85e9c7d4c",
+  "document": "0ba166bfb64fb4f22f02602d",
+  "workspace": "9542689e03946387a1094829",
+  "element": "debd6c21a5e57ef5f77b7b78",
   "start": "doc-linked",
-  "startElement": "5b3c1ab569e9ebb85e9c7d4c",
+  "startElement": "debd6c21a5e57ef5f77b7b78",
   "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
@@ -127,10 +127,10 @@
     }
    },
    "ok": true,
-   "ti": 19059,
-   "tmove": 19087,
+   "ti": 20632,
+   "tmove": 20671,
    "moves": 1,
-   "tdown": 19382,
+   "tdown": 20970,
    "at": [
     381,
     976
@@ -248,8 +248,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 21991,
-   "te": 21991
+   "t": 23642,
+   "te": 23642
   },
   {
    "step": 2,
@@ -260,10 +260,10 @@
     }
    },
    "ok": true,
-   "ti": 21991,
-   "tmove": 22339,
+   "ti": 23642,
+   "tmove": 24002,
    "moves": 1,
-   "tdown": 22637,
+   "tdown": 24303,
    "at": [
     90,
     209
@@ -416,8 +416,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 24670,
-   "te": 24670
+   "t": 26405,
+   "te": 26405
   },
   {
    "step": 3,
@@ -428,10 +428,10 @@
     }
    },
    "ok": true,
-   "ti": 24670,
-   "tmove": 24723,
+   "ti": 26405,
+   "tmove": 26464,
    "moves": 2,
-   "tdown": 25774,
+   "tdown": 27510,
    "at": [
     225,
     629
@@ -455,13 +455,18 @@
      ],
      "fields": [
       {
-       "label": "Newer versions available for 0 documents",
+       "label": "Newer versions available for 1 document",
        "kind": "text",
        "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "string",
+       "text": "V1 ⇨ V2"
       }
      ],
      "error": null,
-     "ok": "disabled",
+     "ok": "enabled",
      "okLabel": "Update all"
     },
     "dialogs": [],
@@ -469,7 +474,7 @@
      {
       "id": "external-reference-update-dialog",
       "title": "Reference manager",
-      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 0 documents / Update all",
+      "text": "Reference manager / Update to latest / Selective update / Newer versions available for 1 document / uip Source / V1 / ⇨ / V2 / Update all",
       "inputs": []
      }
     ],
@@ -579,8 +584,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 27699,
-   "te": 27699
+   "t": 29502,
+   "te": 29502
   },
   {
    "step": 4,
@@ -589,7 +594,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 27699,
+   "ti": 29502,
    "pointer": {
     "at": [
      225,
@@ -598,7 +603,7 @@
     "hover": [],
     "element": "div.ns-tree-root"
    },
-   "tdown": 27704,
+   "tdown": 29509,
    "state": {
     "focus": {
      "kind": "none"
@@ -712,9 +717,9 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 31055,
-   "te": 31055
+   "t": 32869,
+   "te": 32869
   }
  ],
- "t0_epoch_ms": 1795661652899
+ "t0_epoch_ms": 1795675985175
 }

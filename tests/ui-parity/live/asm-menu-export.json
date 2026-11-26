@@ -1,6 +1,6 @@
 {
  "scenario": "asm-menu-export",
- "recorded": "2026-11-26T02:47:20.953Z",
+ "recorded": "2026-11-26T06:52:27.843Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "7dfc7b37f14df9e69d55353f",
+  "element": "001322d5d403607581019dca",
   "start": "two-blocks",
   "startElement": "30e13e13ac6a0443bcc154be",
   "runner": "live2 .nstate-uip-4.json"
@@ -177,10 +177,10 @@
     }
    },
    "ok": true,
-   "ti": 26504,
-   "tmove": 26854,
+   "ti": 26947,
+   "tmove": 27302,
    "moves": 1,
-   "tdown": 27156,
+   "tdown": 27600,
    "at": [
     90,
     235
@@ -367,8 +367,8 @@
     },
     "measure": null
    },
-   "t": 29602,
-   "te": 29602
+   "t": 30087,
+   "te": 30087
   },
   {
    "step": 2,
@@ -379,10 +379,10 @@
     }
    },
    "ok": true,
-   "ti": 29602,
-   "tmove": 29644,
+   "ti": 30087,
+   "tmove": 30134,
    "moves": 2,
-   "tdown": 30690,
+   "tdown": 31186,
    "at": [
     225,
     699
@@ -404,7 +404,7 @@
       {
        "label": "Format",
        "kind": "select",
-       "value": "STEP"
+       "value": "PARASOLID"
       },
       {
        "label": "Export models oriented Y axis up",
@@ -412,32 +412,12 @@
        "value": false
       },
       {
-       "label": "Preprocessing",
-       "kind": "select",
-       "value": "None"
-      },
-      {
        "label": "Version",
        "kind": "select",
-       "value": "AP242"
+       "value": "38.1"
       },
       {
        "label": "Use latest version",
-       "kind": "checkbox",
-       "value": true
-      },
-      {
-       "label": "Use custom units for export",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Include derived tolerances in export",
-       "kind": "checkbox",
-       "value": true
-      },
-      {
-       "label": "Use custom annotation text height for MBD export",
        "kind": "checkbox",
        "value": false
       },
@@ -451,7 +431,7 @@
       "Export",
       "Cancel"
      ],
-     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up Preprocessing None Automatic Remove small entities only (advanced) Remove small entities only (basic) Remove small entities only (advanced) and convert all surfaces to b-surfaces Version AP242 AP214 AP203 Use latest version Use custom units for export Include derived tolerances in export Use custom annotation text height for MBD export Options Download Do"
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up Version 38.1 37.1 37.0 36.0 35.1 34.1 34.0 33.1 33.0 32.1 32.0 31.1 31.0 30.1 30.0 29.1 29.0 28.1 28.0 27.1 27.0 26.1 26.0 25.1 25.0 Use latest version Options Download Download and store file in a new tab Email with file download link Store file in a new tab"
     },
     "dialogs": [],
     "panels": null,
@@ -596,8 +576,8 @@
     },
     "measure": null
    },
-   "t": 33033,
-   "te": 33033
+   "t": 33550,
+   "te": 33550
   },
   {
    "step": 3,
@@ -606,7 +586,7 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 33033,
+   "ti": 33550,
    "pointer": {
     "at": [
      225,
@@ -615,7 +595,7 @@
     "hover": [],
     "element": "div.modal.export-dialog"
    },
-   "tdown": 33038,
+   "tdown": 33556,
    "state": {
     "focus": {
      "kind": "none"
@@ -764,9 +744,9 @@
     },
     "measure": null
    },
-   "t": 36799,
-   "te": 36799
+   "t": 37337,
+   "te": 37337
   }
  ],
- "t0_epoch_ms": 1795661220384
+ "t0_epoch_ms": 1795675927615
 }
