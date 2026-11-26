@@ -3,13 +3,15 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 16:28 UTC) — read first
+## RESUME HERE (11-26 17:14 UTC) — read first
 
-P0 scissor closed (11-26 15:36 UTC): no code regression; studios fetched 11-25 21:23 for Assembly 3, parity_assemblies
-didn't read imports/ (ac4efa6a queued; fddd23 0 diffs, bdddaf 1). 92138f/97ad5f leftovers told to core; qa told; lead
-answered again 16:28.
-Queued 16:40 UTC: e1fe3f14 (185542983: the 3 qa sketch tickets + lead's Tangent first pick, T1s green on vibex7).
-Uncommitted: TICKETS lines 29-32 were union-merge duplicates of fixed rows (dropped); commit + land after e1fe3f14.
+P0 scissor closed (11-26 15:36 UTC; ac4efa6a). Queued 17:12 UTC: 39897f2b (the 3 qa sketch tickets + Tangent first pick
+(also queued as e1fe3f14 at 16:40), TICKETS duplicates, and the SKETCH-ISO-ORIGIN-ALIGN T1).
+SKETCH-ISO-ORIGIN-ALIGN: no inference bug. At live's pixel ours infers nothing (T1). The replay's HORIZONTAL comes from
+its approach: three moves from the Top-plane click (885,486) cross the origin's horizontal band, and the snap holds
+(HOLD_PX 9.5) at the click, 9.3 px off; live's recorder parked the pointer at [1889, 932] for the `l` key step. Also,
+in our replay live's pixel lands ~1 px lower in y than in live. Seen with an instrumented replay on vibe2
+(~/tmp/skasm/uip). Replay fix (approach from live's recorded pointer) handed to the lead for psui (their 1e9efbed7).
 Queue empty but live waits: MEASURE-MAX-TIE (second tie take), the 1866 (d) retake, ASM-DRAG-REVOLUTE-ANGLE.
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
