@@ -24,7 +24,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (0.5599 + 0.1885) and has a 0.3563 edge at (5, -0.144, -44.007) and a 0.0469 one at (0.023, 4.132, -63.209).
   Next: is the run-on end ours (section_blend's trim) or the chamfer's 0.09 mm2? Fix the chamfer first if it is.
   Chamfer: OFFSET_ANGLE 3.5 mm 20 deg, 3 edges; Fillet 3: CONIC 3 mm rho 0.5. .f3e.sh <feature> = edges by length vs
-  live near the tube (ran 23:1x on the chamfer: read its output first, rerun if lost). .imp2.sh <feature> = debug log.
+  live near the tube (chamfer run: /root/core-scratch/f3e-chamfer.out, unread). .imp2.sh <feature> = debug log.
 - THEN screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
 - P1 PATTERN-AFTER-INSERTED-CHAMFER (lead 19:5x): already fixed by 6a8e411db (11-19); TICKETS row marked (b4dc6e1cf).
 - TRANSFORM-TRANSLATE-DISTANCE: LANDED 662228ffc, qa verified 21:5x (hem docs SAME); delete vibex7 ~/tmp/core/tr.
