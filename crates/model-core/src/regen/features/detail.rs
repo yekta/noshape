@@ -471,29 +471,16 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         attempted_round(ev);
         // Its picked edges that fail (live errors-1123 too-big: an edge's entry red, a picked face's not).
         let edges = ev.query("entities").iter().filter(|r| matches!(r, crate::reference::Reference::Edge(_))).cloned().collect();
-        ev.error_refs = failing_alone(ev, edges, fillet_in, "Failed to fillet selections.");
+        ev.error_refs = blamed_at_regen(edges);
     }
     r
 }
 
-/// The picks of a failed blend that fail on their own: live blames those (errors-1123: one edge too big, its entry
-/// red) and none when only the set fails (mistakes-1125: a block's 12 edges at R12, each alone builds).
-fn failing_alone(ev: &EvalCtx, picks: Vec<crate::reference::Reference>, run: fn(&mut EvalCtx) -> FResult<()>, message: &str) -> Vec<crate::reference::Reference> {
-    const MAX_TRIES: usize = 24;
-    if picks.len() <= 1 || ev.scratch {
-        return picks;
-    }
-    if picks.len() > MAX_TRIES {
-        return Vec::new();
-    }
-    picks.into_iter().filter(|r| {
-        let mut p = ev.params.clone();
-        p.set("entities", crate::params::ParamValue::Query(vec![r.clone()]));
-        let mut sub = EvalCtx::new(ev.feature, ev.name, &p, ev.units, ev.ctx.clone(), ev.outer_vars);
-        sub.cancel = ev.cancel.clone();
-        sub.scratch = true;
-        !ev.cancelled() && in_onshape_words(run(&mut sub), message).is_err_and(|e| e.message == message)
-    }).collect()
+/// The picks a failed blend blames at regeneration: a lone pick (live errors-1123 too big: its entry red), none of
+/// several (live mistakes-1125: a block's 12 edges at R12, each alone builds). Never a rerun per pick to find the
+/// ones that fail alone: regeneration doesn't pay for blame (c2-impeller-loft's failed Fillet took 52 s, not 1.1).
+fn blamed_at_regen(picks: Vec<crate::reference::Reference>) -> Vec<crate::reference::Reference> {
+    if picks.len() == 1 { picks } else { Vec::new() }
 }
 
 /// A fillet that fails shows the round it tried (live errors-1123, too big and a concave corner): each edge's ball strip
@@ -1400,7 +1387,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
     let res = in_onshape_words(chamfer_in(ev), "Failed to chamfer selections.");
     // Live errors-1123 too-big: its edges drawn red.
     if res.as_ref().is_err_and(|e| e.message == "Failed to chamfer selections.") {
-        ev.error_refs = failing_alone(ev, ev.query("entities").to_vec(), chamfer_in, "Failed to chamfer selections.");
+        ev.error_refs = blamed_at_regen(ev.query("entities").to_vec());
     }
     res
 }

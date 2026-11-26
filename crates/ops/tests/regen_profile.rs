@@ -953,3 +953,35 @@ fn gyro_chamfer_probe() {
     println!("GYRO parts after: {}", after.to_string().chars().take(1500).collect::<String>());
     let _ = std::fs::remove_file(&tmp);
 }
+
+/// P0 11-26 (bool): a failed Fillet regenerates without rerunning itself per edge to blame the ones that fail alone
+/// (only its dialog asks, off regeneration): c2-impeller-loft's "Fillet Ansaugflansch zum Gehaeuse" 1.1 s, 52-60 s with
+/// the reruns. The model suite's copy (NOSHAPE_PARITY_MODELS, /root/parity/models or ~/parity/models), translated.
+#[test]
+#[ignore = "T2: c2-impeller-loft from the parity models, a failed Fillet's regeneration time"]
+fn a_failed_fillet_regenerates_without_blaming_each_edge() {
+    let home = std::env::var("HOME").map(|h| std::path::PathBuf::from(h).join("parity/models")).unwrap_or_default();
+    let root = std::env::var("NOSHAPE_PARITY_MODELS").map(std::path::PathBuf::from).unwrap_or_else(|_| if std::path::Path::new("/root/parity/models").is_dir() { std::path::PathBuf::from("/root/parity/models") } else { home });
+    let Some((features, _, refs)) = super::parity::read_model(&root.join("c2-impeller-loft")) else {
+        eprintln!("c2-impeller-loft: not in {}", root.display());
+        return;
+    };
+    let mut ctx = noshape_ops::Ctx::new();
+    let path = std::env::temp_dir().join(format!("noshape-failed-fillet-{}.noshape", std::process::id()));
+    let mut t = noshape_ops::parity::Translator::open(&mut ctx, &path, &features, noshape_ops::parity::parse_refs(&refs)).expect("translated");
+    for k in 0..t.len() {
+        let _ = t.step(k);
+    }
+    drop(t);
+    let doc = ctx.doc(path.to_str()).expect("the document").doc().clone();
+    let _ = std::fs::remove_file(&path);
+    const NAME: &str = "Fillet Ansaugflansch zum Gehaeuse";
+    let ps = doc.tabs.iter().find_map(|tab| match &tab.content {
+        TabContent::PartStudio(ps) if ps.features.iter().any(|f| f.name == NAME) => Some(ps.clone()),
+        _ => None,
+    }).expect("the Part Studio with the Fillet");
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &doc.settings.units, &RegenOptions::default());
+    let (f, s) = ps.features.iter().zip(&r.display.features).find(|(f, _)| f.name == NAME).expect("its state");
+    eprintln!("{} {:?} {:?}: {:.0} ms", f.name, s.status, s.message, s.time_ms);
+    assert!(s.time_ms < 10_000.0, "{NAME}: {:.0} ms ({:?} {:?}; 1.1 s without per-edge blame)", s.time_ms, s.status, s.message);
+}
