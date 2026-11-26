@@ -161,11 +161,28 @@ docs/DECISIONS.md (read first; it wins over anything here).
   foreshorten, the two extrude takes from 2ff0dfee checked out then restored): base 78/81 -> new 81/81, 1011/1011.
   drawing-ui lib tests 193 ok.
 
+## LANDING 11-26 19:09, c76091651 replay + 72dfe3dd4 gdt (lead 17:5x: gdt T1 + replay checks, commit, ops e2e, land, report)
+- Drawing rerun (verify13, ~/tmp/psui/ver13n|ver13g, names13.txt): this morning 75 failed; green 91c15afe9 81/86
+  (814/828); branch 85/86 (830/834). The one left, drw-geometric-tolerance, matches now (below).
+- REPLAY APPROACH (lead 17:2x): run.py live_pointer_from (where live's pointer rested before each step: a key step's
+  pointer.at, e.g. parked [1889,932] by run.mjs l.49, else the last click's at) -> NOSHAPE_UI_LIVE_FROM; ui_script.rs
+  live_from(): jump there first, then 8 moves to a sketch_point (run.mjs l.288), else 3; a menu row is reached from
+  our own pointer (the jump swapped the open submenu: folder-menu-collapse-then-expand-all s10, 3/3 runs). No ~1 px
+  vertical offset (107 clicks: dy mean +0.08, |dy| <= 0.46 px). A/B (verify15, names11 = 18 takes since 14:05 +
+  sample100 + 2 gdt): without 114/120, with 113/120 (only the folder-menu s10, fixed after); drag-fixed-line matches
+  both ways. verify17 (menu fix, ~/tmp/psui/ver17n): 116/120; left: 3 sketch mistakes (skasm's e709bc2d1 covers
+  mirror-no-line, offset-negative; dimension-construction s11) + asm-measure-face-cylinder-panel (Measure reader).
+- Tests: drawing-ui 215, ops e2e 313, clippy (drawing-ui, app) clean. Lead not told yet: report on land.
+- GEOMETRIC TOLERANCE (live 7062): empty slots: the edge lights and reads as selected, its click places nothing and
+  starts a leader (the edge stays lit), the next click places ONE ⌖ frame with it, Esc keeps it; edge click + Esc
+  places nothing. gdt_empty removed; drawing_ui_state.rs Tool::Gdt lights the hovered / leader edge. T1
+  an_empty_geometric_tolerance_places_one_frame_after_an_edge_click (replaces feel::an_empty_..._places_nothing).
+  App: drw-geometric-tolerance 6/6, -edge-then-escape 9/9 (with the takes of live's 6b1c85cd4, not on main yet).
+  Our listed position (82.9, 93.0) vs live (84.5, 94.1) is within the comparison's tolerance.
+
 ## NEXT
-1. SKETCH-ISO-ORIGIN-ALIGN: our iso alignment reach (sketch/src/inference.rs off_y, 7.5 px on screen) vs live.
-2. Geometric tolerance once live answers (REQUESTS 12:24; live gdt.md: empty frame silent, Position default,
-   leader end snaps to a nearby hole centre).
-3. Older: asm Measure panel reader, asm-drag-revolute-turns (REQUESTS 11:33), radial drag rule.
+- SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Older: asm Measure panel
+  reader, radial drag rule. qa 18:0x (from 70): the Hole rows 'Ø 5 mm THRU' / field Diameter are not shown.
 
 ## Agents
 
