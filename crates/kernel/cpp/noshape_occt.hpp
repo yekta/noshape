@@ -866,6 +866,7 @@ PropsF                   props_volume_precise(const OcShape& s);
 P3                       props_volume_centre_estimate(const OcShape& s);
 double                   props_volume_estimate(const OcShape& s);
 double                   volume_change(const OcShape& a, const OcShape& b);
+double                   volume_change_estimate(const OcShape& a, const OcShape& b);
 double                   max_edge_tolerance(const OcShape& s);
 PropsF                   props_surface(const OcShape& s);
 double                   area_fast(const OcShape& s);

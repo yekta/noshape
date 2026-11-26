@@ -1031,9 +1031,20 @@ fn closed_run_on(shape: &Shape, ef: &[Vec<u32>], tools: Vec<RunOnTool>, scale: f
 /// (a flange's rim, three probes), halving where the guesses stall.
 fn face_reach(face: &Shape, p: DVec3, u: DVec3, setback: f64, scale: f64) -> FResult<f64> {
     let tol = |t: f64| (scale * 1e-7).max(t * 1e-4);
+    // On the face where the probe's nearest point is inside it: off it along its normal there (a curved face bends
+    // away from `u`; judged by the distance alone, its probes crept back towards `p`: ~27 a station, 3 s of
+    // c2-impeller-loft's Fillet Bohrungssitz Ansaugflasch).
     let probe = |t: f64| -> FResult<(bool, f64)> {
-        let d = k::distance(&k::make_vertex(p + u * t)?, face)?;
-        Ok((d.distance <= tol(t), (d.point_b - p).dot(u)))
+        let q = p + u * t;
+        let d = k::distance(&k::make_vertex(q)?, face)?;
+        let inside = || {
+            let off = q - d.point_b;
+            face.normal_at_point(d.point_b).is_ok_and(|n| {
+                let n = n.normalize_or_zero();
+                (off - n * off.dot(n)).length() <= tol(t)
+            })
+        };
+        Ok((d.distance <= tol(t) || inside(), (d.point_b - p).dot(u)))
     };
     let (on, mut guess) = probe(setback)?;
     if on {

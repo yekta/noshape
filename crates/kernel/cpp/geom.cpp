@@ -1630,13 +1630,9 @@ double props_volume_estimate(const OcShape& s)
   return out.Mass();
 }
 
-// The volume `b` has more than `a`: only the faces either has that the other doesn't (a Boolean's untouched faces are
-// the same faces) integrated, by one divergence field, so the shared faces' terms cancel exactly; milliseconds where
-// two whole volumes took ~0.5 s on a 180-face part (asm-isaac-ball's Extrude 41).
-double volume_change(const OcShape& a, const OcShape& b)
+// The faces `a` has that `b` hasn't (gone) and `b` has that `a` hasn't (added).
+static void unshared_faces(const OcShape& a, const OcShape& b, std::vector<TopoDS_Shape>& gone, std::vector<TopoDS_Shape>& added)
 {
-  require_non_null(a.shape, "a");
-  require_non_null(b.shape, "b");
   TopTools_IndexedMapOfShape fa, fb;
   for (TopExp_Explorer e(a.shape, TopAbs_FACE); e.More(); e.Next())
     fa.Add(e.Current());
@@ -1653,7 +1649,39 @@ double volume_change(const OcShape& a, const OcShape& b)
     }
     return out;
   };
-  const std::vector<TopoDS_Shape> gone = only(fa, fb), added = only(fb, fa);
+  gone  = only(fa, fb);
+  added = only(fb, fa);
+}
+
+double volume_change_estimate(const OcShape& a, const OcShape& b)
+{
+  require_non_null(a.shape, "a");
+  require_non_null(b.shape, "b");
+  std::vector<TopoDS_Shape> gone, added;
+  unshared_faces(a, b, gone, added);
+  // (Each set's terms about the same point, the origin: the shared faces' would cancel.)
+  auto volume = [](const std::vector<TopoDS_Shape>& fs) {
+    BRep_Builder    bb;
+    TopoDS_Compound c;
+    bb.MakeCompound(c);
+    for (const TopoDS_Shape& f : fs)
+      bb.Add(c, f);
+    GProp_GProps out;
+    BRepGProp::VolumeProperties(c, out);
+    return out.Mass();
+  };
+  return volume(added) - volume(gone);
+}
+
+// The volume `b` has more than `a`: only the faces either has that the other doesn't (a Boolean's untouched faces are
+// the same faces) integrated, by one divergence field, so the shared faces' terms cancel exactly; milliseconds where
+// two whole volumes took ~0.5 s on a 180-face part (asm-isaac-ball's Extrude 41).
+double volume_change(const OcShape& a, const OcShape& b)
+{
+  require_non_null(a.shape, "a");
+  require_non_null(b.shape, "b");
+  std::vector<TopoDS_Shape> gone, added;
+  unshared_faces(a, b, gone, added);
   Bnd_Box box;
   BRepBndLib::Add(b.shape, box);
   gp_XYZ o;

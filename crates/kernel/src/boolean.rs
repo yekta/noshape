@@ -292,9 +292,16 @@ fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolea
     let solids = |l: &[Shape]| l.iter().all(|x| x.count(crate::ShapeType::Solid) > 0);
     if op == BooleanOp::Fuse && opts.glue == Glue::Off && res.shape.count(crate::ShapeType::Solid) == 0 && solids(objects) && solids(tools) {
         let glued = BooleanOptions { glue: Glue::Shift, ..*opts };
-        if let Ok(g) = ck(ffi::op_boolean(code, &a, &t, &glued.ffi())).map(OpResult::from_ffi) {
-            let sum: f64 = objects.iter().chain(tools).filter_map(|x| x.volume().ok()).sum();
-            if g.shape.count(crate::ShapeType::Solid) > 0 && g.shape.volume().is_ok_and(|v| (v - sum).abs() <= 1e-6 * sum.abs()) {
+        // The volumes only for a glued solid, the plain estimates first to rule out a clear miss (two exact ones of a
+        // 59-face part took 1 s of c2-impeller-loft's Move face 1, whose glued fuse had no solid either).
+        if let Ok(g) = ck(ffi::op_boolean(code, &a, &t, &glued.ffi())).map(OpResult::from_ffi)
+            && g.shape.count(crate::ShapeType::Solid) > 0
+        {
+            let adds_up = |vol: &dyn Fn(&Shape) -> Result<f64>, tol: f64| {
+                let sum: f64 = objects.iter().chain(tools).filter_map(|x| vol(x).ok()).sum();
+                vol(&g.shape).is_ok_and(|v| (v - sum).abs() <= tol * sum.abs())
+            };
+            if adds_up(&crate::props::volume_estimate, 1e-2) && adds_up(&|x: &Shape| x.volume(), 1e-6) {
                 return Ok(g);
             }
         }

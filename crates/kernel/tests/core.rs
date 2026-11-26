@@ -1674,7 +1674,8 @@ fn a_sheet_with_sharp_edges_thickens_with_its_offsets_meeting() {
 }
 
 /// A cut's volume change from the faces it touched only: the hole's volume taken off (most faces shared), nothing
-/// for the part against itself, and the same as two whole volumes for a shape sharing no face.
+/// for the part against itself, and the same as two whole volumes for a shape sharing no face; its plain estimate
+/// alike.
 #[test]
 fn a_volume_change_counts_only_the_faces_not_shared() {
     let mm = 1e-3;
@@ -1687,6 +1688,10 @@ fn a_volume_change_counts_only_the_faces_not_shared() {
     assert_eq!(volume_change(&cut, &cut).unwrap(), 0.0, "nothing against itself");
     let other = make_box_corners(DVec3::ZERO, DVec3::new(20.0, 30.0, 10.0) * mm).unwrap();
     assert!((volume_change(&block, &other).unwrap() / (mm * mm * mm) + 6000.0).abs() < 1e-6, "no shared face: the whole difference");
+    // The plain estimate alike (plane and cylinder faces: within a thousandth of a mm³).
+    assert!((volume_change_estimate(&block, &cut).unwrap() / (mm * mm * mm) + hole).abs() < 1e-3, "estimate: the hole taken off");
+    assert_eq!(volume_change_estimate(&cut, &cut).unwrap(), 0.0, "estimate: nothing against itself");
+    assert!((volume_change_estimate(&block, &other).unwrap() / (mm * mm * mm) + 6000.0).abs() < 1e-3, "estimate: no shared face");
 }
 
 /// A surface loft between two open curves: its edges from end to end are lines, as live's (c2-surfaces-lofts-projected's

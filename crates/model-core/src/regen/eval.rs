@@ -2175,11 +2175,16 @@ pub fn unchanged(a: &Shape, b: &Shape) -> bool {
             return false;
         }
     }
+    let size = ba.max - ba.min;
+    let room = size.x * size.y * size.z;
+    // A clear change by the plain integral first: where the Boolean rebuilt every face none are shared, and the exact
+    // one took 3.1 s on c2-impeller-loft's Remove Bohrung Ansaugflansch (its offset faces ~1 s each).
+    if noshape_kernel::volume_change_estimate(a, b).is_ok_and(|e| e.abs() > 1e-5 * room) {
+        return false;
+    }
     // The volume between them from the faces they don't share (two whole volumes: ~0.5 s on asm-isaac-ball's 180-face
     // part); the part's own volume (at most its box's) only where that change is near the 1e-9 bound.
     let Ok(d) = noshape_kernel::volume_change(a, b) else { return false };
-    let size = ba.max - ba.min;
-    let room = size.x * size.y * size.z;
     if d.abs() > 1e-9 * room {
         return false;
     }

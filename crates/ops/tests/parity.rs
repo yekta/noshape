@@ -2483,6 +2483,20 @@ fn an_exchange_import_is_read_in_mm() {
     assert_eq!((mesh[0].faces, mesh[0].edges, mesh[0].vertices, mesh[0].body_type.as_str()), (0, 0, 0, ""));
 }
 
+/// c2-impeller-loft's full regeneration within its budget: 26 s in v0.4.71, 46.6 s once Move face 2 worked as live's
+/// (IMPELLER-LOFT-REGEN-TIME: a Remove's volume check integrating every rebuilt face exactly, a glued fuse's volumes,
+/// a round's reach probes creeping along curved faces); live 2.5 s.
+#[test]
+#[ignore = "T2: live's models from /root/parity/models (other people's work, never in the repo); timed"]
+fn parity_impeller_loft_regenerates_in_time() {
+    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let Some((features, live, refs)) = read_model(&root.join("c2-impeller-loft")) else { panic!("c2-impeller-loft not under {}", root.display()) };
+    let r = run_model("c2-impeller-loft", &features, &live, &refs);
+    let Some((ms, _)) = r.regen_ms else { panic!("not regenerated: {:?}", r.first) };
+    println!("c2-impeller-loft: regenerated in {ms:.0} ms (slowest: {:?})", r.slowest);
+    assert!(ms < 40_000.0, "{ms:.0} ms (slowest: {:?})", r.slowest);
+}
+
 #[test]
 #[ignore = "T2: live's models from /root/parity/models (other people's work, never in the repo)"]
 fn parity_models() {

@@ -52,6 +52,12 @@ pub fn volume_change(a: &Shape, b: &Shape) -> Result<f64> {
     ck(ffi::volume_change(a.raw(), b.raw()))
 }
 
+/// [`volume_change`] by plain Gauss integration: loose on B-spline faces, quick where every face is new (a whole
+/// part's exact integral can take seconds on offset surfaces).
+pub fn volume_change_estimate(a: &Shape, b: &Shape) -> Result<f64> {
+    ck(ffi::volume_change_estimate(a.raw(), b.raw()))
+}
+
 /// [`volume_properties`] with the centre of mass and inertia integrated
 /// tighter (the mass properties shown; slower, not cached).
 pub fn mass_properties(shape: &Shape) -> Result<MassProperties> {
