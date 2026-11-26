@@ -8,7 +8,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 Queued: df113102 (Mirror skips the sketch's regions), 8742ccbc (parity connector, 14->15/27), 0a0a16acf (kernel
 shown_topology: crosses_closure walks the seam past later rings' vertices; hunting-knife Split 4 48 -> 51/52; the full
 corpus run with a print showed only hunting-knife takes the new path; T1 a_ring_round_a_lofts_closure_keeps_a_vertex_there).
-hunting-knife next: Fillet 8 "HANDLE" 16/34/20 vs live 15/37/25 (fillet: core's, report).
+NOW (lead 22:1x, core told): hunting-knife Fillet 8 "HANDLE" 16/34/20 vs live 15/37/25 (feature 51, dump index 51 with
+bin/edgedbg.sh c2-hunting-knife + skdbg-parity.patch; edgecmp.py ... "Fillet 8" HANDLE corp/edges 51 3), then
+c2-surf-workshop-knifehandle Mutual trim 1 (core's list). SURF-INTRO-CAR waits on live.
 surf-intro-offset Offset surfaces 1 (22:07): NOT the offset. Its source, Derived 1's "Car" (derived studio b7635b82,
 run as its own doc: cp models/c2-surf-intro-offset/derived/b7635b82*/* models/zz-surf-derived on vibex7; its wire-count
 DIFFs are the recording's), differs from Loft 1 on: Loft 1 sheet 12748.845 mm2 vs 12749.860 (two projected curves),
