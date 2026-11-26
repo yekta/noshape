@@ -1,0 +1,31 @@
+{
+ "name": "drw-view-tangent-edges-menu",
+ "about": "Front view of the chamfered + filleted block: right-click \u203a hover Tangent edges \u25b8 (its rows and which is checked), then Escape twice",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "live first-week drawing audit 11-26 (gap-audit-drw-1126; qa DRW-FIRST-WEEK-TANGENT)",
+ "start": "chamfer-fillet-block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "view": "Isometric"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Tangent edges"
+   },
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

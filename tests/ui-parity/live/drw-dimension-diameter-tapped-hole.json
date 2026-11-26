@@ -1,6 +1,6 @@
 {
  "scenario": "drw-dimension-diameter-tapped-hole",
- "recorded": "2026-11-26T12:11:05.986Z",
+ "recorded": "2026-11-26T13:13:08.902Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "a2c19f76d1ae1985a3d96961",
+  "element": "b5973efc2be9e70361c4d1f3",
   "start": "hole-types-plate-drawing",
   "startElement": "009dbd492c79c55d1f021138",
   "runner": "live2 .nstate-uip-4.json"
@@ -125,9 +125,9 @@
     }
    },
    "ok": true,
-   "ti": 216806,
-   "tdown": 216858,
-   "tmove": 218073,
+   "ti": 208988,
+   "tdown": 209074,
+   "tmove": 210462,
    "moves": 2,
    "at": [
     631,
@@ -228,8 +228,8 @@
      }
     }
    },
-   "t": 247625,
-   "te": 247626
+   "t": 241078,
+   "te": 241078
   },
   {
    "step": 2,
@@ -247,10 +247,10 @@
     }
    },
    "ok": true,
-   "ti": 247626,
-   "tmove": 249442,
+   "ti": 241078,
+   "tmove": 242956,
    "moves": 1,
-   "tdown": 249755,
+   "tdown": 243337,
    "at": [
     756,
     358
@@ -355,8 +355,8 @@
      }
     }
    },
-   "t": 277557,
-   "te": 277557
+   "t": 271458,
+   "te": 271458
   },
   {
    "step": 3,
@@ -374,10 +374,10 @@
     }
    },
    "ok": true,
-   "ti": 277557,
-   "tmove": 279440,
+   "ti": 271458,
+   "tmove": 273052,
    "moves": 1,
-   "tdown": 279769,
+   "tdown": 273402,
    "at": [
     773,
     443
@@ -486,8 +486,8 @@
      }
     }
    },
-   "t": 308359,
-   "te": 308359
+   "t": 301060,
+   "te": 301060
   },
   {
    "step": 4,
@@ -496,13 +496,13 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 308359,
+   "ti": 301060,
    "pointer": {
     "at": null,
     "hover": [],
     "element": null
    },
-   "tdown": 308375,
+   "tdown": 301078,
    "state": {
     "focus": {
      "kind": "other",
@@ -612,9 +612,9 @@
      }
     }
    },
-   "t": 338360,
-   "te": 338360
+   "t": 330475,
+   "te": 330475
   }
  ],
- "t0_epoch_ms": 1795694864501
+ "t0_epoch_ms": 1795698595162
 }
