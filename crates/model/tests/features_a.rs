@@ -3721,8 +3721,9 @@ fn a_curvature_fillet_of_a_concave_corner_adds_material() {
 }
 
 /// A Curvature round run across a tighter round's end (setback 9 mm over a 7.24 mm round, whose curve bends tighter
-/// than 9 mm): its sections fold back there, and it removes the union of its sections, 827.0 mm³ computed apart (as
-/// c2-body-draft-naming's Fillet 2, which failed; live 1.8% more there, its round pinched at the corner).
+/// than 9 mm): its sections fold back there, and its corner is three-sided, as live c2-body-draft-naming's Fillet 2 (the
+/// same corner: live's Fill 1 of its three edges is its corner face, 121.947 mm², edges 11.778, 14.741 and 14.741 mm;
+/// its two neighbours 14.362 mm² smaller than the sections' union). Ours a G1 fill, as our Fill (120.35 mm²).
 #[test]
 fn a_round_across_a_tighter_rounds_end_folds_and_holds() {
     let mut t = T::new();
@@ -3742,7 +3743,14 @@ fn a_round_across_a_tighter_rounds_end_folds_and_holds() {
     assert!(after[0].shape.is_valid());
     assert_eq!(after[0].shape.open_edges().unwrap(), 0);
     let removed = (before - total_volume(&res.context)) * 1e9;
-    assert!((removed - 827.0).abs() < 0.6, "{removed} mm³ removed");
+    assert!(removed > 835.0 && removed < 850.0, "{removed} mm³ removed (the sections' union 827.0, live's corner about 842.3)");
+    let c = DVec3::new(0.04, 0.009, 0.037);
+    let corner = after[0].shape.faces().into_iter().find(|f| f.edges().len() == 3 && f.vertices().iter().any(|v| v.vertex_point().is_ok_and(|p| p.distance(c) < 1e-9))).expect("a three-sided corner at C");
+    let mut lengths: Vec<f64> = corner.edges().iter().map(|e| e.length().unwrap() * 1e3).collect();
+    lengths.sort_by(f64::total_cmp);
+    assert!((lengths[0] - 11.778).abs() < 1e-3 && lengths[1..].iter().all(|l| (l - 14.7414).abs() < 1e-3), "{lengths:?}");
+    let area = corner.area().unwrap() * 1e6;
+    assert!((area - 121.947).abs() < 2.0, "{area} mm²");
 }
 
 /// A Curvature round wider than the face beside it runs on across it and is trimmed by the face beyond (live

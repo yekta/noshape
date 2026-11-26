@@ -563,6 +563,29 @@ fn section_wire(p: DVec3, f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> 
     Ok((k::make_wire(&edges)?, edges, convex))
 }
 
+/// A folding piece's three-sided corner (live c2-body-draft-naming's Fillet 2 across Fillet 1's end): where its
+/// neighbours' contacts on the face it doesn't fold on end at the joints (A, B), and where their contacts on the face it
+/// folds on meet (C, their lines' closest point). `before` and `after`: stations just inside the neighbours; `start` and
+/// `end`: the folding piece's own frames there.
+fn pinch_corner(spec: &BlendSpec, side: usize, before: &(DVec3, Frame, bool, DVec3), after: &(DVec3, Frame, bool, DVec3), [start, end]: [&Frame; 2], scale: f64) -> FResult<Option<[DVec3; 3]>> {
+    let contacts = |(p, fr, first, _): &(DVec3, Frame, bool, DVec3), own: &Frame| -> FResult<Option<(DVec3, DVec3)>> {
+        let s = setbacks(fr, spec, *first)?;
+        let at = |j: usize| *p + fr.u[j] * [s.0, s.1][j];
+        Ok((0..2).find(|&j| fr.m[j].dot(own.m[side]) > 1.0 - 1e-6).map(|j| (at(j), at(1 - j))))
+    };
+    let (Some((a1, a)), Some((a2, b))) = (contacts(before, start)?, contacts(after, end)?) else { return Ok(None) };
+    let (d1, d2) = (before.3, after.3);
+    let (dd, w) = (d1.dot(d2), a1 - a2);
+    let denom = 1.0 - dd * dd;
+    if denom < 1e-6 {
+        return Ok(None);
+    }
+    let t = (dd * d2.dot(w) - d1.dot(w)) / denom;
+    let s = (d2.dot(w) - dd * d1.dot(w)) / denom;
+    let (q1, q2) = (a1 + d1 * t, a2 + d2 * s);
+    Ok((q1.distance(q2) < scale * 1e-7).then_some([a, b, (q1 + q2) / 2.0]))
+}
+
 /// Onshape's curvature-continuous blend section (live G11, exact): a quintic
 /// B-spline, knots 0⁶ ½² 1⁶, from tangent point `a` to `b` around `corner`.
 /// In units of the setbacks along the two faces, the control points are
@@ -1420,6 +1443,8 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     }
     // (A convex round on a line run past its faces: crossing ones checked below.)
     let mut past_faces = false;
+    // (A folding piece between two lines' pieces: its corner, filled after the Booleans.)
+    let mut pinched: Option<(usize, [DVec3; 3])> = None;
     for &(lo, hi, held) in ranges.iter().filter(|_| !ball) {
     if general || held {
         const N: usize = 64;
@@ -1543,6 +1568,20 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             let n = if folds[pi].is_some() { 2 * n } else { n };
             // (Stations a hair inside a piece: one at its end vertex belongs to its own edge.)
             let nudge = if pieces.len() > 1 { 1e-9 * total } else { 0.0 };
+            let line_at = |q: usize| matches!(chain[pieces[q].2].shape.edge_curve(), Ok(k::Curve::Line { .. }));
+            if let Some((side, _)) = folds[pi]
+                && pi > 0
+                && pi < last_piece
+                && line_at(pi - 1)
+                && line_at(pi + 1)
+            {
+                let (before, after) = (station(plo - nudge)?, station(phi + nudge)?);
+                let (start, end) = (station(plo + nudge)?.1, station(phi - nudge)?.1);
+                pinched = pinch_corner(spec, side, &before, &after, [&start, &end], scale)?.map(|p| (ci, p));
+                if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                    eprintln!("section blend: folding piece {pi}'s corner {pinched:?}");
+                }
+            }
             let mut secs = Vec::new();
             let mut starts = Vec::new();
             let mut convex = false;
@@ -2057,6 +2096,17 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             let collapsed = k::collapse_short_edges(&shape, &made, SLIVER)?;
             names = ev.name_result(&[&crate::regen::eval::names_for(&shape, names)], &collapsed.history, &collapsed.shape, &BTreeMap::new(), None);
             shape = collapsed.shape;
+        }
+    }
+    // A folding round's corner as live's: three-sided, filled.
+    if let Some((ci, corner)) = pinched {
+        let corner_name = TopoName::face(feature, Role::Blend(body.edges[chain[ci].index].clone()));
+        let filled = fill_pinched_corner(&shape, &names, &corner_name, corner, scale)?;
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("section blend: pinched corner filled: {}", filled.is_some());
+        }
+        if let Some((s, n)) = filled {
+            (shape, names) = (s, n);
         }
     }
     // (A surface's round: one surface again.)
@@ -5386,6 +5436,140 @@ pub fn chamfer_offsets(shape: &Shape, e: usize, faces: [&Shape; 2], chamfer: Cha
         return Ok(None);
     }
     Ok(Some(Some([curves[0](x[0]).0.length(), curves[1](x[1]).0.length()])))
+}
+
+/// A folding round's corner as live's (c2-body-draft-naming's Fillet 2 across Fillet 1's end, live's Fill 1 of its three
+/// edges = its corner face): its neighbours' rounds cut back along the lines from A and B, where they meet the face the
+/// round doesn't fold on, to C, where their contacts on the face it folds on meet (straight in their parameters: 14.7412
+/// mm, live's 14.7414), and the three-sided hole left by them and the corner (named `corner`) filled as the Fill feature
+/// fills its rim. None where it doesn't come out one valid solid.
+fn fill_pinched_corner(shape: &Shape, names: &[Name], corner: &TopoName, [a, b, c]: [DVec3; 3], scale: f64) -> FResult<Option<(Shape, Vec<Name>)>> {
+    let tol = scale * 1e-7;
+    let faces = shape.faces();
+    let near = |p: DVec3, q: DVec3| p.distance(q) < tol * 100.0;
+    let has = |f: &Shape, p: DVec3| f.vertices().iter().any(|v| v.vertex_point().is_ok_and(|q| near(p, q)));
+    let corner_set: Vec<usize> = (0..faces.len()).filter(|&i| names.get(i).is_some_and(|n| n.descends_from(corner))).collect();
+    let round_with = |p: DVec3| (0..faces.len()).find(|&i| !corner_set.contains(&i) && !faces[i].is_planar() && has(&faces[i], c) && has(&faces[i], p));
+    let (Some(ia), Some(ib)) = (round_with(a), round_with(b)) else { return Ok(None) };
+    if corner_set.is_empty() || ia == ib {
+        return Ok(None);
+    }
+    let made = (|| -> Result<Option<(Shape, Vec<Name>)>, k::KernelError> {
+        // The line from `p` to C on face `i`, straight in its parameters.
+        let cut = |i: usize, p: DVec3| -> Result<Option<Shape>, k::KernelError> {
+            let f = &faces[i];
+            let (pp, pc) = (f.project_point(p)?, f.project_point(c)?);
+            if pp.distance > tol * 100.0 || pc.distance > tol * 100.0 {
+                return Ok(None);
+            }
+            let pts = (0..=16).map(|j| f.point_at_uv(pp.u + (pc.u - pp.u) * j as f64 / 16.0, pp.v + (pc.v - pp.v) * j as f64 / 16.0)).collect::<Result<Vec<_>, _>>()?;
+            Ok(Some(k::make_edge_on(f, &pts)?))
+        };
+        let (Some(ca), Some(bc)) = (cut(ia, a)?, cut(ib, b)?) else { return Ok(None) };
+        let split = k::split_on(shape, &[ca.clone(), bc.clone()], tol)?.shape;
+        let sf = split.faces();
+        let ef = split.edge_faces()?;
+        let edges = split.edges();
+        // Each split face near the corner by the old face it lies on: the corner's, or a piece of a neighbour.
+        let mine: Vec<usize> = corner_set.iter().copied().chain([ia, ib]).collect();
+        let boxes: Vec<k::BoundingBox> = mine.iter().map(|&i| faces[i].bounding_box(true)).collect::<Result<_, _>>()?;
+        let pad = DVec3::splat(tol * 100.0);
+        let origin: Vec<Option<usize>> = sf
+            .iter()
+            .map(|f| {
+                let p = super::helpers_a::point_on_face(f)?;
+                mine.iter().zip(&boxes).find(|(i, bx)| (bx.min - pad).cmple(p).all() && p.cmple(bx.max + pad).all() && faces[**i].contains_point(p, tol * 10.0).unwrap_or(false)).map(|(i, _)| *i)
+            })
+            .collect();
+        let on_cut = |e: &Shape| -> Result<bool, k::KernelError> {
+            let i = e.edge_info()?;
+            let mid = k::make_vertex(e.point_at(0.5 * (i.first_param + i.last_param))?)?;
+            Ok(k::distance(&mid, &ca)?.distance < tol * 10.0 || k::distance(&mid, &bc)?.distance < tol * 10.0)
+        };
+        let cut_edge: Vec<bool> = edges.iter().zip(&ef).map(|(e, fs)| if fs.iter().any(|&f| origin[f as usize].is_some_and(|o| o == ia || o == ib)) { on_cut(e) } else { Ok(false) }).collect::<Result<_, _>>()?;
+        // The corner and what lies past the cuts from it.
+        let mut dropped: Vec<bool> = origin.iter().map(|o| o.is_some_and(|o| corner_set.contains(&o))).collect();
+        let mut stack: Vec<usize> = (0..sf.len()).filter(|&i| dropped[i]).collect();
+        while let Some(i) = stack.pop() {
+            for (ei, fs) in ef.iter().enumerate() {
+                if cut_edge[ei] || !fs.contains(&(i as u32)) {
+                    continue;
+                }
+                for j in fs.iter().map(|&j| j as usize) {
+                    if !dropped[j] && origin[j].is_some() {
+                        dropped[j] = true;
+                        stack.push(j);
+                    }
+                }
+            }
+        }
+        // (Each neighbour keeps a piece.)
+        if [ia, ib].iter().any(|&n| !(0..sf.len()).any(|i| origin[i] == Some(n) && !dropped[i])) {
+            return Ok(None);
+        }
+        // The hole's rim: each edge between a dropped face and a kept one, with the kept one, in order round it.
+        let mut rim: Vec<(Shape, usize, DVec3, DVec3)> = Vec::new();
+        let mut cuts_on_rim = 0;
+        for (ei, fs) in ef.iter().enumerate() {
+            let (d, kept): (Vec<usize>, Vec<usize>) = fs.iter().map(|&f| f as usize).partition(|&f| dropped[f]);
+            if d.len() == 1 && kept.len() == 1 {
+                let i = edges[ei].edge_info()?;
+                rim.push((edges[ei].clone(), kept[0], i.start, i.end));
+                cuts_on_rim += cut_edge[ei] as usize;
+            }
+        }
+        if rim.len() < 3 || cuts_on_rim != 2 {
+            return Ok(None);
+        }
+        let mut ordered = vec![rim.remove(0)];
+        let mut end = ordered[0].3;
+        while !rim.is_empty() {
+            let Some(next) = rim.iter().position(|r| near(r.2, end) || near(r.3, end)) else { return Ok(None) };
+            let r = rim.remove(next);
+            end = if near(r.2, end) { r.3 } else { r.2 };
+            ordered.push(r);
+        }
+        if !near(end, ordered[0].2) {
+            return Ok(None);
+        }
+        // (As the Fill feature's G2 of those edges: OCCT's plate declines it, the fair G1 fill.)
+        let fill = [k::Continuity::Curvature, k::Continuity::Tangent].into_iter().find_map(|continuity| {
+            let boundary: Vec<k::FillEdge> = ordered.iter().map(|(e, f, _, _)| k::FillEdge { edge: e.clone(), support: Some(sf[*f].clone()), continuity }).collect();
+            k::fill_surface(&boundary, &[]).ok().map(|r| r.shape).filter(|r| r.is_valid())
+        });
+        let Some(fill) = fill.and_then(|f| f.faces().into_iter().next()) else { return Ok(None) };
+        let mut parts: Vec<Shape> = sf.iter().zip(&dropped).filter(|(_, d)| !**d).map(|(f, _)| f.clone()).collect();
+        parts.push(fill);
+        let sewn = k::sew(&parts, tol * 10.0, true)?.shape;
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+            eprintln!("section blend: corner fill sewn: valid {} solids {} open {:?}", sewn.is_valid(), sewn.count(ShapeType::Solid), sewn.open_edges());
+        }
+        if !sewn.is_valid() || sewn.count(ShapeType::Solid) != 1 || sewn.open_edges()? != 0 {
+            return Ok(None);
+        }
+        // Each face named after the old face it lies on; the fill the corner's.
+        let corner_name = names[corner_set[0]].clone();
+        let old_boxes: Vec<k::BoundingBox> = faces.iter().map(|f| f.bounding_box(true)).collect::<Result<_, _>>()?;
+        let named = sewn
+            .faces()
+            .iter()
+            .map(|f| {
+                let p = super::helpers_a::point_on_face(f);
+                let from = p.and_then(|p| (0..faces.len()).filter(|i| !corner_set.contains(i)).find(|&i| (old_boxes[i].min - pad).cmple(p).all() && p.cmple(old_boxes[i].max + pad).all() && faces[i].contains_point(p, tol * 10.0).unwrap_or(false)));
+                from.map_or_else(|| corner_name.clone(), |i| names[i].clone())
+            })
+            .collect();
+        Ok(Some((sewn, named)))
+    })();
+    match made {
+        Ok(r) => Ok(r),
+        Err(e) => {
+            if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
+                eprintln!("section blend: corner fill failed: {e}");
+            }
+            Ok(None)
+        }
+    }
 }
 
 /// Where a round of radius `r` runs into a tube it also rounds onto, OCCT's fillet leaves a corner patch (a B-spline
