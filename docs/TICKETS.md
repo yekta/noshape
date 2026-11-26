@@ -9256,4 +9256,4 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
 
 ## qa 11-26 17:3x: hole/thread callout rerun (suites/uipcall-1126, green 4dd73153a)
 - 4/6, 38/46. Verified: tapped thread callout, blind depth, diameter on the tapped hole (one Esc ends the tool, psui 480d4233e), Tangent edges submenu greys the current style (psui e230bec20).
-- P2 **DRW-HOLE-CALLOUT-X (dx parked -> lead)** (open): drw-hole-callout-counterbore s5-8, the callout's x is 23.5 mm against live's 20.2 (+3.3); drw-hole-callout-countersink s5-8, 139.5 against 141.6 (-2.1). Down from 6.6 / 4.2 before the M6x1 retake; y and text match.
+- P2 **DRW-HOLE-CALLOUT-X (dx parked -> lead)** (open): drw-hole-callout-counterbore s5-8, the callout's x is 23.5 mm against live's 20.2 (+3.3); drw-hole-callout-countersink s5-8, 139.5 against 141.6 (-2.1); y 190.6 vs 191. Down from 6.6 / 4.2 before the M6x1 retake. Live's state has only the text's first line (%%c.260); ours the whole callout.
