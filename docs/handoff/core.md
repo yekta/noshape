@@ -1,12 +1,29 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-25 22:01 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 01:02 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **RE-LAND 22:01**: f6ae10d3 / 27a24d37 FAILED 20:59 on a rebase conflict (Update…, hole banner, MESH-UP-TO-FACE,
-  Ribs); rebased on origin/main and land.sh again with 5aab43cd7 (mesh Translate). Check the lead's result first.
+- **RE-LAND 11-25 22:5x**: 1bd337a6 FAILED 22:04 (rebase conflict, workspace_tests.rs: qa's page-open test beside my
+  Update… test, kept both); rebased, QUEUED 52c8f9ce (Ribs, Update…, mesh Translate + handoff). Lead reports it.
+- **QUEUE (lead 11-25 23:xx)**: (1) scissor parse_refs fix through the models gate (core-base/.gof.sh pair), (2) scissor
+  97ad5f Delete face 1, (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
+  (qa suites/gaps-1125). Then skasm's sweep items, BLEND-FAILS b-d.
+- **SCISSOR 264eb3 WIP (uncommitted in core-rf, 11-26 01:0x)**: (a) sketch solver (crates/sketch solver.rs): an
+  over-determined component (more equations than unknowns) whose least-squares minimum is within 1e-8 m (live's
+  zeroLength) is solved: Sketch 1 (arcs through Mesh points, tangent to lines: 7e-10 m) Ok; T1 constraints_more::
+  an_arc_through_three_projected_points…; sketch tests 177 ok. (b) cplane.rs: a MeshPoint is a vertex (Plane 2
+  Point-Plane); T1 in features_b::move_face_offsets_a_mesh_part… (passes). (c) parity.rs: parse_refs merges repeated
+  ids' parameters (24 Mesh points on one face); fetched_derived_sources passes the studio's refs (97ad5f's Derived 1
+  at a version = the "(1)" tab had none); LiveRef.created_by (method qCreatedBy(makeId)) -> a cPlane's face is that
+  plane (Extrude 2 up to Plane 1 = mid-plane y=-9: ours took WAGO's y=-18 face, Part 3 23.616 vs live 11.808).
+  Live per feature: studios/264eb3….live.jsonl (Extrude 2 11.808, Replace face 2.099, Move face 2.624, Mirror 5.248,
+  Linear pattern WAGO 41 f 1704.726, Hole 43 f 1660.251 (ours cut the mesh Part 1), Extrude 3 47 f, Chamfer 51 f).
+  HANG: with (c) the suite stalled >30 min (11 GB) on 97ad5f Linear pattern 1 (PART ADD x6 of two wrong 114-face
+  parts); perf bug to look at if it stays after the source is right. Run .t11.sh (suite with NOSHAPE_PARITY_TRACE,
+  then sc6.py probe on ~/tmp/core/sc/new); probes core-scratch/sc hp.py, fg.py (feature_get by tab name);
+  mid-run doc copy ~/tmp/core/sc/hang. No ptrace on vibex7 (no gdb attach).
 - **LANDING (11-25 ~20:00)**: lead order 1-3 done in one commit: (1) Ø5 Hole banner: the dialog's typed size marks
   the Hole tableSynced (feature_dialog.rs set_text_value, as ops hole_standard), so Ø5 = schema default still reads
   "Parameters have been overridden. Check input." (UI test dialogs::an_overridden_hole_diameter_shows_the_blue_banner,
@@ -22,21 +39,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   c2-rib-wrap 18/18; c2-parting-line-draft-parting-line Rib 1 73/213/143 vs live 73/214/144 is the same before (open).
 - **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
   (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
-- **5. SCISSOR 97ad5f: NOT CORE (11-25 20:4x, sent to the lead)**: the first diff is Derived 1, not Delete face 1. Live's
-  Derived 1 = one part "WAGO Mount Extended" 51 faces 1606.634; ours 2 parts (Part 1, 1 mesh face 1564.85, + 19 faces
-  1644.51). Its source "a0989746e9c6735c0a31036c (1)" (another doc's studio) has no live geometry in the fetch (no
-  studios/ file): 13 queries "not mapped", Sketch 1's mesh cPoints empty, so Sketch 1 unsolved, Extrude 2 / Replace face /
-  Move face / Mirror / Pattern / Delete part 1 lose picks (the mesh part stays). Lead 20:4x: live fetches it; REQUESTS
-  "core 11-25 20:40" (source 264eb3b8 per feature + refs + sketches); live fetched it 20:5x (+ Middle Bay / Arduino Shield
-  refetched). Re-run 21:4x (vibex7 .t6.sh: parity_assemblies on ~/tmp/core/scm, saved ~/tmp/core/sc/new, probe
-  ~/tmp/core/sc/sc6.py): live per feature Import 1 Part 1 1564.853, Extrude 1 WAGO Mount 17 f 1688.982, Extrude 2 Part 3
-  11.808, Replace face 2.099, Move face 2.624, Mirror 5.248, Linear pattern WAGO 41 f 1704.726, ... Chamfer 1 51 f
-  1606.626. Ours: Sketch 1 "could not be solved", Plane 2 "Point-Plane requires a point and a plane", Replace face 1
-  fails; Derived 1 uses the "(1)" copy (tab "a0989746… (1)"), worse: Extrude 2 "Select a face to terminate". Cause 1:
-  parse_refs keys (index, id): the 24 Mesh points' lines (all face JFC) overwrite, only the last keeps its
-  `subFeature:<id>.mesh` parameter -> "an empty query in live's fetch". Fix in /root/core-scratch/parity-refs-merge.patch
-  (merge parameters; untranslated 264eb3 lines -> 7) NOT LANDED: Sketch 1 still unsolved, and it needs the models gate.
-  Next: why Sketch 1 fails with the cPoints translated; why the "(1)" copy differs.
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
   (c2-surf-intro-boundary/fill/mutualtrim/ruled; -offset's Offset area): Derived 1 car body's tail vertex x 33.940348 vs
   33.940739; doc vibex6 ~/tmp/skasm/fin/c2-surf-intro-fill.noshape. PARKED 21:0x: it is the source's Fillet 1 (R 0.6 in,
