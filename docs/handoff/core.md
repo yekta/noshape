@@ -5,6 +5,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
+- LEAD 22:1x ORDER: (1) Move face 1: skip the repeated offset_by_booleans try (~310 ms) regardless of bool; (2) sharpen
+  sliver() (bdddaf F5 + fed22d F2 back, F4/F25 kept), strip probes, land; (3) PATTERN-AFTER-INSERTED-CHAMFER, screws MF3.
 - **9cbb0e FILLET 18 (uncommitted in core-rf; 22:1x)**: live's line 71: at the x -15.09 cusps live runs the concave
   rounds to the tip, the convex ball rolls onto them. features/cusp_blend.rs cusp_wall_round (hooked in detail.rs'
   fillet Err chain). detail.rs TangentLinks::neighbours: leaving directions (tangent_at + a step's sign; derivatives_at
