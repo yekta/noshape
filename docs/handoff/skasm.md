@@ -3,9 +3,19 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 20:5x UTC) — read first
+## RESUME HERE (11-26 22:10 UTC) — read first
 
-207ce53e7 (1866 d Perpendicular + ERR-SM-BEND-RANGE) LANDED as 190bd1b8d, main green.
+Queued: df113102 (Mirror skips the sketch's regions, mirror-no-line s11 28/28) and 8742ccbc (parity connector, 14->15/27).
+Lead 21:xx: nuts Sweep 1 + parting-line Rib 1. Both are NOT sketch/translation: reported back for core/bool.
+- nuts Sweep 1: profile + helix right; live 3 cylinders/2 other, ours 2/3: the thread's flat (a profile line parallel
+  to the axis, r 2.0 mm) sweeps a multi-turn helical strip on a cylinder, ours a B-spline. Patch
+  /root/skasm-scratch/nuts-helical-cyl.patch (features.cpp exact_helical_cylinders takes lines + unwrapped_cylinder_pcurves,
+  with SKDBG prints) makes both strips exact cylinders (valid faces) but OCCT's Boolean then fails "non-manifold"
+  (also with only the r 2.0 one): bool's merge territory (merge_cylinder_* in boolean.cpp).
+- parting-line Rib 1: rib profiles right (their 3 mm ends match live). Ours merges the drafted side wall's edge at
+  y ±21.77 into one (68.79 mm) where live has 41.30 + 27.52 (a vertex near x -15.5, z ~32), and splits a 0.224 mm piece
+  at (-21.5, 9.95, 3) off live's 8.56 mm line: edge merging after the union (core/bool). Edge dump: temporary SKDBG
+  writer in parity.rs our_parts (removed) -> ~/tmp/skasm/corp/edges/edges-13.json on vibex7.
 SKETCH-ISO-ORIGIN-ALIGN: no inference bug (T1); psui takes the replay approach fix (their 1e9efbed7).
 MEASURE-MAX-TIE: live 17:16 says no geometric rule (kernel vertex order): closed as note, nothing to match.
 ASM-DRAG-REVOLUTE-ANGLE: live 16:45 confirms the pin turns AGAINST the pointer (+20/+40/+80/−40/148−8 px →
