@@ -9,10 +9,15 @@ Queued: df113102 (Mirror skips the sketch's regions), 8742ccbc (parity connector
 shown_topology: crosses_closure walks the seam past later rings' vertices; hunting-knife Split 4 48 -> 51/52; the full
 corpus run with a print showed only hunting-knife takes the new path; T1 a_ring_round_a_lofts_closure_keeps_a_vertex_there).
 hunting-knife next: Fillet 8 "HANDLE" 16/34/20 vs live 15/37/25 (fillet: core's, report).
-NOW: c2-surf-intro-offset Offset surfaces 1: one sheet face, live 9590.995 mm2, ours 9588.568; offset 1.1 in of the
-Derived part's face JpK (8515.58 mm2, box x -58.8..0, y 0..254); live's sheet box x -86.742..0, y -27.94..268.271,
-z -12.251..34.033. Debug: git apply /root/skasm-scratch/skdbg-parity.patch (SKDBG writes edges/vertices/faces-N.json per
-traced feature), bin/edgedbg.sh <doc> on vibex7 (~/tmp/skasm/corp/edges), bin/edgecmp.py (scp to vibex7) matches edges.
+surf-intro-offset Offset surfaces 1 (22:07): NOT the offset. Its source, Derived 1's "Car" (derived studio b7635b82,
+run as its own doc: cp models/c2-surf-intro-offset/derived/b7635b82*/* models/zz-surf-derived on vibex7; its wire-count
+DIFFs are the recording's), differs from Loft 1 on: Loft 1 sheet 12748.845 mm2 vs 12749.860 (two projected curves),
+Lofts 2-4 about -2 mm2; Car's end at y 254: fillet ends z 15.31 on the side (live 15.206), end edges 20.145/24.733 (live
+20.042/24.800). Tried: projected curves by arc length (edge_by_arc_length) -> loft areas match live but the Car's edges
+move 5x further from live's (sum |dl| 2.07 vs 0.39 mm) and surf-intro boundary/fill/ruled/mutualtrim lose a feature
+(Tail fin up to a Car vertex): reverted. Asked live: REQUESTS SURF-INTRO-CAR (that studio edge by edge). Next on answer.
+Debug: git apply /root/skasm-scratch/skdbg-parity.patch (SKDBG edges/vertices/faces-N.json per traced feature),
+bin/edgedbg.sh <doc> on vibex7 (~/tmp/skasm/corp/edges; edges-old = before the arc-length try), bin/edgecmp.py.
 Lead 21:xx: nuts Sweep 1 + parting-line Rib 1. Both are NOT sketch/translation: reported back for core/bool.
 - nuts Sweep 1: profile + helix right; live 3 cylinders/2 other, ours 2/3: the thread's flat (a profile line parallel
   to the axis, r 2.0 mm) sweeps a multi-turn helical strip on a cylinder, ours a B-spline. Patch
