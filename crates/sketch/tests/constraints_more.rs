@@ -353,6 +353,28 @@ fn large_dimension_changes_converge() {
 }
 
 
+/// asm-scissor-lift 264eb3 Sketch 1 (live solves it): an arc between two projected points, tangent to a line ending on
+/// one of them and through a third, is one equation more than it has unknowns, met only as closely as the points lie
+/// on one circle: within live's zero length (1e-8 m) it is solved, a micron off it can't be.
+#[test]
+fn an_arc_through_three_projected_points_tangent_to_a_line_solves_within_live_zero_length() {
+    for (off, solves) in [(7e-10, true), (1e-6, false)] {
+        let mut sk = Sketch::new();
+        let r = 1e-3;
+        let a = sk.use_external_point(v(-2.0 * r, 0.0));
+        let start = sk.use_external_point(v(0.0, 0.0));
+        let end = sk.use_external_point(v(r, r));
+        let on = sk.use_external_point(v(0.0, r) + DVec2::from_angle(-PI / 4.0) * (r + off));
+        let line = sk.add_entity(Geometry::Line { start: a, end: start }, false, false).unwrap();
+        let center = sk.add_point(v(0.0, r));
+        let arc = sk.add_arc_between(center, start, end).unwrap();
+        sk.add_constraint(ConstraintKind::Tangent { a: arc, b: line }).unwrap();
+        sk.add_constraint(ConstraintKind::Coincident { a: on, b: arc }).unwrap();
+        let rep = sk.solve();
+        assert_eq!(rep.is_solved(), solves, "{off}: {rep:?}");
+    }
+}
+
 /// Live 1862 (SKETCH-REDUNDANT-SOLVES): a Ø10 circle Tangent to two
 /// Horizontal lines and the lines' 10 mm Distance dimensioned too can't be
 /// solved, in whatever order they were added; without the Distance it solves.

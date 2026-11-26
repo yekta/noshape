@@ -30,6 +30,13 @@ use std::collections::{HashMap, HashSet};
 const NONE: u32 = u32::MAX;
 /// Weight of dragged parameters in the minimum-norm metric.
 const DRAG_WEIGHT: f64 = 1e6;
+/// Live's zero length (FeatureScript's TOLERANCE.zeroLength): a least-squares minimum within it is solved
+/// (asm-scissor-lift 264eb3 Sketch 1: arcs through Mesh points and tangent to lines between them, 7e-10 m).
+const ZERO_LENGTH: f64 = 1e-8;
+
+fn solved_within(opts: &SolveOptions, maxr: f64) -> bool {
+    maxr <= opts.tolerance.max(ZERO_LENGTH)
+}
 
 /// Overall result of a solve.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -766,6 +773,8 @@ impl System {
             }
             self.eval(comp, &cols, &mut r, Some(&mut rows));
         }
+        // (More equations than unknowns: their least-squares minimum is as close as the data allow.)
+        let converged = converged || (!min_norm && solved_within(opts, r.iter().fold(0.0f64, |a, v| a.max(v.abs()))));
         CompSolve { converged, iterations, residual: r, rows }
     }
 
@@ -1044,7 +1053,7 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
         // could not be solved."), where a redundant relation (a second
         // Perpendicular, an Equal twice) doesn't.
         // A trial's failure (no exclusion: `solve_trial`, `solve_inner`'s first try) is thrown away: no analysis for it.
-        let analyse = opts.analyze && (allow_exclusion || (out.all_converged && out.max_residual <= opts.tolerance));
+        let analyse = opts.analyze && (allow_exclusion || (out.all_converged && solved_within(opts, out.max_residual)));
         let analysis = (analyse && !is_drag).then(|| analyze(sk, &mut sys, &out, &conflicting));
         let mut conflicting = conflicting;
         // A conflict's driving dimensions include the ones the sketch solves without (live errors-1118 / recheck 11-19:
@@ -1069,7 +1078,7 @@ fn run_weighted(sk: &mut Sketch, opts: &SolveOptions, drag: &[DragTarget], allow
                 conflicting = dedup_sorted(conflicting.iter().copied().chain(freeing.into_iter().flatten()).chain(nearby).collect());
             }
         }
-        let status = if !out.all_converged || out.max_residual > opts.tolerance {
+        let status = if !out.all_converged || !solved_within(opts, out.max_residual) {
             failed()
         } else if conflicting.is_empty() {
             SolveStatus::Solved
