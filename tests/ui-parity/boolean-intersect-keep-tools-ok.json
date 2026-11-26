@@ -1,0 +1,61 @@
+{
+ "name": "boolean-intersect-keep-tools-ok",
+ "about": "Boolean Intersect, Part 1 + Part 2, \u2611 Keep tools, \u2713",
+ "area": "psui",
+ "source": "depth batch 2 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Boolean"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Intersect"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Keep tools"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

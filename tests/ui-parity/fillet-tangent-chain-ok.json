@@ -1,0 +1,61 @@
+{
+ "name": "fillet-tangent-chain-ok",
+ "about": "right top edge (tangent to Fillet 1 at its end), Fillet, radius 1, propagation on, \u2713",
+ "area": "psui",
+ "source": "depth batch 1 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     22,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Radius"
+   }
+  },
+  {
+   "do": "type",
+   "text": "1"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

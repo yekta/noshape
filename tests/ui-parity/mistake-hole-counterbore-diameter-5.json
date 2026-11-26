@@ -1,0 +1,72 @@
+{
+ "name": "mistake-hole-counterbore-diameter-5",
+ "about": "Hole at the sketch point on the 10 mm box, Counterbore, counterbore diameter 5 (under the 6.35 mm hole), \u2713: the Hole stays in error with the dialog open",
+ "area": "psui",
+ "source": "depth batch 2 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "hole-sketch",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     20,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Counterbore"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "",
+    "index": 1
+   }
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

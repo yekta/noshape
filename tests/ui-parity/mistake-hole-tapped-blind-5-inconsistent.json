@@ -1,0 +1,73 @@
+{
+ "name": "mistake-hole-tapped-blind-5-inconsistent",
+ "about": "Hole at the sketch point on the 10 mm box, Hole type \u25be Tapped, Blind depth 5 (below the default tapped depth 5.6 mm + clearance), \u2713: \"Depth, tapped depth, tap clearance, and pitch are inconsistent.\" and the dialog stays open",
+ "area": "psui",
+ "source": "depth batch 2 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "hole-sketch",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     20,
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Drilled",
+    "pick": "Tapped"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "",
+    "index": 1
+   }
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,4155 @@
+{
+ "scenario": "mistake-hole-counterbore-diameter-5",
+ "recorded": "2026-11-26T21:08:48.518Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "3a31ff8f0e8e696816467c14",
+  "start": "hole-sketch",
+  "startElement": "97b215701d0fb30690204252",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Sketch 2"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Hole"
+    }
+   },
+   "ok": true,
+   "ti": 27076,
+   "tmove": 27141,
+   "moves": 1,
+   "tdown": 27472,
+   "at": [
+    998,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Sketch points to place holes",
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31233,
+   "te": 31233
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 31233,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Sketch points to place holes",
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 35759,
+   "te": 35759
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "vertex": [
+      20,
+      15,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 35759,
+   "tmove": 35811,
+   "moves": 1,
+   "hover": [
+    "II"
+   ],
+   "tdown": 37308,
+   "at": [
+    1363,
+    514
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39866,
+   "te": 39866
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 39866,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 44294,
+   "te": 44294
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "Counterbore"
+    }
+   },
+   "ok": true,
+   "ti": 44295,
+   "tmove": 44353,
+   "moves": 1,
+   "tdown": 44694,
+   "at": [
+    724,
+    149
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "9.75 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "9.75 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 46585,
+   "te": 46585
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 46585,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "9.75 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "9.75 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 50963,
+   "te": 50963
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "",
+     "index": 1
+    }
+   },
+   "ok": true,
+   "ti": 50963,
+   "tmove": 50998,
+   "moves": 1,
+   "tdown": 51472,
+   "at": [
+    732,
+    409
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "9.75 mm",
+     "selection": [
+      0,
+      7
+     ],
+     "all": true,
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "9.75 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "9.75 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 53421,
+   "te": 53421
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "type",
+    "text": "5"
+   },
+   "ok": true,
+   "ti": 53421,
+   "tdown": 53421,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "5",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 9.75 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 55404,
+   "te": 55404
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 55404,
+   "pointer": {
+    "at": [
+     732,
+     409
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "tdown": 55411,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "5 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1/4 in",
+       "focused": false,
+       "state": "error"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": true,
+       "state": "error"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1/4 in",
+        "focused": false,
+        "state": "error"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": true,
+        "state": "error"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 57388,
+   "te": 57388
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 57388,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "5 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1/4 in",
+       "focused": false,
+       "state": "error"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": true,
+       "state": "error"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1/4 in",
+        "focused": false,
+        "state": "error"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": true,
+        "state": "error"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 61818,
+   "te": 61818
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 61818,
+   "tmove": 61881,
+   "moves": 1,
+   "tdown": 62292,
+   "at": [
+    805,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1/4 in",
+       "focused": false,
+       "state": "error"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "error"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1/4 in",
+        "focused": false,
+        "state": "error"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "error"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 64200,
+   "te": 64200
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 64200,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": false
+      },
+      {
+       "label": "Counterbore",
+       "selected": true
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1/4 in",
+       "focused": false,
+       "state": "error"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "error"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": false
+       },
+       {
+        "label": "Counterbore",
+        "selected": true
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1/4 in",
+        "focused": false,
+        "state": "error"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "error"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm | \u2334\u00d8 5 mm \u21a7 5 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 68627,
+   "te": 68627
+  }
+ ],
+ "t0_epoch_ms": 1795727307586,
+ "name": "mistake-hole-counterbore-diameter-5"
+}

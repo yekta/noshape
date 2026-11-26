@@ -1,0 +1,94 @@
+{
+ "name": "circular-pattern-centered-ok",
+ "about": "Circular pattern Part 1 about the right front edge, \u2610 Equal spacing, angle 90, \u2611 Centered, \u2713",
+ "area": "psui",
+ "source": "depth batch 2 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern",
+    "menu": "Circular pattern"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Axis of pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Equal spacing"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Angle"
+   }
+  },
+  {
+   "do": "type",
+   "text": "90"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Centered"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

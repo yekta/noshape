@@ -1,0 +1,6042 @@
+{
+ "scenario": "hole-tapped-blind-ok",
+ "recorded": "2026-11-26T22:04:17.212Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "99e7226052697f159e707b02",
+  "start": "hole-sketch",
+  "startElement": "97b215701d0fb30690204252",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Sketch 2"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Hole"
+    }
+   },
+   "ok": true,
+   "ti": 23930,
+   "tmove": 23971,
+   "moves": 1,
+   "tdown": 24295,
+   "at": [
+    998,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Sketch points to place holes",
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 27325,
+   "te": 27325
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 27325,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Sketch points to place holes",
+     "dialog": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31708,
+   "te": 31708
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "vertex": [
+      20,
+      15,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 31708,
+   "tmove": 31760,
+   "moves": 1,
+   "hover": [
+    "II"
+   ],
+   "tdown": 33152,
+   "at": [
+    1363,
+    514
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 35177,
+   "te": 35177
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 35177,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "\u00d8 6.35 mm \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Drilled",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Drill size",
+       "kind": "enum",
+       "text": "1/4 (0.25)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "6.35 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "\u00d8 6.35 mm \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Drilled",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Drill size",
+        "kind": "enum",
+        "text": "1/4 (0.25)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "6.35 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "\u00d8 6.35 mm \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "\u00d8 6.35 mm \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39498,
+   "te": 39498
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Drilled",
+     "pick": "Tapped"
+    }
+   },
+   "ok": true,
+   "ti": 39498,
+   "tmove": 39548,
+   "moves": 2,
+   "tdown": 39876,
+   "at": [
+    781,
+    275
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.039",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.039",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43416,
+   "te": 43416
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 43417,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.039",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.039",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47752,
+   "te": 47752
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "",
+     "index": 1
+    }
+   },
+   "ok": true,
+   "ti": 47752,
+   "tmove": 47775,
+   "moves": 1,
+   "tdown": 48142,
+   "at": [
+    732,
+    506
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "12 mm",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 12 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "12 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.039",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "12 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.039",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 49992,
+   "te": 49992
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "type",
+    "text": "8"
+   },
+   "ok": true,
+   "ti": 49992,
+   "tdown": 49992,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "8",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "1/4-20 \u21a7 12 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 12 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.039",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 12 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.039",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 12 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 12 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 51960,
+   "te": 51960
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 51960,
+   "pointer": {
+    "at": [
+     732,
+     506
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "tdown": 51968,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "8 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1.89",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1.89",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 53928,
+   "te": 53928
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 53928,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "8 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1.89",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1.89",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 58300,
+   "te": 58300
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 58300,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "8 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1.89",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1.89",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 62818,
+   "te": 62818
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "",
+     "index": 3
+    }
+   },
+   "ok": true,
+   "ti": 62818,
+   "tmove": 62867,
+   "moves": 1,
+   "tdown": 63382,
+   "at": [
+    737,
+    601
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "1.8897637795275588",
+     "selection": [
+      0,
+      18
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "1.8897637795275588",
+       "focused": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "1.8897637795275588",
+        "focused": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 65452,
+   "te": 65452
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "type",
+    "text": "4"
+   },
+   "ok": true,
+   "ti": 65453,
+   "tdown": 65453,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "4",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.6 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "4",
+       "focused": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.6 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "4",
+        "focused": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 67561,
+   "te": 67561
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 67562,
+   "pointer": {
+    "at": [
+     737,
+     600
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "tdown": 67570,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "4",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "2.92 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "4",
+       "focused": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "2.92 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "4",
+        "focused": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 69520,
+   "te": 69520
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 69520,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "4",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "1/4-20 \u21a7 8 mm"
+    },
+    "dialog": {
+     "title": "1/4-20 \u21a7 8 mm",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Inch",
+       "selected": true
+      },
+      {
+       "label": "Metric",
+       "selected": false
+      },
+      {
+       "label": "Simple",
+       "selected": true
+      },
+      {
+       "label": "Counterbore",
+       "selected": false
+      },
+      {
+       "label": "Countersink",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Sketch points to place holes",
+       "kind": "query",
+       "items": [
+        "Vertex of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Merge scope",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Hole type",
+       "kind": "enum",
+       "text": "Tapped",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tap type",
+       "kind": "enum",
+       "text": "Straight tap",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Size",
+       "kind": "enum",
+       "text": "1/4",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Threads/inch",
+       "kind": "enum",
+       "text": "20 tpi (UNC)",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Fastener fit",
+       "kind": "enum",
+       "text": "None",
+       "lookup": true,
+       "state": "ok"
+      },
+      {
+       "label": "Thread class",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "5.105 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Start plane",
+       "kind": "enum",
+       "text": "Start from part",
+       "state": "ok"
+      },
+      {
+       "label": "Termination",
+       "kind": "enum",
+       "text": "Blind",
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "8 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "enum",
+       "text": "118 deg",
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "2.92 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "",
+       "kind": "number",
+       "text": "4",
+       "focused": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "1/4-20 \u21a7 8 mm",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Inch",
+        "selected": true
+       },
+       {
+        "label": "Metric",
+        "selected": false
+       },
+       {
+        "label": "Simple",
+        "selected": true
+       },
+       {
+        "label": "Counterbore",
+        "selected": false
+       },
+       {
+        "label": "Countersink",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Sketch points to place holes",
+        "kind": "query",
+        "items": [
+         "Vertex of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Merge scope",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Hole type",
+        "kind": "enum",
+        "text": "Tapped",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tap type",
+        "kind": "enum",
+        "text": "Straight tap",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Size",
+        "kind": "enum",
+        "text": "1/4",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Threads/inch",
+        "kind": "enum",
+        "text": "20 tpi (UNC)",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Fastener fit",
+        "kind": "enum",
+        "text": "None",
+        "lookup": true,
+        "state": "ok"
+       },
+       {
+        "label": "Thread class",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "5.105 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Start plane",
+        "kind": "enum",
+        "text": "Start from part",
+        "state": "ok"
+       },
+       {
+        "label": "Termination",
+        "kind": "enum",
+        "text": "Blind",
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "8 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "enum",
+        "text": "118 deg",
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "2.92 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "",
+        "kind": "number",
+        "text": "4",
+        "focused": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "II"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 74076,
+   "te": 74076
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 74077,
+   "tmove": 74152,
+   "moves": 1,
+   "tdown": 74595,
+   "at": [
+    805,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 76684,
+   "te": 76684
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 76684,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "1/4-20 \u21a7 8 mm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "1/4-20 \u21a7 8 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 81085,
+   "te": 81085
+  }
+ ],
+ "t0_epoch_ms": 1795730638806
+}

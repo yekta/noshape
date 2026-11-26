@@ -1,0 +1,78 @@
+{
+ "name": "boolean-subtract-offset-ok",
+ "about": "Boolean Subtract, tool Part 2, target Part 1, \u2611 Offset, \u2611 Offset all (5 mm), \u2713",
+ "area": "psui",
+ "source": "depth batch 2 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Boolean"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Subtract"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Targets"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Offset"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Offset all",
+    "set": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
