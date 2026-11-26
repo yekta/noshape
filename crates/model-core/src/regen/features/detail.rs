@@ -22,18 +22,24 @@ fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {
 /// (within ~1 degree) are added transitively. Shared by fillet, chamfer and
 /// face blend.
 pub fn propagate_tangent(shape: &k::Shape, edges: &[usize]) -> Vec<usize> {
-    propagate(shape, edges, true)
+    propagate(shape, edges, true, true)
+}
+
+/// [`propagate_tangent`], running on over slivers unless `cut_slivers`.
+fn tangent_chain(shape: &k::Shape, edges: &[usize], cut_slivers: bool) -> Vec<usize> {
+    propagate(shape, edges, true, cut_slivers)
 }
 
 /// A fillet's chain: [`propagate_tangent`] stopping where the convexity changes, over edges between two faces only
 /// (asm-isaac-ball's Fillet 2, as live; chamfers keep running on: c2-rings-loft's Chamfer 3).
 fn fillet_chain(shape: &k::Shape, edges: &[usize]) -> Vec<usize> {
-    propagate(shape, edges, false)
+    propagate(shape, edges, false, true)
 }
 
-fn propagate(shape: &k::Shape, edges: &[usize], any_convexity: bool) -> Vec<usize> {
+fn propagate(shape: &k::Shape, edges: &[usize], any_convexity: bool, cut_slivers: bool) -> Vec<usize> {
     let Some(mut links) = TangentLinks::new(shape) else { return edges.to_vec() };
     links.any_convexity = any_convexity;
+    links.cut_slivers = cut_slivers;
     let mut set: BTreeSet<usize> = edges.iter().copied().collect();
     // Each edge with the chain's convexity so far (a smooth edge's 0 takes its neighbour's: it can't bridge a concave
     // run to a convex one).
@@ -65,6 +71,8 @@ struct TangentLinks {
     convexity: std::cell::RefCell<BTreeMap<usize, i32>>,
     /// Tangent neighbours whatever their convexity and faces ([`propagate_tangent`]); off for a fillet's chain.
     any_convexity: bool,
+    /// Stopping where a face thins to nothing between a convex and a concave edge ([`TangentLinks::sliver`]).
+    cut_slivers: bool,
 }
 
 impl TangentLinks {
@@ -78,6 +86,7 @@ impl TangentLinks {
             faces: shape.faces(),
             convexity: Default::default(),
             any_convexity: true,
+            cut_slivers: true,
         })
     }
 
@@ -103,14 +112,31 @@ impl TangentLinks {
         c
     }
 
+    /// A convex and a concave edge of one face: folded back on each other at a vertex, the face between them a sliver.
+    fn sliver(&self, a: usize, b: usize) -> bool {
+        let shared = self.edge_faces.get(a).zip(self.edge_faces.get(b)).is_some_and(|(fa, fb)| fa.iter().any(|f| fb.contains(f)));
+        self.cut_slivers && shared && self.convexity(a) * self.convexity(b) < 0
+    }
+
     fn neighbours(&self, ei: usize) -> Vec<usize> {
-        let tangent_at = |e: &k::Shape, p: glam::DVec3| -> Option<glam::DVec3> {
-            // The parameter end at `p` (a reversed edge starts at its last
-            // parameter: extrudes since 339de774 reverse their top edges).
-            let info = e.edge_info().ok()?;
+        // The directions the edge leaves `p` in, from each of its ends there (both for a closed edge): a chain runs on
+        // where two edges leave a vertex opposite ways, or fold back on each other, but not over a face thinning to
+        // nothing between them (asm-scissor-lift 9cbb0e's Fillet 18: a wall's convex edge and the concave arc of a
+        // round tangent to its plate; fed22d's Fillet 2 runs on over its folds).
+        let leaving = |e: &k::Shape, p: glam::DVec3| -> Vec<glam::DVec3> {
+            let Ok(info) = e.edge_info() else { return Vec::new() };
             let at = |t: f64| e.point_at(t).map(|q| (q - p).length()).unwrap_or(f64::MAX);
-            let t = if at(info.first_param) < at(info.last_param) { info.first_param } else { info.last_param };
-            e.tangent_at(t).ok().map(|v| v.normalize())
+            let near = at(info.first_param).min(at(info.last_param)) + 1e-9;
+            [(info.first_param, 1.0), (info.last_param, -1.0)]
+                .into_iter()
+                .filter(|&(t, _)| at(t) <= near * (1.0 + 1e-6))
+                .filter_map(|(t, s)| {
+                    // (The tangent, not the curve's derivatives: an offset curve's third derivative can be undefined.)
+                    let d = e.tangent_at(t).ok()?.normalize_or_zero();
+                    let step = e.point_at(t + s * 1e-3 * (info.last_param - info.first_param)).ok()? - e.point_at(t).ok()?;
+                    Some(if d.dot(step) < 0.0 { -d } else { d })
+                })
+                .collect()
         };
         let mut out = Vec::new();
         let Some(e) = self.edges.get(ei) else { return out };
@@ -123,8 +149,8 @@ impl TangentLinks {
                 if o != ei
                     && !out.contains(&o)
                     && (self.any_convexity || self.edge_faces.get(o).is_some_and(|f| f.len() >= 2))
-                    && let (Some(t1), Some(t2)) = (tangent_at(e, p), self.edges.get(o).and_then(|x| tangent_at(x, p)))
-                    && t1.dot(t2).abs() > 0.9998
+                    && let Some(x) = self.edges.get(o)
+                    && leaving(e, p).iter().any(|t1| leaving(x, p).iter().any(|t2| t1.dot(*t2) < -0.9998 || (t1.dot(*t2) > 0.9998 && !self.sliver(ei, o))))
                     && (self.any_convexity || self.convexity(ei) * self.convexity(o) >= 0)
                 {
                     out.push(o);
@@ -679,7 +705,10 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
     let touched: Vec<usize> = groups.keys().copied().collect();
     // (A surface's round leaves a surface: c2-surf-workshop-mutualtrim's Fillet 1.)
     let sheets: Vec<usize> = touched.iter().copied().filter(|&bi| ev.ctx.bodies.get(bi).is_some_and(|b| b.shape.count(ShapeType::Solid) == 0)).collect();
-    for (bi, edges) in groups.into_iter().rev() {
+    // Each part's picks, and whether its chain stops at slivers: where that chain fails, the part again with the chain
+    // run on over them (asm-scissor-lift bdddaf's Fillet 5 and fed22d's Fillet 2, as live).
+    let mut work: Vec<(usize, Vec<usize>, bool)> = groups.into_iter().map(|(bi, edges)| (bi, edges, true)).collect();
+    while let Some((bi, edges, cut_slivers)) = work.pop() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
         // Live 2202 / 2227: picked faces alone, their edges aren't propagated (the result doesn't depend on propagation).
@@ -687,7 +716,7 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
         // A chain that stops where the convexity changes (fillet_chain), the faces round its ends run on to trim the
         // round, where it is a plane's concave arc round a cylinder (asm-isaac-ball's Fillet 2, as live); else the
         // tangent chain as it runs (scissor-lift's fed22d Fillet 2 fails as the shorter one).
-        if propagate && !faces_only && !width && special.is_none() {
+        if propagate && !faces_only && !width && special.is_none() && cut_slivers {
             let mut short = fillet_chain(&body.shape, &edges);
             short.extend(edges.iter().filter(|&&e| !short.contains(&e)).copied().collect::<Vec<_>>());
             short.sort_unstable();
@@ -698,11 +727,12 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
                 continue;
             }
         }
-        let mut chain = if propagate && !faces_only { propagate_tangent(&body.shape, &edges) } else { edges.clone() };
+        let picked = edges.clone();
+        let mut chain = if propagate && !faces_only { tangent_chain(&body.shape, &edges, cut_slivers) } else { edges.clone() };
         chain.extend(edges.iter().filter(|&&e| !chain.contains(&e)).copied().collect::<Vec<_>>());
         chain.sort_unstable();
         // The selection stops where its edges run on tangentially into edges left out.
-        let stops = propagate_tangent(&body.shape, &chain).len() > chain.len();
+        let stops = tangent_chain(&body.shape, &chain, cut_slivers).len() > chain.len();
         // Live 1796: Width control takes one unbranched chain of edges per part (open or closed); a corner of three
         // edges, two separate edges or a box's 12 fail.
         if width && !single_chain(&body.shape, &chain) {
@@ -881,6 +911,13 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
             // A chain turning from convex to concave: the concave edges' balls too, their tools added (asm-scissor-lift's
             // Studio 9cbb0e Fillet 2).
             Err(_) if !width && super::blend_section::with_concave_balls(|| super::blend_section::rolling_ball_blend(ev, bi, &edges, radius, None)).is_ok() => continue,
+            // A wall thinning to a zero-angle cusp between a convex and a concave pick: the concave rounds first, on the
+            // wall raised past the plate (asm-scissor-lift's Studio 9cbb0e Fillet 18).
+            Err(_) if !width && super::cusp_blend::cusp_wall_round(ev, bi, &edges, radius).unwrap_or(false) => continue,
+            Err(_) if cut_slivers && propagate && !faces_only && tangent_chain(&body.shape, &picked, false) != edges => {
+                work.push((bi, picked, false));
+                continue;
+            }
             Err(_) if k::fillet_deferred_overflows() => return Err(fillet_failed(k::KernelError::OperationFailed("fillet failed: unfilleted edge overlapped by fillet".into()))),
             Err(e) => return Err(fillet_failed(e)),
         };
@@ -2239,6 +2276,31 @@ mod tests {
         assert_eq!(super::in_onshape_words(Err(raw), "Failed to fillet selections.").unwrap_err().message, "Failed to fillet selections.");
         let own = FeatureError::new("Adjoining edge not filleted.");
         assert_eq!(super::in_onshape_words(Err(own), "Failed to fillet selections.").unwrap_err().message, "Adjoining edge not filleted.");
+    }
+
+    /// A channel's wall thinning to nothing where its floor, a round, rises tangent to the plate's top: the wall's top
+    /// edge and the floor's arc on it fold back on each other at the tip, so tangent propagation stops there (asm-scissor-
+    /// lift 9cbb0e's Fillet 18: live leaves the arcs sharp).
+    #[test]
+    fn tangent_propagation_stops_where_a_wall_thins_to_a_cusp() {
+        use glam::DVec3;
+        let plate = k::make_box_corners(DVec3::new(0.0, -0.01, -0.01), DVec3::new(0.03, 0.01, 0.0)).unwrap();
+        let slot = k::make_box_corners(DVec3::new(0.005, -0.002, -0.004), DVec3::new(0.015, 0.002, 0.001)).unwrap();
+        let round = k::make_cylinder(&k::Plane { origin: DVec3::new(0.015, -0.003, -0.004), x_dir: DVec3::X, normal: DVec3::Y }, 0.004, 0.006, std::f64::consts::TAU).unwrap();
+        let opts = k::BooleanOptions::default();
+        let tool = k::boolean(k::BooleanOp::Cut, &[slot], &[round], &opts).unwrap().shape;
+        let shape = k::boolean(k::BooleanOp::Cut, &[plate], &[tool], &opts).unwrap().shape;
+        let mid = |e: &k::Shape| {
+            let i = e.edge_info().unwrap();
+            e.point_at(0.5 * (i.first_param + i.last_param)).unwrap()
+        };
+        let edges = shape.edges();
+        let find = |f: &dyn Fn(DVec3, &k::Shape) -> bool| edges.iter().position(|e| f(mid(e), e)).unwrap();
+        let top = find(&|p, _| (p - DVec3::new(0.01, -0.002, 0.0)).length() < 1e-7);
+        let arc = find(&|p, e| (p.y + 0.002).abs() < 1e-9 && p.x > 0.011 && p.z < -1e-4 && matches!(e.edge_curve(), Ok(k::Curve::Circle { .. })));
+        let chain = super::propagate_tangent(&shape, &[top]);
+        assert!(!chain.contains(&arc), "the floor's arc joined the wall's top edge's chain: {chain:?}");
+        assert!(super::propagate_tangent(&shape, &[arc]).iter().all(|&e| e != top));
     }
 
     /// Two edges of one name (a bevel gear's tooth root): each found by its own ends, not the first one twice.

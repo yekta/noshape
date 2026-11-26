@@ -4,6 +4,7 @@ use super::eval::{EvalCtx, FResult};
 
 pub mod basic;
 pub mod blend_section;
+pub mod cusp_blend;
 pub mod cplane;
 pub mod detail;
 pub mod extrude;

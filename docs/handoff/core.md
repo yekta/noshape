@@ -1,33 +1,22 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 22:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 22:36 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
-- LEAD 22:1x ORDER: (1) Move face 1: skip the repeated offset_by_booleans try (~310 ms) regardless of bool; (2) sharpen
-  sliver() (bdddaf F5 + fed22d F2 back, F4/F25 kept), strip probes, land; (3) PATTERN-AFTER-INSERTED-CHAMFER, screws MF3.
-- **9cbb0e FILLET 18 (uncommitted in core-rf; 22:1x)**: live's line 71: at the x -15.09 cusps live runs the concave
-  rounds to the tip, the convex ball rolls onto them. features/cusp_blend.rs cusp_wall_round (hooked in detail.rs'
-  fillet Err chain). detail.rs TangentLinks::neighbours: leaving directions (tangent_at + a step's sign; derivatives_at
-  dropped: D3 throws on offset curves) and sliver() = a fold between a convex and a concave edge of one face is cut.
-  CLEAN A/B (same translation, HEAD vs mine, vibex7 ~/tmp/core/sc d-base vs d-tan): fixes 9cbb0e F18, fed22d F4/F25,
-  97ad5f F2; REGRESSES bdddaf Fillet 5 + fed22d Fillet 2 (665cf3 etc. were never mine: d-1621 was another translation).
-  Toggle probe (.rg2.sh): NOSHAPE_PROP_NOSLIVER=1 fixes both regressions but loses F4/F25 -> sliver() must be sharper.
-  Cut folds all look alike (rg3.out: convex line + concave circle/ellipse tangent where a plane face thins to 0).
-  RUNNING 22:0x: .rg4.sh -> /root/core-scratch/rg4.out: per feature, chain with/without sliver + cut folds per feature
-  (studios bdddaf 51425d5bdf945e8a, fed22d aa4ecb577fd8a5c0, 9cbb0e 0640599f0bc42c52 in fresh/ doc = HEAD's translation).
-  PROBE CODE in detail.rs to remove before landing: env NOSHAPE_PROP_ONEEND / NOSHAPE_PROP_NOSLIVER / NOSHAPE_NO_CUSP,
-  NOSHAPE_FOLD_DEBUG prints (sliver() + "FOLD feature" after chain); clean copy w/o probes: /root/core-scratch/ab/
-  detail.new.rs (has tangent fix, no toggles). Then: T1 .f18t.sh, .f18cmp.sh/.f18diff.py vs live, corpus .f18ab.sh, land.
-  Then Fillet 19/23, MF7, Chamfer 11.
-- **IMPELLER SPEED (lead 21:3x: regression vs own release = P0 at any ratio)**: same-host alternating A/B vibex7 21:48
-  (core-p0 detached at origin/main c444ac1d5, cli LTO off vs qa-rel 0.4.71 release cli; .impab.sh): main FASTER every
-  pair (medians 26.7 vs 29.5 s). Only slower feature: Move face 1 69 -> ~650 ms (Error in both, live OK): two
-  offset_by_booleans tries (freeform branch + after OCCT offset error 3) each ~310 ms, our OWN fuse returns EMPTY (0
-  faces); NOSHAPE_BOOL_RUST=0 -> Move face 1 Ok. Sent to bool 22:0x with inputs vibex7 ~/agents/core-keep/mf1-bool/
-  (mf-body-38 + mf-tool-38-0, Fuse). Mine if bool declines: skip the second identical booleans try (saves ~310 ms).
-  qa sees 27.2 vs 19.7 s: told qa to rerun as one same-host alternating A/B with same build profile.
+- LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
+- **SCISSOR FILLETS + MOVE FACE 1 (core-rf, LANDING 22:3x; corpus A/B .ab7.sh: only impeller "Fillet Stevenrohr zum
+  Halter" Error both, message Adjoining edge -> Failed to fillet; T1 ok)**: detail.rs
+  TangentLinks: leaving directions (tangent_at + a step's sign) and sliver() (a fold between a convex and a concave edge
+  of one face) cut, cut_slivers flag; fillet_in's work list: where the cut chain fails, the part again uncut (bdddaf
+  F5, fed22d F2 back; F4/F25, 9cbb0e F18 kept: rg6.out). Every cut fold is a real sliver (rg5 probe: midpoint on the
+  face, other faces tangent) so no geometric rule separates them. features/cusp_blend.rs cusp_wall_round = F18.
+  direct.rs move_face: booleans not tried again after OCCT's offset fails where they failed first (impeller MF1
+  ~310 ms). Then: scissor parity rerun (.pa2.sh vs d-base), Fillet 19/23, MF7, Chamfer 11.
+- NEXT after the sliver land (lead 22:5x): IMPELLER FILLET 3 (feature 27) matching live: bool found MF1's empty fuse
+  is OCCT's too (ours declines); the body differs upstream (MF1 sees 38 faces, live 59): Fillet 3 with our Boolean on,
+  feature 15 with it off. Then screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
 - P1 PATTERN-AFTER-INSERTED-CHAMFER (lead 19:5x): already fixed by 6a8e411db (11-19); TICKETS row marked (b4dc6e1cf).
 - TRANSFORM-TRANSLATE-DISTANCE: LANDED 662228ffc, qa verified 21:5x (hem docs SAME); delete vibex7 ~/tmp/core/tr.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test

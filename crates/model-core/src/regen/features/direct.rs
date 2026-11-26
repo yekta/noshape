@@ -524,7 +524,8 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         // Else, faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
         // extruded from a loft's): OCCT's offset worked on them for ~0.6 s and left an invalid solid the booleans
         // then made (c2-impeller-loft's Flansch verbreitern): the booleans first, OCCT's offset if they fail.
-        if translate_dir.is_none() && (touches_freeform(&body.shape, &faces) || beside_its_own_surface(&body.shape, &faces)) && offset_by_booleans(ev, bi, &faces, dist).is_ok() {
+        let booleans_first = translate_dir.is_none() && (touches_freeform(&body.shape, &faces) || beside_its_own_surface(&body.shape, &faces));
+        if booleans_first && offset_by_booleans(ev, bi, &faces, dist).is_ok() {
             continue;
         }
         // A cylinder offset to its axis goes whole: OCCT's offset turns it inside out (live mf-cyl-neg: no r 2 boss).
@@ -544,6 +545,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                     if let Some(steps) = tweak_planes_in_turn(&body.shape, &faces, dist, 2..=usize::MAX) {
                         name_tweaks(ev, bi, steps, failed_msg)?;
                         continue;
+                    }
+                    // (Not the booleans again where they failed above: ~0.3 s each on c2-impeller-loft's Move face 1.)
+                    if booleans_first {
+                        return err(failed_msg);
                     }
                     offset_by_booleans(ev, bi, &faces, dist).map_err(|e| {
                         log::debug!("move face: booleans failed ({})", e.message);
