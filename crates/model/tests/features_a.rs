@@ -2274,6 +2274,39 @@ fn move_face_offset_of_a_plane_between_sloping_sides() {
     assert!(near(v, frustum(0.015, s), 1e-9), "grown {v}, expected {}", frustum(0.015, s));
 }
 
+/// Move face's Offset of a flange's face a tube runs along (tangent to it, so OCCT can neither move nor offset it):
+/// grown by its prism, walls on its walls' surfaces (asm-scissor-lift 404ddb's Move face 1, live 14 faces). The face's
+/// centroid is in its bore: the slab's side is probed off a point on it.
+#[test]
+fn move_face_offset_of_a_flange_face_a_tube_runs_along() {
+    let mut t = T::new();
+    let mut ring = circle(DVec2::ZERO, 0.014);
+    ring.add_circle(DVec2::ZERO, 0.00525);
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), ring);
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "5 mm", "NEW");
+    let s = t.sketch(Reference::Plane(DatumPlane::Right), circle(DVec2::new(-0.014, 0.0), 0.014));
+    let r = t.regions(s)[0].clone();
+    let tube = t.extrude(r, "118 mm", "ADD");
+    t.set(tube, "symmetric", b(true));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 1);
+    let before = total_volume(&res.context);
+    let face = face_with_normal(&res.context.bodies[0], DVec3::Y);
+    t.add("moveFace", &[("moveFaces", q(vec![face])), ("offsetDistance", e("5 mm"))]);
+    let res = t.ok();
+    let body = &res.context.bodies[0];
+    assert!(body.shape.is_valid());
+    let grown = std::f64::consts::PI * (0.014f64.powi(2) - 0.00525f64.powi(2)) * 0.005;
+    let v = total_volume(&res.context);
+    assert!(near(v - before, grown, 1e-6), "grown {} mm3, expected {}", (v - before) * 1e9, grown * 1e9);
+    let bb = body.shape.bounding_box(true).unwrap();
+    assert!((bb.max.y - 0.005).abs() < 1e-6, "{bb:?}");
+    // The flange's wall, grown on its own cylinder: one face (thickened, its new strip was a face apart).
+    let wall = body.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { axis, radius, .. }) if axis.cross(DVec3::Y).length() < 1e-9 && (radius - 0.014).abs() < 1e-9)).count();
+    assert_eq!(wall, 1, "faces {}", body.faces.len());
+}
+
 #[test]
 fn move_face_offset_and_translate() {
     let mut t = T::new();

@@ -20,24 +20,26 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   extrudes_made_puts_the_first_extrudes_piece_first.
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
-- **SCISSOR RUN 11-26 13:37** (.pa.sh n1126; full list /root/core-scratch/sc-fails-1126.txt, 251 Studio rows): fixed
-  since slabs run: 0139f2 F1, 184ad0 F3/F5, 264eb3 C1, 2d82a0 C2/C6/F6/F21/F31/F37, 37a1a7 F3, 57725f. Still failing blends: 2d82a0 F4/F5/F7/F13/F25/F28/F30, 37a1a7 F5, 404ddb F1/F5/
-  F14/C1, 665cf3 C1/F2/F3, 92138f F1/F6, 97ad5f F2, 9cbb0e F18/F19/F23 (parked), fed22d C2/F4/F5/F24/F25/F30; b58244's
-  are "Select edges" (references). NEW since slabs: 608/Roller/Long Bar occurrences moved ~5-8 mm by our mates, BOM 72
-  vs 87 rows: check whether a fix upstream changed mate connector geometry. Rank these next.
+- **SCISSOR RUN 11-26 13:37** (.pa.sh n1126; /root/core-scratch/sc-fails-1126.txt = live-OK differences, st-1126.out =
+  failing features per Studio in list order). No blend is a Studio's first failure: all fillet/chamfer errors follow
+  earlier ones. First divergences: Move face offset 9cbb0e MF2, b58244 MF6, 404ddb MF1, 92138f MF1; Draft 2d82a0 D1,
+  b7e381 D2; Replace face 0139f2 RF1, edcbb0 RF1; Extrude e24753 E3; Thicken 665cf3; Mirror fed22d M5; references
+  37a1a7 T3, 4ce5c7 DF1, 57725f T1, 5aae43 B1, 0c2c42 P1. REGRESSION since 11-25 12:51 (reported to lead 13:5x):
+  92138f, bdddaf, fddd23 were as live, now fail early (fddd23 Extrude 1 "Select face or sketch region"); 97ad5f
+  Sketch 2 Error->Warning then Extrude 2 fails (skasm bisects, P0). NEW: 608/Roller occurrences moved 5-8 mm, BOM 72
+  vs 87. MOVE FACE 404ddb MF1 FIXED (direct.rs face_slab: probe off inner_point, not the centroid in the bore; planes'
+  slab = prism so walls merge: live 14 faces, 73951.72 vs .857; Fillet 1 = live). T1 features_a::move_face_offset_of_a_
+  flange_face_a_tube_runs_along. Then 404ddb Fillet 2: our import kept 2 of live's 3 edge queries (the "&" one likely
+  dropped because references were matched while MF1 failed): re-run .pa.sh after the land. 9cbb0e MF2 (Frame Plate, 2
+  faces -15 mm): reblend path -> offset_faces fails; tweak "a moved face no longer meets its neighbour"; prism cut
+  110110 vs live 109400.89 mm3, 46 vs 44 faces: live extends the sloping neighbours (dump: dmp.sh <tab> <feature>
+  offsetfaces; probe core-scratch/zz_move_face_probe.rs + .mfp.sh). Then b58244 MF6, Drafts 2d82a0 D1 / b7e381 D2.
 - **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
   11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
-- **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
-  fillets rolled again (detail_a::reblend) at the cylinder floor: OCCT built 1-2 of the 4 corners (3 equal r 12.7
-  fillets) as plate patches, not spheres, whenever the free-form stripe (drafted wall x cylinder floor) was the 2nd of
-  the corner's three added (ChFi3d PerformThreeCorner; 160 corners of 40 orders: middle = patch, first/last = sphere).
-  Fix: reblend adds curved edges first (lines last). Now 4 spheres, faces as live, 688435.71 vs live 688437.67
-  (was 688456.90), 436 -> 290 ms; test features_c::replace_face_onto_a_cylinder_rolls_every_corner_as_a_sphere (fails
-  without: 2 spheres). Left (-2 mm3, 2.8e-6 > the 1e-6 band; edges 20 'other' vs live's conics): live keeps the RIM
-  (corner patch KFWB 476.844, top plane JFq 16331.985 unchanged through Replace face 1); our blends_to_reapply
-  propagates floor fillets -> corner spheres -> vertical fillets -> rim corners -> rim fillets and rolls the rim again
-  (OCCT filling: 476.851 / 16331.873). Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case.
-  Probe: core-scratch/refillet-probe.patch (kernel crash_inputs zz_probe_refillet on NOSHAPE_DUMP_OPS fillet-3).
+- **REPLACE FACE 1 (bool's, c2-replace-face-exercise)**: landed 83082091 (reblend adds curved edges first: 4 spheres).
+  Left -2 mm3: live keeps the RIM; our blends_to_reapply propagates floor fillets -> spheres -> vertical fillets -> rim
+  and rolls it again. Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case. Probe:
+  core-scratch/refillet-probe.patch (kernel crash_inputs zz_probe_refillet on NOSHAPE_DUMP_OPS fillet-3).
 - **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
   7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain

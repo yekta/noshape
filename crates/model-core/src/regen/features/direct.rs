@@ -552,9 +552,23 @@ fn face_slab(f: &Shape, d: f64) -> FResult<Shape> {
         }
         return Ok(k::make_cylinder(&k::Plane::from_normal(origin + axis * lo, axis), radius, hi - lo, std::f64::consts::TAU)?);
     }
-    // Thicken, then make sure the slab is on the requested side.
-    let p = f.centroid()?;
-    let probe = f.project_point(p)?.point + f.normal_at_point(p)? * (d * 0.5);
+    // Thicken, then make sure the slab is on the requested side: probed off a point on the face (a flange's face has
+    // its centroid in its bore: asm-scissor-lift 404ddb's Move face 1).
+    let p = match inner_point(f) {
+        Some(p) => p,
+        None => f.project_point(f.centroid()?)?.point,
+    };
+    let n = f.normal_at_point(p)?;
+    let probe = p + n * (d * 0.5);
+    // A plane's slab is its prism: walls on the surfaces of the walls it extends (exact cylinders for its holes), so
+    // they merge with them (404ddb's Move face 1: live's 14 faces, not 22).
+    if f.is_planar()
+        && let Ok(r) = k::extrude(f, n * d)
+        && r.shape.is_valid()
+        && r.shape.classify_point(probe, d.abs() * 1e-6)? == k::PointClass::Inside
+    {
+        return Ok(r.shape);
+    }
     for (t1, t2) in [(d.max(0.0), (-d).max(0.0)), ((-d).max(0.0), d.max(0.0))] {
         let Ok(r) = k::thicken(f, t1, t2) else { continue };
         if !r.shape.is_valid() {
