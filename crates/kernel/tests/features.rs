@@ -1350,6 +1350,14 @@ fn a_ring_round_a_lofts_closure_keeps_a_vertex_there() {
     assert_eq!((t.face_count(), t.edge_count(), t.vertex_count()), (3, 9, 9), "the bottom section's 8 edges and vertices, the ring and its vertex");
     let ring: Vec<DVec3> = r.vertices().iter().zip(&t.vertices).filter(|(_, s)| **s).filter_map(|(v, _)| v.vertex_point().ok()).filter(|p| p.z > 1.0).collect();
     assert!(ring.len() == 1 && ring[0].y.abs() > 10.0, "on the loft's seam, not the sphere's (in y = 0): {ring:?}");
+    // A ring split round the side below it (c2-hunting-knife's Split 4, live 14/31/19) cuts the seam between that
+    // vertex and the profile's: the vertex stays, the split's ring has none.
+    let rings = section_plane(&r, &xy.offset(20.0)).unwrap().edges();
+    let s = imprint_kept(&r, &rings).unwrap().shape;
+    let t = s.shown_topology().unwrap();
+    let shown: Vec<DVec3> = s.vertices().iter().zip(&t.vertices).filter(|(_, v)| **v).filter_map(|(v, _)| v.vertex_point().ok()).filter(|p| p.z > 1.0).collect();
+    assert_eq!((t.face_count(), t.edge_count(), t.vertex_count(), rings.len()), (4, 10, 9, 1), "the split ring one edge, no vertex: {shown:?}");
+    assert!(shown.len() == 1 && shown[0].z > 60.0 && shown[0].y.abs() > 10.0, "the cut's ring keeps its vertex: {shown:?}");
 }
 
 /// (d) of live 1784 / 1788: our section at z 20 against live's (1388.7098 mm², perimeter 138.9262).

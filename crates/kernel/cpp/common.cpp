@@ -1147,35 +1147,59 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       f.erase(std::unique(f.begin(), f.end()), f.end());
       return f;
     };
+    // Whether edge j is a seam closing face f, a B-surface closed but not periodic that way.
+    auto closure_seam = [&](int j, uint32_t f) {
+      const TopoDS_Edge& s = TopoDS::Edge(em(j));
+      if (out[(size_t)j - 1] != 0 || BRep_Tool::Degenerated(s))
+        return false;
+      const TopoDS_Face& face = TopoDS::Face(fm((int)f + 1));
+      if (!BRep_Tool::IsClosed(s, face))
+        return false;
+      const BRepAdaptor_Surface su(face, false);
+      if (su.GetType() != GeomAbs_BSplineSurface && su.GetType() != GeomAbs_BezierSurface)
+        return false;
+      return (su.IsUClosed() && !su.IsUPeriodic()) || (su.IsVClosed() && !su.IsVPeriodic());
+    };
+    auto closes_any = [&](int j) {
+      for (uint32_t q = ef.first[(size_t)j - 1]; q < ef.first[(size_t)j]; ++q)
+        if (closure_seam(j, ef.second[q]))
+          return true;
+      return false;
+    };
     // Whether a seam through vertex i closes one of edge e's faces, a B-surface closed but not periodic that way, and
-    // starts at a vertex shown (its closure at a profile's vertex, not a ring's).
+    // starts at a vertex shown (its closure at a profile's vertex, not a ring's), followed past the vertices of rings
+    // that cut it later (c2-hunting-knife's Split 4: rings round the handle between the Revolve 1 ring and its profile).
     auto crosses_closure = [&](int i, int e) {
-      const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
       for (uint32_t k = ve.first[(size_t)i - 1]; k < ve.first[(size_t)i]; ++k)
       {
         const int j = (int)ve.second[k] + 1;
-        const TopoDS_Edge& s = TopoDS::Edge(em(j));
-        if (out[(size_t)j - 1] != 0 || BRep_Tool::Degenerated(s))
+        bool      on_e = false;
+        for (uint32_t q = ef.first[(size_t)j - 1]; q < ef.first[(size_t)j] && !on_e; ++q)
+          on_e = std::find(ef.second.begin() + ef.first[(size_t)e - 1], ef.second.begin() + ef.first[(size_t)e], ef.second[q]) != ef.second.begin() + ef.first[(size_t)e]
+                 && closure_seam(j, ef.second[q]);
+        if (!on_e)
           continue;
-        for (uint32_t q = ef.first[(size_t)j - 1]; q < ef.first[(size_t)j]; ++q)
+        int from = i, seam = j;
+        for (int step = 0; step < 64; ++step)
         {
-          const uint32_t f = ef.second[q];
-          if (std::find(ef.second.begin() + ef.first[(size_t)e - 1], ef.second.begin() + ef.first[(size_t)e], f) == ef.second.begin() + ef.first[(size_t)e])
-            continue;
-          const TopoDS_Face& face = TopoDS::Face(fm((int)f + 1));
-          if (!BRep_Tool::IsClosed(s, face))
-            continue;
-          const BRepAdaptor_Surface su(face, false);
-          if (su.GetType() != GeomAbs_BSplineSurface && su.GetType() != GeomAbs_BezierSurface)
-            continue;
-          if (!(su.IsUClosed() && !su.IsUPeriodic()) && !(su.IsVClosed() && !su.IsVPeriodic()))
-            continue;
           TopoDS_Vertex a, b;
-          TopExp::Vertices(s, a, b);
-          const int o = vm.FindIndex(a.IsSame(v) ? b : a);
-          for (uint32_t m = o > 0 ? ve.first[(size_t)o - 1] : 0; o > 0 && m < ve.first[(size_t)o]; ++m)
-            if (open[(size_t)ve.second[m] + 1])
+          TopExp::Vertices(TopoDS::Edge(em(seam)), a, b);
+          const int o = vm.FindIndex(a.IsSame(vm(from)) ? b : a);
+          if (o <= 0 || o == i)
+            break;
+          int next = 0;
+          for (uint32_t m = ve.first[(size_t)o - 1]; m < ve.first[(size_t)o]; ++m)
+          {
+            const int x = (int)ve.second[m] + 1;
+            if (open[(size_t)x])
               return true;
+            if (next == 0 && x != seam && closes_any(x))
+              next = x;
+          }
+          if (next == 0)
+            break;
+          from = o;
+          seam = next;
         }
       }
       return false;
