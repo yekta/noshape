@@ -1475,7 +1475,7 @@ fn ring_sweep(r: &super::SweepRecipe, body: &crate::regen::context::Body, remove
     let plane = r.profile.face_plane().ok().flatten()?;
     let disc = k::make_face(&plane, &k::make_wire(&[k::make_circle(center, axis, radius - t).ok()?]).ok()?, &[]).ok()?;
     let core = k::sweep(&disc, &r.path, &r.opts).ok()?.shape;
-    let res = k::cut(&body.shape, &core).ok()?.shape;
+    let res = tube_between(&body.shape, &core).or_else(|| k::cut(&body.shape, &core).ok().map(|r| r.shape))?;
     let walls: Vec<(Shape, Name)> = body.shape.faces().into_iter().zip(body.faces.iter().cloned()).filter(|(f, _)| f.face_plane().ok().flatten().is_none()).collect();
     if !res.is_valid() || res.count(ShapeType::Solid) != 1 || res.faces().len() != 2 * walls.len() + 2 || body.shape.faces().len() != walls.len() + 2 {
         return None;
@@ -1499,6 +1499,32 @@ fn ring_sweep(r: &super::SweepRecipe, body: &crate::regen::context::Body, remove
         out.push(name);
     }
     Some((res, out))
+}
+
+/// The tube between a round sweep and the sweep of a circle inside it, from their own faces: the outer walls, the inner
+/// ones and a ring between each end's two caps, sewn (the cut of one by the other took 450 ms on cf-hose-routing's hoses).
+fn tube_between(outer: &Shape, inner: &Shape) -> Option<Shape> {
+    let parts = |s: &Shape| -> (Vec<(Shape, k::Plane)>, Vec<Shape>) {
+        let (mut caps, mut walls) = (Vec::new(), Vec::new());
+        for f in s.faces() {
+            match f.face_plane().ok().flatten() {
+                Some(p) => caps.push((f, p)),
+                None => walls.push(f),
+            }
+        }
+        (caps, walls)
+    };
+    let ((oc, mut faces), (ic, iw)) = (parts(outer), parts(inner));
+    if oc.len() != 2 || ic.len() != 2 {
+        return None;
+    }
+    faces.extend(iw);
+    for (c, p) in &oc {
+        let (ci, _) = ic.iter().find(|(_, q)| (q.origin - p.origin).dot(p.normal).abs() < 1e-7 && q.normal.dot(p.normal).abs() > 1.0 - 1e-9)?;
+        faces.push(k::make_face(p, &k::make_wire(&c.edges()).ok()?, &[k::make_wire(&ci.edges()).ok()?]).ok()?);
+    }
+    let s = k::sew(&faces, 1e-7, true).ok()?.shape;
+    (s.is_valid() && s.count(ShapeType::Solid) == 1).then_some(s)
 }
 
 fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
