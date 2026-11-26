@@ -1861,6 +1861,52 @@ fn a_hole_size_cell_lights_its_holes_and_tags(cx: &mut TestAppContext) {
 /// Live behaviours "feel coverage (11-20)" D2: a dimension dragged by its text from unselected ends unselected (tan
 /// hover with grips while the pointer is on it), its move one edit; a selected one stays selected and its palette
 /// opens (live drwm-2 d5).
+/// Live drw-copy-annotation-drag 6, drw-note-hover-matrix 20: the runner grabs a note where live's recorder presses one,
+/// its top-left corner (the point it was placed at), and a drag from there moves it by the drag.
+#[gpui::test]
+fn the_runner_grabs_a_note_at_its_corner(cx: &mut TestAppContext) {
+    use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
+    let (window, editor) = drawing(cx, "note-grab");
+    real_sheet(cx, window, &editor);
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.open_note_panel(None, [60.0, 40.0], w, cx);
+        if let Some(crate::drawing_view::Panel::Note { input, .. }) = &mut e.panel {
+            input.update(cx, |s, cx| s.set_value("TEMP", w, cx));
+        }
+        e.apply_panel(cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let to_window = |cx: &mut TestAppContext, p: [f64; 2]| cx.update(|cx| {
+        let e = editor.read(cx);
+        let l = e.sheet_to_local(p);
+        e.bounds.origin + Point::new(px(l[0] as f32), px(l[1] as f32))
+    });
+    let at = cx.update(|cx| editor.read(cx).ui_target_point(&json!({"annotation": "TEMP"}), cx)).expect("where the runner presses");
+    let placed = to_window(cx, [60.0, 40.0]);
+    let mm = f32::from(to_window(cx, [70.0, 40.0]).x - placed.x) / 10.0;
+    assert!(f32::from(at.x - placed.x).abs() < mm && f32::from(at.y - placed.y).abs() < mm, "{at:?} vs placed {placed:?} ({mm} px/mm)");
+    let position = |cx: &mut TestAppContext| cx.update(|cx| {
+        let e = editor.read(cx);
+        e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::Note { .. })).map(|a| a.position).expect("the note")
+    });
+    let before = position(cx);
+    let to = at + Point::new(px(40.0 * mm), px(0.));
+    cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+        e.on_mouse_move(&MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }, w, cx);
+        e.on_mouse_down(&MouseDownEvent { button: MouseButton::Left, position: at, modifiers: Modifiers::default(), click_count: 1, first_mouse: false }, w, cx);
+        for k in 1..=4 {
+            let p = at + Point::new(px(10.0 * mm * k as f32), px(0.));
+            e.on_mouse_move(&MouseMoveEvent { position: p, pressed_button: Some(MouseButton::Left), modifiers: Modifiers::default() }, w, cx);
+        }
+        e.on_mouse_up(&MouseUpEvent { button: MouseButton::Left, position: to, modifiers: Modifiers::default(), click_count: 1 }, w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    let after = position(cx);
+    assert!((after[0] - before[0] - 40.0).abs() < 0.5 && (after[1] - before[1]).abs() < 0.5, "moved 40 mm right: {before:?} → {after:?}");
+}
+
 #[gpui::test]
 fn a_dimension_dragged_from_unselected_ends_unselected(cx: &mut TestAppContext) {
     use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
