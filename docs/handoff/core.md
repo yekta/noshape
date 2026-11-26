@@ -14,19 +14,25 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   face, other faces tangent) so no geometric rule separates them. features/cusp_blend.rs cusp_wall_round = F18.
   direct.rs move_face: booleans not tried again after OCCT's offset fails where they failed first (impeller MF1
   ~310 ms). Then: scissor parity rerun (.pa2.sh vs d-base), Fillet 19/23, MF7, Chamfer 11.
-- **IMPELLER FILLET 3 (lead 22:5x, IN PROGRESS 23:0x)**: bool: MF1's empty fuse is OCCT's too; the body differs from
-  Fillet 3 (feature 27) on. Fresh .pmi.sh: 27/48, Fillet 3 34/93/60 vs live 34/95/62. .f3cmp.sh <feature> (corpus copy,
-  cli-rfB, faces matched by area vs live.jsonl): already after "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE) its 2
-  SPLINE faces are 6.0969 vs live 6.1849 mm2 and Extrude 4's cylinder (r 9.473) 303.42 vs 303.58. Fillet 3 (CONIC,
-  section_blend run on, 2 tools, both picks = cylinder x rib edges y +-2.61 z -43.106 x 1.5..60.9): blends 176.24 vs
-  live 177.23, rib faces 604.65 vs 603.62, chamfer faces 12.49 vs 12.68. Live's blend runs on to x 0.097 (its edge on
-  the rib y 0.957 z -46.774 is 54.606 long), ours stops at x 0.957 (53.746); live also splits the x=5 plane edge
-  (0.5599 + 0.1885) and has a 0.3563 edge at (5, -0.144, -44.007) and a 0.0469 one at (0.023, 4.132, -63.209).
-  Next: is the run-on end ours (section_blend's trim) or the chamfer's 0.09 mm2? Fix the chamfer first if it is.
-  Chamfer: OFFSET_ANGLE 3.5 mm 20 deg, 3 edges; Fillet 3: CONIC 3 mm rho 0.5. .f3e.sh <feature> = edges by length vs
-  live near the tube (chamfer run: /root/core-scratch/f3e-chamfer.out, unread). .imp2.sh <feature> = debug log.
+- **SCISSOR FILLETS FIX-FORWARD: QUEUED dc73ccf7** (ec47e4e4 FAILED: kernel_robustness::a_concave_arcs_round_stops_at_
+  the_convex_rounds_and_runs_them_on; fixed by 6ce108cc4: the short-chain check runs on over folds; model tests 654 ok,
+  scissor F5/F2/F4/F25/F18 still Ok).
+- **IMPELLER FILLET 3 (IN PROGRESS)**. Chain: Fillet 3's run-on end -> "Fillet Stevenrohr zum Halter" (r 2, 4 picks:
+  per side Fillet-3 face x chamfer face, Fillet-3 face x x=5 plane) fails (live OK: r2 rounds to x 7) -> Move face 1.
+  Found: (a) only 3 of its 4 picks resolve on the OLD corpus copy (~/qa/corpus: refs = Split{Generated(CapEnd x
+  Side19) chamfer face, ordinal 0 / 3}; ours renumbers). Fresh translation running (.pmi2.sh c2-impeller-loft, saves to
+  vibex7 ~/tmp/core/imp/fresh; output task bszabbg98, result ~/tmp/core/pmi.txt): redo .zp.sh on the fresh doc.
+  rim_chamfer_cut names chamfer faces Generated (on_chamfer contains_point at 20 nm misses) -> look at that too.
+  (b) Fillet 3's end: ours round x chamfer meets the rib at x 0.957, live 0.097 (live chamfer face extended to x 0.097,
+  12.68 vs 12.49 mm2; live also has a valence-2 vertex on the chamfer x plane edge: 0.1885+0.5599 vs ours 0.7458).
+  Chamfer itself: rim_chamfer_cut (OCCT fails), 6.0969 vs live 6.1849: set by the run-on extension (ZZ_RC_ALONG 0.5
+  -> 6.1425, 0 -> breaks); edge extrapolation = side surface section within 6 um (probe diff /root/core-scratch/
+  rim-chamfer-zz.diff). UNCOMMITTED ZZ_PICKS probes in detail.rs fillet_in: strip before landing.
+  Scripts (core-rf, untracked): .zp.sh <feature> (picks + faces), .f3n.sh/.f3n2.sh (edges vs live near the tube),
+  .f3cmp.sh (faces), .rc.sh (chamfer variants), .imp2.sh (debug log).
 - THEN screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
-- P1 PATTERN-AFTER-INSERTED-CHAMFER (lead 19:5x): already fixed by 6a8e411db (11-19); TICKETS row marked (b4dc6e1cf).
+- THEN psui's two TICKETS items: Extrude "Up to part" overlap; Remove pattern of the only part.
+- PATTERN-AFTER-INSERTED-CHAMFER: taken by skasm (lead 11-26).
 - TRANSFORM-TRANSLATE-DISTANCE: LANDED 662228ffc, qa verified 21:5x (hem docs SAME); delete vibex7 ~/tmp/core/tr.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
