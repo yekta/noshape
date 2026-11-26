@@ -34,13 +34,21 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   tangent contact -> OCCT's; OCCT's result there is invalid, the doc's first live difference is Fillet 1 just after, not shown
   related). replace-face 5925baca: target from our Replace face inconsistent (+19 mm3 vs live): asked lead whether core's.
 - SPEED LIST re-measured 11-26 10:50 on main e6bae0fd7 (vibex8 ~/tmp/bool: cli-main, models = copies of ~/qa-parity/saved,
-  fl-main2.sh -> fl-main.jsonl, sel-main.jsonl 69 rows >= 100 ms and >= 2x live, prof-main.jsonl). By Boolean/Shell time:
-  impeller Fillet 4 (2129/91 ms: our Boolean 1661, OCCT's per-pair sections 1536 in 20 serial calls; case rec-imp
-  9040230e4b11f11b, cut 45 faces, ours 1662 vs OCCT 364-432 ms, 0 differ), knifehandle Fillet 1 (OCCT path 1634), impeller
-  Fillet 3 (1579, 3 Booleans), impeller Boolean Flansch+Gehaeuse (591, sections_ahead 361), rings Shell 1 (555), loft-paths
-  Mirror 1 (487) / Loft 5 (383, sections_ahead 366), impeller Chamfer Stevenrohr (418), Shell Gehaeuse (297). NOW: why
-  Fillet 4's 20 pairs are not made ahead in parallel: probe sec-probe.patch (PROBE_SEC per call: pair, path seeded/ahead/own/ff,
-  ms) in bool-mf (detached at main). recfeat.py names each recorded case's feature (rec-imp, recfeat-imp.out).
+  fl-main2.sh -> fl-main.jsonl, sel-main.jsonl 69 rows >= 100 ms and >= 2x live, prof-main.jsonl; recfeat.py names each recorded
+  case's feature: rec-imp, rec-kh, rec-lp).
+  SEED 8d1875822 (worktree bool-seed, branch bool-seed, on main 076da3e5f): seeded_sections stops projecting once 5 steps in a row
+  come no closer (impeller Fillet 4's cut 9040230e: one seed stuck 7.9 mm apart 400 steps on an offset surface, 1.5 s; ours 1662 ->
+  189 ms, OCCT 359, 0 differ; rec-imp 2 differ as before: 549d67 unify 76 vs 77, 79058fda OCCT wrong). Unit bool-chain-seed
+  (/root/bool-scratch/chain-8d1875822.sh -> kn-8d1875822.out) waits for bool-chain-b, gates, knurls, lands bool-seed. No
+  handoff commits in bool-seed (it is on an older main: handoff conflict).
+  Checked, no Boolean fix: impeller Fillet 3 ae73c9d8 / Extrude impellerraum 6fd99e06 'a point near two vertices' (one of our points
+  reaches 2.6 mm, input vertices 0.22 mm from the fillet: nv-probe in mf-probes-1126b.patch); knifehandle Fillet 1 856a411e (OCCT
+  2 s, invalid; tool edge 4 = the fillet's contact line on the handle face, 0.68 mm off our face: tangent family; doc matches live
+  there); impeller Chamfer e0dcafbf (tool plane x 1.5 mm through a spot three target faces meet within 6 um, 2-edge sliver);
+  loft-paths Loft 5 e49bd394 (ours 302 vs OCCT 408: one B-spline x B-spline pair's OCCT section 280-365 ms; own B-spline sections
+  would be the lever); rings Shell 1 (by_quadrics, repair ~420 ms; A/B without the parallel second try: rings 500-650 vs 600-850
+  noisy, impeller worse without it: kept). Not Boolean (core's?): impeller Delete face 2 1414/11, surf-intro Derived 1 x5 ~512/65,
+  parting-line Split 3 631/31 and Drafts ~350/20, sm-rocker Mirror 3 225/8.
 - Idea: replay could run OCCT with set_boolean_no_tree for occt_tree cases (pcb 101003c5 then comparable).
 - Cleanup: vibex8 ~/tmp/bool {kt-slow, wt1, rf1, models, rec-imp, rp1, fl-work, p0}; bool-sf/bool-mf targets after the lands.
 
