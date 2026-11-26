@@ -19,15 +19,13 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (state 11-26 10:57 UTC)
-- QUEUED ac1aac8d 10:52 (bool-slow, branch bool-cov): screws coverage (00e677ac FAILED 08:58 on a handoff rebase conflict, rides
-  along), WRAP-TEXT a7a17af18 (tilted arcs on a cylinder -> C2::Conic with Map::Cyl; ours 68/88 ms vs OCCT 298/135; T1
-  letters_wrapped_on_a_cylinder_with_rims_at_an_angle_fuse), 5e07cd824 gate-host.py ignores "a gap" timing hints (its gate's only
-  CHECK was 21 docs whose gap hint changed). Gate + knurls 5x 0. Lead told.
-- LOFT-PATHS 063eb6fea (worktree bool-sf, branch bool-loft, rebased on 5e07cd824): lies_on also needs parallel normals at the
-  samples. b076c08c ours 33 ms vs OCCT 151; T1 a_boss_lofted_from_a_slots_top_fuses_to_it. Unit bool-chain-b
-  (/root/bool-scratch/chainb.sh -> chain-063eb6fea.sh -> kn4772.out) gates, knurls, lands bool-sf (only once wrap-text is on
-  main). Keep bool-sf CLEAN until then.
+## NEXT (state 11-26 11:58 UTC)
+- QUEUED 11-26 11:58 as one stack from bool-sf (branch bool-loft, rebased on main 158ab4c25): screws coverage 402be8f80,
+  WRAP-TEXT a7a17af18 (tilted arcs on a cylinder -> C2::Conic with Map::Cyl; ours 68/88 ms vs OCCT 298/135), gate-host.py
+  ignoring "a gap" timing hints 5e07cd824, LOFT-PATHS 063eb6fea (lies_on also needs parallel normals; b076c08c ours 33 ms vs OCCT
+  151). ac1aac8d had FAILED 10:52 on a handoff rebase conflict. Gate chain-063eb6fea.out clean (differing 3 -> 3, to the end
+  132 -> 132, crate tests pass), knurls 5x 0. chain-063eb6fea.sh's suite check was wrong ($5 of "to the end a -> b" is "->"):
+  chain scripts must read fields 4 and 6.
 - Coverage ranking DONE: every decline >= 100 ms parked: partial-fillet 7340044b (pf-secant-order-probes.patch; 57 um micro edge),
   tangent family beb5d239, setback df44fb85, loft-paths e74bf29d (tb-probe.patch), body-draft e13ba873 (tool B-spline index 2
   lies on target plane y 14.58 mm along a straight stretch of its profile, then leaves it C2 past a knot: the overlap's edge is a
