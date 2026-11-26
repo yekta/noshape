@@ -5401,7 +5401,12 @@ impl SketchEditor {
         self.press = None;
         self.drag_origin = None;
         self.drag_held.clear();
-        if let Some(DragState::Handle(h @ (PatternHandle::Rotate | PatternHandle::Scale | PatternHandle::MoveX | PatternHandle::MoveY))) = &self.drag {
+        // An arrow clicked, not dragged, opens no box (live sketch-entity-copy-paste: the click after a paste on its
+        // triad leaves the focus on the canvas).
+        let unmoved = |h: &PatternHandle| matches!(h, PatternHandle::MoveX | PatternHandle::MoveY) && self.xf_grab.is_some_and(|(_, at)| at == self.xf_offset);
+        if let Some(DragState::Handle(h @ (PatternHandle::Rotate | PatternHandle::Scale | PatternHandle::MoveX | PatternHandle::MoveY))) = &self.drag
+            && !unmoved(h)
+        {
             self.xf_released = Some(*h);
             if *h == PatternHandle::Scale {
                 self.xf_scale_box = self.cursor.map(|c| c + DVec2::new(XF_SCALE_BOX_FROM_POINTER.0, XF_SCALE_BOX_FROM_POINTER.1) * self.world_per_px);
@@ -10837,6 +10842,20 @@ mod tests {
         ed.tool_drag(&mut d, shaft + v(1.0, 40.0) * px);
         ed.tool_up(&mut d, shaft + v(1.0, 40.0) * px);
         assert!((ed.xf_offset / px - v(0.0, 40.0)).length() < 1e-6, "the pointer's travel along Y: {:?}", ed.xf_offset / px);
+    }
+
+    /// Live sketch-entity-copy-paste: a click on an arrow (no drag) opens no distance box; the focus stays on the canvas.
+    #[test]
+    fn a_clicked_transform_arrow_opens_no_box() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        ed.selection = vec![d.sketch.add_line(v(0.0, 0.0), v(0.01, 0.0))];
+        ed.set_tool(Tool::Transform);
+        ed.apply_preselection(&mut d);
+        let head = ed.pattern_handles(&d.sketch).into_iter().find(|x| x.0 == PatternHandle::MoveY).unwrap().1;
+        ed.tool_down(&mut d, head, None, false, false);
+        ed.tool_up(&mut d, head);
+        assert_eq!(ed.xf_released, None);
+        assert!(!ed.pattern_value_labels(&d.sketch).iter().any(|x| x.0 == PatternHandle::MoveY), "no box");
     }
 
     /// live2's combined snaps (feel/combo.json, 0.2507 mm a pixel, mm here): a chain's next end where two zones cross
