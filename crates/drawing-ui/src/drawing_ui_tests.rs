@@ -1661,6 +1661,8 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
         e.cursor = e.to_sheet(e.local(w));
         Some(flat(&e.ordinate_entries(id, cx)?))
     })).expect("an ordinate group");
+    // The menus above copied an annotation, so this one has Paste too.
+    let ordinate: Vec<String> = ordinate.into_iter().filter(|r| r != "Paste").collect();
     assert_eq!(ordinate, with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Unbreak dimension"]));
     // An image: its Switch to <file tab> row names the tab.
     let image: Vec<String> = cx.update(|cx| {
@@ -2120,6 +2122,38 @@ fn two_views_menu_as_live(cx: &mut TestAppContext) {
     assert_eq!(got.first().map(String::as_str), Some(show));
     assert!(got[1].starts_with("Tangent edges ▸"), "{got:?}");
     assert_eq!(got[2..], ["Adjust linestyle...", "View properties...", "Move to sheet...", "Copy", "Paste as table", "Clear selection", "Zoom to fit", "Delete"]);
+}
+
+/// Live drw-view-tangent-edges-menu (gap-audit-drw-1126): the Isometric view's menu has Rotate view and no Suppress
+/// alignment with parent; its Tangent edges ▸ greys the current style (Solid), checking none.
+#[gpui::test]
+fn the_isometric_views_menu_as_live(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "iso-view-menu");
+    real_sheet(cx, window, &editor);
+    let rows = cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            let sheet = e.current_sheet();
+            let iso = sheet.views.iter().map(|v| v.id).find(|id| noshape_model::drawing::views::is_isometric(sheet, *id)).expect("an isometric view");
+            e.onshape_view_entries(iso, cx)
+        })
+    });
+    let labels: Vec<String> = rows.iter().filter_map(|m| match m {
+        MenuEntry::Item { label, .. } | MenuEntry::Submenu(label, _) => Some(label.to_string()),
+        MenuEntry::Separator => None,
+    }).collect();
+    assert!(labels.iter().any(|l| l == "Rotate view"), "{labels:?}");
+    assert!(!labels.iter().any(|l| l.contains("alignment with parent")), "{labels:?}");
+    let tangent = rows.iter().find_map(|m| match m {
+        MenuEntry::Submenu(label, rows) if label.as_ref() == "Tangent edges" => Some(rows.clone()),
+        _ => None,
+    }).expect("Tangent edges");
+    let got: Vec<(String, bool, bool)> = tangent.iter().filter_map(|m| match m {
+        MenuEntry::Item { label, checked, disabled, .. } => Some((label.to_string(), *checked, *disabled)),
+        _ => None,
+    }).collect();
+    let want = [("Hidden", false, false), ("Solid", false, true), ("Phantom", false, false)].map(|(l, c, d)| (l.to_string(), c, d));
+    assert_eq!(got, want);
 }
 
 /// Live ct-2-add (cfg-choosers-1120): the Custom table dialog's Add and Insert are 26 px, 2 px apart; the fixed corners

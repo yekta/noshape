@@ -295,9 +295,9 @@ impl DrawingEditor {
                 }
             }
         }
-        // Tangent edges ▸ Hidden / Solid / Phantom.
+        // Tangent edges ▸ Hidden / Solid / Phantom, the current one greyed, not checked (live drw-view-tangent-edges-menu).
         let tm = TangentMode::of(&v);
-        let tangent = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom].into_iter().map(|m| MenuEntry::check(m.label(), m == tm, move |t, _, cx| t.edit_view("Tangent edges", id, cx, |v| m.apply(v)))).collect();
+        let tangent = [TangentMode::Hidden, TangentMode::Solid, TangentMode::Phantom].into_iter().map(|m| MenuEntry::item(m.label(), move |t, _, cx| t.edit_view("Tangent edges", id, cx, |v| m.apply(v))).disabled(m == tm)).collect();
         out.push(MenuEntry::Submenu("Tangent edges".into(), tangent));
         out.push(MenuEntry::item("Adjust linestyle...", move |t, w, cx| t.open_linestyle(id, w, cx)));
         // View-type entries (Onshape: Edit / Flip direction / Remove crop ...),
@@ -376,7 +376,7 @@ impl DrawingEditor {
         // suppressed). Live (behaviours "Replicate annotations with real
         // annotations" (5)): a "Rotate view" submenu "Vertical to… |
         // Horizontal to…".
-        if sheet.turns_freely(id) {
+        if views::turns_freely(sheet, id) {
             out.push(MenuEntry::Submenu(
                 "Rotate view".into(),
                 vec![
@@ -398,7 +398,7 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Move to sheet...", move |t, w, cx| t.open_move_sheet_at(w.mouse_position(), crate::drawing_move_sheet::MoveTarget::View(id), cx)));
         // Suppress alignment with parent (derived views that align with it;
         // live drawing/447: after Move to sheet…).
-        if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
+        if matches!(v.kind, ViewKind::Projected { .. } | ViewKind::Auxiliary { .. } | ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) && !views::is_isometric(sheet, id) {
             let un = v.unaligned;
             // Help H:views: a rotated view can't be re-aligned.
             let rotated = v.rotation.abs() > 1e-9;

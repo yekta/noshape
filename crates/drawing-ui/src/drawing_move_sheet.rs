@@ -266,7 +266,7 @@ impl DrawingEditor {
             .into_iter()
             .map(|m| {
                 let ids = ids.clone();
-                MenuEntry::check(m.label(), m == tm, move |t, _, cx| t.edit_views("Tangent edges", &ids, cx, |v| m.apply(v)))
+                MenuEntry::item(m.label(), move |t, _, cx| t.edit_views("Tangent edges", &ids, cx, |v| m.apply(v))).disabled(m == tm)
             })
             .collect();
         let props_ids = ids.clone();

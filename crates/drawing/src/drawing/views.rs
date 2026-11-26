@@ -894,6 +894,17 @@ pub fn projected_direction(sheet: &Sheet, id: ViewId) -> Option<[f64; 2]> {
     Some(snap_direction(d))
 }
 
+/// An isometric view (a diagonal projection): not aligned with its parent, so it turns like a free view and has no
+/// Suppress alignment with parent (live drw-view-tangent-edges-menu: the Isometric view's menu has Rotate view).
+pub fn is_isometric(sheet: &Sheet, id: ViewId) -> bool {
+    projected_direction(sheet, id).is_some_and(|d| d[0] != 0.0 && d[1] != 0.0)
+}
+
+/// [`Sheet::turns_freely`], an isometric view too (without children).
+pub fn turns_freely(sheet: &Sheet, id: ViewId) -> bool {
+    sheet.turns_freely(id) || (is_isometric(sheet, id) && !sheet.views.iter().any(|x| sheet.parent_of(x.id) == Some(id)))
+}
+
 /// Section cut data in the parent's view coordinates.
 #[derive(Clone, Debug)]
 pub struct SectionCut {

@@ -171,7 +171,7 @@ fn od<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<&'a mut OpenDoc, OpError> {
 
 /// A view without a parent (on this sheet) or children: it can turn.
 fn free(t: &Target, id: ViewId) -> bool {
-    t.d.sheets[t.sheet].turns_freely(id)
+    noshape_model::drawing::views::turns_freely(&t.d.sheets[t.sheet], id)
 }
 
 /// A sheet given as in `sheet`: a number (1 = first) or a name.
