@@ -6,7 +6,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
-- **SCISSOR FILLETS + MOVE FACE 1 (core-rf, LANDING 22:3x; corpus A/B .ab7.sh: only impeller "Fillet Stevenrohr zum
+- **SCISSOR FILLETS + MOVE FACE 1 (QUEUED ec47e4e4 22:46; corpus A/B .ab7.sh: only impeller "Fillet Stevenrohr zum
   Halter" Error both, message Adjoining edge -> Failed to fillet; T1 ok)**: detail.rs
   TangentLinks: leaving directions (tangent_at + a step's sign) and sliver() (a fold between a convex and a concave edge
   of one face) cut, cut_slivers flag; fillet_in's work list: where the cut chain fails, the part again uncut (bdddaf
@@ -14,9 +14,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   face, other faces tangent) so no geometric rule separates them. features/cusp_blend.rs cusp_wall_round = F18.
   direct.rs move_face: booleans not tried again after OCCT's offset fails where they failed first (impeller MF1
   ~310 ms). Then: scissor parity rerun (.pa2.sh vs d-base), Fillet 19/23, MF7, Chamfer 11.
-- NEXT after the sliver land (lead 22:5x): IMPELLER FILLET 3 (feature 27) matching live: bool found MF1's empty fuse
-  is OCCT's too (ours declines); the body differs upstream (MF1 sees 38 faces, live 59): Fillet 3 with our Boolean on,
-  feature 15 with it off. Then screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
+- **IMPELLER FILLET 3 (lead 22:5x, IN PROGRESS 23:0x)**: bool: MF1's empty fuse is OCCT's too; the body differs from
+  Fillet 3 (feature 27) on. Fresh .pmi.sh: 27/48, Fillet 3 34/93/60 vs live 34/95/62. .f3cmp.sh <feature> (corpus copy,
+  cli-rfB, faces matched by area vs live.jsonl): already after "Chamfer Stevenrohr Halterung" (OFFSET_ANGLE) its 2
+  SPLINE faces are 6.0969 vs live 6.1849 mm2 and Extrude 4's cylinder (r 9.473) 303.42 vs 303.58. Fillet 3 (CONIC,
+  section_blend run on, 2 tools, both picks = cylinder x rib edges y +-2.61 z -43.106 x 1.5..60.9): blends 176.24 vs
+  live 177.23, rib faces 604.65 vs 603.62, chamfer faces 12.49 vs 12.68. Live's blend runs on to x 0.097 (its edge on
+  the rib y 0.957 z -46.774 is 54.606 long), ours stops at x 0.957 (53.746); live also splits the x=5 plane edge
+  (0.5599 + 0.1885) and has a 0.3563 edge at (5, -0.144, -44.007) and a 0.0469 one at (0.023, 4.132, -63.209).
+  Next: is the run-on end ours (section_blend's trim) or the chamfer's 0.09 mm2? Fix the chamfer first if it is.
+- THEN screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
 - P1 PATTERN-AFTER-INSERTED-CHAMFER (lead 19:5x): already fixed by 6a8e411db (11-19); TICKETS row marked (b4dc6e1cf).
 - TRANSFORM-TRANSLATE-DISTANCE: LANDED 662228ffc, qa verified 21:5x (hem docs SAME); delete vibex7 ~/tmp/core/tr.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
