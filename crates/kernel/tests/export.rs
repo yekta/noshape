@@ -135,6 +135,23 @@ fn an_onshape_file_of_three_parts_reads_as_them() {
     assert_eq!(read_parasolid(&p, LengthUnit::Millimeter).unwrap().count(ShapeType::Solid), 3);
 }
 
+/// Misumi's FXBA3-10-F43 and FXBA3-7-F5-SET as Cadenas PARTsolutions writes them (bare little-endian binary in a .x_t;
+/// asm-xdev-subs' Import 1 of two studios): they read as live's parts, 1 solid of 26 faces, 598.93 mm³, and 2 solids of
+/// 40 faces, 275.49 mm³ (their cone-plane loops start and end at one terminator). Vendor files, kept out of the repo:
+/// in $NOSHAPE_XT_VENDOR.
+#[test]
+#[ignore = "T2: vendor files outside the repo"]
+fn cadenas_misumi_vendor_parts_read() {
+    let Some(dir) = std::env::var_os("NOSHAPE_XT_VENDOR").map(std::path::PathBuf::from) else { return };
+    for (f, solids, faces, volume) in [("misumi-fxba3-10-f43.x_t", 1, 26, 598.9303), ("misumi-fxba3-7-f5-set.x_t", 2, 40, 271.4193 + 4.0723)] {
+        let s = read_parasolid(&dir.join(f), LengthUnit::Millimeter).unwrap_or_else(|e| panic!("{f}: {e}"));
+        let got = (s.count(ShapeType::Solid), s.count(ShapeType::Face), s.is_valid());
+        assert_eq!(got, (solids, faces, true), "{f}: solids, faces, valid");
+        let v = s.volume().unwrap();
+        assert!((v - volume).abs() < 1e-3 * volume, "{f}: {v} mm³, live {volume}");
+    }
+}
+
 /// Onshape's Parasolid of a Part Studio with a mesh part (live c2-hex-bookcase-derived's zip: the B-rep "shrunk" and the
 /// imported mesh "imported") keeps the mesh in the .xmm_txt written beside the .x_t: both parts read, the mesh as a
 /// mesh solid of live's volume. Without its mesh file the file fails, naming it, never reads as part of itself.

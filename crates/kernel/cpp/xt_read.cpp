@@ -1288,7 +1288,9 @@ struct Builder
         cp.insert(cp.begin(), pt[0]);
         fixed_first = true;
       }
-      else if (dl < df && !fixed_last && dl > 1e-12)
+      // A closed curve's start and end limits are one point (Cadenas' FXBA3 cone-plane loops: both terminators at the
+      // chart's 10 µm gap): the second goes to the other end, closing it.
+      else if (!fixed_last && dl > 1e-12 && (dl < df || (fixed_first && pt[0].Distance(cp.front()) < 1e-12)))
       {
         cp.push_back(pt[0]);
         fixed_last = true;
