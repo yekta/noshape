@@ -2771,6 +2771,30 @@ mod tests {
         }
     }
 
+    /// Live 1768: the same chain with P's geometry changed instead. P's
+    /// sketch +10 mm in X keeps its Planar satisfied, so P stays and C and D
+    /// follow its moved top +10 mm; P 5 mm taller lifts C and D 5 mm.
+    #[test]
+    fn a_parents_geometry_change_carries_the_chain_above_it() {
+        let up = |o: DVec3| Frame::from_axes(o, DVec3::Z, DVec3::X);
+        let down = |o: DVec3| Frame::from_axes(o, DVec3::NEG_Z, DVec3::X);
+        let start = [DVec3::ZERO, DVec3::new(0.0, 0.0, 0.01), DVec3::new(0.0, 0.0, 0.02), DVec3::new(0.0, 0.0, 0.03)];
+        for (bottom, top) in [(DVec3::new(0.01, 0.0, 0.0), DVec3::new(0.01, 0.0, 0.0)), (DVec3::ZERO, DVec3::new(0.0, 0.0, 0.005))] {
+            let mut bodies: Vec<SolverBody> = start.iter().enumerate().map(|(i, o)| body(*o, i == 0)).collect();
+            let mates = vec![
+                mate(MateType::Planar, 0, up(DVec3::new(0.03, 0.03, 0.01)), 1, down(DVec3::new(0.01, 0.01, 0.0) + bottom)),
+                mate(MateType::Fastened, 1, up(DVec3::new(0.01, 0.01, 0.01) + top), 2, down(DVec3::new(0.01, 0.01, 0.0))),
+                mate(MateType::Fastened, 2, up(DVec3::new(0.01, 0.01, 0.01)), 3, down(DVec3::new(0.01, 0.01, 0.0))),
+            ];
+            let r = solve(&mut bodies, &mates, &[], &[]);
+            assert!(r.converged, "{r:?}");
+            let want = [start[0], start[1], start[2] + top, start[3] + top];
+            for (b, w) in bodies.iter().zip(want) {
+                assert!((b.pose.origin - w).length() < 1e-9 && b.pose.rotation.angle_between(DQuat::IDENTITY) < 1e-9, "{top:?}: {:?} vs {w:?}", b.pose);
+            }
+        }
+    }
+
     /// Fuzz f11 / f8 / f19: an axial mate whose connectors start exactly
     /// perpendicular ends aligned as the mate says, not reversed (the
     /// residual is flat both ways there), with no conflict.
