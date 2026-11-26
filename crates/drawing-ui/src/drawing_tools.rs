@@ -71,8 +71,9 @@ impl DrawingEditor {
         // Dimension tools exit only when the same kind is chosen again.
         let same_dim = matches!((&tool, &self.tool), (Tool::Dimension { kind: a, .. }, Tool::Dimension { kind: b, .. }) if a == b)
             || matches!((&tool, &self.tool), (Tool::Sketch { tool: a, .. }, Tool::Sketch { tool: b, .. }) if a == b)
-            || matches!((&tool, &self.tool), (Tool::Constrain { kind: a, .. }, Tool::Constrain { kind: b, .. }) if a == b);
-        if std::mem::discriminant(&tool) == std::mem::discriminant(&self.tool) && (same_dim || !matches!(tool, Tool::Select | Tool::InsertView { .. } | Tool::Dimension { .. } | Tool::Sketch { .. } | Tool::Constrain { .. })) {
+            || matches!((&tool, &self.tool), (Tool::Constrain { kind: a, .. }, Tool::Constrain { kind: b, .. }) if a == b)
+            || matches!((&tool, &self.tool), (Tool::CircleCenterline { three: a, .. }, Tool::CircleCenterline { three: b, .. }) if a == b);
+        if std::mem::discriminant(&tool) == std::mem::discriminant(&self.tool) && (same_dim || !matches!(tool, Tool::Select | Tool::InsertView { .. } | Tool::Dimension { .. } | Tool::Sketch { .. } | Tool::Constrain { .. } | Tool::CircleCenterline { .. })) {
             self.tool = Tool::Select;
         } else {
             // A new Insert view starts from the drawing's View simplification default.

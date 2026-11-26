@@ -4978,7 +4978,9 @@ fn a_circle_centerline_click_takes_the_circles_top_quadrant(cx: &mut TestAppCont
     // drw-centerline-circle-3-point).
     let count = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().filter(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::CircleCenterline { .. })).count());
     let before = count(cx);
+    // (Choosing the 3 point tool while the 2 point one is on switches to it.)
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::CircleCenterline { three: true, points: vec![] }, cx)));
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::CircleCenterline { three: true, .. })), "the 3 point tool");
     draw(cx, window);
     for q in quads {
         click_sheet(cx, window, &editor, q);

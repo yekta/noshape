@@ -19,6 +19,9 @@ pub const SNAP_REACH_PX: f64 = 8.0;
 /// A circle centre's reach (live2 batch 1, 11-18 16:15: lit at 9 px and not at 11, on the diagonal and from inside the
 /// hole alike; 11-13 had 7 / 9).
 pub const CENTER_SNAP_REACH_PX: f64 = 10.0;
+/// A circle centerline click takes a circle's quadrant within this reach, else its top quadrant (live
+/// drw-centerline-circle-3-point clicks on the quadrants; drw-dims-1123 a click off them).
+pub const QUADRANT_CLICK_REACH_PX: f64 = 3.0;
 /// The 2 point centerline's reach to a view's points (live2 ann-1118: lit 9 px from a vertex on the diagonal, not at 10).
 pub const CENTERLINE_SNAP_REACH_PX: f64 = 9.5;
 
@@ -729,20 +732,27 @@ impl<'a> SheetPick<'a> {
     /// A circle centerline's click on a face-on circle: its top quadrant, unless the click is on its centre (live
     /// drw-dims-1123 centerline.md: ModeQuad points, the centre needs an exact click).
     pub fn circle_click_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
-        // On its centre or one of its quadrant snaps: that point (live drw-centerline-circle-3-point: the right, top and
-        // left quadrants make the hole's circle).
+        // On its centre: that point. On a quadrant: that one (live drw-centerline-circle-3-point: the right, top and
+        // left quadrants make the hole's circle; its prompt: "hole centers, end, mid or quad points").
         let snap = self.snap_at(s);
-        if snap.as_ref().is_some_and(|p| matches!(p.r, Some(PointRef::Center { .. } | PointRef::Quadrant { .. }))) {
+        if snap.as_ref().is_some_and(|p| matches!(p.r, Some(PointRef::Center { .. }))) {
             return snap;
         }
         if let Some((view, me)) = self.hovered_edge()
             && let EdgeGeom::Circle { center, radius, face_on: true, .. } = me.geom
         {
+            // The quadrant within reach of the click (a seam vertex there is the same point), else the top one.
+            let pl = self.placement(view)?;
+            let quad = |k: u8| {
+                let a = f64::from(k) * std::f64::consts::FRAC_PI_2;
+                [center[0] + radius * a.cos(), center[1] + radius * a.sin()]
+            };
+            let k = (0..4u8).find(|k| len(sub(pl.to_sheet(quad(*k)), s)) <= self.tol_mm(QUADRANT_CLICK_REACH_PX)).unwrap_or(1);
             let r = match me.center_ref() {
-                Some(PointRef::Center { body, name }) => Some(PointRef::Quadrant { body, name, k: 1 }),
+                Some(PointRef::Center { body, name }) => Some(PointRef::Quadrant { body, name, k }),
                 _ => None,
             };
-            return Some(PickedPoint { view, p: [center[0], center[1] + radius], r });
+            return Some(PickedPoint { view, p: quad(k), r });
         }
         self.snap_or_edge_point(s)
     }
