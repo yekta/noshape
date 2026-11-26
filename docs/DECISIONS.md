@@ -220,3 +220,4 @@ each: date, ruling, reason. Newest at the bottom of its section. A ruling here w
   impeller seat Extrude 0.9-1.3 s -> 0.22-0.38 s). A corpus case whose raw fuse differs only before the feature's unify
   is a gate exception when a T1 pins the feature's final result (faces, volume) as recorded (bool-corpus 58c61d: 65 raw,
   56 after unify, as recorded); the model suite vs live and parity56 stay at 0 differences.
+- 11-26 (lead) bool starts noshape's own free-form × free-form surface intersection (B-spline / offset / extrusion pairs), staged: an intersector checked against OCCT on every replay pair lands first unused; it is switched on per pair family only at 0 differences in the gate, parity56 and the knurls. First stage time-boxed to ~2 days with a report (pairs matched, time vs OCCT, user documents moved). Reverses the 11-24 hold now that the remaining ≥100 ms / ≥2× Boolean rows all need it.
