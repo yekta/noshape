@@ -118,10 +118,34 @@ def window_heights(live_dir):
     return heights
 
 
-def run_one(app, scenario, out, display, timeout, height=None):
+# Live's recorder clicks round(px) since 11-26 14:05 (its `at`); before, Chrome truncated the fractional pixel it was
+# given (lead 11-26, SKETCH-CLICK-ONE-PIXEL).
+WHOLE_PIXEL_CLICKS_SINCE = "2026-11-26T14:05"
+
+
+def live_clicks(live):
+    """The take's click pixel per scenario step (its `at`, steps numbered from 1) and whether it clicked round(px)."""
+    try:
+        d = json.loads(Path(live).read_text())
+    except (OSError, ValueError, TypeError):
+        return None, False
+    at = []
+    for s in d.get("steps") or []:
+        n, a = s.get("step"), s.get("at")
+        if isinstance(n, int) and n >= 1 and isinstance(a, list) and len(a) == 2 and all(isinstance(x, (int, float)) for x in a):
+            at += [None] * (n - len(at))
+            at[n - 1] = a
+    return at, str(d.get("recorded") or "") >= WHOLE_PIXEL_CLICKS_SINCE
+
+
+def run_one(app, scenario, out, display, timeout, height=None, live=None):
     env = dict(os.environ)
     if height:
         env["NOSHAPE_UI_WINDOW_HEIGHT"] = str(height)
+    at, whole = live_clicks(live) if live else (None, False)
+    if whole:
+        env["NOSHAPE_UI_CLICKS_ROUND"] = "1"
+        env["NOSHAPE_UI_LIVE_AT"] = json.dumps(at)
     config = tempfile.mkdtemp(prefix="noshape-uip-config-")
     seed = json.loads(Path(scenario).read_text()).get("remembered")
     if seed:
@@ -1892,11 +1916,11 @@ def main():
             continue
         if not args.compare_only:
             height = heights.get(name)
-            problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout, height)
+            problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout, height, live_dir / f"{name}.json")
             # The display refusing a new client now and then (Xvfb): once more.
             if problem and "platform.rs" in problem:
                 time.sleep(2)
-                problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout, height)
+                problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout, height, live_dir / f"{name}.json")
             if problem:
                 print(f"{name}: {problem}")
                 continue

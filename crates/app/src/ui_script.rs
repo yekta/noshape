@@ -22,6 +22,25 @@ fn scenario_path() -> PathBuf {
     PathBuf::from(std::env::var_os("NOSHAPE_UI_SCRIPT").unwrap_or_default())
 }
 
+/// The step the driver is on (0-based), for [`live_click`].
+static STEP: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Whether the take was recorded on whole-pixel clicks (NOSHAPE_UI_CLICKS_ROUND, from the take's time: live's recorder
+/// clicks round(px) since 11-26 14:05; before, Chrome truncated the fractional pixel it was given).
+fn clicks_round() -> bool {
+    std::env::var_os("NOSHAPE_UI_CLICKS_ROUND").is_some()
+}
+
+/// The window pixel live's recorder clicked on the current step (NOSHAPE_UI_LIVE_AT, the take's `at` per step) when it
+/// is the pixel of `p`'s own: the same layout, at most a pixel apart.
+fn live_click(p: Point<Pixels>) -> Option<Point<Pixels>> {
+    static AT: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
+    let at = AT.get_or_init(|| std::env::var("NOSHAPE_UI_LIVE_AT").ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default());
+    let a = at.get(STEP.load(std::sync::atomic::Ordering::Relaxed))?;
+    let (x, y) = (a.get(0)?.as_f64()? as f32, a.get(1)?.as_f64()? as f32);
+    ((x - f32::from(p.x)).abs() <= 1.5 && (y - f32::from(p.y)).abs() <= 1.5).then(|| point(px(x), px(y)))
+}
+
 fn read_json(path: &Path) -> Result<Value, String> {
     let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
     serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))
@@ -366,13 +385,20 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         let b = noshape_app_core::ui_script::bounds_of(&format!("feature:{f}")).ok_or_else(|| format!("feature:{f} is not shown"))?;
         return Ok(point(b.center().x, b.bottom() + px(3.)));
     }
-    // A pointer is at whole pixels (a mouse's, and Chrome's under live's runner).
-    // The exact target is noted for what Chrome hit-tests at it (`pointer_between_pixels`), as live's runner gives it:
-    // a point on the model at its projection; the triad, drawn where the last face pick landed, at that pick's exact
-    // point (live2's runner: the triad at the pick's world point); an empty spot at a whole pixel ([1560, 960]).
+    // A pointer is at whole pixels: the one live's recorder clicked. Takes from 11-26 14:05 click round(px), the take's
+    // `at`; older ones gave Chrome the fractional pixel, which it truncated for the click (floor) but hit-tested rows
+    // at exactly (`pointer_between_pixels`). That exact target is noted: a point on the model at its projection; the
+    // triad, drawn where the last face pick landed, at that pick's exact point (live2's runner: the triad at the pick's
+    // world point); an empty spot at a whole pixel ([1560, 960]).
     let floor = |p: Point<Pixels>| point(px(f32::from(p.x).floor()), px(f32::from(p.y).floor()));
     let empty = t.get("empty").is_some();
+    let round = clicks_round();
     let whole = |p: Point<Pixels>| {
+        if round {
+            let at = live_click(p).unwrap_or_else(|| point(px(f32::from(p.x).round()), px(f32::from(p.y).round())));
+            noshape_app_core::ui_script::set_exact_pointer((!empty).then_some(at));
+            return at;
+        }
         let at = floor(p);
         let same_pick = noshape_app_core::ui_script::exact_pointer().filter(|e| floor(*e) == at && p == at);
         noshape_app_core::ui_script::set_exact_pointer(if empty { None } else { same_pick.or(Some(p)) });
@@ -662,6 +688,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // A button a "hold" drag left down, and where (the "release" step lets it go).
         let mut held: Option<(MouseButton, Point<Pixels>)> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
+            STEP.store(i, std::sync::atomic::Ordering::Relaxed);
             let step = ours_step(step);
             let what = step["do"].as_str().unwrap_or("");
             let mods = modifiers(&step);
@@ -1138,6 +1165,7 @@ pub fn start_page(cx: &mut App) {
         let mut steps = Vec::new();
         let mut pointer: Option<Point<Pixels>> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
+            STEP.store(i, std::sync::atomic::Ordering::Relaxed);
             let step = ours_step(step);
             let Some(w) = follow(cx) else { break };
             // (Also a help link: live's opens a browser tab, docs-advanced-search-help.)

@@ -23,3 +23,14 @@ assert run.first_difference({"sketch": {"entities": ["line", "spline"]}}, ours) 
 # Each side's own order: sorted by kind and points before comparing.
 ours = {"sketch": {"geometry": [spline, {**line, "points": [[0.0, 0.0], [40.0, 0.0]]}]}}
 assert run.first_difference({"sketch": {"geometry": [line, spline]}}, ours) is None
+
+# Live's click pixels (SKETCH-CLICK-ONE-PIXEL): a take from 11-26 14:05 on clicked its `at` (round(px)), per scenario
+# step; an older one gave Chrome the fractional pixel (the app floors its own projection).
+import json, tempfile
+with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+    json.dump({"recorded": "2026-11-26T14:06:45.447Z", "steps": [{"step": 1, "at": [155, 58]}, {"step": 3, "do": "key"}, {"step": 4, "at": [1083, 562]}, {"step": 5, "at": [[1, 2], [3, 4]]}]}, f)
+assert run.live_clicks(f.name) == ([[155, 58], None, None, [1083, 562]], True), run.live_clicks(f.name)
+with open(f.name, "w") as g:
+    json.dump({"recorded": "2026-11-26T13:56:18.350Z", "steps": [{"step": 1, "at": [155, 58]}]}, g)
+assert run.live_clicks(f.name) == ([[155, 58]], False)
+Path(f.name).unlink()
