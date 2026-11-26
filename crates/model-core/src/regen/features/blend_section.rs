@@ -3212,7 +3212,7 @@ pub fn apart_blend(ev: &mut EvalCtx, bi: usize, f1: usize, f2: usize, spec: &Ble
 pub fn gap_faces(shape: &Shape, f1: usize, f2: usize) -> FResult<Option<Vec<usize>>> {
     let faces = shape.faces();
     let d = k::distance(&faces[f1], &faces[f2])?;
-    let (pa, pb) = (d.point_a, d.point_b);
+    let (mut pa, mut pb) = (d.point_a, d.point_b);
     let gap = pb - pa;
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     let tol = scale * 1e-6;
@@ -3226,7 +3226,19 @@ pub fn gap_faces(shape: &Shape, f1: usize, f2: usize) -> FResult<Option<Vec<usiz
     if np.length() < 1e-9 * gap.length() {
         return Ok(None);
     }
-    let plane = k::Plane::from_normal(pa, np.normalize());
+    let np = np.normalize();
+    let mut plane = k::Plane::from_normal(pa, np);
+    // Sides as far apart all along (a round between them) are closest at an end, on a cap the plane would run in
+    // (c2-surfaces-lofts-projected's Face blend 2 took the cap for the gap): the section moves midway along the sides.
+    let in_plane = |f: &Shape| f.face_plane().ok().flatten().is_some_and(|q| q.normal.cross(np).length() < 1e-9 && (q.origin - pa).dot(np).abs() < tol);
+    if faces.iter().enumerate().any(|(i, f)| i != f1 && i != f2 && in_plane(f)) {
+        let (Ok(b1), Ok(b2)) = (faces[f1].bounding_box(false), faces[f2].bounding_box(false)) else { return Ok(None) };
+        let mid = 0.25 * (b1.min + b1.max + b2.min + b2.max);
+        plane = k::Plane::from_normal(pa + np * (mid - pa).dot(np), np);
+        let (Ok(c1), Ok(c2)) = (k::section_plane(&faces[f1], &plane), k::section_plane(&faces[f2], &plane)) else { return Ok(None) };
+        let Ok(d) = k::distance(&c1, &c2) else { return Ok(None) };
+        (pa, pb) = (d.point_a, d.point_b);
+    }
     // Section segments of the other faces: (face, from, to, length).
     let mut segs: Vec<(usize, DVec3, DVec3, f64)> = Vec::new();
     for (i, f) in faces.iter().enumerate() {

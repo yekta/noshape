@@ -3892,6 +3892,64 @@ fn face_blend_on_curved_faces_filtered(ellipse: bool, curvature_only: bool) {
     assert!(bad.is_empty(), "{bad:#?}");
 }
 
+/// A face blend between two curved walls a round already joins (c2-surfaces-lofts-projected's Face blend 2): the round
+/// goes and the blend is the corner's own fillet. A profile's concave corner between two arcs, extruded 10 mm and
+/// filleted 2 mm, then face-blended 3 mm (Flip side 2, as there) is the corner filleted 3 mm (the gap between the walls was looked for on the
+/// cap they are closest at: "Failed to blend faces.").
+#[test]
+fn face_blend_across_a_round_between_curved_walls() {
+    let build = |fillet: &'static str, blend: Option<[bool; 2]>| -> RegenResult {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let pt = |sk: &mut noshape_sketch::Sketch, x: f64, y: f64| sk.add_point(DVec2::new(mm(x), mm(y)));
+        let ps = [(-30.0, -30.0), (30.0, -30.0), (30.0, -10.0), (0.0, -10.0), (0.0, 30.0), (-30.0, 30.0)].map(|(x, y)| pt(&mut sk, x, y));
+        let (ca, cb) = (pt(&mut sk, 15.0, -40.0), pt(&mut sk, -30.0, 10.0));
+        sk.add_line_between(ps[0], ps[1]).unwrap();
+        sk.add_line_between(ps[1], ps[2]).unwrap();
+        sk.add_arc_between(ca, ps[2], ps[3]).unwrap();
+        sk.add_arc_between(cb, ps[3], ps[4]).unwrap();
+        sk.add_line_between(ps[4], ps[5]).unwrap();
+        sk.add_line_between(ps[5], ps[0]).unwrap();
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let corner = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && (i.start.truncate() - DVec2::new(0.0, mm(-10.0))).length() < 1e-9 && (i.end.truncate() - DVec2::new(0.0, mm(-10.0))).length() < 1e-9)).unwrap();
+        let e = Reference::Edge((*b.edges[corner]).clone());
+        s.add("fillet", move |p| {
+            p.set("entities", q(e));
+            p.set("radius", expr(fillet));
+        });
+        let Some(flips) = blend else { return s.ok() };
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let wall = |rc: f64| {
+            let i = b.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - mm(rc)).abs() < 1e-6)).unwrap();
+            Reference::Face((*b.faces[i]).clone())
+        };
+        let (side1, side2) = (wall(1125f64.sqrt()), wall(1300f64.sqrt()));
+        s.add("faceBlend", move |p| {
+            p.set("side1", q(side1));
+            p.set("side2", q(side2));
+            p.set("flipSide1", ParamValue::Bool(flips[0]));
+            p.set("flipSide2", ParamValue::Bool(flips[1]));
+            p.set("radius", expr("3 mm"));
+        });
+        s.regen()
+    };
+    let want = build("3 mm", None);
+    let got = build("2 mm", Some([false, true]));
+    let st = got.display.features.last().unwrap();
+    assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+    let (v, w) = (volume(&got, 0) * 1e9, volume(&want, 0) * 1e9);
+    let (nf, wf) = (got.context.bodies[0].shape.faces().len(), want.context.bodies[0].shape.faces().len());
+    assert!(near(v, w, 1e-4) && nf == wf, "volume {v} mm³, {nf} faces; the 3 mm fillet {w}, {wf}");
+}
+
 /// Live (behaviours "dx (2026-10-27, P3) flat pattern line styles in a
 /// drawing"): a counterbore shows in the flat as its through hole and its
 /// head's circle, "up" when the head is on the side the flat is seen from.

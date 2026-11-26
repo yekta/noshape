@@ -29,8 +29,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   sweep items.** Impeller's 1432 ms final cut handed to bool (08:0x; vibex7 ~/agents/core-keep/imp-bool/ed1c251b6b5acedd).
   Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
   qa gaps-1125 models-report.json): each failure hits ONE document; order = own first difference first:
-  (1) c2-surfaces-lofts-projected #9 Face blend 2 "Failed to blend faces." (its first difference) <- NEXT;
-  (2) c2-body-draft-naming #7 Fillet 1 edges 19 line/2 other vs 15/6, then #8 Fillet 2 fails (BLEND-FAILS e);
+  (1) DONE (core-rf, after 5d5cce52d): c2-surfaces-lofts-projected Face blend 2/3: gap_faces took the cap (sides
+  closest at an end) for the gap; section moved midway; 9 -> 18/45, regen 1000 -> 268 ms; next diff #18 Sweep 2 (edge
+  circle vs other, 0.009% volume: a sweep item); test features_c::face_blend_across_a_round_between_curved_walls;
+  (2) <- IN PROGRESS: c2-body-draft-naming Fillet 2 (curvature, 3-edge chain across Fillet 1's end; Fill 1, Intersection
+  curve 1, Body draft 1 fail after it). One loft over 3 edges: its back face approximates Fillet 1's extrusion face, the
+  cut (OCCT 928 ms) leaves 4 slivers + an invalid plane (15 faces, live 12; fuzzy cut leaves it unchanged). Tried (patch
+  /root/core-scratch/fillet2-wip.patch, NOT committed): one loft per edge when the supports change (live: 3 faces) +
+  each piece's face on a curved support refaced onto it (reface_on: reversed normals -> wires reversed + face reversed;
+  edges ~1 um off -> tolerance widened <= 10 um). Refacing now valid, but the 3 cuts leave the part open (5.2 s). Next:
+  fuse the pieces into one tool first, or split only the back face per support. (Fillet 1: edge types only.) c2-body-draft-naming #7 Fillet 1 edges 19 line/2 other vs 15/6, then #8 Fillet 2 fails (BLEND-FAILS e);
   (3) c2-cov2-face-blend-partial-fillet #6 Face blend 1 edges 19/2 vs 17/4, then #15 Fillet 3 fails;
   (4) asm-scissor-lift studios (BLEND-FAILS b-d below); after upstream fixes: genesis #72, impeller Stevenrohr #29.
 - **NATIVE BLEND FACES PLAN (for the lead's later decision)**: scope: section_blend's rolling-ball path (blend_section.rs
