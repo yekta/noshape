@@ -152,11 +152,20 @@ docs/DECISIONS.md (read first; it wins over anything here).
   gap-profile-extrude s18, mirror-no-line s11, offset-negative s16, asm-measure-face-cylinder-panel s4.
 - drag-fixed-line s5: real app difference, filed SKETCH-ISO-ORIGIN-ALIGN (TICKETS top).
 
-## NEXT (lead 16:0x)
-1. Drawing open rows: foreshorten s10 hover reader; geometric tolerance once live answers (live gdt.md: empty frame
-   silent, Position default, leader end snaps to a nearby hole centre).
-2. EXTRUDE-OPEN-SKETCH-FOCUS step 17 (also gap-profile-extrude s18: "feature:Extrude 1 is not shown").
-3. SKETCH-ISO-ORIGIN-ALIGN: our iso alignment reach (sketch/src/inference.rs off_y, 7.5 px on screen) vs live.
+## LANDING 11-26 17:1x (lead 16:0x items)
+- 3d3e59398 drawing: a view under a clicked menu row reads lit only within 6.5 px of its box's edges (inside too;
+  drw-dimension-foreshorten s10). T1 drawing_ui_tests::a_view_under_a_clicked_menu_row_reads_lit_only_near_its_edges.
+- b4ba08978 EXTRUDE-OPEN-SKETCH-FOCUS: the editing placeholder row is wrapped "feature:<name>" (part_studio mod.rs
+  render_editing_placeholder); run.py button_late holds through hover steps (README Focus).
+- verify12 (81: every drw take with a context-menu row click + note-move, surface-finish-flip, view-align h/v,
+  foreshorten, the two extrude takes from 2ff0dfee checked out then restored): base 78/81 -> new 81/81, 1011/1011.
+  drawing-ui lib tests 193 ok.
+
+## NEXT
+1. SKETCH-ISO-ORIGIN-ALIGN: our iso alignment reach (sketch/src/inference.rs off_y, 7.5 px on screen) vs live.
+2. Geometric tolerance once live answers (REQUESTS 12:24; live gdt.md: empty frame silent, Position default,
+   leader end snaps to a nearby hole centre).
+3. Older: asm Measure panel reader, asm-drag-revolute-turns (REQUESTS 11:33), radial drag rule.
 
 ## Agents
 
