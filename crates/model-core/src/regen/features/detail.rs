@@ -720,7 +720,8 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
             let mut short = fillet_chain(&body.shape, &edges);
             short.extend(edges.iter().filter(|&&e| !short.contains(&e)).copied().collect::<Vec<_>>());
             short.sort_unstable();
-            if propagate_tangent(&body.shape, &short).len() > short.len()
+            // (Running on over folds: the arc's ends meet the rounds' edges tangent and folded back.)
+            if tangent_chain(&body.shape, &short, false).len() > short.len()
                 && !curved_edge_left_open(&body.shape, &short, false)
                 && super::blend_section::stopped_concave_arc_round(ev, bi, &short, radius).unwrap_or(false)
             {
