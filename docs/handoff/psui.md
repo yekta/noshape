@@ -123,7 +123,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Run: rb.sh on vibe2: `cargo build --profile ui-bench -p noshape --bin noshape`, then from the src root
   `~/bin/slot bash tools/perf/ui-audit.sh $HOME/agents/psui/target/ui-bench/noshape :151 3 ~/tmp/psui/auditN`.
 
-## Drawing triage + asm shard + qa 12:3x tickets (lead 11-26 09:3x / 10:50 / 12:2x): QUEUED 11-26 14:2x
+## Drawing triage + asm shard + qa 12:3x tickets (lead 11-26 09:3x / 10:50 / 12:2x): QUEUED 94d158aa 11-26 14:2x (lead + qa told)
 - Baseline 1125-1501: drw 382/457, 53 maker-scope failures; asm shard (green bc0fc23b8) 212/225. After: the 87
   failures rerun 79/87 (drw 70/75), the 77 Esc/radial drw 75/77, then verify3-6 (~/tmp/psui/ver3..ver6 on vibe2):
   ver6 13/14 (114/116 states); drawing-ui 214, assembly-ui 228, scene 259, ops e2e 312 all ok.
@@ -149,6 +149,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - (2) Esc keeps the Diameter tool: probably fixed by the Esc commit (green 11:31 predates it): run
   drw-dimension-diameter-tapped-hole (picked circle stays selected after Esc).
 - (3)/(4) done in the stack; check drw-view-tangent-edges-menu after the rebase.
+- verify7 (14:2x, ~/tmp/psui/ver7): 3/5. (2) FIXED: drw-dimension-diameter-tapped-hole matches. (1) box centres
+  live/ours: tapped (left of hole) 21.5/21.8, blind 65.9/66.9, counterbore (left) 20.2/23.5, countersink (right)
+  141.6/139.5. Reading: ours ≈ live on letters/digits/⌀ (tapped +0.6 wide); blind ours ~2.0 narrower (↧), cbore 6.6
+  (⌴ ~4.6 + ↧ 2.0), csink 4.2 (⌵). The symbols ⌴ ⌵ ↧ are stroke glyphs (font.rs l.144-146, advance 7 + spacing 2 of
+  CAP 10 ≈ 0.9 h; Noto Sans lacks them) where live draws them in "Drawing Symbols Sans", much wider. Plan: widen
+  those three advances to fit live's 4 boxes (tapped 29.58, cbore 32.25, csink 33.19, blind 25.09; line pitch
+  0.199 in), centre each callout line on the widest (sheet.rs HoleCallout, now left-aligned at x0; live cbore line 1
+  starts 0.173 in right of line 2, tapped line 2 0.020 in right of line 1), a T1 on the four widths, then check hole
+  tables / notes that use the same glyphs (ops e2e + drw scenarios with ⌴ ⌵ ↧).
+
+## NEXT 2 (qa 11-26 14:3x, SKETCH-CLICK-ONE-PIXEL, harness)
+- LEAD RULING (11-26 14:3x): replay each take at the pixel live clicked: floor(at) for takes recorded before
+  11-26 14:05 (Chrome truncated), `at` as-is from 14:05 on; pick at that whole pixel (no fractional exact pointer).
+  Rerun the ps, sk and asm shards before landing. Order: callout widths (NEXT) first, then this.
+- Live's recorder clicks whole pixels: round(px) for takes recorded from 11-26 14:05 (incl. the 18 retaken in
+  2ff0dfee), floor(px) before (~171 sketch_point takes). Ours: crates/app/src/ui_script.rs l.373-380 `whole` floors the
+  pointer but `set_exact_pointer(Some(p))` makes the pick hit-test at the fractional projection
+  (`pointer_between_pixels`): ≤0.14 mm x / ~0.3 mm y off on iso, the 18 fail at 0.01 mm. Fix: hit-test at the whole
+  pixel (round or floor by the take's 'recorded'; run.py passing 'recorded' is the lead's call, qa asked), or replay
+  the take's own 'at' pixel. Touches every Part Studio pick: rerun the ps/sk/asm shards before landing.
 
 ## Agents
 
