@@ -101,7 +101,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   slot at picks.len()+1, overlay ids moved up by one; fs_hover_mask keeps HIDDEN), a re-hovered second mate pick plain,
   a selected part's hovered face boundary #ffc368 (BODY_HOVER_EDGE), explode edit: the selected instance unlit under the
   pointer and an empty click keeps the selection.
-- Rows 1-4 QUEUED 73236c4a (11-26 08:30, full assembly-ui/scene/render + clippy green). 08:44: mate preview (4) fixed:
+- Rows 1-4 QUEUED 73236c4a (11-26 08:30, full assembly-ui/scene/render + clippy green); with mate preview (4) QUEUED 800c7338. 08:44: mate preview (4) fixed:
   the part a mate's preview moves lights nothing under an arriving pointer (`previewed` in the hover filter and
   `moving` in the inference block; `still` = the pointer still at the second pick's click keeps the old look);
   a_re_hovered_second_pick_shows_plain compares all states away vs over it (fails without the fix). Landing.
@@ -111,6 +111,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
   exploded_view`), done.
 - 11-26 07:2x the psui worktree directory was gone (branch agent/psui intact at 54dbd7bc0); recreated with
   `git worktree add /root/projects/noshape-wt/psui agent/psui`.
+
+## Responsiveness audit (lead 11-26 08:5x): DONE, landing
+- `tools/perf/ui-audit.sh <app> <display> [rounds]` (scenarios tests/perf/ui-audit: 30-feature part + a 20-instance
+  assembly, 60 timed actions); `tools/perf/ui-audit-medians.py` fails on a median first frame > 100 ms or UI CPU > 50 ms.
+  Driver (crates/app/src/ui_script.rs): `timing.cpu` (UI-thread CPU input → first frame end), a hover timed from its
+  last move, a drag from its release (both untimed before).
+- 11-26 09:31 result (vibe2, ui-bench app at ~/agents/psui/target/ui-bench/noshape, Xvfb :151 left running): nothing
+  over 100 ms, UI CPU ≤ 28 ms; table in interaction-feel.md "UI responsiveness audit". Nothing to fix; on Xvfb wall
+  times are mostly software present / core waits (`ui stall` lines all ≤ 30 ms UI CPU).
+- Run: rb.sh on vibe2: `cargo build --profile ui-bench -p noshape --bin noshape`, then from the src root
+  `~/bin/slot bash tools/perf/ui-audit.sh $HOME/agents/psui/target/ui-bench/noshape :151 3 ~/tmp/psui/auditN`.
 
 ## Agents
 
