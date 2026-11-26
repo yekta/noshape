@@ -141,34 +141,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
   reader; asm-drag-revolute-turns (REQUESTS 11:33); radial drag rule. SKETCH-CLICK-OFFSET is qa/live's now
   (SKETCH-CLICK-ONE-PIXEL).
 
-## NEXT (lead 11-26 13:5x, live gap-audit-drw-1126, behaviours "First-week drawing gaps")
-- (1) counterbore / countersink callouts 6.6 / 4.2 mm narrower: live centres each line on the widest, symbols in
-  Drawing Symbols Sans; boxes tapped 29.58, cbore 32.25, csink 33.19, blind 25.09 mm (h 0.12 in, pitch 0.199 in).
-  Ours: sheet.rs HoleCallout (lines left-aligned at x0, font::text_width). Measure ours first (start
-  hole-types-plate-drawing, takes drw-hole-callout-*, drw-thread-callout-tapped).
-- (2) Esc keeps the Diameter tool: probably fixed by the Esc commit (green 11:31 predates it): run
-  drw-dimension-diameter-tapped-hole (picked circle stays selected after Esc).
-- (3)/(4) done in the stack; check drw-view-tangent-edges-menu after the rebase.
-- verify7 (14:2x, ~/tmp/psui/ver7): 3/5. (2) FIXED: drw-dimension-diameter-tapped-hole matches. (1) box centres
-  live/ours: tapped (left of hole) 21.5/21.8, blind 65.9/66.9, counterbore (left) 20.2/23.5, countersink (right)
-  141.6/139.5. Reading: ours ≈ live on letters/digits/⌀ (tapped +0.6 wide); blind ours ~2.0 narrower (↧), cbore 6.6
-  (⌴ ~4.6 + ↧ 2.0), csink 4.2 (⌵). The symbols ⌴ ⌵ ↧ are stroke glyphs (font.rs l.144-146, advance 7 + spacing 2 of
-  CAP 10 ≈ 0.9 h; Noto Sans lacks them) where live draws them in "Drawing Symbols Sans", much wider. Plan: widen
-  those three advances to fit live's 4 boxes (tapped 29.58, cbore 32.25, csink 33.19, blind 25.09; line pitch
-  0.199 in), centre each callout line on the widest (sheet.rs HoleCallout, now left-aligned at x0; live cbore line 1
-  starts 0.173 in right of line 2, tapped line 2 0.020 in right of line 1), a T1 on the four widths, then check hole
-  tables / notes that use the same glyphs (ops e2e + drw scenarios with ⌴ ⌵ ↧).
+## LANDING 11-26 16:1x (lead 14:4x: callout widths + the pixel item), commits after the 94d158aa stack
+- f0424bccc callouts: ⌴ ⌵ ↧ advances fitted to live's boxes (⌴/⌵ 2.35 h, ↧ 1.47 h, strokes centred; font.rs),
+  HoleCallout lines centred on the widest, pitch 5/3 h (sheet.rs). T1 drawing::tests::hole_callout_boxes_as_live.
+  verify8: drawing 188, model-data 47, drawing-ui 214, ops e2e 312 ok; 25/25 callout + hole-table scenarios.
+- b68f72d9f pixel (SKETCH-CLICK-ONE-PIXEL): takes recorded >= 2026-11-26T14:05 replay at their own `at`
+  (NOSHAPE_UI_CLICKS_ROUND + NOSHAPE_UI_LIVE_AT, app ui_script.rs `whole`); older takes floor(projection) as before
+  (lead approved). verify11: 18 new takes + 100 sampled ps/sk/asm: new 111/118, 1000/1022 states; sample new = base
+  (99/100, 755/757). Remaining differs pre-existing: extrude-open-sketch s17, dimension-construction s11,
+  gap-profile-extrude s18, mirror-no-line s11, offset-negative s16, asm-measure-face-cylinder-panel s4.
+- drag-fixed-line s5: real app difference, filed SKETCH-ISO-ORIGIN-ALIGN (TICKETS top).
 
-## NEXT 2 (qa 11-26 14:3x, SKETCH-CLICK-ONE-PIXEL, harness)
-- LEAD RULING (11-26 14:3x): replay each take at the pixel live clicked: floor(at) for takes recorded before
-  11-26 14:05 (Chrome truncated), `at` as-is from 14:05 on; pick at that whole pixel (no fractional exact pointer).
-  Rerun the ps, sk and asm shards before landing. Order: callout widths (NEXT) first, then this.
-- Live's recorder clicks whole pixels: round(px) for takes recorded from 11-26 14:05 (incl. the 18 retaken in
-  2ff0dfee), floor(px) before (~171 sketch_point takes). Ours: crates/app/src/ui_script.rs l.373-380 `whole` floors the
-  pointer but `set_exact_pointer(Some(p))` makes the pick hit-test at the fractional projection
-  (`pointer_between_pixels`): ≤0.14 mm x / ~0.3 mm y off on iso, the 18 fail at 0.01 mm. Fix: hit-test at the whole
-  pixel (round or floor by the take's 'recorded'; run.py passing 'recorded' is the lead's call, qa asked), or replay
-  the take's own 'at' pixel. Touches every Part Studio pick: rerun the ps/sk/asm shards before landing.
+## NEXT (lead 16:0x)
+1. Drawing open rows: foreshorten s10 hover reader; geometric tolerance once live answers (live gdt.md: empty frame
+   silent, Position default, leader end snaps to a nearby hole centre).
+2. EXTRUDE-OPEN-SKETCH-FOCUS step 17 (also gap-profile-extrude s18: "feature:Extrude 1 is not shown").
+3. SKETCH-ISO-ORIGIN-ALIGN: our iso alignment reach (sketch/src/inference.rs off_y, 7.5 px on screen) vs live.
 
 ## Agents
 
