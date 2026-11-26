@@ -6502,6 +6502,56 @@ fn a_plane_through_an_in_context_point_builds() {
     assert!(s.ours.is_some() && s.problems.is_empty() && s.status.as_deref() == Some("Ok"), "{:?} {:?} {:?}", s.status, s.message, s.problems);
 }
 
+/// The B-spline surfaces (IGES 128) of an IGES file whose written parameter range is reversed or runs off its knots:
+/// "<DE>: <why>".
+fn iges_bsurface_range_faults(path: &Path) -> Vec<String> {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let section = |c: u8| text.lines().filter(move |l| l.len() >= 73 && l.as_bytes()[72] == c);
+    let d: Vec<&str> = section(b'D').collect();
+    let mut params: HashMap<usize, String> = HashMap::new();
+    for l in section(b'P') {
+        params.entry(l[64..72].trim().parse().unwrap_or(0)).or_default().push_str(&l[..64]);
+    }
+    let mut faults = Vec::new();
+    for (i, pair) in d.chunks(2).enumerate() {
+        if pair[0][..8].trim() != "128" {
+            continue;
+        }
+        let de = 2 * i + 1;
+        let p = params.get(&de).map(String::as_str).unwrap_or_default();
+        let v: Vec<f64> = p.split(';').next().unwrap_or_default().split(',').skip(1).filter_map(|x| x.trim().replace('D', "E").parse().ok()).collect();
+        let n = |k: usize| v.get(k).copied().unwrap_or(f64::NAN) as usize;
+        let (k1, k2, m1, m2) = (n(0), n(1), n(2), n(3));
+        let (s, t) = (&v[9..9 + k1 + m1 + 2], &v[9 + k1 + m1 + 2..9 + k1 + m1 + k2 + m2 + 4]);
+        let b = &v[v.len() - 4..];
+        let off = |a: f64, z: f64, lo: f64, hi: f64| a >= z || a < lo - 1e-9 * (1.0 + hi - lo) || z > hi + 1e-9 * (1.0 + hi - lo);
+        if off(b[0], b[1], s[m1], s[k1 + 1]) || off(b[2], b[3], t[m2], t[k2 + 1]) {
+            faults.push(format!("{de}: U {}..{} on knots {}..{}, V {}..{} on knots {}..{}", b[0], b[1], s[m1], s[k1 + 1], b[2], b[3], t[m2], t[k2 + 1]));
+        }
+    }
+    faults
+}
+
+/// c2-rings-loft's Extruded ring in IGES: live read no part from ours (corpus-gaps-1125 "Data exchange", live xours
+/// 1125), its face on a periodic loft band written V 0.0471..0.0032 (the face across the seam; its u 8e-6 past the
+/// band's open end had skipped the re-cut). Every B-surface's range runs forward inside its knots.
+#[test]
+#[ignore = "T2: live's corpus from /root/parity/models (other people's work, never in the repo)"]
+fn rings_iges_bsurfaces_run_forward_inside_their_knots() {
+    let dir = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into())).join("c2-rings-loft");
+    let Some((features, live, refs)) = read_model(&dir) else { return };
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("rings-iges.noshape"), &features, live_refs(&live, &refs)).expect("opened");
+    for k in 0..t.len() {
+        t.step(k);
+    }
+    let file = scratch("rings-iges.igs");
+    t.call("export_parts", json!({ "format": "IGES", "file": file })).expect("exported");
+    let faults = iges_bsurface_range_faults(&file);
+    let _ = std::fs::remove_file(&file);
+    assert!(faults.is_empty(), "{faults:#?}");
+}
+
 /// Live (bool/rings-shell-edit-1123 chain-2132): c2-rings-loft's "Extruded ring" diameter 20.5 → 21.32 mm. Its two
 /// R3.137 arcs are held only by their ends on the trimmed ellipse and a mirror; live keeps their radius (3.1374) and
 /// Extrude 1 is 989.9879 mm³.

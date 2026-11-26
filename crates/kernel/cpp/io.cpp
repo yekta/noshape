@@ -107,6 +107,7 @@
 #include <XCAFDimTolObjects_DatumObject.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <gp_Trsf.hxx>
+#include <gp_Vec2d.hxx>
 
 #include <fstream>
 #include <sstream>
@@ -1390,22 +1391,37 @@ TopoDS_Shape step_bsurfaces(const TopoDS_Shape& in, bool all)
     bool seam = false;
     for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More() && !seam; ee.Next())
       seam = BRep_Tool::IsClosed(TopoDS::Edge(ee.Current()), F);
-    if (seam || (!pu && !pv) || (pu && !b->IsUClosed()) || (pv && !b->IsVClosed()))
+    // Only a closed direction is re-cut; an open one the face overruns by a hair keeps its bounds (c2-rings-loft's
+    // loft band: u 8e-6 past an open end skipped the face, and its v across the seam was written V(0) > V(1)).
+    const bool cu = pu && b->IsUClosed(), cv = pv && b->IsVClosed();
+    if (seam || (!cu && !cv))
       continue;
     try
     {
       occ::handle<Geom_BSplineSurface> c = occ::down_cast<Geom_BSplineSurface>(b->Copy());
-      if (pu && !c->IsUPeriodic())
+      if (cu && !c->IsUPeriodic())
         c->SetUPeriodic();
-      if (pv && !c->IsVPeriodic())
+      if (cv && !c->IsVPeriodic())
         c->SetVPeriodic();
-      c->Segment(u0, u1, v0, v1);
+      // A face around the whole period spans it to rounding: cut exactly one.
+      c->Segment(cu ? u0 : su0, cu ? std::min(u1, u0 + c->UPeriod()) : su1, cv ? v0 : sv0, cv ? std::min(v1, v0 + c->VPeriod()) : sv1);
+      // A periodic surface's segment starts in its first period: the face's p-curves move by the same whole periods
+      // (c2-rings-loft's band asked v -0.017..0.003, cut 0.047..0.068, and was written V(0) > V(1)).
+      double a0, a1, b0, b1;
+      c->Bounds(a0, a1, b0, b1);
+      const gp_Vec2d shift(cu ? a0 - u0 : 0.0, cv ? b0 - v0 : 0.0);
       std::vector<std::pair<TopoDS_Edge, occ::handle<Geom2d_Curve>>> pcurves;
       for (TopExp_Explorer ee(F, TopAbs_EDGE); ee.More(); ee.Next())
       {
         double f, l;
         const TopoDS_Edge& E = TopoDS::Edge(ee.Current());
-        pcurves.emplace_back(E, BRep_Tool::CurveOnSurface(E, F, f, l));
+        occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(E, F, f, l);
+        if (!pc.IsNull() && shift.SquareMagnitude() > eps * eps)
+        {
+          pc = occ::down_cast<Geom2d_Curve>(pc->Copy());
+          pc->Translate(shift);
+        }
+        pcurves.emplace_back(E, pc);
       }
       B.UpdateFace(F, c, loc, BRep_Tool::Tolerance(F));
       for (const auto& [E, pc] : pcurves)
