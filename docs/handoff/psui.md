@@ -123,6 +123,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Run: rb.sh on vibe2: `cargo build --profile ui-bench -p noshape --bin noshape`, then from the src root
   `~/bin/slot bash tools/perf/ui-audit.sh $HOME/agents/psui/target/ui-bench/noshape :151 3 ~/tmp/psui/auditN`.
 
+## Drawing interaction triage (lead 11-26 09:3x): IN FLIGHT, waiting for live
+- Run 1125-1501-c7944540 (/root/qa-scratch/suites/1125-1501-c7944540/uip, uip.log): drw 382/457; 75 fail, 53 in maker scope
+  (views, dimensions, notes, title block, export): 48 fail on Esc after a dimension (recordings 11-14..11-22: tool null; live
+  drw-dims-1123 + studios 9aa272149: Esc keeps the tool), + drw-copy-annotation-drag / drw-note-hover-matrix (note grab
+  point), drw-dimension-foreshorten (radial text position), drw-view-properties-scale-typed (scale applied at Enter; label
+  order), drw-view-move-to-sheet-ok (picked sheet shown before OK = studios 7d931a213 from workflows-1123). Out of scope 22.
+- REQUESTS "psui 11-26 09:40" asks live stale-or-ours per item. On the answer: stale → live re-records; ours → fix with T1s,
+  most-used first (dimension tools), then full ops e2e (drawing rule) before land.sh. Report before/after (in scope 0/53 now).
+- Diff helper: /root/psui-scratch/resp/sdiff.py <ours dir> <live dir> <name> <steps,...>.
+- Also answered (09:20): live/psui/asm-triad-hover-1126 (ASM-SELECTED-HOVER-LOOK arrow): after the drawings.
+
 ## Agents
 
 - skasm owns the hover matrix's sk/* cells (lead 11-22); psui the 3D / Part Studio cells.
