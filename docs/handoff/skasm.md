@@ -27,6 +27,10 @@ listed in /root/skasm-scratch/audit-checked.txt (94 of 95 checked). 11-26 13:00 
 h0 = 1/3), Pierce with a circle's centre. Live fuzz T2 (live_matches, probes) 29/29 green. Diffs found: Pierce with a
 curve (ticket SKETCH-PIERCE-CURVE-RIGID: live moves the circle / line rigidly; a radius weight only approximates it);
 inference-1866 (d) asked live (REQUESTS skasm 11-26 12:51). Left: row 3 (the general "Sketch mode" section, 102 lines).
+NEXT (lead 11-26 13:05): 1) SKETCH-PIERCE-CURVE-RIGID first: a free curve under a Pierce (and likely any point-on-curve
+to a fixed point) moves rigidly, circle r kept, line direction + length kept (live skasm/pierce: circle (22,4) r3 ->
+(23.2,2.4); line (16,5)-(28,9) start -> (18.4,-2.2)). Solver weights: crates/sketch/src/solver.rs System::build (~line 395,
+weight / HELD_WEIGHT); a radius weight only approximates. Gate: sketch --lib + --test all + live_fuzz T2 (sk2.sh). 2) row 3.
 
 qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
 lora-enclosure-ribs 46/46 MATCH); Assembly 3 numbers pending (qa-tr4). Driver fix ada3263b: asm-face-menu/fastened 9/10;
