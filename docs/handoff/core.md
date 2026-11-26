@@ -5,7 +5,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf 11-26**: QUEUED 2b8aa8ed 14:0x (carries 799ae65a, c5619f82, 1719d98d: Fill 1, Body draft, Split, MF1).
+- **LANDING core-rf 11-26**: 799ae65a, c5619f82 LANDED 14:22 (082a6b31). QUEUED 56131f3c 15:1x (carries 2b8aa8ed: Split, MF1 + 254d5fa5c: 9cbb0e MF2, b58244 MF6, tweak trim fix).
 - **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
   fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
   need a FRESH parity run (save/ copies keep old references): .bd2.sh.
@@ -19,7 +19,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   extrudes_made_puts_the_first_extrudes_piece_first.
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
-- **SCISSOR 11-26 15:0x (core-rf, commit + land.sh)**: (a) detail_a.rs blends_to_reapply: the spread
+- **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
   to "blends touching removed blends" skips a LARGER cylinder met along a line (the round's support): 9cbb0e MF2 now
   live's 44 faces, 109400.892 (live .89). (b) direct.rs tweak_planes_in_turn: planes facing several ways (all
   neighbours planar) tweaked one way at a time; also the fallback in move_face's reblend closure when OCCT's offset is
