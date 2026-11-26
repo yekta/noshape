@@ -183,6 +183,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Our listed position (82.9, 93.0) vs live (84.5, 94.1) is within the comparison's tolerance.
 
 ## NEXT
+- 19:50 interaction-feel sweep (lead order 2): rows 964-966, 987-990, 1003, 1031, 1749 marked = with their tests; 1071 /
+  ASM-SELECTED-HOVER-LOOK fixed (70fb1b47b: hovered triad handle = shaded blue stroke, MANIP_HOVER, T1
+  a_hovered_triad_handle_is_a_shaded_blue_tube), to verify. Still ≠, not mine: 1100 (unverified), 1662 (decision), 1900 (core),
+  FEEL-MC-MARKER-SHAPES (skasm). mirror-no-line → skasm. Next: qa's diffs from live's option-combination batches (order 3).
 - SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Radial placed inside a hole: both takes match (verify13, branch and green), closed. Queue empty (19:4x). qa's 70 (Hole rows 'Ø 5 mm THRU' / field
   Diameter): answered 19:4x, a flow-script issue (THRU = the account's remembered seed; live's diameter box is unlabelled).
 
