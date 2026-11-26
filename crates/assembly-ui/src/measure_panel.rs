@@ -125,6 +125,47 @@ type Set = Rc<dyn Fn(MeasureSettings, &mut App)>;
 type Close = Rc<dyn Fn(&mut Window, &mut App)>;
 type Remove = Rc<dyn Fn(usize, &mut App)>;
 
+/// The panel as live's recorder reads it (asm-measure-face-cylinder-panel s4): its texts in order (a chip and its ×,
+/// the select labels, the checkbox as "[ ] name" then its name, each row's label, number and unit; an X / Y / Z
+/// letter is no text, a squared unit reads as its "2"), at most 30, and its fields. The recorder labels the selects
+/// with the field above them.
+pub fn ui_state(selected: &[String], rows: &[Row], settings: MeasureSettings, doc_units: &UnitPrefs) -> serde_json::Value {
+    const FIELD: &str = "Select entities to measure";
+    let (length_name, angle_name) = unit_names(&settings.units(doc_units));
+    let mut text = vec![FIELD.to_string()];
+    for c in selected {
+        text.extend([c.clone(), "×".into()]);
+    }
+    text.extend(["Measure type:", "Length unit:", "Angle unit:", "[ ] Reference coordinate system", "Reference coordinate system"].map(String::from));
+    for r in rows {
+        if r.axis.is_none() {
+            text.push(format!("{}:", r.label));
+        }
+        let (num, unit) = r.value.split_once(' ').unwrap_or((r.value.as_str(), ""));
+        text.push(num.to_string());
+        let unit = match unit.chars().last() {
+            Some('²') => "2",
+            Some('³') => "3",
+            _ => unit,
+        };
+        if !unit.is_empty() {
+            text.push(unit.to_string());
+        }
+    }
+    text.truncate(30);
+    let select = |value: &str| serde_json::json!({ "label": FIELD, "kind": "select", "value": value });
+    serde_json::json!({
+        "kind": "panel", "title": "Measure", "text": text,
+        "fields": [select(settings.kind.unwrap_or("Show all")), select(&length_name), select(&angle_name), { "label": "Reference coordinate system", "kind": "checkbox", "value": false }],
+    })
+}
+
+fn unit_names(units: &UnitPrefs) -> (String, String) {
+    let length = LENGTH_UNITS.iter().find(|(_, u)| *u == units.length).map(|(n, _)| n.to_string()).unwrap_or_default();
+    let angle = ANGLE_UNITS.iter().find(|(_, u)| *u == units.angle).map(|(n, _)| n.to_string()).unwrap_or_default();
+    (length, angle)
+}
+
 /// The panel, docked by the caller as the Part Studio's (2 px over the graphics area's bottom, flush right, over
 /// the evaluation tools). `selected`: the picked entities' names for the field; `set`: a choice changed;
 /// `remove`: a chip's × (its index); `close`: the ×. Drawn as the Part Studio's (part_studio/menus.rs, live
@@ -161,8 +202,7 @@ pub fn panel(selected: Vec<String>, rows: Vec<Row>, settings: MeasureSettings, d
     let type_items = MEASURE_TYPES.iter().map(|t| (t.to_string(), MeasureSettings { kind: (*t != "Show all").then_some(*t), ..settings })).collect();
     let length_items = LENGTH_UNITS.iter().map(|(n, u)| (n.to_string(), MeasureSettings { length: Some(*u), ..settings })).collect();
     let angle_items = ANGLE_UNITS.iter().map(|(n, u)| (n.to_string(), MeasureSettings { angle: Some(*u), ..settings })).collect();
-    let length_name = LENGTH_UNITS.iter().find(|(_, u)| *u == units.length).map(|(n, _)| n.to_string()).unwrap_or_default();
-    let angle_name = ANGLE_UNITS.iter().find(|(_, u)| *u == units.angle).map(|(n, _)| n.to_string()).unwrap_or_default();
+    let (length_name, angle_name) = unit_names(&units);
     // A 12 px `#666` label, then the select.
     let select_row = |label: &'static str, menu: AnyElement| h_flex().h(px(26.)).px(px(5.)).gap(px(4.)).child(div().text_size(px(12.)).text_color(pal.text_muted).child(label)).child(div().flex_1().mt(px(2.)).child(menu));
     // Onshape's selection box: `#def1fb` with a 1 px blue border (active), the caption small on top once something
@@ -308,5 +348,22 @@ mod tests {
     fn an_angle_reads_in_degrees_to_three_places() {
         let units = UnitPrefs { length: LengthUnit::Millimeter, ..UnitPrefs::default() };
         assert_eq!(format(Quantity::new(std::f64::consts::FRAC_PI_2, Dim::ANGLE), &units), "90.000 deg");
+    }
+
+    /// Live asm-measure-face-cylinder-panel s4: chips with their ×, the selects' labels, the checkbox, then each row's
+    /// label, number and unit (no axis letter; a squared unit as its "2").
+    #[test]
+    fn the_panel_reads_as_live_recorder_reads_it() {
+        let units = UnitPrefs { length: LengthUnit::Millimeter, ..UnitPrefs::default() };
+        let row = |label: &str, value: &str, axis| Row { label: label.into(), value: value.into(), axis };
+        let rows = [row("Min dist", "35.000 mm", None), row("Min dist", "-35.000 mm", Some(0)), row("Area", "1742.478 mm²", None)];
+        let st = ui_state(&["Face of Part 1 <1>".into()], &rows, MeasureSettings::default(), &units);
+        let text: Vec<&str> = st["text"].as_array().unwrap().iter().filter_map(|t| t.as_str()).collect();
+        assert_eq!(
+            text,
+            ["Select entities to measure", "Face of Part 1 <1>", "×", "Measure type:", "Length unit:", "Angle unit:", "[ ] Reference coordinate system", "Reference coordinate system", "Min dist:", "35.000", "mm", "-35.000", "mm", "Area:", "1742.478", "2"]
+        );
+        assert_eq!(st["fields"][1]["value"], "Millimeter");
+        assert_eq!(st["fields"][0]["value"], "Show all");
     }
 }

@@ -5493,13 +5493,11 @@ impl AssemblyView {
         }));
     }
 
-    /// The Measure panel (`crate::measure_panel`, live part-studio/82 and
-    /// icons2 Round 14), at `MEASURE_TOP` / `MEASURE_RIGHT`.
-    pub(super) fn render_measure(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// The Measure panel's field entries ("Face of Part 1 <2>"); None while the panel is closed.
+    pub(super) fn measure_chips(&self, cx: &App) -> Option<Vec<String>> {
         let picks = self.ui.measure.as_ref()?;
         let asm = self.assembly(cx)?;
-        // The field's entries: "Face of Part 1 <2>".
-        let selected: Vec<String> = picks
+        let selected = picks
             .iter()
             .map(|(path, r)| {
                 let inst = path.last().and_then(|id| asm.instance(*id)).map(|i| i.name.clone()).unwrap_or_default();
@@ -5512,6 +5510,13 @@ impl AssemblyView {
                 format!("{kind} of {inst}")
             })
             .collect();
+        Some(selected)
+    }
+
+    /// The Measure panel (`crate::measure_panel`, live part-studio/82 and
+    /// icons2 Round 14), at `MEASURE_TOP` / `MEASURE_RIGHT`.
+    pub(super) fn render_measure(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let selected = self.measure_chips(cx)?;
         let units = self.units(cx);
         let settings = self.ui.measure_settings;
         let rows = crate::measure_panel::rows(&self.ui.measure_result, &settings, &units);

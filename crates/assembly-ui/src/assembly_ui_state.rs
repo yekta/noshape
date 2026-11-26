@@ -824,6 +824,11 @@ impl AssemblyView {
         if let Some(f) = &self.ui.folder_name {
             out.push(panel("Folder name", vec![f.input.read(cx).value().to_string()]));
         }
+        // [ › Measure (live asm-measure-face-cylinder-panel s4).
+        if let Some(chips) = self.measure_chips(cx) {
+            let rows = crate::measure_panel::rows(&self.ui.measure_result, &self.ui.measure_settings, &self.units(cx));
+            out.push(crate::measure_panel::ui_state(&chips, &rows, self.ui.measure_settings, &self.units(cx)));
+        }
         // Edit standard content (live asm-standard-content-edit-instance): the Standard content tab's rows, with
         // Update.
         if self.ui.std.editing.is_some()
