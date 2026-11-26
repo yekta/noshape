@@ -725,6 +725,34 @@ fn a_foreshortened_radius_reads_as_a_dimension(cx: &mut TestAppContext) {
     assert_eq!(dims(cx), before + 1, "the foreshortened radius listed as a dimension");
 }
 
+/// Live drw-note-move-to-title-block s8, drw-surface-finish-flip s6, drw-dimension-foreshorten s10: a view under the
+/// pointer where a menu row was clicked reads lit within 6 px of its box's edges, outside or inside, not deeper in.
+#[gpui::test]
+fn a_view_under_a_clicked_menu_row_reads_lit_only_near_its_edges(cx: &mut TestAppContext) {
+    use noshape_model::drawing::build::PickTarget;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "menu-row-lit");
+    real_sheet(cx, window, &editor);
+    let lit = |cx: &mut TestAppContext, off: [f64; 2]| cx.update(|cx| editor.update(cx, |e, cx| {
+        let b = e.built.as_ref().expect("built");
+        let (h, pl) = b.picks.iter().enumerate().find_map(|(i, p)| match p {
+            PickTarget::View(v) => Some((i as u32, e.placement(*v).expect("placed"))),
+            _ => None,
+        }).expect("a view pick");
+        let px = 1.0 / e.zoom;
+        let at = [pl.max[0] + off[0] * px, (pl.min[1] + pl.max[1]) / 2.0 + off[1] * px];
+        e.cursor = at;
+        e.menu_closed_at = Some(at);
+        e.hover = Some(h);
+        let st = e.ui_drawing_state(cx);
+        st["selection"].as_array().expect("selection").iter().any(|s| s["kind"] == "EDGE" && s["new"] == true)
+    }));
+    assert!(lit(cx, [6.0, 0.0]), "6 px outside the right edge");
+    assert!(!lit(cx, [7.0, 0.0]), "7 px outside");
+    assert!(lit(cx, [-6.0, 0.0]), "6 px inside the right edge");
+    assert!(!lit(cx, [-11.0, 0.0]), "11 px inside");
+}
+
 /// Live2 feel/drawing.json (tables_live2_1013 centerlines): with Centermark, a circle lights from 6 px outside it and
 /// shows the preview cross; not from further; a circle that has a centermark gets nothing more.
 #[gpui::test]
