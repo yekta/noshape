@@ -5012,3 +5012,19 @@ skasm meanwhile; I'll list what I change here before landing.
   Impellergehaeuse tab, 1 part: Coarse 16 292 / Medium 49 570 / Fine 316 872 / Custom 492 184 tris; presets Coarse
   0.24/12.5/0.635, Medium 0.12/6.25/0.254, Fine 0.06/2.5/0.0254; 3MF in metres, no Units field): next, compare ours
   per tab.
+
+## Moved from the handoff 11-26 12:3x
+- **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
+  (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
+- **DL-STL-MESH-MOVE-FACE Translate (lead 21:1x P1)**: committed 5aab43cd7 (mesh Translate moves the whole mesh; T1 in
+  features_b::move_face_offsets_a_mesh_part…). Tessellation (live 0.005 mm chord, 8/12 segments a quarter) is low
+  priority: BRepMesh deflection 5e-6 gave 10592.119, angle-driven 10592.355 (live 10591.438): needs own chord control.
+  Inward remesh chamfer: not a target (lead).
+- **P1 MESH-MOVE-FACE (lead 11-25 14:4x, qa flow 5, live qa/dl-bracket-1125)**: Move face Offset on an STL part (1 mesh
+  face) offsets the whole mesh: kernel `Shape::offset_mesh` (mesh_io.cpp: facets unified, OCCT sharp offset, then its
+  convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
+  (live 35320.926): the holes' facet rims stay sharp (OCCT can't fillet them). Delete face already removed the part.
+  T1 mesh_import::a_mesh_body_offsets_whole_with_rounded_convex_edges, features_b::move_face_offsets_a_mesh_part_….
+- **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
+  BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
+  matches live. Saved doc vibex7 ~/tmp/core/sc/new; probes core-scratch/sc pf.py (per feature), fc.py, nm.py (normals).

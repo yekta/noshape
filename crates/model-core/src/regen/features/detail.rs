@@ -517,7 +517,7 @@ fn partial_of(ev: &EvalCtx) -> FResult<Option<super::blend_section::Partial>> {
     };
     let first = bound(ev, "startPartialType", "partialFirstEdgeTotalParameter", "startPartialOffset", "startPartialEntity", false)?;
     let second = if ev.bool("secondBound") { Some(bound(ev, "endPartialType", "partialSecondEdgeTotalParameter", "endPartialOffset", "endPartialEntity", true)?) } else { None };
-    Ok(Some(Partial { first, second, opposite: ev.bool("partialOppositeParameter") }))
+    Ok(Some(Partial { first, second, opposite: ev.bool("partialOppositeParameter"), from_edge: None }))
 }
 
 /// A kernel's failure reaching the user as Onshape's `message` (qa compat 11-19: c2-surf-workshop-knifehandle's Fillet 2
@@ -713,11 +713,13 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
             return err("Adjoining edge not filleted.");
         }
         if let Some(spec) = &special {
+            let partial = spec.partial.map(|p| super::blend_section::Partial { from_edge: edges.first().copied(), ..p });
+            let spec = super::blend_section::BlendSpec { partial, ..spec.clone() };
             let edges = chain;
             if let Some(p) = &spec.partial {
                 super::blend_section::check_partial(&body.shape, &edges, p)?;
             }
-            super::blend_section::section_blend(ev, bi, &edges, spec)?;
+            super::blend_section::section_blend(ev, bi, &edges, &spec)?;
             continue;
         }
         // Allow edge overflow off and a ball wider than a straight edge's

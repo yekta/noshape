@@ -139,6 +139,9 @@ pub struct Partial {
     pub second: Option<Bound>,
     /// One bound: true covers first → end (Onshape's default arrow), false start → first.
     pub opposite: bool,
+    /// The first picked edge: where it ends the chain, the chain starts at its free end (std's path over the tangent
+    /// propagated edges leads with it: c2-cov2-face-blend-partial-fillet's Fillet 3, its end offset from the far end).
+    pub from_edge: Option<usize>,
 }
 
 /// Distance along `chain` (of length `total`) of a partial fillet's bound.
@@ -197,7 +200,7 @@ fn bound_along(chain: &[ChainEdge], total: f64, bd: Bound) -> FResult<f64> {
 
 /// A partial fillet's range along `edges`' chain (from its end nearest the origin corner): from, to and its length.
 pub(super) fn partial_range(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<(f64, f64, f64)> {
-    let chain = chain(shape, edges)?;
+    let chain = chain_from(shape, edges, false, p.from_edge)?;
     let total: f64 = chain.iter().map(|c| c.length).sum();
     let a = bound_along(&chain, total, p.first)?;
     Ok(match p.second {
@@ -257,6 +260,11 @@ fn chain(shape: &Shape, edges: &[usize]) -> FResult<Vec<ChainEdge>> {
 /// a later chain runs as its first edge does (the section route's run-ons read their ends so: qa's
 /// rust-zero-solid-f197's Fillet 1, two straight edges).
 fn chain_ordered(shape: &Shape, edges: &[usize], own_ends: bool) -> FResult<Vec<ChainEdge>> {
+    chain_from(shape, edges, own_ends, None)
+}
+
+/// [`chain_ordered`] starting at `seed`'s free end where that edge ends the chain.
+fn chain_from(shape: &Shape, edges: &[usize], own_ends: bool, seed: Option<usize>) -> FResult<Vec<ChainEdge>> {
     let mut items = Vec::new();
     for &i in edges {
         let e = shape.sub_shape(ShapeType::Edge, i)?;
@@ -288,7 +296,12 @@ fn chain_ordered(shape: &Shape, edges: &[usize], own_ends: bool) -> FResult<Vec<
         let free = left.iter().flat_map(|it| [it.2, it.3]).filter(|q| near(*q, p)).count() == 1;
         if free { p } else { left[0].2 }
     };
-    let mut start = first_free(&items);
+    let seeded = seed.and_then(|e| items.iter().find(|it| it.0 == e)).and_then(|it| match (count(it.2) == 1, count(it.3) == 1) {
+        (true, false) => Some(it.2),
+        (false, true) => Some(it.3),
+        _ => None,
+    });
+    let mut start = seeded.or_else(|| first_free(&items));
     let mut out = Vec::new();
     let mut left = items;
     while !left.is_empty() {
@@ -321,7 +334,7 @@ pub fn check_partial(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<()>
     if ends.iter().any(|a| ends.iter().filter(|b| (**b - *a).length() < tol).count() > 2) {
         return Err(FeatureError::new("Edges do not form a continuous path."));
     }
-    let chain = chain(shape, edges)?;
+    let chain = chain_from(shape, edges, false, p.from_edge)?;
     if chain.windows(2).any(|w| (w[0].end - w[1].start).length() > tol) {
         return Err(FeatureError::new("Only one edge or one chain of tangent edges can be partially fillet."));
     }
@@ -413,6 +426,16 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
     Ok(Frame { u, m, extent: [f64::INFINITY; 2], air: false })
 }
 
+/// Whether face 0 of a frame takes side 1: an asymmetric round's radius goes on the face the edge, as it runs (`own`),
+/// has on its left, as live's: a block's top back edge rounded 3 / 6 takes 3 on the top (c2-opt-fillet-partial-asym-
+/// smooth's Fillet 2; flipped, c2-cov2-face-blend-partial-fillet's Fillet 2). Else `default`.
+fn radius_first(spec: &BlendSpec, f: &Frame, own: DVec3, default: bool) -> bool {
+    match spec.reference.is_none() && spec.sides.is_none() && spec.r1 != spec.r2 {
+        true => (-f.m[0]).cross(own).dot(f.u[0]) > 0.0,
+        false => default,
+    }
+}
+
 /// Setbacks along the two faces of a frame (face 0, face 1); `first_is_side1`
 /// says which face is side 1 of a face blend.
 fn setbacks(f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(f64, f64)> {
@@ -448,7 +471,8 @@ fn setbacks(f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(f64, 
                 let s = w / (2.0 * half.cos());
                 (s, s)
             }
-            None => (spec.r1 * half.tan(), spec.r2 * half.tan()),
+            None if first_is_side1 => (spec.r1 * half.tan(), spec.r2 * half.tan()),
+            None => (spec.r2 * half.tan(), spec.r1 * half.tan()),
         });
     };
     let c = f.u[0].dot(f.u[1]).clamp(-1.0, 1.0);
@@ -1141,7 +1165,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     let faces = shape.faces();
     let ef = shape.edge_faces()?;
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
-    let chain = chain_ordered(shape, edges, ball)?;
+    let chain = chain_from(shape, edges, ball, spec.partial.and_then(|p| p.from_edge))?;
     let total: f64 = chain.iter().map(|c| c.length).sum();
     // An edge's ends free in the chain: the chain's own ends, or where the next selected edge doesn't start (a stadium's
     // two straight edges, each run out at both ends).
@@ -1291,6 +1315,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     let (s1, s2) = setbacks(&fr, spec, side1_first)?;
                     fr.extent[j] = face_reach(ff[j], p, fr.u[j], [s1, s2][j], scale)?;
                 }
+                let side1_first = radius_first(spec, &fr, if c.forward { tangent } else { -tangent }, side1_first);
                 return Ok((p, fr, side1_first, tangent));
             }
             acc += c.length;
@@ -1665,6 +1690,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             k::Curve::Line { .. } => {
                 let d = (c.end - c.start).normalize();
                 let mut fr = frame_at(shape, ff, c.start + d * ((a + b) / 2.0), d, scale)?;
+                let side1_first = radius_first(spec, &fr, if c.forward { d } else { -d }, side1_first);
                 // With overflow off the ball rests on a face's far edge; on, a section wider than a face runs on past it
                 // and the cut trims it where it meets the faces beyond (live c2-extension-spring's Fillet 2: a 1.5 mm
                 // Curvature round across a 1 mm arm's end, two meeting in the middle of a 3 mm end).
@@ -1725,7 +1751,9 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     ax = -ax;
                 }
                 let p0 = rotate(c.start, *center, ax, f0 * span - g0);
-                let fr = frame_at(shape, ff, rotate(c.start, *center, ax, (f0 + f1) / 2.0 * span), ax.cross(rotate(c.start, *center, ax, (f0 + f1) / 2.0 * span) - *center).normalize(), scale)?;
+                let along = ax.cross(rotate(c.start, *center, ax, (f0 + f1) / 2.0 * span) - *center).normalize();
+                let fr = frame_at(shape, ff, rotate(c.start, *center, ax, (f0 + f1) / 2.0 * span), along, scale)?;
+                let side1_first = radius_first(spec, &fr, if c.forward { along } else { -along }, side1_first);
                 // Frame at p0: rotate the mid frame back.
                 let back = (f0 - (f0 + f1) / 2.0) * span - g0;
                 let rot = |v: DVec3| glam::DQuat::from_axis_angle(ax, back) * v;

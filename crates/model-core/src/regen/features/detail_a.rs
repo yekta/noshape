@@ -956,11 +956,25 @@ fn sheet_blend(ev: &mut EvalCtx, (b1, f1): (usize, usize), (b2, f2): (usize, usi
 }
 
 /// Live 2306 A: Adjacent and Custom propagation carry side 2 on round side 1 through the faces beside it that meet it
-/// within the maximum angle (a block's 90° walls: all four top edges with Adjacent or 95°, only the picked one at 45°).
+/// within the maximum angle (a block's 90° walls: all four top edges with Adjacent or 95°, only the picked one at 45°),
+/// along edges with side 1 as convex or concave as the picked ones' (an L's inner corner stays one: c2-cov2-face-blend-
+/// partial-fillet's Face blend 3, not round the top and bottom edges).
 fn grow_side(shape: &Shape, side: &mut Vec<usize>, other: &[usize], max: f64) -> FResult<()> {
     let faces = shape.faces();
     let ef = shape.edge_faces()?;
-    let touches_other = |f: usize| ef.iter().any(|fs| fs.len() == 2 && fs.contains(&(f as u32)) && fs.iter().any(|g| other.contains(&(*g as usize))));
+    let probe = shape.bounding_box(true).map_or(1e-6, |b| (b.max - b.min).length() * 1e-5);
+    let convex = |ei: usize| -> Option<bool> {
+        let m = edge_mid(&shape.sub_shape(ShapeType::Edge, ei).ok()?)?;
+        let (n1, n2) = edge_normals(shape, &faces, &ef, ei)?;
+        Some(super::sheetmetal_util::is_convex(shape, m, n1, n2, probe))
+    };
+    let with_other = |f: usize| ef.iter().enumerate().filter(move |(_, fs)| fs.len() == 2 && fs.contains(&(f as u32)) && fs.iter().any(|g| other.contains(&(*g as usize)))).map(|(ei, _)| ei);
+    let picked: BTreeSet<Option<bool>> = side.iter().flat_map(|&f| with_other(f)).map(convex).collect();
+    let want = match picked.len() {
+        1 => picked.into_iter().next().flatten(),
+        _ => None,
+    };
+    let touches_other = |f: usize| with_other(f).any(|ei| want.is_none() || convex(ei) == want);
     loop {
         let mut grew = false;
         for (ei, fs) in ef.iter().enumerate() {

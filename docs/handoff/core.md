@@ -1,12 +1,12 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 11:0x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 12:2x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
 - **LANDING core-rf**: 6ea74721 LANDED 09:49 (158ab4c2: knifehandle settle + Face blend 2/3); Fillet 2 fold fix QUEUED
-  10b134ab 10:4x; Replace face corner fix on top (below).
+  10b134ab 10:4x; Replace face corner fix QUEUED 0bda5d83 11:1x (below).
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
   fillets rolled again (detail_a::reblend) at the cylinder floor: OCCT built 1-2 of the 4 corners (3 equal r 12.7
   fillets) as plate patches, not spheres, whenever the free-form stripe (drafted wall x cylinder floor) was the 2nd of
@@ -23,12 +23,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
   (cli-hist). (2) knifehandle settle fix + T1 settle test: core-rf tip commit (land.sh after 66dba573); slow cuts
   handed to bool 06:5x: vibex7 ~/agents/core-keep/kh-bool (Fillet 3 cut 244416f8 667 ms, Fillet 1 cut 856a411e 3.2 s).
-  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands. (4) loft-guide
-  Sweep 1: CLOSED not a target: our path within 4 um of live's 801 samples (core-scratch/lg cmp.py/fit.py; centripetal
-  natural is the best of 8 fits), live's sections bulge to r 0.0275-0.028 at the 12 tight bends (behaviours 11-18) =
-  live's approximation; REQUESTS row withdrawn.
-- **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 (/root/core-rf-scratch/gate-420fd5d01.log): replay +0 -0 (parity56
-  513 -> 513, 0 differing), suite 132 -> 132, features 2106 -> 2106 (1 "changed" = lora's note, translator); landed. Next: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck.
+  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands. (4) loft-guide Sweep 1: CLOSED, not a target (live's approximation; archive).
+- **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 landed (+0 -0). Next there: recheck 97ad5f Linear pattern 1 (fuses copies live keeps apart).
 - **P0 SPEED**: c927ff4e QUEUED (core-spd): hose, radiator = 0.4.68; profile kit vibex7 ~/tmp/core/spd (m/ models,
   pft.py, spd-prof.sh, ~/qa-rel/<v>/noshape-cli). Impeller: no regression on main (old-base test builds).
 - **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
@@ -38,11 +34,28 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
   qa gaps-1125 models-report.json): each failure hits ONE document; order = own first difference first:
   (1) DONE (6ea74721): c2-surfaces-lofts-projected Face blend 2/3 (9 -> 18/45); next diff #18 Sweep 2 (sweep item);
-  (2) c2-body-draft-naming Fillet 2: QUEUED 10b134ab (folding sections: per-edge lofts, the folding one clipped at
-  0.9 * least radius, 2x sections; OK 280 ms). Live removes +15 mm3 (Parasolid pinches the middle round to the flat
-  face's corner). Left: a 0.17 mm2 clip-face sliver near the evolute (13 faces, live 12) breaks Fill 1 ("Boundary
-  edges selected do not form a closed loop"). Next: cover the evolute (or live's pinch), then Fill 1 / Body draft 1.
-  (3) c2-cov2-face-blend-partial-fillet #6 Face blend 1 edges 19/2 vs 17/4, then #15 Fillet 3 fails;
+  (2) c2-body-draft-naming Fillet 2: LANDED 281ced578 (OK 280 ms). Fill 1 still fails: live's corner is 3-sided
+  (A (50.634,14.575,63.877), B (50.634,21.818,71.12), C (59.634,23.575,62.12)): the middle round (along Fillet 1's
+  end curve on the right face, setback 9 > its 5.2 radius) PINCHES to C, where the neighbours' contact lines meet;
+  BC / CA lie on the neighbours' extrusions (live's mid points: x,z (resp. x,y) on their profiles, the third
+  coordinate linear). Ours clips at 0.9 rho: 4-sided corner + 0.17 mm2 sliver + a crease to C. TRIED 11-26 (patch
+  core-scratch/pinch-probe.patch): middle sections pinched to C (pinch_point = neighbours' contact lines' closest
+  point; exact C) -> loft valid but tolerance 0.12 mm at the apex, every cut order open/invalid; fuzzy 1e-5 cut =
+  live's 12/27/17, 38249.2 (live 38239.5) but tol 0.12 mm; a hair off C: open, or 1.3 s and Fill 1 still fails.
+  => needs the corner as its own face (native blend face work). Doc's first diff: Fillet 1's edge kinds (live 'other').
+  (3) c2-cov2-face-blend-partial-fillet: IN FLIGHT 11-26 12:2x, UNCOMMITTED in core-rf (no Fillet 3 failure any more):
+  a) detail_a::grow_side: Adjacent/Custom propagation only along edges as convex/concave as the picked ones (Face
+  blend 3, L inner corner: 16 -> 9 faces, 17880 -> 18024.534, live 18024.575 = its B-spline fit); b) blend_section
+  radius_first: an asymmetric round's radius on the face LEFT of the edge's own direction (station + Line + Circle
+  paths; setbacks swaps when !first_is_side1): c2-opt-fillet-partial-asym-smooth F2 and cov2 F2 faces now = live
+  (top 2076/1745, back 840/960); c) Partial.from_edge + chain_from: a partial chain starts at the first picked edge's
+  free end (std constructPaths): cov2 F3 +78 -> +0.37 mm3 (17 faces vs 16: sliver at the curve/top-edge joint).
+  Tests added (features_a): adjacent_propagation_keeps_an_l_corners_blend_in_the_corner, an_asymmetric_fillets_radius_
+  lies_on_the_top_of_a_blocks_back_edge, a_partial_fillets_propagated_chain_runs_from_the_picked_edges_free_end.
+  .ft1.sh (core-scratch/ft1.out): all 3 new + face_blend 13, fillet 35, partial 4, blend 18, T2 fillet_options OK;
+  T2 std_oracle boolean/loft/transform FAIL (not blends: check they fail on main too). Next: clippy, commit, land. Left (not targets): FB1 conic
+  and FB3/asym volumes = live's surface fits (rho 0.59990 / 0.41448 vs 0.41426: no consistent rule). Probe scripts
+  vibex7 ~/tmp/core/fb: pf.sh <doc> (per-feature vol/faces vs live), qp.sh <doc> <feature> <part>, save/ (2 docs).
   (4) asm-scissor-lift studios (BLEND-FAILS b-d below); after upstream fixes: genesis #72, impeller Stevenrohr #29.
 - **NATIVE BLEND FACES PLAN (for the lead's later decision)**: scope: section_blend's rolling-ball path (blend_section.rs
   ball_tools -> 35-section loft tools -> closed_run_on splits -> Boolean with the body) replaced by the blend face
@@ -55,11 +68,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   closed_run_on handles now: walls, corners, ties) and validity of the sewn shell; the section path stays as the
   fallback. Size: ~1-2 weeks; confirm per-phase timings first (NOSHAPE_KERNEL_PROFILE; gdb kit ~/tmp/core/spd/w/i).
 - **QUEUE**: Replace face rim (above), blend failures (ranking above), then skasm's sweep items.
-- **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
-  BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
-  matches live. Saved doc vibex7 ~/tmp/core/sc/new; probes core-scratch/sc pf.py (per feature), fc.py, nm.py (normals).
-- **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
-  (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
   (c2-surf-intro-boundary/fill/mutualtrim/ruled; -offset's Offset area): Derived 1 car body's tail vertex x 33.940348 vs
   33.940739; doc vibex6 ~/tmp/skasm/fin/c2-surf-intro-fill.noshape. PARKED 21:0x: it is the source's Fillet 1 (R 0.6 in,
@@ -72,15 +80,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   through them (kernel ops.rs loft -> features.cpp ThruSections; look for where wire profiles' edges become one
   section curve). Saved doc vibex7 ~/tmp/core/si. (4) c2-hunting-knife Revolve 1 18 vs 19 vertices: shown_topology (common.cpp) shows no vertex on the closed ring the
   sphere cuts in the loft tip; live likely one at the loft's seam (y=0). Doc vibex8 ~/tmp/bool/knife.noshape.
-- **DL-STL-MESH-MOVE-FACE Translate (lead 21:1x P1)**: committed 5aab43cd7 (mesh Translate moves the whole mesh; T1 in
-  features_b::move_face_offsets_a_mesh_part…). Tessellation (live 0.005 mm chord, 8/12 segments a quarter) is low
-  priority: BRepMesh deflection 5e-6 gave 10592.119, angle-driven 10592.355 (live 10591.438): needs own chord control.
-  Inward remesh chamfer: not a target (lead).
-- **P1 MESH-MOVE-FACE (lead 11-25 14:4x, qa flow 5, live qa/dl-bracket-1125)**: Move face Offset on an STL part (1 mesh
-  face) offsets the whole mesh: kernel `Shape::offset_mesh` (mesh_io.cpp: facets unified, OCCT sharp offset, then its
-  convex edges filleted at d run by run, meshed back). qa's bracket: 1 mm 25822.709 (live 25800.854), 2 mm 35387.538
-  (live 35320.926): the holes' facet rims stay sharp (OCCT can't fillet them). Delete face already removed the part.
-  T1 mesh_import::a_mesh_body_offsets_whole_with_rounded_convex_edges, features_b::move_face_offsets_a_mesh_part_….
 - **Scissor parity 11-25 14:3x** (core-scratch/pa-now-1125.out, saved doc vibex7 ~/tmp/core/sc/fresh): 2d82a0
   Chamfer 2 fixed. New vs the slabs run, not from the chamfer (it only runs after OCCT fails): fed22d Extrude
   18/28/38 + Fillet 18 + Move face 7, 97ad5f Extrude 2/Boolean 2/Fillet 3/Move face 1, 665cf3 Fillet 2/3, 57725f

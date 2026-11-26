@@ -1283,6 +1283,90 @@ fn face_blend_adjacent_faces() {
     assert!(near(removed, (1.0 - PI / 4.0) * 0.004f64.powi(2) * 0.04, 1e-3));
 }
 
+/// Face blend's Adjacent propagation carries the blend on only along edges as convex or concave as the picked faces'
+/// (live c2-cov2-face-blend-partial-fillet's Face blend 3: an L's inner corner, R 6 Curvature 0.8, stays one round, 9
+/// faces, 18024.575 mm³; ours went on round the wall's top and bottom edges too, 16 faces). Live's B-spline fit of the
+/// section adds 0.04 mm³ to the exact profile.
+#[test]
+fn adjacent_propagation_keeps_an_l_corners_blend_in_the_corner() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (0.06, 0.0), (0.06, 0.01), (0.01, 0.01), (0.01, 0.04), (0.0, 0.04)].map(|(x, y)| sk.add_point(DVec2::new(x, y)));
+    for i in 0..6 {
+        sk.add_line_between(p[i], p[(i + 1) % 6]).unwrap();
+    }
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "20 mm", "NEW");
+    let res = t.ok();
+    let b0 = solids(&res.context)[0];
+    let face_at = |p: DVec3| {
+        let i = b0.shape.faces().iter().position(|f| f.contains_point(p, 1e-9).unwrap_or(false)).expect("a face there");
+        Reference::Face((*b0.faces[i]).clone())
+    };
+    let (wall_x, wall_y) = (face_at(DVec3::new(0.01, 0.025, 0.01)), face_at(DVec3::new(0.035, 0.01, 0.01)));
+    t.add("faceBlend", &[("side1", q(vec![wall_y])), ("side2", q(vec![wall_x])), ("radius", e("6 mm")), ("crossSectionShape", en("CURVATURE")), ("magnitude", e("0.8")), ("propagation", b(true)), ("propagationType", en("ADJACENT"))]);
+    let res = t.ok();
+    let part = solids(&res.context)[0];
+    let v = part.shape.volume().unwrap();
+    assert!(part.faces.len() == 9 && near(v, 18024.575e-9, 5e-6), "{} faces, {} mm³", part.faces.len(), v * 1e9);
+}
+
+/// An asymmetric fillet's radius goes on the face the edge has on its left as it runs, the other radius on the other
+/// (live c2-opt-fillet-partial-asym-smooth's Fillet 2: a block's top back edge, 3 / 6 mm, sets back 3 on the top and 6
+/// down the back; flipped, c2-cov2-face-blend-partial-fillet's Fillet 2, the other way round). Ours went by the faces'
+/// order in the kernel: the other way round.
+#[test]
+fn an_asymmetric_fillets_radius_lies_on_the_top_of_a_blocks_back_edge() {
+    for flip in [false, true] {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.06, 0.04, "20 mm");
+        let res = t.ok();
+        let edge = edge_near(solids(&res.context)[0], DVec3::new(0.03, 0.04, 0.02));
+        t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("3 mm")), ("isAsymmetric", b(true)), ("otherRadius", e("6 mm")), ("flipAsymmetric", b(flip))]);
+        let res = t.ok();
+        let part = solids(&res.context)[0];
+        let area = |n: DVec3| {
+            let i = part.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|pl| pl.unit_normal().dot(n) > 0.999)).expect("the face");
+            part.shape.faces()[i].area().unwrap() * 1e6
+        };
+        let (top, back) = if flip { (6.0, 3.0) } else { (3.0, 6.0) };
+        let (want_top, want_back) = (60.0 * (40.0 - top), 60.0 * (20.0 - back));
+        assert!((area(DVec3::Z) - want_top).abs() < 1e-6 && (area(DVec3::Y) - want_back).abs() < 1e-6, "flip {flip}: top {} back {}", area(DVec3::Z), area(DVec3::Y));
+    }
+}
+
+/// A partial fillet's chain of tangent edges starts at the picked edge's free end (std's path leads with it): live
+/// c2-cov2-face-blend-partial-fillet's Fillet 3, R 3 on a block's back vertical edge under a 4 / 8 round of its top back
+/// edge, from a plane 8 mm up to 4 mm before the chain's far end, runs up the edge, over the round's end and along the
+/// top's side edge to 4 mm from the front. Ours measured from the front end and rounded the edge from 8 mm down to 4.
+#[test]
+fn a_partial_fillets_propagated_chain_runs_from_the_picked_edges_free_end() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.06, 0.04, "20 mm");
+    let res = t.ok();
+    let edge = edge_near(solids(&res.context)[0], DVec3::new(0.03, 0.04, 0.02));
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("4 mm")), ("isAsymmetric", b(true)), ("otherRadius", e("8 mm")), ("flipAsymmetric", b(true))]);
+    let plane = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("8 mm"))]);
+    let res = t.ok();
+    let edge = edge_near(solids(&res.context)[0], DVec3::new(0.06, 0.04, 0.008));
+    let partial = [("isPartial", b(true)), ("startPartialType", en("ENTITY")), ("startPartialEntity", q(vec![Reference::FeaturePlane(plane)])), ("secondBound", b(true)), ("endPartialType", en("OFFSET")), ("endPartialOffset", e("4 mm"))];
+    let mut params = vec![("entities", q(vec![edge])), ("radius", e("3 mm")), ("tangentPropagation", b(true))];
+    params.extend(partial);
+    t.add("fillet", &params);
+    let res = t.ok();
+    let part = solids(&res.context)[0];
+    // The round's faces at the right end: from 8 mm up, to 4 mm from the front.
+    let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+    for f in part.shape.faces().iter().filter(|f| f.face_plane().ok().flatten().is_none()) {
+        let bb = f.bounding_box(true).unwrap();
+        if bb.min.x > 0.055 {
+            (lo, hi) = (lo.min(bb.min), hi.max(bb.max));
+        }
+    }
+    assert!((lo.z - 0.008).abs() < 1e-5 && (lo.y - 0.004).abs() < 1e-5 && (hi.z - 0.02).abs() < 1e-5, "round from {lo:?} to {hi:?}");
+}
+
 /// FILLET-PARTIAL-PLANE: a partial fillet's end can be a datum plane (std: a face, which a plane is in Onshape, or a
 /// point): the round stops where the edge crosses it. The Right plane halves the block's top front edge.
 #[test]
