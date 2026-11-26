@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 05:16 UTC) — read first
+## RESUME HERE (11-26 05:50 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -19,6 +19,22 @@ QUEUED ada3263b (3 commits, rebased on origin/main; the old WIP is NOT in it):
   idle() before the cold press). qa told 11-26 to rerun those once it lands.
 WIP (drag traces, hover_paused, Cadenas x_t fixtures + Parasolid test; not for landing) is in branch **skasm-wip2**
 (= 908540c59 + 11-26 work); cherry-pick the Cadenas fixtures/test from it for the Parasolid reader.
+
+Committed after ada3263b, NOT yet landed (land.sh again once ada3263b's result is in): c049e26ed handoff;
+30a11b8f8 Parasolid fix (xt_read.cpp chart_points: a closed intersection curve's end terminator at the start's point goes
+to the back; Cadenas FXBA3 files now 1 solid/26 faces/598.9 mm³ and 2 solids/40 faces as live) + T2
+export::cadenas_misumi_vendor_parts_read (files outside the repo: NOSHAPE_XT_VENDOR=~/agents/skasm-keep/xt on vibex7,
+copies in /root/skasm-scratch/xt). Kernel export:: 98/98 pass.
+Main RED 05:06 at 72bc8ad36 (parity::a_face_two_parts_have_is_the_one_on_lives_part): not mine, passes alone on vibex7 (flaky under load).
+
+IN FLIGHT (IGES reader, 16 docs split more than live): pulley02-maxwell ours 10 faces vs model/live 9: the model's torus
+is ONE face (3849 mm²), ours two halves (1926 each) that merge_same_surface_faces (boolean.cpp, **bool's file: tell
+bool before changing it**) doesn't merge. Suspect same_surface's torus/cylinder gp_Ax1::IsCoaxial rejecting opposite axis
+directions (fix idea: also accept the reversed axis). UNCOMMITTED TEMPORARY in the worktree, drop before any commit:
+boolean.cpp MRGDBG fprintf block in same_surface; export.rs probe_iges_tmp test. Probe: prb.sh -> ~/tmp/skasm/prb.log
+(NOSHAPE_IGS=~/parity/exchange/pulley02-maxwell/live.igs on vibex7). Our CLI probe: ~/tmp/skasm/probe/b.jsonl with
+/root/green/noshape batch. Other docs: housing-draft 36/93/61 vs 36/79/44, knob-jason 90/182/95 vs 81/164/88,
+motor-mount 25/59/41 vs 16/24/0 (live/corpus-gaps-1125.md "Data exchange" item 1).
 
 Next: speed T2 rerun (tsk9.sh, timeout 5400, needs skasm-wip2's speed traces?) -> Parasolid T1
 cadenas_misumi_vendor_parts_read (asm-xdev-subs) -> sketch + sheet-metal feel-coverage audit (counts) -> IGES reader
