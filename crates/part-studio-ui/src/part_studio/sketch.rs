@@ -361,7 +361,7 @@ impl PartStudioView {
     pub(super) fn sync_sketch_editor(&mut self, cx: &mut Context<Self>) {
         let drop_editor = |this: &mut Self, cx: &mut Context<Self>| {
             if let Some(ed) = this.sketch.take() {
-                this.sketch_fillet_radius = Some(ed.fillet_radius);
+                this.doc.update(cx, |d, _| d.sketch_fillet_radius = Some(ed.fillet_radius));
                 (this.opts.editing_sketch, this.opts.sketch_dragging) = (None, false);
                 this.viewport.update(cx, |vp, _| vp.tool_captures_left = false);
             }
@@ -394,8 +394,8 @@ impl PartStudioView {
                 }
             }
             _ => {
-                if let Some(ed) = &self.sketch {
-                    self.sketch_fillet_radius = Some(ed.fillet_radius);
+                if let Some(r) = self.sketch.as_ref().map(|ed| ed.fillet_radius) {
+                    self.doc.update(cx, |d, _| d.sketch_fillet_radius = Some(r));
                 }
                 self.sketch = Some(SketchEditor::new(id, frame));
                 // A spline from before handle arms gets them, so its handles can be picked and constrained: the
@@ -420,7 +420,7 @@ impl PartStudioView {
                         ed.show_expressions = o.show_expressions;
                         ed.show_errors = o.show_errors;
                     }
-                    if let Some(r) = self.sketch_fillet_radius {
+                    if let Some(r) = self.doc.read(cx).sketch_fillet_radius {
                         ed.fillet_radius = r;
                     }
                 }
@@ -451,7 +451,7 @@ impl PartStudioView {
             self.hover = None;
             (self.ui.hover_pick, self.ui.hover_raw, self.ui.sketch_gpu_hover) = (None, None, None);
             self.ui.sketch_hover_held_at = None;
-            self.sketch_fillet_radius = Some(ed.fillet_radius);
+            self.doc.update(cx, |d, _| d.sketch_fillet_radius = Some(ed.fillet_radius));
             self.dim_input = None;
             (self.opts.editing_sketch, self.opts.sketch_dragging) = (None, false);
             // Live: "Sketch could not be solved." goes when the sketch closes.

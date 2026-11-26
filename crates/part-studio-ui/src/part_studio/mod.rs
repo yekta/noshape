@@ -485,9 +485,6 @@ pub struct PartStudioView {
     /// for the toast's Restore link (live sketch/68), with the toast text.
     canceled_edit: Option<(Feature, usize, bool, String)>,
     sketch: Option<SketchEditor>,
-    /// The sketch fillet radius last used in this tab: live's default is
-    /// R5 on a fresh load and then sticks per tab (behaviours.md 568).
-    sketch_fillet_radius: Option<f64>,
     /// Sketch dialog options toggled before the sketch plane is picked (the
     /// editor opens with them).
     sketch_pending_options: Option<crate::sketch_mode::SketchOptions>,
@@ -664,7 +661,6 @@ impl PartStudioView {
             toasts: Default::default(),
             canceled_edit: None,
             sketch: None,
-            sketch_fillet_radius: None,
             sketch_pending_options: None,
             context: None,
             context_menu: None,

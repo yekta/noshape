@@ -4901,7 +4901,7 @@ fn drawing_datum_target_takes_area_style_origin_and_distances() {
 
 #[test]
 fn sketch_fillet_radius_default_is_r5_then_sticky() {
-    // Live: R5 on a fresh page, then the last radius used in that tab.
+    // Live: R5 on a fresh page, then the last radius used in that browser tab (the document).
     let mut ctx = Ctx::new();
     let sk = new_sketch(&mut ctx, "fillet_sticky.noshape", "plane:top");
     let rect = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
@@ -4920,6 +4920,13 @@ fn sketch_fillet_radius_default_is_r5_then_sticky() {
     let c = id_of(created(&rect2, "point").into_iter().find(|p| near(&p["at"], 40.0, 0.0)).unwrap());
     let f = call(&mut ctx, "sketch_fillet", json!({ "sketch": sk2, "entities": [c] }));
     assert!((radius(&f) - 3.0).abs() < 1e-6, "{f}");
+    // Another Part Studio of the document too (live: the tab's last radius, skb fdef (c)).
+    let ps = call(&mut ctx, "tab_create", json!({ "kind": "partstudio" }))["tab"]["id"].as_str().unwrap().to_string();
+    let sk3 = call(&mut ctx, "sketch_create", json!({ "tab": ps, "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let rect3 = call(&mut ctx, "sketch_draw", json!({ "tab": ps, "sketch": sk3, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    let c = id_of(created(&rect3, "point").into_iter().find(|p| near(&p["at"], 40.0, 0.0)).unwrap());
+    let f = call(&mut ctx, "sketch_fillet", json!({ "tab": ps, "sketch": sk3, "entities": [c] }));
+    assert!((radius(&f) - 3.0).abs() < 1e-6, "another Part Studio: {f}");
 }
 
 #[test]

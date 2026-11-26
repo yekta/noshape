@@ -37,10 +37,9 @@ pub struct OpenDoc {
     /// Each Part Studio's chosen configuration (the Configurations box's
     /// values; view state, not stored in the document).
     pub active_config: HashMap<TabId, ConfigValues>,
-    /// The sketch fillet radius last used in each Part Studio: live's
-    /// default for the next fillet (5 mm on a fresh page, then sticky per
-    /// tab until the page reloads; here, while the document is open).
-    pub sketch_fillet_radius: HashMap<TabId, f64>,
+    /// The sketch fillet radius last used in any of the document's Part Studios: live's default for the next fillet
+    /// (5 mm on a fresh page, then sticky for the browser tab until it reloads; here, while the document is open).
+    pub sketch_fillet_radius: Option<f64>,
     /// The document window's state (tab shown, panels, compare…; see
     /// [`crate::window`]).
     pub window: crate::window::WindowState,
@@ -51,7 +50,7 @@ impl OpenDoc {
         // std's dialog logic (Extrude, Hole, …) loads in the background, so
         // the first feature_add doesn't parse std (fs, lead 10-26).
         noshape_model::custom::std_feature::prewarm();
-        OpenDoc { session, studio_cache: Default::default(), assemblies: None, active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
+        OpenDoc { session, studio_cache: Default::default(), assemblies: None, active_config: HashMap::new(), sketch_fillet_radius: None, window: Default::default() }
     }
 
     pub fn doc(&self) -> &Document {

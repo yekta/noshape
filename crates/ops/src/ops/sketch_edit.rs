@@ -335,11 +335,11 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
     };
     let mut ed = editor(&t);
     ed.set_tool(tool);
-    // The fillet radius is sticky per tab (live): the last one used.
+    // The fillet radius is sticky for the document (live): the last one used.
     if tool == Tool::Fillet
-        && let Some(r) = od.sketch_fillet_radius.get(&tab)
+        && let Some(r) = od.sketch_fillet_radius
     {
-        ed.fillet_radius = *r;
+        ed.fillet_radius = r;
     }
     if let Some((_, m)) = &size_text {
         if tool == Tool::Fillet {
@@ -392,7 +392,7 @@ fn corners(ctx: &mut Ctx, a: &Args, tool: Tool, size: &str) -> Result<OpOutput, 
     ed.dim_edit = None;
     ed.message = None;
     if tool == Tool::Fillet && changed {
-        od.sketch_fillet_radius.insert(tab, ed.fillet_radius);
+        od.sketch_fillet_radius = Some(ed.fillet_radius);
     }
     finish(od, t, &ed, changed, &before)
 }

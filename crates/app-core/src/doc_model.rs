@@ -62,6 +62,9 @@ pub struct DocModel {
     /// Commits the pending edit when the app quits (Quit, logout, shutdown, SIGTERM): Drop alone misses it while
     /// anything else (a background task) still holds the model.
     quit_commit: Option<Subscription>,
+    /// The sketch fillet radius last used in any of the document's Part Studios: live's default is R5 on a fresh
+    /// load and then sticks for the tab (behaviours "skb: sketch fillet / chamfer DEFAULT value rule").
+    pub sketch_fillet_radius: Option<f64>,
 }
 
 /// What the window shows, read on demand outside the document's update (see
@@ -126,7 +129,7 @@ impl DocModel {
         session.forget_undo();
         let studio_cache = crate::derived::StudioCache::default();
         let assemblies = std::sync::Arc::new(parking_lot::Mutex::new(crate::derived::assembly_evaluator_with_store(studio_cache.clone(), crate::result_store::store())));
-        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_links: Vec::new(), notice_input: None, quit_commit: None }
+        Self { session, studio_cache, assemblies, pending: PendingEdit::default(), pending_preview: false, client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_links: Vec::new(), notice_input: None, quit_commit: None, sketch_fillet_radius: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice), gone after
