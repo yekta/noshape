@@ -564,3 +564,18 @@ fn a_splines_body_drag_bends_it_as_live() {
     let near = |i: usize| ((d[i].y / d[3].y) / (w[i] / w[3]) - 1.0).abs() < 0.02;
     assert!(near(0) && near(1) && near(2), "{d:?} {w:?}");
 }
+
+/// Live skasm/pierce (11-17): a spline crossing the sketch plane at (25, 0); Pierce with a circle's centre (r 3, at
+/// (22, 4)) puts the centre on (25, 0), r unchanged. (Pierce with the circle or a line itself moves it rigidly in
+/// live: ticket SKETCH-PIERCE-CURVE-RIGID.)
+#[test]
+fn pierce_with_a_circles_centre_puts_it_on_the_pierce_point() {
+    let mut sk = Sketch::new();
+    let at = sk.use_external_point(v(25.0, 0.0));
+    let c = sk.add_circle(v(22.0, 4.0), 3.0);
+    let centre = sk.entity(c).and_then(|e| e.center()).unwrap();
+    sk.add_constraint(ConstraintKind::Pierce { point: centre, target: at }).unwrap();
+    solved(&mut sk);
+    let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { panic!("circle") };
+    assert!((center - v(25.0, 0.0)).length() < 1e-9 && (radius - 3.0).abs() < 1e-9, "{center} r {radius}");
+}

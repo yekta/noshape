@@ -7480,6 +7480,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   Boolean's unify for one case (core.md 11-07 19:18).
 
 ## Sketch + assembly (skasm)
+- [ ] P2 **SKETCH-PIERCE-CURVE-RIGID (skasm 11-26, audit; live skasm/pierce 11-17)**: Pierce with a free circle (r 3 at (22, 4), pierce point (25, 0)) moves it rigidly in live, centre (23.2, 2.4), r 3; ours splits the gap between centre and radius, (22.6, 3.2) r 4. A line (16, 5)–(28, 9) keeps its direction and length in live (start (18.4, −2.2)). A radius weight (100, 1e4) keeps the live fuzz green but stays approximate (r 3.0198, 3.0002): needs a rigid move of the curve. The centre-point form matches (T1 pierce_with_a_circles_centre_puts_it_on_the_pierce_point).
 - [x] verified (qa 11-20 02:48, green a06ec927: model suite 1119-1302 c2-hex-bookcase-derived 17/17) (psui 11-10 18:35: 17/17, matches to the end: core's rejoin fixed the text on 11-09; the in-feature cPoint and the
   cap vertex on the extrude's own faces, skasm.md) P2 SUITE-HEX-BOOKCASE-TEXT (skasm, paused; core 2026-11-08 20:05 UTC from the model suite): c2-hex-bookcase-derived's
   "text indent" (extrude of a text sketch's regions) makes "shrunk" 43/111/70 faces/edges/vertices, live 31/87/58: the
