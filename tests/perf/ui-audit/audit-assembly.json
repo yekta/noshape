@@ -1,0 +1,248 @@
+{
+ "name": "audit-assembly",
+ "about": "UI-thread responsiveness of everyday actions in a 20-instance, 8-mate assembly: hover and select, menus, mate / Insert / pattern dialogs, an instance drag, undo / redo, a mate selected, a tab switch and back (tools/perf/ui-audit.sh)",
+ "area": "psui",
+ "start": "audit-assembly",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     0,
+     10
+    ],
+    "instance": "Part 1 <2>"
+   },
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     10
+    ],
+    "instance": "Part 1 <2>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "instance": "Part 1 <3>"
+   },
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <3>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     0,
+     10
+    ],
+    "instance": "Part 1 <2>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <2>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fastened mate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolute mate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Assembly linear pattern"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     -80,
+     0,
+     5
+    ],
+    "instance": "Part 3 <2>"
+   },
+   "to": {
+    "face": [
+     -80,
+     0,
+     5
+    ],
+    "instance": "Part 3 <3>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "mate": "Revolute 3"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "start audit-assembly asm"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ],
+ "source": "lead 11-26 responsiveness audit"
+}

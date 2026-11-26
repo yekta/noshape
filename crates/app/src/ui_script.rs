@@ -432,6 +432,10 @@ fn visible_center(b: Bounds<Pixels>, clip: Option<Bounds<Pixels>>) -> Point<Pixe
 /// Presses at `at`, where the pointer already is (a pointer that doesn't move sends no second move: a repeated
 /// one would snap an edge's midpoint).
 fn mouse(window: &mut Window, cx: &mut App, at: Point<Pixels>, button: MouseButton, modifiers: Modifiers, clicks: usize) {
+    // (A hover's time is its last move's.)
+    if clicks == 0 {
+        return;
+    }
     timed(window, cx, |window, cx| {
         for n in 1..=clicks {
             window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button, position: at, modifiers, click_count: n, first_mouse: false }), cx);
@@ -441,8 +445,9 @@ fn mouse(window: &mut Window, cx: &mut App, at: Point<Pixels>, button: MouseButt
 }
 
 /// `NOSHAPE_UI_TIMING=1`: each step's recording gets `timing`, in ms from its action (a click or a key): `dispatch`
-/// (the action's handlers), `frame` (the end of the first frame drawn after it; its draw time needs `NOSHAPE_PERF=1`)
-/// and `idle` (the window's work done: a regeneration, a background load; in a document window only).
+/// (the action's handlers), `frame` (the end of the first frame drawn after it; its draw time needs `NOSHAPE_PERF=1`),
+/// `cpu` (the UI thread's CPU till then) and `idle` (the window's work done: a regeneration, a background load; in a
+/// document window only). A hover is timed from its last move, a drag from its release.
 fn timing_on() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var("NOSHAPE_UI_TIMING").is_ok_and(|v| v == "1"))
@@ -455,8 +460,9 @@ struct StepClock {
     frame: FrameTimes,
 }
 
-/// A timed action's first frame: its end (ms from the action) and its layout, prepaint and paint (ms).
-type FrameTimes = std::sync::Arc<std::sync::Mutex<Option<(f32, [f32; 3])>>>;
+/// A timed action's first frame: its end (ms from the action), its layout, prepaint and paint (ms), and the UI thread's
+/// CPU till then (ms).
+type FrameTimes = std::sync::Arc<std::sync::Mutex<Option<(f32, [f32; 3], f32)>>>;
 
 thread_local! {
     static CLOCK: std::cell::RefCell<Option<StepClock>> = const { std::cell::RefCell::new(None) };
@@ -475,17 +481,19 @@ fn timed(window: &mut Window, cx: &mut App, f: impl FnOnce(&mut Window, &mut App
     for st in FRAME_STAGES {
         noshape_render::perf::series_start(st);
     }
-    let t0 = Instant::now();
+    let (t0, cpu0) = (Instant::now(), noshape_render::perf::thread_cpu_ms());
     f(window, cx);
     let dispatch = ms(t0);
     let frame = std::sync::Arc::new(std::sync::Mutex::new(None));
     let tx = frame.clone();
-    // The next frame draws the action: its start, then its layout, prepaint and paint.
+    // The next frame draws the action: its start, then its layout, prepaint and paint; and the UI thread's own CPU
+    // from the action to that frame's end (its blocking work, where wall time also waits for a core or the screen).
     window.on_next_frame(move |w, _| {
         let start = ms(t0);
         w.on_next_frame(move |_, _| {
             let stages = FRAME_STAGES.map(|st| noshape_render::perf::series_take(st).first().copied().unwrap_or(0.0));
-            *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some((start + stages.iter().sum::<f32>(), stages));
+            let cpu = (noshape_render::perf::thread_cpu_ms() - cpu0) as f32;
+            *tx.lock().unwrap_or_else(|e| e.into_inner()) = Some((start + stages.iter().sum::<f32>(), stages, cpu));
         });
     });
     CLOCK.with(|c| *c.borrow_mut() = Some(StepClock { t0, dispatch, frame }));
@@ -518,7 +526,7 @@ fn take_timing(idle: Option<Instant>) -> Option<Value> {
     let frame = *c.frame.lock().unwrap_or_else(|e| e.into_inner());
     let idle = idle.map(|i| i.saturating_duration_since(c.t0).as_secs_f32() * 1e3);
     // (`stages`: the frame's layout, prepaint and paint.)
-    Some(json!({ "dispatch": c.dispatch, "frame": frame.map(|f| f.0), "stages": frame.map(|f| f.1), "idle": idle }))
+    Some(json!({ "dispatch": c.dispatch, "frame": frame.map(|f| f.0), "stages": frame.map(|f| f.1), "cpu": frame.map(|f| f.2), "idle": idle }))
 }
 
 /// Run the scenario in `window` (the document window of `ws`).
@@ -690,7 +698,16 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                         let from = if what == "hover" && from == at { at - point(px(0.), px(40.)) } else { from };
                         for k in 1..=3 {
                             let p = from + (at - from) * (k as f32 / 3.0);
-                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: Modifiers::default() }), cx));
+                            let mv = PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: Modifiers::default() });
+                            let _ = cx.update(|window, cx| {
+                                if k == 3 && what == "hover" {
+                                    timed(window, cx, |window, cx| {
+                                        let _ = window.dispatch_event(mv, cx);
+                                    });
+                                } else {
+                                    let _ = window.dispatch_event(mv, cx);
+                                }
+                            });
                             if k < 3 {
                                 sleep(cx, 20).await;
                             }
@@ -841,7 +858,13 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             if plan.hold {
                                 held = Some((plan.button, b));
                             } else {
-                                let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: plan.button, position: b, modifiers: mods, click_count: 1 }), cx));
+                                // (A drag's time is its release's.)
+                                let up = PlatformInput::MouseUp(MouseUpEvent { button: plan.button, position: b, modifiers: mods, click_count: 1 });
+                                let _ = cx.update(|window, cx| {
+                                    timed(window, cx, |window, cx| {
+                                        let _ = window.dispatch_event(up, cx);
+                                    })
+                                });
                             }
                             Ok(())
                         }

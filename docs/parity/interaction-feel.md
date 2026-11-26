@@ -1567,6 +1567,49 @@ each display from the right-click to the menu's first frame. Evidence live/feel/
 | Context menu on a face: shown 117 ms | = (green c7d388e8, live2 ours-1118 speed: block, xdotool input → 60 fps screen frames, one round each: shown 134 ms after the right-click, within a capture frame of live's 117) | latency_tests::everyday_interactions_beat_live_on_the_30_feature_part (T2, Mac release 11-20: 8.6 ms, target 58.5) |
 | Mass properties: the dialog 161 ms; values 154 ms after the pick | not a target (lead 11-18 23:14): software-render frame cadence; handler < 1 ms, frame 8 ms (green c7d388e8, live2 ours-1118 speed: block, xdotool input → 60 fps screen frames, one round each: the dialog 94 ms (=); Volume / Surface area 313 ms after picking the part, live 154 ms; psui 11-18 23:00 frame log, green df6be9b6 on Xvfb: the pick's handler 0.35 ms and its frame's layout and paint 8 ms, but presents land at +128 / +300 / +394 ms (software Vulkan, ~100–150 ms a frame): the values come two frames after the pick, so the cost is the software renderer's frame time) | missing (sketch_ui_tests::mass_properties_dont_hold_up_the_frame checks only that the frame isn't held) |
 
+### UI responsiveness audit (lead 11-26: feedback within a frame, no blocking work on the UI thread) [psui]
+
+`tools/perf/ui-audit.sh <app> <display> [rounds]` (scenarios in tests/perf/ui-audit; fails on a median first frame over
+100 ms or UI-thread CPU over 50 ms): the real app through the ui-parity driver's timing mode, each input dispatched to
+the window. Per action, medians of 3 rounds (ms): the handler; the UI thread's CPU from the input to the end of the
+first frame drawn after it (its blocking work); that frame's end (max of the rounds); idle = the window's work done
+(regeneration, solve, preview: off the UI thread). 2026-11-26 09:31, agent/psui on main 983ad6d76, `--profile
+ui-bench`, vibe2 under Xvfb with software rendering at load 17–24: wall times include waiting for a core and the
+software present (the app's `ui stall` lines over 100 ms all had ≤ 30 ms of UI CPU), so the CPU column is the measure.
+Over 100 ms: none; blocking work: none (UI CPU ≤ 28 ms, most of it the frame's own layout and paint). The single
+samples over 80 ms (drag release 226, dimension placed 110, Extrude 1 edited 82) did not repeat and had ≤ 23 ms of UI
+CPU. A hover's first frame is before its GPU pick: the lit frame is latency_tests' "hover" (T2, ≤ 30 ms).
+
+| Action (Part Studio: tests/perf/live-30-features.noshape) | handler | UI CPU | first frame (max) | idle |
+|---|---|---|---|---|
+| Hover a face / a feature row | 0.2 / 0.2 | 0.5 / 6.1 | 10.3 (11.0) / 12.3 (12.4) | (pick after the dwell) |
+| Click a face (selected); click empty (cleared) | 0.3 / 0.2 | 14.7 / 12.8 | 15.7 (28.7) / 17.0 (24.2) | 58 / 60 |
+| Click a feature row; Escape | 0.6 / 1.1 | 15.2 / 12.5 | 19.1 (21.5) / 13.5 (18.7) | 57 / 42 |
+| Right-click a face / a feature row (menu shown) | 0.5 / 10.0 | 27.7 / 22.0 | 33.1 (36.4) / 21.8 (24.4) | 53 / 69 |
+| Open from the toolbar: Extrude, Revolve, Fillet, Chamfer, Shell, Hole | 1.0–2.4 | 16.4–26.9 | 14.5–32.4 (40.6) | 67–188 |
+| Open from the toolbar: Linear pattern, Mirror, Plane, Boolean, Draft, Sweep | 0.9–4.6 | 17.1–21.5 | 17.9–23.7 (27.0) | 64–142 |
+| Cancel a dialog (Escape) | 0.1–0.2 | 13.1–28.0 | 13.4–28.0 (32.0) | 14–71 |
+| Double-click Extrude 1 (its dialog and preview) | 2.1 | 23.7 | 33.1 (36.7) | 90 |
+| Rollback bar dragged up 8 rows / back down | 0.2 / 0.2 | 14.2 / 0.9 | 13.5 (18.5) / 7.6 (32.0) | 38 / 11 |
+| Sketch tool; Top picked (sketch entered) | 1.4 / 0.6 | 21.6 / 16.9 | 18.9 (29.0) / 14.1 (28.4) | 123 / 62 |
+| Line tool (`l`); its two clicks | 14.5 / 0.3–0.4 | 26.9 / 13.6–20.0 | 27.7 (28.7) / 13.0–27.2 (29.6) | 65 / 14–58 |
+| Dimension (`d`): the line picked, the label placed, 45 + Enter | 0.3 / 0.3 / 0.2 | 15.4 / 18.7 / 18.3 | 24.8 (28.1) / 19.0 (20.1) / 18.2 (28.5) | 56 / 120 / 65 |
+| Sketch ✓ (left, regenerated) | 0.4 | 19.2 | 24.4 (26.2) | 69 |
+| Undo / Redo (the sketch) | 1.9 / 4.1 | 16.0 / 17.1 | 16.3 (26.2) / 19.5 (19.7) | 56 / 57 |
+| Double-click Sketch 1 (entered); ✓ | 1.7 / 0.4 | 18.6 / 16.3 | 27.2 (28.3) / 15.3 (17.8) | 66 / 56 |
+
+| Action (Assembly: 20 instances of 3 parts, 8 Revolute mates; start audit-assembly) | handler | UI CPU | first frame (max) | idle |
+|---|---|---|---|---|
+| Hover an instance's face / its list row | 0.2 / 0.5 | 5.8 / 9.7 | 10.2 (13.8) / 14.8 (17.1) | (pick after the dwell) |
+| Click a face (instance selected); click empty | 0.3 / 0.3 | 16.2 / 12.9 | 26.7 (31.4) / 20.5 (21.3) | 76 / 54 |
+| Click an instance row; Escape | 0.7 / 1.3 | 11.5 / 12.7 | 18.0 (22.8) / 14.7 (20.1) | 50 / 42 |
+| Right-click a face / an instance row (menu shown) | 0.4 / 0.7 | 19.8 / 17.2 | 26.7 (30.1) / 27.5 (30.3) | 62 / 78 |
+| Open: Fastened mate, Revolute mate, Mate connector, Insert, Assembly linear pattern | 0.4–0.8 | 14.8–19.1 | 15.6–25.8 (28.2) | 58–93 |
+| Drag an instance (the release) | 0.2 | 16.1 | 18.8 (23.8) | 236 |
+| Undo / Redo (the move) | 1.3 / 3.0 | 15.8 / 17.6 | 12.5 (16.4) / 16.2 (24.3) | 117 / 124 |
+| Click a mate row | 4.1 | 18.1 | 20.9 (21.6) | 149 |
+| Tab switch to the Part Studio / back | 0.7 / 0.7 | 16.8 / 14.1 | 22.6 (29.7) / 14.6 (21.0) | 88 / 56 |
+
 ### cfg-1118 (Configurations, live 11-18 01:03) [psui + studios]
 
 | Finding | Ours | Test |
