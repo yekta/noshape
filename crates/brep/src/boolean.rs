@@ -3436,6 +3436,35 @@ impl Ctx<'_> {
                 })
             };
             secs.retain(|c| !(along(fa, c) && along(fb, c)));
+            // (Along a straight edge of one of them only: that edge's piece, lying on the other face (a shell's outer
+            // corner round and a cylinder whose seam lies along the wall's top: the curve leaves the seam to the fourth
+            // order at the round's edge, OCCT's 43 um along it 0.18 um off; a second edge between those two vertices
+            // left a sliver, qa BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX).)
+            let mut on_edge: Vec<(usize, usize, DVec3, DVec3)> = Vec::new();
+            secs.retain(|c| {
+                for (f, g) in [(fa, fb), (fb, fa)] {
+                    if matches!(self.faces[g].s, Surf::Nurbs { .. }) {
+                        continue;
+                    }
+                    let line = self.faces[f].edges.iter().map(|x| x.0).find(|&e| {
+                        let s = Seg { v: self.edges[e].v, g: self.edges[e].g };
+                        matches!(s.g, Geo::Line) && (0..=8).all(|k| self.seg_param(&s, c.curve.at(c.t0 + (c.t1 - c.t0) * k as f64 / 8.0)).1 <= tol)
+                    });
+                    if let Some(e) = line {
+                        on_edge.push((e, g, c.curve.at(c.t0), c.curve.at(c.t1)));
+                        return false;
+                    }
+                }
+                true
+            });
+            for (e, g, q0, q1) in on_edge {
+                let s = self.edge_seg(e);
+                let a = self.p(s.v[0]);
+                let d = (self.p(s.v[1]) - a).normalize();
+                let (t0, t1) = ((q0 - a).dot(d), (q1 - a).dot(d));
+                let part = if t0 <= t1 { (t0, End::Point(q0), t1, End::Point(q1)) } else { (t1, End::Point(q1), t0, End::Point(q0)) };
+                self.pending.push(Pending::InFace(g, Path::Line { p: a, d }, vec![part], vec![None], e));
+            }
         }
         // (A curve 10 to 100 tolerances long from a vertex of the faces to where two more of the pair's curves branch
         // (OCCT's section of a tool's corner on a cylinder, branching 10.6 um from the corner): OCCT's builder takes
@@ -3457,8 +3486,10 @@ impl Ctx<'_> {
         let mut ends: Vec<DVec3> = self.boundaries_meet(fa, fb).into_iter().filter(|q| secs.iter().all(|c| (c.curve.at(c.t0) - *q).length() > 10.0 * tol && (c.curve.at(c.t1) - *q).length() > 10.0 * tol)).collect();
         // (None found and the boundaries meeting once: where either's edges pierce the other face too (a hole's wall
         // through a corner round, coaxial with it: OCCT's section of the wall and one bottom round empty, isaac-ball's
-        // Fastened 43).)
-        if secs.is_empty() && ends.len() == 1 {
+        // Fastened 43); or not meeting at all (a shell's inner corner round, R3, through which a cylinder R3 at right
+        // angles lying along the wall's top runs: OCCT's section empty, the piece of the cylinder inside the wall left
+        // joined to the rest, qa BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX).)
+        if secs.is_empty() && ends.len() <= 1 {
             for q in self.edges_piercing(fa, fb)?.into_iter().chain(self.edges_piercing(fb, fa)?) {
                 if ends.iter().all(|e| (*e - q).length() > 10.0 * tol) {
                     ends.push(q);
@@ -6779,6 +6810,17 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                             Some((_, _, tc, _)) => free::mapped(&cx.faces[f], &cx.ncurves[id as usize].c, tc, t1)?,
                             None => c,
                         }
+                    }
+                    _ => c,
+                };
+                // (A cylinder's seam piece is on its seam: a ruling's angle is its vertex's, which may lie a little off
+                // it (0.18 um where a box's fillet, turning into its wall, meets a cylinder's seam lying on that wall),
+                // and both copies would then be one curve.)
+                let c = match (&cx.faces[f].s, &c) {
+                    (&Surf::Cyl { r, th0, .. }, &C2::Seg { a, b }) if seams.contains(&si) && a.x == b.x => {
+                        let off = (a.x - r * th0).abs().min((a.x - r * (th0 + TAU)).abs());
+                        let x = r * if copy == 1 { th0 + TAU } else { th0 };
+                        if off > 0.0 && off <= GREY * tol { C2::Seg { a: DVec2::new(x, a.y), b: DVec2::new(x, b.y) } } else { c }
                     }
                     _ => c,
                 };

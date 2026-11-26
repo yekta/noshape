@@ -3697,3 +3697,25 @@ fn a_section_of_a_tolerant_part_lies_on_another_patterned_tools_face() {
     assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
     assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
 }
+
+/// An Add cylinder (R3) along the top of a filleted, shelled box's back wall, its seam on the wall, running into the
+/// box's corner rounds (qa BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX: OCCT's fuse kept the two solids apart or lost the
+/// cylinder; recorded fuses x 0-20 flush with the box's side, x 1-20, x 40-60 flush with the other side): noshape's
+/// fuse is one valid solid, the box's volume and the cylinder's outside it (integrated by slices across the axis).
+#[test]
+fn a_cylinder_along_a_shelled_boxs_wall_fuses_through_its_corner_rounds() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    for (case, volume) in [("7bf937bee39bc4a9", 15587.680994e-9), ("1582a3d770492550", 15559.815055e-9), ("b81914460c3f4567", 15587.680994e-9)] {
+        let c = k::bool_corpus::load(&dir, case).expect("the recorded fuse");
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let why = k::last_rust_decline();
+        k::set_rust_boolean_only(false);
+        let r = r.unwrap_or_else(|e| panic!("{case}: noshape's Boolean declined: {why} ({e})"));
+        assert!(r.shape.is_valid(), "{case}");
+        assert_eq!(r.shape.count(k::ShapeType::Solid), 1, "{case}");
+        let v = r.shape.volume().unwrap();
+        assert!((v / volume - 1.0).abs() < 1e-7, "{case}: volume {v}, {volume} expected");
+    }
+}

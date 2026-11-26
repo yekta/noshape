@@ -2308,6 +2308,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         };
         auto chord_pcurve = [&]() -> const char* {
           const auto at3 = [&](double t) { return c->Value(t).Transformed(el.Transformation()); };
+          // (Off it within the tolerance and its vertices' added, OCCT's rule for two shapes meeting: a cylinder's seam
+          // piece on a shell's corner round, 0.18 um off at the end where OCCT's section of the two stops, qa
+          // BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX.)
+          double vtol = 0;
+          for (TopoDS_Iterator x(e); x.More(); x.Next())
+            if (x.Value().ShapeType() == TopAbs_VERTEX)
+              vtol = std::max(vtol, BRep_Tool::Tolerance(TopoDS::Vertex(x.Value())));
+          const double reach = tol + vtol;
           const auto off = [&](const gp_XY& q, double t) { return s->Value(q.X(), q.Y()).Transformed(loc.Transformation()).Distance(at3(t)); };
           std::vector<gp_Pnt2d> uv;
           for (int n = 1; n <= 64; n *= 2)
@@ -2325,7 +2333,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
               knots_off = std::max(knots_off, off(uv[j].XY(), f0 + (f1 - f0) * j / n));
             for (int j = 0; j < n; ++j)
               mids_off = std::max(mids_off, off(0.5 * (uv[j].XY() + uv[j + 1].XY()), f0 + (f1 - f0) * (j + 0.5) / n));
-            if (knots_off > tol)
+            if (knots_off > reach)
               return "an edge off its cylinder or cone";
             if (mids_off > knots_off + 0.1 * BRep_Tool::Tolerance(e) && n < 64)
               continue;
@@ -6460,7 +6468,9 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
       gp_Pnt   m((ends[3 * i] + ends[3 * j]) / 2, (ends[3 * i + 1] + ends[3 * j + 1]) / 2, (ends[3 * i + 2] + ends[3 * j + 2]) / 2);
       gp_Pnt2d ua = qa->ValueOfUV(m, 1e-9), ub = qb->ValueOfUV(sa->Value(ua.X(), ua.Y()), 1e-9);
       double   gap = 1;
-      for (int k = 0; k < 50 && gap > 1e-9; ++k)
+      // (Up to 400 steps: a shell's inner corner round and a cylinder along the wall's top, 50 left it over 0.1 um
+      // off, qa BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX.)
+      for (int k = 0; k < 400 && gap > 1e-9; ++k)
       {
         const gp_Pnt pa = sa->Value(ua.X(), ua.Y()), pb = sb->Value(ub.X(), ub.Y());
         gap = pa.Distance(pb);
