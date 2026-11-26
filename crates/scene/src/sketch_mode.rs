@@ -10215,6 +10215,45 @@ mod tests {
         assert_eq!(dimension_label_text(None, "30.607".into(), false), "30.607");
     }
 
+    /// Live "Sketch dimension display + Enter/Esc" tables (1) and (4): what a line's length label reads after each
+    /// typed value, and what its box reopens with, in a mm and an inch workspace (`#var` = 10 mm).
+    #[test]
+    fn a_typed_length_labels_and_reopens_as_live_in_mm_and_inch() {
+        let mm = UnitPrefs::default();
+        let inch = UnitPrefs { length: noshape_units::LengthUnit::Inch, ..UnitPrefs::default() };
+        let vars = std::collections::BTreeMap::from([("var".to_string(), Quantity::mm(10.0))]);
+        let rows: [(&UnitPrefs, &str, &str, &str); 10] = [
+            (&mm, "1", "1", "1 mm"),
+            (&mm, "25.4", "25.4", "25.4 mm"),
+            (&mm, "1 in", "25.4", "1 in"),
+            (&mm, "#var", "ƒx 10", "#var"),
+            (&mm, "2*5", "ƒ 10", "(2*5) mm"),
+            (&inch, "1", "1", "1 in"),
+            (&inch, "25.4", "25.4", "25.4 in"),
+            (&inch, "25.4 mm", "1", "25.4 mm"),
+            (&inch, "#var", "ƒx 0.394", "#var"),
+            (&inch, "2*5", "ƒ 10", "(2*5) in"),
+        ];
+        for (units, typed, label, reopened) in rows {
+            let (mut ed, mut data) = editor(Tool::Select);
+            let line = data.sketch.add_line(v(0.0, 0.0), v(0.08776026, 0.0));
+            let cid = data.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 0.08776026 }).unwrap();
+            ed.apply_dimension(&mut data, cid, typed, units, &vars).unwrap();
+            let kind = data.sketch.constraint(cid).unwrap().kind.clone();
+            let value = dim_value_text(&kind, kind.value().unwrap(), units);
+            let expr = data.dimension_exprs.get(&cid.0).map(|e| e.text.as_str());
+            assert_eq!(dimension_label_text(expr, value, false), label, "{typed} label");
+            assert_eq!(dimension_edit_text(&data, cid, units).as_deref(), Some(reopened), "{typed} reopened");
+        }
+        // Before typing, the box shows the measured value to 5 decimals with the unit (live "87.76026 mm", "3.51041 in").
+        let (_, mut data) = editor(Tool::Select);
+        let line = data.sketch.add_line(v(0.0, 0.0), v(0.08776026, 0.0));
+        let cid = data.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 0.08776026 }).unwrap();
+        assert_eq!(dimension_edit_text(&data, cid, &mm).as_deref(), Some("87.76026 mm"));
+        let cid = data.sketch.add_constraint(ConstraintKind::Length { curve: line, value: 3.51041 * 0.0254 }).unwrap();
+        assert_eq!(dimension_edit_text(&data, cid, &inch).as_deref(), Some("3.51041 in"));
+    }
+
     /// Live (lead sketch dim): Enter never accepts the sketch: with a tool
     /// after a commit, with no tool, with a selection. Esc ends the tool and
     /// never clears the selection or leaves the sketch.
@@ -12011,6 +12050,10 @@ mod tests {
         d.sketch.add_circle(v(0.01, 0.03), 0.003);
         click(&mut ed, &mut d, v(0.0, 0.02));
         assert_eq!(ed.message.as_deref(), Some("Select entities to be mirrored."));
+        // A box over both mirrors nothing: only clicks do (live uip/sketch-mirror-box-select-26).
+        drag(&mut ed, &mut d, v(0.004, 0.004), v(0.02, 0.036));
+        assert_eq!(count(&d, EntityKind::Circle), 2, "a box mirrors nothing");
+        assert_eq!(ed.tool, Tool::Mirror);
         click(&mut ed, &mut d, v(0.013, 0.01));
         click(&mut ed, &mut d, v(0.013, 0.03));
         assert_eq!(count(&d, EntityKind::Circle), 4);
