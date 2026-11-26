@@ -6291,6 +6291,7 @@ impl SketchEditor {
             if positive_only {
                 return Err(DIM_NOT_NEGATIVE.into());
             }
+            data.dimension_exprs.remove(&cid.0);
             match &c.kind {
                 // A negative line length flips the line about its start point.
                 ConstraintKind::Length { curve, .. } => {
@@ -6300,6 +6301,14 @@ impl SketchEditor {
                         let _ = data.sketch.set_point(e, ps * 2.0 - pe);
                     }
                 }
+                // An Offset's distance keeps its sign, the copy on the other side (live mistake-sketch-offset-negative:
+                // "-3 mm", no error).
+                ConstraintKind::Distance { a, b, .. }
+                    if data.sketch.constraints().any(|o| matches!(o.kind, ConstraintKind::OffsetPair { master_source: s, master_copy: m, .. } if (s, m) == (*a, *b) || (s, m) == (*b, *a))) =>
+                {
+                    data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
+                    data.dimension_exprs.insert(cid.0, ExprValue::new(text));
+                }
                 // Distances and angles: solve to the mirrored side, then keep it.
                 _ => {
                     data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
@@ -6307,9 +6316,10 @@ impl SketchEditor {
                     let _ = data.sketch.recompute_hints(cid);
                 }
             }
-            data.sketch.set_dimension_value(cid, value.abs()).map_err(|e| e.to_string())?;
-            let _ = data.sketch.recompute_hints(cid);
-            data.dimension_exprs.remove(&cid.0);
+            if !data.dimension_exprs.contains_key(&cid.0) {
+                data.sketch.set_dimension_value(cid, value.abs()).map_err(|e| e.to_string())?;
+                let _ = data.sketch.recompute_hints(cid);
+            }
         } else {
             data.sketch.set_dimension_value(cid, value).map_err(|e| e.to_string())?;
             // The text in the shown scale (regeneration divides by
@@ -6689,7 +6699,9 @@ impl SketchEditor {
         // (A model edge's reference line isn't: live sketch-mirror-model-edge, the edge as the mirror line, Mirror shown.)
         // (A circle's, arc's or ellipse's centre counts as construction, picked by a tool too: live sketch-dim-circle-centres;
         // a line's end doesn't: sketch-dim-hv-two-points.)
-        if self.construction {
+        // (Construction mode shows with Select or a drawing tool, not with Dimension: live
+        // mistake-sketch-dimension-construction, a line made construction with q, Escape, d: Dimension.)
+        if self.construction && (self.tool == Tool::Select || self.tool.draws()) {
             return true;
         }
         // (A lone sketch point counts as a solid entity: live sketch-constraint-refusals, a point and a circle's centre
@@ -10375,6 +10387,30 @@ mod tests {
         assert!((radius(&d, copy) - 0.010).abs() < 1e-9, "the copy r10 before: {}", radius(&d, copy));
         ed.apply_dimension(&mut d, dist, "3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
         assert_eq!(((radius(&d, source) * 1e6).round() / 1e3, (radius(&d, copy) * 1e6).round() / 1e3), (7.0, 10.0), "source, copy radius (mm)");
+    }
+
+    /// Qa SKETCH-OFFSET-NEGATIVE-DIMENSION (live mistake-sketch-offset-negative s16-s18): a rectangle's bottom offset
+    /// 5 mm out, its distance set to -3: live keeps "-3 mm" and the copy goes to the other side (3 mm inside), no error.
+    /// Ours made it 3, the copy staying outside.
+    #[test]
+    fn an_offsets_negative_distance_keeps_its_sign_and_crosses_over() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let bottom = d.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+        d.sketch.add_constraint(ConstraintKind::Horizontal { a: bottom, b: None }).unwrap();
+        let r = d.sketch.offset(&[bottom], 0.005).unwrap();
+        assert!(d.sketch.solve().is_solved());
+        let copy = r.created.iter().copied().find(|e| d.sketch.kind(*e) == Some(EntityKind::Line)).expect("the copy");
+        let dist = r.constraints_added.iter().copied().find(|c| matches!(d.sketch.constraint(*c).map(|c| &c.kind), Some(ConstraintKind::Distance { .. }))).expect("its distance");
+        let y0 = |d: &SketchData, e| d.sketch.endpoints(e).and_then(|(a, _)| d.sketch.point(a)).unwrap().y;
+        // The copy's side of the source (the solve may move either line).
+        let y = |d: &SketchData| y0(d, copy) - y0(d, bottom);
+        let before = y(&d);
+        assert!((before.abs() - 0.005).abs() < 1e-9, "5 mm off: {before}");
+        ed.apply_dimension(&mut d, dist, "-3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+        assert!((y(&d) + before.signum() * 0.003).abs() < 1e-9, "3 mm on the other side: {before} -> {}", y(&d));
+        assert_eq!(d.sketch.constraint(dist).and_then(|c| c.kind.value()), Some(-0.003), "the value keeps its sign");
+        assert_eq!(d.dimension_exprs.get(&dist.0).map(|e| e.text.clone()).as_deref(), Some("-3 mm"), "shown as typed");
+        assert!(ed.message.is_none(), "no error");
     }
 
     /// Live (qa sellat-1118): a horizontal line off the origin with only its length, 40 -> 50 typed in the editor,
@@ -14365,6 +14401,13 @@ mod tests {
         assert!(d.sketch.entity(l).unwrap().construction && ed.construction && ed.construction_shown(&d.sketch));
         ed.construction = false;
         assert!(ed.construction_shown(&d.sketch), "a construction line selected alone");
+        // (Live mistake-sketch-dimension-construction: q on it, Escape, d: Dimension shown, the mode kept for a curve.)
+        ed.construction = true;
+        ed.selection.clear();
+        ed.set_tool(Tool::Dimension);
+        assert!(!ed.construction_shown(&d.sketch), "Dimension shown, not Construction");
+        ed.set_tool(Tool::Line);
+        assert!(ed.construction_shown(&d.sketch), "the next line construction");
     }
 
     /// Live (ui-parity revolve-dialog-axis): a Line clicked over a rectangle's

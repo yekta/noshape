@@ -920,6 +920,15 @@ impl PartStudioView {
         if ed.tool == Tool::Trim {
             return self.trim_pick_at(p, cx).and_then(pick_of).or_else(|| id.filter(|i| own(*i).is_none()));
         }
+        // Mirror before its line: a line in reach, else what lies behind the sketch's other entities.
+        if ed.tool == Tool::Mirror && !ed.has_mirror_axis() {
+            let skip = |i: u32| own(i).is_some_and(|e| self.mirror_skips(e, cx));
+            let near = self.sketch_pick_at(p, cx).filter(|e| !self.mirror_skips(*e, cx)).and_then(pick_of);
+            return near.or_else(|| match id {
+                Some(i) if skip(i) => vp.pick_at_pointer_without(&skip).flatten(),
+                _ => id,
+            });
+        }
         // Nothing of the sketch under the GPU's pick (a plane, a region, the background): what a click there takes. The
         // open sketch's region is the one under the pointer now, not the GPU's (a pick made mid-sweep, qa
         // USER-HOVER-STAYS-LIT: the loop stayed lit with the pointer at rest outside it).
@@ -957,6 +966,14 @@ impl PartStudioView {
             None => sk.distance_to(e, p),
         };
         curves.into_iter().filter_map(|e| Some((dist(e)?, e))).min_by(|a, b| a.0.total_cmp(&b.0)).map(|x| x.1)
+    }
+
+    /// Sketch Mirror before its line: a sketch entity of its own that is no line is no mirror line, the pick passes over
+    /// it to what lies behind (live mistake-sketch-mirror-no-line: a click on the selected circle took the Front plane
+    /// behind it, the circle mirrored about the horizontal axis).
+    fn mirror_skips(&self, e: noshape_sketch::EntityId, cx: &App) -> bool {
+        self.sketch.as_ref().is_some_and(|ed| ed.tool == Tool::Mirror && !ed.has_mirror_axis())
+            && self.sketch_data(cx).is_some_and(|d| d.sketch.entity(e).is_some() && d.sketch.kind(e) != Some(noshape_sketch::EntityKind::Line))
     }
 
     /// The GPU's hover pick outside sketch mode, held to live's reach for the shown sketches (live2 11-18 hover-p0
@@ -1605,10 +1622,10 @@ impl PartStudioView {
                     let (o, d) = vp.read(cx).ray(*position);
                     self.sketch.as_ref().and_then(|s| s.plane_point(o, d)).unwrap_or(p)
                 };
-                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, hit, cx));
+                let hovered = self.hovered_sketch_entity(cx).filter(|e| self.in_sketch_reach(*e, hit, cx) && !self.mirror_skips(*e, cx));
                 // A point in reach beats a curve, as the hover's (a quick click's hover still the line through it from
                 // the last place: qa FEEL-DIM-TWO-POINTS-ZERO, a line's end at the origin took the line, "0 mm").
-                let near = self.sketch_pick_at(hit, cx);
+                let near = self.sketch_pick_at(hit, cx).filter(|e| !self.mirror_skips(*e, cx));
                 let is_point = |e: &noshape_sketch::EntityId| self.sketch_data(cx).is_some_and(|d| d.sketch.point(*e).is_some());
                 let trim = self.sketch.as_ref().is_some_and(|s| s.tool == Tool::Trim);
                 let hovered = match (hovered, near) {

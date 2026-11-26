@@ -3351,6 +3351,10 @@ impl AssemblyView {
             }
             let is_new = self.mate.as_ref().is_some_and(|s| s.editing.is_none());
             dialog.update(cx, |d, cx| d.set_connector(c, cx));
+            // Tangent's first entity passes the keyboard on to its second field (live asm-tangent-mate-pin-side).
+            if dialog.read(cx).picks_entities() && !dialog.read(cx).connectors_complete() {
+                self.ui.mate_field_focus = true;
+            }
             // Both connectors picked: the heads-up checkmark appears at the cursor.
             if is_new && dialog.read(cx).connectors_complete() {
                 // Default primary-axis alignment (`default_flip_primary`: the

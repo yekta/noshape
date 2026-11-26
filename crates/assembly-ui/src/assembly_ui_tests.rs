@@ -3311,6 +3311,36 @@ fn a_new_tangent_on_flush_tops_turns_the_revolute_red_too(cx: &mut TestAppContex
     });
 }
 
+/// Live asm-tangent-mate-pin-side (behaviours "Second-month maker gaps"): after a Tangent's first pick its field keeps the
+/// keyboard and nothing reads selected; after the second the keyboard leaves and the selection is that FACE of Part 1.
+/// Ours dropped the focus and listed both picks as owner-less FEATUREs.
+#[gpui::test]
+fn a_tangents_first_pick_keeps_the_field_focused_and_lists_its_entities(cx: &mut TestAppContext) {
+    let path = pin_block_document(cx, "tangent-first-pick");
+    let (window, view) = open_assembly(cx, &path);
+    draw(cx, window);
+    let pick = |cx: &mut TestAppContext, name: &'static str| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                // (As a click in the graphics area: the viewport takes the keyboard first.)
+                v.focus_from_viewport(w, cx);
+                let c = face_connector(v, name, true, cx);
+                v.deliver_connector(c, w, cx);
+            })
+        })
+        .unwrap();
+        cx.run_until_parked();
+        cx.update(|cx| {
+            let st = view.read(cx).ui_state(cx);
+            (st["focus"]["kind"].as_str().map(str::to_string), st["selection"]["items"].clone())
+        })
+    };
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_mate(MateType::Tangent, w, cx))).unwrap();
+    cx.run_until_parked();
+    assert_eq!(pick(cx, "Part 2 <1>"), (Some("field".into()), serde_json::json!([])), "(focus, selection) after the first pick");
+    assert_eq!(pick(cx, "Part 1 <1>"), (Some("none".into()), serde_json::json!([{ "kind": "FACE", "owner": "Part 1" }])), "(focus, selection) after the second");
+}
+
 /// Live tangent-one-entity-1123: after one pick a Tangent's ✓ is enabled; ✓ makes "Tangent 1" in error, "Tangent mate
 /// needs two entities.", and it reopens with its second field empty.
 #[gpui::test]

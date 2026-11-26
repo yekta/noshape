@@ -10475,3 +10475,62 @@ fn a_point_under_a_hovered_label_takes_the_hover(cx: &mut TestAppContext) {
     event(cx, press, ViewportEvent::LabelHover(Some(super::dim_label_hit(width))));
     assert_eq!(lit(cx), (Some(corner), None), "the corner, the label hovered after the pick");
 }
+
+/// Qa SKETCH-MIRROR-PRESELECTED-CLICK (live mistake-sketch-mirror-no-line s11-s13): a circle selected, the sketch Mirror,
+/// a click on the circle itself: live's pick passes over it (no mirror line) to the Front plane behind, and mirrors the
+/// circle about the horizontal axis at once, nothing left selected. Ours took the circle and did nothing. (The GPU's
+/// pick past the circle stands in as the Front plane's hover.)
+#[gpui::test]
+fn mirror_with_a_selected_circle_takes_the_plane_behind_it_as_the_line(cx: &mut TestAppContext) {
+    use noshape_sketch::EntityKind;
+    let (window, view) = sketch_with(cx, "mirror-plane-behind", Tool::Circle);
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    for q in [mm(20., 10.), mm(25., 10.)] {
+        let p = on_screen(cx, &view, q);
+        click(cx, window, &view, (p.x, p.y));
+    }
+    let circle = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().find(|e| e.kind() == EntityKind::Circle).map(|e| e.id)).expect("the circle");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.activate_tool(Tool::Select, w, cx);
+            v.sketch.as_mut().unwrap().selection = vec![circle];
+            v.activate_tool(Tool::Mirror, w, cx);
+        })
+    })
+    .unwrap();
+    let front = cx.update(|cx| view.read(cx).built.as_ref().and_then(|b| b.picks.ids_for(&Reference::Plane(DatumPlane::Front)).first().copied())).expect("the Front plane's pick");
+    // (Elsewhere on its rim: the hover is held where the circle was finished until the pointer moves.)
+    let at = on_screen(cx, &view, mm(20., 15.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            let m = Modifiers::default();
+            for ev in [ViewportEvent::PointerMove { position: at, modifiers: m }, ViewportEvent::Hover(Some(front))] {
+                v.on_viewport_event(&vp, &ev, w, cx);
+            }
+        })
+    })
+    .unwrap();
+    assert_eq!(cx.update(|cx| view.read(cx).hover.clone()), Some(Reference::Plane(DatumPlane::Front)), "the Front plane lit");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            let m = Modifiers::default();
+            for ev in [ViewportEvent::ToolDown { position: at, modifiers: m, click_count: 1 }, ViewportEvent::ToolUp { position: at, modifiers: m }] {
+                v.on_viewport_event(&vp, &ev, w, cx);
+            }
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        let d = v.sketch_data(cx).unwrap();
+        let centres: Vec<DVec2> = d.sketch.entities().filter(|e| e.kind() == EntityKind::Circle).filter_map(|e| e.center().and_then(|c| d.sketch.point(c))).collect();
+        assert_eq!(centres.len(), 2, "mirrored at once: {centres:?}");
+        assert!((centres[1] - DVec2::new(centres[0].x, -centres[0].y)).length() < 1e-9, "about the horizontal axis: {centres:?}");
+        assert!(d.sketch.constraints().any(|c| c.kind.name() == "Symmetric"), "the copy symmetric with it");
+        assert!(ed.selection.is_empty(), "nothing left selected");
+    });
+}

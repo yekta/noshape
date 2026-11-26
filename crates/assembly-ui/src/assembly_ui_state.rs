@@ -360,23 +360,16 @@ impl AssemblyView {
         // The Mate connector dialog's picked entities are selected, owned by their part (live asm-mate-connector-on-face:
         // FACE of "Part 2").
         {
-            items.extend(self.mc_picks().into_iter().map(|c| {
-                let r = match &c.reference {
-                    Reference::Implicit { on, .. } => &**on,
-                    r => r,
-                };
-                let kind = match r {
-                    Reference::Edge(_) => "EDGE",
-                    Reference::Vertex(_) => "VERTEX",
-                    _ => "FACE",
-                };
-                let path: Vec<InstanceId> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
-                json!({ "kind": kind, "owner": self.result.occurrences.iter().find(|o| o.path == path).map(|o| o.body_name.clone()) })
-            }));
+            items.extend(self.mc_picks().into_iter().map(|c| self.pick_item(c)));
         }
-        // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
+        // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs); Tangent's entities
+        // are its own, the second one only (live asm-tangent-mate-pin-side: none after the first, the FACE after it).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
-            items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
+            if d.picks_entities() {
+                items.extend(d.b.iter().map(|c| self.pick_item(c)));
+            } else {
+                items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
+            }
         }
         let mut dialogs: Vec<Value> = self
             .mate
@@ -537,6 +530,21 @@ impl AssemblyView {
         let (rows, _, _) = self.ui.select_other.as_ref()?;
         let rows: Vec<String> = rows.iter().map(|r| self.select_other_label(r, cx)).collect();
         Some(json!({ "kind": "select-other", "rows": rows, "highlighted": null }))
+    }
+
+    /// A picked face, edge or vertex as the state's selection item: its kind and its part.
+    fn pick_item(&self, c: &MateConnectorRef) -> Value {
+        let r = match &c.reference {
+            Reference::Implicit { on, .. } => &**on,
+            r => r,
+        };
+        let kind = match r {
+            Reference::Edge(_) => "EDGE",
+            Reference::Vertex(_) => "VERTEX",
+            _ => "FACE",
+        };
+        let path: Vec<InstanceId> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
+        json!({ "kind": kind, "owner": self.result.occurrences.iter().find(|o| o.path == path).map(|o| o.body_name.clone()) })
     }
 
     fn mc_picks(&self) -> Vec<&MateConnectorRef> {
