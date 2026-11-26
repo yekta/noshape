@@ -1,0 +1,1804 @@
+{
+ "scenario": "asm-tangent-mate-pin-side",
+ "recorded": "2026-11-26T14:56:41.447Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "382d384079d0707834421951",
+  "start": "pin-block-apart",
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start pin-block-apart asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    15.034,
+    12.932,
+    6.379
+   ],
+   "eye_mm": [
+    48.121,
+    -44.377,
+    44.585
+   ],
+   "width_mm": 127.984,
+   "height_mm": 67.779,
+   "mmPerPixel": 0.0765,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Tangent mate"
+    }
+   },
+   "ok": true,
+   "ti": 31446,
+   "tmove": 31502,
+   "moves": 1,
+   "tdown": 31829,
+   "at": [
+    564,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Face, edge or vertex",
+     "dialog": "Tangent 1"
+    },
+    "dialog": {
+     "title": "Tangent 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Tangent 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34402,
+   "te": 34403
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 34403,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Face, edge or vertex",
+     "dialog": "Tangent 1"
+    },
+    "dialog": {
+     "title": "Tangent 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Tangent 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 39166,
+   "te": 39166
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      65,
+      0,
+      15
+     ],
+     "instance": "Part 2 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 39166,
+   "tmove": 39612,
+   "moves": 1,
+   "hover": [
+    "JKC"
+   ],
+   "tdown": 40985,
+   "at": [
+    1564,
+    658
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Face, edge or vertex",
+     "dialog": "Tangent 1"
+    },
+    "dialog": {
+     "title": "Tangent 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [
+        "Face of Part 2 <1>"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Tangent 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [
+         "Face of Part 2 <1>"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43442,
+   "te": 43443
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      20,
+      0,
+      10
+     ],
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 43443,
+   "tmove": 43920,
+   "moves": 1,
+   "hover": [
+    "JHO"
+   ],
+   "tdown": 45393,
+   "at": [
+    1054,
+    567
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Tangent 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [
+        "Face of Part 2 <1>"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [
+        "Face of Part 1 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Tangent 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [
+         "Face of Part 2 <1>"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [
+         "Face of Part 1 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      37.59,
+      -26.137,
+      32.424
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47864,
+   "te": 47864
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 47864,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Tangent 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [
+        "Face of Part 2 <1>"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Face, edge or vertex",
+       "kind": "query",
+       "items": [
+        "Face of Part 1 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Tangent 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [
+         "Face of Part 2 <1>"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Face, edge or vertex",
+        "kind": "query",
+        "items": [
+         "Face of Part 1 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      37.59,
+      -26.137,
+      32.424
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 52735,
+   "te": 52735
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 52736,
+   "pointer": {
+    "at": [
+     1054,
+     567
+    ],
+    "hover": [
+     "JHO"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 52753,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -35,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      37.59,
+      -26.137,
+      32.424
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 55542,
+   "te": 55542
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 55543,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Tangent 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -35,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      37.59,
+      -26.137,
+      32.424
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 60654,
+   "te": 60654
+  }
+ ],
+ "t0_epoch_ms": 1795704976520
+}

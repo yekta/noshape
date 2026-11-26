@@ -1,0 +1,53 @@
+{
+ "name": "asm-pin-slot-mate-pin-hole",
+ "about": "pin-block-apart: Pin slot mate, the pin's side (Part 2) then the hole's side (Part 1) as implicit mate connectors, Enter: the mate row and the pin's place",
+ "area": "assembly",
+ "source": "live 11-26 second-month gap audit (Pin slot mate completed, implicit connectors)",
+ "start": "pin-block-apart",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Pin slot mate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     65,
+     0,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     5,
+     0,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

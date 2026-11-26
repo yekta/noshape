@@ -1,0 +1,53 @@
+{
+ "name": "asm-tangent-mate-pin-side",
+ "about": "pin-block-apart: Tangent mate between the pin's side (Part 2) and the block's +X side face (Part 1), Enter: the mate row and where the pin goes",
+ "area": "assembly",
+ "source": "live 11-26 second-month gap audit (Tangent mate completed)",
+ "start": "pin-block-apart",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Tangent mate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     65,
+     0,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

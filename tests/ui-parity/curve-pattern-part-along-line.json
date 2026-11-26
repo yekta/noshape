@@ -1,0 +1,82 @@
+{
+ "name": "curve-pattern-part-along-line",
+ "about": "curves: Curve pattern (Part pattern) of the block along Sketch 2's line (y -20, x -10..50), Instance count 3, OK: the feature row and the parts",
+ "area": "psui",
+ "source": "live 11-26 second-month gap audit (Curve pattern completed)",
+ "start": "curves",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern",
+    "menu": "Curve pattern"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Path to pattern along"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     -20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Instance count"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

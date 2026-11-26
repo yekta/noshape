@@ -1,0 +1,3437 @@
+{
+ "scenario": "curve-pattern-part-along-line",
+ "recorded": "2026-11-26T14:58:58.187Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "4e8797ca2e857f3f9bca2272",
+  "start": "curves",
+  "startElement": "5f0adb03f7c8a33d7b305fb8",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 3",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Sketch 3"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Linear pattern",
+     "menu": "Curve pattern"
+    }
+   },
+   "ok": true,
+   "ti": 26863,
+   "tmove": 26941,
+   "moves": 3,
+   "tdown": 28076,
+   "at": [
+    711,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to pattern",
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 32909,
+   "te": 32910
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 32910,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to pattern",
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37315,
+   "te": 37315
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      20,
+      15,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 37315,
+   "tmove": 37365,
+   "moves": 1,
+   "hover": [
+    "JHD"
+   ],
+   "tdown": 38804,
+   "at": [
+    1173,
+    482
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "error"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "error"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41076,
+   "te": 41076
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Path to pattern along"
+    }
+   },
+   "ok": true,
+   "ti": 41076,
+   "tmove": 41110,
+   "moves": 1,
+   "tdown": 41490,
+   "at": [
+    356,
+    229
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Path to pattern along",
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 43480,
+   "te": 43480
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "edge": [
+      20,
+      -20,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 43480,
+   "tmove": 43524,
+   "moves": 1,
+   "hover": [
+    "JIB"
+   ],
+   "tdown": 44863,
+   "at": [
+    1109,
+    569
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47022,
+   "te": 47022
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 47022,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 51516,
+   "te": 51516
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Instance count"
+    }
+   },
+   "ok": true,
+   "ti": 51516,
+   "tmove": 51580,
+   "moves": 1,
+   "tdown": 51930,
+   "at": [
+    387,
+    305
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "2",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 54249,
+   "te": 54249
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "mod+a"
+   },
+   "ok": true,
+   "ti": 54249,
+   "pointer": {
+    "at": [
+     386,
+     304
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "2",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "2",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "2",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 56247,
+   "te": 56247
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "type",
+    "text": "3"
+   },
+   "ok": true,
+   "ti": 56247,
+   "tdown": 56247,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "3",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 58272,
+   "te": 58272
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 58272,
+   "pointer": {
+    "at": [
+     386,
+     304
+    ],
+    "hover": [],
+    "element": "input.os-param-number.dropdown-source"
+   },
+   "tdown": 58281,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "3",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 60544,
+   "te": 60544
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 60544,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "3",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Curve pattern 1"
+    },
+    "dialog": {
+     "title": "Curve pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Path to pattern along",
+       "kind": "query",
+       "items": [
+        "Edge of Sketch 2"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Equal spacing",
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Orientation",
+       "kind": "enum",
+       "text": "Tangent to curve",
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Curve pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Path to pattern along",
+        "kind": "query",
+        "items": [
+         "Edge of Sketch 2"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Equal spacing",
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Orientation",
+        "kind": "enum",
+        "text": "Tangent to curve",
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": "Sketch 2",
+       "id": "JIB"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "For best results ensure that the path start point and pattern seed are touching. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 64985,
+   "te": 64985
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 64985,
+   "tmove": 65068,
+   "moves": 1,
+   "tdown": 65517,
+   "at": [
+    424,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 67627,
+   "te": 67627
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 67627,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sketch 3",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Curve pattern 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Curve pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      73.791,
+      -127.809,
+      85.206
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 72067,
+   "te": 72067
+  }
+ ],
+ "t0_epoch_ms": 1795705117347
+}

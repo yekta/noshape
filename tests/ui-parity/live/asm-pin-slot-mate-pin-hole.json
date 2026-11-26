@@ -1,0 +1,1929 @@
+{
+ "scenario": "asm-pin-slot-mate-pin-hole",
+ "recorded": "2026-11-26T14:57:47.040Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "29f60d27596d6b2a43ebd14a",
+  "start": "pin-block-apart",
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start pin-block-apart asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    15.034,
+    12.932,
+    6.379
+   ],
+   "eye_mm": [
+    48.121,
+    -44.377,
+    44.585
+   ],
+   "width_mm": 127.984,
+   "height_mm": 67.779,
+   "mmPerPixel": 0.0765,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Pin slot mate"
+    }
+   },
+   "ok": true,
+   "ti": 29689,
+   "tmove": 29749,
+   "moves": 1,
+   "tdown": 30084,
+   "at": [
+    458,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Mate connectors",
+     "dialog": "Pin slot 1"
+    },
+    "dialog": {
+     "title": "Pin slot 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Pin slot",
+       "state": "ok"
+      },
+      {
+       "label": "Mate connectors",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Limits",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Pin slot 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Pin slot",
+        "state": "ok"
+       },
+       {
+        "label": "Mate connectors",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Limits",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 32926,
+   "te": 32926
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 32926,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Mate connectors",
+     "dialog": "Pin slot 1"
+    },
+    "dialog": {
+     "title": "Pin slot 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Pin slot",
+       "state": "ok"
+      },
+      {
+       "label": "Mate connectors",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Limits",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Pin slot 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Pin slot",
+        "state": "ok"
+       },
+       {
+        "label": "Mate connectors",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Limits",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": true,
+       "cls": "selected edited ns-list-item-hidden ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37825,
+   "te": 37825
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      65,
+      0,
+      15
+     ],
+     "instance": "Part 2 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 37825,
+   "tmove": 38332,
+   "moves": 1,
+   "hover": [],
+   "tdown": 42690,
+   "at": [
+    1564,
+    658
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Pin slot 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Pin slot",
+       "state": "ok"
+      },
+      {
+       "label": "Mate connectors",
+       "kind": "query",
+       "items": [
+        "Mate connector of Part 2 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Limits",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Pin slot 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Pin slot",
+        "state": "ok"
+       },
+       {
+        "label": "Mate connectors",
+        "kind": "query",
+        "items": [
+         "Mate connector of Part 2 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Limits",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": null,
+       "id": "MnANY8p/JYlTK6y6N"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": true,
+       "cls": "related-highlight selected edited ns-list-item-hidden ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 45415,
+   "te": 45415
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      5,
+      0,
+      10
+     ],
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 45415,
+   "tmove": 45918,
+   "moves": 1,
+   "hover": [],
+   "tdown": 50128,
+   "at": [
+    884,
+    518
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Pin slot 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Pin slot",
+       "state": "ok"
+      },
+      {
+       "label": "Mate connectors",
+       "kind": "query",
+       "items": [
+        "Mate connector of Part 2 <1>",
+        "Mate connector of Part 1 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Limits",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Pin slot 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Pin slot",
+        "state": "ok"
+       },
+       {
+        "label": "Mate connectors",
+        "kind": "query",
+        "items": [
+         "Mate connector of Part 2 <1>",
+         "Mate connector of Part 1 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Limits",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": null,
+       "id": "MnANY8p/JYlTK6y6N"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": null,
+       "id": "Mfjbz0j0wTcQmzH0W"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": true,
+       "cls": "related-highlight selected edited ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      39.526,
+      -29.49,
+      34.66
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 54017,
+   "te": 54017
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 54017,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Pin slot 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Pin slot",
+       "state": "ok"
+      },
+      {
+       "label": "Mate connectors",
+       "kind": "query",
+       "items": [
+        "Mate connector of Part 2 <1>",
+        "Mate connector of Part 1 <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Offset",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Limits",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Pin slot 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Pin slot",
+        "state": "ok"
+       },
+       {
+        "label": "Mate connectors",
+        "kind": "query",
+        "items": [
+         "Mate connector of Part 2 <1>",
+         "Mate connector of Part 1 <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Offset",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Limits",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": null,
+       "id": "MnANY8p/JYlTK6y6N"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": null,
+       "id": "Mfjbz0j0wTcQmzH0W"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": true,
+       "cls": "related-highlight selected edited ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      39.526,
+      -29.49,
+      34.66
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 58823,
+   "te": 58823
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 58823,
+   "pointer": {
+    "at": [
+     884,
+     518
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 58832,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -40,
+        0,
+        1,
+        0,
+        -20,
+        0,
+        0,
+        1,
+        5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Pin slot 1",
+       "type": "PIN_SLOT",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      38.973,
+      -28.532,
+      34.021
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 61410,
+   "te": 61410
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 61410,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Pin slot 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -40,
+        0,
+        1,
+        0,
+        -20,
+        0,
+        0,
+        1,
+        5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Pin slot 1",
+       "type": "PIN_SLOT",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      38.973,
+      -28.532,
+      34.021
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 66352,
+   "te": 66352
+  }
+ ],
+ "t0_epoch_ms": 1795705043989
+}
