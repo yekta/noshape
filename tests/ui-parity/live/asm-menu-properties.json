@@ -1,18 +1,23 @@
 {
  "scenario": "asm-menu-properties",
- "recorded": "2026-11-07T00:30:42.021Z",
+ "recorded": "2026-11-26T02:53:00.312Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "35bd874419e7ea9d22e2d609",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "8893a321967a3a4f06085af1",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -132,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -144,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 24240,
+   "tmove": 24585,
+   "moves": 1,
+   "tdown": 24879,
    "at": [
     90,
     235
@@ -154,6 +191,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -177,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -299,9 +338,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 27516
+   "t": 27307,
+   "te": 27307
   },
   {
    "step": 2,
@@ -312,6 +379,10 @@
     }
    },
    "ok": true,
+   "ti": 27307,
+   "tmove": 27350,
+   "moves": 2,
+   "tdown": 28399,
    "at": [
     225,
     259
@@ -326,6 +397,16 @@
      "title": "Properties",
      "fields": [
       {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
        "label": "Name *",
        "kind": "input",
        "value": "Part 2"
@@ -399,22 +480,19 @@
        "label": "Unit of measure",
        "kind": "select",
        "value": "Each"
-      },
-      {
-       "label": "Mass Override",
-       "kind": "checkbox",
-       "value": false
       }
      ],
      "buttons": [
-      "",
-      "",
+      "Undo",
+      "Redo",
       "Apply",
       "Save",
       "Close"
-     ]
+     ],
+     "text": "Properties Part 2 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Apply Save Close"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -527,9 +605,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 30006
+   "t": 30744,
+   "te": 30744
   },
   {
    "step": 3,
@@ -538,6 +644,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 30744,
+   "pointer": {
+    "at": [
+     225,
+     259
+    ],
+    "hover": [],
+    "element": "div.modal.metadata-dialog"
+   },
+   "tdown": 30750,
    "state": {
     "focus": {
      "kind": "other",
@@ -548,6 +664,16 @@
      "title": "Properties",
      "fields": [
       {
+       "label": "Override",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Override",
+       "kind": "input",
+       "value": ""
+      },
+      {
        "label": "Name *",
        "kind": "input",
        "value": "Part 2"
@@ -621,22 +747,19 @@
        "label": "Unit of measure",
        "kind": "select",
        "value": "Each"
-      },
-      {
-       "label": "Mass Override",
-       "kind": "checkbox",
-       "value": false
       }
      ],
      "buttons": [
-      "",
-      "",
+      "Undo",
+      "Redo",
       "Apply",
       "Save",
       "Close"
-     ]
+     ],
+     "text": "Properties Part 2 Name * Description Category Onshape Part Part number Revision State * In progress Pending Released Obsolete Rejected Discarded Vendor Project Product line Material Title 1 Title 2 Title 3 Not revision managed Exclude from all BOMs Unit of measure Centimeter Foot Inch Meter Millimeter Yard Gram Kilogram Ounce Pound Liter Gallon Each Fluid ounce Milliliter Centiliter Package Mass Override Apply Save Close"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -749,9 +872,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 33788
+   "t": 34495,
+   "te": 34495
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661561794
 }

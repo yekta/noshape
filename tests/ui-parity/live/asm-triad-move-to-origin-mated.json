@@ -1,19 +1,23 @@
 {
  "scenario": "asm-triad-move-to-origin-mated",
- "recorded": "2026-11-13T05:42:32.904Z",
+ "recorded": "2026-11-26T03:02:30.548Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "6329688cda7917b236fe9824",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "f3b2fa99e0b67c28d8ef1c46",
   "start": "pin-block",
-  "startElement": "ed211f3bd9ad0f1f27da328a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -193,9 +197,13 @@
     }
    },
    "ok": true,
+   "ti": 28128,
+   "tmove": 28601,
+   "moves": 1,
    "hover": [
     "JKK"
    ],
+   "tdown": 29962,
    "at": [
     1110,
     321
@@ -358,7 +366,7 @@
       7.5
      ],
      "eye_mm": [
-      18.394,
+      18.395,
       -31.86,
       31.24
      ],
@@ -378,7 +386,8 @@
      "panel": null
     }
    },
-   "t": 41678
+   "t": 32469,
+   "te": 32469
   },
   {
    "step": 2,
@@ -389,6 +398,10 @@
     }
    },
    "ok": true,
+   "ti": 32469,
+   "tmove": 32523,
+   "moves": 1,
+   "tdown": 32965,
    "at": [
     1110,
     321
@@ -424,6 +437,7 @@
       "Add mate connector to instance origin…",
       "Replace Part 2 <1>…",
       "Switch to start pin-block",
+      "Where used for Part 2…",
       "Clear selection",
       "Select other…",
       "Zoom to fit",
@@ -584,7 +598,7 @@
       7.5
      ],
      "eye_mm": [
-      18.394,
+      18.395,
       -31.86,
       31.24
      ],
@@ -604,7 +618,8 @@
      "panel": null
     }
    },
-   "t": 45406
+   "t": 35586,
+   "te": 35586
   },
   {
    "step": 3,
@@ -615,6 +630,10 @@
     }
    },
    "ok": true,
+   "ti": 35587,
+   "tmove": 35639,
+   "moves": 2,
+   "tdown": 36680,
    "at": [
     1234,
     335
@@ -777,7 +796,7 @@
       7.5
      ],
      "eye_mm": [
-      18.394,
+      18.395,
       -31.86,
       31.24
      ],
@@ -797,7 +816,9 @@
      "panel": null
     }
    },
-   "t": 49478
+   "t": 39018,
+   "te": 39018
   }
- ]
+ ],
+ "t0_epoch_ms": 1795662128625
 }

@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-collapse-selected",
- "recorded": "2026-11-07T05:34:59.809Z",
+ "recorded": "2026-11-26T02:30:35.847Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "48703dbd54c4a22c8a262897",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "78bdae370d31250036d2d7a8",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -146,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 27563,
+   "tmove": 27942,
+   "moves": 1,
+   "tdown": 28241,
    "at": [
     90,
     235
@@ -180,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -302,9 +338,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 23630
+   "t": 30974,
+   "te": 30974
   },
   {
    "step": 2,
@@ -315,6 +379,10 @@
     }
    },
    "ok": true,
+   "ti": 30974,
+   "tmove": 31041,
+   "moves": 2,
+   "tdown": 32106,
    "at": [
     225,
     655
@@ -334,7 +402,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -460,9 +528,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 26792
+   "t": 35462,
+   "te": 35462
   },
   {
    "step": 3,
@@ -473,6 +569,10 @@
     }
    },
    "ok": true,
+   "ti": 35462,
+   "tmove": 35792,
+   "moves": 1,
+   "tdown": 36085,
    "at": [
     90,
     235
@@ -509,7 +609,8 @@
       "Dissolve subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Assembly 2…",
@@ -529,7 +630,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -655,9 +756,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 29638
+   "t": 38536,
+   "te": 38536
   },
   {
    "step": 4,
@@ -669,9 +798,12 @@
     "ms": 600
    },
    "ok": true,
+   "ti": 38536,
+   "tmove": 38579,
+   "moves": 1,
    "at": [
     225,
-    881
+    901
    ],
    "state": {
     "focus": {
@@ -715,7 +847,8 @@
        "Dissolve subassembly",
        "Change to version…",
        "Export…",
-       "Release…",
+       "Where used…",
+       "Create task…",
        "Add comment",
        "Zoom to selection",
        "Create Drawing of Assembly 2…",
@@ -725,7 +858,7 @@
        "Create empty subassembly",
        "Delete"
       ],
-      "highlighted": 27,
+      "highlighted": 28,
       "disabled": []
      },
      {
@@ -745,7 +878,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -871,9 +1004,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 32145
+   "t": 41290,
+   "te": 41290
   },
   {
    "step": 5,
@@ -884,9 +1045,13 @@
     }
    },
    "ok": true,
+   "ti": 41290,
+   "tmove": 41337,
+   "moves": 2,
+   "tdown": 42389,
    "at": [
     410,
-    882
+    902
    ],
    "state": {
     "focus": {
@@ -903,7 +1068,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1047,9 +1212,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 34733
+   "t": 44910,
+   "te": 44910
   },
   {
    "step": 6,
@@ -1060,6 +1253,10 @@
     }
    },
    "ok": true,
+   "ti": 44910,
+   "tmove": 45248,
+   "moves": 1,
+   "tdown": 45553,
    "at": [
     90,
     235
@@ -1096,7 +1293,8 @@
       "Dissolve subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Assembly 2…",
@@ -1116,7 +1314,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1260,9 +1458,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 37552
+   "t": 48128,
+   "te": 48128
   },
   {
    "step": 7,
@@ -1274,9 +1500,12 @@
     "ms": 600
    },
    "ok": true,
+   "ti": 48128,
+   "tmove": 48200,
+   "moves": 1,
    "at": [
     225,
-    903
+    923
    ],
    "state": {
     "focus": {
@@ -1320,7 +1549,8 @@
        "Dissolve subassembly",
        "Change to version…",
        "Export…",
-       "Release…",
+       "Where used…",
+       "Create task…",
        "Add comment",
        "Zoom to selection",
        "Create Drawing of Assembly 2…",
@@ -1330,7 +1560,7 @@
        "Create empty subassembly",
        "Delete"
       ],
-      "highlighted": 28,
+      "highlighted": 29,
       "disabled": []
      },
      {
@@ -1350,7 +1580,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1494,9 +1724,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 40090
+   "t": 50917,
+   "te": 50917
   },
   {
    "step": 8,
@@ -1507,9 +1765,13 @@
     }
    },
    "ok": true,
+   "ti": 50917,
+   "tmove": 50969,
+   "moves": 2,
+   "tdown": 52022,
    "at": [
     410,
-    904
+    924
    ],
    "state": {
     "focus": {
@@ -1526,7 +1788,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1652,9 +1914,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 42561
+   "t": 54373,
+   "te": 54373
   }
- ]
+ ],
+ "t0_epoch_ms": 1795660214476
 }

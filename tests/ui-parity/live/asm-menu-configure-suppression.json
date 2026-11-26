@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-configure-suppression",
- "recorded": "2026-11-07T01:49:21.900Z",
+ "recorded": "2026-11-26T02:38:54.776Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "052c02a19dd30520d96735d4",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "5b9ec73f9405c2a5c4427d5c",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -133,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -145,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 25794,
+   "tmove": 25847,
+   "moves": 1,
+   "tdown": 26142,
    "at": [
     1904,
     461
@@ -155,6 +191,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -268,13 +305,41 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Configurations",
      "rows": [],
      "banner": null
     }
    },
-   "t": 28613
+   "t": 28641,
+   "te": 28641
   },
   {
    "step": 2,
@@ -285,6 +350,10 @@
     }
    },
    "ok": true,
+   "ti": 28641,
+   "tmove": 28688,
+   "moves": 1,
+   "tdown": 28977,
    "at": [
     1551,
     129
@@ -302,6 +371,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -310,7 +380,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -415,6 +485,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Configurations",
      "rows": [
@@ -426,7 +523,8 @@
      "banner": null
     }
    },
-   "t": 31877
+   "t": 31313,
+   "te": 31313
   },
   {
    "step": 3,
@@ -437,6 +535,10 @@
     }
    },
    "ok": true,
+   "ti": 31313,
+   "tmove": 31650,
+   "moves": 1,
+   "tdown": 31956,
    "at": [
     90,
     316
@@ -447,6 +549,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -471,7 +574,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -489,7 +593,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -594,6 +698,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Configurations",
      "rows": [
@@ -605,7 +736,8 @@
      "banner": null
     }
    },
-   "t": 35386
+   "t": 34422,
+   "te": 34422
   },
   {
    "step": 4,
@@ -616,6 +748,10 @@
     }
    },
    "ok": true,
+   "ti": 34422,
+   "tmove": 34464,
+   "moves": 2,
+   "tdown": 35517,
    "at": [
     225,
     712
@@ -626,6 +762,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -634,7 +771,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -739,6 +876,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Configurations",
      "rows": [
@@ -750,7 +914,8 @@
      "banner": null
     }
    },
-   "t": 38105
+   "t": 37852,
+   "te": 37852
   },
   {
    "step": 5,
@@ -759,12 +924,23 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 37852,
+   "pointer": {
+    "at": [
+     225,
+     712
+    ],
+    "hover": [],
+    "element": "div.ns-tree-root"
+   },
+   "tdown": 37858,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -773,7 +949,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -878,6 +1054,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Configurations",
      "rows": [
@@ -889,7 +1092,9 @@
      "banner": null
     }
    },
-   "t": 42440
+   "t": 42270,
+   "te": 42270
   }
- ]
+ ],
+ "t0_epoch_ms": 1795660714861
 }

@@ -1,19 +1,23 @@
 {
  "scenario": "asm-triad-origin-menu",
- "recorded": "2026-11-07T03:55:59.216Z",
+ "recorded": "2026-11-26T02:59:14.367Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "4afbf51519fa34094a8f38d7",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "6f16fcd66640c4777d8e5d37",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -151,12 +182,16 @@
     }
    },
    "ok": true,
+   "ti": 27922,
+   "tmove": 28386,
+   "moves": 1,
    "hover": [
     "JKK"
    ],
+   "tdown": 29739,
    "at": [
-    1388,
-    691
+    1407,
+    702
    ],
    "state": {
     "focus": {
@@ -283,9 +318,46 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 40470
+   "t": 32137,
+   "te": 32137
   },
   {
    "step": 2,
@@ -296,9 +368,13 @@
     }
    },
    "ok": true,
+   "ti": 32137,
+   "tmove": 32173,
+   "moves": 1,
+   "tdown": 32554,
    "at": [
-    1388,
-    691
+    1407,
+    702
    ],
    "state": {
     "focus": {
@@ -323,12 +399,13 @@
       "Use best available tessellation",
       "Copy Part 2 <1>",
       "Create Drawing of Part 2…",
-      "Create Drawing of start two-blocks asm Copy 2…",
+      "Create Drawing of start two-blocks asm Copy 1…",
       "Export…",
       "Edit in context",
       "Add mate connector to instance origin…",
       "Replace Part 2 <1>…",
       "Switch to start two-blocks",
+      "Where used for Part 2…",
       "Clear selection",
       "Select other…",
       "Zoom to fit",
@@ -336,7 +413,7 @@
       "View normal to",
       "Delete Part 2 <1>"
      ],
-     "highlighted": 24,
+     "highlighted": 25,
      "disabled": []
     },
     "selection": {
@@ -456,9 +533,46 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 44308
+   "t": 34987,
+   "te": 34987
   },
   {
    "step": 3,
@@ -467,6 +581,23 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 34987,
+   "pointer": {
+    "at": [
+     1406,
+     701
+    ],
+    "hover": [
+     {
+      "_serializedByteLength": 0,
+      "path": [
+       "MVhUjOQHXaI2e/Ty4"
+      ]
+     }
+    ],
+    "element": "ul.context-menu-list.contextmenu-list"
+   },
+   "tdown": 34993,
    "state": {
     "focus": {
      "kind": "none"
@@ -592,9 +723,47 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "400.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
    },
-   "t": 48120
+   "t": 38810,
+   "te": 38810
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661932526
 }

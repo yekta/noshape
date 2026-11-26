@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-select-same-part-configuration",
- "recorded": "2026-11-07T04:04:10.742Z",
+ "recorded": "2026-11-26T02:53:40.610Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "86f0faa9048c42a801787e54",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "29fed1149e60560628f6c6b6",
   "start": "config-blocks",
-  "startElement": "61cade5edb3ac0e572751d23",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "1e02ef8ec3c2e3dc2f09fdc9",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -146,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 25716,
+   "tmove": 26104,
+   "moves": 1,
+   "tdown": 26400,
    "at": [
     90,
     235
@@ -183,7 +218,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -305,9 +341,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 25814
+   "t": 28926,
+   "te": 28927
   },
   {
    "step": 2,
@@ -318,6 +382,10 @@
     }
    },
    "ok": true,
+   "ti": 28927,
+   "tmove": 28977,
+   "moves": 2,
+   "tdown": 30018,
    "at": [
     225,
     702
@@ -336,7 +404,7 @@
       {
        "kind": "INSTANCE",
        "owner": null,
-       "id": "MXUqZnY9wkHFk1HUa"
+       "id": "MuBkDmqvj4oxdg/20"
       }
      ]
     },
@@ -447,9 +515,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 28442
+   "t": 32476,
+   "te": 32476
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661601141
 }

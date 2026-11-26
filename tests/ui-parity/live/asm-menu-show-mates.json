@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-show-mates",
- "recorded": "2026-11-07T00:58:22.814Z",
+ "recorded": "2026-11-26T03:03:12.796Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "4519da1b3e75f5c0db16f984",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "2ba918bdfef2ef3c630cfce6",
   "start": "pin-block",
-  "startElement": "7425731ef03d2b9db73c3efb",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -148,7 +153,34 @@
     }
    ]
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    -2.165,
+    3.75,
+    7.5
+   ],
+   "eye_mm": [
+    16.636,
+    -28.814,
+    29.209
+   ],
+   "width_mm": 105.679,
+   "height_mm": 55.966,
+   "mmPerPixel": 0.063167,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -160,6 +192,10 @@
     }
    },
    "ok": true,
+   "ti": 25772,
+   "tmove": 26139,
+   "moves": 1,
+   "tdown": 26429,
    "at": [
     90,
     235
@@ -170,6 +206,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -195,7 +232,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -332,9 +370,37 @@
       }
      ]
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 105.679,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.063167,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 42237
+   "t": 29016,
+   "te": 29016
   },
   {
    "step": 2,
@@ -345,6 +411,10 @@
     }
    },
    "ok": true,
+   "ti": 29016,
+   "tmove": 29062,
+   "moves": 2,
+   "tdown": 30132,
    "at": [
     225,
     547
@@ -355,6 +425,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -363,7 +434,7 @@
     "features": {
      "rows": [
       {
-       "name": "start pin-block asm Copy 2",
+       "name": "start pin-block asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -482,9 +553,37 @@
       }
      ]
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 105.679,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.063167,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 46190
+   "t": 32440,
+   "te": 32440
   },
   {
    "step": 3,
@@ -495,6 +594,10 @@
     }
    },
    "ok": true,
+   "ti": 32440,
+   "tmove": 32773,
+   "moves": 1,
+   "tdown": 33060,
    "at": [
     90,
     235
@@ -505,6 +608,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -530,7 +634,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -548,7 +653,7 @@
     "features": {
      "rows": [
       {
-       "name": "start pin-block asm Copy 2",
+       "name": "start pin-block asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -667,9 +772,37 @@
       }
      ]
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 105.679,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.063167,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 49323
+   "t": 35461,
+   "te": 35461
   },
   {
    "step": 4,
@@ -680,6 +813,10 @@
     }
    },
    "ok": true,
+   "ti": 35461,
+   "tmove": 35503,
+   "moves": 2,
+   "tdown": 36550,
    "at": [
     225,
     525
@@ -690,6 +827,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -698,7 +836,7 @@
     "features": {
      "rows": [
       {
-       "name": "start pin-block asm Copy 2",
+       "name": "start pin-block asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -817,9 +955,38 @@
       }
      ]
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      -2.165,
+      3.75,
+      7.5
+     ],
+     "eye_mm": [
+      16.636,
+      -28.814,
+      29.209
+     ],
+     "width_mm": 105.679,
+     "height_mm": 55.966,
+     "mmPerPixel": 0.063167,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 53683
+   "t": 38897,
+   "te": 38897
   }
- ]
+ ],
+ "t0_epoch_ms": 1795662173020
 }

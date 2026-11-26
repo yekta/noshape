@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-add-to-named-positions",
- "recorded": "2026-11-07T05:36:40.300Z",
+ "recorded": "2026-11-26T02:27:21.672Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "7bb774209030510d0ed601b8",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "e383ceac6acd62255bbe4336",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -146,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 37286,
+   "tmove": 37634,
+   "moves": 1,
+   "tdown": 37926,
    "at": [
     90,
     235
@@ -180,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -302,9 +338,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 24634
+   "t": 40442,
+   "te": 40443
   },
   {
    "step": 2,
@@ -315,6 +379,10 @@
     }
    },
    "ok": true,
+   "ti": 40443,
+   "tmove": 40494,
+   "moves": 2,
+   "tdown": 41544,
    "at": [
     225,
     655
@@ -334,7 +402,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -392,8 +460,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -414,8 +482,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -460,9 +528,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 27783
+   "t": 44815,
+   "te": 44815
   },
   {
    "step": 3,
@@ -473,6 +569,10 @@
     }
    },
    "ok": true,
+   "ti": 44815,
+   "tmove": 45153,
+   "moves": 1,
+   "tdown": 45440,
    "at": [
     90,
     235
@@ -509,7 +609,8 @@
       "Dissolve subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Assembly 2…",
@@ -529,7 +630,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -587,8 +688,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -609,8 +710,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -655,9 +756,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 30613
+   "t": 52178,
+   "te": 52178
   },
   {
    "step": 4,
@@ -668,6 +797,10 @@
     }
    },
    "ok": true,
+   "ti": 52178,
+   "tmove": 52223,
+   "moves": 2,
+   "tdown": 53293,
    "at": [
     225,
     609
@@ -687,7 +820,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -745,8 +878,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -767,8 +900,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -814,6 +947,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Named positions",
      "rows": [
@@ -825,7 +985,8 @@
      "banner": "Editing Named position 1"
     }
    },
-   "t": 33646
+   "t": 55809,
+   "te": 55809
   },
   {
    "step": 5,
@@ -834,6 +995,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 55809,
+   "pointer": {
+    "at": [
+     225,
+     609
+    ],
+    "hover": [],
+    "element": "div.ns-tree-root"
+   },
+   "tdown": 55816,
    "state": {
     "focus": {
      "kind": "none"
@@ -849,7 +1020,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -907,8 +1078,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -929,8 +1100,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -976,6 +1147,33 @@
      "mates": []
     },
     "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 61.841,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null,
     "panel": {
      "title": "Named positions",
      "rows": [
@@ -987,7 +1185,9 @@
      "banner": null
     }
    },
-   "t": 38391
+   "t": 60786,
+   "te": 60786
   }
- ]
+ ],
+ "t0_epoch_ms": 1795660014411
 }

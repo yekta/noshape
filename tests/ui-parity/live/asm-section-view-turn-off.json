@@ -1,19 +1,23 @@
 {
  "scenario": "asm-section-view-turn-off",
- "recorded": "2026-11-07T00:48:57.318Z",
+ "recorded": "2026-11-26T02:57:41.807Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "491022e60b8c00af5ef292bb",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "be7b3b35429393646b3b92d5",
   "start": "two-blocks",
-  "startElement": "17925cad4a23714ccd49b367",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -133,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -150,12 +182,16 @@
     }
    },
    "ok": true,
+   "ti": 25101,
+   "tmove": 25566,
+   "moves": 1,
    "hover": [
     "JKK"
    ],
+   "tdown": 26901,
    "at": [
-    1388,
-    691
+    1407,
+    702
    ],
    "state": {
     "focus": {
@@ -163,6 +199,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -178,13 +215,14 @@
       "Use best available tessellation",
       "Copy Part 2 <1>",
       "Create Drawing of Part 2…",
-      "Create Drawing of start two-blocks asm Copy 2…",
+      "Create Drawing of start two-blocks asm Copy 1…",
       "Export…",
       "Edit in context",
       "Find in instance list",
       "Add mate connector to instance origin…",
       "Replace Part 2 <1>…",
       "Switch to start two-blocks",
+      "Where used for Part 2…",
       "Select other…",
       "Add comment",
       "Zoom to fit",
@@ -192,7 +230,7 @@
       "View normal to",
       "Delete Part 2 <1>"
      ],
-     "highlighted": 24,
+     "highlighted": 25,
      "disabled": []
     },
     "selection": {
@@ -306,9 +344,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 45321
+   "t": 29354,
+   "te": 29355
   },
   {
    "step": 2,
@@ -319,9 +385,13 @@
     }
    },
    "ok": true,
+   "ti": 29355,
+   "tmove": 29404,
+   "moves": 2,
+   "tdown": 30481,
    "at": [
-    1513,
-    262
+    1531,
+    250
    ],
    "state": {
     "focus": {
@@ -401,6 +471,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -513,9 +584,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 54713
+   "t": 32883,
+   "te": 32883
   },
   {
    "step": 3,
@@ -526,6 +625,10 @@
     }
    },
    "ok": true,
+   "ti": 32884,
+   "tmove": 32921,
+   "moves": 1,
+   "tdown": 33205,
    "at": [
     574,
     193
@@ -536,6 +639,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -648,9 +752,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 57438
+   "t": 35480,
+   "te": 35480
   },
   {
    "step": 4,
@@ -661,6 +793,10 @@
     }
    },
    "ok": true,
+   "ti": 35480,
+   "tmove": 35503,
+   "moves": 1,
+   "tdown": 35782,
    "at": [
     1560,
     960
@@ -671,13 +807,14 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
       "Show all",
       "Edit section view…",
       "Turn off section view",
-      "Create Drawing of start two-blocks asm Copy 2…",
+      "Create Drawing of start two-blocks asm Copy 1…",
       "Zoom to fit",
       "Isometric"
      ],
@@ -795,9 +932,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 60366
+   "t": 38154,
+   "te": 38154
   },
   {
    "step": 5,
@@ -808,6 +973,10 @@
     }
    },
    "ok": true,
+   "ti": 38154,
+   "tmove": 38192,
+   "moves": 2,
+   "tdown": 39298,
    "at": [
     1685,
     884
@@ -818,6 +987,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -930,9 +1100,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 63114
+   "t": 41551,
+   "te": 41551
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661842484
 }

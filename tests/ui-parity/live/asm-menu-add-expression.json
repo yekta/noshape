@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-add-expression",
- "recorded": "2026-11-07T00:46:14.502Z",
+ "recorded": "2026-11-26T02:28:21.823Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "025518e09a8abf5d0f111472",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "0a7316d89f39ea9cc6b7981e",
   "start": "two-blocks",
-  "startElement": "17925cad4a23714ccd49b367",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -21,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -133,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -145,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 26512,
+   "tmove": 26858,
+   "moves": 1,
+   "tdown": 27156,
    "at": [
     90,
     235
@@ -155,6 +191,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -178,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -300,9 +338,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 37217
+   "t": 29696,
+   "te": 29696
   },
   {
    "step": 2,
@@ -314,6 +380,9 @@
     "ms": 600
    },
    "ok": true,
+   "ti": 29696,
+   "tmove": 29748,
+   "moves": 1,
    "at": [
     225,
     458
@@ -324,6 +393,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -356,7 +426,8 @@
        "Move to new subassembly",
        "Change to version…",
        "Export…",
-       "Release…",
+       "Where used…",
+       "Create task…",
        "Add comment",
        "Zoom to selection",
        "Create Drawing of Part 2…",
@@ -487,9 +558,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 39943
+   "t": 32426,
+   "te": 32426
   },
   {
    "step": 3,
@@ -500,6 +599,10 @@
     }
    },
    "ok": true,
+   "ti": 32426,
+   "tmove": 32473,
+   "moves": 2,
+   "tdown": 33527,
    "at": [
     410,
     459
@@ -521,9 +624,29 @@
      "title": "Dynamic suppression",
      "text": [
       "Unsuppressed if"
+     ],
+     "fields": [
+      {
+       "label": "Unsuppressed if",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "suppression-expression-dialog",
+      "title": "Dynamic suppression",
+      "text": "Dynamic suppression / Unsuppressed if",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 1,
@@ -642,9 +765,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 43117
+   "t": 36051,
+   "te": 36052
   },
   {
    "step": 4,
@@ -653,6 +804,8 @@
     "text": "1 > 2"
    },
    "ok": true,
+   "ti": 36052,
+   "tdown": 36052,
    "state": {
     "focus": {
      "kind": "field",
@@ -671,9 +824,29 @@
      "text": [
       "Unsuppressed if",
       "1 > 2"
+     ],
+     "fields": [
+      {
+       "label": "Unsuppressed if",
+       "kind": "input",
+       "value": "1 > 2"
+      }
      ]
     },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "suppression-expression-dialog",
+      "title": "Dynamic suppression",
+      "text": "Dynamic suppression / Unsuppressed if",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "1 > 2"
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 1,
@@ -792,9 +965,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 45977
+   "t": 38894,
+   "te": 38894
   },
   {
    "step": 5,
@@ -803,6 +1004,16 @@
     "key": "Enter"
    },
    "ok": true,
+   "ti": 38894,
+   "pointer": {
+    "at": [
+     409,
+     459
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 38901,
    "state": {
     "focus": {
      "kind": "field",
@@ -821,9 +1032,29 @@
      "text": [
       "Unsuppressed if",
       "1 > 2"
+     ],
+     "fields": [
+      {
+       "label": "Unsuppressed if",
+       "kind": "input",
+       "value": "1 > 2"
+      }
      ]
     },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "suppression-expression-dialog",
+      "title": "Dynamic suppression",
+      "text": "Dynamic suppression / Unsuppressed if",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "1 > 2"
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 1,
@@ -942,9 +1173,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 48264
+   "t": 41322,
+   "te": 41322
   },
   {
    "step": 6,
@@ -953,12 +1212,23 @@
     "key": "Enter"
    },
    "ok": true,
+   "ti": 41322,
+   "pointer": {
+    "at": [
+     409,
+     459
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 41328,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -967,7 +1237,7 @@
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm Copy 2",
+       "name": "start two-blocks asm Copy 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1071,9 +1341,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      51.838,
+      -0.505,
+      23.67
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 51501
+   "t": 43581,
+   "te": 43581
   }
- ]
+ ],
+ "t0_epoch_ms": 1795660081543
 }

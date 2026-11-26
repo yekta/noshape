@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-make-transparent-enter",
- "recorded": "2026-11-13T05:16:54.317Z",
+ "recorded": "2026-11-26T02:51:09.950Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "53029e4738bc7ae002c787bb",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "acd012fa666762f4807780f6",
   "start": "two-blocks",
-  "startElement": "fbd9c2146a18cf5cba6d5b3a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -173,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 24743,
+   "tmove": 25094,
+   "moves": 1,
+   "tdown": 25392,
    "at": [
     90,
     235
@@ -207,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -358,7 +367,8 @@
     },
     "measure": null
    },
-   "t": 31576
+   "t": 27916,
+   "te": 27916
   },
   {
    "step": 2,
@@ -369,6 +379,10 @@
     }
    },
    "ok": true,
+   "ti": 27916,
+   "tmove": 27968,
+   "moves": 2,
+   "tdown": 29024,
    "at": [
     225,
     414
@@ -539,7 +553,8 @@
     },
     "measure": null
    },
-   "t": 36617
+   "t": 31525,
+   "te": 31525
   },
   {
    "step": 3,
@@ -548,6 +563,7 @@
     "key": "Enter"
    },
    "ok": true,
+   "ti": 31525,
    "pointer": {
     "at": [
      225,
@@ -556,6 +572,7 @@
     "hover": [],
     "element": "div.ns-tree-root"
    },
+   "tdown": 31532,
    "state": {
     "focus": {
      "kind": "none"
@@ -722,7 +739,9 @@
     },
     "measure": null
    },
-   "t": 39496
+   "t": 33760,
+   "te": 33760
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661451124
 }

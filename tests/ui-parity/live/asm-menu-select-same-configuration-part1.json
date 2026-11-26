@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-select-same-configuration-part1",
- "recorded": "2026-11-13T05:18:43.843Z",
+ "recorded": "2026-11-26T02:50:33.958Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "2d45dd8d713922d614bdb66c",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "19ff4bcdcc9cf58bfacd1c7e",
   "start": "config-blocks",
-  "startElement": "1328021391bf38fdb065789b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "1e02ef8ec3c2e3dc2f09fdc9",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -173,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 24506,
+   "tmove": 24853,
+   "moves": 1,
+   "tdown": 25151,
    "at": [
     90,
     209
@@ -210,7 +218,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -361,7 +370,8 @@
     },
     "measure": null
    },
-   "t": 31724
+   "t": 27670,
+   "te": 27670
   },
   {
    "step": 2,
@@ -372,6 +382,10 @@
     }
    },
    "ok": true,
+   "ti": 27670,
+   "tmove": 27712,
+   "moves": 2,
+   "tdown": 28768,
    "at": [
     225,
     636
@@ -535,7 +549,9 @@
     },
     "measure": null
    },
-   "t": 35634
+   "t": 31146,
+   "te": 31146
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661414898
 }

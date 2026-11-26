@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-dissolve-subassembly-undo",
- "recorded": "2026-11-13T05:15:13.662Z",
+ "recorded": "2026-11-26T02:31:35.904Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "41d2d30152bc4fdfe3e877a5",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "9a1f475a27a0ec6d802b5e34",
   "start": "two-blocks",
-  "startElement": "fbd9c2146a18cf5cba6d5b3a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -173,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 26577,
+   "tmove": 26937,
+   "moves": 1,
+   "tdown": 27233,
    "at": [
     90,
     235
@@ -207,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -358,7 +367,8 @@
     },
     "measure": null
    },
-   "t": 31621
+   "t": 29711,
+   "te": 29712
   },
   {
    "step": 2,
@@ -369,6 +379,10 @@
     }
    },
    "ok": true,
+   "ti": 29712,
+   "tmove": 29753,
+   "moves": 2,
+   "tdown": 30802,
    "at": [
     225,
     655
@@ -446,8 +460,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -468,8 +482,8 @@
        ]
       },
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -543,7 +557,8 @@
     },
     "measure": null
    },
-   "t": 36598
+   "t": 33998,
+   "te": 33998
   },
   {
    "step": 3,
@@ -554,6 +569,10 @@
     }
    },
    "ok": true,
+   "ti": 33998,
+   "tmove": 34332,
+   "moves": 1,
+   "tdown": 34628,
    "at": [
     90,
     235
@@ -590,7 +609,8 @@
       "Dissolve subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Assembly 2…",
@@ -668,8 +688,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -690,8 +710,8 @@
        ]
       },
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -765,7 +785,8 @@
     },
     "measure": null
    },
-   "t": 40053
+   "t": 36987,
+   "te": 36987
   },
   {
    "step": 4,
@@ -776,6 +797,10 @@
     }
    },
    "ok": true,
+   "ti": 36987,
+   "tmove": 37035,
+   "moves": 2,
+   "tdown": 38086,
    "at": [
     225,
     699
@@ -928,7 +953,8 @@
     },
     "measure": null
    },
-   "t": 44216
+   "t": 40361,
+   "te": 40361
   },
   {
    "step": 5,
@@ -937,6 +963,7 @@
     "key": "mod+z"
    },
    "ok": true,
+   "ti": 40361,
    "pointer": {
     "at": [
      225,
@@ -945,6 +972,7 @@
     "hover": [],
     "element": "div.ns-tree-root"
    },
+   "tdown": 40367,
    "state": {
     "focus": {
      "kind": "none"
@@ -1093,7 +1121,9 @@
     },
     "measure": null
    },
-   "t": 46791
+   "t": 42795,
+   "te": 42795
   }
- ]
+ ],
+ "t0_epoch_ms": 1795660275260
 }

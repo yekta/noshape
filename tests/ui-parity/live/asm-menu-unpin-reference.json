@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-unpin-reference",
- "recorded": "2026-11-13T04:12:20.297Z",
+ "recorded": "2026-11-26T02:55:17.686Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "303d13a9a241ff5d6ade486a",
-  "workspace": "cce4e78c2613fe68f6072f21",
-  "element": "f7ca2d832746336776fddd17",
+  "document": "2417107642bdaf838582bf11",
+  "workspace": "aff6d3a075385a042c90e39b",
+  "element": "c2b83f5eaa19e20790e45b83",
   "start": "doc-linked",
-  "startElement": "f7ca2d832746336776fddd17",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "c2b83f5eaa19e20790e45b83",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -123,6 +127,10 @@
     }
    },
    "ok": true,
+   "ti": 19660,
+   "tmove": 19694,
+   "moves": 1,
+   "tdown": 19990,
    "at": [
     381,
     976
@@ -240,7 +248,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 31624
+   "t": 22466,
+   "te": 22466
   },
   {
    "step": 2,
@@ -251,6 +260,10 @@
     }
    },
    "ok": true,
+   "ti": 22466,
+   "tmove": 22830,
+   "moves": 1,
+   "tdown": 23122,
    "at": [
     90,
     209
@@ -286,7 +299,8 @@
       "Open linked document",
       "Pin reference",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -402,7 +416,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 34851
+   "t": 25154,
+   "te": 25154
   },
   {
    "step": 3,
@@ -413,6 +428,10 @@
     }
    },
    "ok": true,
+   "ti": 25154,
+   "tmove": 25209,
+   "moves": 2,
+   "tdown": 26249,
    "at": [
     225,
     673
@@ -530,7 +549,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38125
+   "t": 28176,
+   "te": 28176
   },
   {
    "step": 4,
@@ -541,6 +561,10 @@
     }
    },
    "ok": true,
+   "ti": 28176,
+   "tmove": 28524,
+   "moves": 1,
+   "tdown": 28807,
    "at": [
     90,
     209
@@ -575,7 +599,8 @@
       "Open linked document",
       "Unpin reference",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -691,7 +716,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40959
+   "t": 30788,
+   "te": 30788
   },
   {
    "step": 5,
@@ -702,6 +728,10 @@
     }
    },
    "ok": true,
+   "ti": 30788,
+   "tmove": 30848,
+   "moves": 2,
+   "tdown": 31898,
    "at": [
     225,
     651
@@ -819,7 +849,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44359
+   "t": 33772,
+   "te": 33772
   },
   {
    "step": 6,
@@ -830,6 +861,10 @@
     }
    },
    "ok": true,
+   "ti": 33772,
+   "tmove": 34126,
+   "moves": 1,
+   "tdown": 34422,
    "at": [
     90,
     209
@@ -865,7 +900,8 @@
       "Open linked document",
       "Pin reference",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -981,7 +1017,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47184
+   "t": 36354,
+   "te": 36354
   },
   {
    "step": 7,
@@ -990,6 +1027,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 36354,
    "pointer": {
     "at": [
      90,
@@ -999,12 +1037,13 @@
      {
       "_serializedByteLength": 0,
       "path": [
-       "MxNkK8XBK/rFhUtpC"
+       "MXsGxIR1cUHWOnXtK"
       ]
      }
     ],
     "element": "div#context-menu-layer"
    },
+   "tdown": 36360,
    "state": {
     "focus": {
      "kind": "none"
@@ -1118,7 +1157,9 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50884
+   "t": 39743,
+   "te": 39743
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661703740
 }

@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-export",
- "recorded": "2026-11-08T00:04:54.094Z",
+ "recorded": "2026-11-26T02:47:20.953Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.11"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "a7222f060410368356b2ae57",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "7dfc7b37f14df9e69d55353f",
   "start": "two-blocks",
-  "startElement": "1d65bf6416087417d0d32074",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "30e13e13ac6a0443bcc154be",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -146,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 26504,
+   "tmove": 26854,
+   "moves": 1,
+   "tdown": 27156,
    "at": [
     90,
     235
@@ -180,7 +215,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -302,9 +338,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 27751
+   "t": 29602,
+   "te": 29602
   },
   {
    "step": 2,
@@ -315,6 +379,10 @@
     }
    },
    "ok": true,
+   "ti": 29602,
+   "tmove": 29644,
+   "moves": 2,
+   "tdown": 30690,
    "at": [
     225,
     699
@@ -336,7 +404,7 @@
       {
        "label": "Format",
        "kind": "select",
-       "value": "PARASOLID"
+       "value": "STEP"
       },
       {
        "label": "Export models oriented Y axis up",
@@ -344,12 +412,32 @@
        "value": false
       },
       {
+       "label": "Preprocessing",
+       "kind": "select",
+       "value": "None"
+      },
+      {
        "label": "Version",
        "kind": "select",
-       "value": "25.0"
+       "value": "AP242"
       },
       {
        "label": "Use latest version",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Use custom units for export",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Include derived tolerances in export",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Use custom annotation text height for MBD export",
        "kind": "checkbox",
        "value": false
       },
@@ -363,7 +451,7 @@
       "Export",
       "Cancel"
      ],
-     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up Version 38.1 37.1 37.0 36.0 35.1 34.1 34.0 33.1 33.0 32.1 32.0 31.1 31.0 30.1 30.0 29.1 29.0 28.1 28.0 27.1 27.0 26.1 26.0 25.1 25.0 Use latest version Options Download Download and store file in a new tab Store file in a new tab"
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up Preprocessing None Automatic Remove small entities only (advanced) Remove small entities only (basic) Remove small entities only (advanced) and convert all surfaces to b-surfaces Version AP242 AP214 AP203 Use latest version Use custom units for export Include derived tolerances in export Use custom annotation text height for MBD export Options Download Do"
     },
     "dialogs": [],
     "panels": null,
@@ -479,9 +567,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 30353
+   "t": 33033,
+   "te": 33033
   },
   {
    "step": 3,
@@ -490,6 +606,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 33033,
+   "pointer": {
+    "at": [
+     225,
+     699
+    ],
+    "hover": [],
+    "element": "div.modal.export-dialog"
+   },
+   "tdown": 33038,
    "state": {
     "focus": {
      "kind": "none"
@@ -609,9 +735,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 34000
+   "t": 36799,
+   "te": 36799
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661220384
 }

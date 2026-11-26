@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-pin-reference",
- "recorded": "2026-11-13T04:11:08.616Z",
+ "recorded": "2026-11-26T02:46:34.325Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-10.5 0a4d2573 + live2 2026-11-12.1"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "6235afdcb4fc67d720369a70",
-  "workspace": "8802eff5ec59b723d52e31f7",
-  "element": "ced9f1eb34481f9bea06d8d2",
+  "document": "6e4698800a7be3dd2966793a",
+  "workspace": "3b654a477e83b29e216b0f7c",
+  "element": "51ee6b3d84bc9bcea996f083",
   "start": "doc-linked",
-  "startElement": "ced9f1eb34481f9bea06d8d2",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "51ee6b3d84bc9bcea996f083",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -123,6 +127,10 @@
     }
    },
    "ok": true,
+   "ti": 18976,
+   "tmove": 19004,
+   "moves": 1,
+   "tdown": 19293,
    "at": [
     381,
     976
@@ -240,7 +248,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30690
+   "t": 21731,
+   "te": 21731
   },
   {
    "step": 2,
@@ -251,6 +260,10 @@
     }
    },
    "ok": true,
+   "ti": 21731,
+   "tmove": 22075,
+   "moves": 1,
+   "tdown": 22382,
    "at": [
     90,
     209
@@ -286,7 +299,8 @@
       "Open linked document",
       "Pin reference",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -402,7 +416,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 34452
+   "t": 24430,
+   "te": 24430
   },
   {
    "step": 3,
@@ -413,6 +428,10 @@
     }
    },
    "ok": true,
+   "ti": 24430,
+   "tmove": 24481,
+   "moves": 2,
+   "tdown": 25533,
    "at": [
     225,
     673
@@ -530,7 +549,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38144
+   "t": 27381,
+   "te": 27381
   },
   {
    "step": 4,
@@ -541,6 +561,10 @@
     }
    },
    "ok": true,
+   "ti": 27381,
+   "tmove": 27716,
+   "moves": 1,
+   "tdown": 28007,
    "at": [
     90,
     209
@@ -575,7 +599,8 @@
       "Open linked document",
       "Unpin reference",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 1…",
@@ -691,7 +716,8 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 41134
+   "t": 29890,
+   "te": 29890
   },
   {
    "step": 5,
@@ -700,6 +726,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 29890,
    "pointer": {
     "at": [
      90,
@@ -709,12 +736,13 @@
      {
       "_serializedByteLength": 0,
       "path": [
-       "MPUoaioSO7DYwk2nJ"
+       "M94VxEGXhQ9vpok6U"
       ]
      }
     ],
     "element": "div#context-menu-layer"
    },
+   "tdown": 29895,
    "state": {
     "focus": {
      "kind": "none"
@@ -828,7 +856,9 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 45055
+   "t": 33250,
+   "te": 33250
   }
- ]
+ ],
+ "t0_epoch_ms": 1795661180392
 }

@@ -1,19 +1,23 @@
 {
  "scenario": "asm-menu-change-configuration",
- "recorded": "2026-11-07T04:02:52.832Z",
+ "recorded": "2026-11-26T02:32:23.993Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "9b566d2baa87bbf43a0b4ed2",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "9bd9616d160d4be70b704a1f",
   "start": "config-blocks",
-  "startElement": "61cade5edb3ac0e572751d23",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "1e02ef8ec3c2e3dc2f09fdc9",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -134,7 +138,34 @@
    ],
    "mates": []
   },
-  "drawing": null
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    36.83,
+    25.49,
+    6.34
+   ],
+   "eye_mm": [
+    63.812,
+    -21.243,
+    37.495
+   ],
+   "width_mm": 108.335,
+   "height_mm": 57.373,
+   "mmPerPixel": 0.064755,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -146,6 +177,10 @@
     }
    },
    "ok": true,
+   "ti": 25350,
+   "tmove": 25721,
+   "moves": 1,
+   "tdown": 26021,
    "at": [
     90,
     235
@@ -183,7 +218,8 @@
       "Move to new subassembly",
       "Change to version…",
       "Export…",
-      "Release…",
+      "Where used…",
+      "Create task…",
       "Add comment",
       "Zoom to selection",
       "Create Drawing of Part 2…",
@@ -305,9 +341,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 28474
+   "t": 28578,
+   "te": 28578
   },
   {
    "step": 2,
@@ -318,6 +382,10 @@
     }
    },
    "ok": true,
+   "ti": 28578,
+   "tmove": 28623,
+   "moves": 2,
+   "tdown": 29671,
    "at": [
     225,
     631
@@ -330,7 +398,7 @@
      "kind": "panel",
      "title": "Change configuration",
      "text": [
-      "noshape ui parity live2-1",
+      "noshape ui parity lane4-1115",
       "start config-blocks",
       "Size",
       "Small",
@@ -338,6 +406,13 @@
       "Part 2",
       "Sketch 1",
       "Sketch 2"
+     ],
+     "fields": [
+      {
+       "label": "Small",
+       "kind": "input",
+       "value": ""
+      }
      ]
     },
     "dialogs": [],
@@ -345,7 +420,7 @@
      {
       "id": "assembly-insert-dialog",
       "title": "Change configuration",
-      "text": "Change configuration / noshape ui parity live2-1 / Main / start config-blocks / Size / Small / Part 1 / Part 2 / Sketch 1 / Sketch 2",
+      "text": "Change configuration / noshape ui parity lane4-1115 / Main / start config-blocks / Size / Small / Part 1 / Part 2 / Sketch 1 / Sketch 2",
       "inputs": [
        {
         "placeholder": null,
@@ -466,9 +541,37 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 31430
+   "t": 32637,
+   "te": 32637
   },
   {
    "step": 3,
@@ -477,6 +580,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 32637,
+   "pointer": {
+    "at": [
+     225,
+     631
+    ],
+    "hover": [],
+    "element": "div.ns-tree-root"
+   },
+   "tdown": 32642,
    "state": {
     "focus": {
      "kind": "none"
@@ -596,9 +709,38 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      36.83,
+      25.49,
+      6.34
+     ],
+     "eye_mm": [
+      63.812,
+      -21.243,
+      37.495
+     ],
+     "width_mm": 108.335,
+     "height_mm": 57.373,
+     "mmPerPixel": 0.064755,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 35254
+   "t": 36503,
+   "te": 36503
   }
- ]
+ ],
+ "t0_epoch_ms": 1795660324471
 }
