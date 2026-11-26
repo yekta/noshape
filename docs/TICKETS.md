@@ -5,6 +5,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-26 14:0x: live's sketch beginner mistakes batch 4 (75b8386b5) on green 8308d3410: 1/12 as scored, 8/12 with 1-px click tolerance
+(suites/uipnew4-1126; GTOL=0.7 qa-scratch/bin/uipsteps.py. Live's surprises: a fixed line's END drag lengthens it and Offset ignoring a typed value / 0 match ours.)
+- [ ] P2 **SKETCH-MIRROR-PRESELECTED-CLICK (skasm)** (mistake-sketch-mirror-no-line s11-s13): a circle selected, sketch Mirror, a click anywhere (25, 10): live mirrors the circle about the horizontal axis at once (2 entities, selection cleared); ours does nothing (1 entity, the circle still selected).
+- [ ] P2 **SKETCH-OFFSET-NEGATIVE-DIMENSION (skasm)** (mistake-sketch-offset-negative s16-s18): an Offset's dimension double-clicked and set to -3: live keeps -3 ("-3 mm", the copy goes to the other side, no error); ours turns it into 3.
+- [ ] P3 **SKETCH-Q-THEN-D-TOOL (skasm)** (mistake-sketch-dimension-construction s11-s15): a line made construction with Q, Escape, then D: live's sketch tool reads Dimension; ours reads Construction (the dimension itself is placed and drives the line as live).
+
 ## qa 11-26 12:3x: live's 34 new ui-parity scenarios (45f31f16b + f37581e4c) on green f393d8ee4: 12/34, 221/319 states
 (suites/uipnew-1126 score.log; per-step diffs: qa-scratch/bin/uipsteps.py. plane-remembers-last-type matches: cPlane honoured.)
 - [ ] fixed (core 813432936, land bd7f4d31), to verify (qa-uipr12) P1 **FILLET-R12-BLOCK-OVERFLOW (core)** (mistake-fillet-r12-overflows s6-s10): Fillet R12 of the 4 top edges of the 40x30x10 block (start "block"): live regenerates OK, the round runs onto the sides; ours: red title, Fillet 1 row red, "Failed to fillet selections". Chamfer 12 mm on the same edges matches live.
@@ -12,8 +18,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P2 **ASM-MATE-ONE-CONNECTOR-RED (psui)** (mistake-asm-mate-one-connector s8; the rest of MISTAKES-ROWS): editing Fastened 1 and × on one Mate connectors chip: live's title turns red and the Fastened 1 row red at once; ours keeps both ok.
 - [ ] P2 **ASM-HIDDEN-ROW-TOOLTIP (psui)** (asm-hover-hidden-instance-row s4): hovering a hidden instance's row: live's tooltip "Part 2 <1> (Hidden)", ours "Part 2 <1>".
 - [ ] P2 **SHELL-TOO-THICK-FIELD-RED (psui)** (mistake-shell-too-thick s6-s7): Shell 16 mm on the 10 mm block, Enter: live's Shell thickness field turns red (title red too); ours' title is red, the field stays ok.
-- [ ] P3 **EXTRUDE-OPEN-SKETCH-FOCUS (psui)** (mistake-extrude-open-sketch s12, s15-s16): Sketch 1's row picked: live's selection item has no owner, ours "Sketch 1"; ✓ on the failing Extrude: live has no focused field, ours focuses one.
-- [ ] P2 **SKETCH-CLICK-OFFSET-EMPTY-TOP (psui)** (7 scenarios: sketch-drag-*, mistake-sketch-dimension-driven, -overdefine-45, -extrude-open-sketch): every point clicked in a Top sketch of the empty start lands (-0.275, +0.477) mm from live's, the same offset at every position and in every scenario (live itself varies per take, ours follows it): a constant view shift (pan or half a pixel), not the drags. Fails those 7 on the 0.01 mm geometry tolerance.
+- [ ] P3 **EXTRUDE-OPEN-SKETCH-FOCUS (psui)** (mistake-extrude-open-sketch s12, s15-s16; also mistake-sketch-gap-profile-extrude s13, s16-s17): Sketch 1's row picked: live's selection item has no owner, ours "Sketch 1"; ✓ on the failing Extrude: live has no focused field, ours focuses one.
+- [ ] P2 **SKETCH-CLICK-ONE-PIXEL (live: runner; lead: compare)** (was SKETCH-CLICK-OFFSET-EMPTY-TOP (psui), corrected 14:0x): both apps' cameras are identical (mmPerPixel 0.275365); every point live clicks in a sketch lands exactly 1 px off its target (x -0.275 mm, plane y +0.48 mm), in every take, while ours lands within 0.16 mm of the target. Live's runner rounds or offsets its click pixel; the app isn't at fault. It fails 7 of the 34 and 11 of batch 4 on the 0.01 mm geometry tolerance. Fix: live's runner, or the compare takes free-clicked points within 1 px (studios parked: lead's call).
 - [ ] P2 **ASM-REPLICATE-MATED-PIN-ROW (skasm)** (asm-replicate-pick-mated-pin s3-s4): Replicate, pick the pin on Revolute 1: live shows Replicate 1's row red while the dialog is open; ours ok.
 - [ ] P2 **ASM-MEASURE-BRACKET-KEY (skasm)** (asm-measure-face-cylinder-panel s4-s5): two faces picked in an assembly, `[`: live opens the Measure panel with its field focused; ours opens nothing.
 - [ ] P2 **ASM-DRAG-REVOLUTE-ANGLE (skasm)** (asm-drag-revolute-turns s1): the same drag of the pin about its Revolute: live turns it to cos 0.774 (39 deg), ours to cos 0.884 (28 deg).
