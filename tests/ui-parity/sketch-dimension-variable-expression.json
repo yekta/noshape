@@ -1,0 +1,119 @@
+{
+ "name": "sketch-dimension-variable-expression",
+ "about": "vars (#width = 30 mm): sketch on Front beside the box, rectangle 25 x 15 at x -30..-5, z 5..20; dimension the left side typed #width/2 (Enter), then the bottom typed #width (Enter): the sketch takes 15 and 30 mm; Escape",
+ "area": "skasm",
+ "source": "live 11-26 second-month gap audit (variables in sketches)",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Front"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -30,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -5,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -30,
+     12
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -38,
+     12
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "#width/2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -17.5,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     -17.5,
+     -3
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "#width"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,8 +1,8 @@
 {
  "name": "sketch-dimension-variable",
- "about": "vars (#width = 30 mm): sketch on Front beside the box, rectangle 25 x 15 at x -30..-5, z 5..20; dimension the left side typed #width/2 (Enter), then the bottom typed #width (Enter): the sketch takes 15 and 30 mm; Escape",
- "area": "skasm",
- "source": "live 11-26 second-month gap audit (variables in sketches)",
+ "about": "Sketch on Top, rectangle, dimension its bottom edge with #width + Enter: the label shows 30 with the ƒx icon",
+ "area": "psui",
+ "source": "everyday",
  "start": "vars",
  "steps": [
   {
@@ -14,7 +14,7 @@
   {
    "do": "click",
    "on": {
-    "plane": "Front"
+    "plane": "Top"
    }
   },
   {
@@ -25,8 +25,8 @@
    "do": "click",
    "on": {
     "sketch_point": [
-     -30,
-     5
+     60,
+     0
     ]
    }
   },
@@ -34,7 +34,7 @@
    "do": "click",
    "on": {
     "sketch_point": [
-     -5,
+     90,
      20
     ]
    }
@@ -51,8 +51,8 @@
    "do": "click",
    "on": {
     "sketch_point": [
-     -30,
-     12
+     64,
+     0
     ]
    }
   },
@@ -60,38 +60,8 @@
    "do": "click",
    "on": {
     "sketch_point": [
-     -38,
-     12
-    ]
-   }
-  },
-  {
-   "do": "type",
-   "text": "#width/2"
-  },
-  {
-   "do": "key",
-   "key": "Enter"
-  },
-  {
-   "do": "wait",
-   "until": "regenerated"
-  },
-  {
-   "do": "click",
-   "on": {
-    "sketch_point": [
-     -17.5,
-     5
-    ]
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "sketch_point": [
-     -17.5,
-     -3
+     85,
+     -8
     ]
    }
   },
@@ -102,18 +72,11 @@
   {
    "do": "key",
    "key": "Enter"
-  },
+  }
+ ],
+ "expect": [
   {
-   "do": "wait",
-   "until": "regenerated"
-  },
-  {
-   "do": "key",
-   "key": "Escape"
-  },
-  {
-   "do": "wait",
-   "until": "regenerated"
+   "live": "behaviours 4777: '#var' gives the label 10 with a grey ƒx icon"
   }
  ]
 }
