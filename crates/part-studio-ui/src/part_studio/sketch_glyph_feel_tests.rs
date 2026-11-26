@@ -418,6 +418,7 @@ fn a_selected_points_glyph_sits_above_it(cx: &mut TestAppContext) {
             let ed = v.sketch.as_mut().expect("sketch mode");
             ed.set_show_constraints(show);
             ed.selection = vec![corner];
+            ed.cursor = None;
             cx.notify();
         }));
         draw(cx, window);
@@ -435,6 +436,44 @@ fn a_selected_points_glyph_sits_above_it(cx: &mut TestAppContext) {
     assert_eq!(two.len(), 2, "{two:?}");
     assert!(two.iter().all(|c| (c.y + 40.0).abs() <= 1.5) && (two[1].x - two[0].x - 22.0).abs() <= 0.5, "a row 22 px apart, 40 px up: {two:?}");
     assert!((-13.0..=-5.0).contains(&two[0].x) && (fix_x - two[1].x).abs() <= 0.5, "Coincident left, Fix right: {two:?}, Fix at {fix_x}");
+}
+
+/// Live glyph-taken-1125 gl5: a lone selected point's glyph sits ~38.5 px from it, at right angles to the line to the
+/// pointer, on its upper side (pointer parked at (1700, 950); the points at (604, 574), (1605, 355), (1805, 574)).
+#[gpui::test]
+fn a_selected_points_glyph_turns_from_the_pointer(cx: &mut TestAppContext) {
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "glyph-point-circle", Tool::Select);
+    let (o, dx, dy) = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().screen_map.unwrap());
+    let plane = |q: DVec2| o + glam::DMat2::from_cols(dx, dy) * q;
+    let a = DVec2::new(450., 300.);
+    let t = cx
+        .update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| {
+            let t = data.sketch.add_point(plane(a));
+            data.sketch.add_constraint(noshape_sketch::ConstraintKind::Fix { entity: t }).unwrap();
+            t
+        })))
+        .expect("in a sketch");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let at = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        v.viewport.read(cx).project(ed.frame.to_world(v.sketch_data(cx).unwrap().sketch.point(t).unwrap())).unwrap()
+    });
+    for (pointer, live) in [(DVec2::new(1096., 376.), 15.0), (DVec2::new(95., 595.), 84.0), (DVec2::new(-105., 376.), -77.0)] {
+        cx.update(|cx| view.update(cx, |v, cx| {
+            let ed = v.sketch.as_mut().expect("sketch mode");
+            ed.set_show_constraints(false);
+            ed.selection = vec![t];
+            ed.cursor = Some(plane(at + pointer));
+            cx.notify();
+        }));
+        draw(cx, window);
+        let c = cx.update(|cx| view.read(cx).ui.glyph_boxes.iter().filter(|b| b.1 == t).map(|b| DVec2::new(f64::from(b.2) + 10.0, f64::from(b.3) + 10.0) - at).collect::<Vec<_>>());
+        assert_eq!(c.len(), 1, "{c:?}");
+        let angle = c[0].x.atan2(-c[0].y).to_degrees();
+        assert!((c[0].length() - 38.5).abs() <= 1.5 && (angle - live).abs() <= 6.0, "pointer at {pointer}: {c:?} ({angle:.0}°, live {live}°)");
+    }
 }
 
 /// Live glyph-taken-1125: two points 9-37 px apart selected (Show constraints off; live: a rectangle's top corners), the
@@ -469,6 +508,7 @@ fn a_second_points_glyph_goes_left_when_its_spot_is_taken(cx: &mut TestAppContex
         let ed = v.sketch.as_mut().expect("sketch mode");
         ed.set_show_constraints(false);
         ed.selection = vec![t1, t2];
+        ed.cursor = None;
         cx.notify();
     }));
     draw(cx, window);

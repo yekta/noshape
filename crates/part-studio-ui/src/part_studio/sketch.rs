@@ -5211,6 +5211,7 @@ impl PartStudioView {
         let mut glyphs = glyphs;
         glyphs.sort_by_key(|g| if g.on_point { ed.selection.iter().position(|e| *e == g.entity).unwrap_or(usize::MAX) } else { usize::MAX });
         let mut point_rows: Vec<(f32, f32, f32)> = Vec::new();
+        let pointer = ed.cursor.and_then(&project);
         let mut row_left: HashMap<u32, (f32, f32)> = HashMap::new();
         for g in glyphs {
             // Dragged glyphs sit centered on their stored offset. Live
@@ -5242,13 +5243,15 @@ impl PartStudioView {
                     let kf = *k as f32;
                     *k += 1;
                     if g.on_point && !show_all {
-                        // Show constraints off: a centred row straight above the point, ~40 px up, in screen space
-                        // (live, behaviours "skasm point glyph placement": 1 glyph (+4..+9, -39), 2 (-11 / +11, -39)).
+                        // Show constraints off: the row centred ~38.5 px from the point, at right angles to the line
+                        // to the pointer, on its upper side (live glyph-taken-1125 gl5: 17 points, pointer parked at
+                        // (1700, 950), within 5°); the pointer on the point, straight above (+4, -40).
                         // Its spot taken by an earlier selected point's row (6 px apart or less), the row goes left
                         // of the point, its last glyph centred at (-40, -12) (live glyph-taken-1125: past the first).
                         let (left, top) = *row_left.entry(g.entity.0).or_insert_with(|| {
-                            let (l, t) = (-6.0 - 11.0 * (n - 1.0), -50.0);
                             let w = 22.0 * n - 2.0;
+                            let (cx, cy) = point_glyph_spot(pointer.map(|(px, py)| (px - x, py - y)));
+                            let (l, t) = (cx - w / 2.0, cy - 10.0);
                             let taken = point_rows.iter().any(|&(rl, rr, rt)| (y + t - rt).abs() < 20.0 && x + l < rr + 6.0 && x + l + w > rl - 6.0);
                             let (l, t) = if taken { (-50.0 - 22.0 * (n - 1.0), -22.0) } else { (l, t) };
                             point_rows.push((x + l, x + l + w, y + t));
@@ -7078,6 +7081,16 @@ fn model_straight_edges(display: &noshape_model::display::StudioDisplay, frame: 
         }
     }
     out
+}
+
+/// A lone selected point's glyph row centre, from the point, given the pointer's offset from it (screen px, y down): ~38.5 px
+/// away at right angles to the pointer, on the upper side (live glyph-taken-1125 gl5); straight above with no pointer.
+fn point_glyph_spot(pointer: Option<(f32, f32)>) -> (f32, f32) {
+    const R: f32 = 38.5;
+    let Some((dx, dy)) = pointer.filter(|(dx, dy)| dx * dx + dy * dy > 16.0) else { return (4.0, -40.0) };
+    let len = (dx * dx + dy * dy).sqrt();
+    let (ux, uy) = if dx > 0.0 { (dy / len, -dx / len) } else { (-dy / len, dx / len) };
+    (R * ux, R * uy)
 }
 
 /// The centre of the circle through three points (none when they are in a line).
