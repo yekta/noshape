@@ -339,20 +339,37 @@ pub fn split_part(ev: &mut EvalCtx) -> FResult<()> {
         // piece keeps comes first, whichever way the tool faces and however big the pieces. A body several features
         // made: the earlier feature's faces first (c2-body-draft-naming's Split 2: Extrude 1's box is Part 1, the boss
         // Part 2).
-        if let Some(order) = face_creation_order(ev, &target.faces) {
-            let holds = |p: &NamedShape, i: usize| p.names.faces.iter().any(|f| f.descends_from(&target.faces[i]));
-            let keys: Vec<usize> = pieces.iter().map(|p| order.iter().position(|&i| holds(&p.2, i) && !pieces.iter().all(|o| holds(&o.2, i))).unwrap_or(usize::MAX)).collect();
-            let mut keyed: Vec<_> = keys.into_iter().zip(pieces).collect();
-            keyed.sort_by_key(|k| k.0);
-            pieces = keyed.into_iter().map(|k| k.1).collect();
+        let holds = |p: &NamedShape, i: usize| p.names.faces.iter().any(|f| f.descends_from(&target.faces[i]));
+        let first_held = |pieces: &[(f64, DVec3, NamedShape)], order: &[usize]| -> Vec<usize> {
+            pieces.iter().map(|p| order.iter().position(|&i| holds(&p.2, i) && !pieces.iter().all(|o| holds(&o.2, i))).unwrap_or(usize::MAX)).collect()
+        };
+        let by_keys = |keys: Vec<usize>| {
+            let mut idx: Vec<usize> = (0..keys.len()).collect();
+            idx.sort_by_key(|&j| keys[j]);
+            idx
+        };
+        // Piece ids as v0.4.71 gave them (a saved document's Body references name them): only a body one Extrude made
+        // ordered by its faces.
+        let ids = match crate::naming::extrude_face_order(&target.faces) {
+            Some(order) => by_keys(first_held(&pieces, &order)),
+            None => (0..pieces.len()).collect(),
+        };
+        let kept_side = |p: &(f64, DVec3, NamedShape)| both || if front { p.0 > 0.0 } else { p.0 < 0.0 };
+        let mut id_of = vec![0; pieces.len()];
+        for (j, &k) in ids.iter().filter(|&&k| kept_side(&pieces[k])).enumerate() {
+            id_of[k] = j;
         }
-        if !both {
-            pieces.retain(|p| if front { p.0 > 0.0 } else { p.0 < 0.0 });
-        }
+        let names = match face_creation_order(ev, &target.faces) {
+            Some(order) => by_keys(first_held(&pieces, &order)),
+            None => (0..pieces.len()).collect(),
+        };
+        let names: Vec<usize> = names.into_iter().filter(|&k| kept_side(&pieces[k])).collect();
+        let mut slots: Vec<Option<(f64, DVec3, NamedShape)>> = pieces.into_iter().map(Some).collect();
+        let pieces: Vec<(usize, (f64, DVec3, NamedShape))> = names.into_iter().filter_map(|k| slots[k].take().map(|p| (id_of[k], p))).collect();
         // Live ("qa5 booleans"): every piece is a new part (new id) in the
         // source's colour, at the end of the parts list.
         ev.ctx.bodies.remove(ti);
-        for (j, (_, _, p)) in pieces.into_iter().enumerate() {
+        for (j, (_, _, p)) in pieces.into_iter() {
             let bid = BodyId { feature: ev.feature, index: (tord * 64 + j) as u32 };
             ev.ctx.part_source.insert(bid.clone(), (id.clone(), true));
             kept.push((bid, target.kind, target.color, p));

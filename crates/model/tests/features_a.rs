@@ -4375,3 +4375,25 @@ fn a_split_part_two_extrudes_made_puts_the_first_extrudes_piece_first() {
         assert_eq!(names, ["Part 1", "Part 2"]);
     }
 }
+
+/// A document saved by v0.4.71 names a split piece by its Body id (c2-duct-multipart's Split 2 and Mirror 1 name Split
+/// 1's pieces): numbering a part several features made by which made its faces first leaves the ids as they were.
+#[test]
+fn a_split_part_two_extrudes_made_keeps_its_pieces_ids() {
+    let mut t = T::new();
+    let part = {
+        t.block(0.0, 0.0, 0.04, 0.03, "10 mm");
+        t.ok().context.bodies[0].id.clone()
+    };
+    let top = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let s = t.sketch(Reference::FeaturePlane(top), rect(0.01, 0.01, 0.03, 0.02));
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "15 mm", "ADD");
+    let at = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+    let split = t.add("splitPart", &[("targets", q(vec![body_ref(&part)])), ("tool", q(vec![Reference::FeaturePlane(at)])), ("keepBothSides", b(true))]);
+    let r = t.ok();
+    let boss = BodyId { feature: split, index: 0 };
+    let ids: Vec<(BodyId, f64)> = r.context.bodies.iter().map(|b| (b.id.clone(), b.shape.bounding_box(true).unwrap().min.z * 1e3)).collect();
+    assert!(ids.iter().any(|(id, z)| *id == boss && (z - 10.0).abs() < 1e-6), "piece 0 is the boss, as v0.4.71 made it: {ids:?}");
+    assert!(ids.iter().any(|(id, z)| *id == BodyId { feature: split, index: 1 } && z.abs() < 1e-6), "{ids:?}");
+}
