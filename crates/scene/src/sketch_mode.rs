@@ -11732,6 +11732,28 @@ mod tests {
     /// segment's box lies left of its drawing direction on the perpendicular through its middle, its centre (px)
     /// 27 above one drawn rightward, 25 below one drawn leftward, 41 right of one drawn downward, 35 down-right of one
     /// drawn down-left; left of one drawn upward (live2 11-17 value-box).
+    /// Live 2022 (1): the typed box on a sketch's first line (its first dimension too) never scales: the 1st click's
+    /// end moves to the length, the 2nd click's stays, in all four directions (lines A-D as drawn, mm).
+    #[test]
+    fn a_first_lines_typed_length_moves_its_first_click_end() {
+        let mm = |x: f64, y: f64| v(x, y) * 1e-3;
+        for (from, to, start) in [
+            (mm(20.13, 20.276), mm(39.968, 24.36), mm(25.276, 21.335)),
+            (mm(39.968, 30.195), mm(20.13, 34.279), mm(34.822, 31.255)),
+            (mm(-39.968, -19.692), mm(-20.13, -15.608), mm(-34.822, -18.633)),
+            (mm(-20.13, -29.612), mm(-39.968, -25.819), mm(-25.235, -28.636)),
+        ] {
+            let (mut ed, mut d) = editor(Tool::Line);
+            click(&mut ed, &mut d, from);
+            click(&mut ed, &mut d, to);
+            ed.commit_otf(&mut d, "15", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
+            let line = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
+            let c = d.sketch.curve(line).unwrap();
+            assert!((c.end_point() - to).length() < 1e-9, "{from} -> {to}: the 2nd click's end stays at {}", c.end_point());
+            assert!((c.start_point() - start).length() < 1e-5, "{from} -> {to}: start {} (live {start})", c.start_point());
+        }
+    }
+
     #[test]
     fn a_drawn_lines_box_lies_left_of_its_direction() {
         let side = |from: DVec2, to: DVec2| {
