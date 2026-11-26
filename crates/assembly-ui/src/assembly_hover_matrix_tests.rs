@@ -393,3 +393,17 @@ fn fastened_vertex_hovered(cx: &mut TestAppContext) {
     assert!(between(&c, 4.5, 6.5).any(|p| close(p, 0xf8c58a, 20)), "inside the vertex's light orange disc");
     assert!(!between(&c, 0.0, 30.0).any(|p| p[2] > 180 && p[0] < 60 && p[1] < 60), "no connector triad (its blue Z)");
 }
+
+/// Interaction-feel "Combined states in an assembly" (live REQUESTS 07:02 (3) to confirm): with Fastened open, Mate
+/// connector 1 takes the hover from its corner's inference dot (its glyph lit, no inferred point); a plain corner infers.
+#[gpui::test]
+fn combined_hover_mate_connector_in_a_mate_dialog(cx: &mut TestAppContext) {
+    let m = matrix(cx, "mc-in-mate");
+    cx.update_window(m.window, |_, w, cx| m.view.update(cx, |v, cx| v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx))).unwrap();
+    let (mc, corner) = (m.screen(cx, MC), m.screen(cx, VERTEX));
+    m.park(cx);
+    m.hover(cx, mc);
+    assert!(cx.update(|cx| m.view.read(cx).hover_overlay.is_some() && m.view.read(cx).infer.is_none()), "the connector's glyph lit, no inference");
+    m.hover(cx, corner);
+    assert!(cx.update(|cx| m.view.read(cx).infer.is_some()), "a plain corner infers");
+}
