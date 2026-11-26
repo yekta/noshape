@@ -12,6 +12,9 @@ on:
       ref:
         description: 'Build this branch/commit from source instead of a release'
         required: false
+      uiparity:
+        description: 'ui-parity scenarios to run instead of the folder links (space-separated names)'
+        required: false
 
 permissions:
   contents: read
@@ -45,11 +48,24 @@ jobs:
           asset: ${{ matrix.asset }}
 
       - name: Documents page folder links
+        if: inputs.uiparity == ''
         shell: bash
         run: |
           py=python; command -v python3 > /dev/null && [ "$RUNNER_OS" != Windows ] && py=python3
           $py -m pip install -q pillow || $py -m pip install -q --break-system-packages pillow
           $py .github/qa/footer.py --bin "$BIN" --out "$RUNNER_TEMP/qa"
+
+      # The same scenarios as on Linux, to find what differs by platform (keys, menus, fonts, hit-testing).
+      - name: ui-parity sample
+        if: inputs.uiparity != ''
+        shell: bash
+        env:
+          UIP: ${{ inputs.uiparity }}
+          PYTHONUTF8: '1'
+        run: |
+          py=python; command -v python3 > /dev/null && [ "$RUNNER_OS" != Windows ] && py=python3
+          mkdir -p "$RUNNER_TEMP/qa"
+          $py -u tools/ui-parity/run.py --app "$BIN" --display '' --out "$RUNNER_TEMP/qa/uip" --timeout 900 $UIP 2>&1 | tee "$RUNNER_TEMP/qa/uip.log"
 
       - uses: actions/upload-artifact@v7
         if: always()
