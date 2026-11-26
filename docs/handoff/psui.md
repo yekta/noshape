@@ -123,24 +123,32 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Run: rb.sh on vibe2: `cargo build --profile ui-bench -p noshape --bin noshape`, then from the src root
   `~/bin/slot bash tools/perf/ui-audit.sh $HOME/agents/psui/target/ui-bench/noshape :151 3 ~/tmp/psui/auditN`.
 
-## Drawing triage + asm shard + qa 12:3x tickets (lead 11-26 09:3x / 10:50 / 12:2x): IN FLIGHT, not landed
-- Baseline 1125-1501: drw 382/457, 53 maker-scope failures; asm shard (green bc0fc23b8) 212/225.
-- verify run 1 (12:16, ~/tmp/psui/ver): ops e2e 312 ok, drawing-ui/assembly-ui lib ok; 87 failures rerun → 79/87
-  (drw 70/75). Left: foreshorten s3 (radial), centerline-circle-3-point(+hole-centres), geometric-tolerance,
-  ordinate-add-to-group, asm-drag-revolute-turns, asm-measure-face-cylinder-panel, asm-replicate-pick-mated-pin (pre-fix).
-- Commits since (all T1'd): radial text halfway at 0° for a click within r/2 (pending.rs, live triage 3); foreshortened
-  radius reads as "dimension"; runner presses an ordinate group at its first value's point (no Reset ordinate); circle
-  centerline click on a quadrant snap takes it (pick.rs circle_click_point); hole-centres live_defects s4 (lead 11-23);
-  run.py click_placed_points (2 px on plane, README), button_focused + created_feature_owner (README Focus); Shell too
-  thick blames `entities`; edited mate row red while its title is + mate chip × named button:x:<box>:<row>.
-- Asked live (REQUESTS 12:24): drw-geometric-tolerance empty-slot clicks (11-19 take places, 11-23 gdt.md says not).
-- qa 12:3x tickets: SKETCH-CLICK-OFFSET 6/7 by compare-only (7th = EXTRUDE-OPEN-SKETCH s17: hover "feature:Extrude 1"
-  "is not shown" while its dialog is open: our row not registered then; open). HIDDEN-ROW-TOOLTIP done (a46af04f9);
-  EXPORT-PARASOLID seed done (a46af04f9). ASM-REPLICATE-MATED-PIN-ROW (filed skasm) done by me in 324fcaa20: tell lead.
-- verify2 (radial commit only; 77 Esc/radial drw scenarios → ~/tmp/psui/ver2): its radial T1 failed (test toggled the
-  tool: fixed 38478addb). NEXT: verify3 (/root/psui-scratch/resp/verify3.sh, names3.txt) → land → report drawing
-  before/after + tell qa (Parasolid, asm 5 tickets).
-- Open: asm Measure panel reader; asm-drag-revolute-turns (REQUESTS 11:33); radial drag rule.
+## Drawing triage + asm shard + qa 12:3x tickets (lead 11-26 09:3x / 10:50 / 12:2x): QUEUED 11-26 14:2x
+- Baseline 1125-1501: drw 382/457, 53 maker-scope failures; asm shard (green bc0fc23b8) 212/225. After: the 87
+  failures rerun 79/87 (drw 70/75), the 77 Esc/radial drw 75/77, then verify3-6 (~/tmp/psui/ver3..ver6 on vibe2):
+  ver6 13/14 (114/116 states); drawing-ui 214, assembly-ui 228, scene 259, ops e2e 312 all ok.
+- In the stack: one Esc ends dimension-type tools; reader_artefacts; radial text halfway for a click within r/2;
+  foreshortened radius reads "dimension" (a foreshortened diameter isn't read); ordinate press point; circle
+  centerline quadrants (within 3 px, from the hovered circle) + 2↔3 point tool switch (was toggling off); Remove
+  foreshorten clears the selection; run.py click_placed_points (2 px, DECISIONS 91aa2f213), button_focused,
+  created_feature_owner; Shell too thick blames `entities`; mate: × chip button, row red while dialog red, REST status
+  stays OK, × is an Undo step, edited mate keeps its flip icon; asm Where used / hidden tooltip / select other /
+  Parasolid 38.1 seed; Import Units; Tangent edges greys the current style; Isometric menu has Rotate view, no
+  Suppress alignment (views::is_isometric / views::turns_freely, ops uses it too). 324fcaa20 dropped (skasm bf9f9f32).
+- Open: drw-dimension-foreshorten s10: ours reads EDGE+ (the menu-row hover rule, drawing_ui_state ~l.690) where
+  live's 11-26 take reads nothing; mistake-extrude-open-sketch s17 (+ mistake-sketch-gap-profile-extrude, qa): our
+  Extrude row isn't registered while its dialog is open; drw-geometric-tolerance (REQUESTS 12:24); asm Measure panel
+  reader; asm-drag-revolute-turns (REQUESTS 11:33); radial drag rule. SKETCH-CLICK-OFFSET is qa/live's now
+  (SKETCH-CLICK-ONE-PIXEL).
+
+## NEXT (lead 11-26 13:5x, live gap-audit-drw-1126, behaviours "First-week drawing gaps")
+- (1) counterbore / countersink callouts 6.6 / 4.2 mm narrower: live centres each line on the widest, symbols in
+  Drawing Symbols Sans; boxes tapped 29.58, cbore 32.25, csink 33.19, blind 25.09 mm (h 0.12 in, pitch 0.199 in).
+  Ours: sheet.rs HoleCallout (lines left-aligned at x0, font::text_width). Measure ours first (start
+  hole-types-plate-drawing, takes drw-hole-callout-*, drw-thread-callout-tapped).
+- (2) Esc keeps the Diameter tool: probably fixed by the Esc commit (green 11:31 predates it): run
+  drw-dimension-diameter-tapped-hole (picked circle stays selected after Esc).
+- (3)/(4) done in the stack; check drw-view-tangent-edges-menu after the rebase.
 
 ## Agents
 
