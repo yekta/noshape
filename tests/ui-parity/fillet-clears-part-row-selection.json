@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "live psui/hover-combined-1125 (behaviours 'hover in combined states')",
  "start": "block",
+ "remembered": {
+  "fillet": {
+   "length:Millimeter": {
+    "radius": "2 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

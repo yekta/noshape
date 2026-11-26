@@ -4,6 +4,13 @@
  "area": "psui",
  "source": "live behaviours 'First-hour mistakes, batch 2' (qa MISTAKES-2)",
  "start": "block",
+ "remembered": {
+  "fillet": {
+   "length:Millimeter": {
+    "radius": "16 mm"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",

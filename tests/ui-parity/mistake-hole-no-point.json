@@ -4,6 +4,23 @@
  "area": "psui",
  "source": "live behaviours 'First-hour mistakes, batch 2' (qa MISTAKES-2)",
  "start": "block",
+ "remembered": {
+  "hole": {
+   "": {
+    "unitsSystem": "INCH",
+    "styleV2": "SIMPLE",
+    "ansiHoleTableEx": [
+     "Drilled",
+     "1/4 (0.25)"
+    ],
+    "ansiHoleTable": [
+     "Drilled",
+     "1/4 (0.25)"
+    ],
+    "endStyleV2": "THROUGH"
+   }
+  }
+ },
  "steps": [
   {
    "do": "click",
