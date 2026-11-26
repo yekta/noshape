@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 15:54 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 16:24 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -28,7 +28,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (a) b58244 (~70 rows): IMPORT GAP, not geometry: live Sketch 3's sketchPlane is a qCompressed query with no
   deterministicIds and no refs.jsonl row; we fall back to Front (y 0) where live's is a face at y -2 mm, so Extrude 4
   (+0.5 mm boss, live +61.3 mm3) is contained (Info) and Plane 1.. cascade. Ours = live through Move face 1 (21721.72).
-  Reported to the lead (capture/importer owner).
+  Reported to the lead (capture/importer owner). live 16:0x added 24 refs rows: rerun 16:21: Extrude 4 = live now
+  (Sketch 3 on its face; ours = live through Transform 1, 56055.30); first failure now Plane 1: ref KZGB box at y = -2
+  (point (52.516,-2,25.800)) but our Extrude 4 cap at that x,z is at y = -2.5 (boss -2..-2.5, volume = live): import
+  says "no face of ours" -> ask live/skasm whether the KZGB row (captured 11-21) is stale vs the 11-26 Sketch 3 row.
+  New b58244 tab 22490dcfa787b5a5.
   (b) 404ddb Hole 2 (then Mirror 1, Split 1, Extrude 5-8, Booleans): Ø8.2 x 42 blind coaxial with the r14 bar from its
   x 59 end face; the input = live (73840.04 vs .83). Ours "Hole creates invalid geometry": the profile shows only the ray
   common (boolean.rust) and op_revol, no cut recorded or OCCT build: looks like the own Boolean's cut errors with no
@@ -36,7 +40,15 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (c) 9cbb0e: Foot = live through Fillet 7 (64907.55); Fillet 8 -0.017, Fillet 12 -0.017; FILLET 17 is the first real
   diff: r 8 on ONE line edge (x -15.54, z -27.68 mm, along y, 16 mm), live 79 -> 80 faces / -154.8 mm3, ours 79 -> 83 /
   -250.7 (vibex7 ~/tmp/core/sc/foot-live.txt; dump ~/agents/core-keep/f17-9cbb0e/fillet-16.brep+txt = edge 177 r 0.008).
-  NEXT. Then Fillet 18 (r 0.8 x 8, fails), 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  WIP 11-26 16:24 (UNCOMMITTED in core-rf: features.cpp fillet_over_smooth_faces + BallSide/ball_centre helpers
+  refactored out of fillet_overflows; OSF_DBG debug prints to strip; probe crash_inputs zz_probe_f17 to drop; .f17.sh):
+  edge 177 = top face 64 (0.6 mm strip) / face 65 (3.8 mm), 65 TANGENT into face 66 (cyl r9 c (-8.53,-34.49)); y walls
+  76/78 at -8.25/7.75. OCCT rolls on 64 + 65 EXTENDED (section 15.68 mm2 = ours); live = ball on 64 + 66: 9.42 mm2 x16 =
+  150.7 (live 154.8). OCCT Defeaturing refuses face 65 (AlertUnableToRemoveTheFeature: tangent) -> own prism fill
+  (A, V' = plane64 x cyl66, arc to D0, back) fused + UnifySameDomain (only fill/body edges) = valid 78 faces; made 1 edge;
+  BUT BRepFilletAPI on the new 64/66 edge fails or is invalid ("OSF filleting" then nothing): next look why (r 8 on
+  a 47 deg nose whose round overflows face 40 at e147; try fillet_checked's full path on s0 instead of a bare mk).
+  NEXT after: Fillet 18 (r 0.8 x 8, fails), 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
   surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
