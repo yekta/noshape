@@ -123,20 +123,26 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Run: rb.sh on vibe2: `cargo build --profile ui-bench -p noshape --bin noshape`, then from the src root
   `~/bin/slot bash tools/perf/ui-audit.sh $HOME/agents/psui/target/ui-bench/noshape :151 3 ~/tmp/psui/auditN`.
 
-## Drawing interaction triage (lead 11-26 09:3x): IN FLIGHT, waiting for live
-- Run 1125-1501-c7944540 (/root/qa-scratch/suites/1125-1501-c7944540/uip, uip.log): drw 382/457; 75 fail, 53 in maker scope
-  (views, dimensions, notes, title block, export): 48 fail on Esc after a dimension (recordings 11-14..11-22: tool null; live
-  drw-dims-1123 + studios 9aa272149: Esc keeps the tool), + drw-copy-annotation-drag / drw-note-hover-matrix (note grab
-  point), drw-dimension-foreshorten (radial text position), drw-view-properties-scale-typed (scale applied at Enter; label
-  order), drw-view-move-to-sheet-ok (picked sheet shown before OK = studios 7d931a213 from workflows-1123). Out of scope 22.
-- REQUESTS "psui 11-26 09:40" asks live stale-or-ours per item. On the answer: stale → live re-records; ours → fix with T1s,
-  most-used first (dimension tools), then full ops e2e (drawing rule) before land.sh. Report before/after (in scope 0/53 now).
-- Diff helper: /root/psui-scratch/resp/sdiff.py <ours dir> <live dir> <name> <steps,...>.
-- 11-26 09:5x: note grab was ours (runner pressed the text centre; live's recorder the note's top-left corner = where it
-  was placed): fixed in ui_target_point + T1 the_runner_grabs_a_note_at_its_corner (1af5597ca), ops e2e + drawing-ui run
-  before land. scale-typed: stale per live's own viewprops-scale-enter-1123 (re-record only). foreshorten: studios
-  5ae8c1c43 (halfway, = this record) vs 0c904a521 (where dropped, from a drag): asked live creation vs drag (item 3).
-- Also answered (09:20): live/psui/asm-triad-hover-1126 (ASM-SELECTED-HOVER-LOOK arrow): after the drawings.
+## Drawing triage + asm shard (lead 11-26 09:3x / 10:50): IN FLIGHT (not landed: e15fb05f1..5e45bcb81)
+- Baseline run 1125-1501: drw 382/457, 53 maker-scope failures; asm shard on green bc0fc23b8 (vibe2, ~/tmp/psui/asm,
+  local copy /root/psui-scratch/asm): 212/225.
+- Live answered (live/psui/drw-triage-1126/index.md): Esc rule ours (one Esc ends Dimension/Radial/Ordinate) → reverted
+  9aa272149's Esc part (Datum, Surface finish too; right-click part kept), T1 one_esc_ends_a_dimension_tool. Note grab =
+  insertion point (`position`) → ui_target_point, T1 the_runner_grabs_a_note_at_its_insertion_point. Scale at Enter /
+  Move to sheet s9: reader artefacts → new scenario key `reader_artefacts` (run.py, README), compare-only 2/2 match.
+- Radial placed inside the hole (item 3): live takes (-1,1)→(83.5,160.8) halfway, (-2,-2)→(77.1,157.8), (3,0)→(83.8,160.8);
+  takes queued 6ea5f8246. Rule not derived yet (not at the click, not always halfway). Open.
+- asm fixes: subassembly list menu Where used… (WhereUsedAssembly(TabId), workspace open_where_used), hidden row tooltip
+  "(Hidden)", Select other also as list {kind select-other}, asm-menu-export seed version 0 (38.1), incomplete Replicate
+  row red; T1s in assembly_ui_tests / feel_tests. Import dialog Units noted as a field (qa 70-dl-bracket; no T1: recorder
+  needs NOSHAPE_UI_SCRIPT).
+- Open asm: asm-measure-face-cylinder-panel (live's new recorder reads the Measure panel: dialog text/fields + measure
+  readout; our asm reader has none: a reader feature), asm-drag-revolute-turns (REQUESTS psui 11:33: live CW −39.3° vs
+  follow-the-point +23.6°, ours +27.9°).
+- Lead 11-26 ~11:40 (context cap): Esc (55 scenarios) and the scale / Move to sheet exclusion are what's asked; both done
+  in e15fb05f1 / 2c10093d0. After compaction: read the verify result, then land and report.
+- Verify run (vibe2, /root/psui-scratch/resp/verify.sh, names.txt = 75 drw fails + 12 asm): build ui-bench, drawing-ui +
+  assembly-ui lib, ops e2e, scenarios → ~/tmp/psui/ver. Then: tests for 324fcaa20/5e45bcb81, land, report before/after.
 
 ## Agents
 
