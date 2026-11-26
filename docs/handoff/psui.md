@@ -132,6 +132,10 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - REQUESTS "psui 11-26 09:40" asks live stale-or-ours per item. On the answer: stale → live re-records; ours → fix with T1s,
   most-used first (dimension tools), then full ops e2e (drawing rule) before land.sh. Report before/after (in scope 0/53 now).
 - Diff helper: /root/psui-scratch/resp/sdiff.py <ours dir> <live dir> <name> <steps,...>.
+- 11-26 09:5x: note grab was ours (runner pressed the text centre; live's recorder the note's top-left corner = where it
+  was placed): fixed in ui_target_point + T1 the_runner_grabs_a_note_at_its_corner (1af5597ca), ops e2e + drawing-ui run
+  before land. scale-typed: stale per live's own viewprops-scale-enter-1123 (re-record only). foreshorten: studios
+  5ae8c1c43 (halfway, = this record) vs 0c904a521 (where dropped, from a drag): asked live creation vs drag (item 3).
 - Also answered (09:20): live/psui/asm-triad-hover-1126 (ASM-SELECTED-HOVER-LOOK arrow): after the drawings.
 
 ## Agents
