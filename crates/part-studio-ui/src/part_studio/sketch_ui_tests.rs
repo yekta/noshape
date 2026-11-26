@@ -406,6 +406,15 @@ fn sketch_drags_hide_the_fills_and_undo_one_at_a_time_as_live(cx: &mut TestAppCo
     };
     let fills_hidden = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).opts.sketch_dragging);
     event(cx, ViewportEvent::PointerMove { position: DVec2::new(600., 340.), modifiers: Modifiers::default() });
+    // (Lit under the pointer, as the GPU's pick in the app.)
+    let lit = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let line = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).unwrap().id;
+        Reference::SketchEntity { sketch: v.sketch.as_ref().unwrap().feature, entity: line.0 }
+    });
+    cx.update(|cx| view.update(cx, |v, _| v.hover = Some(lit)));
+    assert!(!cx.update(|cx| view.read(cx).highlighted_hover(cx).is_empty()), "lit before the press");
     event(cx, ViewportEvent::ToolDown { position: DVec2::new(600., 340.), modifiers: Modifiers::default(), click_count: 1 });
     event(cx, ViewportEvent::ToolDrag { position: DVec2::new(610., 335.) });
     event(cx, ViewportEvent::ToolDrag { position: DVec2::new(620., 330.) });

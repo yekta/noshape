@@ -1372,6 +1372,11 @@ impl PartStudioView {
         if let Some((ed, e)) = self.sketch.as_ref().filter(|ed| ed.mid_draw()).and_then(|ed| Some((ed, ed.inference.as_ref()?.entity?))) {
             return vec![Reference::SketchEntity { sketch: ed.feature, entity: e.0 }];
         }
+        // Live sketch-drag-1125: nothing lights while the open sketch's geometry is dragged (qa SKETCH-DRAG-FILLS-HOVER:
+        // the pressed rim stayed orange).
+        if self.sketch.as_ref().is_some_and(|ed| ed.geometry_dragging()) {
+            return Vec::new();
+        }
         match &self.hover {
             Some(r) if self.dimension_skips_plane(r, self.viewport.read(cx).pointer_position(), cx) => Vec::new(),
             Some(r @ Reference::Body(_)) => vec![r.clone()],
