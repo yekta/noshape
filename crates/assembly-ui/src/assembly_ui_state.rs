@@ -510,7 +510,7 @@ impl AssemblyView {
             "dialog": dialog,
             "dialogs": dialogs,
             // An open menu (a row's, the graphics area's): its rows, as the Part Studio's.
-            "list": crate::os_menu::ui_state(cx).or_else(|| self.ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))).or_else(crate::ui_script::open_list),
+            "list": crate::os_menu::ui_state(cx).or_else(|| self.ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))).or_else(crate::ui_script::open_list).or_else(|| self.ui_select_other_list(cx)),
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],
@@ -525,6 +525,14 @@ impl AssemblyView {
 impl AssemblyView {
     /// The Mate connector dialog's entities picked in the graphics (not an instance origin it opened with: live
     /// asm-menu-connector-at-origin selects nothing).
+    /// The Select other popup as live's recorder lists it too (asm-face-menu-select-other 11-26: "select-other", its
+    /// rows; the bold one isn't read as highlighted).
+    fn ui_select_other_list(&self, cx: &App) -> Option<Value> {
+        let (rows, _, _) = self.ui.select_other.as_ref()?;
+        let rows: Vec<String> = rows.iter().map(|r| self.select_other_label(r, cx)).collect();
+        Some(json!({ "kind": "select-other", "rows": rows, "highlighted": null }))
+    }
+
     fn mc_picks(&self) -> Vec<&MateConnectorRef> {
         let Some(m) = self.mc.as_ref().filter(|m| !m.picks_undo.is_empty()) else { return Vec::new() };
         // The active field's pick only (live asm-mate-connector-realign: Realign makes the empty Primary axis entity

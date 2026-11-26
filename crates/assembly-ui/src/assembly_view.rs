@@ -640,8 +640,9 @@ pub enum AssemblyViewEvent {
     /// Instance menu › Where used for <part>… (live, Professional: asm-triad-move-to-origin-free): the part's Part
     /// Studio with its Where used panel open.
     WhereUsed(TabId, noshape_model::reference::BodyId),
-    /// The top-level row's Where used…: the rail's Where used panel, on this assembly.
-    WhereUsedAssembly,
+    /// The top-level row's Where used…: the rail's Where used panel, on this assembly; a subassembly instance's, on
+    /// its assembly (live Pro asm-menu-unlock 11-26).
+    WhereUsedAssembly(TabId),
     /// Instance menu › Edit in context: open the Part Studio with the
     /// assembly as context graphics.
     EditInContext(TabId, Box<crate::assembly_context::AssemblyContext>),
@@ -4735,15 +4736,17 @@ impl AssemblyView {
         // Live E15: "Part 2 <1> has error: Failed to resolve instance." (the badge repeats it).
         // A pattern copy in error (live 1754 (C)) is red with just its name.
         // Every row's label has its name as its tooltip, cut off or not (live2 asm-feel2 (a)).
+        // A hidden one's ends " (Hidden)", as a hidden mate's (live Pro asm-hover-hidden-instance-row 11-26).
+        let tail = if hidden { " (Hidden)" } else { "" };
         let row_tip: SharedString = if let Some(e) = error.as_ref().filter(|e| !e.is_empty()) {
-            format!("{name} has error: {e}").into()
+            format!("{name} has error: {e}{tail}").into()
         } else if dyn_suppressed {
             format!("{name} (Suppressed with expression)").into()
         } else if suppressed {
             // Live2 errors-1119 a6: "Part 2 <1> (Suppressed)".
             format!("{name} (Suppressed)").into()
         } else {
-            name.clone().into()
+            format!("{name}{tail}").into()
         };
         // More than one part fixed: the warning sits on the fixed icon, its tooltip live's words alone (live2
         // errors-1119 a2-p1warn).

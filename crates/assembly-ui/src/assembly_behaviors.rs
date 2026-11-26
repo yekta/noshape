@@ -1618,6 +1618,13 @@ impl AssemblyView {
         if let Some((studio, body)) = part.clone() {
             where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsed(studio, body.clone()))));
         }
+        // A subassembly of this document's too (live Pro asm-menu-unlock 11-26).
+        if let InstanceSource::Assembly { assembly, .. } = &inst.source
+            && !multi
+        {
+            let a = *assembly;
+            where_used = Some(item("Where used…", move |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedAssembly(a))));
+        }
         m.extend(where_used);
         if let Some((studio, body)) = part.filter(|_| noshape_ops::release_settings::managed_workflows()) {
             m.push(item("Revision history…", move |t, w, cx| crate::assembly_hooks::open_part_revision_history(t.doc.clone(), studio, body.clone(), w, cx)));
@@ -2280,7 +2287,7 @@ impl AssemblyView {
         });
     }
 
-    fn move_ids_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
+    pub(super) fn move_ids_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
         let mut new_id = None;
         self.edit_doc(noshape_ops::assembly::MOVE_TO_NEW_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::move_to_new_subassembly(doc, tab, &ids));
         // Live (asm-menu-move-to-new-subassembly): nothing is selected after.
@@ -2406,7 +2413,7 @@ impl AssemblyView {
         m.push(MenuEntry::Sep);
         m.push(item("Export…", |t, w, cx| t.open_asm_export(None, w, cx)));
         // Live revtools-1121: Where used… after Export…; with managed workflows Release… and Revision history… after it.
-        m.push(item("Where used…", |_, _, cx| cx.emit(AssemblyViewEvent::WhereUsedAssembly)));
+        m.push(item("Where used…", |t, _, cx| cx.emit(AssemblyViewEvent::WhereUsedAssembly(t.tab))));
         if noshape_ops::release_settings::managed_workflows() {
             m.push(item("Release…", |t, w, cx| {
                 let items = crate::assembly_hooks::release_tab_items(t.doc.read(cx), t.tab);

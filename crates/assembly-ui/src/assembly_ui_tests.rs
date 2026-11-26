@@ -1253,7 +1253,7 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
                 super::AssemblyViewEvent::ShowPart(_, body) => format!("show {body:?}"),
                 super::AssemblyViewEvent::WhereUsed(_, body) => format!("where used {body:?}"),
                 super::AssemblyViewEvent::ActivateTab(_) => "activate".into(),
-                super::AssemblyViewEvent::WhereUsedAssembly => "where used".into(),
+                super::AssemblyViewEvent::WhereUsedAssembly(t) => format!("where used {t:?}"),
                 super::AssemblyViewEvent::EditInContext(..) | super::AssemblyViewEvent::EditInContextOther(..) => "context".into(),
             })
         })
@@ -1288,6 +1288,32 @@ fn switch_to_part_studio_carries_the_part(cx: &mut TestAppContext) {
     .unwrap();
     cx.run_until_parked();
     assert_eq!(*got.borrow(), [format!("show {body:?}"), format!("where used {body:?}")]);
+    // A subassembly of this document: its list menu's Where used… after Export…, on the subassembly (live Pro
+    // asm-menu-unlock 11-26).
+    got.borrow_mut().clear();
+    let sub = cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 2 <1>", cx);
+            v.move_ids_to_new_subassembly(vec![id], cx);
+            let (id, tab) = v.assembly(cx).unwrap().instances.iter().find_map(|i| match i.source {
+                noshape_model::assembly::InstanceSource::Assembly { assembly, .. } => Some((i.id, assembly)),
+                _ => None,
+            }).expect("the subassembly");
+            let menu = v.instance_menu(id, false, cx);
+            let labels: Vec<&str> = menu.iter().filter_map(|e| match e {
+                super::behaviors::MenuEntry::Item { label, .. } => Some(label.as_str()),
+                _ => None,
+            }).collect();
+            let at = labels.iter().position(|l| *l == "Export…").expect("Export…");
+            assert_eq!(labels.get(at + 1), Some(&"Where used…"), "{labels:?}");
+            let Some(super::behaviors::MenuEntry::Item { act, .. }) = menu.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == "Where used…")) else { panic!("Where used…") };
+            act.clone()(v, w, cx);
+            tab
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert_eq!(*got.borrow(), [format!("where used {sub:?}")]);
 }
 
 /// Show center of mass in an assembly (lead 11-10, the synchronous calls list): each part's own center is worked out
@@ -2539,7 +2565,7 @@ fn a_mate_rows_flyout_shows_the_type_alone_until_a_parameter_is_set(cx: &mut Tes
 /// pointer comes to rest on it (~0.1 s); the next row's replaces it at once.
 #[gpui::test]
 fn every_instance_row_tooltips_its_name(cx: &mut TestAppContext) {
-    let (window, _view) = pattern_assembly(cx, "row-tips");
+    let (window, view) = pattern_assembly(cx, "row-tips");
     draw(cx, window);
     for (name, sel) in [("Part 1 <1>", "inst-row Part 1 <1>"), ("Part 2 <1>", "inst-row Part 2 <1>")] {
         let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
@@ -2558,6 +2584,29 @@ fn every_instance_row_tooltips_its_name(cx: &mut TestAppContext) {
         draw(cx, window);
         assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some(name), "{name}: its name");
     }
+    // A hidden one's: "Part 2 <1> (Hidden)" (live Pro asm-hover-hidden-instance-row 11-26).
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let id = instance(v, "Part 2 <1>", cx);
+            let menu = v.instance_menu(id, false, cx);
+            let Some(super::behaviors::MenuEntry::Item { act, .. }) = menu.iter().find(|e| matches!(e, super::behaviors::MenuEntry::Item { label, .. } if label == "Hide")) else { panic!("Hide") };
+            act.clone()(v, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("inst-row Part 2 <1>").expect("Part 2 <1>'s row");
+    // (Off the list and back, as from the menu.)
+    vcx.simulate_mouse_move(gpui_kit::Point::new(gpui_kit::px(900.), gpui_kit::px(500.)), None, gpui_kit::Modifiers::default());
+    cx.executor().advance_clock(std::time::Duration::from_millis(400));
+    draw(cx, window);
+    crate::ui_script::clear_tooltip();
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_move(b.center(), None, gpui_kit::Modifiers::default());
+    cx.executor().advance_clock(std::time::Duration::from_millis(400));
+    draw(cx, window);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Part 2 <1> (Hidden)"));
 }
 
 /// Live asm-export-1150: an assembly's Export shows "<name> is being prepared for export…" while its file is written

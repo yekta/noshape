@@ -354,11 +354,7 @@ impl Workspace {
                             v.update(cx, |v, cx| v.show_where_used(body.clone(), cx));
                         }
                     }
-                    crate::assembly_view::AssemblyViewEvent::WhereUsedAssembly => {
-                        if !matches!(this.doc_panel, Some((DocPanel::WhereUsed(_), _))) {
-                            this.toggle_where_used(window, cx);
-                        }
-                    }
+                    crate::assembly_view::AssemblyViewEvent::WhereUsedAssembly(t) => this.open_where_used(*t, window, cx),
                     crate::assembly_view::AssemblyViewEvent::EditInContext(t, ctx) => {
                         this.activate(*t, window, cx);
                         if let Some(TabView::PartStudio(v)) = this.views.get(t) {
@@ -1495,25 +1491,37 @@ impl Workspace {
 
     /// The rail's Where used (`doc_panels::WhereUsedPanel`): opens or closes it like the other document panels.
     fn toggle_where_used(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let open = matches!(self.doc_panel, Some((DocPanel::WhereUsed(_), _)));
-        self.doc_panel = None;
-        if !open {
-            self.history = None;
-            HISTORY_OPEN.set(false);
-            self.release_drafts = None;
-            self.tab_manager = None;
-            let (doc, tab) = (self.doc.clone(), self.active);
-            let panel = cx.new(|_| crate::doc_panels::WhereUsedPanel::new(doc, tab));
-            let subs = vec![
-                cx.subscribe(&panel, |this, _, _: &crate::doc_panels::ClosePanel, cx| {
-                    this.doc_panel = None;
-                    cx.notify();
-                }),
-                cx.subscribe_in(&panel, window, |this, _, ev: &crate::doc_panels::OpenTab, window, cx| this.activate(ev.0, window, cx)),
-            ];
-            self.doc_panel = Some((DocPanel::WhereUsed(panel), subs));
+        if matches!(self.doc_panel, Some((DocPanel::WhereUsed(_), _))) {
+            self.doc_panel = None;
+        } else {
+            self.where_used_panel(self.active, window, cx);
         }
         cx.notify();
+    }
+
+    /// The Where used panel on a tab (an assembly's, or its subassembly instance's menu).
+    fn open_where_used(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        if !matches!(&self.doc_panel, Some((DocPanel::WhereUsed(p), _)) if p.read(cx).tab() == Some(tab)) {
+            self.where_used_panel(Some(tab), window, cx);
+        }
+        cx.notify();
+    }
+
+    fn where_used_panel(&mut self, tab: Option<TabId>, window: &mut Window, cx: &mut Context<Self>) {
+        self.history = None;
+        HISTORY_OPEN.set(false);
+        self.release_drafts = None;
+        self.tab_manager = None;
+        let doc = self.doc.clone();
+        let panel = cx.new(|_| crate::doc_panels::WhereUsedPanel::new(doc, tab));
+        let subs = vec![
+            cx.subscribe(&panel, |this, _, _: &crate::doc_panels::ClosePanel, cx| {
+                this.doc_panel = None;
+                cx.notify();
+            }),
+            cx.subscribe_in(&panel, window, |this, _, ev: &crate::doc_panels::OpenTab, window, cx| this.activate(ev.0, window, cx)),
+        ];
+        self.doc_panel = Some((DocPanel::WhereUsed(panel), subs));
     }
 
     /// The Performance panel's numbers: the active Part Studio, the

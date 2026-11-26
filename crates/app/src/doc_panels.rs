@@ -526,6 +526,10 @@ impl WhereUsedPanel {
         Self { doc, tab }
     }
 
+    pub fn tab(&self) -> Option<noshape_model::document::TabId> {
+        self.tab
+    }
+
     /// The tab whose users it lists (the workspace's active tab).
     pub fn set_tab(&mut self, tab: Option<noshape_model::document::TabId>, cx: &mut Context<Self>) {
         if self.tab != tab {

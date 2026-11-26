@@ -948,6 +948,8 @@ fn select_other_on_a_selected_face_lists_the_face(cx: &mut TestAppContext) {
         let labels: Vec<String> = rows.iter().map(|r| v.select_other_label(r, cx)).collect();
         assert!(matches!(rows.first(), Some(SelectOtherRow::Entity(t)) if t.kind == PickKind::Face), "the face first: {labels:?}");
         assert!(labels.iter().any(|l| l == "Part 1 <1>"), "then its part: {labels:?}");
+        // Live's recorder lists it as "select-other" too (asm-face-menu-select-other 11-26).
+        assert_eq!(v.ui_state(cx)["list"], serde_json::json!({ "kind": "select-other", "rows": labels, "highlighted": null }));
     });
 }
 
