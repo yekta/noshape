@@ -28,7 +28,9 @@ reports by feature and reason ("query kind X not mapped"), never silently drops.
 **Runner and score (dx, qa).** A T2 test `parity_models` translates every document under /root/parity/models,
 regenerates feature by feature and compares with live.jsonl within live's tolerance band (counts exact; volume and
 area 1e-6 relative or live's band; centre and box 1e-6 m). Per document: the first feature that differs and how.
-Score: documents that match to the end, and features that match, out of all. Each difference that isn't the
+Score: documents that match to the end, and features that match, out of all. Speed: live's latest timing line in live.jsonl (`full_regen_ms`, `per_feature_ms`; the fresh copies keyed by
+featureId); ours is our feature list's total, and where that is a gap (>= 100 ms and >= 2x live's) the median of it and
+two more runs, each in a fresh process (`time_child`; a reopen in the same process reads caches) (live speed audit 11-26). Each difference that isn't the
 translator's becomes a ticket for its area.
 
 **Pattern tracing (core, lead 11-14).** `NOSHAPE_PATTERN_TRACE=1` on any regeneration (parity_models,

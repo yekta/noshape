@@ -353,6 +353,65 @@ fn live_scatter_holds_the_knifehandle_blade_within_its_own_face_sum() {
 
 /// Live's mass-property band of a part (its `volume_band`) holds on later features while live's volume of that part is
 /// the same (c2-config-parts-sprockets: banded after Circular pattern 1, the same 3302.355823 mm³ through Part Number 1).
+/// `first` and two more regenerations of the document (its feature list's total), each in a fresh process: their
+/// median. In one process the reopen reads caches (c2-surf-workshop-mutualtrim 752 ms, then 9 ms).
+fn median_of_fresh(path: &Path, studio: &Value, first: f64) -> f64 {
+    let Ok(exe) = std::env::current_exe() else { return first };
+    let mut runs = vec![first];
+    for i in 0..2 {
+        // A copy each: this process still has the document open.
+        let copy = scratch(&format!("time-{i}-{}", path.file_name().unwrap_or_default().to_string_lossy()));
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::copy(format!("{}{ext}", path.display()), format!("{}{ext}", copy.display()));
+        }
+        let child = std::process::Command::new(&exe).args(["parity::time_child", "--exact", "--ignored", "--nocapture", "--test-threads=1"]).env("NOSHAPE_PARITY_TIME_DOC", &copy).env("NOSHAPE_PARITY_TIME_STUDIO", studio.to_string()).output();
+        for ext in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{ext}", copy.display()));
+        }
+        let Ok(out) = child else { return first };
+        let Some(ms) = String::from_utf8_lossy(&out.stdout).lines().find_map(|l| l.split("PARITY-TIME ").nth(1)?.trim().parse::<f64>().ok()) else {
+            eprintln!("parity timing child gave no time: {}", String::from_utf8_lossy(&out.stdout).lines().find_map(|l| l.split("PARITY-TIME-FAILED").nth(1)).unwrap_or(" no PARITY-TIME line"));
+            return first;
+        };
+        runs.push(ms);
+    }
+    runs.sort_by(f64::total_cmp);
+    if std::env::var_os("NOSHAPE_PARITY_ONLY").is_some() {
+        println!("  a gap, the median of 3 runs: {runs:.0?} ms");
+    }
+    runs[1]
+}
+
+/// `median_of_fresh`'s child: the document opened and its features listed in this process, their total printed.
+#[test]
+#[ignore = "T2: the parity suite's timing child, runs only with NOSHAPE_PARITY_TIME_DOC"]
+fn time_child() {
+    let Some(path) = std::env::var_os("NOSHAPE_PARITY_TIME_DOC") else { return };
+    let studio = std::env::var("NOSHAPE_PARITY_TIME_STUDIO").ok().and_then(|s| serde_json::from_str::<Value>(&s).ok()).unwrap_or(json!({}));
+    let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::by_tool_name(tool).and_then(|op| noshape_ops::registry::run(ctx, op, &args).ok());
+    let mut ctx = Ctx::new();
+    // Warmed up as a running app is (kernel, threads): a block built first, in a document of its own.
+    let warm = scratch("time-warm.noshape");
+    run(&mut ctx, "document_create", json!({ "path": warm.to_string_lossy(), "length_unit": "mm" }));
+    run(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    run(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+    if let Some(region) = run(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" })).and_then(|g| g.value["regions"][0]["id"].as_str().map(str::to_string)) {
+        run(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+        run(&mut ctx, "query_parts", json!({}));
+    }
+    if run(&mut ctx, "document_open", json!({ "path": Path::new(&path).to_string_lossy() })).is_none() {
+        println!("PARITY-TIME-FAILED document_open {}", Path::new(&path).display());
+        return;
+    }
+    let list = noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut ctx, op, &studio));
+    match list {
+        Some(Ok(l)) if l.value["regen_ms"].is_f64() => println!("PARITY-TIME {}", l.value["regen_ms"]),
+        Some(Ok(l)) => println!("PARITY-TIME-FAILED feature_list without regen_ms ({studio}): {}", l.value.to_string().chars().take(200).collect::<String>()),
+        Some(Err(e)) => println!("PARITY-TIME-FAILED feature_list ({studio}): {e:?}"),
+        None => println!("PARITY-TIME-FAILED no feature_list"),
+    }
+}
+
 fn carry_volume_bands(banded: &mut HashMap<String, (f64, [f64; 2])>, mut parts: Vec<PartState>) -> Vec<PartState> {
     for p in &mut parts {
         let Some(v) = p.volume else { continue };
@@ -645,8 +704,8 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             }
         }
     }
-    // Live's regeneration time of each feature, by our feature id.
-    let live_times: std::collections::HashMap<String, f64> = live.iter().find_map(|l| l["per_feature_ms"].as_object()).into_iter().flatten().filter_map(|(id, ms)| Some((t.ours(id)?.to_string(), ms.as_f64()?))).collect();
+    // Live's regeneration time of each feature, by our feature id: its latest timing (the fresh copy keyed by featureId).
+    let live_times: std::collections::HashMap<String, f64> = live.iter().rev().find_map(|l| l["per_feature_ms"].as_object()).into_iter().flatten().filter_map(|(id, ms)| Some((t.ours(id)?.to_string(), ms.as_f64()?))).collect();
     // (The studio the features went into: an Import's own tab, not the document's first, empty one: c2-gamma-imported.)
     let studio = t.tab().map_or(json!({}), |tab| json!({ "tab": tab }));
     drop(t);
@@ -662,7 +721,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     if opened && run(&mut fresh, "query_parts", studio.clone()) {
         let wall_ms = t0.elapsed().as_secs_f64() * 1000.0;
         res.wall_ms = wall_ms;
-        res.regen_ms = Some((wall_ms, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
+        res.regen_ms = Some((wall_ms, live.iter().rev().find_map(|l| l["full_regen_ms"].as_f64())));
         // NOSHAPE_PARITY_SPLIT: where the time goes (open, list, parts), then each Part Studio regenerated again from
         // scratch split into its features and the display (meshes).
         if std::env::var_os("NOSHAPE_PARITY_SPLIT").is_some() {
@@ -726,8 +785,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         // The speed case compares like with like (lead 11-08): live's `full_regen_ms` is its Regeneration times panel,
         // the features' regeneration alone, so ours is the feature list's (our panel's) total, not the wall time with
         // the parts' mass properties and the display build (the opens cases time the shown model).
+        // A gap (>= 100 ms and >= 2x live's) is the median of 3 runs (live speed audit 11-26: one run on a loaded host).
         if let (Some(features), Some(r)) = (res.features_ms, res.regen_ms.as_mut()) {
-            r.0 = features;
+            r.0 = match r.1 {
+                Some(l) if features >= 2.0 * l && features - l >= 100.0 => median_of_fresh(&path, &studio, features),
+                _ => features,
+            };
         }
     }
     // NOSHAPE_PARITY_SAVE=<dir>: the translated document kept there (its
