@@ -6354,6 +6354,13 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
   }
   if (!blend_retries())
     fail_op(std::string(what) + (ok ? " gave an invalid solid" : " failed"));
+  // Inside out: the retries come out so too (c2-surf-intro's car Fillet 1: three of them, 300 ms), the repair first.
+  if (const TopExp_Explorer solid(r, TopAbs_SOLID); ok && solid.More() && solid_inside_out(solid.Current()))
+  {
+    HHist hr = h;
+    if (const TopoDS_Shape fixed = repaired(input, r, hr); !fixed.IsNull())
+      return {fixed, hr};
+  }
   // Smallest step that works (an L bracket's 5 mm walls filleted R2.5 all
   // round need 1e-5; volume error ~1e-6 relative).
   for (const double eps : {1e-7, 1e-6, 1e-5})

@@ -1216,6 +1216,10 @@ fn geometric_feature_pattern(ev: &mut EvalCtx, feats: &[FeatureId], instances: &
                 (!fs.is_empty()).then(|| (b.id.clone(), fs))
             })
             .collect();
+        // (A seed tool keeps only new bodies: c2-sm-rocker's Mirror 3 of two mirrors re-ran their face patterns, 230 ms.)
+        if ev.tool_only {
+            continue;
+        }
         let targets: Vec<usize> = groups.iter().filter_map(|(id, _)| index_of_body(ev, id)).collect();
         // Each seed re-run once (a mirror of mirrors re-runs the inner ones, each its own seeds).
         let seeds: Vec<(FeatureId, Shape)> = if groups.is_empty() { Vec::new() } else { group.iter().filter_map(|&g| seed_tool(ev, g).map(|t| (g, t))).collect() };
@@ -1410,6 +1414,7 @@ fn seed_tool(ev: &EvalCtx, f: FeatureId) -> Option<Shape> {
     let mut sub = EvalCtx::new(tmp, &seed.name, &params, ev.units, ev.ctx.clone(), ev.outer_vars);
     sub.features = ev.features;
     sub.scratch = true;
+    sub.tool_only = true;
     sub.seed_op = seed_op;
     sub.cancel = ev.cancel.clone();
     eval_fn(&mut sub).ok()?;

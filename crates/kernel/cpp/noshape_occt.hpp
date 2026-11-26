@@ -794,6 +794,7 @@ uint64_t                 shape_hash(const OcShape& s);
 bool                     shape_is_same(const OcShape& a, const OcShape& b);
 // Whether any solid of `s` is inside out (its faces' normals pointing in: a negative volume).
 bool                     shape_inside_out(const OcShape& s);
+bool                     solid_inside_out(const TopoDS_Shape& solid);
 size_t                   shape_open_edges(const OcShape& s);
 bool                     shape_is_equal(const OcShape& a, const OcShape& b);
 bool                     shape_is_partner(const OcShape& a, const OcShape& b);

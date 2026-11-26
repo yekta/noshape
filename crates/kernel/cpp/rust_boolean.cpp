@@ -7237,7 +7237,7 @@ void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
 // Whether a solid is inside out (its faces' normals pointing in): a planar face whose plane holds the solid's
 // vertices at one extreme says it cheaply, its normal pointing away from them, or at them with its box there too;
 // none such: its volume's sign.
-static bool solid_inside_out(const TopoDS_Shape& solid)
+bool solid_inside_out(const TopoDS_Shape& solid)
 {
   ShapeIMap vertices;
   TopExp::MapShapes(solid, TopAbs_VERTEX, vertices);
