@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-26 03:50 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-26 04:45 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -43,7 +43,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   (data/booleans 7bf937 / 1582a3 / b81914). T1 PASSES, small cases 78/78 0 differ (t1.sh, vibex8 ~/tmp/bool/p0/kt).
   GATE (03:38, P0 + item 1 as ONE stack: 2c051fbee cherry-picked onto bool-flush-p0 as 1a04f549d; the 2c051 gate had
   waited 00:51-03:37 for vibex8's slot (qa's parity held it), stopped): unit bool-gate-p0s -> /root/bool-hat-scratch/
-  chain-1a04f549d.out. Then knurls (chainf16.sh pattern: copy both gate trees' all-96c035059fc28abb to vibex7
+  chain-1a04f549d.out (built 04:30; its run waits in vibex8's slot behind qa/live jobs). Then knurls (chainf16.sh pattern: copy both gate trees' all-96c035059fc28abb to vibex7
   ~/tmp/bool/<dir>, kn-run.sh), land from bool-flush (NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh: lands both), tell qa
   (roster id, qa moved 11-26) + lead. OCCT stays wrong on these (fallback only). bool-slow (2c051fbee) then obsolete.
   UNIFY SCOPE TRY (11-26 03:40, PARKED, /root/bool-scratch/unify-clean-full.patch): every op_unify result marked
@@ -181,7 +181,11 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
      anyway), reverted (/root/bool-scratch/prop-full.patch). Perf: NurbsCurve::at 19 % + sincos 6 % + derivs 6 %
      (revolved free-form evaluation) in free::ray_hits; perf call graphs don't resolve on the 280 MB kt binary. Next
      ideas: round 0's split groups found transitively (round 1's 39 are pairs made near by round 0's merges); cheaper
-     rays on revolved faces (profile curve + angle, not the NURBS surface).
+     rays on revolved faces (profile curve + angle, not the NURBS surface). 11-26 04:00: kept sample points made
+     lazily: no change (1.37M sample evals either way, cut 1.08 s both; reverted). Replay now: brep 989 ms
+     (sections_ahead 286), usd 161. perf can't attribute it: vibex hosts have perf_event_paranoid 4 (no perf as
+     ngyekta); locally (root) flat perf works, but neither fp nor dwarf call chains resolve inside the 280 MB kt binary.
+     Flat: NurbsCurve::at 11 %, sincos 7 %, NurbsCurve::derivs 6 %. gdb breakpoints (local copy, static OCCT) do work.
    4 impeller Remove Bohrung Ansaugflansch 511/54: op_unify 393 (unify.reordered 224, patches 101)
    5 rings Circular pattern 2 364/149: ours trimmed 283
    6 impeller Boolean 1 271/67 (e), Extrude 3 171/20 (convert 81 = offset fit 67 ms, see above), Extrude 4 184/38 (prism_until split 122),
@@ -189,6 +193,9 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    7 standoffs Revolve 2 232/27, Boolean 2 170/25, Boolean 1 156/26: thread x revolve, ours 263 ms vs OCCT 2.7 s,
      perf flat (NURBS evaluation spread): no single cut. 11-25: not e's pattern (stretches_over ~1000 projections a
      case, replay 120-190 ms each, brep 95-160, sections_ahead 26-61); NOSHAPE_PROBE_INV (probes-slow.patch) counts them.
+     11-26 04:40 (rec vibex8 ~/tmp/bool/rec-c2-config-parts-standoffs, de7a7e61 / 3d0a29e1 / b5ad0ef0): build 16-48 ms;
+     in b5ad0ef0 29.5 ms of 48 are 53 input edges on a B-spline face projected by OCCT (rust_boolean.cpp build's
+     last BuildPCurveForEdgeOnFace: ProjLib polar approx + Extrema grids). Rest is our NURBS evaluation, flat: skip.
    8 DONE (0c7a80c70, gating) sm-rocker Extrude 11. sm-rocker Mirror 3 (144 ms profile, live 8): spread, no one cut:
      7 Booleans 25 + unify 23, props_surface 28 (74 calls) + props_volume 20 (7), face_project_point 11 (145): next
      would be finding the props callers (model-core checks); skipped for now. (Run docs WITH their -wal: rocker.sh.)
