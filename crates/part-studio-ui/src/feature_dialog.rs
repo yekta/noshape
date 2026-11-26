@@ -1936,11 +1936,12 @@ impl FeatureDialog {
         // row (Onshape, after clicking the sketch in the list).
         let mut rows: Vec<(String, Vec<usize>, Reference)> = Vec::new();
         // A Mate connector's origin at a hovered face's vertex or edge midpoint reads as that vertex or edge (live
-        // fc-1120 (7): "Vertex of Extrude 1"); it is stored on the face, the point its secondary.
+        // fc-1120 (7): "Vertex of Extrude 1"); it is stored on the face, the point its secondary. An edge's end reads as
+        // the edge (live mate-connector-shift-lock-inference: "Edge of Extrude 1").
         let p = &self.feature.params;
         let point_of = (self.feature.type_id == "mateConnector" && s.id == "originQuery" && matches!(p.enum_("entityInferenceType"), "POINT" | "MID_POINT")).then(|| p.query("secondaryOriginQuery").first()).flatten();
         for (k, r) in refs.iter().enumerate() {
-            if let Some(e) = point_of {
+            if let Some(e) = point_of.filter(|_| matches!(r, Reference::Face(_))) {
                 rows.push(((self.labeler)(e), vec![k], r.clone()));
                 continue;
             }

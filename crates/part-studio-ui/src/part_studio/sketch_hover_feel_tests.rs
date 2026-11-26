@@ -1155,6 +1155,120 @@ fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestA
     assert!(got == (2, 0, false), "(model picks, dimensions, box) {got:?}; lit {lit:?}, {outline:?} px off the outline");
 }
 
+/// Live sketch-entity-copy-paste: a line copied from its menu, a right-click on empty space beside it opens the plain
+/// sketch menu, Paste second (no constraint glyph's menu, its hover left behind on the way).
+#[gpui::test]
+fn a_right_click_beside_a_copied_line_opens_the_sketch_menu(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-copy-paste-menu", Tool::Line);
+    // The scenario's scale: 0.275 mm a px.
+    cx.update(|cx| view.read(cx).viewport.clone()).update(cx, |vp, cx| {
+        let h = vp.size().y;
+        vp.camera.distance = 0.275365e-3 * h * 0.5 / (vp.camera.fov_y * 0.5).tan();
+        vp.request_frame(cx);
+    });
+    draw(cx, window);
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (x, y) in [(0., 0.), (30., 0.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape escape");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let on_line = screen(cx, 7.5, 0.);
+    pointer.move_to(cx, &view, on_line);
+    pointer.right_click(cx, &view, on_line);
+    let item = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("menu:Copy sketch entities").expect("Copy sketch entities").center();
+    let beside = screen(cx, 15., 20.);
+    let target = pointer.window_point(cx, beside);
+    // As the scenario runner: three moves to each target, a rest, then the click.
+    let mut from = pointer.window_point(cx, on_line);
+    for to in [item, target] {
+        for k in 1..=3 {
+            let t = k as f32 / 3.0;
+            let p = gpui_kit::point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(p, None, Modifiers::default());
+            pointer.frames(cx, &view);
+        }
+        if to == item {
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(item, Modifiers::default());
+            pointer.settle(cx, &view);
+        }
+        from = to;
+    }
+    let held = cx.update(|cx| {
+        let v = view.read(cx);
+        format!("{:?}; glyphs {:?} for the pointer at {beside:?}", v.sketch.as_ref().and_then(|ed| ed.hover_constraint), v.ui.glyph_boxes)
+    });
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(target, gpui_kit::MouseButton::Right, Modifiers::default());
+    vcx.simulate_mouse_up(target, gpui_kit::MouseButton::Right, Modifiers::default());
+    pointer.settle(cx, &view);
+    let rows: Vec<String> = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default()).into_iter().filter(|l| l != "———").collect();
+    assert!(rows.get(1).map(String::as_str) == Some("Paste sketch entities") && !rows.iter().any(|r| r.starts_with("Delete")), "{rows:?}; glyph hover {held}");
+}
+
+/// Live sketch-fully-defined: with a side picked for a dimension, a click 1.5 px outside the Right plane's outline, over no
+/// plane's face, picks the plane (the length placed before).
+#[gpui::test]
+fn a_click_just_outside_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-dim-outline-outside", Tool::CornerRect);
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (x, y) in [(0., 0.), (30., 20.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let side = screen(cx, 30., 10.);
+    pointer.move_to(cx, &view, side);
+    pointer.click(cx, &view, side);
+    let near = screen(cx, 38., 10.);
+    let at = cx.update(|cx| {
+        let v = view.read(cx);
+        let vp = v.viewport.read(cx);
+        let q = v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Right)).unwrap();
+        let c = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(u, w)| vp.project(q.corner(u, w)).unwrap());
+        let mid = vp.project(q.corner(0.0, 0.0)).unwrap();
+        (0..4)
+            .map(|k| {
+                let (a, b) = (c[k], c[(k + 1) % 4]);
+                let foot = a + (b - a) * ((near - a).dot(b - a) / (b - a).length_squared()).clamp(0.0, 1.0);
+                let n = DVec2::new(a.y - b.y, b.x - a.x).normalize();
+                foot + n * 1.5 * (foot - mid).dot(n).signum()
+            })
+            .min_by(|x, y| x.distance(near).total_cmp(&y.distance(near)))
+            .unwrap()
+    });
+    pointer.move_to(cx, &view, at);
+    let lit = cx.update(|cx| view.read(cx).highlighted_hover(cx));
+    pointer.click(cx, &view, at);
+    let got = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        (v.sketch.as_ref().unwrap().tool_picks().len(), d.sketch.constraints().filter(|c| c.kind.is_dimension()).count(), v.dim_input.is_some())
+    });
+    assert!(got == (2, 0, false), "(model picks, dimensions, box) {got:?}; lit {lit:?} at {at:?}");
+}
+
 /// qa SKETCH-DIM-PLACE-PICKS-PLANE (workflow 01 steps 15-20, live: a linear dimension of the side): with the pointer
 /// last over the Front plane's face (lit, nothing picked yet), a quick click on the rectangle's right side and then beside
 /// it places the side's length; the stale hover's plane, off its outline, isn't picked (a 90° angle to Front before).

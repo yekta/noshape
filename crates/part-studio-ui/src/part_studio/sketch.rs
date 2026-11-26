@@ -1196,9 +1196,10 @@ impl PartStudioView {
         let mut pick = *id;
         // With entities picked for a dimension a plane lights by its outline only, the nearest within reach, whichever
         // plane's face is under the pointer: ~2 px (live dimplane-1122, behaviours "psui plane while dimensioning":
-        // qa walk 1's (72, -3) inside Front lights nothing), 6 px with an ellipse picked (live plane-behind-1121).
+        // qa walk 1's (72, -3) inside Front lights nothing), 6 px with an ellipse picked (live plane-behind-1121); just
+        // outside every face too (live sketch-fully-defined: Right's outline 1.5 px off).
         if let Some(reach) = self.dimension_plane_reach(cx)
-            && matches!(r, Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
+            && matches!(r, None | Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
         {
             (r, pick) = self.plane_by_outline(vp.read(cx).pointer_position(), reach, vp, cx).map_or((None, None), |(r, id)| (Some(r), Some(id)));
         }

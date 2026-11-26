@@ -1829,6 +1829,44 @@ fn the_ball_dragged_onto_a_face_reaches_its_corner_from_45_px_and_turns(cx: &mut
     assert!(t.origin.distance(corner) < 1e-8 && t.axes[2].distance(glam::DVec3::X) < 1e-9, "released there: {t:?}");
 }
 
+/// Live ui-parity mate-connector-shift-lock-inference (behaviours: the inference locked on the **edge**): Mate connector,
+/// the pointer resting on the block's top face 6 px inside its back edge and 15 px from its corner, Shift then a click
+/// takes the edge: Origin entity "Edge of Extrude 1" (edge pick reach ~6 px, live mc-infer-1122).
+#[gpui::test]
+fn a_shift_click_6_px_inside_an_edge_near_a_corner_takes_the_edge(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = block(cx, "dlg-mc-shift-edge");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("mateConnector", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let at = |cx: &mut TestAppContext, x: f64, y: f64, z: f64| cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(x, y, z) * 1e-3)).expect("on screen");
+    let (corner, along, centre) = (at(cx, 40., 30., 10.), at(cx, 0., 30., 10.), at(cx, 20., 15., 10.));
+    let e = (along - corner).normalize();
+    let mut n = DVec2::new(-e.y, e.x);
+    if n.dot(centre - corner) < 0.0 {
+        n = -n;
+    }
+    let target = corner + e * (15.0f64 * 15.0 - 36.0).sqrt() + n * 6.0;
+    let pointer = Pointer::new(cx, window, &view);
+    pointer.move_to(cx, &view, centre);
+    pointer.move_to(cx, &view, target);
+    let lit = cx.update(|cx| view.read(cx).ui.hover_pick.as_ref().map(|t| t.kind));
+    let win = pointer.window_point(cx, target);
+    let shift = |m: Modifiers| gpui_kit::PlatformInput::ModifiersChanged(gpui_kit::ModifiersChangedEvent { modifiers: m, capslock: Default::default() });
+    cx.update_window(window, |_, w, cx| { w.dispatch_event(shift(Modifiers::shift()), cx); }).unwrap();
+    pointer.frames(cx, &view);
+    let held = cx.update(|cx| view.read(cx).inference_choice().map(|p| (p.reference.clone(), p.align.clone())));
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(win, Modifiers::shift());
+    cx.update_window(window, |_, w, cx| { w.dispatch_event(shift(Modifiers::default()), cx); }).unwrap();
+    pointer.settle(cx, &view);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Mate connector dialog").dialog.clone());
+    let state = cx.update_window(window, |_, w, cx| dialog.read(cx).ui_state(w, cx)).unwrap();
+    let origin = state["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Origin entity").map(|f| f["items"].clone());
+    assert_eq!(origin, Some(serde_json::json!(["Edge of Extrude 1"])), "lit {lit:?} at {target:?}; the point chosen {held:?}");
+}
+
 /// Live2 ours-1118 pattern (p1audit skip-02..04): with Skip instances on, "Instances to skip" takes the instances' rings:
 /// the one under the pointer lights, a click skips its instance (the item (1, 0), the preview one part fewer) and a
 /// second click on it keeps it again; the seed's dot takes nothing.
