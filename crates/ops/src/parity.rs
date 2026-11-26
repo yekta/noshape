@@ -340,6 +340,11 @@ pub fn refs_in_configuration(text: &str, configuration: Option<&str>) -> String 
         .join("\n")
 }
 
+/// A mate connector's query (`…mateConnectorOp`) whose refs live gave only as bodies: a body says nothing of its frame.
+fn connector_known_only_as_a_body(text: &str, refs: &[&LiveRef]) -> bool {
+    text.contains("mateConnectorOp") && !refs.is_empty() && refs.iter().all(|r| r.kind == "BODY")
+}
+
 /// Parses `refs.jsonl` (one referenced id per line, see the module docs).
 pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     let mut out: HashMap<(usize, String), LiveRef> = HashMap::new();
@@ -2487,7 +2492,11 @@ impl<'a> Translator<'a> {
                     // (Nor one whose text names a sketch entity of ours: that entity (c2-surf-intro-simple's Revolve 1, Sketch 1's
                     // ellipse; by live's id it went to a region).)
                     let named = |q: &Value| q["queryString"].as_str().is_some_and(|t| self.sketch_entities_from_query(t).is_some());
-                    let keep: Vec<bool> = queries.iter().map(|q| own_sub(q) || named(q)).collect();
+                    // (Nor a mate connector's query live's refs give only as a body, a point with no plane: by its text, else
+                    // on live's frame (prize-wheel-tim's Sketch 3 on a connector at Hole 1's tip went to Part 1).)
+                    let bodies: Vec<&LiveRef> = mine.iter().filter_map(|(id, _)| self.refs.get(&(k, id.clone()))).collect();
+                    let connector = |q: &Value| connector_known_only_as_a_body(q["queryString"].as_str().unwrap_or(""), &bodies);
+                    let keep: Vec<bool> = queries.iter().map(|q| own_sub(q) || named(q) || connector(q)).collect();
                     for (n, q) in queries.iter_mut().enumerate().filter(|(n, q)| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty()) && !keep[*n]) {
                         let mut own: Vec<String> = mine.iter().filter(|(_, m)| *m == Some(n)).map(|(id, _)| id.clone()).collect();
                         own.sort();
@@ -11483,6 +11492,22 @@ mod tests {
         let mut got: Vec<String> = fetched_derived_sources(&top, "4ce5c7", &studios, &mut shared).into_iter().map(|(e, _)| e).collect();
         got.sort();
         assert_eq!(got, ["37a1a7", "8f7baa", "b7e381", "fed22d"]);
+    }
+
+    /// Prize-wheel-tim's Sketch 3 (refs 11-26 16:01): its plane, a mate connector at Hole 1's tip, comes in live's refs as
+    /// a BODY with a point only; that query stays by its text (a face's ref, or another query, still goes by id).
+    #[test]
+    fn a_connector_query_live_gives_as_a_body_stays_by_its_text() {
+        let refs = parse_refs(concat!(
+            r#"{"index":6,"feature":"Sketch 3","parameter":"sketchPlane","id":"JND","body":"JND","box":[[0,0,0],[0,0,0]],"kind":"BODY","point":[0,0,0],"query":0}"#, "\n",
+            r#"{"index":3,"feature":"Sketch 2","parameter":"sketchPlane","id":"JIC","kind":"FACE","normal":[0,0,1],"point":[0,0,0.0245],"surfaceType":"PLANE","query":0}"#
+        ));
+        let (body, face) = (&refs[&(6, "JND".to_string())], &refs[&(3, "JIC".to_string())]);
+        let text = r#"query=qCompressed(1.0,"%B5$QueryM5Sb$derivedFromC0…Sf.f$F8zwFjBSnNKkwOImateConnectorOpS9$queryTypeS5$DUMMY",id);"#;
+        assert!(super::connector_known_only_as_a_body(text, &[body]));
+        assert!(!super::connector_known_only_as_a_body(text, &[face]), "a face's ref still wins");
+        assert!(!super::connector_known_only_as_a_body(text, &[]));
+        assert!(!super::connector_known_only_as_a_body("query=qCreatedBy(makeId(\"Fx\"), EntityType.BODY);", &[body]));
     }
 
     /// A composite part is live's "composite" with no topology of its own (asm-infento-subs 1dc32b's Large wheel asm:
