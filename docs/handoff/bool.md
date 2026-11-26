@@ -19,7 +19,7 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (state 11-26 06:55 UTC)
+## NEXT (state 11-26 08:10 UTC)
 - P0 11-25 05:55 UTC (blocks v0.4.69): macOS CI a_lofts_added_vertices_stay_for_good still "shell took too long" after
   1b9ab96c. Cause (CI diag runs on scratch branch bool-macdiag, deleted): deterministic on macOS 26 only, not a race;
   by_quadrics' corner (10,30,0) solve3 started from a foot hint left by the last corner, which Newton took to the
@@ -41,9 +41,7 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   (vibex8 ~/tmp/bool/p0/rec) taken; volumes = slice integration (x0-20 15587.68099, x1-20 15559.81505, x4.9-20
   15468.10594 mm3; x5-20 check 15465.83). T1 bool_patterns::a_cylinder_along_a_shelled_boxs_wall_fuses_through_its_corner_rounds
   (data/booleans 7bf937 / 1582a3 / b81914). T1 PASSES, small cases 78/78 0 differ (t1.sh, vibex8 ~/tmp/bool/p0/kt).
-  P0 QUEUED ee26ad1a 05:44 (ecd7e0938 flush fix + ee26ad1a Bohrungssitz one run; gate clean, knurls 5x 0; first land
-  stopped on clippy too_many_arguments: boolean_in's touching_only + or_plain now one `Touching` struct). qa + lead told.
-  bool-slow obsolete (delete worktree + target).
+  P0 LANDED ca45e817c + 14c277481 (11-26 ~07:50; gate clean, knurls 5x 0). bool-flush worktree: delete it + its target.
   COVERAGE (lead 11-26 05:10). Ranking done 06:00: parity56 "86.5 %" counts the 44 direct builds (on_face,
   through_holes: "not tried (an earlier path took it)") as declined; ours incl. direct 557/593 = 93.9 %; its 36 OCCT
   cases = 30 tangent corner (OCCT's, ruling 11-15) + 6 singles. NOSHAPE_BOOL_LOCAL=0 changes nothing there.
@@ -52,18 +50,29 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   doc), rp200-dec.txt. By doc: genesis-trunk-hanger 28 (diverges from live at feature 20: untranslated snap-in draft
   -> circles not ellipses; not a Boolean issue; skip), screws 8, sheet metal ~25 (parked), impeller 6, lora-ribs 4
   ("an edge twice in a face": slit input, 11 ms, skip). rp200 also shows 33 raw differ vs OCCT (most relabels/
-  equivalent; volume ones 0aa1b421, 18a377a8, 2c326fc9, 34202f28: TO CHECK which doc / who's right).
-  SCREWS DONE: 65a212abf (worktree bool-slow, branch bool-cov off main a476fa14f): round() picks the seam angle among
+  equivalent). Volume ones checked 07:30 (suite doc with ours on vs NOSHAPE_BOOL_RUST=0): 2c326fc9 nuts and 18a377a8
+  fan-blade: ours is live's (OCCT-only: nuts' Sweep 1 errors, fan-blade 42/53 vs ours 48/53); 34202f28 surface-pattern
+  same 36/39 either way (OCCT-only 100 s vs ours 5.6 s); 0aa1b421 genesis past its feature-20 divergence. Nothing to fix.
+  SCREWS: 696a6e89d (rebased from 65a212abf; worktree bool-slow, branch bool-cov): round() picks the seam angle among
   ruling angles (thread run-out face with a notch ruling at another angle) -> screws' 10/10 cases ours, 0 differ (were
-  8 OCCT 120-430 ms). T1 bool_patterns::a_threads_run_out_face_with_a_notch_ruling_goes_round (data ee3676ad, 83a40b89)
-  passes; clippy clean. GATE RUNNING: unit bool-gate-65a212abf-x8 -> /root/bool-hat-scratch/chain-65a212abf.out. NEXT:
-  clean -> knurls (chainp0k.sh pattern, vibex7 kn-run.sh) -> land from bool-slow, tell lead.
-  NEXT ITEM knifehandle (core 11-26: vibex7 ~/agents/core-keep/kh-bool, private, never in the repo; also in recdoc-main):
-  856a411e Fillet 1 cut 1.8-3.2 s "an edge without its curve on a free-form face": probe (/root/bool-scratch/
-  probe-pc.diff, NOSHAPE_PROBE_PC) = tool's B-spline edge 4 (arg 1) taken as lying on the part's B-spline face 0 but
-  1-10 mm off it (projects only at 1000x band): find why the piece is put on face 0 (ends only touching?). 244416f8
-  Fillet 3 run-on cut "a section touching a face's boundary" (tangent grey zone; core passes Fillet 3 ~1 s). Fillet
-  cases elsewhere: partial-fillet beb5d239 515 ms / 7340044b, setback-fillet df44fb85 142 ms.
+  8 OCCT 120-430 ms). T1 bool_patterns::a_threads_run_out_face_with_a_notch_ruling_goes_round (data ee3676ad, 83a40b89).
+  Gate 65a212abf clean (vs a476fa14f: replay 3113 = , differing 3 = 3, suite 132 = , speeds 1.00x, crate tests pass).
+  KNURLS clean (5 corpora 0 diff lines); land 86f06be4 failed 08:16 on a rebase conflict, rebased clean and re-landed 08:21.
+  PARKED (tangent family, OCCT's per ruling 11-15): knifehandle 856a411e Fillet 1 cut (OCCT 1.7-3.2 s, its result
+  invalid, live-matching): the fillet tool's edge 4 is its contact line on part face 0; face 0's sections merge into it
+  (21 um off, over the 10 um band) where it touches, other stretches are off the face -> no closed loop on face 0, the
+  sections stay slits -> non-manifold (try: /root/bool-scratch/kh-merged-sec-probes.patch, merged section's pcurve on its
+  face). Knifehandle 244416f8 Fillet 3: near-tangent touch. Impeller ed1c251b (core, Fillet 3's 2-round cut, OCCT 1432
+  ms; vibex8 ~/tmp/bool/imp1, private) and 552bc1ba (758 ms): 'a point near two vertices' = edge_in_face's run-past-the-
+  face point 1.7 mm from the face's edge accepted (near <= 1e3*gap) as a 2.6 mm vertex; capped (imp-ed1c-probes.patch)
+  -> 'a piece's point on another solid's face' (round tools tangent to the body). Remaining declines ranked by OCCT ms:
+  impeller 1599/758/418/198/188, loft-paths 628 (tangent)/270, partial-fillet 545/146, wrap-text 523+262, setback 146.
+  NEXT: wrap-text-cylinders 34dfd505 / 4ff76287 (40-letter fuse, 'no point inside a face piece'; vibex8 ~/tmp/bool/wt1,
+  pwt.sh, probe /root/bool-scratch/ls-probe.patch): the letter tools' Cyl faces (e.g. tool 2 face 21) have own Arc
+  edges that are NOT cross-sections of the face's cylinder (arc ends 0.9 mm off its centre's height along the axis), so
+  c2_of's Arc-on-Cyl Seg (at the circle's height) misses its vertices' places and the region has no inside point. Find
+  how the bridge types these faces/arcs (a B-spline taken as Cyl? arcs recognized loosely?) or give a tilted arc its
+  true curve (C2::Trig as the ellipse branch).
   UNIFY SCOPE TRY (11-26 03:40, PARKED, /root/bool-scratch/unify-clean-full.patch): every op_unify result marked
   clean (unify twice = same on all 19 readable impeller dumps), solids inherit it (sub_shapes/list_get), t_built.scoped
   for free-form results. Impeller: only 4 of 24 unifies scoped, Bohrungssitz still whole (the mark is lost elsewhere),
