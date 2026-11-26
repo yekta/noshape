@@ -298,6 +298,7 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
                     .when(units_select && !bare, |d| {
                         let ch = choice.clone();
+                        os::note_modal_select("Units", MESH_UNITS.get(c.unit).map_or("", |(n, _)| n));
                         d.child(
                             v_flex().gap(px(6.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Units")).child(div().w(px(212.)).child(crate::os_ui::select_field(
                                 "imp-units",
