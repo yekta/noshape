@@ -1210,6 +1210,17 @@ impl PartStudioView {
                 }
             }
         }
+        // A dimension's line lit on the move before the pick came gives way to the sketch's geometry picked under it (live
+        // sk-hover-matrix-1123 DL / DE; speed-1125 S50: the width's extension line ends on the corner).
+        let line = self.ui_ref().and_then(|u| u.dim_line_hover).filter(|c| own && self.sketch.as_ref().is_some_and(|s| s.hover_constraint == Some(*c)));
+        if line.is_some() {
+            if let Some(u) = self.ui_mut() {
+                u.dim_line_hover = None;
+            }
+            if let Some(ed) = &mut self.sketch {
+                ed.hover_constraint = None;
+            }
+        }
         // While a glyph/label is hovered (or the pointer is between a row's glyphs), the geometry under it isn't.
         if self.sketch.as_ref().is_some_and(|s| s.hover_constraint.is_some()) || (row && (tile.is_some() || !own)) {
             if self.hover.take().is_some() {
@@ -1360,8 +1371,10 @@ impl PartStudioView {
             ViewportEvent::LabelHover(id) => {
                 let new = id.and_then(dim_label_of);
                 let prev = self.ui_mut().and_then(|u| std::mem::replace(&mut u.label_hover, new));
+                let point = new.is_some() && self.picked_sketch_point(self.ui.sketch_gpu_hover.and_then(|(_, id)| id), cx);
                 if let Some(ed) = &mut self.sketch {
                     let hover = match new {
+                        Some(_) if point => ed.hover_constraint,
                         Some(c) => Some(c),
                         None if prev.is_some() && ed.hover_constraint == prev => None,
                         None => ed.hover_constraint,
@@ -5042,8 +5055,13 @@ impl PartStudioView {
                     .whitespace_nowrap()
                     .children(dim_label_parts(text))
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
+                        // (Kept as the frame's labels keep theirs: a sketch point picked under it takes the hover, below.)
+                        if let Some(u) = this.ui_mut() {
+                            u.label_hover = if *h { Some(cid) } else { u.label_hover.filter(|c| *c != cid) };
+                        }
+                        let point = *h && this.picked_sketch_point(this.ui.sketch_gpu_hover.and_then(|(_, id)| id), cx);
                         if let Some(ed) = &mut this.sketch {
-                            let new = if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
+                            let new = if point { ed.hover_constraint } else if *h { Some(cid) } else if ed.hover_constraint == Some(cid) { None } else { ed.hover_constraint };
                             if new != ed.hover_constraint {
                                 ed.hover_constraint = new;
                                 if new.is_some() {

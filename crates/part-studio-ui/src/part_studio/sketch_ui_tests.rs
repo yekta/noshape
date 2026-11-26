@@ -10463,4 +10463,15 @@ fn a_point_under_a_hovered_label_takes_the_hover(cx: &mut TestAppContext) {
     assert_eq!(lit(cx), (Some(corner), None), "the corner lit under the label");
     event(cx, off, ViewportEvent::Hover(None));
     assert_eq!(lit(cx), (None, Some(width)), "off the point, still on the label: the label");
+    // The width's extension line (it ends on the corner) lit on the move, before the pick came: the corner takes it.
+    event(cx, off, ViewportEvent::LabelHover(None));
+    cx.update(|cx| view.update(cx, |v, _| {
+        v.ui_mut().unwrap().dim_line_hover = Some(width);
+        v.sketch.as_mut().unwrap().hover_constraint = Some(width);
+    }));
+    event(cx, press, ViewportEvent::Hover(Some(pick)));
+    assert_eq!(lit(cx), (Some(corner), None), "the corner, not the dimension's line");
+    // The pick came first and the label's hover after it (speed-1125 S50 run 3): the corner keeps it.
+    event(cx, press, ViewportEvent::LabelHover(Some(super::dim_label_hit(width))));
+    assert_eq!(lit(cx), (Some(corner), None), "the corner, the label hovered after the pick");
 }
