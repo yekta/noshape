@@ -1,0 +1,137 @@
+{
+ "name": "mistake-sketch-drag-fully-defined",
+ "about": "rectangle from the origin dimensioned 40 and 20 (fully defined); dragging its far corner and its top side moves nothing",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     28
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "40"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     48,
+     10
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     50,
+     28
+    ]
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     10,
+     20
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     10,
+     28
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,98 @@
+{
+ "name": "mistake-sketch-drag-fixed-line",
+ "about": "a slanted line (5,5)-(35,20) on Top fixed with Shift+J; dragging it near one end and then its far end moves nothing",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     5,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     35,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     12.5,
+     8.75
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+j"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     12.5,
+     8.75
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     12.5,
+     18.75
+    ]
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     35,
+     20
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     40,
+     28
+    ]
+   }
+  }
+ ]
+}

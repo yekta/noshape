@@ -1,0 +1,68 @@
+{
+ "name": "mistake-sketch-extend-nothing",
+ "about": "a lone 30 mm line: Extend (x) clicked near its end with nothing to reach leaves it unchanged",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "x"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     28,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

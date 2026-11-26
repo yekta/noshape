@@ -1,0 +1,98 @@
+{
+ "name": "mistake-sketch-delete-dimensioned-line",
+ "about": "rectangle with its top side dimensioned 40; deleting that side deletes the dimension with it; Ctrl+Z brings both back",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     28
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "40"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

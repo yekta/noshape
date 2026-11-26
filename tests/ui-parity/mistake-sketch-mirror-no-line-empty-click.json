@@ -1,0 +1,89 @@
+{
+ "name": "mistake-sketch-mirror-no-line-empty-click",
+ "about": "a circle selected, the sketch Mirror tool, then a click on empty space (no line anywhere); Escape",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     25,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     25,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     35,
+     25
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

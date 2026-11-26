@@ -1,0 +1,112 @@
+{
+ "name": "mistake-sketch-offset-negative",
+ "about": "rectangle: Offset (o) of its bottom side, typing -3 during the tool is ignored (Enter commits 5 mm); then its dimension double-clicked and set to -3",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "o"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     10,
+     -4
+    ]
+   },
+   "ms": 800
+  },
+  {
+   "do": "type",
+   "text": "-3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "sketch_point": [
+     19.8,
+     -2.5
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "-3"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

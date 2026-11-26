@@ -1,0 +1,38 @@
+{
+ "name": "mistake-delete-sketch-used",
+ "about": "block: Sketch 1 (used by Extrude 1) deleted from the list: Extrude 1's red row and tooltip; Ctrl+Z brings the sketch back",
+ "area": "psui",
+ "source": "live behaviours 'Sketch beginner mistakes, batch 4' (qa MISTAKES-4)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
