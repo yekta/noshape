@@ -65,8 +65,19 @@ docs/DECISIONS.md (read first; it wins over anything here).
    face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
    Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
 3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
-4. IN FLIGHT: after count of the triage's 15 scenarios (run20.sh on vibe2, out ~/tmp/psui/r20; r17 before = 10/15,
-   235/247 states), then report to the lead and give qa the count (qa id: roster). Interaction-suite triage (lead). QUEUED 2ffe9497 (6 commits: 3a08ed5ef, e7fae29e2 had not
+4. Triage after count 13/15, 241/247 (vibe2 r20; before 10/15, 235/247); lead + qa told. plane-* (5) match on
+   green (qa uip5-1125): no re-record. Left:
+   - copy-paste step 12 FIXED cf0c044af (a clicked, unmoved Transform arrow opens no "0 mm" box; T1
+     a_clicked_transform_arrow_opens_no_box); vibe2 run22: scene lib ok, clippy ok, copy-paste 14/14 + menu-transform
+     11/11. Landed with dc6768f9/9416858b (re-queued stack 11-26).
+   - fully-defined step 13: live's 2nd Dimension click at sketch (38,10) (screen 1212,537) picked the Right plane
+     (sel: line JFN + PLANE Right), waiting for placement; ours missed it (dimension_skips_plane: with picks, a
+     plane only within ~2 px of its outline, live dimplane-1122) and placed the line's length (box focused).
+     Geometry checks out: (38,10) is ~1.45 px from the Right plane's +y outline (75 mm half, iso camera, 0.275 mm/px),
+     inside the 2 px reach, and T1 sketch_hover_feel_tests::a_click_on_the_right_planes_outline_picks_it_for_the_
+     dimension asserts exactly this (passes). The scenario differs before it: d, click bottom line (15,0), place at
+     (15,-8), type 30, Enter, THEN (30,10), (38,10). Next: extend that T1 with the first dimension (typed 30, Enter)
+     and see what takes the click (pixel rounding 1.45 -> >2 px? the placed dimension's state? hover lag?). QUEUED 2ffe9497 (6 commits: 3a08ed5ef, e7fae29e2 had not
    landed; workspace_tests.rs conflict = keep both tests): coincident, refusals, routing x5, offset, ver-protection,
    mate-connector, fully-defined. Told lead (qa >200k): before 20, after 14/15 expected.
    copy-paste FIXED (uncommitted, testing on vibex7 r21 + lib/clippy): cause = the line's glyph row (Show
