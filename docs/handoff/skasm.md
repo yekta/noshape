@@ -5,6 +5,14 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## RESUME HERE (11-26 13:27 UTC) — read first
 
+P0 (lead 11-26 13:4x): asm-scissor-lift studios fddd23/92138f/bdddaf/97ad5f regressed since 11-25 18:45 (core's d-b22 ok,
+d-now bad, vibex7 ~/tmp/core/sc). Bisect worktree /root/skasm-scratch/bis/skasm (detached main 461eff9e1, rb name skasm),
+run sc.sh. Suspects: 0356fe4fb datum_plane_of (fires for any face whose part we can't match), ae279ee59 Derived-source refs.
+After the P0, qa 11-26 14:0x sketch tickets: SKETCH-MIRROR-PRESELECTED-CLICK, SKETCH-OFFSET-NEGATIVE-DIMENSION,
+SKETCH-Q-THEN-D-TOOL (P3).
+Then (lead, second-month audit, takes 0853f43d5): Tangent mate after its first pick keeps field focus and lists one
+FACE (ours: focus dropped, 2 owner-less FEATURE items); T1.
+
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
 > ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &). Speed T2: sp3.sh (sp4.sh = same with SKTRACE, trace code removed).

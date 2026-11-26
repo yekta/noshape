@@ -821,18 +821,7 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     if let Ok(t) = std::fs::read_to_string(dir.join("context.jsonl")) {
         features["contextEntities"] = t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).collect();
     }
-    // Import features' files: imports/<foreign id>.json names the file beside it (`file`, or `path` in live's later
-    // layout, the id then its own name).
-    for e in std::fs::read_dir(dir.join("imports")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
-        let Some(meta) = std::fs::read_to_string(&e).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { continue };
-        let stem = e.file_stem().map(|s| s.to_string_lossy().to_string());
-        if let (Some(id), Some(file)) = (meta["foreignId"].as_str().or(stem.as_deref()), meta["file"].as_str().or(meta["path"].as_str())) {
-            // Live's export of the Part Studio (the upload is gone): already
-            // as the Import feature placed it.
-            let placed = meta["fetchedBy"].as_str().is_some_and(|f| f.contains("translation of the Part Studio"));
-            features["foreignFiles"][id] = json!({ "path": dir.join("imports").join(file).to_string_lossy(), "placed": placed });
-        }
-    }
+    import_files(dir, &mut features);
     // The states after each feature, and the last line's regeneration times.
     let mut live: Vec<Value> = std::fs::read_to_string(dir.join("live.jsonl")).unwrap_or_default().lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some() || l.get("full_regen_ms").is_some()).collect();
     // The UI fetch's boxes are the client's body bounds, loose around swept B-spline faces (live 2052): ours only has
@@ -862,6 +851,20 @@ pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
         }
     }
     Some((features, live, refs))
+}
+
+/// Import features' files: imports/<foreign id>.json names the file beside it (`file`, or `path` in live's later layout,
+/// the id then its own name), as `foreignFiles`.
+fn import_files(dir: &Path, features: &mut Value) {
+    for e in std::fs::read_dir(dir.join("imports")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
+        let Some(meta) = std::fs::read_to_string(&e).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { continue };
+        let stem = e.file_stem().map(|s| s.to_string_lossy().to_string());
+        if let (Some(id), Some(file)) = (meta["foreignId"].as_str().or(stem.as_deref()), meta["file"].as_str().or(meta["path"].as_str())) {
+            // Live's export of the Part Studio (the upload is gone): already as the Import feature placed it.
+            let placed = meta["fetchedBy"].as_str().is_some_and(|f| f.contains("translation of the Part Studio"));
+            features["foreignFiles"][id] = json!({ "path": dir.join("imports").join(file).to_string_lossy(), "placed": placed });
+        }
+    }
 }
 
 /// The document's own Feature Studios: studios/<elementId>.fs (its source,
@@ -4890,12 +4893,18 @@ fn parity_assemblies() {
             }
             // Imported files (live's studios/foreign/foreign.json: blob element → file) as the Part Studio corpus'
             // `foreignFiles`.
-            if features["foreignFiles"].is_null()
-                && let Some(Value::Object(files)) = read(&dir.join("studios/foreign/foreign.json"))
-            {
-                let foreign = dir.join("studios/foreign");
-                let map: serde_json::Map<String, Value> = files.iter().filter_map(|(k, v)| Some((k.clone(), serde_json::json!({ "path": foreign.join(v["path"].as_str()?).to_string_lossy() })))).collect();
-                features["foreignFiles"] = Value::Object(map);
+            // (And imports/<foreign id>.json's, as the Part Studio corpus': asm-scissor-lift fddd23's Import 1 of the motor
+            // STEP, fetched for Assembly 3, wasn't built.) A studio's own entries stay.
+            if features["foreignFiles"].is_null() {
+                if let Some(Value::Object(files)) = read(&dir.join("studios/foreign/foreign.json")) {
+                    let foreign = dir.join("studios/foreign");
+                    for (k, v) in &files {
+                        if let Some(path) = v["path"].as_str() {
+                            features["foreignFiles"][k] = json!({ "path": foreign.join(path).to_string_lossy() });
+                        }
+                    }
+                }
+                import_files(&dir, &mut features);
             }
             if features["derivedSources"].is_null() && !derived.is_empty() {
                 features["derivedSources"] = Value::Object(derived.clone());
