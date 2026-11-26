@@ -17,7 +17,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P2 **ASM-MEASURE-BRACKET-KEY (skasm)** (asm-measure-face-cylinder-panel s4-s5): two faces picked in an assembly, `[`: live opens the Measure panel with its field focused; ours opens nothing.
 - [ ] P2 **ASM-DRAG-REVOLUTE-ANGLE (skasm)** (asm-drag-revolute-turns s1): the same drag of the pin about its Revolute: live turns it to cos 0.774 (39 deg), ours to cos 0.884 (28 deg).
 - [ ] P2 **ASM-FASTENED-SAME-INSTANCE-FLIP (skasm)** (mistake-asm-fastened-same-instance s3-s5): Fastened with both connectors on Part 2 <1> (top, then right side): live's flip button shows flipped (svg-icon-flip-direction), ours not.
-- Take state, not filed (live asked): 7 scenarios open Fillet / Chamfer on the account's last value (2 / 12 / 16 / 0.5 mm) and mistake-hole-no-point's Hole on THRU; ours opens 5 mm / Blind 12 mm. They need "remembered" seeds like plane-remembers-last-type. After typing, the fillet/chamfer states match, except FILLET-R12 above.
+- Take state, not filed (live added the seeds, eab14f0ee; THRU is the account memory, std default Blind): 7 scenarios open Fillet / Chamfer on the account's last value (2 / 12 / 16 / 0.5 mm) and mistake-hole-no-point's Hole on THRU; ours opens 5 mm / Blind 12 mm. They need "remembered" seeds like plane-remembers-last-type. After typing, the fillet/chamfer states match, except FILLET-R12 above.
 
 ## qa 11-26 11:4x: ui-parity reruns on green f393d8ee4
 
