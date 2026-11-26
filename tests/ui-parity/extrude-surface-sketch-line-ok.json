@@ -1,0 +1,47 @@
+{
+ "name": "extrude-surface-sketch-line-ok",
+ "about": "Extrude, Surface tab, Sketch 2 line (y -20 on Top), \u2713",
+ "area": "psui",
+ "source": "depth batch 1 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "curves",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Surface"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     -20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

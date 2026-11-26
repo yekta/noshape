@@ -1,0 +1,62 @@
+{
+ "name": "extrude-up-to-vertex-overlap-ok",
+ "about": "Part 1 top face, shift+e, Up to vertex, Part 2 corner (50,20,15), \u2713",
+ "area": "psui",
+ "source": "depth batch 1 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     5,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind",
+    "pick": "Up to vertex"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     50,
+     20,
+     15
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

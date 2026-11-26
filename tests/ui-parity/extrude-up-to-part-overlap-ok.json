@@ -1,0 +1,58 @@
+{
+ "name": "extrude-up-to-part-overlap-ok",
+ "about": "Part 1 top face, shift+e, Up to part, Part 2, \u2713",
+ "area": "psui",
+ "source": "depth batch 1 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     5,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Blind",
+    "pick": "Up to part"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

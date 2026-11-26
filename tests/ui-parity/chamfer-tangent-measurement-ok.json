@@ -1,0 +1,54 @@
+{
+ "name": "chamfer-tangent-measurement-ok",
+ "about": "front top edge, Chamfer, Measurement \u25be Tangent, \u2713",
+ "area": "psui",
+ "source": "depth batch 1 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Chamfer"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Offset",
+    "pick": "Tangent"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
