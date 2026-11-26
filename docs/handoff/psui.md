@@ -188,7 +188,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a_hovered_triad_handle_is_a_shaded_blue_tube), to verify. Still ≠, not mine: 1100 (unverified), 1662 (decision), 1900 (core),
   FEEL-MC-MARKER-SHAPES (skasm). mirror-no-line → skasm. Row 1662 = superset (lead 11-26), T1 units
   live_accepted_inputs_and_our_superset_of_its_refusals. 19:5x RUNNER-UNLABELLED-FIELD-INDEX fixed (Hole icon rows marked field:#n),
-  to verify by qa's flow45 rerun. Next: qa's diffs from live's option-combination batches (order 3) as filed.
+  to verify by qa's flow45 rerun. 20:2x-20:4x drawing triage outside the maker scope (lead): 127 in-scope (section,
+  detail, broken-out, BOM / hole tables, centerlines / centermarks, sheets, formats) + 178 other drw (no flat / weld) all
+  match on branch (green d3abfe79c + 74595efa): 305/305, 3151/3151 states (vibe2 ~/tmp/psui/drw2, drw3). Next: qa's diffs from live's option-combination batches (order 3) as filed.
 - SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Radial placed inside a hole: both takes match (verify13, branch and green), closed. Queue empty (19:4x). qa's 70 (Hole rows 'Ø 5 mm THRU' / field
   Diameter): answered 19:4x, a flow-script issue (THRU = the account's remembered seed; live's diameter box is unlabelled).
 
