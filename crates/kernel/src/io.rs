@@ -289,9 +289,13 @@ fn sewn_closed(p: ImportedShape, unit: LengthUnit) -> ImportedShape {
 /// colours follow their faces.
 fn merged_faces(mut p: ImportedShape, periodic: bool) -> Result<ImportedShape> {
     let t0 = std::time::Instant::now();
-    let styled: Vec<u32> = p.face_colors.iter().map(|&(f, _)| f as u32).collect();
+    // (A face coloured as its part has no colour of its own: pulley02-maxwell's IGES gives all 16 faces the part's.)
+    let own = |c: &[f32; 3]| p.color.is_none_or(|pc| pc.iter().zip(c).any(|(a, b)| (a - b).abs() > 1e-4));
+    let styled: Vec<u32> = p.face_colors.iter().filter(|(_, c)| own(c)).map(|&(f, _)| f as u32).collect();
     let m = ck(ffi::merge_same_surface_faces(p.shape.raw(), periodic, &styled))?;
     p.face_colors = p.face_colors.iter().filter_map(|(f, c)| m.face_map.get(*f).filter(|&&k| k != u32::MAX).map(|&k| (k as usize, *c))).collect();
+    p.face_colors.sort_by_key(|(f, _)| *f);
+    p.face_colors.dedup_by_key(|(f, _)| *f);
     p.shape = Shape::from_ptr(m.shape);
     if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
         eprintln!("  faces on one surface merged: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);

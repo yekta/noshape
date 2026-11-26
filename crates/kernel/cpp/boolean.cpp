@@ -12654,8 +12654,20 @@ occ::handle<Geom_Surface> round_under_trim(const occ::handle<Geom_Surface>& s)
   return b != s && occ::down_cast<Geom_ElementarySurface>(b) && !occ::down_cast<Geom_Plane>(b) ? b : occ::handle<Geom_Surface>();
 }
 
-// Adjacent faces on copies of one B-spline surface put on one of them (UnifySameDomain merges B-spline faces only on
-// one surface), and faces on a trimmed cylinder, cone, sphere or torus on the whole one (merge_cylinder_bands takes
+// Two copies of one torus, parametrised alike (an IGES writer's quarters of a fillet's: pulley02-maxwell).
+bool same_torus(const occ::handle<Geom_Surface>& a, const occ::handle<Geom_Surface>& b, double tol)
+{
+  const auto p = occ::down_cast<Geom_ToroidalSurface>(untrimmed(a)), q = occ::down_cast<Geom_ToroidalSurface>(untrimmed(b));
+  if (p.IsNull() || q.IsNull())
+    return false;
+  const gp_Ax3 &x = p->Position(), &y = q->Position();
+  constexpr double ang = 1e-9;
+  return x.Location().Distance(y.Location()) < tol && x.Direction().IsEqual(y.Direction(), ang) && x.XDirection().IsEqual(y.XDirection(), ang) &&
+         x.YDirection().IsEqual(y.YDirection(), ang) && std::abs(p->MajorRadius() - q->MajorRadius()) < tol && std::abs(p->MinorRadius() - q->MinorRadius()) < tol;
+}
+
+// Adjacent faces on copies of one B-spline surface or torus put on one of them (UnifySameDomain merges B-spline faces
+// only on one surface, tori only so: its IntPatch test has no torus-torus case), and faces on a trimmed cylinder, cone, sphere or torus on the whole one (merge_cylinder_bands takes
 // only those): each face's pcurves registered on it, an edge where two pieces meet across the surface's period a seam
 // with both. In place: `shape` is a copy of the part's.
 bool share_bspline_surfaces(const TopoDS_Shape& shape)
@@ -12676,7 +12688,7 @@ bool share_bspline_surfaces(const TopoDS_Shape& shape)
       continue;
     TopLoc_Location la, lb;
     const auto      ga = surface(fs.First(), la), gb = surface(fs.Last(), lb);
-    if (ga == gb || !la.IsEqual(lb) || !same_bspline_surface(ga, gb, 1e-9))
+    if (ga == gb || !la.IsEqual(lb) || !(same_bspline_surface(ga, gb, 1e-9) || same_torus(ga, gb, 1e-9)))
       continue;
     parent[root(fmap.FindIndex(fs.Last()))] = root(fmap.FindIndex(fs.First()));
     any = true;
@@ -12706,8 +12718,9 @@ bool share_bspline_surfaces(const TopoDS_Shape& shape)
     const int r = root(i);
     TopLoc_Location lr, lf;
     occ::handle<Geom_Surface> rep = surface(fmap(r), lr);
-    // (On its own copy of the whole surface: a neighbour on the same one may run its curves from another start.)
-    if (const auto whole = round_under_trim(rep); size[(size_t)r] == 1 && !whole.IsNull())
+    // (On its own copy of the whole surface: a neighbour on the same one may run its curves from another start. A group's
+    // first face's copy, the others then on it.)
+    if (const auto whole = round_under_trim(rep); !whole.IsNull())
       rep = occ::down_cast<Geom_Surface>(whole->Copy());
     // (Forward: a seam's two curves read as the edge's orientation in it says, as they're put back.)
     const TopoDS_Face               f   = TopoDS::Face(fmap(i).Oriented(TopAbs_FORWARD));
@@ -12881,7 +12894,7 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic, rust::Slic
       rebuilt = true;
     }
   }
-  // Pieces of one B-spline surface on one (on a copy: the part as read stays as it is).
+  // Pieces of one B-spline surface or torus on one (on a copy: the part as read stays as it is).
   std::unique_ptr<BRepBuilderAPI_Copy> copy;
   if (periodic)
   {

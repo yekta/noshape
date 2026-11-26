@@ -2958,3 +2958,18 @@ fn a_face_appearance_is_written_named_with_its_predefined_colour() {
     let green: Vec<usize> = p.face_colors.iter().filter(|(_, c)| c.iter().zip([0.0, 1.0, 0.0]).all(|(x, y)| (x - y).abs() < 1e-3)).map(|(i, _)| *i).collect();
     assert_eq!(green, vec![1], "the face green again: {:?}", p.face_colors);
 }
+
+/// An IGES writer's pieces of one torus (pulley02-maxwell's fillet, written as a 2×2 grid of quarters) read as one face,
+/// as live's: OCCT's unify can't tell two tori are one surface, and faces coloured as their part keep no edges (all 16
+/// are). 16 faces read as live's 9. The file is outside the repo, in $NOSHAPE_IGES_PULLEY.
+#[test]
+#[ignore = "T2: a corpus file outside the repo"]
+fn an_iges_torus_in_pieces_reads_as_one_face() {
+    let Some(p) = std::env::var_os("NOSHAPE_IGES_PULLEY") else { return };
+    let parts = read_iges_parts(std::path::Path::new(&p), LengthUnit::Millimeter).unwrap();
+    assert_eq!(parts.len(), 1);
+    let s = &parts[0].shape;
+    let tori = (0..s.count(ShapeType::Face)).filter(|&i| matches!(s.sub_shape(ShapeType::Face, i).unwrap().face_surface().unwrap(), Surface::Torus { .. })).count();
+    assert_eq!((s.count(ShapeType::Face), tori, s.is_valid()), (9, 1, true), "faces, tori, valid (live: 9 faces, the fillet one)");
+    assert_eq!(parts[0].face_colors.len(), 9, "one colour per merged face");
+}
