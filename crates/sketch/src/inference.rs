@@ -445,8 +445,8 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
             let starts_on = |w: EntityId| sk.curve(w).is_some_and(|c| c.closest(a).2 <= 1e-9 * (1.0 + a.length()));
             // Started near a held line, square to it: Perpendicular to it when the start is within reach of the line or
             // of its midpoint on screen, the end anywhere (live "Reach brackets" 11-21, sketch-line-from-midpoint).
-            // Started on it off the midpoint, or from its end as a chain: Vertical, as on a free one (live
-            // sketch-tools-1119, the 11-19 trim retakes, sketch-line-chain).
+            // From its end as a chain: Vertical, as on a free one (live sketch-line-chain); started on it off the
+            // midpoint, Perpendicular (live inference-1866 (d) 11-26).
             let px = r / SNAP_RADIUS_PX;
             // Live perp-reach-vertical-1123: off a held vertical line, from 9 px out to its exact midpoint, a
             // horizontal line stays Horizontal; only a vertical line takes Perpendicular (to a held horizontal one).
@@ -465,11 +465,15 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     if mid.length() <= on {
                         return true;
                     }
-                    let to_line = la + t * (a - la).dot(t) - a;
+                    // From its end (a chain): Vertical (live sketch-line-chain).
+                    if (la - a).length() <= on || (lb - a).length() <= on {
+                        return false;
+                    }
                     // To the segment: started 5 mm past its end, square to it, a line is Vertical (live
-                    // sketch-coincident-constraint, 12 px off the line, 25 px off its end).
+                    // sketch-coincident-constraint, 12 px off the line, 25 px off its end); started on it anywhere,
+                    // Perpendicular (live inference-1866 (d): 3, 6 and 12 mm off the midpoint).
                     let to_segment = la + t * (a - la).dot(t).clamp(0.0, (lb - la).length()) - a;
-                    to_line.length() > on && (seen(to_segment) / px <= PERPENDICULAR_LINE_REACH_PX || seen(mid) / px <= PERPENDICULAR_MID_REACH_PX)
+                    seen(to_segment) / px <= PERPENDICULAR_LINE_REACH_PX || seen(mid) / px <= PERPENDICULAR_MID_REACH_PX
                 })
             };
             let line_kind = |horizontal: bool| match square_near(horizontal) {
@@ -623,10 +627,10 @@ mod tests {
         DVec2::new(x, y)
     }
 
-    /// A line square to a held line (the Line tool's Horizontal): started on it off its midpoint, drawn across it from
-    /// far off or going on from its end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross
-    /// retake, the 11-19 trim retakes, live2's sketch-line-chain variants 11-19 17:xx); started at its midpoint,
-    /// Perpendicular to it (live sketch-line-from-midpoint).
+    /// A line square to a held line (the Line tool's Horizontal): drawn across it from far off or going on from its
+    /// end as a chain, Vertical, as on a free line (live sketch-tools-1119, its cross retake, live2's sketch-line-chain
+    /// variants 11-19 17:xx); started on it, at its midpoint or off it, Perpendicular to it (live
+    /// sketch-line-from-midpoint, inference-1866 (d) 11-26).
     #[test]
     fn square_to_a_held_line_from_its_midpoint_is_perpendicular() {
         let mut sk = Sketch::new();
@@ -637,8 +641,8 @@ mod tests {
             let ctx = InferenceContext { tool: SketchTool::Line, anchor: Some(v(x, y)), snap_radius: 0.05, woken: vec![base], ..Default::default() };
             infer(sk, v(x + 0.01, y + 1.5), &ctx).into_iter().next().unwrap()
         };
-        // Started on it: Vertical; at its midpoint: Perpendicular; on a free line's midpoint: Vertical.
-        assert_eq!(up(&sk, held, 1.0, 0.0).kind, InferenceKind::Vertical);
+        // Started on it, off or at its midpoint: Perpendicular; on a free line's midpoint: Vertical.
+        assert_eq!(up(&sk, held, 1.0, 0.0).kind, InferenceKind::Perpendicular);
         let r = up(&sk, held, 2.0, 0.0);
         assert_eq!((r.kind, r.constraints), (InferenceKind::Perpendicular, vec![AutoConstraint::PerpendicularTo(held)]));
         assert_eq!(up(&sk, free, 2.0, 2.0).kind, InferenceKind::Vertical);

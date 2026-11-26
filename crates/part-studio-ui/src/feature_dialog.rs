@@ -2402,8 +2402,7 @@ impl FeatureDialog {
             let dim = n.kind.dim();
             let f = self.units.si_factor(dim);
             let v = noshape_units::evaluate_as(text, dim, &self.units, &self.variables).map(|q| q.value / f).unwrap_or(0.0);
-            let sig3 = |b: f64| if b == 0.0 { "0".to_string() } else { format!("{:.*}", (2 - b.abs().log10().floor() as i32).max(0) as usize, b) };
-            return format!("Enter a value between {} and {}.  Current value is {}.", sig3(n.min / f), sig3(n.max / f), noshape_units::format_number(v, 6));
+            return format!("Enter a value between {} and {}.  Current value is {}.", bound_digits(n.min / f), bound_digits(n.max / f), noshape_units::format_number(v, 6));
         }
         let v = noshape_units::evaluate_as(text, noshape_units::Dim::UNITLESS, &self.units, &self.variables).map(|q| q.value).unwrap_or(0.0);
         let shown = if v.fract() == 0.0 { format!("{}", v as i64) } else { noshape_units::format_number(v, 3) };
@@ -5129,6 +5128,27 @@ fn configure_items(m: crate::os_menu::OsMenu, view: &Entity<FeatureDialog>, para
 /// (10-25 p1) (2): two clicks give two "Vertex of Sketch 1" chips).
 fn groups_vertices(picked_as_whole: bool, vertices: usize, picked: usize) -> bool {
     picked_as_whole && vertices >= 2 && picked == vertices
+}
+
+/// A range tip's bound to 3 significant digits, cut rather than rounded (live errors-1123: Bend's 359.9° reads "359",
+/// a radius's 0.01 mm "0.0100").
+fn bound_digits(b: f64) -> String {
+    if b == 0.0 {
+        return "0".to_string();
+    }
+    let decimals = (2 - b.abs().log10().floor() as i32).max(0);
+    let scale = 10f64.powi(decimals);
+    let cut = ((b * scale) + b.signum() * 1e-6).trunc() / scale;
+    format!("{:.*}", decimals as usize, cut)
+}
+
+#[cfg(test)]
+mod bound_digits_tests {
+    #[::core::prelude::v1::test]
+    fn a_range_tips_bounds_are_cut_to_three_digits() {
+        let tips: Vec<String> = [359.9, 179.0, 89.9, 1.0, 0.01, 500000.0, 0.29].into_iter().map(super::bound_digits).collect();
+        assert_eq!(tips, ["359", "179", "89.9", "1.00", "0.0100", "500000", "0.290"]);
+    }
 }
 
 #[cfg(test)]

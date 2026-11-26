@@ -15150,6 +15150,45 @@ mod tests {
         assert!(m && vert && !p, "a free line: MIDPOINT + VERTICAL: {kinds:?}");
     }
 
+    /// Live inference-1866 (d), 3.63 px a mm: a Line started on a held line (drawn with the Line tool, or a rectangle's
+    /// edge) 3, 6 or 12 mm off its midpoint and drawn straight up stores COINCIDENT + PERPENDICULAR, never VERTICAL; 1 mm
+    /// off, the start snaps to the midpoint.
+    #[test]
+    fn a_line_up_from_a_held_line_off_its_midpoint_is_perpendicular() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        for held in [Tool::Line, Tool::CornerRect] {
+            for off in [1.0, 3.0, 6.0, 12.0] {
+                let (mut ed, mut d) = editor(held);
+                ed.world_per_px = 1e-3 / 3.63;
+                click(&mut ed, &mut d, mm(-50.0, if held == Tool::Line { 10.0 } else { -10.0 }));
+                click(&mut ed, &mut d, mm(-10.0, 10.0));
+                ed.set_tool(Tool::Select);
+                let base = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).find(|l| {
+                    let (a, b) = d.sketch.endpoints(*l).unwrap();
+                    (d.sketch.point(a).unwrap().y - 0.01).abs() < 1e-9 && (d.sketch.point(b).unwrap().y - 0.01).abs() < 1e-9
+                });
+                let base = base.expect("a line along y = 10");
+                let before = d.sketch.constraints().count();
+                ed.set_tool(Tool::Line);
+                click(&mut ed, &mut d, mm(-30.0 + off, 10.0));
+                ed.pointer_move(&mut d, mm(-30.0 + off, 25.0), false, false);
+                click(&mut ed, &mut d, mm(-30.0 + off, 25.0));
+                let new = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).max().unwrap();
+                let kinds: Vec<_> = d.sketch.constraints().skip(before).map(|c| c.kind.clone()).collect();
+                let has = |f: &dyn Fn(&ConstraintKind) -> bool| kinds.iter().any(f);
+                let midpoint = has(&|k| matches!(k, ConstraintKind::Midpoint { curve, .. } if *curve == base));
+                let on = has(&|k| matches!(k, ConstraintKind::Coincident { a, b } if *a == base || *b == base));
+                let square = has(&|k| matches!(k, ConstraintKind::Perpendicular { a, b } if (*a, *b) == (new, base) || (*a, *b) == (base, new)));
+                let vertical = has(&|k| matches!(k, ConstraintKind::Vertical { .. }));
+                if off == 1.0 {
+                    assert!(midpoint, "{held:?} 1 mm off: the midpoint: {kinds:?}");
+                } else {
+                    assert!(on && square && !vertical && !midpoint, "{held:?} {off} mm off: COINCIDENT + PERPENDICULAR: {kinds:?}");
+                }
+            }
+        }
+    }
+
     /// Live infer-arc-circle-1125 (0.293 mm a px): a circle's radius point at a line's end that is also its tangent
     /// point stores COINCIDENT to the end and no TANGENT (the point wins); a centre-point arc's start straight above its
     /// centre stores VERTICAL to it and its end at 180 degrees HORIZONTAL.
