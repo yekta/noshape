@@ -1,11 +1,11 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 17:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 19:23 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
-- **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): fixed in a626544d5** (core-rf): my a5e0075bb sent Move faces
+- **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): QUEUED 01c87462 19:16** (core-rf, carries Fillet 17; qa + lead told): my a5e0075bb sent Move faces
   of planes facing several ways down the one-way-at-a-time tweak (neighbours keep names) instead of OCCT's offset
   (every face Offset(old)): the derived source's Move face 1 vertices renamed, Part Studio 1's Transform 1 by two
   vertices lost them. Now several ways only after OCCT's offset fails (before the booleans); reblend fallback as was.
@@ -71,8 +71,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   35,40) FAILS. Probe 2 (core-scratch/f18b-probe.patch): all 42 edges are 90 deg, walls y +-11 = faces 49/80
   (planes), the chains on them split at sharp corners: -11 side {1,6,35,40} "fillet failed", {20,21,22,24}
   "invalid solid", 39 OK. Edge 40/9 = short arc (x -15..-17, z -28) on cylinders 81/52 (y -8.25..-11 / 7.75..11,
-  Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there. Next: fillet those sub-chains
-  on their own (OCCT ChFi3d's fault, or a corner there), then Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there.
+  19:2x probes (core-scratch/f18cde-probe.patch, outputs f18c/d/e.out): chains are {1,6} (OK r<=0.5, fail 0.8), 35
+  alone (OK only r 0.1), 40 alone (FAILS at every r, 0.8..0.1), B {20,24} (OK r 0.5/0.3, fail 0.8 and 0.1). CAUSE at
+  edge 40: cylinder 81 (r4, y -8.25..-11) is a concave round from slope face 58 into plate underside face 0 (tilted
+  plane, L-shaped, y -8.25..-18.5), tangent to it at x -15.09. At y -11 the wall 80's outline has a ZERO-ANGLE CUSP
+  there: edge 1 (0/80) and edge 40 (80/81) leave vertex (-15.09,-11,-27.73) the same way; the wall is a sliver
+  thinning to nothing between plane 0 and the round (at y -8.25 the same vertex is smooth: k0 0/82 runs on +x).
+  Rounding 1 and 40 at r 0.8 must eat the sliver. Next: how live ends there (live 141 faces, -6.93 mm3; capture
+  the faces near (-15,-11,-28) via live helpers), then a blend that consumes the cusp sliver (ours) or trims edge 40's
+  round before the tip; then Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
   surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
