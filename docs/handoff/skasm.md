@@ -1,18 +1,23 @@
 # Handoff: skasm (sketch solver, sheet metal, frames, the parity translator's sketches): current state
 
-Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
+Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 17:14 UTC) — read first
+## RESUME HERE (11-26 18:06 UTC) — read first
 
-P0 scissor closed (11-26 15:36 UTC; ac4efa6a). Queued 17:12 UTC: 39897f2b (the 3 qa sketch tickets + Tangent first pick
-(also queued as e1fe3f14 at 16:40), TICKETS duplicates, and the SKETCH-ISO-ORIGIN-ALIGN T1).
-SKETCH-ISO-ORIGIN-ALIGN: no inference bug. At live's pixel ours infers nothing (T1). The replay's HORIZONTAL comes from
-its approach: three moves from the Top-plane click (885,486) cross the origin's horizontal band, and the snap holds
-(HOLD_PX 9.5) at the click, 9.3 px off; live's recorder parked the pointer at [1889, 932] for the `l` key step. Also,
-in our replay live's pixel lands ~1 px lower in y than in live. Seen with an instrumented replay on vibe2
-(~/tmp/skasm/uip). Replay fix (approach from live's recorded pointer) handed to the lead for psui (their 1e9efbed7).
-Queue empty but live waits: MEASURE-MAX-TIE (second tie take), the 1866 (d) retake, ASM-DRAG-REVOLUTE-ANGLE.
+Queued 18:06 UTC: 1b4189ea (8 commits: 39897f2b's work + 207ce53e7). 207ce53e7: (1) 1866 (d): a Line started ON a held
+line anywhere off its midpoint is Perpendicular + Coincident (inference.rs square_near: the on-line exclusion gone; a
+start at the line's own end stays Vertical, sketch-line-chain); T1s scene `a_line_up_from_a_held_line_off_its_midpoint_is_perpendicular`,
+sketch `square_to_a_held_line_from_its_midpoint_is_perpendicular` updated; interaction-feel Perpendicular row rewritten.
+11-19 trim scenarios start 10 mm off the line: unaffected. (2) ERR-SM-BEND-RANGE: range tips cut bounds to 3 digits
+(feature_dialog.rs bound_digits). part-studio-ui sketch tests 595/0 on vibex7.
+SKETCH-ISO-ORIGIN-ALIGN: no inference bug (T1); psui takes the replay approach fix (their 1e9efbed7).
+MEASURE-MAX-TIE: live 17:16 says no geometric rule (kernel vertex order): closed as note, nothing to match.
+ASM-DRAG-REVOLUTE-ANGLE: live 16:45 confirms the pin turns AGAINST the pointer (+20/+40/+80/−40/148−8 px →
+−11.82/−21.95/−33.96/+24.04/−39.55°, iso 0.0632 mm/px). No rule fits all five: the angle of the pointer's hit on a plane
+square to the axis fits the three rightward takes within 1.3° only with the grab behind the axis (R≈5–6 mm, 70° from
+screen-right), −40 gives +30 (live +24). New REQUESTS "skasm 11-26 … the angle along ONE drag" (stepped drag, upward
+drag, second press point). Drag code: assembly_view.rs ~3838 (grab) and ~4450 (SolveOptions drags, drag_view).
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
