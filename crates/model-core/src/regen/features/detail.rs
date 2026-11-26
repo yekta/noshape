@@ -697,6 +697,11 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
         }
     };
     let faces_only = refs.iter().all(|r| matches!(r, crate::reference::Reference::Face(_)));
+    if std::env::var_os("ZZ_PICKS").is_some() {
+        for r in refs {
+            eprintln!("ZZ ref {:?} -> {:?}", format!("{r:?}").chars().take(400).collect::<String>(), ev.resolve_edges(std::slice::from_ref(r)));
+        }
+    }
     let groups = by_body(sharp_of_picked_faces(ev, refs));
     // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
@@ -710,6 +715,14 @@ fn fillet_in(ev: &mut EvalCtx) -> FResult<()> {
     let mut work: Vec<(usize, Vec<usize>, bool)> = groups.into_iter().map(|(bi, edges)| (bi, edges, true)).collect();
     while let Some((bi, edges, cut_slivers)) = work.pop() {
         let body = ev.ctx.bodies[bi].clone();
+        if std::env::var_os("ZZ_PICKS").is_some() {
+            let (all, fcs, ef) = (body.shape.edges(), body.shape.faces(), body.shape.edge_faces()?);
+            for &x in &edges {
+                let i = all[x].edge_info()?;
+                let kinds: Vec<String> = ef[x].iter().map(|&f| format!("{}:{:?} {:.4}", f, fcs[f as usize].face_surface().map(|s| format!("{s:?}").chars().take(60).collect::<String>()), fcs[f as usize].area().unwrap_or(0.0) * 1e6)).collect();
+                eprintln!("ZZ pick {x} {:?} {:?} -> {:?} len {:.4} conv {:?} faces {kinds:?}", i.curve, i.start * 1e3, i.end * 1e3, i.length * 1e3, TangentLinks::new(&body.shape).map(|l| l.convexity(x)));
+            }
+        }
         let propagate = ev.bool("tangentPropagation");
         // Live 2202 / 2227: picked faces alone, their edges aren't propagated (the result doesn't depend on propagation).
         // With edges picked too, all are (learning-center-michael's Fillet 2: seven edges and a cap face, as live).

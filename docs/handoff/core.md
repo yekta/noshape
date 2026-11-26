@@ -33,7 +33,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - THEN screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
 - THEN psui's two TICKETS items: Extrude "Up to part" overlap; Remove pattern of the only part.
 - PATTERN-AFTER-INSERTED-CHAMFER: taken by skasm (lead 11-26).
-- TRANSFORM-TRANSLATE-DISTANCE: LANDED 662228ffc, qa verified 21:5x (hem docs SAME); delete vibex7 ~/tmp/core/tr.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
@@ -45,7 +44,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   blend_section Support::Face when Newton's foot leaves the face) on Move face 2's new (live) geometry; live does
   Move face 1, Delete face 2 and both fillets OK -> the real fix is making them succeed (parity work, not speed).
 ## Now (11-25)
-- **LANDING core-rf 11-26**: 2b8aa8ed LANDED 15:11. QUEUED 0b615541 15:54: 56131f3c (9cbb0e MF2, b58244 MF6, tweak trim fix) + be8307ce4 (speed: inside-out fillet repaired before the retries; tool_only seed re-runs).
 - **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
   fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
   need a FRESH parity run (save/ copies keep old references): .bd2.sh.
