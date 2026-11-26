@@ -23,7 +23,7 @@
     },
     {
       "do": "key",
-      "key": "ctrl+a"
+      "key": "mod+a"
     },
     {
       "do": "type",
@@ -45,7 +45,7 @@
     },
     {
       "do": "key",
-      "key": "ctrl+a"
+      "key": "mod+a"
     },
     {
       "do": "type",

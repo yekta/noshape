@@ -177,6 +177,16 @@ fn opens_on_tab() -> Option<String> {
 
 /// A key name of the scenario format as a GPUI keystroke ("Enter", "mod+z", "shift+e", "#").
 fn keystroke(key: &str) -> Option<Keystroke> {
+    keystroke_for(key, cfg!(target_os = "macos"))
+}
+
+/// [`keystroke`] on a Mac (`mac`) or elsewhere.
+fn keystroke_for(key: &str, mac: bool) -> Option<Keystroke> {
+    // A take's redo (Ctrl+Y) is ⇧⌘Z on a Mac: live's ⌘Y redoes only in a drawing, its ⌃Y only outside one
+    // (live keys-macos, shortcuts-1123 drw).
+    if mac && key == "mod+y" {
+        return keystroke_for("mod+shift+z", mac);
+    }
     // "+" itself, alone or after modifiers ("mod++"), isn't a separator (vs-value-chip typed "-" for it).
     let parts: Vec<&str> = match key.strip_suffix("++") {
         Some(mods) => mods.split('+').chain(["+"]).collect(),
@@ -187,7 +197,7 @@ fn keystroke(key: &str) -> Option<Keystroke> {
     let mut spec: Vec<String> = mods
         .iter()
         .map(|m| match m.to_lowercase().as_str() {
-            "mod" if cfg!(target_os = "macos") => "cmd".to_string(),
+            "mod" if mac => "cmd".to_string(),
             "mod" => "ctrl".to_string(),
             other => other.to_string(),
         })
@@ -1642,6 +1652,19 @@ fn drag_plan(step: &Value) -> DragPlan {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+
+    /// A take's keys on each OS: `mod` is Ctrl / ⌘, and its redo (Ctrl+Y) ⇧⌘Z on a Mac, where ⌘Y redoes nothing
+    /// outside a drawing (psui platform sample: sketch-undo-redo-line on the Mac).
+    #[test]
+    fn a_takes_keys_press_the_platforms_keys() {
+        let k = |key: &str, mac: bool| super::keystroke_for(key, mac).map(|k| k.unparse());
+        let p = |s: &str| gpui_kit::Keystroke::parse(s).ok().map(|k| k.unparse());
+        assert_eq!(k("mod+z", false), p("ctrl-z"));
+        assert_eq!(k("mod+z", true), p("cmd-z"));
+        assert_eq!(k("mod+y", false), p("ctrl-y"));
+        assert_eq!(k("mod+y", true), p("cmd-shift-z"));
+        assert_eq!(k("shift+e", true), p("shift-e"));
+    }
 
     /// A menu row named by part of its text, never by the start of a longer row, unless what follows is its shortcut
     /// or a quoted name (qa UIS-CONFIG-ROW-MENU: "Switch to" for Switch to "Large").

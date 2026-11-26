@@ -188,7 +188,9 @@ def run_one(app, scenario, out, display, timeout, height=None, live=None):
     })
     if out.exists():
         out.unlink()
-    proc = subprocess.Popen([app], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    # The app's log goes to a file, never a pipe read at the end: a full pipe (16 KB at first on macOS) stops the app.
+    log = open(Path(config, "stderr.log"), "w+", encoding="utf-8", errors="replace")
+    proc = subprocess.Popen([app], env=env, stdout=subprocess.DEVNULL, stderr=log)
     t = time.time()
     while proc.poll() is None and time.time() - t < timeout:
         # Focus it until its first frames are up (a window not mapped yet ignores it).
@@ -199,10 +201,17 @@ def run_one(app, scenario, out, display, timeout, height=None, live=None):
             if w:
                 subprocess.run(["xdotool", "windowfocus", w[-1]], env=env, capture_output=True)
         time.sleep(0.2)
-    if proc.poll() is None:
+    timed_out = proc.poll() is None
+    if timed_out:
         proc.kill()
+        proc.wait()
+    log.seek(0)
+    err = log.read()
+    log.close()
+    if timed_out:
+        if os.environ.get("NOSHAPE_UIP_LOGS"):
+            Path(str(out) + ".stderr").write_text(err)
         return "timed out"
-    err = proc.stderr.read()
     # NOSHAPE_UIP_LOGS=1: the app's own log (its UI-SCRIPT lines: where each step clicked) beside the recording.
     if os.environ.get("NOSHAPE_UIP_LOGS"):
         Path(str(out) + ".stderr").write_text(err)

@@ -136,7 +136,7 @@ take's placement) carries the same control by name for ours, which runs `ours_on
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.
 - `{"do": "type", "text": "..."}` types characters one key at a time.
-- `{"do": "key", "key": "Enter"}`: one key or chord; `mod` is Ctrl on Linux / Windows and Cmd on macOS (`mod+z`,
+- `{"do": "key", "key": "Enter"}`: one key or chord; `mod` is Ctrl on Linux / Windows and Cmd on macOS (`mod+y`, redo, is Shift+Cmd+Z there) (`mod+z`,
   `shift+e`, `alt+c`). Key names: `Enter`, `Escape`, `Tab`, `Backspace`, `Delete`, `ArrowUp` / `Down` / `Left` /
   `Right`, `Space`, `F2`, single characters.
 - A `key` step with `"hold": true` leaves its modifiers down (Ctrl+Space's quick tab switcher) until
