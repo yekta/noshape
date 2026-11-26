@@ -11,6 +11,8 @@ the refill), against live's per-feature geometry with T1s; brep / kernel Boolean
 bin/corp1.sh <doc> <grep> on vibex7 (~/tmp/skasm/corp/one.log); edge-by-edge compare as in the Rib 1 note below
 (temporary SKDBG edge writer in parity.rs our_parts: query_entities edges -> edges-N.json, matched to live.jsonl's
 bodies[].edges by midPoint/length).
+Trace 21:1x: hunting-knife 48/52, Split 4 "HANDLE" 14/31/18 vs live 14/31/19 (one vertex more in live, same edges:
+a closed edge live splits with a second vertex? compare vertices/edges as for Rib 1); then Fillet 8 16/34/20 vs 15/37/25.
 Lead 21:xx: nuts Sweep 1 + parting-line Rib 1. Both are NOT sketch/translation: reported back for core/bool.
 - nuts Sweep 1: profile + helix right; live 3 cylinders/2 other, ours 2/3: the thread's flat (a profile line parallel
   to the axis, r 2.0 mm) sweeps a multi-turn helical strip on a cylinder, ours a B-spline. Patch
