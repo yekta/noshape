@@ -19,6 +19,15 @@ square to the axis fits the three rightward takes within 1.3° only with the gra
 screen-right), −40 gives +30 (live +24). New REQUESTS "skasm 11-26 … the angle along ONE drag" (stepped drag, upward
 drag, second press point). Drag code: assembly_view.rs ~3838 (grab) and ~4450 (SolveOptions drags, drag_view).
 
+IN FLIGHT (lead 18:0x: translator side of the 11-26 corpus refills): 27 refilled docs (live.jsonl 05:21, refs.jsonl 16:08)
+run on vibex7 (bin/corp.sh; ~/tmp/skasm/corp/models.log): 14/27 to the end. Translator: prize-wheel-tim Sketch 3 (new
+refs.jsonl gives its plane, a mate connector at Hole 1's tip, as a point BODY -> went to Part 1, "Select a sketch plane."):
+UNCOMMITTED fix in crates/ops/src/parity.rs (connector_known_only_as_a_body + T1 a_connector_query_live_gives_as_a_body_stays_by_its_text),
+rerun bin/corp2.sh -> ~/tmp/skasm/corp/models2.log. Next: c2-surf-intro-ruled Ruled surface 1 box (x -8.7..0 vs live
+-0.05..23.9: a wrong edge?) after the Tail Fin spline area (1.2e-5, old). Others to core/bool: nuts Sweep 1, screws Move
+face 3, gamma/wire-clip Boolean 2 (imported), hunting-knife Split 4, impeller Fillet 3, parting-line Rib 1, surf-intro-offset
+Offset, knifehandle Mutual trim. Report the count moved to the lead.
+
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
 > ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &). Speed T2: sp3.sh (sp4.sh = same with SKTRACE, trace code removed).
