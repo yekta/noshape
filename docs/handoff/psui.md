@@ -93,8 +93,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   (pick_dimmed only with Select transparent geometry). Open: selected instance, face already in a mate field, MC
   while a mate dialog is open, under a mate preview, Alt over an isolated ghost (ours: alt_through makes ghosts
   pickable, assembly_view.rs ~1279; live PS: Alt changes nothing -> likely a diff), Make transparent, hidden, exploded.
-- REQUESTS "psui 11-26 07:02" (7 items) filed. Next: as live answers, write T1s in assembly-ui (look at the existing
-  asm hover tests first) and fix the diffs; meanwhile check ours for each cell with a T1 that records what lights.
+- REQUESTS "psui 11-26 07:02" (7 items) filed; live had not answered at 07:13.
+- Recording T1s (assembly_feel_tests.rs end): combined_hover_on_a_selected_instance,
+  combined_hover_through_faded_and_hidden_instances, combined_hover_while_editing_an_exploded_view (stacked_blocks:
+  Part 2 moved onto Part 1). Ours column filled. Alt diff narrowed: Alt over a ghost WITH an instance behind lights
+  that instance (as live PS); over a ghost alone Alt lights the ghost (live PS: nothing). If live (5) confirms, fix:
+  drop `|| self.ui.alt_through` for Isolate/Make transparent ghosts (assembly_view.rs ~1279; keep Alt for appearance
+  transparency) and add the Alt asserts to the faded test. Not covered yet: mate preview (4) and MC in a mate dialog (3).
+- Note: add_exploded_view refits the camera and the Explode panel narrows the test viewport to 249 px: fit_top after.
 
 ## Agents
 
