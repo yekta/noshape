@@ -89,19 +89,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
    IMP-TOAST-QUEUE (1567cf00a): marked fixed, to verify; duplicate union rows dropped.
 
 ## P0 (lead 11-26 06:5x): assembly hover in combined states
-- Cells in interaction-feel.md "Combined states in an assembly" (11 rows): drag = live; Isolate faded hover = live
-  (pick_dimmed only with Select transparent geometry). Open: selected instance, face already in a mate field, MC
-  while a mate dialog is open, under a mate preview, Alt over an isolated ghost (ours: alt_through makes ghosts
-  pickable, assembly_view.rs ~1279; live PS: Alt changes nothing -> likely a diff), Make transparent, hidden, exploded.
-- REQUESTS "psui 11-26 07:02" (7 items) filed; live had not answered at 07:13.
-- Recording T1s (assembly_feel_tests.rs end): combined_hover_on_a_selected_instance,
-  combined_hover_through_faded_and_hidden_instances, combined_hover_while_editing_an_exploded_view (stacked_blocks:
-  Part 2 moved onto Part 1). Ours column filled. Alt diff narrowed: Alt over a ghost WITH an instance behind lights
-  that instance (as live PS); over a ghost alone Alt lights the ghost (live PS: nothing). If live (5) confirms, fix:
-  drop `|| self.ui.alt_through` for Isolate/Make transparent ghosts (assembly_view.rs ~1279; keep Alt for appearance
-  transparency) and add the Alt asserts to the faded test. MC in a mate dialog (3): combined_hover_mate_connector_in_a_mate_dialog
-  (hover_matrix_tests.rs; the glyph wins over the corner dot). Not covered yet: mate preview (4): wait for live.
-- Note: add_exploded_view refits the camera and the Explode panel narrows the test viewport to 249 px: fit_top after.
+- Live answered (live/psui/asm-hover-combined-1126, behaviours "Assembly hover in combined states"); the table in
+  interaction-feel.md "Combined states in an assembly" has live / ours / status per cell.
+- T1s: assembly_feel_tests.rs end (combined_hover_on_a_selected_instance, combined_hover_through_faded_and_hidden_instances,
+  combined_hover_while_editing_an_exploded_view; stacked_blocks = Part 2 moved onto Part 1) and hover_matrix_tests.rs
+  combined_hover_mate_connector_in_a_mate_dialog. add_exploded_view refits the camera and the Explode panel narrows the
+  test viewport to 249 px: fit_top after it.
+- Fixed (this commit): Alt no longer makes Isolate / Make transparent ghosts pickable (alt_through removed), as live (5).
+- Open, in order (TICKETS P0 rows): ASM-HIDDEN-ROW-HOVER-OUTLINE (outline-only state for a hidden instance: asm_scene
+  skips hidden occurrences, the shaders discard HIDDEN), ASM-MATE-PICKED-FACE-HOVER, ASM-SELECTED-HOVER-LOOK (crop
+  compare + the grey arrow), ASM-EXPLODE-STEPPED-HOVER; mate preview (4) ours still to check.
+- 11-26 07:2x the psui worktree directory was gone (branch agent/psui intact at 54dbd7bc0); recreated with
+  `git worktree add /root/projects/noshape-wt/psui agent/psui`.
 
 ## Agents
 
