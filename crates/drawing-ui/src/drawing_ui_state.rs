@@ -113,8 +113,21 @@ impl DrawingEditor {
             {
                 return self.window_point_on_sheet(at, t);
             }
-            // Its text where it is drawn (a dimension's dragged text is not at its `position`: UIP-ANNOTATION-STALE-POS).
             let picks = self.picks_of(Sel::Annotation(a.0));
+            // An ordinate group at its first value's extension line, by the part (live drw-ordinate-add-to-group s6
+            // pressed at Top (0, -9.5), the first value's point (0, -10): not on a value, no Reset ordinate).
+            let first = self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).and_then(|x| match &x.kind {
+                AnnotationKind::OrdinateGroup { view, points, .. } => Some(self.placement(*view)?.to_sheet(*points.first()?)),
+                _ => None,
+            });
+            let by_first = first.and_then(|f| {
+                let ends = self.built.as_ref()?.geometry.lines.iter().filter(|l| picks.contains(&l.pick)).flat_map(|l| l.points.iter().copied());
+                ends.min_by(|p, q| (p[0] - f[0]).hypot(p[1] - f[1]).total_cmp(&(q[0] - f[0]).hypot(q[1] - f[1])))
+            });
+            if let Some(at) = by_first {
+                return self.window_point_on_sheet(at, t);
+            }
+            // Its text where it is drawn (a dimension's dragged text is not at its `position`: UIP-ANNOTATION-STALE-POS).
             let drawn = self.built.as_ref().and_then(|b| b.geometry.texts.iter().find(|x| picks.contains(&x.pick))).map(|x| {
                 let q = noshape_model::drawing::font::text_box(x);
                 [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0]
@@ -243,8 +256,7 @@ impl DrawingEditor {
                 // Onshape::Dimension::Ordinate "ordinate", Onshape::SurfaceFinishSymbol "surfacefinishsymbol".)
                 let k = match variant {
                     "OrdinateDimension" | "OrdinateGroup" => "ordinate",
-                    "ForeshortenedRadial" | "ForeshortenedDiameter" => "foreshortened",
-                    v if v.ends_with("Dimension") => "dimension",
+                    v if v.ends_with("Dimension") || v.starts_with("Foreshortened") => "dimension",
                     "Note" => "note",
                     "Centermark" => "centermark",
                     v if v.contains("Centerline") => "centerline",
@@ -324,12 +336,12 @@ impl DrawingEditor {
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-        // Live's recorder lists no datum target (live2 drw-datum-target), nor a foreshortened dimension (live2
-        // drw-dimension-foreshorten: its export drops it).
+        // Live's recorder lists no datum target (live2 drw-datum-target); a foreshortened radius is a dimension (live
+        // drw-triage-1126: the 11-26 take lists it).
         let mut annotations: Vec<(&str, String, Option<[i64; 2]>)> = self
             .ui_annotations()
             .into_iter()
-            .filter(|(_, k, _)| !matches!(*k, "datumtarget" | "foreshortened"))
+            .filter(|(_, k, _)| *k != "datumtarget")
             .map(|(id, k, t)| (k, t, self.ui_position(k, |p| matches!(p, PickTarget::Annotation(x) if *x == id))))
             .collect();
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.

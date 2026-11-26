@@ -696,6 +696,34 @@ fn a_radius_placed_near_the_centre_has_its_text_halfway_out(cx: &mut TestAppCont
     assert!(near(p, [center[0] - 0.4 * radius, center[1] - 0.4 * radius]), "0.57 r out: at the click, got {p:?}");
 }
 
+/// Live drw-triage-1126 (drw-dimension-foreshorten s8, the 11-26 take): live's reader lists a foreshortened radius
+/// as a dimension.
+#[gpui::test]
+fn a_foreshortened_radius_reads_as_a_dimension(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{Annotation, AnnotationKind};
+    SUGGESTED.set(true);
+    HOLED.set(true);
+    let (window, editor) = drawing(cx, "foreshortened-read");
+    HOLED.set(false);
+    real_sheet(cx, window, &editor);
+    let dims = |cx: &mut TestAppContext| cx.update(|cx| {
+        let st = editor.read(cx).ui_drawing_state(cx);
+        st["annotations"].as_array().expect("annotations").iter().filter(|a| a["kind"] == "dimension").count()
+    });
+    let before = dims(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        let (view, center, radius) = e.built.as_ref().expect("built").placements.iter().find_map(|pl| {
+            let (c, r, _) = e.geoms.get(&pl.id)?.circles().into_iter().next()?;
+            Some((pl.id, c, r))
+        }).expect("a view showing the hole");
+        let id = e.current_sheet().next_annotation_id();
+        let kind = AnnotationKind::ForeshortenedRadial { view, center, radius, angle: 0.6, jog: [center[0] + 3.0 * radius, center[1] - 2.0 * radius] };
+        e.edit_sheet("Foreshorten", cx, |s| s.annotations.push(Annotation { id, kind, ..Default::default() }));
+    }));
+    draw(cx, window);
+    assert_eq!(dims(cx), before + 1, "the foreshortened radius listed as a dimension");
+}
+
 /// Live2 feel/drawing.json (tables_live2_1013 centerlines): with Centermark, a circle lights from 6 px outside it and
 /// shows the preview cross; not from further; a circle that has a centermark gets nothing more.
 #[gpui::test]
@@ -1624,6 +1652,15 @@ fn drawing_context_menus_are_lives(cx: &mut TestAppContext) {
     for (entity, rows) in live {
         assert_eq!(dump.get(entity), Some(&json!(rows)), "{entity}'s menu");
     }
+    // Where the runner presses an ordinate group (live drw-ordinate-add-to-group s6): off its values, no Reset ordinate.
+    let ordinate = cx.update(|cx| editor.update(cx, |e, cx| {
+        let id = e.current_sheet().annotations.iter().find(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::OrdinateGroup { .. }))?.id;
+        let text = e.ui_annotation_text(id)?;
+        let w = e.ui_target_point(&json!({"annotation": text}), cx).expect("where the runner presses");
+        e.cursor = e.to_sheet(e.local(w));
+        Some(flat(&e.ordinate_entries(id, cx)?))
+    })).expect("an ordinate group");
+    assert_eq!(ordinate, with_tail(&["Add to ordinate dimension group", "Edit...", "Paste as table", "Unbreak dimension"]));
     // An image: its Switch to <file tab> row names the tab.
     let image: Vec<String> = cx.update(|cx| {
         let e = editor.read(cx);
