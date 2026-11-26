@@ -663,6 +663,12 @@ impl PartStudioView {
         (on, row)
     }
 
+    /// A sketch point lit under the pointer takes a press over a dimension's label: the press drags the point it
+    /// shows lit (live speed-1125 S50: the rectangle's corner dragged under the width's label).
+    fn point_lit_over_label(&self, cx: &App) -> bool {
+        self.hovered_sketch_entity(cx).is_some_and(|e| self.sketch_data(cx).is_some_and(|d| d.sketch.point(e).is_some()))
+    }
+
     fn hovered_sketch_entity(&self, cx: &App) -> Option<noshape_sketch::EntityId> {
         let ed = self.sketch.as_ref()?;
         let e = match &self.hover {
@@ -1364,6 +1370,11 @@ impl PartStudioView {
                     }
                     // The press goes on to the editor too, which turns it
                     // into a label drag / selection.
+                    MouseButton::Left if self.point_lit_over_label(cx) => {
+                        if let Some(ed) = &mut self.sketch {
+                            ed.hover_constraint = None;
+                        }
+                    }
                     MouseButton::Left => {
                         let additive = modifiers.shift || modifiers.control;
                         if *click_count >= 2 && d.driving {
@@ -5025,6 +5036,12 @@ impl PartStudioView {
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                         // Not consumed: the viewport receives the press too and the
                         // editor turns it into a label drag / selection.
+                        if this.point_lit_over_label(cx) {
+                            if let Some(ed) = &mut this.sketch {
+                                ed.hover_constraint = None;
+                            }
+                            return;
+                        }
                         let additive = ev.modifiers.shift || ev.modifiers.control;
                         if ev.click_count >= 2 && driving {
                             if let Some(ed) = &mut this.sketch {
