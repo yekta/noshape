@@ -9246,3 +9246,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   (0.025400000000000002) in std, so the board extruded `(3/4)*inch` measured one ulp under the script's
   `3/4 * inch` and took the 5/8 in table (holes 1.6 mm off-centre, shallower). Our unit factors are std's now (live's
   1 in sketch circle has radius 0.025400000000000002); cf-pocket-holes matches to the end.
+
+## qa 11-26 16:3x: compat for the v0.4.72 cut (vs 0.4.71)
+- P0 core SPLIT-NUMBERING-DUCT-MIRROR (open): from green 4dd73153 (not 0be76619; likely da680a50a, Split numbers its pieces by first-made faces), c2-duct-multipart's Split 2 gives Info 'Selected entity does not split selected parts.' and Mirror 1 Error 'Select parts to mirror.'; live and 0.4.71 are OK on both. a2961e2c0 HOLD for v0.4.72 on it (8fe0407e5 GO). c2-bottle-split's swapped parts are da680a50a's intended live naming.
+- P0 core IMPELLER-LOFT-REGEN-TIME (open): c2-impeller-loft regenerates in 46.6 s on 4dd73153 vs 26.2 s on 0.4.71 (compat, vibex7; nightly 23e5d26f 27.9 -> 48 s; live 2.5 s). Move face 2 now Ok as live (1f3b27100), so its later features now do real work; measure which feature takes the time.
