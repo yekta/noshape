@@ -254,8 +254,8 @@ fn meeting_strips_overlap(shape: &Shape, edges: &[usize], d: f64) -> bool {
 /// Fillet 1's rounds cut each notch arc in two): two chains of the edges that don't touch but share a face, whose chamfers
 /// built together take material neither takes alone. (At Ø20.5 they share a sliver, at Extrude 1 9.6 mm neither: both
 /// build.) Rims of a plane and a cylinder and straight edges between planes have live's own rules (`rims`,
-/// [`round_overrun`]). `together`: the body chamfered at all of them.
-fn chains_overlap(shape: &Shape, edges: &[usize], shapes: &[Shape], spec: k::ChamferSpec, together: &Shape) -> FResult<bool> {
+/// [`round_overrun`]). `together`: the body chamfered at all of them, with its history.
+fn chains_overlap(shape: &Shape, edges: &[usize], shapes: &[Shape], spec: k::ChamferSpec, together: &k::OpResult) -> FResult<bool> {
     if edges.len() < 2 || shapes.len() != edges.len() {
         return Ok(false);
     }
@@ -311,9 +311,35 @@ fn chains_overlap(shape: &Shape, edges: &[usize], shapes: &[Shape], spec: k::Cha
     };
     let boxes: Vec<Option<(DVec3, DVec3)>> = chains.iter().map(|c| reach(c)).collect();
     let apart = |a: usize, b: usize| matches!((boxes[a], boxes[b]), (Some((la, ha)), Some((lb, hb))) if la.cmpgt(hb).any() || lb.cmpgt(ha).any());
+    // Chamfers that take more together meet there: chains whose faces in `together` neither share an edge nor end
+    // within 8 d of each other on a face along neither chain (c2-rings-loft's notch pieces end 3.9-6 d apart across
+    // Fillet 1's round) are left alone (bracket03-mattie's Chamfer 1: 12 d apart, 6 trial chamfers, ~40 -> ~90 ms).
+    // A chain without faces in its history is tried.
+    let made: Vec<BTreeSet<u32>> = chains
+        .iter()
+        .map(|c| c.iter().flat_map(|&i| together.history.generated(0, ShapeType::Edge, edges[i] as u32)).filter(|&(kind, _)| kind == ShapeType::Face).map(|(_, f)| f).collect())
+        .collect();
+    let rims_of = together.shape.edge_faces()?;
+    let beside = |c: usize| -> BTreeSet<u32> { rims_of.iter().filter(|fs| fs.iter().any(|f| made[c].contains(f))).flatten().copied().collect() };
+    let along = |g: u32, a: usize, b: usize| {
+        together.history.of_output(ShapeType::Face, g).any(|r| r.input_kind == ShapeType::Face && matches!(r.relation, k::Relation::Modified | k::Relation::Kept) && (on(&chains[a]).contains(&r.input_index) || on(&chains[b]).contains(&r.input_index)))
+    };
+    let all = together.shape.edges();
+    // The box of chain `c`'s chamfer faces' edges on face `g`.
+    let ends_on = |c: usize, g: u32| -> Option<(DVec3, DVec3)> {
+        let boxes = rims_of.iter().enumerate().filter(|(_, fs)| fs.contains(&g) && fs.iter().any(|f| made[c].contains(f))).map(|(e, _)| all.get(e).and_then(|x| x.bounding_box(false).ok()));
+        boxes.into_iter().try_fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), b| b.map(|b| (lo.min(b.min), hi.max(b.max))))
+    };
+    let near = |g: u32, a: usize, b: usize| match (ends_on(a, g), ends_on(b, g)) {
+        (Some((la, ha)), Some((lb, hb))) => (la - hb).max(lb - ha).max(DVec3::ZERO).length() < 8.0 * d,
+        _ => true,
+    };
+    let meet = |a: usize, b: usize| {
+        made[a].is_empty() || made[b].is_empty() || beside(a).intersection(&beside(b)).any(|&g| made[a].contains(&g) || made[b].contains(&g) || (!along(g, a, b) && near(g, a, b)))
+    };
     let pairs: Vec<(usize, usize)> = (0..chains.len())
         .flat_map(|a| (a + 1..chains.len()).map(move |b| (a, b)))
-        .filter(|&(a, b)| !((ruled(&chains[a]) && ruled(&chains[b])) || on(&chains[a]).is_disjoint(&on(&chains[b])) || apart(a, b)))
+        .filter(|&(a, b)| !((ruled(&chains[a]) && ruled(&chains[b])) || on(&chains[a]).is_disjoint(&on(&chains[b])) || apart(a, b) || !meet(a, b)))
         .collect();
     if pairs.is_empty() {
         return Ok(false);
@@ -343,7 +369,7 @@ fn chains_overlap(shape: &Shape, edges: &[usize], shapes: &[Shape], spec: k::Cha
     let alone = |c: usize| jobs[..singles].iter().position(|j| *j == chains[c]).and_then(|i| removed[i]);
     for (n, &(a, b)) in pairs.iter().enumerate() {
         let (Some(ra), Some(rb)) = (alone(a), alone(b)) else { continue };
-        let both = if chains.len() == 2 { together.volume().ok().map(|t| v0 - t) } else { removed[singles + n] };
+        let both = if chains.len() == 2 { together.shape.volume().ok().map(|t| v0 - t) } else { removed[singles + n] };
         let Some(both) = both else { continue };
         if both - (ra + rb) > (1e-3 * ra.min(rb)).max(1e-12) {
             return Ok(true);
@@ -1581,7 +1607,7 @@ fn chamfer_in(ev: &mut EvalCtx) -> FResult<()> {
                 }
             }
         };
-        if matches!(spec, k::ChamferSpec::Equal(_)) && chains_overlap(&body.shape, &edges, &shapes, spec, &res.shape)? {
+        if matches!(spec, k::ChamferSpec::Equal(_)) && chains_overlap(&body.shape, &edges, &shapes, spec, &res)? {
             return err("Overlapping chamfers.");
         }
         // OCCT's chamfer of straight concave edges taking material off (asm-isaac-ball's a2e4a2 Chamfer 2, 568 mm³ where
