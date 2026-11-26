@@ -504,7 +504,9 @@ def compare(base_r, new_r, base_s, new_s, spd):
                 tb += float(tb_[2])
                 tn += float(tn_[2])
             # (A document's measures to 7 digits: an area's 1e-8 moves with the Booleans' paths, c2-rings-loft's.)
-            if rounded(tb_[1], 7) == rounded(tn_[1], 7):
+            # (Nor its "a gap" timing hint, which comes and goes run to run.)
+            gapless = lambda t: re.sub(r" \| a gap, the median of 3 runs: \[[^\]]*\] ms", "", t)
+            if rounded(gapless(tb_[1]), 7) == rounded(gapless(tn_[1]), 7):
                 continue
             fb, fn = frac(tb_[1]), frac(tn_[1])
             line = f"{d}: main '{tb_[1][:200]}' -> '{tn_[1][:200]}'"
