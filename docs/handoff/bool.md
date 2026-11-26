@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-26 03:40 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-26 03:50 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -51,6 +51,9 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   for free-form results. Impeller: only 4 of 24 unifies scoped, Bohrungssitz still whole (the mark is lost elsewhere),
   no gain; NOSHAPE_UNIFY_CHECK aborts at Fillet 4 (whole unify_in's merge changes volume, op_unify reverts it: the
   check is stricter than op_unify). Don't resume without finding where the mark is lost.
+  UP-TO EXTRUDES (item 6 Extrude 4, item 9 valve Extrude 3): prism_until.split (OCCT Splitter) 128-142 ms; both targets
+  free-form (impeller: B-spline + offset faces; valve: revolved + Bezier): no quick win, needs our Boolean on free-form.
+  Next after the land: knurls, land from bool-flush, tell qa + lead; then item 2' SP3 or item 7.
   MAIN REGRESSION (told lead 03:0x): psui 8a62f4834 failing_alone reruns a failed fillet per edge: impeller "Fillet
   Ansaugflansch zum Gehaeuse" (fails either way) 1.1 s -> 60 s.
   SLOW-FEATURE LIST (lead 11-25; re-measured 11-25 12:55 on main 47b49528b, vibex8 ~/tmp/bool: cli-main,
