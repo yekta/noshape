@@ -90,6 +90,9 @@ pub struct LiveRef {
     pub sheet: bool,
     /// A body's name in live's line at that index (its `parts`), to tell bodies in one box apart.
     pub name: Option<String>,
+    /// The feature live's query for it was `qCreatedBy(makeId("F…"))` of (refs.jsonl `method`): a Plane feature's
+    /// plane, which has no part face there (asm-scissor-lift 264eb3's Extrude 2 up to Plane 1, its mid-plane).
+    pub created_by: Option<String>,
 }
 
 /// What became of one Onshape feature.
@@ -356,10 +359,16 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         // A curved face's normal is its tangent plane's at a point: no filter for planar faces of ours (c2-hunting-knife's
         // Extrude 10 took the blade's flat spine for the handle's B-spline side through the same point).
         let normal = f3(&v["normal"]).filter(|_| v["surfaceType"].as_str().is_none_or(|t| t.eq_ignore_ascii_case("plane")));
-        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: v["body"].as_str().filter(|_| v["bodyType"] != "SKETCH" && v["kind"] != "BODY").map(str::to_string), parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false, name: None };
+        let mut r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal, direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: v["body"].as_str().filter(|_| v["bodyType"] != "SKETCH" && v["kind"] != "BODY").map(str::to_string), parameters: v["parameters"].as_array().map_or_else(|| v["parameter"].as_str().map(str::to_string).into_iter().collect(), |a| a.iter().filter_map(|p| p.as_str().map(str::to_string)).collect()), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: v["sketchFeatureId"].as_str().map(str::to_string), query: v["query"].as_u64().map(|n| n as usize), constraints: Vec::new(), self_made: v["method"].as_str().is_some_and(|m| m.contains("the sketch creates it itself")), ends: f3(&v["start"]).zip(f3(&v["end"])).map(|(a, b)| [a, b]), center: f3(&v["center"]), sheet: false, name: None, created_by: v["method"].as_str().and_then(|m| m.split("qCreatedBy(makeId(\"").nth(1)?.split('"').next()).map(str::to_string) };
         let key = (k as usize, id.to_string());
+        // (One entity for several parameters: each of them, asm-scissor-lift 264eb3's 24 Mesh points on one mesh face.)
         if let Some(old) = out.remove(&key) {
             r.constraints = old.constraints;
+            for p in old.parameters.into_iter().rev() {
+                if !r.parameters.contains(&p) {
+                    r.parameters.insert(0, p);
+                }
+            }
         }
         if let (Some(c), Some(p)) = (v["constraintId"].as_str(), v["parameter"].as_str()) {
             r.constraints.push((c.to_string(), p.to_string()));
@@ -5179,6 +5188,12 @@ impl<'a> Translator<'a> {
             .and_then(|q| q["featureId"].as_str().map(str::to_string))
     }
 
+    /// Our plane of live's Plane feature `feature`.
+    fn plane_feature(&self, feature: &str) -> Option<String> {
+        let f = self.features.iter().find(|f| f["featureId"] == feature && f["featureType"] == "cPlane")?;
+        Some(format!("fplane:{}", self.feature_ids.get(f["featureId"].as_str()?)?))
+    }
+
     /// The entity of ours at live's geometry of `id`.
     fn by_geometry(&mut self, k: usize, id: &str) -> Result<String, String> {
         let mut r = self.refs[&(k, id.to_string())].clone();
@@ -5199,6 +5214,7 @@ impl<'a> Translator<'a> {
             "FACE" if r.plane_origin && let Some(f) = self.face_on_plane(&r) => Ok(f),
             // A sketch's region (refs.jsonl `bodyType` SKETCH): ours there, of its area.
             "FACE" if r.sketch => self.region_at(p, r.measure, r.sketch_of.as_deref()).or_else(|e| if r.sketch_of.is_some() { self.region_at(p, r.measure, None) } else { Err(e) }),
+            "FACE" if let Some(plane) = r.created_by.as_deref().and_then(|f| self.plane_feature(f)) => Ok(plane),
             "FACE" | "PLANE" => {
                 let part = self.part_of(k, &r);
                 if part.is_none()
@@ -9488,7 +9504,8 @@ fn fetched_derived_sources(studio: &Value, element: &str, studios: &[(String, Va
         }
         let Some((_, other, _)) = studios.iter().find(|(e, ..)| *e == source) else { continue };
         pending.extend(derived_elements(other));
-        let src = shared.entry(source.clone()).or_insert_with(|| Arc::new(json!({ "doc": other, "live": other["live"], "refs": "" }))).clone();
+        // (With its refs: asm-scissor-lift 97ad5f's Derived 1 of 264eb3 at a version lost its Mesh points and faces without.)
+        let src = shared.entry(source.clone()).or_insert_with(|| Arc::new(json!({ "doc": other, "live": other["live"], "refs": refs_in_configuration(other["refs"].as_str().unwrap_or_default(), None) }))).clone();
         out.push((source, src));
     }
     out
