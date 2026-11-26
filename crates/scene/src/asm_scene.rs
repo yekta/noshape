@@ -866,6 +866,9 @@ fn axis_colors() -> [[u8; 4]; 3] {
         theme::rgb8(theme::pick(theme::viewport::AXIS_Z, theme::viewport_dark::AXIS_Z)),
     ]
 }
+/// A hovered move-triad handle's stroke: (flanks, centre). Live asm-triad-hover-1126: a shaded tube, flanks mid
+/// #5580b7–#638abf / dark #436b9c–#4d6d8f round a light #84a3d0–#9bb4dc centre, never a flat #3e94ff.
+const MANIP_HOVER: ([u8; 4], [u8; 4]) = ([0x52, 0x78, 0xa8, 255], [0x90, 0xac, 0xd6, 255]);
 /// Hovered manipulator handles (Onshape UI_HIGHLIGHT_COLOR).
 const HANDLE_HL: [u8; 4] = [0xff, 0xc2, 0x0e, 255];
 /// Dark points and lines on the white viewport.
@@ -1440,10 +1443,11 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         // stroke (light `#f7f7f8` core inside a `#969da3` edge): shafts with
         // outlined triangle heads, a small rotation ring with a tick at each
         // tip, plane parallelograms near the origin and a ring at the
-        // center. The hovered handle turns blue.
+        // center. The hovered handle turns blue, the same shaded stroke (`MANIP_HOVER`).
         const EDGE: [u8; 4] = [0x96, 0x9d, 0xa3, 255];
         const CORE: [u8; 4] = [0xf7, 0xf7, 0xf8, 255];
-        const HOVER: [u8; 4] = [0x3e, 0x94, 0xff, 255];
+        const HOVER: [u8; 4] = MANIP_HOVER.0;
+        const HOVER_CORE: [u8; 4] = MANIP_HOVER.1;
         const CENTER_HOVER: [u8; 4] = [0x3a, 0x6b, 0xa8, 255];
         const CENTER_HOVER_FLAT: [u8; 4] = [0x60, 0x87, 0xbd, 255];
         const EXPLODE_CORE: [u8; 4] = [0xcd, 0xd0, 0xd3, 255];
@@ -1459,7 +1463,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
         let stroke = |ol: &mut LineData, pts: &[DVec3], closed: bool, id: u32, hl: bool| {
             let n = pts.len();
             let segs = if closed { n } else { n.saturating_sub(1) };
-            let (hover_edge, hover_core) = if h.explode_triad { EXPLODE_HOVER } else { (HOVER, HOVER) };
+            let (hover_edge, hover_core) = if h.explode_triad { EXPLODE_HOVER } else { (HOVER, HOVER_CORE) };
             for (w, c) in [(4.0, if hl { hover_edge } else { edge }), (core_w, if hl { hover_core } else { core })] {
                 for i in 0..segs {
                     ol.segments.push(LineSegment { a: p3(pts[i]), b: p3(pts[(i + 1) % n]), color: c, pick_id: id, width: w, style: LineSegment::ON_TOP, dash_from: 0.0 });
@@ -1504,7 +1508,7 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let (a0, a1) = (size * 0.2, size * 0.36);
             let q = |x: f64, y: f64| f.origin + u * x + v * y;
             stroke(&mut ol, &[q(a0, a0), q(a1, a0), q(a1, a1), q(a0, a1)], true, pid, phl);
-            let fill = if phl { [HOVER[0], HOVER[1], HOVER[2], 70] } else if h.manip_dragging { [0xf7, 0xf7, 0xf8, 15] } else { [0xf7, 0xf7, 0xf8, 40] };
+            let fill = if phl { [HOVER_CORE[0], HOVER_CORE[1], HOVER_CORE[2], 40] } else if h.manip_dragging { [0xf7, 0xf7, 0xf8, 15] } else { [0xf7, 0xf7, 0xf8, 40] };
             for i in 1..6 {
                 let y = a0 + (a1 - a0) * i as f64 / 6.0;
                 ol.segments.push(LineSegment { a: p3(q(a0, y)), b: p3(q(a1, y)), color: fill, pick_id: pid, width: 4.0, style: LineSegment::ON_TOP, dash_from: 0.0 });
@@ -1719,6 +1723,17 @@ fn push_section_glyph(ol: &mut LineData, built: &AsmBuilt, g: &SectionGlyph, d: 
 mod screen_triad_tests {
     use super::*;
     use noshape_render::camera_geometry::View;
+
+    /// Live asm-triad-hover-1126: a hovered handle's flanks between the dark and mid tones, its centre in the light
+    /// band; no flat #3e94ff.
+    #[test]
+    fn a_hovered_triad_handle_is_a_shaded_blue_tube() {
+        let within = |c: [u8; 4], lo: [u8; 3], hi: [u8; 3]| (0..3).all(|i| lo[i] <= c[i] && c[i] <= hi[i]);
+        let (flank, centre) = MANIP_HOVER;
+        assert!(within(flank, [0x43, 0x6b, 0x8f], [0x63, 0x8a, 0xbf]), "flanks {flank:02x?}");
+        assert!(within(centre, [0x84, 0xa3, 0xd0], [0x9b, 0xb4, 0xdc]), "centre {centre:02x?}");
+        assert!(flank[..3] != [0x3e, 0x94, 0xff] && centre[..3] != [0x3e, 0x94, 0xff]);
+    }
 
     /// Live mates.json: a mate's axes are 50 px long at the pixel size where they stand, whatever the zoom (shorter on
     /// screen only as they turn away, as the connector glyph's).
