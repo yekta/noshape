@@ -1571,6 +1571,11 @@ fn replicate_on_matching_holes() {
     let t3 = analysis::matched_targets(&r3, &a3, &a3.patterns[0], &UnitPrefs::default()).unwrap();
     assert_eq!(t3.len(), 3, "other hole on plate 1 + both holes on plate 2");
     assert_eq!(t3.iter().filter(|(_, c, _)| c.instance == InstanceId(50)).count(), 2);
+    // Copies numbered outward from the seed (qa REPLICATE-INSTANCE-ORDER, live mb11: <2> in the nearest hole).
+    let at: Vec<glam::DVec2> = t3.iter().map(|(_, _, p)| DVec3::from(p.unwrap().translation).truncate()).collect();
+    for (got, want) in at.iter().zip([glam::DVec2::new(0.02, 0.0), glam::DVec2::new(-0.02, 0.1), glam::DVec2::new(0.02, 0.1)]) {
+        assert!((*got - want).length() < 1e-6, "copies nearest first: {at:?}");
+    }
     // Dissolving keeps the instance and mate; deleting the seed mate removes the replicate.
     let mut a2 = asm.clone();
     a2.dissolve_pattern(MateId(80));

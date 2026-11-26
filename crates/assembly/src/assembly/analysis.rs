@@ -600,10 +600,12 @@ pub fn matched_targets(result: &AssemblyResult, asm: &Assembly, pattern: &Instan
             let rel = w.mul(&t.inverse());
             super::eval::frame_to_placement(&rel.mul(&super::eval::placement_to_frame(&seed_pose)))
         });
-        out.push((code, conn, placement));
+        let away = target_world.map_or(0, |t| (w.origin.distance(t.origin) * 1e7).round() as i64);
+        out.push((away, code, conn, placement));
     }
-    out.sort_by_key(|(c, _, _)| *c);
-    Ok(out)
+    // Live numbers the copies outward from the seed (qa mb11: <2> on the nearest hole, <3> on the next).
+    out.sort_by_key(|(away, code, _, _)| (*away, *code));
+    Ok(out.into_iter().map(|(_, code, conn, placement)| (code, conn, placement)).collect())
 }
 
 /// One matched target: (stable code, target connector, initial placement of the copy).
