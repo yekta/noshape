@@ -1883,15 +1883,19 @@ impl SheetGeometry {
                         self.lines.push(Polyline2 { points: vec![shoulder, p], style: LineStyle::Thin, closed: false, pick });
                         self.arrow(p, [p[0] - shoulder[0], p[1] - shoulder[1]], 3.0);
                     }
-                    let w = lines.iter().map(|s| font::text_width(&super::format::flatten_stacked(s), h)).fold(0.0, f64::max);
+                    let widths: Vec<f64> = lines.iter().map(|s| font::text_width(&super::format::flatten_stacked(s), h)).collect();
+                    let w = widths.iter().copied().fold(0.0, f64::max);
                     // The text 0.09 in past the landing, its box centred on it (live drw-hole-callout-palette's
                     // holeCallout: the box ends 2.29 mm before the textPosition, the click).
                     const GAP: f64 = 0.09 * 25.4;
                     let x0 = if right { t[0] + GAP } else { t[0] - GAP - w };
                     let n = lines.len() as f64;
                     for (i, line) in lines.iter().enumerate() {
-                        // Lines stacked around the shoulder (bottom-left anchored).
-                        let y = t[1] + (n - 1.0) * h * 0.75 - i as f64 * h * 1.5 - h * 0.5;
+                        // Lines stacked around the shoulder (bottom-left anchored), each centred on the widest, 5/3 h apart (live
+                        // hole-types-plate-drawing: the counterbore's drill line starts 0.173 in right of its ⌴ line; pitch 0.199 in).
+                        let pitch = h * 5.0 / 3.0;
+                        let y = t[1] + (n - 1.0) * pitch / 2.0 - i as f64 * pitch - h * 0.5;
+                        let x0 = x0 + (w - widths[i]) / 2.0;
                         match super::format::split_stacked(line) {
                             // Fit deviations stacked after the size, like a
                             // dimension's deviation tolerance.

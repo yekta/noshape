@@ -4784,6 +4784,63 @@ fn iso_radial_value_inline_along_the_leader() {
     }
 }
 
+/// Live hole-types-plate-drawing (11-26, ANSI inch, h 0.12 in): the callout text boxes are 29.58 (tapped),
+/// 32.25 (counterbore), 33.19 (countersink) and 25.09 mm (blind) wide; each line is centred on the widest (the
+/// counterbore's drill line starts 0.173 in right of its ⌴ line), 0.199 in apart.
+#[test]
+fn hole_callout_boxes_as_live() {
+    struct Callout<'a>(sheet::PlainEnv<'a>);
+    impl sheet::AnnotationEnv for Callout<'_> {
+        fn to_sheet(&self, v: ViewId, p: [f64; 2]) -> [f64; 2] {
+            self.0.to_sheet(v, p)
+        }
+        fn scale(&self, v: ViewId) -> f64 {
+            self.0.scale(v)
+        }
+        fn rotation(&self, v: ViewId) -> f64 {
+            self.0.rotation(v)
+        }
+        fn text(&self, a: &Annotation, value: f64, angular: bool, symbol: &str) -> super::format::DimText {
+            self.0.text(a, value, angular, symbol)
+        }
+        fn expand(&self, s: &str) -> String {
+            self.0.expand(s)
+        }
+        fn balloon_text(&self, a: &Annotation, t: &str) -> String {
+            self.0.balloon_text(a, t)
+        }
+        fn hole_callout(&self, a: &Annotation) -> Vec<String> {
+            let lines: &[&str] = match a.id {
+                1 => &["3X ⌀.197 THRU", "M6x1.00 THRU"],
+                2 => &["⌀.260 THRU", "⌴⌀.433 ↧.157"],
+                3 => &["⌀.260 THRU", "⌵⌀.512 X 90.0°"],
+                _ => &["⌀.315 ↧.236"],
+            };
+            lines.iter().map(|l| l.to_string()).collect()
+        }
+    }
+    let drawing = Drawing::default();
+    let env = Callout(sheet::PlainEnv { drawing: &drawing, scale: 1000.0 });
+    let inch = 25.4;
+    for (id, live) in [(1, 29.58), (2, 32.25), (3, 33.19), (4, 25.09)] {
+        let mut s = Sheet::default();
+        let style = Some(Box::new(AnnStyle { height: Some(0.12 * inch), ..Default::default() }));
+        s.annotations.push(Annotation { id, kind: AnnotationKind::HoleCallout { view: ViewId(1), center: [0.1, 0.1], radius: 0.003, leaders: Vec::new() }, position: [80.0, 100.0], style, ..Default::default() });
+        let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+        g.add_annotations(&s, &env);
+        let starts: Vec<f64> = g.texts.iter().map(|t| t.pos[0]).collect();
+        let x0 = starts.iter().copied().fold(f64::MAX, f64::min);
+        let x1 = g.texts.iter().map(|t| t.pos[0] + font::text_width(&t.text, t.height)).fold(f64::MIN, f64::max);
+        assert!((x1 - x0 - live).abs() < if id == 1 { 0.3 } else { 0.05 }, "callout {id}: {} mm wide, live {live}", x1 - x0);
+        // Placed left of the hole: the box ends 0.09 in before the click.
+        assert!((x1 - (80.0 - 0.09 * inch)).abs() < 1e-9);
+        if id == 2 {
+            assert!((starts[0] - starts[1] - 0.173 * inch).abs() < 0.02 * inch, "{starts:?}");
+            assert!((g.texts[0].pos[1] - g.texts[1].pos[1] - 0.199 * inch).abs() < 0.005 * inch);
+        }
+    }
+}
+
 /// ANSI radial and diameter dimensions (live asbdt-3, drawing/368): the
 /// arrow outside the circle pointing in, the leader to the dropped knee, a
 /// horizontal shoulder an arrow long on the circle's side, the value inline
