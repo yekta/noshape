@@ -1,13 +1,27 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 19:23 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 19:56 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
-- **LEAD 19:2x (FIRST after the compaction)**: continue 9cbb0e Fillet 18 (edge 40's zero-angle cusp sliver at x
-  -15.09, see (c) below): how live shapes that spot from live's per-feature geometry in the corpus; if not there, a
-  REQUESTS row for live. Then Fillet 19/23, MF7, Chamfer 11.
+- **9cbb0e FILLET 18 (lead 19:2x; IN PROGRESS 19:5x, uncommitted in core-rf)**: live's geometry IS in the corpus
+  (studios/9cbb0e….live.jsonl line 71, faces with surface+box, edges with curve+mid). Face 0 is a TOP face (normal +z),
+  wall 80 normal +y: edge 1 (0/80) CONVEX, 40/24 (80/81, 80/58) CONCAVE. Live: concave rounds 24/40 run to the tip
+  (STBCC cyl, STBqB torus); edge 1's convex round STBKE ends at x -19.12 (wall height = 2r); from there the convex
+  ball rolls between face 0 and the concave round: 2 OTHER faces (STBSE over the cyl, STBOE over the torus, ellipse
+  edges); wall 80 trimmed to x -19.21. Mirror at y +11 (wall 49). Probe zz_probe_f18f (kernel crash_inputs, not to
+  commit): stage 1 fuse a box above face 0 on the wall's material side (wall raised) + OCCT concave rounds: valid;
+  stage 2 cut a box above face 0 over wall+round: valid (108 faces); stage 3 OCCT on edge 1 + creases FAILS (crease
+  face0/torus vanishes tangentially at the tip (-15.09,-10.2)). Code: new model-core features/cusp_blend.rs
+  (cusp_wall_round, hooked in detail.rs fillet Err chain before fillet_deferred_overflows; mod.rs) doing stages 1-2
+  then OCCT, then rolling_ball_blend on the rest; build+run .bdc.sh (core-rf, prints Foot volume/faces after Fillet 18
+  with NOSHAPE_BLEND_DEBUG) 19:54: STILL 'Failed to fillet selections.', 95 faces, NO 'cusp round' line: the hook isn't
+  reached or cusps() finds none -> check first (that message may come before the Err chain: round_overrun?). If rolling balls fail too: own tool = cut
+  box from J (ball touching face 0, wall and the concave round's wall contact line) to past the tip so OCCT ends edge
+  1's round on a square plane; fill back common(S2, box) less a loft of exact ball sections (offset plane ∩ offset
+  cyl r 2r / torus minor 2r), 2 lofts (cyl part, torus part), stop just short of the tip; fuse + unify. Target 141
+  faces, 64650.834. Then Fillet 19/23, MF7, Chamfer 11.
 - **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): QUEUED 01c87462 19:16** (core-rf, carries Fillet 17; qa + lead told): my a5e0075bb sent Move faces
   of planes facing several ways down the one-way-at-a-time tweak (neighbours keep names) instead of OCCT's offset
   (every face Offset(old)): the derived source's Move face 1 vertices renamed, Part Studio 1's Transform 1 by two
@@ -75,15 +89,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (planes), the chains on them split at sharp corners: -11 side {1,6,35,40} "fillet failed", {20,21,22,24}
   "invalid solid", 39 OK. Edge 40/9 = short arc (x -15..-17, z -28) on cylinders 81/52 (y -8.25..-11 / 7.75..11,
   Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there.
-  19:2x probes (core-scratch/f18cde-probe.patch, outputs f18c/d/e.out): chains are {1,6} (OK r<=0.5, fail 0.8), 35
-  alone (OK only r 0.1), 40 alone (FAILS at every r, 0.8..0.1), B {20,24} (OK r 0.5/0.3, fail 0.8 and 0.1). CAUSE at
-  edge 40: cylinder 81 (r4, y -8.25..-11) is a concave round from slope face 58 into plate underside face 0 (tilted
-  plane, L-shaped, y -8.25..-18.5), tangent to it at x -15.09. At y -11 the wall 80's outline has a ZERO-ANGLE CUSP
-  there: edge 1 (0/80) and edge 40 (80/81) leave vertex (-15.09,-11,-27.73) the same way; the wall is a sliver
-  thinning to nothing between plane 0 and the round (at y -8.25 the same vertex is smooth: k0 0/82 runs on +x).
-  Rounding 1 and 40 at r 0.8 must eat the sliver. Next: how live ends there (live 141 faces, -6.93 mm3; capture
-  the faces near (-15,-11,-28) via live helpers), then a blend that consumes the cusp sliver (ours) or trims edge 40's
-  round before the tip; then Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  19:2x probes: core-scratch/f18cde-probe.patch (f18c/d/e.out); state in the P0 entry above.  (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
   surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
