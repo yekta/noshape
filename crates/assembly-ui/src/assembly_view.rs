@@ -1447,10 +1447,14 @@ impl AssemblyView {
         let placing_free = (self.placing.is_some() && self.snap.is_none()) || self.ui.placed_at == Some(self.pointer);
         // Live (behaviours "feel (3D): assembly", FEEL-ASM-DRAG-LIT): nothing lit while an instance is dragged.
         let dragging = self.drag.as_ref().is_some_and(|d| d.started && d.handle.is_none());
+        let dialog_mate = self.mate.as_ref().and_then(|s| s.dialog.read(cx).to_mate(cx));
+        let moving = dialog_mate.as_ref().and(self.mate_preview_top(cx));
+        let still = self.mate.as_ref().is_some_and(|s| s.hud.is_some() && self.manip_click.is_some_and(|(at, _)| s.hud == Some(at)));
         // Editing an exploded view, the selected instance lights nothing under the pointer (live asm-hover-combined-1126
-        // (7) j7b: 0 px after its step).
+        // (7) j7b: 0 px after its step); nor does the part a mate's preview moves under an arriving pointer ((4) d4a).
         let explode_selected = |t: &AsmPickTarget| self.explode_edit && t.path.first().is_some_and(|top| self.selected.contains(top));
-        if let Some(t) = self.hover.as_ref().filter(|t| !placing_free && !dragging && !explode_selected(t))
+        let previewed = |t: &AsmPickTarget| !still && moving.is_some() && t.path.first() == moving.as_ref();
+        if let Some(t) = self.hover.as_ref().filter(|t| !placing_free && !dragging && !explode_selected(t) && !previewed(t))
             && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)
             && self.pick_mode(cx) != Some(PickMode::Inference)
         {
@@ -1487,8 +1491,6 @@ impl AssemblyView {
         // The mate dialog's mate, once both connectors are in: the lettered triad, its glyph, the face that stays filled
         // the picks' yellow and the moving part unfilled, its edges through the other (live feel cov-1120 A2; a selected
         // mate's faces amber, live 2220).
-        let dialog_mate = self.mate.as_ref().and_then(|s| s.dialog.read(cx).to_mate(cx));
-        let moving = dialog_mate.as_ref().and(self.mate_preview_top(cx));
         let shown_mate = dialog_mate.as_ref().map(|m| m.id).or(self.selected_mate);
         let selected_mate = dialog_mate.or_else(|| self.selected_mate.and_then(|id| self.assembly(cx).and_then(|a| a.mate(id).cloned())));
         if let Some(m) = &selected_mate {
@@ -1762,6 +1764,7 @@ impl AssemblyView {
             && let Some(((_, entity), occ, cands)) = &self.infer
             && let Some(o) = self.result.occurrences.get(*occ)
             && (self.infer_locked || self.hover.as_ref().is_some_and(|h| h.occ == *occ))
+            && (still || moving != Some(o.top()))
         {
             // A pick re-hovered later: its yellow under the glyph, no outline or other points (live mc-infer-1122
             // 2-hover-fc, picked-asm: qa FEEL-MC-ASM-PICKED-REHOVER).
@@ -1802,7 +1805,6 @@ impl AssemblyView {
         // pointer leaves, and yellow under a re-hover: mc-infer-1122 picked-asm, qa FEEL-MC-ASM-PICKED-REHOVER).
         // The pointer still where the second pick's click was, with the moved part now under it (wf08 s07: Part 2 brought onto
         // Part 1's top): Part 1's top as hovered all the same, the moved part's face under the pointer lit as hovered.
-        let still = self.mate.as_ref().is_some_and(|s| s.hud.is_some() && self.manip_click.is_some_and(|(at, _)| s.hud == Some(at)));
         let hovered = self.hover.as_ref().filter(|t| matches!(t.reference, Reference::Face(_))).map(|t| (t.path.clone(), t.reference.clone()));
         // Once both picks are in, a re-hovered pick drops its yellow too (live asm-hover-combined-1126 (2): plain, its
         // edges #f0d090).
