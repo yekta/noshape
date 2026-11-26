@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 13:00 UTC) — read first
+## RESUME HERE (11-26 13:10 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -21,16 +21,11 @@ qa 11-26 12:3x assembly tickets: ASM-MEASURE-BRACKET-KEY (state didn't report th
 ASM-DRAG-REVOLUTE-ANGLE waits on live (REQUESTS "psui 11-26 11:33"): live's take turns the grabbed point AGAINST the pointer
 (-39.3 deg CW), no pointer-following rule gives that (+21..24 CCW; ours +27.9 CCW). Drag code: assembly_view.rs ~3838.
 
-Sketch feel-coverage audit (lead): 95 uncited sketch sections in /root/skasm-scratch/audit-sections.txt; rows checked are
-listed in /root/skasm-scratch/audit-checked.txt (94 of 95 checked). 11-26 13:00 batch (landing): mate chain parent change
-(live 1768), spline handle arm takes every line constraint + default tip = live tx2 g0 (spline.md's "/9" is d*h0/3 with
-h0 = 1/3), Pierce with a circle's centre. Live fuzz T2 (live_matches, probes) 29/29 green. Diffs found: Pierce with a
-curve (ticket SKETCH-PIERCE-CURVE-RIGID: live moves the circle / line rigidly; a radius weight only approximates it);
-inference-1866 (d) asked live (REQUESTS skasm 11-26 12:51). Left: row 3 (the general "Sketch mode" section, 102 lines).
-NEXT (lead 11-26 13:05): 1) SKETCH-PIERCE-CURVE-RIGID first: a free curve under a Pierce (and likely any point-on-curve
-to a fixed point) moves rigidly, circle r kept, line direction + length kept (live skasm/pierce: circle (22,4) r3 ->
-(23.2,2.4); line (16,5)-(28,9) start -> (18.4,-2.2)). Solver weights: crates/sketch/src/solver.rs System::build (~line 395,
-weight / HELD_WEIGHT); a radius weight only approximates. Gate: sketch --lib + --test all + live_fuzz T2 (sk2.sh). 2) row 3.
+Sketch feel-coverage audit (lead): DONE 11-26 13:10, all 95 sections of /root/skasm-scratch/audit-sections.txt
+checked (notes per row in /root/skasm-scratch/audit-checked.txt). Last batch: SKETCH-PIERCE-CURVE-RIGID fixed (a curve
+tied by nothing else slides the shortest way onto the pierce point before the solve, `Sketch::slide_pierced_curves`;
+only Pierce: live data covers no point-on-curve Coincident to a fixed point), row 3 (Enter with Line and nothing pending
+assert). Still waiting on live: inference-1866 (d) (REQUESTS skasm 11-26 12:51).
 
 qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
 lora-enclosure-ribs 46/46 MATCH); Assembly 3 numbers pending (qa-tr4). Driver fix ada3263b: asm-face-menu/fastened 9/10;

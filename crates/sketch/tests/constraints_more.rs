@@ -566,8 +566,7 @@ fn a_splines_body_drag_bends_it_as_live() {
 }
 
 /// Live skasm/pierce (11-17): a spline crossing the sketch plane at (25, 0); Pierce with a circle's centre (r 3, at
-/// (22, 4)) puts the centre on (25, 0), r unchanged. (Pierce with the circle or a line itself moves it rigidly in
-/// live: ticket SKETCH-PIERCE-CURVE-RIGID.)
+/// (22, 4)) puts the centre on (25, 0), r unchanged.
 #[test]
 fn pierce_with_a_circles_centre_puts_it_on_the_pierce_point() {
     let mut sk = Sketch::new();
@@ -578,4 +577,25 @@ fn pierce_with_a_circles_centre_puts_it_on_the_pierce_point() {
     solved(&mut sk);
     let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { panic!("circle") };
     assert!((center - v(25.0, 0.0)).length() < 1e-9 && (radius - 3.0).abs() < 1e-9, "{center} r {radius}");
+}
+
+/// Live skasm/pierce (11-17): Pierce with a free curve slides it the shortest way through the pierce point (25, 0),
+/// keeping its shape: a circle r 3 at (22, 4) to (23.2, 2.4), a line (16, 5)-(28, 9) to start at (18.4, -2.2).
+#[test]
+fn pierce_with_a_free_curve_slides_it_onto_the_pierce_point() {
+    let mut sk = Sketch::new();
+    let at = sk.use_external_point(v(25.0, 0.0));
+    let c = sk.add_circle(v(22.0, 4.0), 3.0);
+    sk.add_constraint(ConstraintKind::Pierce { point: c, target: at }).unwrap();
+    solved(&mut sk);
+    let Some(Curve2::Circle { center, radius }) = sk.curve(c) else { panic!("circle") };
+    assert!((center - v(23.2, 2.4)).length() < 1e-9 && (radius - 3.0).abs() < 1e-9, "{center} r {radius}");
+
+    let mut sk = Sketch::new();
+    let at = sk.use_external_point(v(25.0, 0.0));
+    let l = sk.add_line(v(16.0, 5.0), v(28.0, 9.0));
+    sk.add_constraint(ConstraintKind::Pierce { point: l, target: at }).unwrap();
+    solved(&mut sk);
+    let Some(Curve2::Line { a, b }) = sk.curve(l) else { panic!("line") };
+    assert!((a - v(18.4, -2.2)).length() < 1e-9 && (b - a - v(12.0, 4.0)).length() < 1e-9, "{a} {b}");
 }

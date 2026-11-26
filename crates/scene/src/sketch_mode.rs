@@ -10254,12 +10254,13 @@ mod tests {
         assert_eq!(dimension_edit_text(&data, cid, &inch).as_deref(), Some("3.51041 in"));
     }
 
-    /// Live (lead sketch dim): Enter never accepts the sketch: with a tool
-    /// after a commit, with no tool, with a selection. Esc ends the tool and
+    /// Live (lead sketch dim; behaviours.md sketch/200–233): Enter never accepts the sketch: with a tool
+    /// after a commit or nothing pending, with no tool, with a selection. Esc ends the tool and
     /// never clears the selection or leaves the sketch.
     #[test]
     fn enter_never_accepts_the_sketch_and_esc_keeps_the_selection() {
         let (mut ed, mut d) = editor(Tool::Line);
+        assert_eq!(ed.enter_target(), EnterTarget::Nothing, "Line with nothing pending: Enter does nothing, the tool stays");
         click(&mut ed, &mut d, v(0.01, 0.01));
         click(&mut ed, &mut d, v(0.03, 0.01));
         assert_eq!(ed.enter_target(), EnterTarget::OnTheFly, "mid-chain Enter places the boxed length");

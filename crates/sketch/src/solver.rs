@@ -1631,6 +1631,7 @@ impl Sketch {
 
     pub fn solve_with(&mut self, opts: &SolveOptions) -> SolveReport {
         let snapshot = self.clone();
+        self.slide_pierced_curves();
         // The DOF analysis is the constraints', not where a least-change placement moves things: a solve without
         // `analyze` keeps reporting the one current when it started (a regeneration's placement touched the sketch,
         // and the open sketch's row lost its under-defined badge, user 11-12).
@@ -1689,6 +1690,56 @@ impl Sketch {
         }
         *self = snapshot;
         self.collapse_report(rep, &collapsed)
+    }
+
+    /// Live (skasm/pierce 11-17): a free curve Pierced through an external point slides the shortest way onto it,
+    /// keeping its shape (a circle its radius, a line its direction and length).
+    fn slide_pierced_curves(&mut self) {
+        let slides: Vec<(SmallVec<[EntityId; 4]>, DVec2)> = self
+            .constraints()
+            .filter(|c| c.driving)
+            .filter_map(|c| {
+                let ConstraintKind::Pierce { point: u, target } = c.kind else { return None };
+                let at = self.point(target)?;
+                let pts = self.free_shape(u, c.id)?;
+                let to = match self.curve(u)? {
+                    crate::geom::Curve2::Line { a, b } => {
+                        let d = (b - a).normalize_or_zero();
+                        a + d * (at - a).dot(d)
+                    }
+                    crate::geom::Curve2::Circle { center, radius } | crate::geom::Curve2::Arc { center, radius, .. } => center + (at - center).normalize_or_zero() * radius,
+                    curve => curve.closest(at).1,
+                };
+                let shift = at - to;
+                (shift.length() > 1e-12).then_some((pts, shift))
+            })
+            .collect();
+        for (pts, shift) in slides {
+            for p in pts {
+                if let Some(q) = self.point(p) {
+                    let _ = self.set_point(p, q + shift);
+                }
+            }
+        }
+    }
+
+    /// The points of curve `u` when only constraint `cid` ties it to anything else (constraints on the curve alone,
+    /// which a move keeps, aside): none external, shared with another entity or fixed.
+    fn free_shape(&self, u: EntityId, cid: ConstraintId) -> Option<SmallVec<[EntityId; 4]>> {
+        let e = self.entity(u)?;
+        if e.kind() == EntityKind::Point || e.external {
+            return None;
+        }
+        let pts = e.point_refs();
+        let own = |x: EntityId| x == u || pts.contains(&x);
+        if pts.iter().any(|p| self.entity(*p).is_none_or(|q| q.external)) || self.entities().any(|o| !own(o.id) && o.point_refs().iter().any(|p| pts.contains(p))) {
+            return None;
+        }
+        let tied = self.constraints().filter(|c| c.driving && c.id != cid).any(|c| {
+            let ents = c.kind.entities();
+            ents.iter().any(|x| own(*x)) && (matches!(c.kind, ConstraintKind::Fix { .. }) || !ents.iter().all(|x| own(*x)))
+        });
+        (!tied).then_some(pts)
     }
 
     /// [`Self::solve_with`]'s retry: the free geometry of each point a Coincident ties to a fixed (external) point
