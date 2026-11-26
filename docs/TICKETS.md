@@ -5,6 +5,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-26 14:2x: live's drawing triage takes (b7fc6e4a5) on green b7fc6e4a5: 0/5, 18/39 states (studios parked: lead)
+- [ ] P1 **DRW-ESC-ENDS-TOOL (studios; lead)** (behaviours replay DRW-ESC-ENDS-TOOL; drw-dimension-esc-then-pick s4-s7, -pick-esc-thrice s3-s8, -radius-place-inside-* s4, -foreshorten s4+): one Escape ends every drawing dimension tool in live (drawing.tool null), whether a pick is pending or a dimension was just placed; ours keeps Dimension / Radial dimension active, so the next clicks make a second dimension (esc-then-pick: 2 annotations, live 1) and the right-click menu on a dimension doesn't open (foreshorten s5: "menu:Foreshorten is not shown"). Fails all 5.
+- [ ] P2 **DRW-RADIAL-INSIDE-TEXT-X (studios; lead)** (drw-dimension-foreshorten s3): a radius of the Top view's hole, its text placed by a click inside the arc at (-1, 1): live's text at x 83.5, ours 79.8 (sheet mm). The click-inside placements at (3, 0) and lower-left (DRW-RADIAL-INSIDE-PLACE) match live through s3.
+
 ## qa 11-26 14:0x: live's sketch beginner mistakes batch 4 (75b8386b5) on green 8308d3410: 1/12 as scored, 8/12 with 1-px click tolerance
 (suites/uipnew4-1126; GTOL=0.7 qa-scratch/bin/uipsteps.py. Live's surprises: a fixed line's END drag lengthens it and Offset ignoring a typed value / 0 match ours.)
 - [ ] P2 **SKETCH-MIRROR-PRESELECTED-CLICK (skasm)** (mistake-sketch-mirror-no-line s11-s13): a circle selected, sketch Mirror, a click anywhere (25, 10): live mirrors the circle about the horizontal axis at once (2 entities, selection cleared); ours does nothing (1 entity, the circle still selected).
