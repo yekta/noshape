@@ -25,7 +25,10 @@ Assembly diffs (Fastened step 3, asm face menu) were a476fa14f (landed).
 Speed T2 (sp.sh, vibex7, ~/tmp/skasm/sp-full.log there) FAILS: S50 run 3 "the corner lit under the pointer": hover
 None. Uncommitted diagnostic in latency_tests.rs:752 prints view hover / hover_constraint / gpu pick / tile / held /
 selection. Suspect: the width's label over the corner takes hover (sketch_hover's "glyph/label hovered" early return).
-Then -> sketch feel-coverage audit (behaviours.md sketch specs without tests -> feel test + fix; report counts).
+Sketch feel-coverage audit (started 08:15): 221 sketch sections in behaviours.md, 126 cited by code (script
+/root/skasm-scratch/audit-sections.txt; key = capture dir / ticket id / title, case-insensitive), 95 not. Spot-checked 9
+uncited: 8 covered under other names, 1 gap (inference-1866 midpoint-up PERPENDICULAR/VERTICAL): test f469d778b, ours
+already right. psui-owned rows (Hide other sketches, readouts) skipped. Continue down the list.
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
