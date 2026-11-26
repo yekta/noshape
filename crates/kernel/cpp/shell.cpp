@@ -9677,7 +9677,25 @@ static bool may_continue(const TopoDS_Shape& solid, const std::vector<TopoDS_Sha
   return false;
 }
 
+static bool by_quadrics_tried(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign,
+                              Built& out);
+
+// An exception inside it (an OCCT call on a shape it made) is a failure: the next way (OCCT's offset) runs.
 bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out)
+{
+  try
+  {
+    return by_quadrics_tried(solid, removed, thickness, sign, out);
+  }
+  catch (const Standard_Failure&)
+  {
+    out = Built();
+    return false;
+  }
+}
+
+static bool by_quadrics_tried(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign,
+                              Built& out)
 {
   bool        continued_any = false;
   const char* why           = "";

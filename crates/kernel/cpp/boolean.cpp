@@ -10178,100 +10178,109 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     rust_decline("fuzzy or a mesh body");
   else if (rust_boolean_on())
   {
-    TopoDS_Shape                          out;
-    HHist                                 h;
-    std::vector<const OcShape*>           rs = srcs;
-    std::vector<std::unique_ptr<OcShape>> own;
-    bool                                  done       = false;
-    bool                                  one_by_one = false;
-    // (Asked to cut scaled copies, OCCT's path below would: its history has the object's entities all Modified.)
-    const bool scaled_inputs = opts.scaled && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr;
+    // (An exception there, in its Boolean or in shaping its result: a decline, OCCT's below.)
+    try
     {
-      const KernelTimer timer("boolean.rust");
-      // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch; where
-      // they reach into the arguments, OCCT's is fuse_trimmed's: so is ours then, noshape's Boolean throughout.)
-      const bool checked = op == 0 && opts.glue == 3 && t.size() > 1;
-      if (checked)
+      TopoDS_Shape                          out;
+      HHist                                 h;
+      std::vector<const OcShape*>           rs = srcs;
+      std::vector<std::unique_ptr<OcShape>> own;
+      bool                                  done       = false;
+      bool                                  one_by_one = false;
+      // (Asked to cut scaled copies, OCCT's path below would: its history has the object's entities all Modified.)
+      const bool scaled_inputs = opts.scaled && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr;
       {
+        const KernelTimer timer("boolean.rust");
+        // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch; where
+        // they reach into the arguments, OCCT's is fuse_trimmed's: so is ours then, noshape's Boolean throughout.)
+        const bool checked = op == 0 && opts.glue == 3 && t.size() > 1;
+        if (checked)
         {
-          // (Too few for the plain fuse to be slow: where they overlap, the same run goes on as the plain fuse (below),
-          // its sections made once (c2-impeller-loft's Bohrungssitz seats: two runs, 0.2 s).)
-          const RustLenient lenient;
-          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true, false, t.size() < plain_fuse_tools);
+          {
+            // (Too few for the plain fuse to be slow: where they overlap, the same run goes on as the plain fuse (below),
+            // its sections made once (c2-impeller-loft's Bohrungssitz seats: two runs, 0.2 s).)
+            const RustLenient lenient;
+            done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, true, false, t.size() < plain_fuse_tools);
+          }
+          reach_in = !done && rust_last_decline() == "pattern instances overlapping";
+          // (Too few for the plain fuse to be slow: the plain fuse at once, as OCCT's below (plain_at_once), apart or
+          // not (c2-impeller-loft's Bohrungssitz seats 0.9 s trimmed -> 0.25 s). Its faces may stay split where the
+          // instances reach in (bool-corpus 58c61d5ddca8047a: 65, the trimmed fuse's 56); the feature's unify merges
+          // them (lead 11-25: a gate exception at the Boolean only).)
+          if (reach_in && t.size() >= plain_fuse_tools)
+          {
+            const KernelTimer trim("boolean.rust.trimmed");
+            done = rust_fuse_trimmed(a, t, rs, opts, out, h);
+          }
+          // (Instances overlapping one another too, so the trimmed ones don't just touch: OCCT's fuse_trimmed fails
+          // there (their volumes don't add up) and OCCT runs the plain fuse; so does ours.)
+          if (reach_in && !done)
+            done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
+          if (!done)
+            rust_decline(nullptr);
         }
-        reach_in = !done && rust_last_decline() == "pattern instances overlapping";
-        // (Too few for the plain fuse to be slow: the plain fuse at once, as OCCT's below (plain_at_once), apart or
-        // not (c2-impeller-loft's Bohrungssitz seats 0.9 s trimmed -> 0.25 s). Its faces may stay split where the
-        // instances reach in (bool-corpus 58c61d5ddca8047a: 65, the trimmed fuse's 56); the feature's unify merges
-        // them (lead 11-25: a gate exception at the Boolean only).)
-        if (reach_in && t.size() >= plain_fuse_tools)
+        else
         {
-          const KernelTimer trim("boolean.rust.trimmed");
-          done = rust_fuse_trimmed(a, t, rs, opts, out, h);
+          // (Big cutters meeting each other past the part: one at a time, where their pieces in it keep apart.)
+          if (op == 1 && a.size() == 1 && t.size() >= 2 && t.size() <= 16 && opts.glue == 0 && tools_meet_outside(a[0], t))
+          {
+            const KernelTimer one("boolean.rust.one_by_one");
+            done       = rust_cut_one_by_one(a[0], t, opts, out, h);
+            one_by_one = done;
+            if (done)
+              rs = srcs;
+          }
+          if (!done)
+            done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false, scaled_inputs);
+          // (Its cutters all at once taken for a non-manifold result where one at a time they aren't: c2-valve-config's
+          // drafted holes, one of them through a notch's wall; OCCT's cut there loses an edge live keeps.)
+          if (!done && !one_by_one && op == 1 && a.size() == 1 && t.size() >= 2 && t.size() <= 16 && opts.glue == 0 &&
+              rust_last_decline() == "a non-manifold result")
+          {
+            const KernelTimer one("boolean.rust.one_by_one");
+            rs         = srcs;
+            own.clear();
+            done       = rust_cut_one_by_one(a[0], t, opts, out, h);
+            one_by_one = done;
+          }
         }
-        // (Instances overlapping one another too, so the trimmed ones don't just touch: OCCT's fuse_trimmed fails
-        // there (their volumes don't add up) and OCCT runs the plain fuse; so does ours.)
-        if (reach_in && !done)
-          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
-        if (!done)
-          rust_decline(nullptr);
       }
-      else
+      if (done)
       {
-        // (Big cutters meeting each other past the part: one at a time, where their pieces in it keep apart.)
-        if (op == 1 && a.size() == 1 && t.size() >= 2 && t.size() <= 16 && opts.glue == 0 && tools_meet_outside(a[0], t))
+        t_bool_path = "rust";
+        // A target known to have nothing to merge: the unify (here or op_unify's) looks only where it changed.
+        std::shared_ptr<const UnifyScope> scope;
+        const TopoDS_Shape made = out;
+        out                     = without_strips(out, h);
+        const bool stripped     = !out.IsSame(made);
+        if (!stripped && !one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
+          scope = rust_unify_scope(*rs[0]);
+        bool clean = false;
+        const TopoDS_Shape pre = out;
+        if (opts.unify)
+          out = scope ? unify_in(out, h, scope.get(), &clean) : unify(out, h);
+        std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.rust.result");
+        OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &rs);
+        lap.reset();
+        if (opts.unify && scope)
+          r.shape->myUnifyClean = clean;
+        // (A whole unify that left it as it was: op_unify's would too (cf-surface-pattern's Surface Pattern 3: its
+        // merges rejected, the same unify again).)
+        else if (opts.unify && out.IsSame(pre))
+          r.shape->myUnifyClean = true;
+        if (!opts.unify)
         {
-          const KernelTimer one("boolean.rust.one_by_one");
-          done       = rust_cut_one_by_one(a[0], t, opts, out, h);
-          one_by_one = done;
-          if (done)
-            rs = srcs;
+          r.shape->myUnifyScope = scope;
+          if (!stripped)
+            rust_boolean_keep(*r.shape);
         }
-        if (!done)
-          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false, scaled_inputs);
-        // (Its cutters all at once taken for a non-manifold result where one at a time they aren't: c2-valve-config's
-        // drafted holes, one of them through a notch's wall; OCCT's cut there loses an edge live keeps.)
-        if (!done && !one_by_one && op == 1 && a.size() == 1 && t.size() >= 2 && t.size() <= 16 && opts.glue == 0 &&
-            rust_last_decline() == "a non-manifold result")
-        {
-          const KernelTimer one("boolean.rust.one_by_one");
-          rs         = srcs;
-          own.clear();
-          done       = rust_cut_one_by_one(a[0], t, opts, out, h);
-          one_by_one = done;
-        }
+        return r;
       }
     }
-    if (done)
+    catch (const Standard_Failure&)
     {
-      t_bool_path = "rust";
-      // A target known to have nothing to merge: the unify (here or op_unify's) looks only where it changed.
-      std::shared_ptr<const UnifyScope> scope;
-      const TopoDS_Shape made = out;
-      out                     = without_strips(out, h);
-      const bool stripped     = !out.IsSame(made);
-      if (!stripped && !one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
-        scope = rust_unify_scope(*rs[0]);
-      bool clean = false;
-      const TopoDS_Shape pre = out;
-      if (opts.unify)
-        out = scope ? unify_in(out, h, scope.get(), &clean) : unify(out, h);
-      std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.rust.result");
-      OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &rs);
-      lap.reset();
-      if (opts.unify && scope)
-        r.shape->myUnifyClean = clean;
-      // (A whole unify that left it as it was: op_unify's would too (cf-surface-pattern's Surface Pattern 3: its
-      // merges rejected, the same unify again).)
-      else if (opts.unify && out.IsSame(pre))
-        r.shape->myUnifyClean = true;
-      if (!opts.unify)
-      {
-        r.shape->myUnifyScope = scope;
-        if (!stripped)
-          rust_boolean_keep(*r.shape);
-      }
-      return r;
+      t_bool_path = "occt";
+      rust_decline("an exception inside it");
     }
   }
   if (glue_case && !glue_first)
@@ -10793,7 +10802,24 @@ namespace
 // One solid split by one planar face covering its whole section (a convex polygon holding the projection of the
 // solid's box): the solid's common with the half-space on the face's side and its cut by it, by noshape's Boolean, with
 // OCCT's Splitter's history (the tool face Modified into the section faces). False where it doesn't apply or declines.
+bool split_by_plane_tried(const TopoDS_Shape& a, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist);
+
+// (An exception inside it: declined, OCCT's Splitter runs.)
 bool split_by_plane_ours(const TopoDS_Shape& a, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
+{
+  try
+  {
+    return split_by_plane_tried(a, tool, out, hist);
+  }
+  catch (const Standard_Failure&)
+  {
+    out.Nullify();
+    hist = HHist();
+    return rust_decline("an exception inside it");
+  }
+}
+
+bool split_by_plane_tried(const TopoDS_Shape& a, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
 {
   if (!rust_boolean_on() || a.ShapeType() != TopAbs_SOLID || tool.ShapeType() != TopAbs_FACE)
     return false;

@@ -858,6 +858,37 @@ fn a_hole_across_a_tubes_seam_leaves_whole_loops() {
     }
 }
 
+/// asm-scissor-lift's Hole 2: a blind hole in a bar whose end is lofted to a point (two B-spline faces, each with a
+/// degenerate edge at the apex) failed inside noshape's Boolean (an OCCT exception) instead of falling back to OCCT's.
+#[test]
+fn a_hole_in_a_bar_with_a_pointed_loft_end_falls_back() {
+    let mm = 1e-3;
+    let z = |h: f64| Plane::new(glam::DVec3::new(0.0, 0.0, h), glam::DVec3::Z, glam::DVec3::X);
+    let ring = |h: f64, r: f64| {
+        let half = |a: f64| make_arc(glam::DVec3::new(0.0, 0.0, h), glam::DVec3::Z, glam::DVec3::X, r, a, a + PI).unwrap();
+        make_wire(&[half(0.0), half(PI)]).unwrap()
+    };
+    let apex = make_vertex(glam::DVec3::new(0.0, 0.0, 6.0 * mm)).unwrap();
+    let end = loft(&[ring(0.0, 14.0 * mm), ring(4.0 * mm, 10.0 * mm), apex], &LoftOptions { solid: true, ..Default::default() }).unwrap().shape;
+    let bar = make_cylinder(&z(-60.0 * mm), 14.0 * mm, 60.0 * mm, 2.0 * PI).unwrap();
+    set_rust_boolean(Some(false));
+    let part = fuse(&bar, &end).unwrap().shape;
+    set_rust_boolean(None);
+    let hole = make_cylinder(&z(-70.0 * mm), 4.1 * mm, 52.0 * mm, 2.0 * PI).unwrap();
+    let before = volume_properties(&part).unwrap().mass;
+    let expected = before - PI * (4.1 * mm).powi(2) * 42.0 * mm;
+    for rust in [true, false] {
+        set_rust_boolean(Some(rust));
+        let r = cut(&part, &hole);
+        set_rust_boolean(None);
+        let r = r.unwrap_or_else(|e| panic!("rust {rust}: {e}")).shape;
+        assert!(r.is_valid(), "rust {rust}");
+        assert_eq!(r.faces().len(), part.faces().len() + 2, "rust {rust}");
+        let v = volume_properties(&r).unwrap().mass;
+        assert!(close(v, expected, 1e-6), "rust {rust}: {v} vs {expected}");
+    }
+}
+
 /// A BREP's counts as Onshape's and its edges (NOSHAPE_BREP_EDGES = the file).
 #[test]
 #[ignore = "T2 probe: NOSHAPE_BREP_EDGES"]

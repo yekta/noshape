@@ -2169,6 +2169,9 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
             bb.UpdateEdge(es[k], rl, s, loc, std::max(BRep_Tool::Tolerance(es[k]), 1.05 * dev + 1e-12));
             continue;
           }
+          // (A degenerate edge has no curve of its own to project.)
+          if (BRep_Tool::Degenerated(es[k]))
+            return "a degenerate edge off its face";
           BOPTools_AlgoTools2D::BuildPCurveForEdgeOnFace(es[k], sf);
           continue;
         }
@@ -7387,9 +7390,33 @@ static bool slab_too_tolerant(const std::vector<TopoDS_Shape>& args)
   return false;
 }
 
+static bool rust_boolean_tried(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
+                               std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out,
+                               occ::handle<BRepTools_History>& hist, double fuzzy, bool touching_only, bool scaled_inputs,
+                               bool or_plain);
+
+// An exception inside it (an OCCT call on a shape it made: Standard_NullObject in asm-scissor-lift's Hole 2) declines,
+// so OCCT's Boolean runs; a stop (cancelled, over the memory budget, the replay's strict decline) stays one.
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only, bool scaled_inputs, bool or_plain)
+{
+  try
+  {
+    return rust_boolean_tried(op, args, srcs, own, out, hist, fuzzy, touching_only, scaled_inputs, or_plain);
+  }
+  catch (const Standard_Failure&)
+  {
+    out.Nullify();
+    hist.Nullify();
+    return decline("an exception inside it");
+  }
+}
+
+static bool rust_boolean_tried(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
+                               std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out,
+                               occ::handle<BRepTools_History>& hist, double fuzzy, bool touching_only, bool scaled_inputs,
+                               bool or_plain)
 {
   if (slab_too_tolerant(args))
     return decline("a Shell slab of 50 um tolerance or more");
