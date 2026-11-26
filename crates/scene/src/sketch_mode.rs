@@ -14160,6 +14160,24 @@ mod tests {
         assert!((value - 3.0 * PI / 4.0).abs() < 1e-9, "obtuse quadrant");
     }
 
+    /// Live "spec: skasm sketch Dimension tool: stored constraint per pick type" (10-27): one line stores a LENGTH
+    /// (not a distance between its ends) at its measured length, unrounded; a circle a DIAMETER, an arc a RADIUS, a
+    /// point and a line a DISTANCE.
+    #[test]
+    fn a_single_picks_dimension_is_lives_kind() {
+        let mut sk = Sketch::new();
+        let l = sk.add_line(v(0.0, 0.0), v(0.0413047745823860, 0.0));
+        let Some(ConstraintKind::Length { curve, value }) = smart_dimension(&sk, &[l], v(0.02, -0.0077)) else { panic!("a line: LENGTH") };
+        assert_eq!(curve, l);
+        assert!((value - 0.041304774582386).abs() < 1e-12);
+        let c = sk.add_circle(v(0.1, 0.0), 0.0110146058723331);
+        assert!(matches!(smart_dimension(&sk, &[c], v(0.13, 0.01)), Some(ConstraintKind::Diameter { curve, .. }) if curve == c), "a circle: DIAMETER");
+        let a = sk.add_arc(v(0.2, 0.0), v(0.21429, 0.0), v(0.2, 0.01429));
+        assert!(matches!(smart_dimension(&sk, &[a], v(0.22, 0.02)), Some(ConstraintKind::Radius { curve, .. }) if curve == a), "an arc: RADIUS");
+        let p = sk.add_point(v(0.01, 0.020247));
+        assert!(matches!(smart_dimension(&sk, &[p, l], v(0.03, 0.01)), Some(ConstraintKind::Distance { a, b, .. }) if a == p && b == l), "a point and a line: DISTANCE");
+    }
+
     /// Live (behaviours "qa (2026-10-28) sketch.md 7.22"): a conic, then a
     /// spline that doesn't touch it: the second pick is refused with the
     /// warning, the picks clear and the tool stays on; hovering the spline
