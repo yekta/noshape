@@ -123,26 +123,24 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Run: rb.sh on vibe2: `cargo build --profile ui-bench -p noshape --bin noshape`, then from the src root
   `~/bin/slot bash tools/perf/ui-audit.sh $HOME/agents/psui/target/ui-bench/noshape :151 3 ~/tmp/psui/auditN`.
 
-## Drawing triage + asm shard (lead 11-26 09:3x / 10:50): IN FLIGHT (not landed: e15fb05f1..5e45bcb81)
-- Baseline run 1125-1501: drw 382/457, 53 maker-scope failures; asm shard on green bc0fc23b8 (vibe2, ~/tmp/psui/asm,
-  local copy /root/psui-scratch/asm): 212/225.
-- Live answered (live/psui/drw-triage-1126/index.md): Esc rule ours (one Esc ends Dimension/Radial/Ordinate) → reverted
-  9aa272149's Esc part (Datum, Surface finish too; right-click part kept), T1 one_esc_ends_a_dimension_tool. Note grab =
-  insertion point (`position`) → ui_target_point, T1 the_runner_grabs_a_note_at_its_insertion_point. Scale at Enter /
-  Move to sheet s9: reader artefacts → new scenario key `reader_artefacts` (run.py, README), compare-only 2/2 match.
-- Radial placed inside the hole (item 3): live takes (-1,1)→(83.5,160.8) halfway, (-2,-2)→(77.1,157.8), (3,0)→(83.8,160.8);
-  takes queued 6ea5f8246. Rule not derived yet (not at the click, not always halfway). Open.
-- asm fixes: subassembly list menu Where used… (WhereUsedAssembly(TabId), workspace open_where_used), hidden row tooltip
-  "(Hidden)", Select other also as list {kind select-other}, asm-menu-export seed version 0 (38.1), incomplete Replicate
-  row red; T1s in assembly_ui_tests / feel_tests. Import dialog Units noted as a field (qa 70-dl-bracket; no T1: recorder
-  needs NOSHAPE_UI_SCRIPT).
-- Open asm: asm-measure-face-cylinder-panel (live's new recorder reads the Measure panel: dialog text/fields + measure
-  readout; our asm reader has none: a reader feature), asm-drag-revolute-turns (REQUESTS psui 11:33: live CW −39.3° vs
-  follow-the-point +23.6°, ours +27.9°).
-- Lead 11-26 ~11:40 (context cap): Esc (55 scenarios) and the scale / Move to sheet exclusion are what's asked; both done
-  in e15fb05f1 / 2c10093d0. After compaction: read the verify result, then land and report.
-- Verify run (vibe2, /root/psui-scratch/resp/verify.sh, names.txt = 75 drw fails + 12 asm): build ui-bench, drawing-ui +
-  assembly-ui lib, ops e2e, scenarios → ~/tmp/psui/ver. Then: tests for 324fcaa20/5e45bcb81, land, report before/after.
+## Drawing triage + asm shard + qa 12:3x tickets (lead 11-26 09:3x / 10:50 / 12:2x): IN FLIGHT, not landed
+- Baseline 1125-1501: drw 382/457, 53 maker-scope failures; asm shard (green bc0fc23b8) 212/225.
+- verify run 1 (12:16, ~/tmp/psui/ver): ops e2e 312 ok, drawing-ui/assembly-ui lib ok; 87 failures rerun → 79/87
+  (drw 70/75). Left: foreshorten s3 (radial), centerline-circle-3-point(+hole-centres), geometric-tolerance,
+  ordinate-add-to-group, asm-drag-revolute-turns, asm-measure-face-cylinder-panel, asm-replicate-pick-mated-pin (pre-fix).
+- Commits since (all T1'd): radial text halfway at 0° for a click within r/2 (pending.rs, live triage 3); foreshortened
+  radius reads as "dimension"; runner presses an ordinate group at its first value's point (no Reset ordinate); circle
+  centerline click on a quadrant snap takes it (pick.rs circle_click_point); hole-centres live_defects s4 (lead 11-23);
+  run.py click_placed_points (2 px on plane, README), button_focused + created_feature_owner (README Focus); Shell too
+  thick blames `entities`; edited mate row red while its title is + mate chip × named button:x:<box>:<row>.
+- Asked live (REQUESTS 12:24): drw-geometric-tolerance empty-slot clicks (11-19 take places, 11-23 gdt.md says not).
+- qa 12:3x tickets: SKETCH-CLICK-OFFSET 6/7 by compare-only (7th = EXTRUDE-OPEN-SKETCH s17: hover "feature:Extrude 1"
+  "is not shown" while its dialog is open: our row not registered then; open). HIDDEN-ROW-TOOLTIP done (a46af04f9);
+  EXPORT-PARASOLID seed done (a46af04f9). ASM-REPLICATE-MATED-PIN-ROW (filed skasm) done by me in 324fcaa20: tell lead.
+- verify2 (radial commit only; 77 Esc/radial drw scenarios → ~/tmp/psui/ver2): its radial T1 failed (test toggled the
+  tool: fixed 38478addb). NEXT: verify3 (/root/psui-scratch/resp/verify3.sh, names3.txt) → land → report drawing
+  before/after + tell qa (Parasolid, asm 5 tickets).
+- Open: asm Measure panel reader; asm-drag-revolute-turns (REQUESTS 11:33); radial drag rule.
 
 ## Agents
 
