@@ -6467,13 +6467,16 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
     {
       gp_Pnt   m((ends[3 * i] + ends[3 * j]) / 2, (ends[3 * i + 1] + ends[3 * j + 1]) / 2, (ends[3 * i + 2] + ends[3 * j + 2]) / 2);
       gp_Pnt2d ua = qa->ValueOfUV(m, 1e-9), ub = qb->ValueOfUV(sa->Value(ua.X(), ua.Y()), 1e-9);
-      double   gap = 1;
+      double   gap = 1, best = 1;
       // (Up to 400 steps: a shell's inner corner round and a cylinder along the wall's top, 50 left it over 0.1 um
-      // off, qa BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX.)
-      for (int k = 0; k < 400 && gap > 1e-9; ++k)
+      // off, qa BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX. Stopped once 5 steps in a row come no closer: the surfaces'
+      // nearest points, apart (c2-impeller-loft's Fillet 4: 7.9 mm every step, 400 steps on an offset surface 1.5 s).)
+      for (int k = 0, still = 0; k < 400 && gap > 1e-9 && still < 5; ++k)
       {
         const gp_Pnt pa = sa->Value(ua.X(), ua.Y()), pb = sb->Value(ub.X(), ub.Y());
         gap = pa.Distance(pb);
+        still = gap < best * (1 - 1e-6) ? 0 : still + 1;
+        best  = std::min(best, gap);
         m   = gp_Pnt((pa.XYZ() + pb.XYZ()) / 2);
         ua  = qa->NextValueOfUV(ua, m, 1e-10);
         ub  = qb->NextValueOfUV(ub, m, 1e-10);
