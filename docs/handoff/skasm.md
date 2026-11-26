@@ -22,9 +22,9 @@ ASM-DRAG-REVOLUTE-ANGLE waits on live (REQUESTS "psui 11-26 11:33"): live's take
 (-39.3 deg CW), no pointer-following rule gives that (+21..24 CCW; ours +27.9 CCW). Drag code: assembly_view.rs ~3838.
 
 Sketch feel-coverage audit (lead): 95 uncited sketch sections in /root/skasm-scratch/audit-sections.txt; rows checked are
-listed in /root/skasm-scratch/audit-checked.txt (about 42 of 95). This session: dimension labels / reopened box mm + inch,
+listed in /root/skasm-scratch/audit-checked.txt (about 47 of 95). This session: dimension labels / reopened box mm + inch,
 Mirror box mirrors nothing, one-pick dimension kinds, aligned rectangle + 3 point arc constraint sets: tests, no diffs.
-Next unchecked rows in file order: 3 (Sketch mode, 102 lines), 10, 12, 24, 25, 27, 28, 30-55, 58, 59, 64-67, 69-78,
+Next unchecked rows in file order: 3 (Sketch mode, 102 lines), 10, 12, 31-55, 58, 59, 64-67, 69-78,
 80, 82-88, 93-95 (skip dx / psui / core-owned ones: note them in audit-checked.txt).
 
 qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
