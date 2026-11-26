@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-26 02:08 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-26 03:40 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -41,10 +41,18 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   (vibex8 ~/tmp/bool/p0/rec) taken; volumes = slice integration (x0-20 15587.68099, x1-20 15559.81505, x4.9-20
   15468.10594 mm3; x5-20 check 15465.83). T1 bool_patterns::a_cylinder_along_a_shelled_boxs_wall_fuses_through_its_corner_rounds
   (data/booleans 7bf937 / 1582a3 / b81914). T1 PASSES, small cases 78/78 0 differ (t1.sh, vibex8 ~/tmp/bool/p0/kt).
-  GATE: unit bool-chain-p0 (/root/bool-scratch/chainp0.sh) starts gate-chain-own.sh 8b52d16a6 when chain-2c051fbee.out
-  says CHAIN DONE -> /root/bool-hat-scratch/chain-8b52d16a6.out. Then knurls (chainf16.sh pattern: copy both gate
-  trees' all-96c035059fc28abb to vibex7 ~/tmp/bool/<dir>, kn-run.sh), land from bool-flush
-  (NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh), tell qa + lead. OCCT stays wrong on these (fallback only).
+  GATE (03:38, P0 + item 1 as ONE stack: 2c051fbee cherry-picked onto bool-flush-p0 as 1a04f549d; the 2c051 gate had
+  waited 00:51-03:37 for vibex8's slot (qa's parity held it), stopped): unit bool-gate-p0s -> /root/bool-hat-scratch/
+  chain-1a04f549d.out. Then knurls (chainf16.sh pattern: copy both gate trees' all-96c035059fc28abb to vibex7
+  ~/tmp/bool/<dir>, kn-run.sh), land from bool-flush (NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh: lands both), tell qa
+  (roster id, qa moved 11-26) + lead. OCCT stays wrong on these (fallback only). bool-slow (2c051fbee) then obsolete.
+  UNIFY SCOPE TRY (11-26 03:40, PARKED, /root/bool-scratch/unify-clean-full.patch): every op_unify result marked
+  clean (unify twice = same on all 19 readable impeller dumps), solids inherit it (sub_shapes/list_get), t_built.scoped
+  for free-form results. Impeller: only 4 of 24 unifies scoped, Bohrungssitz still whole (the mark is lost elsewhere),
+  no gain; NOSHAPE_UNIFY_CHECK aborts at Fillet 4 (whole unify_in's merge changes volume, op_unify reverts it: the
+  check is stricter than op_unify). Don't resume without finding where the mark is lost.
+  MAIN REGRESSION (told lead 03:0x): psui 8a62f4834 failing_alone reruns a failed fillet per edge: impeller "Fillet
+  Ansaugflansch zum Gehaeuse" (fails either way) 1.1 s -> 60 s.
   SLOW-FEATURE LIST (lead 11-25; re-measured 11-25 12:55 on main 47b49528b, vibex8 ~/tmp/bool: cli-main,
   fl-main.jsonl all features, sel-main.jsonl 60 rows >= 100 ms and >= 2x live, prof-main.jsonl their kernel profiles;
   scripts /root/bool-scratch/featlist.py profsel.py fl-main.sh, prof1.sh <cli> <doc> <feature> one profile,
