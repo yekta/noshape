@@ -3,9 +3,14 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 22:10 UTC) — read first
+## RESUME HERE (11-26 21:0x UTC) — read first
 
 Queued: df113102 (Mirror skips the sketch's regions, mirror-no-line s11 28/28) and 8742ccbc (parity connector, 14->15/27).
+NOW (lead 21:0x, core told): c2-hunting-knife Split 4 and c2-surf-intro-offset Offset surfaces 1 (first differences after
+the refill), against live's per-feature geometry with T1s; brep / kernel Boolean changes go through bool's gate. Trace:
+bin/corp1.sh <doc> <grep> on vibex7 (~/tmp/skasm/corp/one.log); edge-by-edge compare as in the Rib 1 note below
+(temporary SKDBG edge writer in parity.rs our_parts: query_entities edges -> edges-N.json, matched to live.jsonl's
+bodies[].edges by midPoint/length).
 Lead 21:xx: nuts Sweep 1 + parting-line Rib 1. Both are NOT sketch/translation: reported back for core/bool.
 - nuts Sweep 1: profile + helix right; live 3 cylinders/2 other, ours 2/3: the thread's flat (a profile line parallel
   to the axis, r 2.0 mm) sweeps a multi-turn helical strip on a cylinder, ours a B-spline. Patch
