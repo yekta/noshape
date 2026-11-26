@@ -14810,6 +14810,50 @@ mod tests {
         assert!(!tangent(tangent_r - 3.0 * 0.275365), "3 px off: not");
     }
 
+    /// Live inference-1866 (normal to Top): a Line from a line's midpoint straight up stores MIDPOINT + PERPENDICULAR when
+    /// that line's direction is held by a constraint (drawn with the Line tool: HORIZONTAL; a rectangle's top edge), and
+    /// MIDPOINT + VERTICAL when it is free (posted with no constraints).
+    #[test]
+    fn a_line_up_from_a_midpoint_is_perpendicular_to_a_held_line_vertical_on_a_free_one() {
+        let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+        let up_from = |held: Option<Tool>| {
+            let (mut ed, mut d) = editor(held.unwrap_or(Tool::Line));
+            let base = match held {
+                Some(t) => {
+                    click(&mut ed, &mut d, mm(-20.0, if t == Tool::Line { 10.0 } else { -10.0 }));
+                    click(&mut ed, &mut d, mm(0.0, 10.0));
+                    ed.set_tool(Tool::Select);
+                    let top = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).find(|l| {
+                        let (a, b) = d.sketch.endpoints(*l).unwrap();
+                        let (a, b) = (d.sketch.point(a).unwrap(), d.sketch.point(b).unwrap());
+                        (a.y - 0.01).abs() < 1e-9 && (b.y - 0.01).abs() < 1e-9
+                    });
+                    top.unwrap_or_else(|| panic!("{t:?}: a line along y = 10: {:?}", d.sketch.entities().filter_map(|e| d.sketch.endpoints(e.id).map(|(a, b)| (d.sketch.point(a), d.sketch.point(b)))).collect::<Vec<_>>()))
+                }
+                None => d.sketch.add_line(mm(-20.0, 10.0), mm(0.0, 10.0)),
+            };
+            let before = d.sketch.constraints().count();
+            if ed.tool != Tool::Line {
+                ed.set_tool(Tool::Line);
+            }
+            click(&mut ed, &mut d, mm(-10.0, 10.0));
+            ed.pointer_move(&mut d, mm(-10.0, 25.0), false, false);
+            click(&mut ed, &mut d, mm(-10.0, 25.0));
+            let new = d.sketch.entities().filter(|e| e.kind() == EntityKind::Line).map(|e| e.id).max().unwrap();
+            let kinds: Vec<_> = d.sketch.constraints().skip(before).map(|c| c.kind.clone()).collect();
+            let midpoint = kinds.iter().any(|k| matches!(k, ConstraintKind::Midpoint { curve, .. } if *curve == base));
+            let perpendicular = kinds.iter().any(|k| matches!(k, ConstraintKind::Perpendicular { a, b } if (*a, *b) == (new, base) || (*a, *b) == (base, new)));
+            let vertical = kinds.iter().any(|k| matches!(k, ConstraintKind::Vertical { .. }));
+            (midpoint, perpendicular, vertical, kinds)
+        };
+        for held in [Some(Tool::Line), Some(Tool::CornerRect)] {
+            let (m, p, vert, kinds) = up_from(held);
+            assert!(m && p && !vert, "{held:?}: MIDPOINT + PERPENDICULAR, no VERTICAL: {kinds:?}");
+        }
+        let (m, p, vert, kinds) = up_from(None);
+        assert!(m && vert && !p, "a free line: MIDPOINT + VERTICAL: {kinds:?}");
+    }
+
     /// Live infer-arc-circle-1125 (0.293 mm a px): a circle's radius point at a line's end that is also its tangent
     /// point stores COINCIDENT to the end and no TANGENT (the point wins); a centre-point arc's start straight above its
     /// centre stores VERTICAL to it and its end at 180 degrees HORIZONTAL.
