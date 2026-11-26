@@ -1,0 +1,70 @@
+{
+ "name": "sketch-drag-undo-redo",
+ "about": "rectangle corner dragged in the sketch, then Ctrl+Z (one drag back) and Ctrl+Y (redone)",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch drags' (psui/sketch-drag-1125)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     50,
+     28
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  }
+ ]
+}

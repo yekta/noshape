@@ -1,0 +1,64 @@
+{
+ "name": "mistake-chamfer-r12-overflows",
+ "about": "block: Chamfer of the top face's edges at 12 mm (more than the 10 mm height): live regenerates it OK, the chamfer overflows onto the sides; ✓, the row's tooltip",
+ "area": "psui",
+ "source": "live behaviours 'First-hour mistakes, batch 1' (qa MISTAKES-1)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Chamfer"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Distance"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "12"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Chamfer 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

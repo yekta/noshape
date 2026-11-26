@@ -1,0 +1,136 @@
+{
+ "name": "mistake-sketch-overdefine-45",
+ "about": "rectangle 40x20, bottom dimensioned 40; the top dimensioned 45: 'Sketch could not be solved.', ✓: the red row, its tooltip; Ctrl+Z",
+ "area": "skasm",
+ "source": "live behaviours 'First-hour mistakes, batch 2' (qa MISTAKES-2)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     -8
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "40"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     28
+    ]
+   }
+  },
+  {
+   "do": "type",
+   "text": "45"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Sketch 1"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

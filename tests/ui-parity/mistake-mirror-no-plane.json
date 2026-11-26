@@ -1,0 +1,42 @@
+{
+ "name": "mistake-mirror-no-plane",
+ "about": "block: Mirror with the part picked and no mirror plane, ✓: red row, tooltip 'Select a mirror plane.'",
+ "area": "psui",
+ "source": "live behaviours 'First-hour mistakes, batch 1' (qa MISTAKES-1)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Mirror 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "name": "mistake-hole-no-point",
+ "about": "block: Hole with nothing selected: the red title and the disabled ✓, then Escape",
+ "area": "psui",
+ "source": "live behaviours 'First-hour mistakes, batch 2' (qa MISTAKES-2)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

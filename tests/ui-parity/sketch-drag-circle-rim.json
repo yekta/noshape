@@ -1,0 +1,62 @@
+{
+ "name": "sketch-drag-circle-rim",
+ "about": "circle at (70,10) R8 on Top: drag its rim (78,10) to (82,10): the radius changes, the centre stays",
+ "area": "skasm",
+ "source": "live behaviours 'Sketch drags' (psui/sketch-drag-1125)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     70,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     78,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     78,
+     10
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     82,
+     10
+    ]
+   }
+  }
+ ]
+}
