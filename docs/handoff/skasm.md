@@ -11,7 +11,7 @@ Read ~/land/results/skasm.log on vibe2, fix forward, land.sh again. Then resume 
   loft-profile line/arc halves (kept_ends edges), and Scaled's Transform copies (in and back) drop kept marks.
 - Fix in the patch (features.cpp): carry_kept_marks in Scaled ctor and in unscaled(); join_split_lines skips vertices
   whose two edges are kept_ends, carries marks onto its copy, keep_marked_edges(u), carry_kept_marks(cp, u).
-  Before the unscaled() carry: 16/35/21 (was 16/34/20, live 15/37/25); run bakni0oz9 tested the unscaled carry.
+  Before the unscaled() carry: 16/35/21 (was 16/34/20, live 15/37/25); with the unscaled carry: HANDLE 16/36/22 (x=6 fixed; rest is the fillet split + rail vertices).
 - Remaining after: our fillet is 2 faces split at y=0 (live 1 face); live's rail on the loft has 6 vertices = where it
   crosses the loft's C1 (double) knots at s 1.05/3.70/31.77 mm from bottom (each side), but NOT the knot at 38.69;
   rule unclear (curvature jumps at all) — park it, report as remaining.
