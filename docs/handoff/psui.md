@@ -172,7 +172,9 @@ docs/DECISIONS.md (read first; it wins over anything here).
   sample100 + 2 gdt): without 114/120, with 113/120 (only the folder-menu s10, fixed after); drag-fixed-line matches
   both ways. verify17 (menu fix, ~/tmp/psui/ver17n): 116/120; left: 3 sketch mistakes (skasm's e709bc2d1 covers
   mirror-no-line, offset-negative; dimension-construction s11) + asm-measure-face-cylinder-panel (Measure reader).
-- Tests: drawing-ui 215, ops e2e 313, clippy (drawing-ui, app) clean. Lead not told yet: report on land.
+- Tests: drawing-ui 215, ops e2e 313, clippy (drawing-ui, app) clean. QUEUED 4bfc0d3a; lead told 19:1x.
+- 19:29: assembly Measure panel reader (measure_panel::ui_state, other_dialogs; T1 the_panel_reads_as_live_recorder_reads_it):
+  asm-measure-face-cylinder-panel 7/7, asm-select-two-faces-measure 3/3, key-bracket-measure 4/4; assembly-ui 233.
 - GEOMETRIC TOLERANCE (live 7062): empty slots: the edge lights and reads as selected, its click places nothing and
   starts a leader (the edge stays lit), the next click places ONE ⌖ frame with it, Esc keeps it; edge click + Esc
   places nothing. gdt_empty removed; drawing_ui_state.rs Tool::Gdt lights the hovered / leader edge. T1
@@ -181,8 +183,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Our listed position (82.9, 93.0) vs live (84.5, 94.1) is within the comparison's tolerance.
 
 ## NEXT
-- SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Older: asm Measure panel
-  reader, radial drag rule. qa 18:0x (from 70): the Hole rows 'Ø 5 mm THRU' / field Diameter are not shown.
+- SKETCH-ISO-ORIGIN-ALIGN and asm-drag-revolute-turns are skasm's (lead 17:1x / 17:5x). Older: radial drag rule. qa 18:0x (from 70): the Hole rows 'Ø 5 mm THRU' / field Diameter are not shown.
 
 ## Agents
 
