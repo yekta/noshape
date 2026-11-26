@@ -1,23 +1,23 @@
 {
  "scenario": "drw-geometric-tolerance",
- "recorded": "2026-11-19T16:15:55.229Z",
+ "recorded": "2026-11-26T17:20:07.687Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   1079
+   992
   ],
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "a1434ec556a7ee081bc21b24",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "1cce4d570d2f5e3610db2519",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (3)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -98,7 +98,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     623,
+     110,
+     1716,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25563
+   }
   }
  },
  "steps": [
@@ -111,8 +124,12 @@
     }
    },
    "ok": true,
+   "ti": 201868,
+   "tmove": 201982,
+   "moves": 1,
+   "tdown": 202300,
    "at": [
-    650,
+    967,
     59
    ],
    "state": {
@@ -153,7 +170,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -206,10 +223,24 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       80,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
     }
    },
-   "t": 233972
+   "t": 227952,
+   "te": 227952
   },
   {
    "step": 2,
@@ -227,9 +258,13 @@
     }
    },
    "ok": true,
+   "ti": 227952,
+   "tmove": 229073,
+   "moves": 1,
+   "tdown": 229368,
    "at": [
-    727,
-    657
+    940,
+    619
    ],
    "state": {
     "focus": {
@@ -269,7 +304,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -321,20 +356,30 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [
+     "annotations": [],
+     "selection": [
       {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        84.5,
-        89.7
-       ]
+       "kind": "EDGE",
+       "owner": "Front"
       }
      ],
-     "selection": []
+     "viewport": {
+      "sheet_px": [
+       623,
+       80,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
     }
    },
-   "t": 260355
+   "t": 255427,
+   "te": 255427
   },
   {
    "step": 3,
@@ -352,9 +397,13 @@
     }
    },
    "ok": true,
+   "ti": 255427,
+   "tmove": 256541,
+   "moves": 1,
+   "tdown": 256836,
    "at": [
-    727,
-    622
+    940,
+    587
    ],
    "state": {
     "focus": {
@@ -394,7 +443,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -452,22 +501,28 @@
        "text": "⌖",
        "position": [
         84.5,
-        89.7
-       ]
-      },
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        84.5,
-        97.7
+        94.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       80,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
     }
    },
-   "t": 286917
+   "t": 282950,
+   "te": 282950
   },
   {
    "step": 4,
@@ -477,6 +532,7 @@
     "ms": 1000
    },
    "ok": true,
+   "ti": 282950,
    "state": {
     "focus": {
      "kind": "other",
@@ -515,7 +571,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -573,22 +629,28 @@
        "text": "⌖",
        "position": [
         84.5,
-        89.7
-       ]
-      },
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        84.5,
-        97.7
+        94.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       80,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
     }
    },
-   "t": 312626
+   "t": 309857,
+   "te": 309857
   },
   {
    "step": 5,
@@ -597,14 +659,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 309857,
    "pointer": {
     "at": [
-     883,
+     989,
      33
     ],
     "hover": [],
     "element": "div.navbar-document-and-workspace-names.os-row"
    },
+   "tdown": 309863,
    "state": {
     "focus": {
      "kind": "other",
@@ -631,7 +695,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -689,38 +753,45 @@
        "text": "⌖",
        "position": [
         84.5,
-        89.7
-       ]
-      },
-      {
-       "kind": "gdt",
-       "text": "⌖",
-       "position": [
-        84.5,
-        97.7
+        94.1
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       623,
+       110,
+       1716,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25563
+     }
     }
    },
-   "t": 339395
+   "t": 336766,
+   "te": 336766
   }
  ],
+ "t0_epoch_ms": 1795713419180,
  "_meta": {
   "export": [
    {
     "format": "DXF",
     "via": "dialog (tab › Export…)",
     "file": "drw-geometric-tolerance.dxf",
-    "bytes": 94329,
+    "bytes": 816549,
     "error": null,
-    "formatBefore": "DXF",
+    "formatBefore": "PDF",
     "fields": [
      {
       "label": "File name View export rules",
       "id": "drawing-export-filename-input",
-      "value": "Part 1 Drawing 1"
+      "value": "Part 1 Drawing 1 (3)"
      },
      {
       "label": "Format",
@@ -745,7 +816,7 @@
      {
       "label": "Text",
       "id": null,
-      "value": "Export as text"
+      "value": "Explode all into polylines"
      },
      {
       "label": "Units",
@@ -780,14 +851,14 @@
     "format": "DWG",
     "via": "dialog (tab › Export…)",
     "file": "drw-geometric-tolerance.dwg",
-    "bytes": 25663,
+    "bytes": 25917,
     "error": null,
     "formatBefore": "DXF",
     "fields": [
      {
       "label": "File name View export rules",
       "id": "drawing-export-filename-input",
-      "value": "Part 1 Drawing 1"
+      "value": "Part 1 Drawing 1 (3)"
      },
      {
       "label": "Format",
@@ -847,14 +918,14 @@
     "format": "PDF",
     "via": "dialog (tab › Export…)",
     "file": "drw-geometric-tolerance.pdf",
-    "bytes": 79730,
+    "bytes": 79056,
     "error": null,
     "formatBefore": "DWG",
     "fields": [
      {
       "label": "File name View export rules",
       "id": "drawing-export-filename-input",
-      "value": "Part 1 Drawing 1"
+      "value": "Part 1 Drawing 1 (3)"
      },
      {
       "label": "Format",

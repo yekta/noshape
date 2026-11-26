@@ -1,0 +1,84 @@
+{
+ "name": "drw-geometric-tolerance-edge-then-escape",
+ "about": "block-drawing: Geometric tolerance, hover and click the Front top edge (20,0,10), move over the view, Escape: nothing placed",
+ "area": "psui",
+ "source": "psui REQUESTS 11-26 12:24 (drw-geometric-tolerance)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Geometric tolerance"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   },
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "hover",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      30,
+      0,
+      20
+     ]
+    }
+   },
+   "ms": 400
+  },
+  {
+   "do": "hover",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      40,
+      0,
+      30
+     ]
+    }
+   },
+   "ms": 1200
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  }
+ ]
+}
