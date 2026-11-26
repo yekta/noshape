@@ -5,6 +5,7 @@
  "ticket": "DRAWING-UI-PARITY",
  "source": "coverage (lead 11-20: drawing types with 0-1 uses)",
  "start": "holes-plate-drawing",
+ "live_defects": [{"from_step": 4, "why": "Live refuses the Ø8 hole's centre (50, 30) as a third point; ours takes it (lead 11-23: live's failure, not a target)"}],
  "steps": [
   {
    "do": "click",

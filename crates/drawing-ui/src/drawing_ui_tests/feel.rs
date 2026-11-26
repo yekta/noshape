@@ -4947,7 +4947,7 @@ fn a_circle_centerline_click_takes_the_circles_top_quadrant(cx: &mut TestAppCont
     START.set(Some("holes-plate-drawing"));
     let (window, editor) = drawing(cx, "feel-cl-quadrant");
     real_sheet(cx, window, &editor);
-    let (at, top) = cx.update(|cx| {
+    let at = cx.update(|cx| {
         editor.update(cx, |e, _| {
             let (view, center, radius, mid) = e.built.as_ref()?.placements.iter().find_map(|pl| {
                 let g = e.geoms.get(&pl.id)?;
@@ -4960,9 +4960,11 @@ fn a_circle_centerline_click_takes_the_circles_top_quadrant(cx: &mut TestAppCont
                 })
             })?;
             let pl = e.placement(view)?;
-            Some((pl.to_sheet(mid), [center[0], center[1] + radius]))
+            let quads = [[radius, 0.0], [0.0, radius], [-radius, 0.0]].map(|d| pl.to_sheet([center[0] + d[0], center[1] + d[1]]));
+            Some((pl.to_sheet(mid), [center[0], center[1] + radius], quads))
         })
     }).expect("a hole's circle");
+    let (at, top, quads) = (at.0, at.1, at.2);
     cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::CircleCenterline { three: false, points: vec![] }, cx)));
     draw(cx, window);
     click_sheet(cx, window, &editor, at);
@@ -4972,6 +4974,16 @@ fn a_circle_centerline_click_takes_the_circles_top_quadrant(cx: &mut TestAppCont
     }).expect("the click is taken");
     assert!((first.p[0] - top[0]).abs() < 1e-9 && (first.p[1] - top[1]).abs() < 1e-9, "the top quadrant {top:?}: {:?}", first.p);
     assert!(matches!(first.r, Some(PointRef::Quadrant { k: 1, .. })), "kept as the quadrant: {:?}", first.r);
+    // Clicks on its right, top and left quadrant snaps take those: a 3 point circle centerline (live
+    // drw-centerline-circle-3-point).
+    let count = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).current_sheet().annotations.iter().filter(|a| matches!(a.kind, noshape_model::drawing::AnnotationKind::CircleCenterline { .. })).count());
+    let before = count(cx);
+    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::CircleCenterline { three: true, points: vec![] }, cx)));
+    draw(cx, window);
+    for q in quads {
+        click_sheet(cx, window, &editor, q);
+    }
+    assert_eq!(count(cx), before + 1, "a circle through the three quadrants");
 }
 
 mod states;

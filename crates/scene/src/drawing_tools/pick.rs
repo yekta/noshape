@@ -729,8 +729,10 @@ impl<'a> SheetPick<'a> {
     /// A circle centerline's click on a face-on circle: its top quadrant, unless the click is on its centre (live
     /// drw-dims-1123 centerline.md: ModeQuad points, the centre needs an exact click).
     pub fn circle_click_point(&self, s: [f64; 2]) -> Option<PickedPoint> {
+        // On its centre or one of its quadrant snaps: that point (live drw-centerline-circle-3-point: the right, top and
+        // left quadrants make the hole's circle).
         let snap = self.snap_at(s);
-        if snap.as_ref().is_some_and(|p| matches!(p.r, Some(PointRef::Center { .. }))) {
+        if snap.as_ref().is_some_and(|p| matches!(p.r, Some(PointRef::Center { .. } | PointRef::Quadrant { .. }))) {
             return snap;
         }
         if let Some((view, me)) = self.hovered_edge()
