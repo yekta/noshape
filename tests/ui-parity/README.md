@@ -686,7 +686,7 @@ Focus (lead 11-08): a `focus` with no text field ("none", or "other" on a button
 feature dialog's button or link, or a checkbox: live's Chrome focuses a clicked button, ours' buttons take no focus)
 equals another such; a text field's focus (an input, a
 textarea, a select, or ours' "other" with `text`) is compared as recorded. A scenario whose later steps depend on the
-clicked button holding the keyboard (Enter or Space re-activating it) is the exception: its recordings show it. After a click on a dialog's button (until the pointer acts again) ours' active query field (a selection box, no text) reads as live's focused button (`button_focused`; qa EXTRUDE-OPEN-SKETCH-FOCUS). A feature the take created and picked in the list has no owner in live's reader; ours' owner isn't compared there (`created_feature_owner`).
+clicked button holding the keyboard (Enter or Space re-activating it) is the exception: its recordings show it. After a click on a dialog's button (until the next click or key; waits and hovers move no focus) ours' active query field (a selection box, no text) reads as live's focused button (`button_focused`; qa EXTRUDE-OPEN-SKETCH-FOCUS). A feature the take created and picked in the list has no owner in live's reader; ours' owner isn't compared there (`created_feature_owner`).
 
 The Feature Studio's code editor holding the keyboard is live's Ace textarea, whose text is a piece around the
 caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).

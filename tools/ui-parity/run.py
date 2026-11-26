@@ -1467,11 +1467,12 @@ def compare(live, ours, whole_document=True):
             clicked = None
         if clicked:
             frame_late[f"step {s.get('step')}"] = clicked
-    # The steps since a click on a dialog's button, until the pointer acts again (button_focused).
+    # The steps since a click on a dialog's button, until the next click or key; a hover moves no focus
+    # (button_focused; mistake-extrude-open-sketch s17: the failing Extrude's row hovered after ✓).
     button_late, on_button = set(), False
     for s in steps:
         do = s.get("do") if isinstance(s.get("do"), dict) else {}
-        if do.get("do") not in ("wait",):
+        if do.get("do") not in ("wait", "hover"):
             on_button = do.get("do") == "click" and isinstance(do.get("on"), dict) and "button" in do["on"]
         if on_button:
             button_late.add(f"step {s.get('step')}")

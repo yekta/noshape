@@ -6215,6 +6215,7 @@ impl PartStudioView {
         let dialog = self.edit.as_ref().map(|e| e.dialog.clone());
         let type_name = self.edit.as_ref().map(|e| e.dialog.read(cx).ty.name).unwrap_or_default();
         let head = if needs_type_tag(&name, type_name) { format!("{name} [{type_name}]") } else { name.clone() };
+        let listed = name.clone();
         let row = crate::ui::tree_row("editing-placeholder", true)
             .debug_selector(|| "feature:new".into())
             .mr(px(5.))
@@ -6227,13 +6228,15 @@ impl PartStudioView {
                 None => crate::ui::tree_icon(&icon, false, cx).into_any_element(),
             })
             .child(div().flex_1().truncate().child(crate::ui::user_text(name)));
-        crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |cx| {
+        let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |cx| {
             match dialog.as_ref().and_then(|d| d.read(cx).title_status()) {
                 Some((FeatureStatus::Error | FeatureStatus::Warning, m)) => format!("{head} did not regenerate properly: {m}").into(),
                 _ => head.clone().into(),
             }
         })
-        .into_any_element()
+        .into_any_element();
+        // The parity suite hovers it by its name (mistake-extrude-open-sketch s17: the failing Extrude 1's row).
+        crate::ui_script::wrap(row, move || format!("feature:{listed}"))
     }
 
     fn render_rollback_bar(&self, index: usize, window: &Window, cx: &mut Context<Self>) -> AnyElement {
