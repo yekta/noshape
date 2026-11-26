@@ -1,26 +1,26 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 12:2x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 13:2x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf 11-26**: f8890c9d QUEUED 12:2x (cov2 Face blend 3 / asym side / partial chain start; tests in
-  features_a). Then QUEUED 12:5x: 9a9df3ee (P0: fold check only on edges bending tighter than twice their setback;
-  impeller Flansch 21 -> 6-7.5 s, Ansaugflansch 7.5 -> 4 s; T2 guard regen_profile::impeller_failing_fillets_stay_under_
-  their_budget, doc vibex7 ~/agents/core-keep/c2-impeller-loft.noshape) and 81343293 (qa P1 FILLET-R12-BLOCK-OVERFLOW:
-  convex line rounds taller than a planar face run past it, crossing ones fail as live's 40x20; test kernel_robustness::
-  a_round_taller_than_a_blocks_sides_runs_past_them_to_the_bottom, 8351.859 mm3). Tell qa when queued (done in report).
-- **FILL 1 (c2-body-draft-naming) PLAN (11-26 12:3x)**: live's Fill 1 = the 3 edges of Fillet 2's corner JSi (JSR on
-  JSO = Fillet 1's face, JSN on JSC = y-round, JSJ on JSe = z-round), G2; its area 121.9466 = live's corner face area, so
-  live's corner IS a fill of AB/BC/CA. All our faces but {JSC 211.865 (live 197.503), JSe 564.654 (550.292), corner
-  97.367 + sliver 0.169 (121.947)} already match live. Post-process (after the Boolean, like canal_corner): BC = the
-  UV-straight line on JSC' from B to C (live: x,z on the profile, y linear; check length 14.7414), CA likewise on JSe';
-  k::split_on(shape,[BC,CA]); flood from the corner' face, stopping at AB/BC/CA, drop that region; k::fill_surface(AB
-  G1/G2 JSO, BC JSC, CA JSe); k::sew(.., true); names as canal_corner (corner face = old corner's name). A, B = the
-  neighbours' contacts at the joints on the non-folding support; C = their fold-side contact lines' meeting point
-  (pinch_point in core-scratch/pinch-probe.patch). Hooks: compute A,B,C in sections()' pieces loop (folds[pi] with line
-  neighbours; `let nudge` ~l.1545), declared before the `ranges` loop like past_faces; run it before the final validity check.
+- **LANDING core-rf 11-26**: QUEUED 799ae65a 13:1x (6 commits: f8890c9d cov2 face blends, 9a9df3ee fold-check P0 + T2 guard
+  regen_profile::impeller_failing_fillets_stay_under_their_budget, 81343293 qa R12 overflow, handoffs, 1916587c4 Fill 1).
+- **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner (A, B, C in the pieces loop) + fill_pinched_corner (after the
+  unify): neighbours cut UV-straight A-C / B-C (14.7412 mm, live 14.7414), corner + sliver + run-ons dropped, rim filled as
+  our Fill does (G2 asked: OCCT plate declines "continuity is not G0 G1 or G2" -> fair_g1_fill), sewn, named by old faces.
+  body-draft: Fillet 2 12/27 as live, Fill 1 + Intersection curve 1 OK. Left: G1 fill 120.347 vs live's G2 121.947 mm2
+  (Fillet 2 38233.07 vs 38239.53); a fair G2 fill would fix both (our Fill feature too). T1 features_a::a_round_across_a_
+  tighter_rounds_end_folds_and_holds (3-sided corner, edge lengths, area band). Parity docs need a FRESH parity run
+  (references in save/ copies were matched to old geometry): .bd2.sh (ops parity_models NOSHAPE_PARITY_ONLY).
+- **BODY DRAFT 1 (lead 13:2x, committed + land.sh 13:3x; out: /root/core-scratch/land-bd.out)**: detail_a.rs body_draft: draftOnSelf errors only for the
+  Parts scope (live 2, 1664 d); Faces/Edges scope -> OK, part unchanged (live body-draft-naming Body draft 1: a side wall,
+  pull up). Test features_c::body_draft_as_live (faces + draft on self = 8000, 6 faces). `draft` filter 20 passed;
+  land.sh runs clippy. TODO: file a live capture request (block wall, Faces, Draft on self 5 deg:
+  status/volume) in live/REQUESTS.md to confirm.
+- **SCISSOR RUN**: .pa.sh n1126 (vibex7 ~/tmp/core/sc/pa-n1126.out, local /root/core-scratch/pa-n1126.out): then rank
+  BLEND-FAILS b-d (184ad0 F5, b7e381 F4, 9cbb0e F2).
 - **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
   11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
@@ -50,7 +50,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
   qa gaps-1125 models-report.json): each failure hits ONE document; order = own first difference first:
   (1) DONE (6ea74721): c2-surfaces-lofts-projected Face blend 2/3 (9 -> 18/45); next diff #18 Sweep 2 (sweep item);
-  (2) c2-body-draft-naming Fillet 2: LANDED 281ced578 (OK 280 ms). Fill 1 still fails: live's corner is 3-sided
+  (2) c2-body-draft-naming Fillet 2: LANDED 281ced578; Fill 1 DONE 1916587c4 (above). Old notes: live's corner is 3-sided
   (A (50.634,14.575,63.877), B (50.634,21.818,71.12), C (59.634,23.575,62.12)): the middle round (along Fillet 1's
   end curve on the right face, setback 9 > its 5.2 radius) PINCHES to C, where the neighbours' contact lines meet;
   BC / CA lie on the neighbours' extrusions (live's mid points: x,z (resp. x,y) on their profiles, the third

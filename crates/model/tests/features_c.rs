@@ -3075,6 +3075,15 @@ fn body_draft_as_live() {
     fails(run(false, &|p, _, _, _| p.set("bodies", ParamValue::Query(vec![]))), "Select parts to draft.", "bodies");
     fails(run(false, &|p, _, _, _| p.set("pullDirection", ParamValue::Query(vec![]))), "Body draft pull direction is invalid.", "pullDirection");
     fails(run(false, &|p, _, _, _| p.set("draftOnSelf", ParamValue::Bool(true))), "Selected parts could not be drafted.", "bodies");
+    ok(
+        run(false, &|p, r, _, _| {
+            p.set("selectionType", en("FACES"));
+            p.set("faces", q(face_at(r, 0, DVec3::new(mm(20.0), 0.0, mm(5.0)))));
+            p.set("draftOnSelf", ParamValue::Bool(true));
+        }),
+        8000.0,
+        6,
+    );
     fails(
         run(false, &|p, r, _, _| {
             p.set("selectionType", en("EDGES"));

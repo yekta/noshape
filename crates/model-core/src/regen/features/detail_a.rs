@@ -1133,9 +1133,13 @@ pub fn body_draft(ev: &mut EvalCtx) -> FResult<()> {
         return crate::regen::eval::err_at(&["pullDirection"], "Body draft pull direction is invalid.");
     };
     let pull = if ev.bool("flipPullDirection") { -pull } else { pull }.normalize();
-    // Live 2: a block drafted on itself fails on the selection.
+    // Live 2 and 1664 (d): parts drafted on themselves fail on the selection; faces drafted on themselves leave the part
+    // as it was, OK (c2-body-draft-naming's Body draft 1: a side wall, pull up).
     if ev.bool("draftOnSelf") {
-        return crate::regen::eval::err_at(&[field], "Selected parts could not be drafted.");
+        if field == "bodies" {
+            return crate::regen::eval::err_at(&[field], "Selected parts could not be drafted.");
+        }
+        return Ok(());
     }
     let Some(parting) = ev.query("partingObject").first().and_then(|r| ev.resolve_plane(r)) else {
         return crate::regen::eval::err_at(&["partingObject"], "Parting entity is invalid.");
