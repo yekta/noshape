@@ -8,11 +8,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 P0 scissor closed (11-26 15:36 UTC): no code regression; studios fetched 11-25 21:23 for Assembly 3, parity_assemblies
 didn't read imports/ (ac4efa6a queued; fddd23 0 diffs, bdddaf 1). 92138f/97ad5f leftovers told to core; qa told; lead
 answered again 16:28.
-In flight (uncommitted, one commit when fin.sh is green): SKETCH-MIRROR-PRESELECTED-CLICK (sketch.rs mirror_skips),
-SKETCH-OFFSET-NEGATIVE-DIMENSION (apply_dimension), SKETCH-Q-THEN-D-TOOL (construction_shown only with Select or a drawing
-tool), lead's Tangent first pick (assembly_view deliver_connector keeps mate_field_focus; ui_state lists Tangent's b as
-FACE + owner; T1 a_tangents_first_pick_keeps_the_field_focused_and_lists_its_entities). Scene sketch_mode:: and psui
-sketch:: green except the Mirror T1's fixed assertion (rerun in fin.sh with the assembly-ui tests). Then land.sh.
+Queued 16:40 UTC: e1fe3f14 (185542983: the 3 qa sketch tickets + lead's Tangent first pick, T1s green on vibex7).
+Uncommitted: TICKETS lines 29-32 were union-merge duplicates of fixed rows (dropped); commit + land after e1fe3f14.
+Queue empty but live waits: MEASURE-MAX-TIE (second tie take), the 1866 (d) retake, ASM-DRAG-REVOLUTE-ANGLE.
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
