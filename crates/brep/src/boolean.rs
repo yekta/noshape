@@ -5483,24 +5483,24 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching: Touching, src: Option<
                 }
             }
             // Going round (a thread's helical face): between its rulings at one angle, th0 there; those its loop runs
-            // up (along its parameters' v) are on the far side.
+            // up (along its parameters' v) are on the far side. (Other rulings inside it, as a thread's run-out notch:
+            // the angle where some run up and some down.)
             let Surf::Cyl { a, flip, r, .. } = cx.faces[f].s else { unreachable!() };
             let round = || -> Option<(f64, Vec<usize>)> {
                 let angle = |p: DVec3| (p - o).dot(y).atan2((p - o).dot(x));
                 let rulings: Vec<(usize, bool)> = cx.faces[f].edges.iter().copied().filter(|&(e, _)| cx.edges[e].g == Geo::Line).collect();
-                let &(e0, _) = rulings.first()?;
-                let th0 = angle(cx.p(cx.edges[e0].v[0]));
-                let at = |p: DVec3| ((angle(p) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= tol;
-                if rulings.len() < 2 || !rulings.iter().all(|&(e, _)| cx.edges[e].v.iter().all(|&w| at(cx.p(w)))) {
-                    return None;
-                }
                 let up = |(e, rev): (usize, bool)| {
                     let [v0, v1] = cx.edges[e].v;
                     let d = (cx.p(v1) - cx.p(v0)).dot(a) * if rev { -1.0 } else { 1.0 };
                     if flip { -d > 0.0 } else { d > 0.0 }
                 };
-                let right: Vec<usize> = rulings.iter().copied().filter(|&x| up(x)).map(|x| x.0).collect();
-                (!right.is_empty() && right.len() < rulings.len()).then_some((th0, right))
+                rulings.iter().find_map(|&(e0, _)| {
+                    let th0 = angle(cx.p(cx.edges[e0].v[0]));
+                    let at = |p: DVec3| ((angle(p) - th0 + PI).rem_euclid(TAU) - PI).abs() * r <= tol;
+                    let there: Vec<(usize, bool)> = rulings.iter().copied().filter(|&(e, _)| cx.edges[e].v.iter().all(|&w| at(cx.p(w)))).collect();
+                    let right: Vec<usize> = there.iter().copied().filter(|&x| up(x)).map(|x| x.0).collect();
+                    (!right.is_empty() && right.len() < there.len()).then_some((th0, right))
+                })
             };
             // (A gap of a rounding between a helix's ends a whole turn apart, within the tolerance (2.6e-8 rad on a
             // nut's thread turn: a gap there left both its rulings on one side): none, it goes round between them.)

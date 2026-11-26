@@ -3719,3 +3719,23 @@ fn a_cylinder_along_a_shelled_boxs_wall_fuses_through_its_corner_rounds() {
         assert!((v / volume - 1.0).abs() < 1e-7, "{case}: volume {v}, {volume} expected");
     }
 }
+
+/// c2-config-parts-screws: the thread's run-out face goes round with rulings at two angles (where it wraps, one up and
+/// one down, and its notch's inside it): the later fuses and cuts of the threaded part are ours (were declined "a
+/// cylinder face without curved edges", OCCT's 120-430 ms).
+#[test]
+fn a_threads_run_out_face_with_a_notch_ruling_goes_round() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    for case in ["ee3676ada5bc01b4", "83a40b8988a32682"] {
+        let c = k::bool_corpus::load(&dir, case).expect("the recorded Boolean");
+        k::set_rust_boolean_only(true);
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+        let why = k::last_rust_decline();
+        k::set_rust_boolean_only(false);
+        let r = r.unwrap_or_else(|e| panic!("{case}: noshape's Boolean declined: {why} ({e})"));
+        let v = r.shape.volume().unwrap();
+        assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-7 * c.summary.volume, "{case}: valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+        assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces, "{case}");
+    }
+}
