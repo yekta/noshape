@@ -70,38 +70,13 @@ docs/DECISIONS.md (read first; it wins over anything here).
    - copy-paste step 12 FIXED cf0c044af (a clicked, unmoved Transform arrow opens no "0 mm" box; T1
      a_clicked_transform_arrow_opens_no_box); vibe2 run22: scene lib ok, clippy ok, copy-paste 14/14 + menu-transform
      11/11. Landed with dc6768f9/9416858b (re-queued stack 11-26).
-   - fully-defined step 13: live's 2nd Dimension click at sketch (38,10) (screen 1212,537) picked the Right plane
-     (sel: line JFN + PLANE Right), waiting for placement; ours missed it (dimension_skips_plane: with picks, a
-     plane only within ~2 px of its outline, live dimplane-1122) and placed the line's length (box focused).
-     Geometry checks out: (38,10) is ~1.45 px from the Right plane's +y outline (75 mm half, iso camera, 0.275 mm/px),
-     inside the 2 px reach, and T1 sketch_hover_feel_tests::a_click_on_the_right_planes_outline_picks_it_for_the_
-     dimension asserts exactly this (passes). The scenario differs before it: d, click bottom line (15,0), place at
-     (15,-8), type 30, Enter, THEN (30,10), (38,10). Next: extend that T1 with the first dimension (typed 30, Enter)
-     and see what takes the click (pixel rounding 1.45 -> >2 px? the placed dimension's state? hover lag?). QUEUED 2ffe9497 (6 commits: 3a08ed5ef, e7fae29e2 had not
-   landed; workspace_tests.rs conflict = keep both tests): coincident, refusals, routing x5, offset, ver-protection,
-   mate-connector, fully-defined. Told lead (qa >200k): before 20, after 14/15 expected.
-   copy-paste FIXED (uncommitted, testing on vibex7 r21 + lib/clippy): cause = the line's glyph row (Show
-   constraints off, placed ~40 px off the line where the hover started) was still up under the second right-click: our
-   graphics kept hovering under the open menu (the approach to Copy crosses the line) and the hover only ended on the
-   pointer's return, so the row lingered onto the glyph. Fix sketch.rs: Hover/PointerMove ignored while context_menu is
-   open (live #context-menu-layer covers the page), and open_sketch_context_menu ends ed.hover (linger from open).
-   T1 a_right_click_where_a_copied_lines_glyphs_were_opens_the_sketch_menu (fails without the hover end). Then land,
-   tell the lead (qa id: roster, qa moved to a new thread).
-   Original item (lead 23:1x): use live's triage (live/REQUESTS.md "11-25 23:09"). 5 plane-* recordings
-   were stale (being re-recorded, abaedadb). The other 17 match live today, so they're OUR fixes, most-used first, each with a T1:
-   sketch-entity x4 (Hide rows done in b00920fe; check the rest), sketch-coincident-constraint, sketch-constraint-refusals,
-   sketch-fully-defined, sketch-offset, mate-connector-shift-lock-inference, routing-curve x5, ver-protection-enable.
-   Skip the 2 gusset ones (sheet metal). Then give qa the after count (qa id from roster; check agent_status first).
-   Interaction suite (lead 19:4x). DONE so far: sketch-entity-* Hide other/all sketches (rows only with another
-   sketch in the studio, live behaviours "qa4 r5 s6b" (5) + ctx-menus-1117 setup had Sketch 1). NEXT: plane-* (4) to
-   live/REQUESTS as stale (re-record), then sketch-coincident, constraint-refusals, fully-defined/offset focus, then report
-   before/after (before 20) to the lead.
-   Original notes: baseline run 1125-1501-c7944540 (qa-scratch/suites/<run>/uip.log, uip/*.json vs
-   tests/ui-parity/live/*.json): 20 PS+sketch failing (skip drw/sm/asm/docs/ver). Found: plane-* (4) = stale live
-   (recorder right-clicked the feature-list row at x 89; ours is the viewport menu = live 2255) -> REQUESTS re-record;
-   sketch-entity-* (4): ours adds "Hide other sketches / Hide all sketches" before Curve/surface analysis and lacks
-   Add comment (cloud): check live. Then sketch-coincident (VERTICAL vs PERPENDICULAR), sketch-constraint-refusals,
-   sketch-fully-defined/offset focus, mate-connector inference, gusset titleState, routing-curve Points field.
+   - fully-defined step 13 FIXED (sketch.rs PointerMove by_outline): with entities picked for a dimension, a move
+     re-resolves the plane outline whenever the GPU pick is a plane or nothing (it only did with an ellipse picked);
+     the runner glides in, so the GPU pick (own plane) stood from 2 mm short and the 1.32 px outline never lit. T1
+     a_click_on_the_right_planes_outline_... now follows the scenario (scale, 30 mm dimension, glide; fails without).
+     vibe2 r42: 83 hover/dimension/plane tests ok, clippy ok, 10 sketch-dimension scenarios 140/140.
+   dc6768f9 "failed" 06:05 = land daemon SIGTERM when skasm's push under it retried (no test failed); re-queued 2de8abe3.
+   Item 4 done: 15/15 expected once 2de8abe3 + the fully-defined fix land (qa to confirm).
 
 ## Agents
 
