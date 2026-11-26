@@ -747,6 +747,33 @@ def click_placed_readouts(a, b, pixel):
             y["value"] = x.get("value")
 
 
+def click_placed_points(a, b, pixel):
+    """A sketch's geometry placed by free `sketch_point` clicks: a coordinate off whole mm on both sides, within two screen
+    pixels on the sketch plane, reads as live's (the readouts' rule, [`click_placed_readouts`]: live's camera after Sketch
+    sits at a sub-pixel offset of its own; qa SKETCH-CLICK-OFFSET-EMPTY-TOP, 7 scenarios at (-0.275, +0.477) mm). Two, as
+    a measure between two clicks: a dimension then scales the others' offset with the sketch (mistake-sketch-dimension-
+    driven: width 40 typed, 0.477 → 0.62 mm in the height)."""
+    ga, gb = ((s.get("sketch") or {}).get("geometry") if isinstance(s, dict) else None for s in (a, b))
+    if not (pixel and isinstance(ga, list) and isinstance(gb, list) and len(ga) == len(gb)):
+        return
+    def key(g):
+        pts = g.get("points") if isinstance(g, dict) else None
+        return (str(g.get("kind")) if isinstance(g, dict) else "", [[round(c) for c in p] for p in pts or []])
+    ga.sort(key=key)
+    gb.sort(key=key)
+    def free(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and abs(v - round(v)) > 0.0005
+    for x, y in zip(ga, gb):
+        pa, pb = (x or {}).get("points"), (y or {}).get("points")
+        if not (isinstance(pa, list) and isinstance(pb, list) and len(pa) == len(pb)):
+            continue
+        for p, q in zip(pa, pb):
+            if isinstance(p, list) and isinstance(q, list):
+                for i, (u, w) in enumerate(zip(p, q)):
+                    if free(u) and free(w) and abs(u - w) <= 2 * pixel:
+                        q[i] = u
+
+
 def cloud_menu(a, b):
     """A menu that lost live's cloud-only rows ([`normalize_live`]): the row under a pointer that didn't move isn't
     compared (the shorter menu may fit where live's had to move under the pointer)."""
@@ -1754,6 +1781,7 @@ def compare(live, ours, whole_document=True):
         section_cut_point_read(a, b)
         placed_alike(a, b)
         click_placed_readouts(a, b, pixel)
+        click_placed_points(a, b, pixel)
         cloud_menu(a, b)
         drawing_menu_hover(a, b)
         menu_badges(a, b)

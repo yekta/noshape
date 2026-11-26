@@ -678,7 +678,7 @@ at a sub-pixel offset of its own, so the same pixel lands up to a pixel away in 
 that step projected along the view onto the plane (`pixel_on_plane`; a plane seen at a slant stretches one screen axis,
 and the larger axis counts: 0.55 mm on Top in the default isometric view at mmPerPixel 0.275), doubled for a measure
 between two clicks (a length, a distance, a diameter: all the readouts so far). Without a default plane (a face) it is
-mmPerPixel. A whole-mm value on either side (a snapped or typed one) stays exact (`click_placed_readouts`). Undo / Redo before a step that only waits is compared with live's at that wait: live's history answers after its server's round trip (context-create-version-update), ours at once. Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>". Live's
+mmPerPixel. A whole-mm value on either side (a snapped or typed one) stays exact (`click_placed_readouts`). The points of a sketch's geometry placed by those clicks are equal within two such pixels per coordinate, off whole mm on both sides (`click_placed_points`; qa SKETCH-CLICK-OFFSET-EMPTY-TOP: a dimension typed later scales the offset with the sketch). Undo / Redo before a step that only waits is compared with live's at that wait: live's history answers after its server's round trip (context-create-version-update), ours at once. Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>". Live's
 menus lose the rows of cloud features noshape leaves out ("Add comment", "Create task…"); a menu that lost one is a row shorter, so it
 may fit where live's had to move under the still pointer: its highlighted row isn't compared (face-rclick-menu).
 
