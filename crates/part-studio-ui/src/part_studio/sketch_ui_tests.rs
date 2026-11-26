@@ -10560,3 +10560,49 @@ fn mirror_with_a_selected_circle_takes_the_plane_behind_it_as_the_line(cx: &mut 
         assert!(ed.selection.is_empty(), "nothing left selected");
     });
 }
+
+/// Live mistake-sketch-mirror-no-line s11 (the real app's pick, ours-1126 20:3x): on the selected circle's rim the GPU's
+/// pick past the circle found the circle's own region inside it, which lit and took the click (no mirror). The region is
+/// no mirror line either: the pick passes over it to what lies behind (live: the Front plane).
+#[gpui::test]
+fn mirror_before_its_line_passes_over_the_sketch_region(cx: &mut TestAppContext) {
+    use noshape_sketch::EntityKind;
+    let (window, view) = sketch_with(cx, "mirror-region-behind", Tool::Circle);
+    let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
+    for q in [mm(20., 10.), mm(25., 10.)] {
+        let p = on_screen(cx, &view, q);
+        click(cx, window, &view, (p.x, p.y));
+    }
+    let circle = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().find(|e| e.kind() == EntityKind::Circle).map(|e| e.id)).expect("the circle");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.activate_tool(Tool::Select, w, cx);
+            v.sketch.as_mut().unwrap().selection = vec![circle];
+            v.activate_tool(Tool::Mirror, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let region = cx.update(|cx| {
+        let v = view.read(cx);
+        let feature = v.sketch.as_ref().unwrap().feature;
+        let shown = v.display.sketches.iter().find(|s| s.feature == feature).expect("the open sketch shown");
+        let r = Reference::SketchRegion { sketch: feature, key: shown.regions.first().expect("the circle's region").key.clone() };
+        v.built.as_ref().and_then(|b| b.picks.ids_for(&r).first().copied()).map(|id| (r, id))
+    });
+    let (region, id) = region.expect("the region's pick");
+    let at = on_screen(cx, &view, mm(25., 10.));
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            let m = Modifiers::default();
+            for ev in [ViewportEvent::PointerMove { position: at, modifiers: m }, ViewportEvent::Hover(Some(id))] {
+                v.on_viewport_event(&vp, &ev, w, cx);
+            }
+        })
+    })
+    .unwrap();
+    let hover = cx.update(|cx| view.read(cx).hover.clone());
+    assert_ne!(hover, Some(region), "the circle's region is no mirror line");
+    assert!(!matches!(hover, Some(Reference::SketchEntity { .. })), "nor the circle: {hover:?}");
+}

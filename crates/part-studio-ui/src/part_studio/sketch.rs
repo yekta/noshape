@@ -920,9 +920,11 @@ impl PartStudioView {
         if ed.tool == Tool::Trim {
             return self.trim_pick_at(p, cx).and_then(pick_of).or_else(|| id.filter(|i| own(*i).is_none()));
         }
-        // Mirror before its line: a line in reach, else what lies behind the sketch's other entities.
+        // Mirror before its line: a line in reach, else what lies behind the sketch's other entities and its regions (live
+        // mirror-no-line s11: on the selected circle's rim the Front plane behind it lit, not the circle's inside).
         if ed.tool == Tool::Mirror && !ed.has_mirror_axis() {
-            let skip = |i: u32| own(i).is_some_and(|e| self.mirror_skips(e, cx));
+            let region = |i: u32| built.picks.get(i).is_some_and(|t| matches!(&t.reference, Reference::SketchRegion { sketch, .. } if *sketch == ed.feature));
+            let skip = |i: u32| own(i).is_some_and(|e| self.mirror_skips(e, cx)) || region(i);
             let near = self.sketch_pick_at(p, cx).filter(|e| !self.mirror_skips(*e, cx)).and_then(pick_of);
             return near.or_else(|| match id {
                 Some(i) if skip(i) => vp.pick_at_pointer_without(&skip).flatten(),

@@ -3,14 +3,9 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 18:06 UTC) — read first
+## RESUME HERE (11-26 20:5x UTC) — read first
 
-Queued 18:06 UTC: 1b4189ea (8 commits: 39897f2b's work + 207ce53e7). 207ce53e7: (1) 1866 (d): a Line started ON a held
-line anywhere off its midpoint is Perpendicular + Coincident (inference.rs square_near: the on-line exclusion gone; a
-start at the line's own end stays Vertical, sketch-line-chain); T1s scene `a_line_up_from_a_held_line_off_its_midpoint_is_perpendicular`,
-sketch `square_to_a_held_line_from_its_midpoint_is_perpendicular` updated; interaction-feel Perpendicular row rewritten.
-11-19 trim scenarios start 10 mm off the line: unaffected. (2) ERR-SM-BEND-RANGE: range tips cut bounds to 3 digits
-(feature_dialog.rs bound_digits). part-studio-ui sketch tests 595/0 on vibex7.
+207ce53e7 (1866 d Perpendicular + ERR-SM-BEND-RANGE) LANDED as 190bd1b8d, main green.
 SKETCH-ISO-ORIGIN-ALIGN: no inference bug (T1); psui takes the replay approach fix (their 1e9efbed7).
 MEASURE-MAX-TIE: live 17:16 says no geometric rule (kernel vertex order): closed as note, nothing to match.
 ASM-DRAG-REVOLUTE-ANGLE: live 16:45 confirms the pin turns AGAINST the pointer (+20/+40/+80/−40/148−8 px →
@@ -23,10 +18,15 @@ IN FLIGHT (lead 18:0x: translator side of the 11-26 corpus refills): 27 refilled
 run on vibex7 (bin/corp.sh; ~/tmp/skasm/corp/models.log): 14/27 to the end. Translator: prize-wheel-tim Sketch 3 (new
 refs.jsonl gives its plane, a mate connector at Hole 1's tip, as a point BODY -> went to Part 1, "Select a sketch plane."):
 UNCOMMITTED fix in crates/ops/src/parity.rs (connector_known_only_as_a_body + T1 a_connector_query_live_gives_as_a_body_stays_by_its_text),
-rerun bin/corp2.sh -> ~/tmp/skasm/corp/models2.log. Next: c2-surf-intro-ruled Ruled surface 1 box (x -8.7..0 vs live
+T1 passes; rerun bin/corp3.sh (models only) -> ~/tmp/skasm/corp/models2.log, started 20:27. Next: c2-surf-intro-ruled Ruled surface 1 box (x -8.7..0 vs live
 -0.05..23.9: a wrong edge?) after the Tail Fin spline area (1.2e-5, old). Others to core/bool: nuts Sweep 1, screws Move
 face 3, gamma/wire-clip Boolean 2 (imported), hunting-knife Split 4, impeller Fillet 3, parting-line Rib 1, surf-intro-offset
 Offset, knifehandle Mutual trim. Report the count moved to the lead.
+
+IN FLIGHT 2: mirror-no-line s11 still differs on green 20:13 (e709bc2d1's T1 fed the plane's pick directly). The real
+pick past the selected circle found the circle's own REGION; fix (UNCOMMITTED): sketch.rs sketch_hover_id's Mirror skip
+also passes over the open sketch's regions; T1 sketch_ui_tests mirror_before_its_line_passes_over_the_sketch_region.
+Check: bin/uip2.sh both mirror-no-line scenarios (empty-click already matched on green).
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
