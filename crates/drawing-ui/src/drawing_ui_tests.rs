@@ -682,9 +682,10 @@ fn a_radius_placed_near_the_centre_has_its_text_halfway_out(cx: &mut TestAppCont
         }).expect("a view showing the hole")
     });
     let at = |cx: &mut TestAppContext, d: [f64; 2]| {
-        cx.update(|cx| editor.update(cx, |e, cx| {
+        cx.update(|cx| editor.update(cx, |e, _| {
+            // (Assigned: choosing Radial dimension again would end it.)
             let pick = e.circle_pick([center[0] + radius, center[1]]).expect("the hole's circle");
-            e.set_tool(Tool::Dimension { kind: DimTool::Radius, picks: vec![pick] }, cx);
+            e.tool = Tool::Dimension { kind: DimTool::Radius, picks: vec![pick] };
             e.cursor = [center[0] + d[0] * radius, center[1] + d[1] * radius];
             e.pending_annotation().expect("the radius preview").position
         }))
