@@ -121,6 +121,16 @@ pub fn open_for_page(paths: Vec<PathBuf>, on_import: noshape_start_ui::start_hoo
     );
 }
 
+/// Whether the dialog drops Join adjacent surfaces, and whether it shows the Units select. Mesh files and PVZ (imported
+/// as meshes) have no Join (live "qa5 zip import": PVZ shows appearances, Y up and composite only); any STL or OBJ
+/// brings Units, and with it no Join, beside a B-rep file too (live qa/dl-bracket-1125: STEP + STL).
+fn mesh_options(paths: &[PathBuf]) -> (bool, bool) {
+    let ext = |p: &PathBuf| p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let units = paths.iter().any(|p| ["stl", "obj"].contains(&ext(p).as_str()));
+    let mesh = !paths.is_empty() && paths.iter().all(|p| ["stl", "obj", "3mf", "pvz"].contains(&ext(p).as_str()));
+    (mesh || units, units)
+}
+
 /// What Import does with the options.
 type OnOk = Rc<dyn Fn(Choice, &mut Window, &mut App)>;
 
@@ -129,10 +139,8 @@ fn show(paths: Vec<PathBuf>, page: bool, join: bool, on_ok: OnOk, window: &mut W
     // Native part files get Onshape's five-checkbox variant, mesh files
     // theirs (see the module docs).
     let all_of = |kinds: &[&str]| !paths.is_empty() && paths.iter().all(|p| p.extension().is_some_and(|e| kinds.contains(&e.to_string_lossy().to_lowercase().as_str())));
-    let (native, stl, obj) = (all_of(NATIVE_PARTS), all_of(&["stl"]), all_of(&["obj"]));
-    // Mesh files and PVZ (imported as meshes) have no Join adjacent surfaces
-    // (live "qa5 zip import": PVZ shows appearances, Y up and composite only).
-    let (mesh, units_select) = (all_of(&["stl", "obj", "3mf", "pvz"]), stl || obj);
+    let (native, stl) = (all_of(NATIVE_PARTS), all_of(&["stl"]));
+    let (mesh, units_select) = mesh_options(&paths);
     // Import material density: Onshape's own file-type list, when any file
     // is one (not STEP, SAT or PVZ; qa4 IMP-DENS).
     let density = noshape_ops::import::offers_material_density(&paths);
@@ -472,6 +480,18 @@ mod tests {
         assert_eq!(super::failed_toast("bad.step uploaded but failed to translate."), "bad.step uploaded but failed to translate.");
         assert_eq!(super::import_name("bad.step uploaded but failed to translate.").as_deref(), Some("bad.step"));
         assert_eq!(super::failed_toast("Something else"), "Something else");
+    }
+
+    #[::core::prelude::v1::test]
+    fn an_stl_beside_a_step_brings_units_and_drops_join() {
+        let o = |names: &[&str]| super::mesh_options(&names.iter().map(std::path::PathBuf::from).collect::<Vec<_>>());
+        // (no Join, Units)
+        assert_eq!(o(&["bracket.step", "bracket.stl"]), (true, true));
+        assert_eq!(o(&["bracket.step"]), (false, false));
+        assert_eq!(o(&["bracket.stl"]), (true, true));
+        assert_eq!(o(&["a.obj", "b.STL"]), (true, true));
+        assert_eq!(o(&["a.3mf"]), (true, false));
+        assert_eq!(o(&["a.pvz", "b.step"]), (false, false));
     }
 
     #[::core::prelude::v1::test]
