@@ -3,24 +3,29 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 10:20 UTC) — read first
+## RESUME HERE (11-26 11:42 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
-> ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &).
+> ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &). Speed T2: sp3.sh (sp4.sh = same with SKTRACE, trace code removed).
 
-LANDED 8efe6acf. 93a23c55 (GLYPH-CIRCLE lone glyph, inference-1866 test, LabelHover label fix) queued 09:00 (lead reports).
-Landing now: 9b5dc85d9 speed T2 fix (the frame-label LabelHover and the label div yield to a picked sketch point; a dim
-line hover gives way to own geometry; S50 run 3 was the label hovered AFTER the pick reached the corner). Speed T2
-passes: S50 release 13.9 ms median (live 654), move 13.9, typed 22.8; S200 35.5 / 16.6 / 25.8 (live 1049 / - / 758);
-worst moves 712 / 377 ms (first drag). e41979117: hovered pattern glyph lights its construction line orange; drag-onto-
-line 7/9 px test. GLYPH-CIRCLE taken spot: not pinned, left as is (TICKETS note, /root/skasm-scratch/glyph/taken.py).
+Landed/queued: 93a23c55, 94a0764c (label hover fix, pattern line orange, drag-onto-line test). Landing now: 071c6853f.
+
+First-drag P0 (lead 11-26): the 712 / 377 ms "first moves" were the test's own wait for the hover pick readback (120-260
+ms on the software renderer, off the UI thread), not the drag. Traced begin_drag (refresh_analysis + drag_graph): 0.25 ms
+cold on the first press, <= 0.28 ms at 399 entities, so no background warm-up was added. latency_tests now times a move
+to its first drawn frame (timed_frame) and asserts the first move <= 54 ms: S50 move 11.2 median / 35.1 worst, S200 11.7 /
+24.1. Watch: one run showed S200 "width typed + Enter" 168 ms median (earlier runs 20-26 ms); rerun before calling it.
 
 Sketch feel-coverage audit: 221 sketch sections in behaviours.md, 126 cited by code (/root/skasm-scratch/audit-sections.txt),
-95 not. Checked 12: 9 covered under other names; gaps fixed/tested: inference-1866 (f469d778b), user-P1 snapping
-(drag onto a line 7/9 px test), icons2 glyph colours (pattern construction line orange, e41979117). Next in the list:
-"sketch value boxes: Tab", "polygon side count", "Copy/paste inside a sketch", "spline end handle arm (2187)",
-"len-2022", "search-2025", "Extend in Top view (2992)", "big-sketch-1119". psui-owned rows skipped.
+95 not. Checked 13: gaps fixed/tested: inference-1866 (f469d778b), drag onto a line 7/9 px, pattern construction line
+orange (e41979117), polygon side count radial/Enter/Esc (071c6853f; Esc with clicks ends the tool, as every tool).
+Next: "which click is a vertex", "polygon commits, exact constraint sets", "Copy/paste inside a sketch", "len-2022",
+"search-2025", "Extend in Top view (2992)", "big-sketch-1119". psui-owned rows skipped.
+
+qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
+lora-enclosure-ribs 46/46 MATCH); Assembly 3 numbers pending (qa-tr4). Driver fix ada3263b: asm-face-menu/fastened 9/10;
+only asm-face-menu-select-other differs (no Select other popup in assemblies; asm's, routed to the lead by qa).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
