@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 08:10 UTC) — read first
+## RESUME HERE (11-26 10:20 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -17,10 +17,17 @@ differs from the part's; boolean.cpp same_torus + share_bspline_surfaces groups 
 round trip on vibex7: all 22 live.igs match live (were 16 diffs); STEP/x_t 49/50, c2-rings-loft STEP 762 vs 767 edges
 predates this (same with the colour rule off). Lead told 07:10. Main RED 78dea5ae7 = ops parity a_face_* (flaky, not mine).
 
-LANDED 8efe6acf (Parasolid, replicate order, IGES torus/colour). LANDING 09:00: e674ed802 GLYPH-CIRCLE lone glyph (38.5 px
-at right angles to the pointer, upper side; gl5 within 5°; taken spot keeps the old left row, ticket open), f469d778b
-(inference-1866 test), 43369c763 (a point under a hovered dimension label takes the hover: the speed T2's S50 run 3 found
-nothing lit, hover_constraint = the width's label). Speed T2 rerun b4zlou463 (sp.sh) after it.
+LANDED 8efe6acf. QUEUED 93a23c55 (09:00, 7 commits: GLYPH-CIRCLE lone glyph 38.5 px at right angles to the pointer,
+upper side; inference-1866 test; a point under a hovered label (ViewportEvent::LabelHover path) takes the hover). Lead told.
+
+Speed T2 (sp.sh, vibex7, sp-full.log there) STILL FAILS: S50 run 3, the corner not lit: hover_constraint = 14 while the
+GPU pick (62) is already the corner, so sketch_hover never reruns. UNCOMMITTED in the worktree: (a) the dim label div's
+on_hover records ui.label_hover and yields to a picked sketch point; (b) sketch_hover clears a dimension LINE hover
+(ui.dim_line_hover) when own geometry is picked; T1 a_point_under_a_hovered_label_takes_the_hover extended (passes);
+(c) latency_tests.rs:752 diagnostic prints constraint 14's kind, label_hover, dim_line_hover, glyph_under, pointer vs s0px.
+Run bpbks8af6 has that diagnostic: read `ssh vibex7 'grep -n panicked -A3 ~/tmp/skasm/sp-full.log | cut -c1-900'`, find
+which path sets 14 (and keep only the needed parts of (a)/(b)), fix it there, rerun sp.sh, then commit + land with the
+speed table.
 
 Sketch feel-coverage audit (started 08:15): 221 sketch sections in behaviours.md, 126 cited by code (script
 /root/skasm-scratch/audit-sections.txt; key = capture dir / ticket id / title, case-insensitive), 95 not. Spot-checked 9
