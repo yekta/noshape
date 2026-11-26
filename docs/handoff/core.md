@@ -1,11 +1,11 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 15:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 15:54 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf 11-26**: 2b8aa8ed LANDED 15:11. QUEUED 15:5x: 56131f3c (9cbb0e MF2, b58244 MF6, tweak trim fix) + be8307ce4 (speed: inside-out fillet repaired before the retries; tool_only seed re-runs).
+- **LANDING core-rf 11-26**: 2b8aa8ed LANDED 15:11. QUEUED 0b615541 15:54: 56131f3c (9cbb0e MF2, b58244 MF6, tweak trim fix) + be8307ce4 (speed: inside-out fillet repaired before the retries; tool_only seed re-runs).
 - **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
   fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
   need a FRESH parity run (save/ copies keep old references): .bd2.sh.
@@ -33,8 +33,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   x 59 end face; the input = live (73840.04 vs .83). Ours "Hole creates invalid geometry": the profile shows only the ray
   common (boolean.rust) and op_revol, no cut recorded or OCCT build: looks like the own Boolean's cut errors with no
   fallback. Handed to bool: vibex7 ~/agents/core-keep/hole2-bool (README, mode 600 copy).
-  (c) 9cbb0e Fillet 18 (r 0.8, 8 edges, tangent prop; live Foot 95 -> 141 faces, 64657.765 -> 64650.834): next; then
-  Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  (c) 9cbb0e: Foot = live through Fillet 7 (64907.55); Fillet 8 -0.017, Fillet 12 -0.017; FILLET 17 is the first real
+  diff: r 8 on ONE line edge (x -15.54, z -27.68 mm, along y, 16 mm), live 79 -> 80 faces / -154.8 mm3, ours 79 -> 83 /
+  -250.7 (vibex7 ~/tmp/core/sc/foot-live.txt; dump ~/agents/core-keep/f17-9cbb0e/fillet-16.brep+txt = edge 177 r 0.008).
+  NEXT. Then Fillet 18 (r 0.8 x 8, fails), 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
   surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
