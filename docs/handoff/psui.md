@@ -91,14 +91,22 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## P0 (lead 11-26 06:5x): assembly hover in combined states
 - Live answered (live/psui/asm-hover-combined-1126, behaviours "Assembly hover in combined states"); the table in
   interaction-feel.md "Combined states in an assembly" has live / ours / status per cell.
-- T1s: assembly_feel_tests.rs end (combined_hover_on_a_selected_instance, combined_hover_through_faded_and_hidden_instances,
-  combined_hover_while_editing_an_exploded_view; stacked_blocks = Part 2 moved onto Part 1) and hover_matrix_tests.rs
+- T1s: assembly_feel_tests.rs (combined_hover_*, a_hidden_instances_hovered_row_outlines_it,
+  a_re_hovered_second_pick_shows_plain, a_selected_instances_hovered_face_lights_its_boundary,
+  after_an_explode_step_its_instance_stays_selected_and_unlit_under_the_pointer) and hover_matrix_tests.rs
   combined_hover_mate_connector_in_a_mate_dialog. add_exploded_view refits the camera and the Explode panel narrows the
-  test viewport to 249 px: fit_top after it.
-- Fixed (this commit): Alt no longer makes Isolate / Make transparent ghosts pickable (alt_through removed), as live (5).
-- Open, in order (TICKETS P0 rows): ASM-HIDDEN-ROW-HOVER-OUTLINE (outline-only state for a hidden instance: asm_scene
-  skips hidden occurrences, the shaders discard HIDDEN), ASM-MATE-PICKED-FACE-HOVER, ASM-SELECTED-HOVER-LOOK (crop
-  compare + the grey arrow), ASM-EXPLODE-STEPPED-HOVER; mate preview (4) ours still to check.
+  test viewport to 249 px: fit after a settle; clicks at the viewport's top 8 % land on the edit banner.
+- Fixed 11-26 (07:1x) Alt no longer picks Isolate / Make transparent ghosts; (08:2x) the 4 P0 rows:
+  hidden row hover outline (`asm_scene::outline_hidden`: the hidden instance's mesh under one HIDDEN|HOVER|OUTLINE state
+  slot at picks.len()+1, overlay ids moved up by one; fs_hover_mask keeps HIDDEN), a re-hovered second mate pick plain,
+  a selected part's hovered face boundary #ffc368 (BODY_HOVER_EDGE), explode edit: the selected instance unlit under the
+  pointer and an empty click keeps the selection.
+- Open: ASM-SELECTED-HOVER-LOOK's arrow (ours: whole triad, hovered handle flat #3e94ff; live c1a shaded #638abf):
+  live REQUESTS psui 11-26 08:20. Mate preview cell (4) (moved part's face / the part under it): ours still to check;
+  in a_re_hovered_second_pick_shows_plain the moved part covered Part 1's top and the pointer there found nothing or
+  its edge. Explode before a step: live's hover outline #ffc685 vs ours to compare.
+- NEXT: full run (assembly-ui + scene + render tests, clippy) was in flight at 08:25: /root/psui-scratch/asmhover/p4.out
+  (rerun: rb.sh with p4.sh). Green: land (commits ready); red: fix first. Then report rows 1-4 to the lead.
 - 11-26 07:2x the psui worktree directory was gone (branch agent/psui intact at 54dbd7bc0); recreated with
   `git worktree add /root/projects/noshape-wt/psui agent/psui`.
 
