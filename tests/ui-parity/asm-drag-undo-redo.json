@@ -1,0 +1,44 @@
+{
+ "name": "asm-drag-undo-redo",
+ "about": "two-blocks: drag Part 2 by its top, then Ctrl+Z (one drag back) and Ctrl+Y",
+ "area": "skasm",
+ "source": "live behaviours '3D manipulator drags' (qa MANIP-DRAG)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "to": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+y"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

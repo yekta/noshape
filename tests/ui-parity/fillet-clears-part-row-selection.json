@@ -1,0 +1,29 @@
+{
+ "name": "fillet-clears-part-row-selection",
+ "about": "block: Part 1 selected in the Parts list, then Fillet: the selection is cleared and the field stays empty; Escape",
+ "area": "psui",
+ "source": "live psui/hover-combined-1125 (behaviours 'hover in combined states')",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

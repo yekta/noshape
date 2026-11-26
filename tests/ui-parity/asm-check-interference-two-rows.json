@@ -1,0 +1,45 @@
+{
+ "name": "asm-check-interference-two-rows",
+ "about": "two-blocks: both rows selected, row menu Check interference…: the dialog's chips and 'No interferences'; Escape",
+ "area": "skasm",
+ "source": "live behaviours 'First-week assembly gaps' (qa ASM-FIRST-WEEK-*)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Check interference…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "asm-list-row-click-adds",
+ "about": "two-blocks: click Part 1 <1>'s row, then Part 2 <1>'s: the second click adds to the selection",
+ "area": "skasm",
+ "source": "live behaviours 'First-week assembly gaps' (qa ASM-FIRST-WEEK-*)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  }
+ ]
+}

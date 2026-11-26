@@ -1,0 +1,31 @@
+{
+ "name": "mistake-asm-delete-mated-instance",
+ "about": "pin-block: delete the pin Part 2 <1>: Revolute 1 goes with it, no prompt; Ctrl+Z restores both",
+ "area": "skasm",
+ "source": "live behaviours 'First-hour mistakes, batch 3' (qa MISTAKES-3)",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

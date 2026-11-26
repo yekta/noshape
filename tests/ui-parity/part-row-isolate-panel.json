@@ -1,0 +1,33 @@
+{
+ "name": "part-row-isolate-panel",
+ "about": "block: Part 1's row menu › Isolate…: the Isolate panel and its controls; Escape",
+ "area": "psui",
+ "source": "live behaviours 'First-week gaps' (qa FIRST-WEEK-*)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Isolate…"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

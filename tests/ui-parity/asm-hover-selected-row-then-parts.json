@@ -1,0 +1,46 @@
+{
+ "name": "asm-hover-selected-row-then-parts",
+ "about": "two-blocks: Part 2 <1> selected by its row; hover its top, then Part 1's top: the selection stays",
+ "area": "psui",
+ "source": "live psui/asm-hover-combined-1126 (behaviours 'Assembly hover in combined states')",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "empty": true
+   },
+   "ms": 1500
+  }
+ ]
+}

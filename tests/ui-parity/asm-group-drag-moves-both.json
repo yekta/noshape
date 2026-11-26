@@ -1,0 +1,70 @@
+{
+ "name": "asm-group-drag-moves-both",
+ "about": "two-blocks: Part 1 unfixed, Group of both rows, ✓; dragging Part 2's top moves both by the same vector",
+ "area": "skasm",
+ "source": "live behaviours 'First-week assembly gaps' (qa ASM-FIRST-WEEK-*) 2",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unfix"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Group"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "to": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

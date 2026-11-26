@@ -1,0 +1,52 @@
+{
+ "name": "mistake-asm-fastened-same-instance",
+ "about": "two-blocks: Fastened with both picks on Part 2 <1> (top, then right side), Enter: the mate's red row, its tooltip",
+ "area": "skasm",
+ "source": "live behaviours 'First-hour mistakes, batch 3' (qa MISTAKES-3)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fastened mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     80,
+     10,
+     5
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "mate": "Fastened 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

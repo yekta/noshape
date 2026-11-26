@@ -1,0 +1,1597 @@
+{
+ "scenario": "asm-measure-face-cylinder-panel",
+ "recorded": "2026-11-26T08:23:25.254Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "01c29f1a44f6655314fe88d0",
+  "start": "pin-block-apart",
+  "startElement": "053ebdbfbec70e9ea2ad6480",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start pin-block-apart asm Copy 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    15.034,
+    12.932,
+    6.379
+   ],
+   "eye_mm": [
+    48.121,
+    -44.377,
+    44.585
+   ],
+   "width_mm": 127.984,
+   "height_mm": 67.779,
+   "mmPerPixel": 0.0765,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      20,
+      0,
+      10
+     ],
+     "instance": "Part 1 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 28337,
+   "tmove": 28997,
+   "moves": 1,
+   "hover": [
+    "JHO"
+   ],
+   "tdown": 30296,
+   "at": [
+    1054,
+    567
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Area",
+       "value": "800.000",
+       "units": "mm2"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 32632,
+   "te": 32632
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      65,
+      0,
+      15
+     ],
+     "instance": "Part 2 <1>"
+    }
+   },
+   "ok": true,
+   "ti": 32632,
+   "tmove": 33167,
+   "moves": 1,
+   "hover": [
+    "JKC"
+   ],
+   "tdown": 34482,
+   "at": [
+    1564,
+    658
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 2",
+       "id": "JKC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      50.955,
+      -49.286,
+      47.857
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Min dist",
+       "value": "35.000",
+       "units": "mm"
+      },
+      {
+       "name": "Center axes dist",
+       "value": "40.000",
+       "units": "mm"
+      },
+      {
+       "name": "Max dist",
+       "value": "58.071",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 36853,
+   "te": 36853
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 36853,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 2",
+       "id": "JKC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      50.955,
+      -49.286,
+      47.857
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Min dist",
+       "value": "35.000",
+       "units": "mm"
+      },
+      {
+       "name": "Center axes dist",
+       "value": "40.000",
+       "units": "mm"
+      },
+      {
+       "name": "Max dist",
+       "value": "58.071",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 40599,
+   "te": 40599
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "["
+   },
+   "ok": true,
+   "ti": 40599,
+   "pointer": {
+    "at": [
+     1563,
+     657
+    ],
+    "hover": [
+     "JKC"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 40606,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Select entities to measure"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Measure",
+     "text": [
+      "Select entities to measure",
+      "Face of Part 1 <1>",
+      "×",
+      "Face of Part 2 <1>",
+      "×",
+      "Measure type:",
+      "Length unit:",
+      "Angle unit:",
+      "[ ] Reference coordinate system",
+      "Reference coordinate system",
+      "Min dist:",
+      "35.000",
+      "mm",
+      "35.000",
+      "mm",
+      "0.000",
+      "mm",
+      "0.000",
+      "mm",
+      "Area:",
+      "1742.478",
+      "2",
+      "Center axes dist:",
+      "40.000",
+      "mm",
+      "-40.000",
+      "mm",
+      "0.000",
+      "mm",
+      "0.000"
+     ],
+     "fields": [
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Reference coordinate system",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "measure-dialog",
+      "title": "Measure",
+      "text": "Measure / Select entities to measure / Face of Part 1 <1> / × / Face of Part 2 <1> / × / Measure type: / Show all / Position / Center position / Min distance / Max distance / Length / Diameter / Radius / Angle / Face tangent angle / Curvature deviation / Surface area / Length unit: / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Angle unit: / Degree / Radian / Reference coordinate system / Min dist:35.000mm / 35.000mm / 0.000mm / 0.000mm / Area:1742.478mm2 / Center axes dist:40.000mm / ",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 2",
+       "id": "JKC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [],
+     "panel": {
+      "selection": [],
+      "items": [
+       {
+        "name": "Min dist",
+        "value": "35.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XLinearLimitMin",
+        "value": "35.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-YLinearLimitMin",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-ZLinearLimitMin",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "Area",
+        "value": "1742.478",
+        "units": "mm2"
+       },
+       {
+        "name": "Center axes dist",
+        "value": "40.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XYZ-Icons-AlongX",
+        "value": "-40.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XYZ-Icons-AlongY",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XYZ-Icons-AlongZ",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "Max dist",
+        "value": "58.071",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XLinearLimitMax",
+        "value": "44.472",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-YLinearLimitMax",
+        "value": "-22.236",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-ZLinearLimitMax",
+        "value": "30.000",
+        "units": "mm"
+       }
+      ]
+     }
+    }
+   },
+   "t": 43153,
+   "te": 43153
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 43153,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Select entities to measure"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Measure",
+     "text": [
+      "Select entities to measure",
+      "Face of Part 1 <1>",
+      "×",
+      "Face of Part 2 <1>",
+      "×",
+      "Measure type:",
+      "Length unit:",
+      "Angle unit:",
+      "[ ] Reference coordinate system",
+      "Reference coordinate system",
+      "Min dist:",
+      "35.000",
+      "mm",
+      "35.000",
+      "mm",
+      "0.000",
+      "mm",
+      "0.000",
+      "mm",
+      "Area:",
+      "1742.478",
+      "2",
+      "Center axes dist:",
+      "40.000",
+      "mm",
+      "-40.000",
+      "mm",
+      "0.000",
+      "mm",
+      "0.000"
+     ],
+     "fields": [
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Show all"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Select entities to measure",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Reference coordinate system",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "measure-dialog",
+      "title": "Measure",
+      "text": "Measure / Select entities to measure / Face of Part 1 <1> / × / Face of Part 2 <1> / × / Measure type: / Show all / Position / Center position / Min distance / Max distance / Length / Diameter / Radius / Angle / Face tangent angle / Curvature deviation / Surface area / Length unit: / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Angle unit: / Degree / Radian / Reference coordinate system / Min dist:35.000mm / 35.000mm / 0.000mm / 0.000mm / Area:1742.478mm2 / Center axes dist:40.000mm / ",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": false
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 2",
+       "id": "JKC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [],
+     "panel": {
+      "selection": [],
+      "items": [
+       {
+        "name": "Min dist",
+        "value": "35.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XLinearLimitMin",
+        "value": "35.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-YLinearLimitMin",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-ZLinearLimitMin",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "Area",
+        "value": "1742.478",
+        "units": "mm2"
+       },
+       {
+        "name": "Center axes dist",
+        "value": "40.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XYZ-Icons-AlongX",
+        "value": "-40.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XYZ-Icons-AlongY",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XYZ-Icons-AlongZ",
+        "value": "0.000",
+        "units": "mm"
+       },
+       {
+        "name": "Max dist",
+        "value": "58.071",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-XLinearLimitMax",
+        "value": "44.472",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-YLinearLimitMax",
+        "value": "-22.236",
+        "units": "mm"
+       },
+       {
+        "name": "svg-icon-ZLinearLimitMax",
+        "value": "30.000",
+        "units": "mm"
+       }
+      ]
+     }
+    }
+   },
+   "t": 47935,
+   "te": 47935
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 47935,
+   "pointer": {
+    "at": [
+     1563,
+     657
+    ],
+    "hover": [
+     "JKC"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 47942,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JHO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 2",
+       "id": "JKC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start pin-block-apart asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      15.034,
+      12.932,
+      6.379
+     ],
+     "eye_mm": [
+      48.121,
+      -44.377,
+      44.585
+     ],
+     "width_mm": 127.984,
+     "height_mm": 67.779,
+     "mmPerPixel": 0.0765,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Min dist",
+       "value": "35.000",
+       "units": "mm"
+      },
+      {
+       "name": "Center axes dist",
+       "value": "40.000",
+       "units": "mm"
+      },
+      {
+       "name": "Max dist",
+       "value": "58.071",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 51833,
+   "te": 51833
+  }
+ ],
+ "t0_epoch_ms": 1795681383492
+}

@@ -1,0 +1,51 @@
+{
+ "name": "asm-hover-hidden-instance-row",
+ "about": "two-blocks: Part 2 <1> hidden from its row menu; hover its row, then where it was",
+ "area": "psui",
+ "source": "live psui/asm-hover-combined-1126 (behaviours 'Assembly hover in combined states')",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "instance": "Part 2 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "empty": true
+   },
+   "ms": 1500
+  }
+ ]
+}

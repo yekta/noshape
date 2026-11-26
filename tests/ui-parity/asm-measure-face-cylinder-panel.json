@@ -1,0 +1,48 @@
+{
+ "name": "asm-measure-face-cylinder-panel",
+ "about": "pin-block-apart: Part 1's right face and the pin's cylinder: the readout, then '[' opens the Measure panel; Escape",
+ "area": "skasm",
+ "source": "live behaviours 'First-week assembly gaps' (qa ASM-FIRST-WEEK-*)",
+ "start": "pin-block-apart",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     65,
+     0,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "["
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

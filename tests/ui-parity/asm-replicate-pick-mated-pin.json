@@ -1,0 +1,42 @@
+{
+ "name": "asm-replicate-pick-mated-pin",
+ "about": "pin-block: Replicate, pick the pin (on Revolute 1): its chip, Mate to be matched filled 'Revolute 1', the select switches to Match edges on face; Escape",
+ "area": "skasm",
+ "source": "live behaviours 'First-week assembly gaps' (qa ASM-FIRST-WEEK-*) 2",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Replicate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     65,
+     0,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

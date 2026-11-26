@@ -1,0 +1,81 @@
+{
+ "name": "asm-hover-fastened-picks",
+ "about": "two-blocks: Fastened, pick Part 2's top, hover it again; pick Part 1's top, hover it again; Escape",
+ "area": "psui",
+ "source": "live psui/asm-hover-combined-1126 (behaviours 'Assembly hover in combined states')",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fastened mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     0,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   },
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+{
+ "name": "mistake-fillet-too-big",
+ "about": "block: Fillet of the top face's edges at 16 mm (opposite edges 30 mm apart overlap): red title, ✓ enabled; ✓ makes a red row, its tooltip",
+ "area": "psui",
+ "source": "live behaviours 'First-hour mistakes, batch 1' (qa MISTAKES-1)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Radius"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "16"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Fillet 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

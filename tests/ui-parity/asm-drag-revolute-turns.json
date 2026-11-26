@@ -1,0 +1,33 @@
+{
+ "name": "asm-drag-revolute-turns",
+ "about": "pin-block: drag the pin's side (on Revolute 1): it turns about the mate axis, no value box",
+ "area": "skasm",
+ "source": "live behaviours '3D manipulator drags' (qa MANIP-DRAG)",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "face": [
+     65,
+     0,
+     28
+    ],
+    "instance": "Part 2 <1>"
+   },
+   "to": {
+    "face": [
+     10,
+     10,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  }
+ ]
+}

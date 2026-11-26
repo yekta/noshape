@@ -1,0 +1,62 @@
+{
+ "name": "hover-fillet-picked-edge",
+ "about": "block: Fillet, pick the front top edge, hover it, then the right top edge, then the top face; Escape",
+ "area": "psui",
+ "source": "live psui/hover-combined-1125 (behaviours 'hover in combined states')",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "edge": [
+     40,
+     15,
+     10
+    ]
+   },
+   "ms": 1500
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   },
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
