@@ -1660,7 +1660,7 @@ CPU. A hover's first frame is before its GPU pick: the lit frame is latency_test
 
 | Finding | Ours | Test |
 |---|---|---|
-| Accepted: "3/8 in", "(1 + 1/2) in", "1 ft + 6 in", "1/2" (document unit), "1 inch" / "2 inches" / "1 foot" / "1 feet", "30 degrees", "0.5 radian"; rejected: "1 1/2 in", "3/8\"", "1'6\"" | ≠ | ours accepts a superset (inch / foot marks): the lead's decision, no test |
+| Accepted: "3/8 in", "(1 + 1/2) in", "1 ft + 6 in", "1/2" (document unit), "1 inch" / "2 inches" / "1 foot" / "1 feet", "30 degrees", "0.5 radian"; rejected: "1 1/2 in", "3/8\"", "1'6\"" | = (superset, lead 11-26) | ours also takes live's refusals (inch / foot marks, mixed numbers); T1 units tests::live_accepted_inputs_and_our_superset_of_its_refusals |
 | Sketch dimension text, deg-min-sec and drawing fractional / feet-and-inches units are the server's [skasm / studios] | drawings = (ef2dfdfd, 1e21f28e: fractional inches to the precision, "2 3/4", `1'-2 1/4"`, drawn stacked); sketch: skasm's | drawing sheet `a_fractional_value_is_drawn_stacked` |
 
 ### hl-pixels-1118 (P0, highlight pixel columns, live 11-18 01:13)

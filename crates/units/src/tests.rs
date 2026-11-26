@@ -95,6 +95,26 @@ fn onshape_shorthands() {
 }
 
 #[test]
+fn live_accepted_inputs_and_our_superset_of_its_refusals() {
+    // interaction-feel row "Accepted: ... rejected: ...": live's accepted forms give live's values.
+    assert_mm("3/8 in", 9.525);
+    assert_mm("(1 + 1/2) in", 38.1);
+    assert_mm("1 ft + 6 in", 457.2);
+    assert_mm("1 inch", 25.4);
+    assert_mm("2 inches", 50.8);
+    assert_mm("1 foot", 304.8);
+    assert_mm("1 feet", 304.8);
+    assert_deg("30 degrees", 30.0);
+    assert_deg("0.5 radian", 0.5f64.to_degrees());
+    let q = evaluate_as("1/2", Dim::LENGTH, &UnitPrefs::imperial(), &scope()).unwrap();
+    assert!((q.value - 0.0127).abs() < 1e-15, "1/2 in the document's inches");
+    // Live refuses the inch / foot marks and mixed numbers; ours takes them (superset, lead 11-26).
+    assert_mm("1 1/2 in", 38.1);
+    assert_mm("3/8\"", 9.525);
+    assert_mm("1'6\"", 457.2);
+}
+
+#[test]
 fn unit_powers() {
     let q = ev("4 mm^2");
     assert_eq!(q.dim, Dim::AREA);
