@@ -491,6 +491,8 @@ impl AssemblyView {
         });
         // (The Mate connector dialog's field keeps no keyboard after a viewport pick: live asm-mate-connector-on-face.)
         let focus = focus.or_else(|| if self.mate.is_none() && !self.mc.as_ref().is_some_and(|m| m.picked) { active_field() } else { None });
+        // [ › Measure: its selection field has the keyboard, as the Part Studio's (live asm-measure-face-cylinder-panel).
+        let focus = focus.or_else(|| self.ui.measure.as_ref().map(|_| json!({ "kind": "field", "label": "Select entities to measure", "text": null, "selection": null, "all": false })));
         // The Driving mate selector's box has the keyboard (live asm-mate-menu-edit-driver-mate).
         let focus = focus.or_else(|| self.ui.np_driver.as_ref().map(|_| json!({ "kind": "field", "label": "Mates to drive positions", "dialog": "Driving mate selector" })));
         // The mate dialog's query box has the focus while it takes picks (live: field "Mate connectors").

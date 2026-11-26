@@ -1139,6 +1139,41 @@ fn the_measure_panel_hangs_from_a_fixed_top(cx: &mut TestAppContext) {
     assert!((top - (crate::ui::TOOLBAR_H + super::MEASURE_TOP)).abs() < 0.5 && (right - super::MEASURE_RIGHT).abs() < 0.5, "top {top}, {right} from the right");
 }
 
+/// Live asm-measure-face-cylinder-panel (ASM-MEASURE-BRACKET-KEY): two faces picked, `[` opens Measure with both and
+/// its "Select entities to measure" field focused; Escape closes it.
+#[gpui::test]
+fn the_bracket_key_opens_measure_on_the_picked_faces(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "measure-key", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.entity_sel = ["Part 1 <1>", "Part 2 <1>"]
+                .iter()
+                .map(|n| {
+                    let id = instance(v, n, cx);
+                    let occ = v.result.occurrences.iter().find(|o| o.top() == id).unwrap();
+                    (vec![id], occ.face_refs[0].clone())
+                })
+                .collect();
+            let f = v.focus.clone();
+            w.focus(&f, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    // (`[` is bound in the app's Workspace context: MeasureTool.)
+    cx.update_window(window, |_, w, cx| w.dispatch_action(Box::new(crate::actions::MeasureTool), cx)).unwrap();
+    draw(cx, window);
+    let (picks, state) = cx.update(|cx| (view.read(cx).ui.measure.as_ref().map(Vec::len), view.read(cx).ui_state(cx)));
+    assert_eq!(picks, Some(2), "Measure opened on both faces");
+    assert_eq!(state["focus"]["label"], "Select entities to measure", "{}", state["focus"]);
+    cx.update_window(window, |_, w, cx| w.dispatch_action(Box::new(crate::actions::Cancel), cx)).unwrap();
+    draw(cx, window);
+    let state = cx.update(|cx| view.read(cx).ui_state(cx));
+    assert!(cx.update(|cx| view.read(cx).ui.measure.is_none()), "Escape closes it");
+    assert_ne!(state["focus"]["label"], "Select entities to measure");
+}
+
 /// The Mass and section properties dialog's values are worked out off the UI thread, once per selection: the frame
 /// that opens it draws with them pending.
 #[gpui::test]
