@@ -4844,28 +4844,6 @@ fn hole_callout_lights_a_holes_circle_only(cx: &mut TestAppContext) {
     assert!(!matches!(on_line, Some(EdgeGeom::Line { .. })), "a straight edge doesn't: {on_line:?}");
 }
 
-/// Live drw-dims-1123 gdt.md: with every slot of the Geometric tolerance panel empty, an edge doesn't light and a
-/// click places nothing (typed, it does: a_geometric_tolerance_clicked_on_an_edge_…).
-#[gpui::test]
-fn an_empty_geometric_tolerance_lights_and_places_nothing(cx: &mut TestAppContext) {
-    use noshape_model::drawing::AnnotationKind;
-    SUGGESTED.set(true);
-    let (window, editor) = drawing(cx, "feel-gdt-empty");
-    real_sheet(cx, window, &editor);
-    let (a, b, _) = horizontal_edge(cx, &editor);
-    cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
-    draw(cx, window);
-    let mid = [(a[0] + b[0]) / 2.0, a[1]];
-    let p = at_window(cx, &editor, mid);
-    VisualTestContext::from_window(window, cx).simulate_mouse_move(p, None, Modifiers::default());
-    draw(cx, window);
-    assert_eq!(cx.update(|cx| editor.read(cx).hover), None, "no edge lights");
-    let gdts = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter(|x| matches!(x.kind, AnnotationKind::Gdt { .. })).count());
-    click_sheet(cx, window, &editor, mid);
-    assert_eq!(gdts(cx), 0, "an empty frame isn't placed");
-    assert!(cx.update(|cx| editor.read(cx).note_leader.is_none()), "nor a leader started");
-}
-
 /// Live drw-dims-1123 datum.md: a Datum click on empty sheet anchors nothing (no pick pending, nothing placed); an
 /// edge click does, and the Datum target tab can't be chosen while it is pending.
 #[gpui::test]

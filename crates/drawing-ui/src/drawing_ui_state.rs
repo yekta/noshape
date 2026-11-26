@@ -506,6 +506,17 @@ impl DrawingEditor {
                     selection.push(("EDGE".into(), self.ui_view_name(v)));
                 }
             }
+            // The edge under the pointer, then the edge its leader starts on until the frame is placed (live
+            // drw-geometric-tolerance 11-26 s2, -edge-then-escape s2-s6).
+            Tool::Gdt if self.gdt_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => {
+                let lit = match &self.note_leader {
+                    Some(l) => l.view.filter(|_| !l.dot),
+                    None => self.hovered_edge().map(|(v, _)| v),
+                };
+                if let Some(v) = lit.filter(|v| *v != noshape_model::drawing::SHEET_VIEW) {
+                    selection.push(("EDGE".into(), self.ui_view_name(v)));
+                }
+            }
             Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
             // The hole a Hole/thread callout is being placed for (live drw-hole-callout-palette).
             Tool::HoleCallout { circle: Some((v, ..)) } => selection.push(("EDGE".into(), self.ui_view_name(*v))),

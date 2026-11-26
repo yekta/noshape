@@ -174,14 +174,6 @@ impl DrawingEditor {
     }
 
     /// The dialog's frame (first row) and extra, None when nothing is entered.
-    /// A new frame with every slot of the dialog empty: edges don't light and clicks place nothing (live drw-dims-1123
-    /// gdt.md, ✓ disabled).
-    pub(crate) fn gdt_empty(&self, cx: &App) -> bool {
-        let Some(d) = self.gdt_dlg.as_ref().filter(|d| d.edit.is_none()) else { return false };
-        let empty = |e: &Entity<InputState>| e.read(cx).value().trim().is_empty();
-        d.rows.iter().all(|r| r.inputs.iter().all(empty)) && empty(&d.upper) && empty(&d.lower)
-    }
-
     pub(crate) fn gdt_values(&self, cx: &App) -> Option<(Vec<String>, GdtExtra)> {
         let d = self.gdt_dlg.as_ref()?;
         let v = |e: &Entity<InputState>| e.read(cx).value().to_string();
@@ -211,11 +203,8 @@ impl DrawingEditor {
         if !matches!(self.tool, Tool::Gdt) {
             return false;
         }
-        if self.gdt_empty(cx) {
-            return true;
-        }
-        // Nothing entered: the default frame, the position symbol (live 2146: each click placed one, "⌖"; ✓ waits for
-        // an entry).
+        // Nothing entered: the default frame, the position symbol (live 11-26 q-gdt-retake: with every slot empty an
+        // edge click starts a leader and the next click places one ⌖ frame; ✓ waits for an entry).
         let (frame, extra) = self.gdt_values(cx).unwrap_or_else(|| (vec![noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), String::new()], Default::default()));
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();

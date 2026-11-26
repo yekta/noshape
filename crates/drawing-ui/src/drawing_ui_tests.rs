@@ -1085,6 +1085,76 @@ fn esc_closes_the_geometric_tolerance_panel_and_its_tool(cx: &mut TestAppContext
     });
 }
 
+/// Live 11-26 q-gdt-retake, q-gdt-edge-then-move (REQUESTS psui 12:24): with every slot of the panel empty an edge
+/// lights and its click places nothing (the tool and panel stay); the next click places ONE ⌖ frame with a leader to
+/// the edge, and Esc ends the tool keeping it. An edge click then Esc places nothing.
+#[gpui::test]
+fn an_empty_geometric_tolerance_places_one_frame_after_an_edge_click(cx: &mut TestAppContext) {
+    use noshape_model::drawing::{build::PickTarget, AnnotationKind};
+    use noshape_scene::drawing_tools::Tool;
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "gdt-empty-leader");
+    real_sheet(cx, window, &editor);
+    cx.update(|cx| cx.bind_keys(noshape_app_core::actions::default_key_bindings()));
+    let on = cx.update(|cx| {
+        let e = editor.read(cx);
+        let b = e.built.as_ref().expect("built");
+        b.geometry.lines.iter().find(|l| matches!(b.picks.get(l.pick as usize), Some(PickTarget::Edge { .. })) && l.points.len() >= 2).map(|l| [(l.points[0][0] + l.points[1][0]) / 2.0, (l.points[0][1] + l.points[1][1]) / 2.0]).expect("a view edge")
+    });
+    let frames = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).drawing_sheet().annotations.iter().filter_map(|a| match &a.kind {
+        AnnotationKind::Gdt { frame, leaders, .. } => Some((frame.first().cloned().unwrap_or_default(), leaders.len())),
+        _ => None,
+    }).collect::<Vec<_>>());
+    let click = |cx: &mut TestAppContext, at: [f64; 2]| {
+        cx.update_window(window, |_, w, cx| editor.update(cx, |e, cx| {
+            e.cursor = at;
+            e.update_hover(cx);
+            e.tool_click(w, cx);
+        })).unwrap();
+        draw(cx, window);
+    };
+    // The state reader's lit edges (live reads the orange edge as selected).
+    let lit_edges = |cx: &mut TestAppContext| cx.update(|cx| editor.read(cx).ui_drawing_state(cx)["selection"].as_array().map_or(0, |a| a.iter().filter(|s| s["kind"] == "EDGE").count()));
+    let esc = |cx: &mut TestAppContext| {
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+        draw(cx, window);
+    };
+    for then_place in [true, false] {
+        cx.update(|cx| editor.update(cx, |e, cx| e.set_tool(Tool::Gdt, cx)));
+        draw(cx, window);
+        draw(cx, window);
+        let lit = cx.update(|cx| editor.update(cx, |e, cx| {
+            e.cursor = on;
+            e.update_hover(cx);
+            e.hover.is_some()
+        }));
+        assert!(lit, "the edge lights with every slot empty");
+        assert_eq!(lit_edges(cx), 1, "the hovered edge reads as lit");
+        let before = frames(cx).len();
+        click(cx, on);
+        assert_eq!(frames(cx).len(), before, "the edge click places nothing");
+        assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Gdt) && editor.read(cx).gdt_dlg.is_some()), "the tool and panel stay");
+        assert!(cx.update(|cx| editor.read(cx).note_leader.is_some()), "the edge click starts a leader");
+        assert_eq!(lit_edges(cx), 1, "its edge stays lit while the leader waits");
+        if then_place {
+            // A spot off every edge (the pointer there lights nothing).
+            let off = [[6.0, 8.0], [6.0, -8.0], [6.0, 20.0], [6.0, -20.0], [-30.0, 30.0]].into_iter().map(|d| [on[0] + d[0], on[1] + d[1]]).find(|&p| cx.update(|cx| editor.update(cx, |e, cx| {
+                e.cursor = p;
+                e.update_hover(cx);
+                e.hovered_edge().is_none()
+            }))).expect("a spot off the edges");
+            click(cx, off);
+            let got = frames(cx);
+            assert_eq!(got.len(), before + 1, "the next click places one frame");
+            assert_eq!(got.last().cloned(), Some((noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), 1)), "a ⌖ frame with its leader");
+            assert_eq!(lit_edges(cx), 0, "placed, the edge goes out");
+        }
+        esc(cx);
+        assert!(cx.update(|cx| matches!(editor.read(cx).tool, Tool::Select)), "Esc ends the tool");
+        assert_eq!(frames(cx).len(), before + usize::from(then_place), "Esc keeps what was placed, nothing more");
+    }
+}
+
 /// Live2 drw-note-editor: Esc in the note editor closes it and ends the Note tool.
 #[gpui::test]
 fn esc_in_the_note_editor_ends_the_note_tool(cx: &mut TestAppContext) {
