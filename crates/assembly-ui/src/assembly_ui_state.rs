@@ -135,8 +135,12 @@ impl AssemblyView {
     pub fn ui_state(&self, cx: &App) -> Value {
         let Some(asm) = self.assembly(cx) else { return json!({ "error": "no assembly" }) };
         let placed: HashMap<InstanceId, Placement> = self.result.solved.placements.iter().cloned().collect();
+        // The edited mate's row is red while its dialog's title is (live mistake-asm-mate-one-connector s8: × on one
+        // connector).
+        let edit_failing = self.mate.as_ref().filter(|s| s.editing.is_some()).is_some_and(|s| s.dialog.read(cx).regen_error(cx).is_some());
         let mate_state = |m: &Mate| match self.result.mates.iter().find(|s| s.id == m.id) {
             _ if m.suppressed => "suppressed",
+            _ if edit_failing && self.mate.as_ref().and_then(|s| s.editing) == Some(m.id) => "error",
             Some(s) if s.inactive => "suppressed",
             Some(s) if !s.ok => "error",
             _ => "ok",

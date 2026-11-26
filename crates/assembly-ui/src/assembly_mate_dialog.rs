@@ -958,6 +958,7 @@ impl MateDialog {
             // Live (qa5 MT3): "Mate connector of Part 1 <3> (Click to edit)".
             let edit_tip = format!("{text} (Click to edit)");
             let bold = self.editing_field == Some(field);
+            let row = rows.len();
             rows.push(
                 os::query_row(SharedString::from(format!("mc-field-{field}")), text.clone())
                     .debug_selector(move || format!("mc-field-{field}"))
@@ -992,6 +993,8 @@ impl MateDialog {
                             div()
                                 .id(SharedString::from(format!("mc-clear-{field}")))
                                 .debug_selector(move || format!("mc-clear-{field}"))
+                                // The runner's chip × by its box and row (live mistake-asm-mate-one-connector s8).
+                                .map(|d| crate::ui_script::mark(d, || format!("button:x:{label}:{row}")))
                                 .tooltip(crate::ui::tooltip(format!("Delete {text_del}")))
                                 // Live: a 16.67 px "×" (#666), 5 px padding.
                                 .px(px(5.))

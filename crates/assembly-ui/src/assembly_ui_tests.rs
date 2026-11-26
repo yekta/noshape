@@ -3209,6 +3209,9 @@ fn an_edited_mate_down_to_one_connector_says_it_needs_two(cx: &mut TestAppContex
         assert_eq!((dlg["titleState"].clone(), dlg["ok"].clone()), (json!("error"), json!("enabled")), "{dlg}");
         let field = dlg["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Mate connectors").cloned().expect("the connectors field");
         assert_eq!((field["items"].as_array().map(Vec::len), field["state"].clone()), (Some(1), json!("ok")), "one chip left, not red: {field}");
+        // Its row red at once (live mistake-asm-mate-one-connector s8).
+        let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Fastened 1").cloned().expect("the mate's row");
+        assert_eq!(row["state"], json!("error"), "{row}");
     });
 }
 
