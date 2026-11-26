@@ -45,20 +45,15 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a_page_step_finds_the_graphics_of_a_document_the_page_opened. Tell qa after landing: flow 91 had no perf lines
   because milestones need NOSHAPE_PERF=1; "no assembly frames" maybe the inactive new window (now activated).
 
-## P0 (lead 11-26, from bool): failed-blend blame off regeneration
-- QUEUED d027ad72: detail.rs `blamed_at_regen` (a lone pick, else none; no per-edge reruns: 8a62f4834 cost
-  c2-impeller-loft's "Fillet Ansaugflansch zum Gehaeuse" 52-60 s vs 1.1).
-- Step 2 (lazy blame + ops) committed after it: model-core regen/blame.rs `failing_alone` (fillet/chamfer, ≤24 picks,
-  cap, a pick is blamed when it fails alone with any error); PartStudioView `blend_blame` (dialog sync, background,
-  10 s, keyed by display Arc) + `blend_blame_shown` (viewport red); ops `feature_get {blame:true}` -> `red_selections`
-  (OpenDoc::blend_blame on a snapshot). T2 fixed (live_refs; c2's fillet fails "Unfilleted edge overlapped by
-  fillet." in 5.0 s on vibe2 release, guard < 10 s). Tests: kernel_robustness::a_failed_fillets_blame_is_the_edge_
-  that_fails_alone, feedback_feel_tests::a_failed_fillets_dialog_reds_the_edge_that_fails_alone, e2e::feature_get_
-  blames_a_failed_fillets_edge_on_request (geometry: 60x40x20, R8 front-top, Ø6 hole at (30,4) symmetric cut, R1 on
-  the rim (picked at (30,7,19.937), off the seam) + the back vertical edge; our kernel builds every single block edge
-  even at R41, so a plain block blames none).
-- Copy-paste (sketch.rs menu-open hover guard + hover end; sketch_hover_feel_tests T1): a full part-studio-ui lib run
-  passed 646/0 (b2gomioo0) after the guard; land it separately after P0 (stash tag psui-copypaste).
+## P0 DONE (lead 11-26): failed-blend blame off regeneration
+- Landed d027ad72 (72bc8ad3) + step 2 (f558a4ae): regen blames only a lone pick; the dialog asks
+  `blame::failing_alone` in the background (≤24 picks, 10 s); ops `feature_get {blame:true}` -> `red_selections`.
+- Same-host A/B (vibe2 05:1x, release T2, 3 alternating runs): base 47b49528b median 5.31 s, main 5.03 s (0.95x):
+  no residual regression; told lead. bool's 1.1 s was a cli measurement, not the T2's feature time.
+- Main RED 05:06 at 72bc8ad36 (not the fix): parity::a_face_two_parts_have_is_the_one_on_lives_part shared the scratch
+  file face-on-lives-part.noshape with a_face_live_names_on_its_part_… (parallel document_create race); renamed. Lead
+  picks the fix into v0.4.71.
+- QUEUED dc6768f9: copy-paste (menu-open hover guard + hover end; T1 in sketch_hover_feel_tests).
 
 ## QUEUE (11-25 19:5x, lead + live)
 1. LOOK-OUTLINE-WEIGHT CLOSED = live (lead 11-26 01:5x; TICKETS row has the numbers): band = live's
@@ -70,7 +65,8 @@ docs/DECISIONS.md (read first; it wins over anything here).
    face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
    Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
 3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
-4. IN FLIGHT 11-26 01:5x: interaction-suite triage (lead). QUEUED 2ffe9497 (6 commits: 3a08ed5ef, e7fae29e2 had not
+4. IN FLIGHT: after count of the triage's 15 scenarios (run20.sh on vibe2, out ~/tmp/psui/r20; r17 before = 10/15,
+   235/247 states), then report to the lead and give qa the count (qa id: roster). Interaction-suite triage (lead). QUEUED 2ffe9497 (6 commits: 3a08ed5ef, e7fae29e2 had not
    landed; workspace_tests.rs conflict = keep both tests): coincident, refusals, routing x5, offset, ver-protection,
    mate-connector, fully-defined. Told lead (qa >200k): before 20, after 14/15 expected.
    copy-paste FIXED (uncommitted, testing on vibex7 r21 + lib/clippy): cause = the line's glyph row (Show
