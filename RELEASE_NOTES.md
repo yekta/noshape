@@ -1,5 +1,5 @@
 **Sketching**
-- Dragging sketch geometry feels as in Onshape: it starts after 3 px, keeps the spot you grabbed, hides region fills and hover colours while it moves, and one undo takes back one drag.
+- Dragging sketch geometry feels as in Onshape: it starts after 3 px, keeps the spot you grabbed, hides region fills while it moves, and one undo takes back one drag.
 - An over-defined or redundant dimension fails the sketch as in Onshape, while features built on it keep their last shape.
 - In a tilted view, dimension values and the Offset distance lie in the sketch plane as in Onshape.
 - Pattern labels, the Text dialog, constraint glyph placement and arc snaps to their own centre match Onshape.
@@ -11,7 +11,6 @@
 - Notices show one at a time and wait their turn, as in Onshape (they stacked in 0.4.69).
 
 **Assemblies**
-- Editing a mate puts a dragged hinge back home within its limits, as in Onshape.
 - Unresolved mate connectors are named as in Onshape.
 
 **Import and export**
