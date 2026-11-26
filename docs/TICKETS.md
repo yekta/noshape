@@ -7,7 +7,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 ## qa 11-26 11:4x: ui-parity reruns on green f393d8ee4
 
-- [ ] P2 **EXPORT-PARASOLID-VERSION-DEFAULT (dx)** (qa 11-26, asm-menu-export re-taken by live 121421f29): Export with Format PARASOLID and ☐ Use latest version: live's Version select shows the newest, 38.1 (list 38.1 … 25.0); ours shows 25.0, the oldest. Step 2 .dialog.fields[5].value. dx is parked, so this goes to the lead.
+- [ ] P2 **EXPORT-PARASOLID-VERSION-DEFAULT (psui)** (qa 11-26, asm-menu-export re-taken by live 121421f29): Export with Format PARASOLID and ☐ Use latest version: live's Version select shows the newest, 38.1 (list 38.1 … 25.0); ours shows 25.0, the oldest. Step 2 .dialog.fields[5].value. psui (lead 11-26).
 - [ ] P2 **ASM-SELECT-OTHER-POPUP (asm)** (qa 11-26, asm-face-menu-select-other, also before skasm's driver fix ada3263b): an assembly face's context menu › Select other… opens no popup. Live lists "Face of Part 2 <1>", "Part 2 <1>" (.list kind select-other). asm is parked, so this goes to the lead.
 
 ## qa 11-26 04:0x: ASM-FIRST-WEEK replays (live qa/asm-audit-1126) by ops on green 349379a41 (qa-scratch/tmp/asmaud/a3.py)
