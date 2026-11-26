@@ -1118,6 +1118,36 @@ fn exchange_round_trip() {
                     .collect::<Vec<_>>()
             })
         };
+        // The model's mesh parts as an option case's import sizes them: its unit over the file's (live's fine STL in
+        // mm imported in Centimeter or Foot); unscaled where the case doesn't say the file's unit.
+        let model_mesh_in = |case: &Value| {
+            let mm = |u: &str| match u.to_lowercase().as_str() {
+                "millimeter" => Some(1.0),
+                "centimeter" => Some(10.0),
+                "meter" => Some(1000.0),
+                "inch" => Some(25.4),
+                "foot" => Some(304.8),
+                "yard" => Some(914.4),
+                _ => None,
+            };
+            let export = &case["export"];
+            let from = export["units"].as_str().map(str::to_string).or_else(|| export["via"].as_str()?.split("units=").nth(1)?.split('&').next().map(str::to_string));
+            let k: f64 = from.as_deref().and_then(mm).zip(case["import"]["unit"].as_str().and_then(mm)).map_or(1.0, |(f, t)| t / f);
+            model_mesh().map(|v| {
+                v.into_iter()
+                    .map(|p| PartState {
+                        volume: p.volume.map(|x| x * k.powi(3)),
+                        volume_band: p.volume_band.map(|b| b.map(|x| x * k.powi(3))),
+                        area: p.area.map(|x| x * k * k),
+                        area_band: p.area_band.map(|b| b.map(|x| x * k * k)),
+                        bbox: p.bbox.map(|b| b.map(|c| c.map(|x| x * k))),
+                        centroid: p.centroid.map(|c| c.map(|x| x * k)),
+                        centroid_band: p.centroid_band.map(|b| b.map(|c| c.map(|x| x * k))),
+                        ..p
+                    })
+                    .collect::<Vec<_>>()
+            })
+        };
         let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
             if mesh(format) && LIVE_MESH_SHEETS.contains(&name.as_str()) {
                 return model_mesh();
@@ -1211,7 +1241,11 @@ fn exchange_round_trip() {
             let diff = match import_with(&scratch(&format!("{name}-option-{case}.noshape")), &file, &live_import["import"]) {
                 Err(e) => vec![e],
                 Ok((ours, tabs)) => {
-                    let live = parts_from_live_import(live_import, is_mesh);
+                    // (Live's mesh read as sheets: the model's solids, as the rows above.)
+                    let live = match model_mesh_in(live_import) {
+                        Some(m) if mesh(&format) && LIVE_MESH_SHEETS.contains(&name.as_str()) => m,
+                        _ => parts_from_live_import(live_import, is_mesh),
+                    };
                     // Live's import empty (its PVZ of c2-housing-draft: a sheet of no faces, its file's mesh not
                     // closed; ours has the mesh as sheets): its parts by name only.
                     let names_only = |v: &[PartState]| -> Vec<PartState> { v.iter().map(|p| PartState { name: p.name.clone(), ..Default::default() }).collect() };
@@ -1354,7 +1388,9 @@ fn exchange_round_trip() {
                     differences(&mesh_counts(within_edge_tolerance(&native, tol(&native).max(tol(&b)))), &mesh_counts(b))
                 }
                 Ok(b) if mesh(format) => {
-                    let read_by_live = (!theirs[format].is_null()).then(|| parts_from_live_import(&theirs[format], true));
+                    // (Live's import of it with sheets, as the bottle's and duct's STL or the rings' OBJ: the model's.)
+                    let solids = theirs[format]["parts"].as_array().is_some_and(|p| p.iter().all(|p| p["bodyType"] == "SOLID"));
+                    let read_by_live = solids.then(|| parts_from_live_import(&theirs[format], true));
                     let (a, n) = (total(&b), read_by_live.as_deref().map_or_else(|| total(&native), total));
                     if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, expected {:.3}", a * 1e9, n * 1e9)] }
                 }
@@ -1449,9 +1485,10 @@ fn exchange_round_trip() {
             let unit = live_import["import"]["unit"].as_str().unwrap_or("Millimeter");
             let y_up = live_import["import"]["yAxisIsUp"] == "true";
             let own = parts_from_live_import(live_import, is_mesh);
-            let live = match &xt {
-                Some(x) => held_to_model(own, x, if is_mesh { 2.0 } else { 1.25 }, true, is_mesh),
-                None => own,
+            let live = match (&xt, model_mesh_in(live_import)) {
+                (_, Some(m)) if mesh(format) && LIVE_MESH_SHEETS.contains(&name.as_str()) => m,
+                (Some(x), _) => held_to_model(own, x, if is_mesh { 2.0 } else { 1.25 }, true, is_mesh),
+                (None, _) => own,
             };
             let mut diff = match import_in(&scratch(&format!("{name}-option-back-{case}.noshape")), &file, unit, y_up) {
                 Err(e) => vec![e],

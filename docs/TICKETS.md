@@ -5,6 +5,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-26 04:0x: ASM-FIRST-WEEK replays (live qa/asm-audit-1126) by ops on green 349379a41 (qa-scratch/tmp/asmaud/a3.py)
+Measure, Interference, Replicate's placement, Group (both parts move by the same vector) and Change configuration ([Size=Large]) match live. Their dialogs and menus are scored by the asm-* ui-parity takes (qa-uipasm run).
+- [ ] P2 **REPLICATE-INSTANCE-ORDER (asm)**: a plate with 3 equal holes, pin Revolute in hole 1 (x 20), Replicate › Match edges on face, the plate's top face, ✓: live numbers the copies outwards from the seed, Part 2 <2> at x 40 and <3> at x 60 (raw/mb11.json occ3); ours puts <2> at x 60 and <3> at x 40.
+- [ ] P3 **MEASURE-MAX-TIE (asm)**: Measure of two parts whose maximum distance ties between two symmetric point pairs: live reports dy -17.236 mm, ours +17.236 mm (same distance). Live takes the other pair of the tie.
+
 ## core, 2026-11-25 (asm-scissor-lift scissor blends)
 - [ ] P2 **SCISSOR-2D82-DERIVED (parity translator, parked by the lead 11-25)**: Studio 2d82a0's Derived 1 translates
   incomplete (Left Plate 120044 mm3, live 105870): the source's Upper/Lower Cutout and Sketch 2 solve away from live's

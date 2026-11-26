@@ -158,7 +158,9 @@ Live's mesh imports that make sheets (lead 11-17, as robot-relations' import): w
 OBJ / 3MF of a good closed mesh gives sheet bodies and ours gives valid solids, that is live's failure, not a target.
 Those rows hold ours to the model's solids, each volume within its area times live's STL chord (`LIVE_MESH_SHEETS`):
 c2-bottle-split (two solid halves touching along edges; live 148 sheets, ours the model's 2) and c2-duct-multipart
-(live 9 sheets; ours 2 solids for the model's 4 overlapping parts, a difference still counted). Formats that can't
+(live 9 sheets; ours 2 solids for the model's 4 overlapping parts, a difference still counted). The option rows of
+those documents' mesh exports are held the same way, the model sized by the case's import unit over its file's (lead
+11-26: the duct's STL options, live 9 sheets; its fine mm STL imported in Centimeter or Foot). Formats that can't
 hold a mesh part (IGES, ACIS: live drops it) are compared with live's own import of that file, held to the parts it
 keeps.
 
@@ -167,7 +169,9 @@ within the largest edge tolerance (of the model's parts or the file's) times the
 times the edges' total length (`query_parts`' `edge_tolerance`, `edge_length`), is no difference. Our models carry
 intersection edges up to 3e-5 m off their faces (OCCT's approximations): a file writes them as tolerant edges that
 the reader fits again, which moves the volume by 1-2e-6, invisible to a user. Making those edges exact is a modelling
-ticket (TICKETS PS-INEXACT-INTERSECTION-EDGES), not the suite's.
+ticket (TICKETS PS-INEXACT-INTERSECTION-EDGES), not the suite's. A mesh read back is held to its total volume within
+1 % of live's import of the same file where live reads it as solids, else of the model's (lead 11-26: live reads our
+bottle's and duct's STL and the rings' OBJ with sheets).
 
 ## 4. Assembly suite: Onshape assemblies rebuilt in noshape (asm, lead 11-06)
 
