@@ -5,11 +5,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **RE-LAND 11-25 22:5x**: 1bd337a6 FAILED 22:04 (rebase conflict, workspace_tests.rs: qa's page-open test beside my
-  Update… test, kept both); rebased, QUEUED 52c8f9ce (Ribs, Update…, mesh Translate + handoff). Lead reports it.
-- **QUEUED a730d3fd (11-26 02:3x)**: 4826656b7 solver, b3785098f cPlane, 0d10fa156 translator (+ 52c8f9ce's stack):
-  models gate base 131/189 docs 2111/2681, branch 132/189 2118/2681, only c2-lora-enclosure-ribs 39 -> 46/46; lead
-  reports the land. (e51c898c failed on a rebase conflict; rebased clean, re-queued.)
+- **LANDING core-rf (11-26 06:4x)**: a730d3fd FAILED 02:30 (rebase conflict, parity.rs: main's LiveRef `body`
+  beside my `created_by`, kept both); rebased with the zero-length plane merge (f378eeb7b + 714337378) on top, one
+  land.sh. Solver/cPlane/translator: models gate 131 -> 132/189 (lora ribs 39 -> 46/46), no doc worse.
 - **P0 SPEED (lead 11-26 05:2x, live/speed-audit-1126.md)**: v0.4.69 regressions found by profiles (NOSHAPE_KERNEL_PROFILE,
   vibex7 ~/tmp/core/spd: m/ models, pft.py, spd-prof.sh <doc> <0.4.68|new>, ~/qa-rel/<v>/noshape-cli): (a) 7a39ced92
   chains_overlap built every chain pair's trial chamfers + volumes; (b) 43e1e6945 ring_sweep cut (Rust Boolean
@@ -19,12 +17,21 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   = v0.4.68; mattie Chamfer 1 217-348 vs v0.4.68 ~100 (v0.4.69 740): re-time quiet; if still 2x, idea: decide overlap
   from `together`'s history (chamfer faces of two chains adjacent) instead of trial chamfers. 12b323a9c, 3dc691949,
   947b179c6 not involved. Then: impeller Fillet 3 (5512 vs live 100), knifehandle Fillet 3 (1345 vs 11).
-- **BOOL GATE 2 IN FLIGHT (11-26 05:24)**: 420fd5d01 (zero-length plane merge + vertex-offset fix; first gate 44abb6438
-  FAILED 2 kernel step tests: parallel faces a micron apart merged; all 608 kernel tests pass now). Gate 1 otherwise:
-  replay +0 -0, suite 132 -> 132, the only doc change lora's untranslated note gone (translator, benign). Running:
-  tools/bool/gate.sh 420fd5d01 --host vibex7 > /root/core-scratch/gate-zl2.out (VERDICT at end); PASS -> land.sh
-  core-rf (44abb6438 + 420fd5d01, rebase first). bool told (no conflict). Scissor 264eb3 WAGO 44 -> 41 faces as live.
-  Next after it: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck with the merge.
+- **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 (/root/core-rf-scratch/gate-420fd5d01.log): replay +0 -0 (parity56
+  513 -> 513, 0 differing), suite 132 -> 132, features 2106 -> 2106; its 1 "changed" doc is lora's untranslated note
+  gone (translator, 46/46 both); suite total 397 -> 624 s = load (branch ran at ~18, main cached; median doc 1.7x).
+  Landing with core-rf. Next: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck.
+- **IMPELLER FILLET REGRESSION ON MAIN (06:3x)**: since v0.4.70 the failing fillets "Flansch zum Stroemungskanal"
+  8.8 -> 27.2 s, "Bohrungssitz Ansaugflasch" 2.4 -> 9.2 s (same run, vibex7 load ~11-19; cli-nm = main without my
+  merge, so not the merge). Their blend runs 5x instead of once (blend.scaled / fallback.past_end_faces 5 vs 1,
+  op_fillet 12 vs 8), with the same input part (faces/edges/areas equal; ~/tmp/core/spd qf.py). No fillet code
+  changed since v0.4.70 (detail.rs only blame; features.cpp only chamfer/prism): suspect the regen around a failed
+  fillet (psui 8a62f4834 / 72bc8ad36 / 0ecf671cf blame) or a caller retrying. Next: find who calls op_fillet 12x
+  (gdb break on noshape::op_fillet with bt, as w/k/g.gdb did for projections).
+- **KNIFEHANDLE FILLET 3 (06:2x)**: conic, 1 edge, section blend via rolling balls: 7040 of 7284 projections are
+  ball_section's swept-side points (8 points x 20 fixed iterations x 2 projections). Patch
+  /root/core-scratch/settle.patch (stop when a point moves < r 1e-13), untested; then the run-on cut (op_boolean ~1 s
+  on B-spline faces: bool's). Probe: gdb -x w/k/g.gdb on a copy rolled back after Fillet 3 (w/k/k.noshape).
 - **QUEUE (lead 11-25 23:xx)**: (1) parse_refs (queued a730d3fd), (2) 97ad5f Delete face 1 (= live;
   merge gate above), (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
   (qa suites/gaps-1125). Then skasm's sweep items, BLEND-FAILS b-d.
