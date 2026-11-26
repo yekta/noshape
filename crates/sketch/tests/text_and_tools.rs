@@ -161,6 +161,26 @@ fn offset_circular_conic_stays_a_conic() {
     }
 }
 
+/// Live (skb 10-22 sketch Text font list): the 32 fonts in plain ASCII order, and which offer B and I (the others hide
+/// the button).
+#[test]
+fn sketch_fonts_are_lives_list_with_its_styles() {
+    use noshape_sketch::text::{SKETCH_DEFAULT_FONT, SKETCH_FONTS};
+    let names: Vec<&str> = SKETCH_FONTS.iter().map(|f| f.name).collect();
+    assert_eq!(names, [
+        "Allerta", "Allerta Stencil", "Arimo", "Balthazar", "Baumans", "Bebas Neue", "Comic Neue", "Courier Prime", "Didact Gothic", "Droid Sans Mono",
+        "Inconsolata", "Inter", "Michroma", "MPLUSRounded1c",
+        "Noto Sans", "Noto Sans Chinese Simplified", "Noto Sans Chinese Traditional", "Noto Sans Japanese", "Noto Sans Korean", "Noto Serif",
+        "Open Sans", "Orbitron", "Oswald", "Poppins", "PTSans", "Rajdhani", "Roboto", "Roboto Slab", "Ropa Sans", "Sofia Sans", "Source Sans Pro", "Tinos",
+    ]);
+    assert_eq!(SKETCH_DEFAULT_FONT, "Open Sans");
+    let with = |b: bool, i: bool| SKETCH_FONTS.iter().filter(|f| (f.bold, f.italic) == (b, i)).map(|f| f.name).collect::<Vec<_>>();
+    assert_eq!(with(true, true), ["Arimo", "Comic Neue", "Courier Prime", "Noto Sans", "Noto Serif", "Open Sans", "Poppins", "PTSans", "Roboto", "Sofia Sans", "Source Sans Pro", "Tinos"]);
+    assert_eq!(with(true, false), ["Inconsolata", "Inter", "MPLUSRounded1c", "Noto Sans Chinese Simplified", "Noto Sans Chinese Traditional", "Noto Sans Japanese", "Noto Sans Korean", "Orbitron", "Oswald", "Rajdhani", "Roboto Slab"]);
+    assert_eq!(with(false, true), ["Ropa Sans"]);
+    assert_eq!(with(false, false), ["Allerta", "Allerta Stencil", "Balthazar", "Baumans", "Bebas Neue", "Didact Gothic", "Droid Sans Mono", "Michroma"]);
+}
+
 #[test]
 fn every_sketch_font_lays_out_in_its_styles() {
     use noshape_sketch::text::{SKETCH_DEFAULT_FONT, SKETCH_FONTS, sketch_font_of_file};
