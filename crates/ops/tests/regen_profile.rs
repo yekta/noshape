@@ -462,6 +462,47 @@ fn bench_profdocs() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
+/// c2-impeller-loft's two fillets that fail (lead 11-26 P0: a fold check on every chain edge took them from 6-10 s and
+/// 3.5-5 s to 22 and 8 s; with it only where an edge bends tighter than its setback, 6-7.5 s and 4 s on vibex7): their sum
+/// under 18 s. The document is a parity model, kept off the repo: NOSHAPE_IMPELLER_DOC, else
+/// ~/agents/core-keep/c2-impeller-loft.noshape (vibex7); skipped without it.
+#[test]
+#[ignore = "T2: a parity model's slow fillets (~25 s)"]
+fn impeller_failing_fillets_stay_under_their_budget() {
+    let path = std::env::var_os("NOSHAPE_IMPELLER_DOC").map_or_else(|| std::path::PathBuf::from(format!("{}/agents/core-keep/c2-impeller-loft.noshape", std::env::var("HOME").unwrap_or_default())), std::path::PathBuf::from);
+    if !path.exists() {
+        eprintln!("skipped: no {}", path.display());
+        return;
+    }
+    let tmp = std::env::temp_dir().join(format!("noshape-impeller-{}", std::process::id()));
+    std::fs::create_dir_all(&tmp).unwrap();
+    let copy = tmp.join("impeller.noshape");
+    for x in ["", "-wal", "-shm"] {
+        let from = std::path::PathBuf::from(format!("{}{x}", path.display()));
+        if from.exists() {
+            std::fs::copy(&from, format!("{}{x}", copy.display())).unwrap();
+        }
+    }
+    let s = noshape_ops::session::Session::open(&copy).unwrap();
+    let units = s.doc.settings.units;
+    let mut slow = Vec::new();
+    for tab in &s.doc.tabs {
+        if let TabContent::PartStudio(ps) = &tab.content {
+            let r = Regenerator::new().regenerate(ps, &ConfigValues::default(), &units, &RegenOptions::default());
+            for (f, st) in ps.features.iter().zip(&r.display.features) {
+                if ["Fillet Flansch zum Stroemungskanal", "Fillet Ansaugflansch zum Gehaeuse"].contains(&f.name.as_str()) {
+                    slow.push((f.name.clone(), st.time_ms as f64));
+                }
+            }
+        }
+    }
+    let _ = std::fs::remove_dir_all(&tmp);
+    eprintln!("impeller fillets: {slow:?}");
+    assert_eq!(slow.len(), 2, "{slow:?}");
+    let total: f64 = slow.iter().map(|(_, ms)| ms).sum();
+    assert!(total < 18_000.0, "{total:.0} ms: {slow:?}");
+}
+
 /// Each document of NOSHAPE_PROFILE_DIR regenerated: a line per part (volume, faces, edges) and per feature not OK,
 /// to compare two builds' results (`diff` the outputs).
 #[test]

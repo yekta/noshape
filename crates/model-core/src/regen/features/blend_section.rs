@@ -1425,7 +1425,35 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
         // A round over a curve tighter than its setback on a support (c2-body-draft-naming's Fillet 2 across Fillet 1's
         // end: setback 9 mm, the end's radius 7.2 mm): its sections fold back there. Per piece the side it folds on and
         // the least radius along it.
-        let fold_of = |plo: f64, phi: f64| -> FResult<Option<(usize, f64)>> {
+        // (Their frames' turn along the edge is its own bend toward the face: only an edge bending tighter than half
+        // its setback at its middle needs the stations, each a distance to both faces (c2-impeller-loft's failing
+        // fillets: 3000 more, 6-10 s -> 22-25 s).)
+        let may_bend = |ci: usize, plo: f64, phi: f64| -> FResult<bool> {
+            let c = &chain[ci];
+            let info = c.shape.edge_info()?;
+            if matches!(info.curve, k::Curve::Line { .. }) {
+                return Ok(false);
+            }
+            let pts = (0..=32).map(|j| c.shape.point_at(info.first_param + (info.last_param - info.first_param) * j as f64 / 32.0)).collect::<Result<Vec<_>, _>>()?;
+            let bend = pts
+                .windows(3)
+                .map(|w| {
+                    let (a, b) = (w[1] - w[0], w[2] - w[1]);
+                    2.0 * a.cross(b).length() / (a.length() * b.length() * (w[2] - w[0]).length())
+                })
+                .filter(|x| x.is_finite())
+                .fold(0.0, f64::max);
+            if bend <= 0.0 {
+                return Ok(false);
+            }
+            let (_, fr, side1_first, _) = station((plo + phi) / 2.0)?;
+            let (s1, s2) = setbacks(&fr, spec, side1_first)?;
+            Ok(2.0 * bend * s1.max(s2) > 1.0)
+        };
+        let fold_of = |ci: usize, plo: f64, phi: f64| -> FResult<Option<(usize, f64)>> {
+            if !may_bend(ci, plo, phi)? {
+                return Ok(None);
+            }
             let mut least: Option<(usize, f64)> = None;
             let h = 1e-4 * (phi - plo);
             for j in 0..=16 {
@@ -1460,7 +1488,7 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             .collect();
         let may_fold = !whole && !held && spec.reference.is_none() && chain.len() > 1;
         let edge_folds = match may_fold {
-            true => edge_ranges.iter().map(|&(a, b, _)| fold_of(a, b)).collect::<FResult<Vec<_>>>()?,
+            true => edge_ranges.iter().map(|&(a, b, ci)| fold_of(ci, a, b)).collect::<FResult<Vec<_>>>()?,
             false => Vec::new(),
         };
         // A chamfer as sections: one loft (one face) per edge, as live's; others one along the chain.
