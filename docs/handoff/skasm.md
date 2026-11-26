@@ -17,14 +17,11 @@ differs from the part's; boolean.cpp same_torus + share_bspline_surfaces groups 
 round trip on vibex7: all 22 live.igs match live (were 16 diffs); STEP/x_t 49/50, c2-rings-loft STEP 762 vs 767 edges
 predates this (same with the colour rule off). Lead told 07:10. Main RED 78dea5ae7 = ops parity a_face_* (flaky, not mine).
 
-GLYPH-CIRCLE lone glyph DONE e674ed802 (08:03, not queued: waits for 8efe6acf on main, then land.sh with 4fee2452a):
-the glyph sits 38.5 px from the point at right angles to the line to the pointer, upper side (gl5's pointer was parked
-at (1700,950): all 17 within 5°). REQUESTS row withdrawn. Taken-spot case keeps the old left row (ticket still open).
-Assembly diffs (Fastened step 3, asm face menu) were a476fa14f (landed).
+LANDED 8efe6acf (Parasolid, replicate order, IGES torus/colour). LANDING 09:00: e674ed802 GLYPH-CIRCLE lone glyph (38.5 px
+at right angles to the pointer, upper side; gl5 within 5°; taken spot keeps the old left row, ticket open), f469d778b
+(inference-1866 test), 43369c763 (a point under a hovered dimension label takes the hover: the speed T2's S50 run 3 found
+nothing lit, hover_constraint = the width's label). Speed T2 rerun b4zlou463 (sp.sh) after it.
 
-Speed T2 (sp.sh, vibex7, ~/tmp/skasm/sp-full.log there) FAILS: S50 run 3 "the corner lit under the pointer": hover
-None. Uncommitted diagnostic in latency_tests.rs:752 prints view hover / hover_constraint / gpu pick / tile / held /
-selection. Suspect: the width's label over the corner takes hover (sketch_hover's "glyph/label hovered" early return).
 Sketch feel-coverage audit (started 08:15): 221 sketch sections in behaviours.md, 126 cited by code (script
 /root/skasm-scratch/audit-sections.txt; key = capture dir / ticket id / title, case-insensitive), 95 not. Spot-checked 9
 uncited: 8 covered under other names, 1 gap (inference-1866 midpoint-up PERPENDICULAR/VERTICAL): test f469d778b, ours
