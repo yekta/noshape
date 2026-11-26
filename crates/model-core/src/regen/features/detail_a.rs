@@ -218,16 +218,27 @@ pub(super) fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize]
             }
         }
     }
+    // A larger cylinder a removed one rolls along (touching it down their axes) is its support, not another blend
+    // (asm-scissor-lift Studio 9cbb0e's Move face 2: an r 5 round's r 76.77 arc wall went too, the round had no
+    // supports left and the Move face failed).
+    let radius = |f: usize| match faces[f].face_surface() {
+        Ok(k::Surface::Cylinder { radius, .. }) => Some(radius),
+        _ => None,
+    };
+    let support = |ei: usize, from: usize, to: usize| {
+        let line = shape.sub_shape(ShapeType::Edge, ei).ok().and_then(|e| e.edge_curve().ok()).is_some_and(|c| matches!(c, k::Curve::Line { .. }));
+        line && radius(from).zip(radius(to)).is_some_and(|(r0, r1)| r1 > r0 * (1.0 + 1e-6))
+    };
     // Blends touching removed blends (corner patches between two fillets).
     loop {
         let before = set.len();
-        for fs in &ef {
+        for (ei, fs) in ef.iter().enumerate() {
             if fs.len() == 2 {
                 let (a, b) = (fs[0] as usize, fs[1] as usize);
-                if set.contains(&a) && !set.contains(&b) && may_join(b) && is_blend(b) {
+                if set.contains(&a) && !set.contains(&b) && may_join(b) && !support(ei, a, b) && is_blend(b) {
                     set.insert(b);
                 }
-                if set.contains(&b) && !set.contains(&a) && may_join(a) && is_blend(a) {
+                if set.contains(&b) && !set.contains(&a) && may_join(a) && !support(ei, b, a) && is_blend(a) {
                     set.insert(a);
                 }
             }

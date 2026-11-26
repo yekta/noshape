@@ -129,6 +129,31 @@ impl History {
         History { records }
     }
 
+    /// This history followed by `next`'s, an operation on this one's output (its argument 0): each record carried on
+    /// to where `next` put its output; outputs `next` has no record of are dropped.
+    pub fn then(&self, next: &History) -> History {
+        let by = next.by_input();
+        let mut records = Vec::new();
+        for r in &self.records {
+            if r.relation == Relation::Deleted {
+                records.push(*r);
+                continue;
+            }
+            for n in by.get(&(0, r.output_kind, r.output_index)).into_iter().flatten() {
+                let relation = match (r.relation, n.relation) {
+                    (_, Relation::Deleted) => Relation::Deleted,
+                    (Relation::Kept, x) => x,
+                    (x, Relation::Kept | Relation::Modified) => x,
+                    (_, x) => x,
+                };
+                records.push(HistoryRecord { relation, output_kind: n.output_kind, output_index: n.output_index, ..*r });
+            }
+        }
+        let mut seen = std::collections::HashSet::with_capacity(records.len());
+        records.retain(|r| seen.insert(*r));
+        History { records }
+    }
+
     /// Records whose input is (`arg`, `kind`, `index`).
     pub fn of_input(&self, arg: u32, kind: ShapeType, index: u32) -> impl Iterator<Item = &HistoryRecord> {
         self.records

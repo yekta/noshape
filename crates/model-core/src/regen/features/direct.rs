@@ -266,19 +266,57 @@ fn tweak(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> bool {
     true
 }
 
-/// The outward normal the faces share when every one is a plane facing that way.
-fn facing_one_way(faces: &[Shape]) -> Option<DVec3> {
-    let mut way = None;
-    for f in faces {
+/// Planes offset as translations along their outward normals, the planes facing one way at a time, their neighbours
+/// re-trimmed in place: each step's way, points on its faces, and result. None unless every face is a
+/// plane and every step makes one valid solid (asm-scissor-lift Studio b58244's Move face 6: two notches' floors
+/// tilted apart; OCCT's offset was invalid and the booleans' slabs fell short of the tilted walls).
+fn tweak_planes_in_turn(shape: &Shape, faces: &[usize], dist: f64) -> Option<Vec<(DVec3, Vec<DVec3>, k::OpResult)>> {
+    let all = shape.faces();
+    // Each face's outward normal and a point inside it (to find it again after the steps before its own).
+    let mut groups: Vec<(DVec3, Vec<DVec3>)> = Vec::new();
+    for &fi in faces {
+        let f = all.get(fi)?;
         f.face_plane().ok()??;
-        let n = f.normal_at_point(f.centroid().ok()?).ok()?;
-        match way {
-            None => way = Some(n),
-            Some(w) if w.dot(n) > 1.0 - 1e-12 => {}
-            Some(_) => return None,
+        let p = inner_point(f)?;
+        let n = f.normal_at_point(p).ok()?;
+        match groups.iter_mut().find(|(m, _)| m.dot(n) > 1.0 - 1e-12) {
+            Some(g) => g.1.push(p),
+            None => groups.push((n, vec![p])),
         }
     }
-    way
+    // Planes facing several ways only among planes (a curved neighbour's crossings left to OCCT's offset).
+    if groups.len() > 1 {
+        let ef = shape.edge_faces().ok()?;
+        let beside = ef.iter().filter(|fs| fs.iter().any(|f| faces.contains(&(*f as usize)))).flatten();
+        if beside.clone().any(|&f| !all.get(f as usize).is_some_and(|x| x.is_planar())) {
+            return None;
+        }
+    }
+    let mut cur = shape.clone();
+    let mut steps = Vec::new();
+    for (n, points) in groups {
+        let now = cur.faces();
+        let moved = planes_at(&cur, n, &points)?;
+        let shapes: Vec<Shape> = moved.iter().map(|&i| now[i].clone()).collect();
+        let r = k::tweak_faces(&cur, &shapes, &k::Transform::Matrix(DMat4::from_translation(n * dist))).ok().filter(|r| r.shape.count(ShapeType::Solid) == 1 && r.shape.is_valid())?;
+        cur = r.shape.clone();
+        steps.push((n, points, r));
+    }
+    Some(steps)
+}
+
+/// [`tweak_planes_in_turn`] as one operation, its steps' histories followed through.
+fn tweak_planes(shape: &Shape, faces: &[Shape], dist: f64) -> Option<k::OpResult> {
+    let idx: Vec<usize> = faces.iter().map(|f| shape.index_of(f, ShapeType::Face)).collect::<Option<_>>()?;
+    let mut steps = tweak_planes_in_turn(shape, &idx, dist)?.into_iter().map(|(_, _, r)| r);
+    let first = steps.next()?;
+    Some(steps.fold(first, |acc, r| k::OpResult { history: acc.history.then(&r.history), shape: r.shape }))
+}
+
+/// The planar faces of `shape` through `points`, facing `n`.
+fn planes_at(shape: &Shape, n: DVec3, points: &[DVec3]) -> Option<Vec<usize>> {
+    let all = shape.faces();
+    points.iter().map(|p| all.iter().position(|f| f.is_planar() && f.normal_at_point(*p).is_ok_and(|m| m.dot(n) > 1.0 - 1e-12) && f.contains_point(*p, 1e-9).unwrap_or(false))).collect()
 }
 
 /// Whether a face in `faces` of `shape` or one sharing an edge with them is a freeform surface (not a plane, cylinder,
@@ -433,7 +471,12 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
             if !blends.is_empty() {
                 let td = translate_dir;
                 super::detail_a::reblend(ev, bi, &faces, &blends, failed_msg, |shape, fs| match td {
-                    None => k::offset_faces(shape, fs, dist),
+                    // OCCT's offset, else (invalid: b58244's Move face 6, two notches' floors tilted apart, their rounds
+                    // removed) the planes moved one way at a time.
+                    None => match k::offset_faces(shape, fs, dist) {
+                        Ok(r) if r.shape.is_valid() && r.shape.count(ShapeType::Solid) == 1 => Ok(r),
+                        other => tweak_planes(shape, fs, dist).map_or(other, Ok),
+                    },
                     Some(d) => {
                         let each: Vec<f64> = fs.iter().map(|s| s.face_plane().ok().flatten().map_or(0.0, |pl| dist * pl.unit_normal().dot(d))).collect();
                         k::offset_faces_each(shape, fs, &each)
@@ -444,20 +487,24 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         }
         // Planes facing one way: their offset is a translation along that way, the neighbours re-trimmed in place
         // (c2-impeller-loft's Flansch (vorne) verbreitern: OCCT's offset 0.8 s and invalid, then the booleans).
-        let tweaked = if translate_dir.is_none() { facing_one_way(&shapes).and_then(|n| k::tweak_faces(&body.shape, &shapes, &k::Transform::Matrix(DMat4::from_translation(n * dist))).ok()).filter(|r| r.shape.count(ShapeType::Solid) == 1 && r.shape.is_valid()) } else { None };
-        if let Some(r) = tweaked {
-            // A moved face the Offset of the one it was, the others keeping their names, as the booleans named them
-            // (v0.4.58's c2-impeller-loft Flansch (vorne) verbreitern, OCCT's offset invalid: a fillet's edges); the
-            // booleans' piece of the moved face (Move face 2's faces) and OCCT's offset names (every face the Offset of
-            // the one it was) still find them.
-            let kept = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &BTreeMap::new(), None);
-            let moved: BTreeSet<&Name> = faces.iter().map(|&fi| &body.faces[fi]).collect();
-            let feature = ev.feature;
-            let offset = |k: &Name| -> Name { Arc::new(TopoName::face(feature, Role::Offset(k.clone()))) };
-            let names: Vec<Name> = kept.iter().map(|k| if moved.contains(k) { offset(k) } else { k.clone() }).collect();
-            let old = kept.iter().zip(&names).map(|(k, n)| if moved.contains(k) { (Arc::new(TopoName::Split { parent: n.clone(), by: feature, ordinal: 0 }), n.clone()) } else { (offset(k), n.clone()) });
-            ev.ctx.bodies.add_aliases(old.collect::<Vec<_>>());
-            ev.replace_body(bi, r.shape, names);
+        let tweaked = if translate_dir.is_none() { tweak_planes_in_turn(&body.shape, &faces, dist) } else { None };
+        if let Some(steps) = tweaked {
+            for (n, points, r) in steps {
+                let body = ev.ctx.bodies[bi].clone();
+                let fs = planes_at(&body.shape, n, &points).ok_or_else(|| fe(failed_msg))?;
+                // A moved face the Offset of the one it was, the others keeping their names, as the booleans named them
+                // (v0.4.58's c2-impeller-loft Flansch (vorne) verbreitern, OCCT's offset invalid: a fillet's edges); the
+                // booleans' piece of the moved face (Move face 2's faces) and OCCT's offset names (every face the Offset of
+                // the one it was) still find them.
+                let kept = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &BTreeMap::new(), None);
+                let moved: BTreeSet<&Name> = fs.iter().map(|&fi| &body.faces[fi]).collect();
+                let feature = ev.feature;
+                let offset = |k: &Name| -> Name { Arc::new(TopoName::face(feature, Role::Offset(k.clone()))) };
+                let names: Vec<Name> = kept.iter().map(|k| if moved.contains(k) { offset(k) } else { k.clone() }).collect();
+                let old = kept.iter().zip(&names).map(|(k, n)| if moved.contains(k) { (Arc::new(TopoName::Split { parent: n.clone(), by: feature, ordinal: 0 }), n.clone()) } else { (offset(k), n.clone()) });
+                ev.ctx.bodies.add_aliases(old.collect::<Vec<_>>());
+                ev.replace_body(bi, r.shape, names);
+            }
             continue;
         }
         // Else, faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls

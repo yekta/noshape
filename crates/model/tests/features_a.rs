@@ -2307,6 +2307,118 @@ fn move_face_offset_of_a_flange_face_a_tube_runs_along() {
     assert_eq!(wall, 1, "faces {}", body.faces.len());
 }
 
+/// A plate's cutout: a flat side meeting an r 75 arc wall through an r 5 round, the arc meeting the far side through
+/// another. The flat side offset 15 mm in, Reapply fillet on: the round is rolled again between it and the arc run on
+/// up to it, as live (asm-scissor-lift Studio 9cbb0e's Move face 2 removed the arc too, as a round between the two
+/// rounds, and failed). The same as the cutout drawn 15 mm higher.
+#[test]
+fn move_face_offset_rolls_a_round_again_on_the_arc_wall_it_runs_along() {
+    let plate = |side: f64, rounds: bool| {
+        let mut t = T::new();
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.1, -0.02, 0.1, 0.13));
+        let r = t.regions(s)[0].clone();
+        t.extrude(r, "7 mm", "NEW");
+        let (c, rad) = (DVec2::new(0.0, 0.04), 0.075);
+        let x_at = |y: f64| (rad * rad - (y - c.y) * (y - c.y)).sqrt();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p: Vec<_> = [DVec2::new(0.008, 0.02), DVec2::new(0.008, side), DVec2::new(x_at(side), side), DVec2::new(x_at(0.02), 0.02)].iter().map(|q| sk.add_point(*q)).collect();
+        let centre = sk.add_point(c);
+        sk.add_line_between(p[0], p[1]).unwrap();
+        sk.add_line_between(p[1], p[2]).unwrap();
+        sk.add_arc_between(centre, p[3], p[2]).unwrap();
+        sk.add_line_between(p[3], p[0]).unwrap();
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = t.regions(s)[0].clone();
+        let cut = t.extrude(r, "7 mm", "REMOVE");
+        t.set(cut, "symmetric", b(true));
+        let res = t.ok();
+        let body = solids(&res.context)[0];
+        let corners: Vec<Reference> = [DVec3::new(x_at(side), side, 0.0035), DVec3::new(x_at(0.02), 0.02, 0.0035)].iter().map(|q| edge_near(body, *q)).collect();
+        if rounds {
+            t.add("fillet", &[("entities", q(corners)), ("radius", e("5 mm"))]);
+        }
+        t
+    };
+    for rounds in [true, false] {
+        let mut t = plate(0.095, rounds);
+        let res = t.ok();
+        let body = solids(&res.context)[0];
+        let side = body.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|pl| pl.unit_normal().dot(-DVec3::Y) > 0.999) && f.project_point(DVec3::new(0.03, 0.095, 0.0035)).is_ok_and(|q| q.distance < 1e-9)).expect("the cutout's flat side");
+        let faces = body.faces.len();
+        t.add("moveFace", &[("moveFaces", q(vec![Reference::Face((*body.faces[side]).clone())])), ("offsetDistance", e("15 mm")), ("oppositeDirection", b(true))]);
+        let res = t.ok();
+        let body = solids(&res.context)[0];
+        assert!(body.shape.is_valid(), "rounds {rounds}");
+        let want = plate(0.11, rounds).ok();
+        let (v, w) = (total_volume(&res.context), total_volume(&want.context));
+        assert!(near(v, w, 1e-7), "rounds {rounds}: {} mm3 vs the cutout drawn higher {} mm3", v * 1e9, w * 1e9);
+        assert_eq!(body.faces.len(), faces, "rounds {rounds}");
+        let r5 = body.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 0.005).abs() < 1e-9)).count();
+        assert_eq!(r5, if rounds { 2 } else { 0 });
+    }
+}
+
+/// Two notches' floors tilted apart between slightly tilted walls, offset 1 mm out together: each floor moves along its
+/// own normal and the walls follow, as the outline drawn so (asm-scissor-lift Studio b58244's Move face 6: OCCT's offset
+/// came out invalid, the booleans' slabs fell short of the walls; the Move face failed).
+#[test]
+fn move_face_offset_of_floors_facing_two_ways() {
+    let outline = |pts: &[DVec2], rounds: bool| {
+        let mut t = T::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let ids: Vec<_> = pts.iter().map(|p| sk.add_point(*p * 0.001)).collect();
+        for i in 0..ids.len() {
+            sk.add_line_between(ids[i], ids[(i + 1) % ids.len()]).unwrap();
+        }
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = t.regions(s)[0].clone();
+        t.extrude(r, "10 mm", "NEW");
+        if rounds {
+            let res = t.ok();
+            let corners: Vec<Reference> = [4usize, 5, 8, 9].iter().map(|&i| edge_near(solids(&res.context)[0], DVec3::new(pts[i].x * 0.001, pts[i].y * 0.001, 0.005))).collect();
+            t.add("fillet", &[("entities", q(corners)), ("radius", e("1 mm"))]);
+        }
+        t
+    };
+    let v = |x: f64, y: f64| DVec2::new(x, y);
+    let pts = [v(30.0, -38.0), v(72.0, -38.0), v(72.0, 29.33), v(61.96, 29.33), v(61.96, 24.92), v(56.62, 23.97), v(56.62, 29.33), v(46.09, 29.33), v(46.48, 21.14), v(40.99, 21.91), v(41.15, 29.33), v(30.0, 29.33)];
+    let floors = [4usize, 8];
+    // The outline with each floor (pts[i] to pts[i + 1]) moved 1 mm along its outward normal, met again by its walls.
+    let mut moved = pts;
+    for &i in &floors {
+        let (a, b) = (pts[i], pts[i + 1]);
+        let n = DVec2::new(b.y - a.y, a.x - b.x).normalize();
+        let meet = |p: DVec2, q: DVec2| {
+            let (d, e) = (b - a, q - p);
+            let t = ((p - (a + n)).perp_dot(e)) / d.perp_dot(e);
+            a + n + d * t
+        };
+        moved[i] = meet(pts[i - 1], pts[i]);
+        moved[i + 1] = meet(pts[i + 1], pts[i + 2]);
+    }
+    for rounds in [false, true] {
+        let mut t = outline(&pts, rounds);
+        let res = t.ok();
+        let body = solids(&res.context)[0];
+        let picked: Vec<Reference> = floors
+            .iter()
+            .map(|&i| {
+                let m = (pts[i] + pts[i + 1]) * 0.0005;
+                let fi = body.shape.faces().iter().position(|f| f.is_planar() && f.project_point(DVec3::new(m.x, m.y, 0.005)).is_ok_and(|q| q.distance < 1e-9)).expect("a floor");
+                Reference::Face((*body.faces[fi]).clone())
+            })
+            .collect();
+        t.add("moveFace", &[("moveFaces", q(picked)), ("offsetDistance", e("1 mm"))]);
+        let res = t.ok();
+        let body = solids(&res.context)[0];
+        assert!(body.shape.is_valid(), "rounds {rounds}");
+        let want = outline(&moved, rounds).ok();
+        let (got, w) = (total_volume(&res.context), total_volume(&want.context));
+        assert!(near(got, w, 1e-9), "rounds {rounds}: {} mm3 vs the outline drawn so {} mm3", got * 1e9, w * 1e9);
+        assert_eq!(body.faces.len(), solids(&want.context)[0].faces.len(), "rounds {rounds}");
+    }
+}
+
 #[test]
 fn move_face_offset_and_translate() {
     let mut t = T::new();

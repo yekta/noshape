@@ -1,12 +1,11 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 13:4x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 15:01 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf 11-26**: QUEUED 799ae65a 13:1x (6 commits: f8890c9d cov2 face blends, 9a9df3ee fold-check P0 + T2 guard
-  regen_profile::impeller_failing_fillets_stay_under_their_budget, 81343293 qa R12 overflow, handoffs, 1916587c4 Fill 1).
+- **LANDING core-rf 11-26**: QUEUED 2b8aa8ed 14:0x (carries 799ae65a, c5619f82, 1719d98d: Fill 1, Body draft, Split, MF1).
 - **FILL 1 DONE (1916587c4)**: blend_section.rs pinch_corner + fill_pinched_corner (live's 3-edge corner). Left: our G1
   fill 120.347 vs live's G2 121.947 mm2 (OCCT plate declines G2); a fair G2 fill fixes our Fill feature too. Parity docs
   need a FRESH parity run (save/ copies keep old references): .bd2.sh.
@@ -20,20 +19,24 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   extrudes_made_puts_the_first_extrudes_piece_first.
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
-- **SCISSOR RUN 11-26 13:37** (.pa.sh n1126; /root/core-scratch/sc-fails-1126.txt = live-OK differences, st-1126.out =
-  failing features per Studio in list order). No blend is a Studio's first failure: all fillet/chamfer errors follow
-  earlier ones. First divergences: Move face offset 9cbb0e MF2, b58244 MF6, 404ddb MF1, 92138f MF1; Draft 2d82a0 D1,
-  b7e381 D2; Replace face 0139f2 RF1, edcbb0 RF1; Extrude e24753 E3; Thicken 665cf3; Mirror fed22d M5; references
-  37a1a7 T3, 4ce5c7 DF1, 57725f T1, 5aae43 B1, 0c2c42 P1. REGRESSION since 11-25 12:51 (reported to lead 13:5x):
-  92138f, bdddaf, fddd23 were as live, now fail early (fddd23 Extrude 1 "Select face or sketch region"); 97ad5f
-  Sketch 2 Error->Warning then Extrude 2 fails (skasm bisects, P0). NEW: 608/Roller occurrences moved 5-8 mm, BOM 72
-  vs 87. MOVE FACE 404ddb MF1 FIXED (direct.rs face_slab: probe off inner_point, not the centroid in the bore; planes'
-  slab = prism so walls merge: live 14 faces, 73951.72 vs .857; Fillet 1 = live). T1 features_a::move_face_offset_of_a_
-  flange_face_a_tube_runs_along. Then 404ddb Fillet 2: our import kept 2 of live's 3 edge queries (the "&" one likely
-  dropped because references were matched while MF1 failed): re-run .pa.sh after the land. 9cbb0e MF2 (Frame Plate, 2
-  faces -15 mm): reblend path -> offset_faces fails; tweak "a moved face no longer meets its neighbour"; prism cut
-  110110 vs live 109400.89 mm3, 46 vs 44 faces: live extends the sloping neighbours (dump: dmp.sh <tab> <feature>
-  offsetfaces; probe core-scratch/zz_move_face_probe.rs + .mfp.sh). Then b58244 MF6, Drafts 2d82a0 D1 / b7e381 D2.
+- **SCISSOR 11-26 15:0x (core-rf, commit + land.sh)**: (a) detail_a.rs blends_to_reapply: the spread
+  to "blends touching removed blends" skips a LARGER cylinder met along a line (the round's support): 9cbb0e MF2 now
+  live's 44 faces, 109400.892 (live .89). (b) direct.rs tweak_planes_in_turn: planes facing several ways (all
+  neighbours planar) tweaked one way at a time; also the fallback in move_face's reblend closure when OCCT's offset is
+  invalid (tweak_planes composes histories with new kernel History::then): b58244 MF6 OK (was Error). (c) features.cpp
+  FaceTweak::prepare: a staying edge with a moving end on a TRIMMED unbounded/periodic curve (an earlier tweak's
+  edge) gets its basis curve back -> re-trimmed (box top then side: 1440 vs 1560 mm3 before). Tests: features_a
+  move_face_offset_rolls_a_round_again_on_the_arc_wall_it_runs_along (fails on old code), move_face_offset_of_floors_
+  facing_two_ways (guard only: synthetic OCCT offset stays valid), kernel offset::histories_followed_through_two_tweaks.
+- **Fresh scissor run 14:37** (.pa2.sh, vibex7 ~/tmp/core/sc d-1126 = 13:37 baseline, d-now): 213/239 occ, 27/41 mates,
+  63/87 BOM. Fixed rows: 404ddb MF1/MF2/Fillet 1/5/14/Chamfer 1, 9cbb0e MF2, 2d82a0 Fillet 4/5/7, MF1/3/9, RF2. New rows
+  (downstream of now-working features: references matched at import while those failed, or real): 404ddb Hole 2,
+  Mirror 1, Split 1 (Standard_NullObject), Extrude 5-8, Boolean 1/2, Fillet 13; 9cbb0e Move face 7, Chamfer 11. 2d82a0
+  now fails from "Position" (sketch/region regression, skasm's P0 bisect). TAB IDS CHANGE PER IMPORT: now 404ddb
+  3e4201fa396e07ca, 9cbb0e bd4d5e98ff402bd7, 2d82a0 8a437c048c49570a, b58244 e14c1dc1b84dfdc3 (vibex7
+  ~/tmp/core/sc/st.sh <tabs> lists failing features; mfq.sh / dmp.sh take tab + feature). b58244 next: Plane 1 Error
+  (likely import-time ref): re-run .pa2.sh after these land, then 404ddb Hole 2 / Split 1, 9cbb0e MF7, Drafts
+  2d82a0 D1 / b7e381 D2 (item 1 of the lead's list: 404ddb Fillet 2 refs: check in that re-run).
 - **BOOL's SLOW ROWS for me (lead 11-26, after blend failures; vibex7 ~/tmp/bool/sel-main.jsonl)**: Delete face 2 1409 vs
   11 ms; surf-intro Derived 1 x5 505 vs 65; parting-line Split 3 / Drafts; sm-rocker Mirror 3.
 - **REPLACE FACE 1 (bool's, c2-replace-face-exercise)**: landed 83082091 (reblend adds curved edges first: 4 spheres).

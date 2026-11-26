@@ -14451,6 +14451,27 @@ public:
       x.NearestPoints(a, b);
       points.Bind(v, gp_Pnt((a.XYZ() + b.XYZ()) / 2));
     }
+    // A staying edge whose end moves, on a stretch of an unbounded or periodic curve (an earlier tweak's new edge): the
+    // whole curve, trimmed again below (a block's side moved after its top: the top's edges stopped short of it).
+    for (int i = 1; i <= ef.Extent(); ++i)
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+      TopoDS_Vertex      v1, v2;
+      TopExp::Vertices(e, v1, v2);
+      if (curves.IsBound(e) || BRep_Tool::Degenerated(e) || v1.IsNull() || v2.IsNull() || (!points.IsBound(v1) && !points.IsBound(v2)))
+        continue;
+      TopLoc_Location                      l;
+      double                               f0, l0;
+      const occ::handle<Geom_TrimmedCurve> tc = occ::down_cast<Geom_TrimmedCurve>(BRep_Tool::Curve(e, l, f0, l0));
+      if (tc.IsNull())
+        continue;
+      occ::handle<Geom_Curve> c = occ::down_cast<Geom_Curve>(tc->BasisCurve()->Copy());
+      if (!Precision::IsInfinite(c->FirstParameter()) && !Precision::IsInfinite(c->LastParameter()) && !c->IsPeriodic())
+        continue;
+      if (!l.IsIdentity())
+        c->Transform(l.Transformation());
+      curves.Bind(e, c);
+    }
     // An unbounded new curve (a plane's line across a cylinder) or an open stretch of a periodic one (a circle) trimmed
     // to its edge's new ends: its curves on the faces are projected over its range.
     for (int i = 1; i <= ef.Extent(); ++i)

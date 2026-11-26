@@ -183,3 +183,24 @@ fn dumped_offset_probe() {
     let r = offset_solid(&s, &faces, &dist, 0);
     println!("{:?} in {:?}\n{}", r.as_ref().map(|r| vol_mm3(&r.shape)), t.elapsed(), last_offset_report());
 }
+
+/// Two tweaks one after the other (a block's top up 2 mm, then its +x side out 3 mm): their histories followed through
+/// take the first's top and side faces to the faces they are in the second's result, and the top's edges the first
+/// made run on to the moved side (they stopped 1 mm past their old ends: 1440 mm3, not 1560).
+#[test]
+fn histories_followed_through_two_tweaks() {
+    let b = make_box_corners(DVec3::ZERO, DVec3::new(0.01, 0.01, 0.01)).unwrap();
+    let face_at = |s: &Shape, p: DVec3| s.faces().iter().position(|f| f.project_point(p).is_ok_and(|q| q.distance < 1e-12)).unwrap();
+    let top = face_at(&b, DVec3::new(0.005, 0.005, 0.01));
+    let side = face_at(&b, DVec3::new(0.01, 0.005, 0.005));
+    let up = |s: &Shape, f: usize, v: DVec3| tweak_faces(s, &[s.faces()[f].clone()], &Transform::Matrix(glam::DMat4::from_translation(v))).unwrap();
+    let r1 = up(&b, top, DVec3::new(0.0, 0.0, 0.002));
+    let side1 = face_at(&r1.shape, DVec3::new(0.01, 0.005, 0.005));
+    let r2 = up(&r1.shape, side1, DVec3::new(0.003, 0.0, 0.0));
+    let h = r1.history.then(&r2.history);
+    let images = |f: usize| h.modified(0, ShapeType::Face, f as u32);
+    assert_eq!(images(top), vec![face_at(&r2.shape, DVec3::new(0.005, 0.005, 0.012)) as u32]);
+    assert_eq!(images(side), vec![face_at(&r2.shape, DVec3::new(0.013, 0.005, 0.005)) as u32]);
+    let v = r2.shape.volume().unwrap();
+    assert!((v / (0.013 * 0.01 * 0.012) - 1.0).abs() < 1e-9, "{} mm3", v * 1e9);
+}
