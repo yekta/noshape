@@ -80,16 +80,16 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                         let blocked = !stale.is_empty();
                         let value = on.get();
                         noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": "Enable workspace protection", "kind": "checkbox", "value": value }));
+                        // (The box is what a script clicks, as live's input: the row's middle can sit under a toast.)
                         h_flex()
                             .id("ws-protect")
-                            .map(|d| noshape_app_core::ui_script::mark(d, || "checkbox:Enable workspace protection".into()))
                             // A clicked checkbox takes the keyboard (live ver-protection-enable).
                             .focusable()
                             .when(blocked, |d| d.opacity(0.5))
                             .h(px(26.))
                             .gap(px(6.))
                             .cursor_pointer()
-                            .child(div().size(px(13.)).flex_none().flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(if on.get() { rgb(0x0075ff) } else { rgb(0x767676) }).bg(if on.get() { rgb(0x0075ff) } else { rgb(0xffffff) }).when(on.get(), |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))))
+                            .child(div().debug_selector(|| "ws-protect-box".into()).size(px(13.)).flex_none().map(|d| noshape_app_core::ui_script::mark(d, || "checkbox:Enable workspace protection".into())).flex().items_center().justify_center().rounded(px(2.)).border_1().border_color(if on.get() { rgb(0x0075ff) } else { rgb(0x767676) }).bg(if on.get() { rgb(0x0075ff) } else { rgb(0xffffff) }).when(on.get(), |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))))
                             .child(div().font_weight(FontWeight::SEMIBOLD).child("Enable workspace protection"))
                             .on_click(move |_, window, _| {
                                 if blocked {

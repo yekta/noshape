@@ -10328,3 +10328,41 @@ fn a_dimension_on_an_edge_the_sketch_already_fixes_as_live(cx: &mut TestAppConte
         assert_eq!((stored, row(cx).map(|r| r.0)), (vec![200, 400], Some(FeatureStatus::Ok)), "Ctrl+Z: the dimension gone, solved");
     }
 }
+
+/// Live ui-parity sketch-offset (11-25 retake): a rectangle's bottom side picked with Offset, a click 7 px outside it
+/// lands on the picked side and drops it: nothing previewed, nothing selected, no distance box, nothing made.
+#[gpui::test]
+fn offset_a_click_beside_the_picked_side_drops_it(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "offset-reclick", Tool::CornerRect);
+    click(cx, window, &view, (450., 300.));
+    click(cx, window, &view, (650., 420.));
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Offset, w, cx))).unwrap();
+    draw(cx, window);
+    let (bottom, curves) = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let mids: Vec<DVec2> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line).filter_map(|e| { let (a, b) = d.sketch.endpoints(e.id)?; Some((d.sketch.point(a)? + d.sketch.point(b)?) * 0.5) }).collect();
+        (*mids.iter().min_by(|a, b| a.y.total_cmp(&b.y)).unwrap(), d.sketch.entities().filter(|e| e.kind() != noshape_sketch::EntityKind::Point).count())
+    });
+    let on = on_screen(cx, &view, bottom);
+    click(cx, window, &view, (on.x, on.y));
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).sketch.as_ref().is_some_and(|ed| ed.offset_pending.is_some())), "the pick previews");
+    // 7 px outside the side, on screen.
+    let below = on_screen(cx, &view, bottom - DVec2::Y * 1e-3);
+    let at = on + (below - on).normalize() * 7.0;
+    let label = cx.update(|cx| { let v = view.read(cx); let d = v.sketch_data(cx).unwrap(); v.sketch.as_ref().unwrap().offset_value_label(&d.sketch).map(|(p, _)| on_screen_in(v, p, cx)) });
+    let origin = cx.update(|cx| view.read(cx).viewport.read(cx).origin());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(gpui_kit::point(origin.x + px(at.x as f32), origin.y + px(at.y as f32)), Modifiers::default());
+    draw(cx, window);
+    let got = cx.update(|cx| {
+        let v = view.read(cx);
+        let ed = v.sketch.as_ref().unwrap();
+        (ed.offset_pending.is_some(), ed.selection.len(), v.ui_ref().is_some_and(|u| u.offset_input.is_some()), v.sketch_data(cx).unwrap().sketch.entities().filter(|e| e.kind() != noshape_sketch::EntityKind::Point).count())
+    });
+    assert_eq!(got, (false, 0, false, curves), "(previewing, selected, box, curves) after the click at {at:?}; the value label at {label:?}, the side at {on:?}");
+}
+
+fn on_screen_in(v: &PartStudioView, q: DVec2, cx: &gpui_kit::App) -> Option<DVec2> {
+    v.viewport.read(cx).project(v.sketch.as_ref()?.frame.to_world(q))
+}

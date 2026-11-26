@@ -703,7 +703,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                         let from = if what == "hover" && from == at { at - point(px(0.), px(40.)) } else { from };
                         for k in 1..=3 {
                             let p = from + (at - from) * (k as f32 / 3.0);
-                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
+                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: Modifiers::default() }), cx));
                             if k < 3 {
                                 sleep(cx, 20).await;
                             }
@@ -726,7 +726,17 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             "hover" => (MouseButton::Left, 0),
                             _ => (MouseButton::Left, 1),
                         };
+                        // The step's keys go down once the pointer rests and up after the click, as live's runner
+                        // (mate-connector-shift-lock-inference: Shift locks what the pointer came to, not its way there).
+                        let held_keys = |m: Modifiers| PlatformInput::ModifiersChanged(ModifiersChangedEvent { modifiers: m, capslock: Default::default() });
+                        if mods != Modifiers::default() {
+                            let _ = cx.update(|window, cx| window.dispatch_event(held_keys(mods), cx));
+                            sleep(cx, 150).await;
+                        }
                         let _ = cx.update(|window, cx| mouse(window, cx, at, button, mods, clicks));
+                        if mods != Modifiers::default() {
+                            let _ = cx.update(|window, cx| window.dispatch_event(held_keys(Modifiers::default()), cx));
+                        }
                         // A dropdown step picks its entry from the list it opened (a toolbar dropdown: its tool).
                         let pick = step["on"].get("pick").or_else(|| step["on"].get("tool").and(step["on"].get("menu"))).and_then(Value::as_str);
                         let row_key = if step["on"].get("pick").is_some() { "list_row" } else { "menu" };
@@ -1166,7 +1176,7 @@ pub fn start_page(cx: &mut App) {
                         let from = if what == "hover" && from == at { at - point(px(0.), px(40.)) } else { from };
                         for k in 1..=3 {
                             let p = from + (at - from) * (k as f32 / 3.0);
-                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: Modifiers::default() }), cx));
                             sleep(cx, 20).await;
                         }
                         pointer = Some(at);
@@ -1177,7 +1187,15 @@ pub fn start_page(cx: &mut App) {
                             "hover" => (MouseButton::Left, 0),
                             _ => (MouseButton::Left, 1),
                         };
+                        let held_keys = |m: Modifiers| PlatformInput::ModifiersChanged(ModifiersChangedEvent { modifiers: m, capslock: Default::default() });
+                        if mods != Modifiers::default() {
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(held_keys(mods), cx));
+                            sleep(cx, 150).await;
+                        }
                         let _ = w.update(cx, |_, window, cx| mouse(window, cx, at, button, mods, clicks));
+                        if mods != Modifiers::default() {
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(held_keys(Modifiers::default()), cx));
+                        }
                         // A select's pick: its entry from the list it opened.
                         match step["on"].get("pick").and_then(Value::as_str) {
                             Some(pick) => {

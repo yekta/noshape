@@ -1568,6 +1568,15 @@ impl PartStudioView {
                 // Dimensions and constraints to planes, model edges / vertices and
                 // other sketches: a linked external reference entity stands in.
                 let tool_now = self.sketch.as_ref().map(|s| s.tool);
+                // The offset's value label opens its box, unless a picked curve is in reach under it (live sketch-offset:
+                // a click 7 px off the picked side, on the label, drops the side).
+                if let Some(ed) = self.sketch.as_ref().filter(|ed| ed.tool == Tool::Offset && ed.offset_label_hovered)
+                    && !hovered.is_some_and(|h| ed.offset_pending.as_ref().is_some_and(|p| p.contains(&h)))
+                {
+                    self.open_offset_input(window, cx);
+                    cx.notify();
+                    return true;
+                }
                 let skip_plane = |r: &Reference| self.dimension_skips_plane(r, *position, cx);
                 // Offset on a model face (live q-off): its outer loop, offset as one chain.
                 if hovered.is_none()
@@ -5658,7 +5667,7 @@ impl PartStudioView {
                     .text_color(if in_plane { gpui::transparent_black() } else { rgb(0x000000).into() })
                     .cursor_pointer()
                     .whitespace_nowrap()
-                    .occlude()
+                    // (Its click is the graphics area's: a picked curve in reach under it takes the click.)
                     .on_hover(cx.listener(|this, h: &bool, _, cx| {
                         if let Some(ed) = &mut this.sketch
                             && ed.offset_label_hovered != *h
@@ -5668,8 +5677,6 @@ impl PartStudioView {
                             cx.notify();
                         }
                     }))
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.open_offset_input(window, cx)))
                     .child(text)
                     .into_any_element(),
             );

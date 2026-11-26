@@ -702,3 +702,33 @@ fn a_file_update_reimports_into_the_same_part_studio(cx: &mut TestAppContext) {
     assert_eq!(parts(cx), 3, "its parts follow the new file");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// Live ui-parity ver-protection-enable: Enable workspace protection ticked and applied (its bubble shows), then the
+/// dialog again: a click on the box unticks it, with the bubble still up, and Apply clears the protection.
+#[gpui::test]
+fn workspace_protection_is_ticked_then_unticked_under_its_bubble(cx: &mut TestAppContext) {
+    let gpu = app(cx);
+    let dir = std::env::temp_dir().join(format!("noshape-ws-protect-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("protect.noshape");
+    call(&mut Ctx::new(), "document_create", json!({ "path": path.to_str().unwrap() }));
+    let doc = cx.new(|_| DocModel::new(crate::session::Session::open(&path).unwrap()));
+    let bounds = Bounds { origin: Point::default(), size: size(px(1400.), px(900.)) };
+    let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(bounds)), ..Default::default() };
+    let w = cx.update(|cx| crate::os_menu::open_window(options, cx, |window, cx| cx.new(|cx| Workspace::new(doc.clone(), gpu, window, cx)))).unwrap().0;
+    let branch = doc.read_with(cx, |d, _| d.session.branch);
+    let protected = |cx: &mut TestAppContext| doc.read_with(cx, |d, _| d.session.branch_protected(branch));
+    for want in [true, false] {
+        cx.update_window(w, |_, window, cx| crate::workspace_protection::open_dialog(doc.clone(), branch, window, cx)).unwrap();
+        draw(cx, w);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(w, cx);
+        let b = vcx.debug_bounds("ws-protect-box").expect("the checkbox");
+        vcx.simulate_click(b.center(), Modifiers::default());
+        draw(cx, w);
+        gpui_kit::VisualTestContext::from_window(w, cx).simulate_keystrokes("enter");
+        draw(cx, w);
+        assert_eq!(protected(cx), want, "ticked {want}: applied");
+    }
+    cx.update_window(w, |_, window, _| window.remove_window()).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+}

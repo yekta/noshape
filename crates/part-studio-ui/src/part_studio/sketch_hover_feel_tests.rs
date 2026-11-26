@@ -1113,6 +1113,48 @@ fn a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline(cx: &mut Tes
     assert_eq!(lit(cx), right, "the line picked: on the Right plane's outline it lights");
 }
 
+/// Live ui-parity sketch-fully-defined (11-25 retake; behaviours "psui plane while dimensioning" (3)): a 30 x 20
+/// rectangle's right side picked at (30, 10), the click at (38, 10) is on the Right plane's outline and picks it (the
+/// line and the plane selected, no dimension placed, no value box).
+#[gpui::test]
+fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "sketch-hover-dim-outline-pick", Tool::CornerRect);
+    let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
+        })
+    };
+    for (x, y) in [(0., 0.), (30., 20.)] {
+        let a = screen(cx, x, y);
+        click(cx, window, &view, (a.x, a.y));
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let pointer = Pointer::new(cx, window, &view);
+    let side = screen(cx, 30., 10.);
+    pointer.move_to(cx, &view, side);
+    pointer.click(cx, &view, side);
+    let at = screen(cx, 38., 10.);
+    let outline = cx.update(|cx| {
+        let v = view.read(cx);
+        v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Right)).map(|q| crate::part_studio::sketch::plane_outline_px(q, at, v.viewport.read(cx)))
+    });
+    pointer.move_to(cx, &view, at);
+    let lit = cx.update(|cx| view.read(cx).highlighted_hover(cx));
+    pointer.click(cx, &view, at);
+    let got = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        (v.sketch.as_ref().unwrap().tool_picks().len(), d.sketch.constraints().filter(|c| c.kind.is_dimension()).count(), v.dim_input.is_some())
+    });
+    assert!(got == (2, 0, false), "(model picks, dimensions, box) {got:?}; lit {lit:?}, {outline:?} px off the outline");
+}
+
 /// qa SKETCH-DIM-PLACE-PICKS-PLANE (workflow 01 steps 15-20, live: a linear dimension of the side): with the pointer
 /// last over the Front plane's face (lit, nothing picked yet), a quick click on the rectangle's right side and then beside
 /// it places the side's length; the stale hover's plane, off its outline, isn't picked (a 90° angle to Front before).
