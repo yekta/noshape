@@ -1337,6 +1337,69 @@ fn replace_face_rolls_its_fillets_again() {
     assert_eq!(cylinder_radii(&r, 0).iter().filter(|&&x| (x - mm(3.0)).abs() < 1e-9).count(), cylinder_radii(&reference, 0).iter().filter(|&&x| (x - mm(3.0)).abs() < 1e-9).count());
 }
 
+/// Replace face of a drafted pocket's floor with a cylinder: its corners, where the floor fillets meet the corner's,
+/// rolled again as spheres, as live (c2-replace-face-exercise's Replace face 1: one or two of OCCT's four were
+/// patches, by the order its fillets were added, the part lopsided and +19 mm³). The pocket is symmetric, so is the
+/// part.
+#[test]
+fn replace_face_onto_a_cylinder_rolls_every_corner_as_a_sphere() {
+    let mut s = block();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(20.0, 10.0), (80.0, 10.0), (80.0, 40.0), (20.0, 40.0)], true);
+    let pl = top_plane_at(&mut s, 25.0);
+    let ps = s.sketch(Reference::FeaturePlane(pl), sk);
+    let pr = s.region(ps);
+    s.add("extrude", move |p| {
+        p.set("entities", q(pr));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("depth", expr("15 mm"));
+        p.set("oppositeDirection", ParamValue::Bool(true));
+        p.set("hasDraft", ParamValue::Bool(true));
+        p.set("draftAngle", expr("10 deg"));
+    });
+    let r = s.ok();
+    let nearest = |r: &RegenResult, p: DVec3| -> Reference {
+        let b = &r.context.bodies[0];
+        let v = noshape_kernel::make_vertex(p).unwrap();
+        let d = |e: &noshape_kernel::Shape| noshape_kernel::distance(&v, e).map(|d| d.distance).unwrap_or(1.0);
+        let edges = b.shape.edges();
+        let i = (0..edges.len()).min_by(|&i, &j| d(&edges[i]).total_cmp(&d(&edges[j]))).unwrap();
+        Reference::Edge((*b.edges[i]).clone())
+    };
+    let t = 15.0 * 10f64.to_radians().tan();
+    let at = [(50.0, 10.0 + t, 10.0), (50.0, 40.0 - t, 10.0), (20.0 + t, 25.0, 10.0), (80.0 - t, 25.0, 10.0), (20.0 + t / 2.0, 10.0 + t / 2.0, 17.5), (80.0 - t / 2.0, 10.0 + t / 2.0, 17.5), (20.0 + t / 2.0, 40.0 - t / 2.0, 17.5), (80.0 - t / 2.0, 40.0 - t / 2.0, 17.5)];
+    let edges: Vec<Reference> = at.iter().map(|&(x, y, z)| nearest(&r, DVec3::new(mm(x), mm(y), mm(z)))).collect();
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(edges));
+        p.set("radius", expr("3 mm"));
+    });
+    // The template: a cylinder along Y, R 100 mm, 3 mm over the floor's middle.
+    let mut sk = noshape_sketch::Sketch::new();
+    let arc = sk.add_arc_angles(DVec2::new(mm(50.0), mm(113.0)), mm(100.0), -2.0 * PI / 3.0, -PI / 3.0).0;
+    let ts = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    s.add("extrude", move |p| {
+        p.set("bodyType", en("SURFACE"));
+        p.set("surfaceEntities", entities(ts, &[arc]));
+        p.set("depth", expr("200 mm"));
+        p.set("symmetric", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let floor = face_at(&r, 0, DVec3::new(mm(50.0), mm(25.0), mm(10.0)));
+    let template = Reference::Face((*r.context.bodies[1].faces[0]).clone());
+    s.add("replaceFace", move |p| {
+        p.set("replaceFaces", q(floor));
+        p.set("templateFace", q(template));
+        p.set("oppositeSense", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let part = &r.context.bodies[0].shape;
+    let spheres = part.faces().iter().filter(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Sphere { .. })).count();
+    assert_eq!(spheres, 4, "the pocket's corners");
+    let c = noshape_kernel::volume_properties(part).unwrap().center;
+    assert!((c.x - mm(50.0)).abs() < 1e-8 && (c.y - mm(25.0)).abs() < 1e-8, "centre {c:?}");
+}
+
 #[test]
 fn move_face_rotate_up_to_translate_and_create() {
     // Rotate the top face about its back edge by 10 degrees (tilts down to the front).

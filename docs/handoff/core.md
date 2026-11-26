@@ -1,12 +1,23 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 10:2x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 11:0x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf**: 6ea74721 QUEUED 08:5x (knifehandle settle + Face blend 2/3; 66dba573 = e3aa841f7 on main);
-  the Fillet 2 fold fix on top (land.sh 10:3x).
+- **LANDING core-rf**: 6ea74721 LANDED 09:49 (158ab4c2: knifehandle settle + Face blend 2/3); Fillet 2 fold fix QUEUED
+  10b134ab 10:4x; Replace face corner fix on top (below).
+- **REPLACE FACE 1 (bool's, c2-replace-face-exercise, +19 mm3; makes 5925baca's fuse target off)**: the pocket's floor
+  fillets rolled again (detail_a::reblend) at the cylinder floor: OCCT built 1-2 of the 4 corners (3 equal r 12.7
+  fillets) as plate patches, not spheres, whenever the free-form stripe (drafted wall x cylinder floor) was the 2nd of
+  the corner's three added (ChFi3d PerformThreeCorner; 160 corners of 40 orders: middle = patch, first/last = sphere).
+  Fix: reblend adds curved edges first (lines last). Now 4 spheres, faces as live, 688435.71 vs live 688437.67
+  (was 688456.90), 436 -> 290 ms; test features_c::replace_face_onto_a_cylinder_rolls_every_corner_as_a_sphere (fails
+  without: 2 spheres). Left (-2 mm3, 2.8e-6 > the 1e-6 band; edges 20 'other' vs live's conics): live keeps the RIM
+  (corner patch KFWB 476.844, top plane JFq 16331.985 unchanged through Replace face 1); our blends_to_reapply
+  propagates floor fillets -> corner spheres -> vertical fillets -> rim corners -> rim fillets and rolls the rim again
+  (OCCT filling: 476.851 / 16331.873). Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case.
+  Probe: core-scratch/refillet-probe.patch (kernel crash_inputs zz_probe_refillet on NOSHAPE_DUMP_OPS fillet-3).
 - **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
   7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
@@ -17,9 +28,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   natural is the best of 8 fits), live's sections bulge to r 0.0275-0.028 at the 12 tight bends (behaviours 11-18) =
   live's approximation; REQUESTS row withdrawn.
 - **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 (/root/core-rf-scratch/gate-420fd5d01.log): replay +0 -0 (parity56
-  513 -> 513, 0 differing), suite 132 -> 132, features 2106 -> 2106; its 1 "changed" doc is lora's untranslated note
-  gone (translator, 46/46 both); suite total 397 -> 624 s = load (branch ran at ~18, main cached; median doc 1.7x).
-  Landing with core-rf. Next: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck.
+  513 -> 513, 0 differing), suite 132 -> 132, features 2106 -> 2106 (1 "changed" = lora's note, translator); landed. Next: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck.
 - **P0 SPEED**: c927ff4e QUEUED (core-spd): hose, radiator = 0.4.68; profile kit vibex7 ~/tmp/core/spd (m/ models,
   pft.py, spd-prof.sh, ~/qa-rel/<v>/noshape-cli). Impeller: no regression on main (old-base test builds).
 - **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
@@ -29,19 +38,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
   qa gaps-1125 models-report.json): each failure hits ONE document; order = own first difference first:
   (1) DONE (6ea74721): c2-surfaces-lofts-projected Face blend 2/3 (9 -> 18/45); next diff #18 Sweep 2 (sweep item);
-  (2) c2-body-draft-naming Fillet 2 (curvature 9 mm, 3-edge chain across Fillet 1's 7.24 mm curvature end): LANDING
-  (core-rf, test features_a::a_round_across_a_tighter_rounds_end_folds_and_holds). Cause: Fillet 1's end curve bends
-  to r 5.23 < setback 9: the sections fold back on the flat face (contact steps go negative), the loft self-crosses.
-  Fix: fold_of per chain edge (rate 1 + s*kappa of the contacts); a folding chain = one loft per edge, the folding
-  piece clipped at 0.9 * its least radius (constant: a local 0.9 rho clip loops with the evolute, cut invalid 8-11 s),
-  2x sections (1x left 4 slivers on Fillet 1's face), line neighbours run on past the joint by the setback (inside the
-  round: convex corner). No reface / kernel change needed (fillet2-wip.patch obsolete). Now OK 280 ms (was failing
-  6 s), valid, closed. Exact union of the sections (grid, core-scratch: 818.28 mm3) = ours 818.12; LIVE removes 833.47
-  (+15 mm3, 0.04% of the part): Parasolid pinches the middle round to the flat face's corner point (live JSi plane
-  contact = 1 point; flat faces match live to 1e-3 mm2). Left: 1 sliver face 0.17 mm2 (13 faces, live 12) = clip face
-  near the tightest point (depths where S(t) in (5.23, ~5.5): only the folding piece's own sections reach there);
-  k::delete_faces leaves it. It breaks Fill 1 ("Boundary edges selected do not form a closed loop"). Next: cover the
-  evolute region (or live's pinched middle round), then Fill 1 / Intersection curve 1 / Body draft 1.
+  (2) c2-body-draft-naming Fillet 2: QUEUED 10b134ab (folding sections: per-edge lofts, the folding one clipped at
+  0.9 * least radius, 2x sections; OK 280 ms). Live removes +15 mm3 (Parasolid pinches the middle round to the flat
+  face's corner). Left: a 0.17 mm2 clip-face sliver near the evolute (13 faces, live 12) breaks Fill 1 ("Boundary
+  edges selected do not form a closed loop"). Next: cover the evolute (or live's pinch), then Fill 1 / Body draft 1.
   (3) c2-cov2-face-blend-partial-fillet #6 Face blend 1 edges 19/2 vs 17/4, then #15 Fillet 3 fails;
   (4) asm-scissor-lift studios (BLEND-FAILS b-d below); after upstream fixes: genesis #72, impeller Stevenrohr #29.
 - **NATIVE BLEND FACES PLAN (for the lead's later decision)**: scope: section_blend's rolling-ball path (blend_section.rs
@@ -53,9 +53,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   OCCT declines (impeller Fillet 3 5.1 s vs live ~0.1; knifehandle Fillets 1-3 ~1.1-4.5 s vs live 0.01-0.1).
   Risk: trimming the supports at a fitted face's contacts when the run-on ends on free-form faces (the cases
   closed_run_on handles now: walls, corners, ties) and validity of the sewn shell; the section path stays as the
-  fallback. Size: ~1-2 weeks; numbers to confirm first: per-phase timings with NOSHAPE_KERNEL_PROFILE on both docs.
-  Profiling: NOSHAPE_RECORD_BOOLEANS; gdb kit vibex7 ~/tmp/core/spd/w/i g2-g4.gdb.
-- **QUEUE**: blend failures (ranking above), then skasm's sweep items.
+  fallback. Size: ~1-2 weeks; confirm per-phase timings first (NOSHAPE_KERNEL_PROFILE; gdb kit ~/tmp/core/spd/w/i).
+- **QUEUE**: Replace face rim (above), blend failures (ranking above), then skasm's sweep items.
 - **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
   BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
   matches live. Saved doc vibex7 ~/tmp/core/sc/new; probes core-scratch/sc pf.py (per feature), fc.py, nm.py (normals).

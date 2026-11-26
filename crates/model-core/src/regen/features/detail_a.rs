@@ -336,7 +336,12 @@ pub(super) fn reblend(ev: &mut EvalCtx, bi: usize, modified: &[usize], blends: &
         ev.replace_body(bi, res2.shape, names);
         return Ok(());
     }
-    let shapes: Vec<Shape> = edges.iter().filter_map(|e| res2.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+    // Curved edges first: OCCT's corner of three equal fillets came out a patch, not live's sphere, where the free-form
+    // fillet (a drafted wall's along a cylinder floor) was the second of the three added (c2-replace-face-exercise's
+    // Replace face 1: one or two of its pocket's four corners, +19 mm³).
+    let mut edges: Vec<(Shape, f64)> = edges.iter().zip(&radii).filter_map(|(e, r)| res2.shape.sub_shape(ShapeType::Edge, *e).ok().map(|s| (s, *r))).collect();
+    edges.sort_by_key(|(e, _)| matches!(e.edge_curve(), Ok(k::Curve::Line { .. })));
+    let (shapes, radii): (Vec<Shape>, Vec<f64>) = edges.into_iter().unzip();
     let res3 = k::fillet_checked(&res2.shape, &shapes, &radii).map_err(|_| fe(failed))?;
     let mut names3 = ev.name_result(&[&n2], &res3.history, &res3.shape, &BTreeMap::new(), Some(&blend_role));
     let map: BTreeMap<Name, Name> = keep_name.into_iter().filter_map(|(ei, old)| n2.edges.get(ei).map(|en| (Arc::new(TopoName::face(ev.feature, Role::Blend(en.clone()))), old))).collect();
