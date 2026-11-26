@@ -5,6 +5,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-26 12:3x: live's 34 new ui-parity scenarios (45f31f16b + f37581e4c) on green f393d8ee4: 12/34, 221/319 states
+(suites/uipnew-1126 score.log; per-step diffs: qa-scratch/bin/uipsteps.py. plane-remembers-last-type matches: cPlane honoured.)
+- [ ] P1 **FILLET-R12-BLOCK-OVERFLOW (core)** (mistake-fillet-r12-overflows s6-s10): Fillet R12 of the 4 top edges of the 40x30x10 block (start "block"): live regenerates OK, the round runs onto the sides; ours: red title, Fillet 1 row red, "Failed to fillet selections". Chamfer 12 mm on the same edges matches live.
+- [ ] P2 **ASM-MATE-ONE-CONNECTOR-RED (psui)** (mistake-asm-mate-one-connector s8; the rest of MISTAKES-ROWS): editing Fastened 1 and × on one Mate connectors chip: live's title turns red and the Fastened 1 row red at once; ours keeps both ok.
+- [ ] P2 **ASM-HIDDEN-ROW-TOOLTIP (psui)** (asm-hover-hidden-instance-row s4): hovering a hidden instance's row: live's tooltip "Part 2 <1> (Hidden)", ours "Part 2 <1>".
+- [ ] P2 **SHELL-TOO-THICK-FIELD-RED (psui)** (mistake-shell-too-thick s6-s7): Shell 16 mm on the 10 mm block, Enter: live's Shell thickness field turns red (title red too); ours' title is red, the field stays ok.
+- [ ] P3 **EXTRUDE-OPEN-SKETCH-FOCUS (psui)** (mistake-extrude-open-sketch s12, s15-s16): Sketch 1's row picked: live's selection item has no owner, ours "Sketch 1"; ✓ on the failing Extrude: live has no focused field, ours focuses one.
+- [ ] P2 **SKETCH-CLICK-OFFSET-EMPTY-TOP (psui)** (7 scenarios: sketch-drag-*, mistake-sketch-dimension-driven, -overdefine-45, -extrude-open-sketch): every point clicked in a Top sketch of the empty start lands (-0.275, +0.477) mm from live's, the same offset at every position and in every scenario (live itself varies per take, ours follows it): a constant view shift (pan or half a pixel), not the drags. Fails those 7 on the 0.01 mm geometry tolerance.
+- [ ] P2 **ASM-REPLICATE-MATED-PIN-ROW (skasm)** (asm-replicate-pick-mated-pin s3-s4): Replicate, pick the pin on Revolute 1: live shows Replicate 1's row red while the dialog is open; ours ok.
+- [ ] P2 **ASM-MEASURE-BRACKET-KEY (skasm)** (asm-measure-face-cylinder-panel s4-s5): two faces picked in an assembly, `[`: live opens the Measure panel with its field focused; ours opens nothing.
+- [ ] P2 **ASM-DRAG-REVOLUTE-ANGLE (skasm)** (asm-drag-revolute-turns s1): the same drag of the pin about its Revolute: live turns it to cos 0.774 (39 deg), ours to cos 0.884 (28 deg).
+- [ ] P2 **ASM-FASTENED-SAME-INSTANCE-FLIP (skasm)** (mistake-asm-fastened-same-instance s3-s5): Fastened with both connectors on Part 2 <1> (top, then right side): live's flip button shows flipped (svg-icon-flip-direction), ours not.
+- Take state, not filed (live asked): 7 scenarios open Fillet / Chamfer on the account's last value (2 / 12 / 16 / 0.5 mm) and mistake-hole-no-point's Hole on THRU; ours opens 5 mm / Blind 12 mm. They need "remembered" seeds like plane-remembers-last-type. After typing, the fillet/chamfer states match, except FILLET-R12 above.
+
 ## qa 11-26 11:4x: ui-parity reruns on green f393d8ee4
 
 - [ ] P2 **EXPORT-PARASOLID-VERSION-DEFAULT (psui)** (qa 11-26, asm-menu-export re-taken by live 121421f29): Export with Format PARASOLID and ☐ Use latest version: live's Version select shows the newest, 38.1 (list 38.1 … 25.0); ours shows 25.0, the oldest. Step 2 .dialog.fields[5].value. psui (lead 11-26).
