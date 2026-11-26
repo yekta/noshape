@@ -1424,6 +1424,26 @@ fn chamfered_groove_edges_stay_whole() {
     assert!(split.is_empty(), "{split:?}");
 }
 
+/// c2-hunting-knife's Fillet 8 (R1 on the handle's two side rails): the loft profile's halves on its x 6 mm end, kept
+/// apart where they meet (as after the loft), stay two edges each through the blend: HANDLE 16/36/22 (joined by the
+/// blend's line join, 16/34/20; live 15/37/25, its fillet one face and its rails split at the loft's knots).
+#[test]
+fn a_loft_profiles_kept_halves_stay_through_a_fillet() {
+    setup();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend/hunting-knife-fillet8.brep.zst");
+    let s = Shape::from_brep_bytes(&zstd::decode_all(std::fs::File::open(path).unwrap()).unwrap()).unwrap();
+    let end = edges_where(&s, |i| (i.start.x - 6.0 * MM).abs() < 1e-7 && (i.end.x - 6.0 * MM).abs() < 1e-7);
+    let t = s.shown_topology().unwrap();
+    assert_eq!((t.face_count(), t.edge_count(), t.vertex_count(), mark_kept_edges(&s, &end, true).unwrap()), (14, 30, 18, 14));
+    let all = s.edges();
+    let r = fillet_checked(&s, &[all[19].clone(), all[20].clone()], &[MM]).unwrap().shape;
+    assert!(r.is_valid());
+    let t = r.shown_topology().unwrap();
+    let mid = DVec3::new(6.0, 0.0, -15.0631) * MM;
+    let at_mid = r.vertices().iter().zip(&t.vertices).filter(|(v, shown)| **shown && v.vertex_point().is_ok_and(|p| p.distance(mid) < 1e-6)).count();
+    assert_eq!((t.face_count(), t.edge_count(), t.vertex_count(), at_mid), (16, 36, 22, 1), "the bottom line's halves meet at y 0");
+}
+
 /// FILLET-BLEND-SPLIT (dx's FeatureScript corpus, cf-planetary-gears): a tooth's two root edges (dedendum cylinder ×
 /// extruded involute, 5.08 mm long) filleted R0.85: one face each as live (OCCT's walk at its default tolerances
 /// restarted 0.5 mm in, two faces each).

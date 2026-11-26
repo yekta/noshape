@@ -6504,6 +6504,7 @@ struct Scaled
     BRepBuilderAPI_Transform tr(s, t, true);
     shape = tr.Shape();
     to    = new BRepTools_History(to_list({s}), tr);
+    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{tr.ModifiedShape(x)}; });
   }
   // Image of a sub-shape of the input in the scaled shape.
   TopoDS_Shape image(const TopoDS_Shape& x) const
@@ -6530,6 +6531,7 @@ struct Scaled
     gp_Trsf t;
     t.SetScale(gp_Pnt(0, 0, 0), 1.0 / factor);
     BRepBuilderAPI_Transform tr(r, t, true);
+    carry_kept_marks(r, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{tr.ModifiedShape(x)}; });
     HHist back = new BRepTools_History(to_list({r}), tr);
     return {tr.Shape(), compose(input, compose(input, to, h), back)};
   }
@@ -6867,7 +6869,8 @@ static void merge_corner_spheres(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
 }
 
 // A blend's edges split where nothing ends (a vertex of only two lines, one line, between the same two faces: the
-// chamfered groove of dx's bracket03-mattie, live 58/136/80 to OCCT's 58/144/88) joined into one edge.
+// chamfered groove of dx's bracket03-mattie, live 58/136/80 to OCCT's 58/144/88) joined into one edge. Not at a
+// vertex made to stay: live keeps a loft profile's line halves (c2-hunting-knife's Fillet 8, 15/37/25).
 static void join_split_lines(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
 {
   if (legacy_topology())
@@ -6876,11 +6879,17 @@ static void join_split_lines(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& 
   ShapeAncMap       ve, ef;
   TopExp::MapShapesAndUniqueAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, ve);
   TopExp::MapShapesAndUniqueAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto kept = [&](const ShapeList& es) {
+    for (const TopoDS_Shape& e : es)
+      if (!kept_ends(e))
+        return false;
+    return true;
+  };
   bool any = false;
   for (int i = 1; i <= ve.Extent() && !any; ++i)
   {
     const ShapeList& es = ve(i);
-    if (es.Extent() != 2)
+    if (es.Extent() != 2 || kept(es))
       continue;
     const TopoDS_Edge a = TopoDS::Edge(es.First()), b = TopoDS::Edge(es.Last());
     BRepAdaptor_Curve ca(a), cb(b);
@@ -6895,10 +6904,13 @@ static void join_split_lines(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& 
     return;
   // (On a copy: UnifySameDomain changes its input's shared edges.)
   BRepBuilderAPI_Copy          cp(r, true, false);
+  carry_kept_marks(r, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
   ShapeUpgrade_UnifySameDomain u(cp.Shape(), true, false, false);
+  keep_marked_edges(u, cp.Shape());
   u.Build();
   if (u.Shape().IsSame(cp.Shape()) || !BRepCheck_Analyzer(u.Shape()).IsValid())
     return;
+  carry_kept_marks(cp.Shape(), u);
   HHist step = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{r}), cp);
   step->Merge(u.History());
   r = u.Shape();

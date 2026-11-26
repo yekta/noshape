@@ -3,21 +3,18 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## FIRST (11-26 22:40 UTC): 09cb32fd FAILED in the land queue (tests, build: doesn't compile)
-Read ~/land/results/skasm.log on vibe2, fix forward, land.sh again. Then resume Fillet 8 below.
-
-## Fillet 8 WIP (11-26 22:40): /root/skasm-scratch/fillet8-wip.patch (git apply; holds debug too)
-- Cause found: c2-hunting-knife Fillet 8 runs scaled_blend; join_split_lines' whole-part unify merges the x=6 face's
-  loft-profile line/arc halves (kept_ends edges), and Scaled's Transform copies (in and back) drop kept marks.
-- Fix in the patch (features.cpp): carry_kept_marks in Scaled ctor and in unscaled(); join_split_lines skips vertices
-  whose two edges are kept_ends, carries marks onto its copy, keep_marked_edges(u), carry_kept_marks(cp, u).
-  Before the unscaled() carry: 16/35/21 (was 16/34/20, live 15/37/25); with the unscaled carry: HANDLE 16/36/22 (x=6 fixed; rest is the fillet split + rail vertices).
-- Remaining after: our fillet is 2 faces split at y=0 (live 1 face); live's rail on the loft has 6 vertices = where it
-  crosses the loft's C1 (double) knots at s 1.05/3.70/31.77 mm from bottom (each side), but NOT the knot at 38.69;
-  rule unclear (curvature jumps at all) — park it, report as remaining.
-- Debug only (drop before land): SKKEPT block in op_fillet (features.cpp), sk_probe in crash_inputs.rs, parity.rs SKDBG.
-- Scripts: bin/kept.sh <doc> (TRACE+SKDBG_KEPT), bin/dumpops.sh <doc> <op>, bin/probe.sh <dump> <xmin>, bin/fdiff.py.
-- Then: corpus check (bin/corp3.sh / fullwalk.sh) for blend regressions, T1 (kernel), land; then knifehandle Mutual trim 1.
+## NOW (11-26 23:35 UTC)
+- 09cb32fd's failure was the land slot's link (mold undefined hashbrown symbol in noshape-ops), not ours; the Split 4
+  fix had landed (bf81ed84), handoffs landed docs-only (db5d67ef1).
+- Fillet 8 fix queued (features.cpp: Scaled carries kept marks; join_split_lines keeps kept_ends vertices). A/B over
+  all 190 corpus docs: only hunting-knife moves, HANDLE 16/34/20 -> 16/36/22 (live 15/37/25). T1
+  blend::a_loft_profiles_kept_halves_stay_through_a_fillet (data/blend/hunting-knife-fillet8.brep.zst).
+- Remaining on Fillet 8 (parked): our fillet 2 faces split at y=0 (live 1); live's loft rail split at the loft's
+  C1 knots s 1.05/3.70/31.77 mm per side, not at 38.69: rule unknown.
+- bool took /root/skasm-scratch/nuts-helical-cyl.patch into its gate: never land it separately.
+- Next: c2-surf-workshop-knifehandle Mutual trim 1 (feature 29): live Handle 1/1/1, Surface 2 1/1/0.
+- Scripts: bin/ab8.sh (suite A/B with/without ~/tmp/skasm/corp/f8.patch on vibex7), bin/kt8.sh; after a remote
+  patch -R, touch the local file before the next rb.sh (sync restores the older mtime: stale C++ object).
 
 ## RESUME HERE (11-26 21:55 UTC) — read first
 
