@@ -2782,8 +2782,10 @@ impl PartStudioView {
                     Some((st, _)) => {
                         let bad = config_value_refused(input, &st.read(cx).value(), &self.doc.read(cx).session.doc.settings.units);
                         let right = matches!(input.kind, ConfigInputKind::Variable { .. });
+                        let label = input.name.clone();
                         div()
                             .id(SharedString::from(format!("cfgbox-val-{}", input.id)))
+                            .map(|d| crate::ui_script::mark(d, || format!("field:{label}")))
                             .child(gpui_kit::base::input::input_frame(
                                 div()
                                     .border_b_1()

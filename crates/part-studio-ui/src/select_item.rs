@@ -723,8 +723,10 @@ impl SelectItemPanel {
                 Some(img) => gpui_kit::img(img.clone()).w(px(70.)).h(px(40.)).object_fit(ObjectFit::Contain).into_any_element(),
                 None => crate::assets::icon(icon, 30., cx),
             };
+            let label = name.clone();
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("list_row:{label}")))
                 .h(px(40.))
                 .flex_none()
                 .pl(px(indent))
