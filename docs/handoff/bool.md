@@ -19,7 +19,7 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (state 11-26 05:45 UTC)
+## NEXT (state 11-26 06:55 UTC)
 - P0 11-25 05:55 UTC (blocks v0.4.69): macOS CI a_lofts_added_vertices_stay_for_good still "shell took too long" after
   1b9ab96c. Cause (CI diag runs on scratch branch bool-macdiag, deleted): deterministic on macOS 26 only, not a race;
   by_quadrics' corner (10,30,0) solve3 started from a foot hint left by the last corner, which Newton took to the
@@ -44,15 +44,26 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   P0 QUEUED ee26ad1a 05:44 (ecd7e0938 flush fix + ee26ad1a Bohrungssitz one run; gate clean, knurls 5x 0; first land
   stopped on clippy too_many_arguments: boolean_in's touching_only + or_plain now one `Touching` struct). qa + lead told.
   bool-slow obsolete (delete worktree + target).
-  COVERAGE (lead 11-26 05:10; ranking under way 05:45): parity56 "86.5 %" counts the 44 direct builds (on_face 30ish,
-  through_holes) as declined ("not tried (an earlier path took it)" = an earlier C++ path took it); ours incl. direct
-  557/593 = 93.9 %. Its 36 OCCT cases: 30 "short section from a corner" (tangent contact, OCCT's per ruling 11-15),
-  2 non-manifold (301238ec/23a4e56c), 2 "two edges leave a vertex", 1 sheets, 1 arc across seam (ce4e3c99). NOSHAPE_BOOL_LOCAL=0
-  changes nothing on parity56. All corpora distinct: shfall slabs 44 (old recordings), corner 30, non-manifold 16, tail 1-4.
-  So: recorded all 200 suite docs on main (vibex8 ~/agents/bool-keep/rec200-main, 1789 cases; replay -> ~/tmp/bool/rp200.out)
-  and per document (~/agents/bool-keep/recdoc-main/<doc>, recdoc.sh -> recdoc.out). NEXT: rank declines by document,
-  maker shapes first (fillets, shells, holes on curved faces), fix the top reason, usual gate. Delete rec200-main once
-  recdoc-main is in.
+  COVERAGE (lead 11-26 05:10). Ranking done 06:00: parity56 "86.5 %" counts the 44 direct builds (on_face,
+  through_holes: "not tried (an earlier path took it)") as declined; ours incl. direct 557/593 = 93.9 %; its 36 OCCT
+  cases = 30 tangent corner (OCCT's, ruling 11-15) + 6 singles. NOSHAPE_BOOL_LOCAL=0 changes nothing there.
+  All 200 suite docs recorded on main per document: vibex8 ~/agents/bool-keep/recdoc-main/<doc> (recdoc.sh). Replay of
+  them: ~/agents/bool-keep/rp200.out (2684 cases, 2510 taken, 107 real declines + 67 direct), rp200-docs.txt (decline ->
+  doc), rp200-dec.txt. By doc: genesis-trunk-hanger 28 (diverges from live at feature 20: untranslated snap-in draft
+  -> circles not ellipses; not a Boolean issue; skip), screws 8, sheet metal ~25 (parked), impeller 6, lora-ribs 4
+  ("an edge twice in a face": slit input, 11 ms, skip). rp200 also shows 33 raw differ vs OCCT (most relabels/
+  equivalent; volume ones 0aa1b421, 18a377a8, 2c326fc9, 34202f28: TO CHECK which doc / who's right).
+  SCREWS DONE: 65a212abf (worktree bool-slow, branch bool-cov off main a476fa14f): round() picks the seam angle among
+  ruling angles (thread run-out face with a notch ruling at another angle) -> screws' 10/10 cases ours, 0 differ (were
+  8 OCCT 120-430 ms). T1 bool_patterns::a_threads_run_out_face_with_a_notch_ruling_goes_round (data ee3676ad, 83a40b89)
+  passes; clippy clean. GATE RUNNING: unit bool-gate-65a212abf-x8 -> /root/bool-hat-scratch/chain-65a212abf.out. NEXT:
+  clean -> knurls (chainp0k.sh pattern, vibex7 kn-run.sh) -> land from bool-slow, tell lead.
+  NEXT ITEM knifehandle (core 11-26: vibex7 ~/agents/core-keep/kh-bool, private, never in the repo; also in recdoc-main):
+  856a411e Fillet 1 cut 1.8-3.2 s "an edge without its curve on a free-form face": probe (/root/bool-scratch/
+  probe-pc.diff, NOSHAPE_PROBE_PC) = tool's B-spline edge 4 (arg 1) taken as lying on the part's B-spline face 0 but
+  1-10 mm off it (projects only at 1000x band): find why the piece is put on face 0 (ends only touching?). 244416f8
+  Fillet 3 run-on cut "a section touching a face's boundary" (tangent grey zone; core passes Fillet 3 ~1 s). Fillet
+  cases elsewhere: partial-fillet beb5d239 515 ms / 7340044b, setback-fillet df44fb85 142 ms.
   UNIFY SCOPE TRY (11-26 03:40, PARKED, /root/bool-scratch/unify-clean-full.patch): every op_unify result marked
   clean (unify twice = same on all 19 readable impeller dumps), solids inherit it (sub_shapes/list_get), t_built.scoped
   for free-form results. Impeller: only 4 of 24 unifies scoped, Bohrungssitz still whole (the mark is lost elsewhere),
