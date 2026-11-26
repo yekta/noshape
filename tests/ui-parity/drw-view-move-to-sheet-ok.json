@@ -4,6 +4,7 @@
  "area": "dx",
  "source": "studios 11-12 (drawing gap audit, behaviours L23511, L1451)",
  "start": "block-drawing",
+ "reader_artefacts": [{"step": 9, "keys": ["drawing.sheet", "drawing.views", "drawing.annotations", "drawing.selection"], "why": "the picked sheet shows on screen with the view moved before OK; live's reader reads the committed drawing, still on Sheet1 (live drw-triage-1126 (5), workflows-1123 11)"}],
  "steps": [
   {
    "do": "key",

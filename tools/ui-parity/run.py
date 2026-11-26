@@ -1868,6 +1868,18 @@ def main():
         if cut is not None:
             live_rec["steps"] = [s for s in live_rec.get("steps", []) if s.get("step", 0) < cut]
         note = "" if cut is None else f", live defect from step {cut} not compared" if cut == defect else f", excluded feature from step {cut} not compared"
+        # Keys live's reader reads from committed data while its screen previews (README "reader_artefacts").
+        for r in scenario.get("reader_artefacts") or []:
+            for side in (live_rec, ours):
+                for s in side.get("steps") or []:
+                    if s.get("step") == r["step"] and isinstance(s.get("state"), dict):
+                        for key in r["keys"]:
+                            *path, last = key.split(".")
+                            node = s["state"]
+                            for k in path:
+                                node = node.get(k) if isinstance(node, dict) else None
+                            if isinstance(node, dict):
+                                node.pop(last, None)
         m, n, first = compare(live_rec, ours, whole)
         # Ours' own expected values where live's reader can't be compared (the `centermarks` entries): a miss fails.
         own = check_expect({"expect": [e for e in scenario.get("expect") or [] if "centermarks" in e]}, ours)

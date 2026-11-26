@@ -99,6 +99,14 @@ comparison: live's states from `from_step` on aren't compared, and the result li
 
     "live_defects": [{"from_step": 20, "why": "Onshape drops the first click after a box select … (live2, 3 runs)"}]
 
+### reader_artefacts (psui, 11-26)
+
+A step where live's reader reads committed data while live's screen already shows a preview (View properties' Scale
+at Enter, Move to sheet's picked sheet before OK: live drw-triage-1126 (4, 5)): those keys (a dotted path in the
+state) aren't compared at that step, on either side; the steps after it are.
+
+    "reader_artefacts": [{"step": 7, "keys": ["drawing.views", "drawing.annotations"], "why": "the reader reads the committed scale; the preview is on screen"}]
+
 ### excluded (studios, 11-16)
 
 A difference a left-out cloud feature makes (comments, sharing…; AGENTS.md) ends the comparison the same way, the

@@ -4,6 +4,7 @@
  "area": "dx",
  "source": "studios 11-12 (drawing gap audit, behaviours L3064, L12660)",
  "start": "block-drawing",
+ "reader_artefacts": [{"step": 7, "keys": ["drawing.sheet", "drawing.views", "drawing.annotations", "drawing.selection"], "why": "Enter in Scale previews the new scale on screen; live's reader reads the committed drawing, still 1:1 until the check (live drw-triage-1126 (4), viewprops-scale-enter-1123)"}],
  "steps": [
   {
    "do": "rclick",
