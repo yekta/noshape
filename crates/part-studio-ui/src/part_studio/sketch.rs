@@ -1150,6 +1150,12 @@ impl PartStudioView {
         matches!(id.and_then(|i| self.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::SketchEntity { sketch, .. }) if self.sketch.as_ref().is_some_and(|s| s.feature == *sketch))
     }
 
+    /// Pick `id` is a point of the open sketch.
+    fn picked_sketch_point(&self, id: Option<u32>, cx: &App) -> bool {
+        let Some(Reference::SketchEntity { entity, .. }) = id.and_then(|i| self.built.as_ref()?.picks.get(i)).map(|t| &t.reference) else { return false };
+        self.sketch_data(cx).is_some_and(|d| d.sketch.point(noshape_sketch::EntityId(*entity)).is_some())
+    }
+
     /// Nothing under the pointer hovers until it moves (an entity just mirrored, a chain ended by Esc).
     fn hold_sketch_hover(&mut self, at: DVec2) {
         self.ui.sketch_hover_held_at = Some(at);
@@ -1189,6 +1195,19 @@ impl PartStudioView {
                     self.ui.glyph_yielded = None;
                 }
                 _ => {}
+            }
+        }
+        // A sketch point under a dimension's label takes the hover from it, and gives it back when the pointer leaves the
+        // point still on the label (live speed-1125 S50: the corner under the width's label lit and dragged).
+        if let Some(label) = self.ui_ref().and_then(|u| u.label_hover).filter(|_| !row && tile.is_none()) {
+            let point = own && self.picked_sketch_point(*id, cx);
+            if let Some(ed) = &mut self.sketch {
+                if point && ed.hover_constraint == Some(label) {
+                    ed.hover_constraint = None;
+                } else if !point && ed.hover_constraint.is_none() {
+                    ed.hover_constraint = Some(label);
+                    ed.hover = None;
+                }
             }
         }
         // While a glyph/label is hovered (or the pointer is between a row's glyphs), the geometry under it isn't.

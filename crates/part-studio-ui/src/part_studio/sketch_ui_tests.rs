@@ -10380,30 +10380,7 @@ fn on_screen_in(v: &PartStudioView, q: DVec2, cx: &gpui_kit::App) -> Option<DVec
 /// point lit under the pointer takes the press, not the label (ours dragged the label: the corner never followed).
 #[gpui::test]
 fn a_lit_point_under_a_dimension_label_drags(cx: &mut TestAppContext) {
-    let (window, view) = sketch_with(cx, "pt-under-label", Tool::CornerRect);
-    let at = |cx: &mut TestAppContext, x: f64, y: f64| { let p = on_screen(cx, &view, DVec2::new(x, y)); (p.x, p.y) };
-    let (a, b) = (at(cx, 0.01, 0.008), at(cx, 0.09, 0.058));
-    click(cx, window, &view, a);
-    click(cx, window, &view, b);
-    keys(cx, window, &["escape"]);
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
-    draw(cx, window);
-    let (line, place) = (at(cx, 0.05, 0.008), at(cx, 0.05, 0.0));
-    click(cx, window, &view, line);
-    click(cx, window, &view, place);
-    keys(cx, window, &["enter", "escape", "escape"]);
-    let (bx, by) = b;
-    let press = DVec2::new(bx, by);
-    let cid = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.kind.is_dimension()).map(|c| c.id)).expect("the width");
-    let points: Vec<(noshape_sketch::EntityId, DVec2)> = cx.update(|cx| {
-        let d = view.read(cx).sketch_data(cx).unwrap();
-        d.sketch.entities().filter_map(|e| Some((e.id, d.sketch.point(e.id)?))).collect()
-    });
-    let mut near = Vec::new();
-    for (e, q) in points {
-        near.push((on_screen(cx, &view, q).distance(press), e, q));
-    }
-    let (_, corner, at) = near.into_iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap();
+    let RectWithWidth { window, view, width: cid, corner, at, press } = rect_with_width(cx, "pt-under-label");
     let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
     cx.update(|cx| view.update(cx, |v, _| v.hover = Some(Reference::SketchEntity { sketch: feature, entity: corner.0 })));
     let event = |cx: &mut TestAppContext, ev: ViewportEvent| {
@@ -10422,4 +10399,68 @@ fn a_lit_point_under_a_dimension_label_drags(cx: &mut TestAppContext) {
     let moved = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.point(corner)).unwrap();
     assert!(dragging && !label, "the corner drags, not the label: dragging {dragging}, label pressed {label}");
     assert!(moved.distance(at) > 1e-4, "the corner followed: {at} -> {moved}");
+}
+
+struct RectWithWidth {
+    window: AnyWindowHandle,
+    view: Entity<PartStudioView>,
+    width: noshape_sketch::ConstraintId,
+    corner: noshape_sketch::EntityId,
+    at: DVec2,
+    press: DVec2,
+}
+
+/// A corner rectangle (10, 8)-(90, 58) mm with its width dimensioned below it; its corner (90, 58), where it is and
+/// where it is on screen.
+fn rect_with_width(cx: &mut TestAppContext, name: &str) -> RectWithWidth {
+    let (window, view) = sketch_with(cx, name, Tool::CornerRect);
+    let at = |cx: &mut TestAppContext, x: f64, y: f64| { let p = on_screen(cx, &view, DVec2::new(x, y)); (p.x, p.y) };
+    let (a, b) = (at(cx, 0.01, 0.008), at(cx, 0.09, 0.058));
+    click(cx, window, &view, a);
+    click(cx, window, &view, b);
+    keys(cx, window, &["escape"]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
+    draw(cx, window);
+    let (line, place) = (at(cx, 0.05, 0.008), at(cx, 0.05, 0.0));
+    click(cx, window, &view, line);
+    click(cx, window, &view, place);
+    keys(cx, window, &["enter", "escape", "escape"]);
+    let press = DVec2::new(b.0, b.1);
+    let width = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.constraints().find(|c| c.kind.is_dimension()).map(|c| c.id)).expect("the width");
+    let points: Vec<(noshape_sketch::EntityId, DVec2)> = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        d.sketch.entities().filter_map(|e| Some((e.id, d.sketch.point(e.id)?))).collect()
+    });
+    let mut near = Vec::new();
+    for (e, q) in points {
+        near.push((on_screen(cx, &view, q).distance(press), e, q));
+    }
+    let (_, corner, at) = near.into_iter().min_by(|a, b| a.0.total_cmp(&b.0)).unwrap();
+    RectWithWidth { window, view, width, corner, at, press }
+}
+
+/// Live speed-1125 S50: the pointer comes onto the corner while the width's label under it is hovered: the corner
+/// lights, not the label (ours kept the label: nothing lit, the drag took the label); off the point, still on the label,
+/// the label lights again.
+#[gpui::test]
+fn a_point_under_a_hovered_label_takes_the_hover(cx: &mut TestAppContext) {
+    let RectWithWidth { window, view, width, corner, press, .. } = rect_with_width(cx, "pt-under-hovered-label");
+    let feature = cx.update(|cx| view.read(cx).sketch.as_ref().unwrap().feature);
+    let pick = cx.update(|cx| view.read(cx).built.as_ref().unwrap().picks.ids_for(&Reference::SketchEntity { sketch: feature, entity: corner.0 }).first().copied()).expect("the corner's pick");
+    let event = |cx: &mut TestAppContext, at: DVec2, ev: ViewportEvent| {
+        cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+            let vp = v.viewport.clone();
+            vp.update(cx, |vp, _| vp.place_pointer(at));
+            v.on_viewport_event(&vp, &ev, w, cx);
+        })).unwrap();
+        draw(cx, window);
+    };
+    let lit = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).sketch.as_ref().map(|ed| (ed.hover, ed.hover_constraint)).unwrap());
+    let off = press + DVec2::new(-40., 0.);
+    event(cx, off, ViewportEvent::LabelHover(Some(super::dim_label_hit(width))));
+    assert_eq!(lit(cx), (None, Some(width)), "the label lit");
+    event(cx, press, ViewportEvent::Hover(Some(pick)));
+    assert_eq!(lit(cx), (Some(corner), None), "the corner lit under the label");
+    event(cx, off, ViewportEvent::Hover(None));
+    assert_eq!(lit(cx), (None, Some(width)), "off the point, still on the label: the label");
 }

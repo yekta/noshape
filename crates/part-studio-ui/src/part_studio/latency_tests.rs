@@ -749,7 +749,7 @@ fn live_speed_1125_sketch_rows(cx: &mut TestAppContext) {
             move_to(cx, window, &pointer, s0px);
             pump(cx, window, &view, Duration::from_millis(900));
             let hovered = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|e| e.hover));
-            assert_eq!(hovered, Some(corner), "{name}: the corner lit under the pointer");
+            assert_eq!(hovered, Some(corner), "{name} run {run}: the corner lit under the pointer (hover {:?})", cx.update(|cx| { let v = view.read(cx); let ed = v.sketch.as_ref().unwrap(); format!("{:?}, constraint {:?}, gpu {:?}, tile {:?}, held {:?}, sel {:?}", v.hover, ed.hover_constraint, v.ui.sketch_gpu_hover, v.ui.glyph_tile, v.ui.sketch_hover_held_at, ed.selection) }));
             let left = gpui_kit::MouseButton::Left;
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(pointer.window_point(cx, s0px), left, Modifiers::default());
             // +60/-40 px and back on the next run, 20 moves 16 ms apart.
