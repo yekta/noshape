@@ -15,10 +15,14 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   FOLDS (edges leaving a vertex the same way, |dot| test): at x -73.8 it added the concave arcs RFBF/RFBp (4 tori)
   live leaves sharp. Fix in detail.rs TangentLinks::neighbours: leaving directions; a fold is skipped only between a
   convex and a concave edge of one face (sliver()); first try (all folds) regressed fed22d Fillet 2/24, Extrude 32/35,
-  bdddaf Fillet 1/5, 665cf3 Fillet 1/2... (.pa2.sh; d-fold), narrowed version rerunning 20:2x (pa3.out). Re-translated
-  (all folds skipped): 9cbb0e Fillet 18 no longer a difference. Next: pa3 result, faces vs live (.f18cmp.sh +
-  .f18diff.py), corpus A/B .f18ab.sh, a T1 (synthetic cusp: plate + wall + tangent round), drop debug prints, land.
-  Then Fillet 19/23, MF7, Chamfer 11.
+  bdddaf Fillet 1/5, 665cf3 Fillet 1/2... (.pa2.sh; vibex7 ~/tmp/core/sc/d-fold; baseline d-1621), narrowed version
+  RUNNING 20:3x (background rb.sh .pa2.sh -> /root/core-scratch/pa3.out; compare `comm` vs d-1621, d-fold). Re-translated
+  (all folds skipped): 9cbb0e Fillet 18 no longer a difference. T1 written (uncommitted): detail.rs tests::
+  tangent_propagation_stops_where_a_wall_thins_to_a_cusp; .f18t.sh runs it + fails-without (sliver() off) -- run only
+  AFTER pa3 finishes (it edits detail.rs on the host). Next: pa3 result; Fillet 18 faces vs live (.f18cmp.sh, uses
+  fresh/ = new translation; .f18diff.py); corpus A/B .f18ab.sh (A = .detail.orig.rs/.mod.orig.rs); drop the debug
+  eprintlns (cusp_blend entry/pair, detail.rs overrun); land. Then Fillet 19/23, MF7, Chamfer 11.
+- P1 PATTERN-AFTER-INSERTED-CHAMFER (lead 19:5x): already fixed by 6a8e411db (11-19); TICKETS row marked (b4dc6e1cf).
 - **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): QUEUED 01c87462 19:16** (core-rf, carries Fillet 17; qa + lead told): my a5e0075bb sent Move faces
   of planes facing several ways down the one-way-at-a-time tweak (neighbours keep names) instead of OCCT's offset
   (every face Offset(old)): the derived source's Move face 1 vertices renamed, Part Studio 1's Transform 1 by two
