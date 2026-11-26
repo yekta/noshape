@@ -5,6 +5,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
+- **LEAD 19:2x (FIRST after the compaction)**: continue 9cbb0e Fillet 18 (edge 40's zero-angle cusp sliver at x
+  -15.09, see (c) below): how live shapes that spot from live's per-feature geometry in the corpus; if not there, a
+  REQUESTS row for live. Then Fillet 19/23, MF7, Chamfer 11.
 - **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): QUEUED 01c87462 19:16** (core-rf, carries Fillet 17; qa + lead told): my a5e0075bb sent Move faces
   of planes facing several ways down the one-way-at-a-time tweak (neighbours keep names) instead of OCCT's offset
   (every face Offset(old)): the derived source's Move face 1 vertices renamed, Part Studio 1's Transform 1 by two
