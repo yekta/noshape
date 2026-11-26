@@ -3636,6 +3636,31 @@ fn a_curvature_fillet_of_a_concave_corner_adds_material() {
     assert!(added > 0.03 && added < 0.054, "{added} mm³ added (live about 0.041)");
 }
 
+/// A Curvature round run across a tighter round's end (setback 9 mm over a 7.24 mm round, whose curve bends tighter
+/// than 9 mm): its sections fold back there, and it removes the union of its sections, 827.0 mm³ computed apart (as
+/// c2-body-draft-naming's Fillet 2, which failed; live 1.8% more there, its round pinched at the corner).
+#[test]
+fn a_round_across_a_tighter_rounds_end_folds_and_holds() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.022, "46 mm");
+    let res = t.ok();
+    let body = solids(&res.context)[0].clone();
+    let top = edge_near(&body, DVec3::new(0.02, 0.0, 0.046));
+    t.add("fillet", &[("entities", q(vec![top])), ("radius", e("7.24264 mm")), ("nonCircularRadius", e("7.24264 mm")), ("crossSection", en("CURVATURE")), ("magnitude", e("0.5"))]);
+    let res = t.ok();
+    let before = total_volume(&res.context);
+    let body = solids(&res.context)[0].clone();
+    let side = edge_near(&body, DVec3::new(0.04, 0.0, 0.02));
+    t.add("fillet", &[("entities", q(vec![side])), ("radius", e("9 mm")), ("nonCircularRadius", e("9 mm")), ("crossSection", en("CURVATURE")), ("magnitude", e("0.5"))]);
+    let res = t.ok();
+    let after = solids(&res.context);
+    assert_eq!(after.len(), 1);
+    assert!(after[0].shape.is_valid());
+    assert_eq!(after[0].shape.open_edges().unwrap(), 0);
+    let removed = (before - total_volume(&res.context)) * 1e9;
+    assert!((removed - 827.0).abs() < 0.6, "{removed} mm³ removed");
+}
+
 /// A Curvature round wider than the face beside it runs on across it and is trimmed by the face beyond (live
 /// c2-extension-spring's Fillet 2: R 1.5 on one corner of a 1 mm wide arm's end, one round across the end).
 #[test]

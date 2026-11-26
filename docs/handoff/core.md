@@ -1,13 +1,12 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 06:5x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 10:2x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## Now (11-25)
-- **LANDING core-rf (11-26 06:4x)**: a730d3fd FAILED 02:30 (rebase conflict, parity.rs: main's LiveRef `body`
-  beside my `created_by`, kept both); rebased with the zero-length plane merge (f378eeb7b + 714337378) on top, one
-  land.sh. Solver/cPlane/translator: models gate 131 -> 132/189 (lora ribs 39 -> 46/46), no doc worse.
+- **LANDING core-rf**: 6ea74721 QUEUED 08:5x (knifehandle settle + Face blend 2/3; 66dba573 = e3aa841f7 on main);
+  the Fillet 2 fold fix on top (land.sh 10:3x).
 - **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
   7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
@@ -29,16 +28,20 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   sweep items.** Impeller's 1432 ms final cut handed to bool (08:0x; vibex7 ~/agents/core-keep/imp-bool/ed1c251b6b5acedd).
   Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
   qa gaps-1125 models-report.json): each failure hits ONE document; order = own first difference first:
-  (1) DONE (core-rf, after 5d5cce52d): c2-surfaces-lofts-projected Face blend 2/3: gap_faces took the cap (sides
-  closest at an end) for the gap; section moved midway; 9 -> 18/45, regen 1000 -> 268 ms; next diff #18 Sweep 2 (edge
-  circle vs other, 0.009% volume: a sweep item); test features_c::face_blend_across_a_round_between_curved_walls;
-  (2) <- IN PROGRESS: c2-body-draft-naming Fillet 2 (curvature, 3-edge chain across Fillet 1's end; Fill 1, Intersection
-  curve 1, Body draft 1 fail after it). One loft over 3 edges: its back face approximates Fillet 1's extrusion face, the
-  cut (OCCT 928 ms) leaves 4 slivers + an invalid plane (15 faces, live 12; fuzzy cut leaves it unchanged). Tried (patch
-  /root/core-scratch/fillet2-wip.patch, NOT committed): one loft per edge when the supports change (live: 3 faces) +
-  each piece's face on a curved support refaced onto it (reface_on: reversed normals -> wires reversed + face reversed;
-  edges ~1 um off -> tolerance widened <= 10 um). Refacing now valid, but the 3 cuts leave the part open (5.2 s). Next:
-  fuse the pieces into one tool first, or split only the back face per support. (Fillet 1: edge types only.) c2-body-draft-naming #7 Fillet 1 edges 19 line/2 other vs 15/6, then #8 Fillet 2 fails (BLEND-FAILS e);
+  (1) DONE (6ea74721): c2-surfaces-lofts-projected Face blend 2/3 (9 -> 18/45); next diff #18 Sweep 2 (sweep item);
+  (2) c2-body-draft-naming Fillet 2 (curvature 9 mm, 3-edge chain across Fillet 1's 7.24 mm curvature end): LANDING
+  (core-rf, test features_a::a_round_across_a_tighter_rounds_end_folds_and_holds). Cause: Fillet 1's end curve bends
+  to r 5.23 < setback 9: the sections fold back on the flat face (contact steps go negative), the loft self-crosses.
+  Fix: fold_of per chain edge (rate 1 + s*kappa of the contacts); a folding chain = one loft per edge, the folding
+  piece clipped at 0.9 * its least radius (constant: a local 0.9 rho clip loops with the evolute, cut invalid 8-11 s),
+  2x sections (1x left 4 slivers on Fillet 1's face), line neighbours run on past the joint by the setback (inside the
+  round: convex corner). No reface / kernel change needed (fillet2-wip.patch obsolete). Now OK 280 ms (was failing
+  6 s), valid, closed. Exact union of the sections (grid, core-scratch: 818.28 mm3) = ours 818.12; LIVE removes 833.47
+  (+15 mm3, 0.04% of the part): Parasolid pinches the middle round to the flat face's corner point (live JSi plane
+  contact = 1 point; flat faces match live to 1e-3 mm2). Left: 1 sliver face 0.17 mm2 (13 faces, live 12) = clip face
+  near the tightest point (depths where S(t) in (5.23, ~5.5): only the folding piece's own sections reach there);
+  k::delete_faces leaves it. It breaks Fill 1 ("Boundary edges selected do not form a closed loop"). Next: cover the
+  evolute region (or live's pinched middle round), then Fill 1 / Intersection curve 1 / Body draft 1.
   (3) c2-cov2-face-blend-partial-fillet #6 Face blend 1 edges 19/2 vs 17/4, then #15 Fillet 3 fails;
   (4) asm-scissor-lift studios (BLEND-FAILS b-d below); after upstream fixes: genesis #72, impeller Stevenrohr #29.
 - **NATIVE BLEND FACES PLAN (for the lead's later decision)**: scope: section_blend's rolling-ball path (blend_section.rs
@@ -51,9 +54,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Risk: trimming the supports at a fitted face's contacts when the run-on ends on free-form faces (the cases
   closed_run_on handles now: walls, corners, ties) and validity of the sewn shell; the section path stays as the
   fallback. Size: ~1-2 weeks; numbers to confirm first: per-phase timings with NOSHAPE_KERNEL_PROFILE on both docs.
-  Profiling notes: Booleans via NOSHAPE_RECORD_BOOLEANS; op_split 14 (10 closed_run_on); 133 min_distance =
-  closed_run_on's threaded `touches`; tried w/o gain (reverted): reuse tie cuts, vertex side of run-on pieces.
-  gdb kit vibex7 ~/tmp/core/spd/w/i g2-g4.gdb, b.jsonl (rollback 30).
+  Profiling: NOSHAPE_RECORD_BOOLEANS; gdb kit vibex7 ~/tmp/core/spd/w/i g2-g4.gdb.
 - **QUEUE**: blend failures (ranking above), then skasm's sweep items.
 - **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
   BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
@@ -137,8 +138,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (VS -> VS -> Part Studio, inch units, w change). Importer already reads configured suppression + VS references;
   suite checks one configuration. Asked live 18:57 (REQUESTS) for c2-dm-config / c2-dm-vs dirs + configurations.json
   rows; then parity_models evaluates each row (config_activate, parts / bbox / volume).
-- **bool-land7 e3078f89:** if a model result moves after it lands, tell bool. **Singularity loft / Loft 3 / Fill G0:**
-  open (live q-singularity-loft-1119); core-scratch/sing, fill/ (FILLDBG in core-oc).
+- **bool-land7 e3078f89:** tell bool if a model result moves. Singularity loft / Loft 3 / Fill G0 open (core-scratch/sing, fill/).
 
 ## Waiting on others
 - c2-config-parts-standoffs Revolve 1 (13/32): Sketch 3 solved 4 x 22 mm, chamfers on the axis side; live 3 x 24 (Length),

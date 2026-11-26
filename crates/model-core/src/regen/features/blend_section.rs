@@ -1397,6 +1397,47 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
     if general || held {
         const N: usize = 64;
         let whole = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
+        // A round over a curve tighter than its setback on a support (c2-body-draft-naming's Fillet 2 across Fillet 1's
+        // end: setback 9 mm, the end's radius 7.2 mm): its sections fold back there. Per piece the side it folds on and
+        // the least radius along it.
+        let fold_of = |plo: f64, phi: f64| -> FResult<Option<(usize, f64)>> {
+            let mut least: Option<(usize, f64)> = None;
+            let h = 1e-4 * (phi - plo);
+            for j in 0..=16 {
+                let x = plo + (phi - plo) * (0.001 + 0.998 * j as f64 / 16.0);
+                let (p, fr, side1_first, tangent) = station(x)?;
+                let (p2, fr2, _, _) = station(x + h)?;
+                let dl = (p2 - p).dot(tangent);
+                let setback = setbacks(&fr, spec, side1_first)?;
+                for (i, sb) in [(0, setback.0), (1, setback.1)] {
+                    let kappa = (fr2.u[i] - fr.u[i]).dot(tangent) / dl;
+                    if kappa < 0.0 && -1.0 / kappa < sb && least.is_none_or(|(_, r)| -1.0 / kappa < r) {
+                        // (Folding on both faces: not clipped, as before.)
+                        if least.is_some_and(|(side, _)| side != i) {
+                            return Ok(None);
+                        }
+                        least = Some((i, -1.0 / kappa));
+                    }
+                }
+            }
+            Ok(least)
+        };
+        let edge_ranges: Vec<(f64, f64, usize)> = chain
+            .iter()
+            .scan(0.0f64, |acc, c| {
+                let r = (acc.max(lo), (*acc + c.length).min(hi));
+                *acc += c.length;
+                Some(r)
+            })
+            .enumerate()
+            .filter(|(_, (a, b))| b > a)
+            .map(|(ci, (a, b))| (a, b, ci))
+            .collect();
+        let may_fold = !whole && !held && spec.reference.is_none() && chain.len() > 1;
+        let edge_folds = match may_fold {
+            true => edge_ranges.iter().map(|&(a, b, _)| fold_of(a, b)).collect::<FResult<Vec<_>>>()?,
+            false => Vec::new(),
+        };
         // A chamfer as sections: one loft (one face) per edge, as live's; others one along the chain.
         let mut pieces = vec![(lo, hi, 0)];
         if held && spec.reference.is_none() {
@@ -1422,18 +1463,18 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     (from, first) = (acc, ci + 1);
                 }
             }
-        } else if spec.reference.is_some() && !whole && chain.len() > 1 {
-            pieces.clear();
-            let mut acc = 0.0f64;
-            for (ci, c) in chain.iter().enumerate() {
-                let (a, b) = (acc.max(lo), (acc + c.length).min(hi));
-                acc += c.length;
-                if b > a {
-                    pieces.push((a, b, ci));
-                }
-            }
+        } else if !whole && chain.len() > 1 && (spec.reference.is_some() || edge_folds.iter().any(Option::is_some)) {
+            // (A round that folds on an edge: one loft per edge, the folding one clipped below.)
+            pieces = edge_ranges.clone();
         }
         let closed = whole && pieces.len() == 1;
+        let folds: Vec<Option<(usize, f64)>> = match pieces.len() > 1 && edge_folds.len() == pieces.len() {
+            true => edge_folds,
+            false => vec![None; pieces.len()],
+        };
+        if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() && folds.iter().any(Option::is_some) {
+            eprintln!("section blend: folds {folds:?}");
+        }
         let last_piece = pieces.len() - 1;
         // A round's sections as wires (its bare loft reads only those); a chamfer's as faces (its loft's history).
         let section = if spec.reference.is_some() { section_face } else { section_wire };
@@ -1443,6 +1484,8 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
             let total_n = if spec.reference.is_some() { 24 } else { N };
             let total_n = if held && pieces.len() > 1 { total_n.max(24 * pieces.len()) } else { total_n };
             let n = if pieces.len() > 1 { ((total_n as f64 * (phi - plo) / (hi - lo)).ceil() as usize).max(6) } else { total_n };
+            // (A folding piece's sections twice as dense: at the usual count its side on a curved face left slivers there.)
+            let n = if folds[pi].is_some() { 2 * n } else { n };
             // (Stations a hair inside a piece: one at its end vertex belongs to its own edge.)
             let nudge = if pieces.len() > 1 { 1e-9 * total } else { 0.0 };
             let mut secs = Vec::new();
@@ -1476,6 +1519,33 @@ fn sections(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendSpec, ball
                     (!tangent_continues(shape, p, out, usize::MAX) && shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside).then_some(out * e)
                 } else {
                     None
+                };
+                // (A line's piece beside a folding one runs on past their joint by its setback: what the folding one's
+                // clip leaves near its ends; within the round, the corner being convex.)
+                let line = matches!(chain[ci].shape.edge_curve(), Ok(k::Curve::Line { .. }));
+                let beside = |q: usize| folds.get(q).is_some_and(|f| f.is_some());
+                let run_on = match run_on {
+                    None if line && convex && ((k == 0 && pi > 0 && beside(pi - 1)) || (k == n && beside(pi + 1))) => {
+                        let (s1, s2) = setbacks(&fr, &here, side1_first)?;
+                        Some(if k == 0 { -tangent } else { tangent } * s1.max(s2))
+                    }
+                    r => r,
+                };
+                // (A folding piece's sections clipped a tenth short of its least radius on the side it folds on.)
+                let face = match folds[pi] {
+                    Some((side, rho)) => {
+                        let (u, v) = (fr.u[side], fr.u[1 - side]);
+                        let c = u.dot(v);
+                        let dual = (u - v * c) / (1.0 - c * c);
+                        let normal = dual.normalize();
+                        let origin = corner + u * (0.9 * rho);
+                        let plane = k::Plane { origin, x_dir: normal.any_orthonormal_vector(), normal };
+                        let whole_face = k::make_face_from_wire(&face, true)?;
+                        let kept = k::split_by_plane(&whole_face, &plane)?.shape.faces().into_iter().find(|f| super::helpers_a::point_on_face(f).is_some_and(|q| (q - origin).dot(normal) < 0.0));
+                        let Some(kept) = kept else { return Err(fail("a folding round's section clipped away")) };
+                        kept.wires().into_iter().next().ok_or_else(|| fail("a clipped section with no wire"))?
+                    }
+                    None => face,
                 };
                 let past = match run_on {
                     Some(v) => Some((section(p + v, &fr, &here, side1_first)?.0, corner + v)),
