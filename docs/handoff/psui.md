@@ -182,7 +182,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   App: drw-geometric-tolerance 6/6, -edge-then-escape 9/9 (with the takes of live's 6b1c85cd4, not on main yet).
   Our listed position (82.9, 93.0) vs live (84.5, 94.1) is within the comparison's tolerance.
 
-## Platform check (lead 11-26 20:5x): DONE (22:5x)
+## Platform check (lead 11-26 20:5x): DONE (22:45)
 - Sample: 100 fixed scenarios (25 drw / asm / sketch, 8 shortcut, 17 ps; /root/psui-scratch/resp/os-sample.txt, seed
   1126), release v0.4.72 on each OS. Linux (vibe2, os-lin.sh): 94/100 (6 drw "tool stays after Esc", fixed after the
   release). Mac (gated: idle >= 600 s, load < 6, one app at a time, <= 175 s; os-mac.sh in ~/noshape-host/psui-keep):
@@ -194,6 +194,23 @@ docs/DECISIONS.md (read first; it wins over anything here).
   and camera moved). At 1920 x 1080 (Set-DisplayResolution / displayplacer; probe runs 45905022971, 45906424638 on
   agent/psui-osci) every one matches: no Windows-only difference. Workflow step landed ("1920 x 1080 screen").
   Rerun: gh workflow run qa-os.yml -f tag=<tag> -f uiparity="$(tr '\n' ' ' < os-sample.txt)"; artefacts qa-<OS>/uip.log.
+
+## Depth batches 1 + 2 (lead 11-26 22:5x: replay live's option-combination takes myself; qa skips them): IN FLIGHT
+- 61 takes (d02aa4898 + 9b9058e66 on main; names /root/psui-scratch/resp/depth-names.txt; vibe2 ~/tmp/psui/depth,
+  script resp/depth.sh, diff helpers /root/psui-scratch/bin/stepdiff.py, sumdiff.py, focusafter.py): 37/61 on db5d67ef1+.
+- Fixed (commit "a Hole's focused icon box"): focused icon box has no label; Hole type pick leaves no focus. T1s
+  a_holes_focused_depth_box_has_no_label, a_hole_type_picked_leaves_no_focus. Hole replay (30 takes): 21/30, the other 9 are the remembered values only (incl. tapped depth 5.6 mm).
+- Waiting on live (REQUESTS 23:0x): (1) keyboard into the selection field a control shows: all 10 runtime-0adacf98
+  takes (since 11-21) move it, the older takes with the same control and start keep it on the control (5 retakes asked).
+  If confirmed: in focus_new_empty_field / the `takes` rule (feature_dialog.rs ~690-725) a field the edit shows and
+  activates takes the keyboard from any control; covers boolean offset x2, circular / mirror / linear feature type,
+  fillet-variable (its vertex pick follows), linear second direction; old takes then need the retakes. (2)
+  mistake-extrude-remove-flipped-out ✓ not closing on an INFO. (3) remembered seeds (chamfer 16 mm, fillet 2 mm,
+  cbore 9.75, csink 11.2, Metric Tapped M5) for 8 takes.
+- core: DEPTH-EXTRUDE-UP-TO-PART-OVERLAP, DEPTH-PATTERN-REMOVE-OWN-PART (TICKETS 23:0x).
+- Open, mine: extrude-remove-through-all-boss-ok s1 (face [10,0,20] = boss top centre: ours picks its circular EDGE,
+  live the FACE); linear-pattern-second-direction-ok s16 field Distance#1 (after the focus rule); mirror s8 focus text.
+- qa verified RUNNER-UNLABELLED-FIELD-INDEX on c444ac1d5 (flow 70, 0 runner errors).
 
 ## NEXT
 - 19:50 interaction-feel sweep (lead order 2): rows 964-966, 987-990, 1003, 1031, 1749 marked = with their tests; 1071 /
