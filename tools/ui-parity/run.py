@@ -1198,7 +1198,7 @@ def runner_names(state, start, live_side):
     if not (isinstance(d, dict) and start):
         return state
     def name(t):
-        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity( live2-\d+[a-z]?)?", t):
+        if live_side and isinstance(t, str) and re.fullmatch(r"noshape ui parity( (live2|lane\d+)-\d+[a-z]?)?", t):
             return "<document>"
         # live2's per-start documents since 11-13 ("live2 uip block-drawing-v1 2026-11-13T19:06:18").
         if live_side and isinstance(t, str) and re.fullmatch(rf"live2 uip {re.escape(start)}( \S+)?", t):
