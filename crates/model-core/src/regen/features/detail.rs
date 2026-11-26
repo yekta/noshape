@@ -1846,12 +1846,14 @@ pub fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edge
 }
 
 pub fn shell(ev: &mut EvalCtx) -> FResult<()> {
-    let res = shell_in(ev);
-    // Live errors-1123 too-thick: its face to remove listed red.
-    if res.as_ref().is_err_and(|e| e.message == "Could not shell part with selections.") {
-        ev.error_refs = ev.query("entities").to_vec();
-    }
-    res
+    // Live errors-1123 too-thick: its face to remove listed red, and the field red (live mistake-shell-too-thick s6).
+    shell_in(ev).map_err(|mut e| {
+        if e.message == "Could not shell part with selections." {
+            ev.error_refs = ev.query("entities").to_vec();
+            e.faulty = vec!["entities"];
+        }
+        e
+    })
 }
 
 fn shell_in(ev: &mut EvalCtx) -> FResult<()> {

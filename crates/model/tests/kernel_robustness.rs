@@ -4005,7 +4005,8 @@ fn shell_walls_past_half_the_part_as_live() {
         let got = if st.status == FeatureStatus::Ok { Ok((volume(&r), r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face))) } else { Err(()) };
         let ok = match (&got, &want) {
             (Ok((v, f)), Ok((wv, wf))) => (v - wv).abs() <= tol && f == wf,
-            (Err(()), Err(())) => st.message.as_deref() == Some("Could not shell part with selections.") && (volume(&r) - 64000.0).abs() < 1e-6,
+            // Its Faces to remove field blamed (live mistake-shell-too-thick s6).
+            (Err(()), Err(())) => st.message.as_deref() == Some("Could not shell part with selections.") && st.faulty == ["entities"] && (volume(&r) - 64000.0).abs() < 1e-6,
             _ => false,
         };
         if !ok {
