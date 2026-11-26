@@ -9244,6 +9244,32 @@ fn a_lines_vertical_reach_is_measured_on_the_screen_in_the_app(cx: &mut TestAppC
     }
 }
 
+/// Psui SKETCH-ISO-ORIGIN-ALIGN (live mistake-sketch-drag-fixed-line s4): on Top in the isometric view a Line's first
+/// click 25 px right of the origin and 3.5 px above it on screen is 10.3 px off the origin's horizontal (the sketch's x
+/// axis, slanted on screen), out of its 7.5 px reach: live infers nothing there, nor does ours.
+#[gpui::test]
+fn a_lines_start_off_the_origins_slanted_horizontal_stays_put(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "iso-origin-align", Tool::Line);
+    let (o, ex, ey) = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|ed| ed.screen_map)).expect("a screen map");
+    let to_px = |p: DVec2| glam::DMat2::from_cols(ex, ey).inverse() * (p - o);
+    let origin = to_px(DVec2::ZERO);
+    let x_axis = (to_px(DVec2::new(0.03, 0.0)) - origin).normalize();
+    assert!((x_axis - DVec2::new(0.961, 0.277)).length() < 0.01, "live's isometric view: the x axis on screen {x_axis:?}");
+    let start = origin + DVec2::new(25.0, -3.5);
+    let seen = x_axis.perp_dot(start - origin).abs();
+    click(cx, window, &view, (start.x, start.y));
+    let end = start + DVec2::new(122.0, 3.0);
+    click(cx, window, &view, (end.x, end.y));
+    cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).expect("sketching");
+        let kinds: Vec<&str> = d.sketch.constraints().map(|c| c.kind.name()).collect();
+        let line = d.sketch.entities().find(|e| e.kind() == noshape_sketch::EntityKind::Line).expect("the line");
+        let (a, _) = d.sketch.endpoints(line.id).unwrap();
+        let p = d.sketch.point(a).unwrap();
+        assert!(kinds.is_empty() && (to_px(p) - start).length() < 1.0, "{seen:.1} px off: the start {:?} where clicked {start:?}, {kinds:?}", to_px(p));
+    });
+}
+
 /// qa STALE-SKETCH-HOVER (b): a line's end lit by its reach (no GPU pick there) goes dark with the one move that takes
 /// the pointer away into empty space, not a move later.
 #[gpui::test]
