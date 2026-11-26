@@ -78,6 +78,17 @@ docs/DECISIONS.md (read first; it wins over anything here).
    dc6768f9 "failed" 06:05 = land daemon SIGTERM when skasm's push under it retried (no test failed); re-queued 2de8abe3.
    Item 4 done: 15/15 expected once 2de8abe3 + the fully-defined fix land (qa to confirm).
 
+## TICKETS pass (lead 11-26 06:4x), QUEUED with the fully-defined stack
+1. UIS-SELECT-ITEM-ROWS + UIS-CONFIG-BOX-FIELD: marks list_row:<name> (select_item.rs row helper) and field:<input
+   name> (config_panel.rs cfgbox-val). Marks exist only under NOSHAPE_UI_SCRIPT: no T1; verify = qa re-runs its
+   speed cells 86 / 88 (qa-scratch/hm2/wf, qa's own runner).
+2. UIS-STATE-GEOMETRY: both sides done (ours sketch.geometry, comparer same_geometry, live run.mjs since 11-24); no
+   take in tests/ui-parity/live has it yet. Marked fixed, to verify.
+3. DL-IMPORT-MIXED-STEP-STL-OPTIONS fixed: import_dialog.rs mesh_options (any STL/OBJ: Units, no Join); unit test.
+4. EXPORT-ASM-STEP-MBD-FIELDS was already fixed (0207b943d). 5. SKETCH-DRAG-FILLS-HOVER (skasm 50ba91aca),
+   IMP-TOAST-QUEUE (1567cf00a): marked fixed, to verify; duplicate union rows dropped.
+Next: none queued: ask the lead.
+
 ## Agents
 
 - skasm owns the hover matrix's sk/* cells (lead 11-22); psui the 3D / Part Studio cells.
