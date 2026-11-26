@@ -5,6 +5,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## psui 11-26 15:5x: exposed by the whole-pixel replay (SKETCH-CLICK-ONE-PIXEL fix)
+- [ ] P2 **SKETCH-ISO-ORIGIN-ALIGN (psui)** (mistake-sketch-drag-fixed-line s5-s13): Line on Top in the default isometric view, first click at live's pixel [1107, 516] (model (5.00, 5.11), ~3.5 px above the origin's screen level): ours aligns the point horizontally with the origin (HORIZONTAL, the point moves to y 0); live infers nothing. The old floor-pixel replay ([1107, 515]) matched by luck. Our alignment reach (inference.rs off_y on screen, 7.5 px) vs live's on a slanted plane, to measure.
+
 ## qa 11-26 14:2x: live's drawing triage takes (b7fc6e4a5) on green b7fc6e4a5: 0/5, 18/39 states (studios parked: lead)
 - [ ] P1 **DRW-ESC-ENDS-TOOL (studios; lead)** (behaviours replay DRW-ESC-ENDS-TOOL; drw-dimension-esc-then-pick s4-s7, -pick-esc-thrice s3-s8, -radius-place-inside-* s4, -foreshorten s4+): one Escape ends every drawing dimension tool in live (drawing.tool null), whether a pick is pending or a dimension was just placed; ours keeps Dimension / Radial dimension active, so the next clicks make a second dimension (esc-then-pick: 2 annotations, live 1) and the right-click menu on a dimension doesn't open (foreshorten s5: "menu:Foreshorten is not shown"). Fails all 5.
 - [ ] P2 **DRW-RADIAL-INSIDE-TEXT-X (studios; lead)** (drw-dimension-foreshorten s3): a radius of the Top view's hole, its text placed by a click inside the arc at (-1, 1): live's text at x 83.5, ours 79.8 (sheet mm). The click-inside placements at (3, 0) and lower-left (DRW-RADIAL-INSIDE-PLACE) match live through s3.
