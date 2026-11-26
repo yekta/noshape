@@ -1028,7 +1028,7 @@ one on a Slider and a fixed one):
 | free part | the grab point stays under the pointer | the same (`a_dragged_free_instance_takes_the_whole_move_from_the_press`) | = |
 | Slider | follows only the pointer's component along its axis on screen, all of it (-155 px for -152) | the same (`a_slider_drag_follows_the_pointer_on_screen_in_an_iso_view`) | = |
 | Revolute | turns about the pivot, the screen angle following the pointer's round it | the same (drawn to the pointer's ray: `a_ball_drag_turns_as_an_arcball`, `a_revolute_drag_stops_at_its_limits`) | = |
-| fixed part | never moves; a 36 × 16 px ground glyph (white box over hatching) lying on its face, where the drag started, till the release | never moves, glyph at the grab point till release, but drawn flat on the screen, not in the face's plane (qa 11-22 049f4e313, FEEL-ASM-FIXED-GLYPH) | ≠ |
+| fixed part | never moves; a 36 × 16 px ground glyph (white box over hatching) lying on its face, where the drag started, till the release | never moves, glyph at the grab point till release, but drawn flat on the screen, not in the face's plane (qa 11-22 049f4e313, FEEL-ASM-FIXED-GLYPH) | = (fixed asm 11-22: along the face's own x in its plane; verified qa 20:2x on green 496a5d0b3, edges FEEL-ASM-FIXED-GLYPH-AA verified 11-25) |
 | drag start | ~1.8 s after the first move, then a jump to the pointer (software GL) | from the first move past 2 px / 50 ms | = (live's delay is not a target) |
 
 Other selection fields and the Dimension tool (batch 5; 8 / 13 on green 6be52caf4; block doc after `f`, the field active; live b5/ (lane 4,
