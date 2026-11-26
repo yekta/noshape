@@ -6377,7 +6377,7 @@ fn a_face_two_parts_have_is_the_one_on_lives_part() {
         json!({ "index": 3, "status": "OK", "parts": [] }),
     ];
     let mut ctx = Ctx::new();
-    let path = scratch("face-on-lives-part.noshape");
+    let path = scratch("face-two-parts-have.noshape");
     let mut t = Translator::open(&mut ctx, &path, &features, refs_from_bodies(&live)).unwrap();
     for k in 0..3 {
         assert!(t.step(k).ours.is_some());
