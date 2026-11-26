@@ -243,6 +243,28 @@ fn a_mate_gets_its_heads_up_check_after_the_second_pick(cx: &mut TestAppContext)
     .unwrap();
 }
 
+/// Live asm-fastened-two-faces / mistake-asm-fastened-same-instance (ASM-FASTENED-SAME-INSTANCE-FLIP): two top faces of
+/// two parts turn the flip icon to `-opposite`; both connectors on one instance leave it as before the picks.
+#[gpui::test]
+fn a_same_instance_fastened_leaves_the_flip_icon_unturned(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mate-flip-same");
+    let flip_shown = |v: &AssemblyView, cx: &gpui_kit::App| v.mate.as_ref().unwrap().dialog.read(cx).ui_fields(cx).iter().find(|f| f["kind"] == "toggle").map(|f| f["checked"].clone());
+    for (other, top, want) in [("Part 1 <1>", true, false), ("Part 2 <1>", false, true)] {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.start_mate(MateType::Fastened, w, cx);
+                let (a, b) = (face_connector(v, "Part 2 <1>", true, cx), face_connector(v, other, top, cx));
+                v.deliver_connector(a, w, cx);
+                assert_eq!(flip_shown(v, cx), Some(json!(true)), "one pick");
+                v.deliver_connector(b, w, cx);
+                assert_eq!(flip_shown(v, cx), Some(json!(want)), "{other}");
+                v.close_mate(w, cx);
+            })
+        })
+        .unwrap();
+    }
+}
+
 /// Live asm-everyday-1125: one undo after a Fastened mate's ✓ takes the mate and the move it made (the part goes back
 /// where it was); redo brings both back.
 #[gpui::test]
@@ -1137,6 +1159,31 @@ fn the_measure_panel_hangs_from_a_fixed_top(cx: &mut TestAppContext) {
     let b = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("measure-panel").expect("the Measure panel");
     let (top, right) = (f32::from(b.top()), window_w - f32::from(b.right()));
     assert!((top - (crate::ui::TOOLBAR_H + super::MEASURE_TOP)).abs() < 0.5 && (right - super::MEASURE_RIGHT).abs() < 0.5, "top {top}, {right} from the right");
+}
+
+/// Live asm-replicate-pick-mated-pin (ASM-REPLICATE-MATED-PIN-ROW): the mated pin picked fills Instances and Mate to be
+/// matched, and the new Replicate's row stays red until a target scope is picked, as its title.
+#[gpui::test]
+fn a_replicate_without_its_target_scope_keeps_its_row_red(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "replicate-row", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::panels::PatternDialogKind::Replicate, w, cx))).unwrap();
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 1 <1>", cx);
+            let s = v.pattern.as_mut().unwrap();
+            s.seeds = vec![pin];
+            s.mate = Some(noshape_model::assembly::MateId(9_000));
+        })
+    });
+    draw(cx, window);
+    let (err, state) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.pattern_from_session(v.pattern.as_ref().unwrap(), cx).err(), v.ui_state(cx))
+    });
+    assert_eq!(err.as_deref(), Some("A target scope must be selected."));
+    let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Replicate 1").cloned();
+    assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "{}", state["features"]);
 }
 
 /// Live asm-measure-face-cylinder-panel (ASM-MEASURE-BRACKET-KEY): two faces picked, `[` opens Measure with both and

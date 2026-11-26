@@ -408,12 +408,13 @@ impl MateDialog {
     /// Whether the flip button shows `flip-direction` (else `-opposite`):
     /// until both connectors are picked it points up-right (live qa5 MT1);
     /// then `-opposite` while the connectors' Z axes agree (live ui-parity
-    /// asm-fastened-two-faces: two top faces, nothing turned). Tangent shows
-    /// its flag alone.
+    /// asm-fastened-two-faces: two top faces, nothing turned). Both on one
+    /// instance aligns nothing: as before the picks (live
+    /// mistake-asm-fastened-same-instance). Tangent shows its flag alone.
     fn flip_icon_on(&self) -> bool {
         match self.mate_type {
             MateType::Tangent => self.flip_primary,
-            _ => self.a.is_none() || self.b.is_none() || !self.flip_primary,
+            _ => self.a.is_none() || self.b.is_none() || self.same_instance() || !self.flip_primary,
         }
     }
 

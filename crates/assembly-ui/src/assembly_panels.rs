@@ -1507,6 +1507,8 @@ impl AssemblyView {
                 }
             }
             PatternDialogKind::PartPattern => PatternKind::PartPattern { mate: s.mate.ok_or("The seed needs exactly one mate to follow (or select the mate in the list)")? },
+            // (No target scope yet: red, as its title (live asm-replicate-pick-mated-pin).)
+            PatternDialogKind::Replicate if s.scope_refs.is_empty() => return Err("A target scope must be selected.".into()),
             PatternDialogKind::Replicate => PatternKind::Replicate {
                 mate: s.mate.ok_or("The seed needs exactly one mate to match (or select the mate in the list)")?,
                 all_instances: false,
