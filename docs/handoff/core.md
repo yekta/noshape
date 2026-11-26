@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-26 02:0x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-26 06:5x UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
@@ -8,38 +8,45 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **LANDING core-rf (11-26 06:4x)**: a730d3fd FAILED 02:30 (rebase conflict, parity.rs: main's LiveRef `body`
   beside my `created_by`, kept both); rebased with the zero-length plane merge (f378eeb7b + 714337378) on top, one
   land.sh. Solver/cPlane/translator: models gate 131 -> 132/189 (lora ribs 39 -> 46/46), no doc worse.
-- **P0 SPEED (lead 11-26 05:2x, live/speed-audit-1126.md)**: v0.4.69 regressions found by profiles (NOSHAPE_KERNEL_PROFILE,
-  vibex7 ~/tmp/core/spd: m/ models, pft.py, spd-prof.sh <doc> <0.4.68|new>, ~/qa-rel/<v>/noshape-cli): (a) 7a39ced92
-  chains_overlap built every chain pair's trial chamfers + volumes; (b) 43e1e6945 ring_sweep cut (Rust Boolean
-  sections_ahead 450 ms). Fix LANDING from worktree core-spd (branch core-spd, land.sh run 05:5x): reach boxes (edges +
-  faces at chain ends + d; the notch test needs the end faces: 7 d), volumes only for pairs left, trial chamfers
-  in parallel; hose sewn from walls + rings (tube_between). Under load 19: hose ~130 ms and radiator chamfers ~35 ms
-  = v0.4.68; mattie Chamfer 1 217-348 vs v0.4.68 ~100 (v0.4.69 740): re-time quiet; if still 2x, idea: decide overlap
-  from `together`'s history (chamfer faces of two chains adjacent) instead of trial chamfers. 12b323a9c, 3dc691949,
-  947b179c6 not involved. Then: impeller Fillet 3 (5512 vs live 100), knifehandle Fillet 3 (1345 vs 11).
+- **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
+  7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
+  skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
+  (cli-hist). (2) knifehandle settle fix + T1 settle test: core-rf tip commit (land.sh after 66dba573); slow cuts
+  handed to bool 06:5x: vibex7 ~/agents/core-keep/kh-bool (Fillet 3 cut 244416f8 667 ms, Fillet 1 cut 856a411e 3.2 s).
+  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands. (4) loft-guide
+  Sweep 1: CLOSED not a target: our path within 4 um of live's 801 samples (core-scratch/lg cmp.py/fit.py; centripetal
+  natural is the best of 8 fits), live's sections bulge to r 0.0275-0.028 at the 12 tight bends (behaviours 11-18) =
+  live's approximation; REQUESTS row withdrawn.
 - **BOOL GATE 2 PASSED (06:17)**: 420fd5d01 (/root/core-rf-scratch/gate-420fd5d01.log): replay +0 -0 (parity56
   513 -> 513, 0 differing), suite 132 -> 132, features 2106 -> 2106; its 1 "changed" doc is lora's untranslated note
   gone (translator, 46/46 both); suite total 397 -> 624 s = load (branch ran at ~18, main cached; median doc 1.7x).
   Landing with core-rf. Next: 97ad5f Linear pattern 1 (PART ADD x6) fuses copies live keeps apart: recheck.
-- **IMPELLER FILLET REGRESSION ON MAIN (06:3x)**: since v0.4.70 the failing fillets "Flansch zum Stroemungskanal"
-  8.8 -> 27.2 s, "Bohrungssitz Ansaugflasch" 2.4 -> 9.2 s (same run, vibex7 load ~11-19; cli-nm = main without my
-  merge, so not the merge). Their blend runs 5x instead of once (blend.scaled / fallback.past_end_faces 5 vs 1,
-  op_fillet 12 vs 8), with the same input part (faces/edges/areas equal; ~/tmp/core/spd qf.py). No fillet code
-  changed since v0.4.70 (detail.rs only blame; features.cpp only chamfer/prism): suspect the regen around a failed
-  fillet (psui 8a62f4834 / 72bc8ad36 / 0ecf671cf blame) or a caller retrying. Next: find who calls op_fillet 12x
-  (gdb break on noshape::op_fillet with bt, as w/k/g.gdb did for projections).
-- **KNIFEHANDLE FILLET 3 (06:2x)**: conic, 1 edge, section blend via rolling balls: 7040 of 7284 projections are
-  ball_section's swept-side points (8 points x 20 fixed iterations x 2 projections). Patch
-  /root/core-scratch/settle.patch (stop when a point moves < r 1e-13), untested; then the run-on cut (op_boolean ~1 s
-  on B-spline faces: bool's). Probe: gdb -x w/k/g.gdb on a copy rolled back after Fillet 3 (w/k/k.noshape).
-- **QUEUE (lead 11-25 23:xx)**: (1) parse_refs (queued a730d3fd), (2) 97ad5f Delete face 1 (= live;
-  merge gate above), (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
-  (qa suites/gaps-1125). Then skasm's sweep items, BLEND-FAILS b-d.
-  (3) status 01:5x: not the sweep's tolerance (1000 segments builds at 4.2e-9: same 6.172), not the path length
-  (40.0385 vs live 40.0318 mm), caps equal (0.002027), end cap normal 1.4° off: the profile's tilt against the
-  path (~21° ours vs ~9° live by the side areas) = the Routing curve's end condition (curves.rs fit_spline_edge ->
-  sketch fit_3d_ends vs std opFitSpline). REQUESTS core 11-26 01:53 asks live's evCurveDefinition of RKBB.
-  Saved doc vibex7 ~/tmp/core/lg; probes core-scratch/sc rc.py (curve), sw.py (sweep faces/normals).
+- **P0 SPEED**: c927ff4e QUEUED (core-spd): hose, radiator = 0.4.68; profile kit vibex7 ~/tmp/core/spd (m/ models,
+  pft.py, spd-prof.sh, ~/qa-rel/<v>/noshape-cli). Impeller: no regression on main (old-base test builds).
+- **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
+  ~225 ms (closed/trimmed run-on), 1632 projections ~360 ms. Probe: gdb -x ~/tmp/core/spd/w/k/g.gdb.
+- **LEAD 11-26 08:0x: blend FAILURES first (ranked by documents hit), native blend faces only planned, then skasm's
+  sweep items.** Impeller's 1432 ms final cut handed to bool (08:0x; vibex7 ~/agents/core-keep/imp-bool/ed1c251b6b5acedd).
+  Ranking (gate cache vibex7 ~/agents/bool-gate/cache/9ad08dd0740c5c08-5839ab362e0e-suite.tsv = main + merge, 200 docs;
+  qa gaps-1125 models-report.json): each failure hits ONE document; order = own first difference first:
+  (1) c2-surfaces-lofts-projected #9 Face blend 2 "Failed to blend faces." (its first difference) <- NEXT;
+  (2) c2-body-draft-naming #7 Fillet 1 edges 19 line/2 other vs 15/6, then #8 Fillet 2 fails (BLEND-FAILS e);
+  (3) c2-cov2-face-blend-partial-fillet #6 Face blend 1 edges 19/2 vs 17/4, then #15 Fillet 3 fails;
+  (4) asm-scissor-lift studios (BLEND-FAILS b-d below); after upstream fixes: genesis #72, impeller Stevenrohr #29.
+- **NATIVE BLEND FACES PLAN (for the lead's later decision)**: scope: section_blend's rolling-ball path (blend_section.rs
+  ball_tools -> 35-section loft tools -> closed_run_on splits -> Boolean with the body) replaced by the blend face
+  itself: a B-spline surface fitted to the ball sections (contact curves exact on the supports), trimmed at the
+  contacts, sewn into the body with the supports trimmed there (no tool solid, no split, no Boolean). Removes: the
+  final body Boolean (impeller 1.43 s OCCT, knifehandle 0.4-0.67 s), the run-on splits (impeller ~1 s, knifehandle
+  ~0.3 s), tight boxes/distances of run-ons (impeller ~1.7 s summed). Cases: conic and circular rolling-ball rounds
+  OCCT declines (impeller Fillet 3 5.1 s vs live ~0.1; knifehandle Fillets 1-3 ~1.1-4.5 s vs live 0.01-0.1).
+  Risk: trimming the supports at a fitted face's contacts when the run-on ends on free-form faces (the cases
+  closed_run_on handles now: walls, corners, ties) and validity of the sewn shell; the section path stays as the
+  fallback. Size: ~1-2 weeks; numbers to confirm first: per-phase timings with NOSHAPE_KERNEL_PROFILE on both docs.
+  Profiling notes: Booleans via NOSHAPE_RECORD_BOOLEANS; op_split 14 (10 closed_run_on); 133 min_distance =
+  closed_run_on's threaded `touches`; tried w/o gain (reverted): reuse tie cuts, vertex side of run-on pieces.
+  gdb kit vibex7 ~/tmp/core/spd/w/i g2-g4.gdb, b.jsonl (rollback 30).
+- **QUEUE**: blend failures (ranking above), then skasm's sweep items.
 - **SCISSOR 264eb3 (11-26 01:21)**: source = live per feature (Chamfer 1 1606.626), suite 942 s, 24/41 mates, 64/87
   BOM; the 90-min stall was 97ad5f's pattern fusing wrong parts while the source was off, not a hang. Delete face 1
   matches live. Saved doc vibex7 ~/tmp/core/sc/new; probes core-scratch/sc pf.py (per feature), fc.py, nm.py (normals).
@@ -87,19 +94,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (30, 10.2) sat in the bite: no part under it. Fix: ops sweeps the pointer through the CCW arc's middle before the end
   click (ops/sketch.rs). Tests: e2e a_hole_at_a_point_on_an_obround_links_top_face (area 1200+100π, Hole Ok, scope 1);
   GPUI a_hole_at_a_point_sketched_on_a_face_merges_into_its_part (the app's dialog fills Merge scope at the first pick).
-- **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
-  (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
-- **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
-  core-scratch/bin/stlz.py rings): ours 678 / 1348 / 5428 / Custom 5514 triangles vs live 924 / 1772 / 6644 / 6612,
-  all watertight, ~140 ms each. Every circle has live's segment count exactly except two: R13 at z 1.5 and R12.5 at
-  z 1.8 (the narrow drafted strip between them), where live has twice ours at every resolution (59/115/285 vs
-  29/58/143), unevenly spaced. Our sag there 0.076 mm < 0.24. REQUESTS core 11-25 08:28 (10) asks live that face's
-  surface / edge curve types. Live (11-25 10:5x): the strip is a CONE (59.0°) bounded by ~350° ARCs plus two 0.6 mm
-  OTHER edges (no full circles), the likely source of its doubled rings; ours is within tolerance, so P3. Impeller
-  Medium: 0 defects after the fin repair. Live's impeller STL/3MF: live/core/stl-impeller-1125/index.md (the
-  Impellergehaeuse tab, 1 part: Coarse 16 292 / Medium 49 570 / Fine 316 872 / Custom 492 184 tris; presets Coarse
-  0.24/12.5/0.635, Medium 0.12/6.25/0.254, Fine 0.06/2.5/0.0254; 3MF in metres, no Units field): next, compare ours
-  per tab.
 - **live dialogs-1125:** Fillet r50 (test kernel_robustness::fillet_wider_than_its_faces_overflows_like_onshape, T1:
   y 10-30, z to sqrt(2100)-30, 7458.616 mm³), Chamfer 25 (T2 chamfer_wider_than_its_face_overflows_like_onshape),
   Shell 20 / Extrude 0 messages, Union disjoint Info, Part Studio Circular angle 0 OK: all as live. Open: 0° pattern

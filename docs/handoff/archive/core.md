@@ -4997,3 +4997,18 @@ skasm meanwhile; I'll list what I change here before landing.
   circles were tuned to exact segment counts, freeform (loft) faces come out coarser. Next: sag vs live's Custom mesh
   (live raw/s6-bin-custom.stl as reference: centroid-to-mesh distance of ours vs live's per resolution; numpy/scipy
   are local only, not on vibex7), then decide whether to densify B-spline faces (export mesh_params in ops/export.rs).
+
+## Moved 11-26 08:1x
+- **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
+  (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
+- **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
+  core-scratch/bin/stlz.py rings): ours 678 / 1348 / 5428 / Custom 5514 triangles vs live 924 / 1772 / 6644 / 6612,
+  all watertight, ~140 ms each. Every circle has live's segment count exactly except two: R13 at z 1.5 and R12.5 at
+  z 1.8 (the narrow drafted strip between them), where live has twice ours at every resolution (59/115/285 vs
+  29/58/143), unevenly spaced. Our sag there 0.076 mm < 0.24. REQUESTS core 11-25 08:28 (10) asks live that face's
+  surface / edge curve types. Live (11-25 10:5x): the strip is a CONE (59.0°) bounded by ~350° ARCs plus two 0.6 mm
+  OTHER edges (no full circles), the likely source of its doubled rings; ours is within tolerance, so P3. Impeller
+  Medium: 0 defects after the fin repair. Live's impeller STL/3MF: live/core/stl-impeller-1125/index.md (the
+  Impellergehaeuse tab, 1 part: Coarse 16 292 / Medium 49 570 / Fine 316 872 / Custom 492 184 tris; presets Coarse
+  0.24/12.5/0.635, Medium 0.12/6.25/0.254, Fine 0.06/2.5/0.0254; 3MF in metres, no Units field): next, compare ours
+  per tab.

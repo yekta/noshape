@@ -2082,14 +2082,12 @@ fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64, sect
             break;
         }
     }
+    let onto = |s: &Support, q: DVec3| settle(q, r * 1e-13, |x| Ok(in_plane(s.foot(x)?.0)));
     let side = |s: &Support, from: DVec3, to: DVec3| -> FResult<Shape> {
         if matches!(s, Support::Plane { .. }) {
             return Ok(k::make_line(from, to)?);
         }
-        let mut m = (from + to) / 2.0;
-        for _ in 0..20 {
-            m = in_plane(s.foot(m)?.0);
-        }
+        let m = onto(s, (from + to) / 2.0)?;
         // (A cylinder cut along its axis: straight.)
         if (m - (from + to) / 2.0).length() < (to - from).length() * 1e-5 {
             return Ok(k::make_line(from, to)?);
@@ -2100,11 +2098,7 @@ fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64, sect
             const N: usize = 8;
             let mut pts = vec![from];
             for i in 1..N {
-                let mut q = from + (to - from) * (i as f64 / N as f64);
-                for _ in 0..20 {
-                    q = in_plane(s.foot(q)?.0);
-                }
-                pts.push(q);
+                pts.push(onto(s, from + (to - from) * (i as f64 / N as f64))?);
             }
             pts.push(to);
             return Ok(k::make_interpolated_spline(&pts, &[], false)?);
@@ -2118,6 +2112,22 @@ fn ball_section(c: DVec3, [t0, t1]: [DVec3; 2], sup: &[Support; 2], r: f64, sect
         _ => k::make_arc_3pts(t0, c + (v0 + v1).normalize() * r, t1)?,
     };
     Ok((k::make_wire(&[side(&sup[0], p, t0)?, arc, side(&sup[1], t1, p)?])?, p))
+}
+
+/// `q` moved by `step` (onto a support, within a plane) until it stays put two steps running, at most 20 steps (20 each
+/// took 7040 projections of c2-surf-workshop-knifehandle's Fillet 3; one still step isn't enough: a foot's uv seed moves
+/// on, and Fillet 2's topology changed).
+fn settle(mut q: DVec3, tol: f64, mut step: impl FnMut(DVec3) -> FResult<DVec3>) -> FResult<DVec3> {
+    let mut still = 0;
+    for _ in 0..20 {
+        let next = step(q)?;
+        still = if (next - q).length() < tol { still + 1 } else { 0 };
+        q = next;
+        if still == 2 {
+            break;
+        }
+    }
+    Ok(q)
 }
 
 /// A shared ball's section with its contacts in the order of `own` (an edge's own contacts there).
@@ -5400,9 +5410,40 @@ fn canal_corner(shape: &Shape, names: &[Name], r: f64, scale: f64) -> FResult<Op
 
 #[cfg(test)]
 mod tests {
-    use super::{Section, Support, ball_tools, chain, chain_ordered, into_face, plane_cylinder_contacts, rolling_ball, with_concave_balls};
+    use super::{Section, Support, ball_tools, chain, chain_ordered, into_face, plane_cylinder_contacts, rolling_ball, settle, with_concave_balls};
     use glam::DVec3;
     use noshape_kernel::{self as k, Shape, ShapeType};
+
+    /// A point settling onto a support stops two steps after it stays put (not 20 projections each), and a point whose
+    /// projection still moves takes all 20.
+    #[test]
+    fn a_settling_point_stops_two_steps_after_it_stays_put() {
+        let mut n = 0;
+        // Halfway to x = 1 each step: still (within 1e-13) after ~43 steps; capped at 20.
+        let q = settle(DVec3::ZERO, 1e-13, |x| {
+            n += 1;
+            Ok(x + (DVec3::X - x) / 2.0)
+        })
+        .unwrap();
+        assert_eq!(n, 20);
+        assert!((q.x - (1.0 - 0.5f64.powi(20))).abs() < 1e-15, "{q}");
+        // Onto the plane z = 0 at once: the first step moves, the next two stay.
+        let mut n = 0;
+        let q = settle(DVec3::new(1.0, 2.0, 3.0), 1e-13, |x| {
+            n += 1;
+            Ok(DVec3::new(x.x, x.y, 0.0))
+        })
+        .unwrap();
+        assert_eq!((n, q), (3, DVec3::new(1.0, 2.0, 0.0)));
+        // A step that stays put once and then moves on (a foot's uv seed) keeps going.
+        let mut n = 0;
+        settle(DVec3::ZERO, 1e-13, |x| {
+            n += 1;
+            Ok(if n == 2 { x } else { x + DVec3::X * 1e-3 })
+        })
+        .unwrap();
+        assert_eq!(n, 20);
+    }
 
     /// A concave round wider than the ledge it rests on (the scissor's Studio 9cbb0e Fillet 2, live's): its tool trimmed
     /// by the face the ledge drops off at, and not run on past its free ends: a wall x 0..3 to y 5 on a ledge to x 4 at
