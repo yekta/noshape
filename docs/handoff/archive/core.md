@@ -4972,3 +4972,22 @@ skasm meanwhile; I'll list what I change here before landing.
   118 -> 119 / 174 docs, 1840 -> 1848 features, none worse (c2-rib-wrap 10 -> 18). OPEN (P2, mine): a thin wrapped r3
   disc fuse loses the cylinder in OCCT (cut -> 0 volume, common empty); recording /root/core-scratch/wrap-disc-fuse-lost.bin
   (parts[0] objects, parts[1] tools; tool 1 fails alone).
+
+## 11-26 01:3x (moved from the handoff: landed / in 52c8f9ce)
+- **LANDING (11-25 ~20:00)**: lead order 1-3 done in one commit: (1) Ø5 Hole banner: the dialog's typed size marks
+  the Hole tableSynced (feature_dialog.rs set_text_value, as ops hole_standard), so Ø5 = schema default still reads
+  "Parameters have been overridden. Check input." (UI test dialogs::an_overridden_hole_diameter_shows_the_blue_banner,
+  also after ✓ + reopen). (2) STEP face appearance: ADVANCED_FACE named after the appearance, 8 AP214 colours as
+  DRAUGHTING_PRE_DEFINED_COLOUR (only green checked in live), OVER_RIDING_STYLED_ITEM; ops export::part_face_styles,
+  ops appearance::face_appearances_of. (3) Derived (c): op import_update + Blob Update…; part-picked Derived picks
+  remapped by name (Import body index = file part × 64 + solid); e2e a_file_update_reimports_in_place_and_its_derived_
+  follow_as_live green. (a)+(b) were already as live.
+- **4. lora f39 Ribs: DONE (landing 11-25 ~20:30)**: c2-lora-enclosure-ribs 46/46 to the end (Base 177/444/265, every
+  face = live's by type + area, 14081.69872 vs live 14081.69873 mm³). Rib's endNeedsExtension as std (no exception for
+  an end on a part edge: ribs on the bosses' top rims run into them) and an end within 1 um of a face counts (its x 35
+  rib ends 0.61 um short of the wall). T1 features_a::a_rib_ending_on_a_rim_or_just_short_of_a_wall_runs_into_it.
+  c2-rib-wrap 18/18; c2-parting-line-draft-parting-line Rib 1 73/213/143 vs live 73/214/144 is the same before (open).
+- **FLOW-EXTRUDE-UP-TO-FACE-BESIDE: not a bug (closed 11:5x, TICKETS):** the cell's floor click hits the outer front
+  wall (it hides the floor in that view): Sketch 3 on y = 0, extrude along -y, lip top parallel. Replay kit: vibex8
+  ~/tmp/core/upto (wf/run.sh copy + 58k cell; the app's doc is /tmp/noshape-uip-<pid>/encl-shell.noshape, run.sh's keep
+  copies nothing), core-scratch/upto/inspect*.py (MCP: Extrude 3 params, region areas, faces). T1 test stays.

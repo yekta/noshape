@@ -10,6 +10,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **QUEUE (lead 11-25 23:xx)**: (1) scissor parse_refs fix through the models gate (core-base/.gof.sh pair), (2) scissor
   97ad5f Delete face 1, (3) c2-loft-guide-curves-driven-pattern's newly fetched Sweep 1: area 6.175 vs live 6.351 mm²
   (qa suites/gaps-1125). Then skasm's sweep items, BLEND-FAILS b-d.
+  (3) status 01:5x: not the sweep's tolerance (1000 segments builds at 4.2e-9: same 6.172), not the path length
+  (40.0385 vs live 40.0318 mm), caps equal (0.002027), end cap normal 1.4° off: the profile's tilt against the
+  path (~21° ours vs ~9° live by the side areas) = the Routing curve's end condition (curves.rs fit_spline_edge ->
+  sketch fit_3d_ends vs std opFitSpline). REQUESTS core 11-26 01:53 asks live's evCurveDefinition of RKBB.
+  Saved doc vibex7 ~/tmp/core/lg; probes core-scratch/sc rc.py (curve), sw.py (sweep faces/normals).
 - **SCISSOR 264eb3 WIP (uncommitted in core-rf, 11-26 01:0x)**: (a) sketch solver (crates/sketch solver.rs): an
   over-determined component (more equations than unknowns) whose least-squares minimum is within 1e-8 m (live's
   zeroLength) is solved: Sketch 1 (arcs through Mesh points, tangent to lines: 7e-10 m) Ok; T1 constraints_more::
@@ -24,19 +29,14 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   parts); perf bug to look at if it stays after the source is right. Run .t11.sh (suite with NOSHAPE_PARITY_TRACE,
   then sc6.py probe on ~/tmp/core/sc/new); probes core-scratch/sc hp.py, fg.py (feature_get by tab name);
   mid-run doc copy ~/tmp/core/sc/hang. No ptrace on vibex7 (no gdb attach).
-- **LANDING (11-25 ~20:00)**: lead order 1-3 done in one commit: (1) Ø5 Hole banner: the dialog's typed size marks
-  the Hole tableSynced (feature_dialog.rs set_text_value, as ops hole_standard), so Ø5 = schema default still reads
-  "Parameters have been overridden. Check input." (UI test dialogs::an_overridden_hole_diameter_shows_the_blue_banner,
-  also after ✓ + reopen). (2) STEP face appearance: ADVANCED_FACE named after the appearance, 8 AP214 colours as
-  DRAUGHTING_PRE_DEFINED_COLOUR (only green checked in live), OVER_RIDING_STYLED_ITEM; ops export::part_face_styles,
-  ops appearance::face_appearances_of. (3) Derived (c): op import_update + Blob Update…; part-picked Derived picks
-  remapped by name (Import body index = file part × 64 + solid); e2e a_file_update_reimports_in_place_and_its_derived_
-  follow_as_live green. (a)+(b) were already as live.
-- **4. lora f39 Ribs: DONE (landing 11-25 ~20:30)**: c2-lora-enclosure-ribs 46/46 to the end (Base 177/444/265, every
-  face = live's by type + area, 14081.69872 vs live 14081.69873 mm³). Rib's endNeedsExtension as std (no exception for
-  an end on a part edge: ribs on the bosses' top rims run into them) and an end within 1 um of a face counts (its x 35
-  rib ends 0.61 um short of the wall). T1 features_a::a_rib_ending_on_a_rim_or_just_short_of_a_wall_runs_into_it.
-  c2-rib-wrap 18/18; c2-parting-line-draft-parting-line Rib 1 73/213/143 vs live 73/214/144 is the same before (open).
+  RESULT 01:21 (.t11): source 264eb3 = live per feature (volumes to Chamfer 1 1606.626), suite 942 s, no hang;
+  scissor 24/41 mates (was 21/40), 64/87 BOM. Committed 4826656b7 (solver), b3785098f (cPlane), 0d10fa156
+  (translator); models gate running (core-cache @ merge-base 3f2251379, .gof.sh base1126 / rf1126 -> vibex7
+  ~/tmp/core/g/run-*.log). Left in 97ad5f (pf.py per feature vs live): +3 faces from the source's Linear pattern 1
+  ADD: the tab copies' slanted tops (3 x 4.0 mm², normal (0.1736,0,0.9848)) stay apart from WAGO's coplanar 10.08 mm²
+  face (live one 22.08 face); both from Sketch 1 lines through the same Mesh points (32 and its duplicate 36). Then
+  97ad5f Linear pattern 1 (PART ADD x6, pitch #x = 11.2 mm as live) fuses copies live keeps apart (INFO "no geometry
+  change"): check after the merge. Delete face 1 (queue item 2) now matches live.
 - **qa 11-25: MESH-UP-TO-FACE landed (fixed, to verify); DL-STL-MESH-MOVE-FACE waits on live/core/mesh-offset-1125
   (REQUESTS 11-25 20:0x: our convex rounds finer than live's: +0.085 % at 1 mm; Translate's message with a plane dir).**
 - **then skasm's sweep items (1124-2341, 11-25 16:2x)**: (1) Tail Fin Up-to-vertex depth 67.880676 vs live 67.881480
@@ -46,7 +46,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   (50.517295). Every build is invalid, retries (1-1e-7..1e-5) too: the kept one is repaired() of the full radius; ChFi3d
   10x tighter SetParams gives the same vertex: OCCT's stripe end on the face, not the walk. Probes ~/tmp/core/fin f2-f4.py. (2) c2-surf-intro-simple Loft
   1: 1 face, live 4 (4-segment profiles). (3) c2-wrap-text-cylinders Wrap keeps lines (86 line; live 6 line/270 other).
-  (4) c2-hunting-knife Revolve 1 18 vs 19 vertices: shown_topology (common.cpp) shows no vertex on the closed ring the
+  (2) 11-26 02:0x: ours 1/8/8 faces/edges/vertices, area 19194.80 vs live 4/12/8 19485.60 (live one face per
+  profile segment: 5922/3910/5492/4161 mm²): our profiles do have 4 segments (8 vertices), the loft makes one face
+  through them (kernel ops.rs loft -> features.cpp ThruSections; look for where wire profiles' edges become one
+  section curve). Saved doc vibex7 ~/tmp/core/si. (4) c2-hunting-knife Revolve 1 18 vs 19 vertices: shown_topology (common.cpp) shows no vertex on the closed ring the
   sphere cuts in the loft tip; live likely one at the loft's seam (y=0). Doc vibex8 ~/tmp/bool/knife.noshape.
 - **DL-STL-MESH-MOVE-FACE Translate (lead 21:1x P1)**: committed 5aab43cd7 (mesh Translate moves the whole mesh; T1 in
   features_b::move_face_offsets_a_mesh_part…). Tessellation (live 0.005 mm chord, 8/12 segments a quarter) is low
@@ -84,10 +87,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   circles were tuned to exact segment counts, freeform (loft) faces come out coarser. Next: sag vs live's Custom mesh
   (live raw/s6-bin-custom.stl as reference: centroid-to-mesh distance of ours vs live's per resolution; numpy/scipy
   are local only, not on vibex7), then decide whether to densify B-spline faces (export mesh_params in ops/export.rs).
-- **FLOW-EXTRUDE-UP-TO-FACE-BESIDE: not a bug (closed 11:5x, TICKETS):** the cell's floor click hits the outer front
-  wall (it hides the floor in that view): Sketch 3 on y = 0, extrude along -y, lip top parallel. Replay kit: vibex8
-  ~/tmp/core/upto (wf/run.sh copy + 58k cell; the app's doc is /tmp/noshape-uip-<pid>/encl-shell.noshape, run.sh's keep
-  copies nothing), core-scratch/upto/inspect*.py (MCP: Extrude 3 params, region areas, faces). T1 test stays.
 - **Edit->rebuild profile (lead 09:1x, reported):** clamp-guillem 78 ms / housing-draft 92 / knife 1.47 s; ours <=4%
   (perf self time), kernel the rest; knife's kernel list passed to bool by the lead.
 - **STL vs live, c2-housing-draft** (ours .ex5.sh on vibex7; live /root/parity/exchange/c2-housing-draft/live-opt-*.stl;
