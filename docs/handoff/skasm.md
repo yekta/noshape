@@ -3,6 +3,22 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
+## FIRST (11-26 22:40 UTC): 09cb32fd FAILED in the land queue (tests, build: doesn't compile)
+Read ~/land/results/skasm.log on vibe2, fix forward, land.sh again. Then resume Fillet 8 below.
+
+## Fillet 8 WIP (11-26 22:40): /root/skasm-scratch/fillet8-wip.patch (git apply; holds debug too)
+- Cause found: c2-hunting-knife Fillet 8 runs scaled_blend; join_split_lines' whole-part unify merges the x=6 face's
+  loft-profile line/arc halves (kept_ends edges), and Scaled's Transform copies (in and back) drop kept marks.
+- Fix in the patch (features.cpp): carry_kept_marks in Scaled ctor and in unscaled(); join_split_lines skips vertices
+  whose two edges are kept_ends, carries marks onto its copy, keep_marked_edges(u), carry_kept_marks(cp, u).
+  Before the unscaled() carry: 16/35/21 (was 16/34/20, live 15/37/25); run bakni0oz9 tested the unscaled carry.
+- Remaining after: our fillet is 2 faces split at y=0 (live 1 face); live's rail on the loft has 6 vertices = where it
+  crosses the loft's C1 (double) knots at s 1.05/3.70/31.77 mm from bottom (each side), but NOT the knot at 38.69;
+  rule unclear (curvature jumps at all) — park it, report as remaining.
+- Debug only (drop before land): SKKEPT block in op_fillet (features.cpp), sk_probe in crash_inputs.rs, parity.rs SKDBG.
+- Scripts: bin/kept.sh <doc> (TRACE+SKDBG_KEPT), bin/dumpops.sh <doc> <op>, bin/probe.sh <dump> <xmin>, bin/fdiff.py.
+- Then: corpus check (bin/corp3.sh / fullwalk.sh) for blend regressions, T1 (kernel), land; then knifehandle Mutual trim 1.
+
 ## RESUME HERE (11-26 21:55 UTC) — read first
 
 Queued: df113102 (Mirror skips the sketch's regions), 8742ccbc (parity connector, 14->15/27), 0a0a16acf (kernel
