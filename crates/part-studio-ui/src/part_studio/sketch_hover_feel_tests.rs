@@ -1155,10 +1155,11 @@ fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestA
     assert!(got == (2, 0, false), "(model picks, dimensions, box) {got:?}; lit {lit:?}, {outline:?} px off the outline");
 }
 
-/// Live sketch-entity-copy-paste: a line copied from its menu, a right-click on empty space beside it opens the plain
-/// sketch menu, Paste second (no constraint glyph's menu, its hover left behind on the way).
+/// Live sketch-entity-copy-paste: a line right-clicked and copied from its menu, a right-click where its glyph row was
+/// opens the plain sketch menu, Paste second: the menu ended the line's hover, so the row was gone by the Copy click
+/// (ours kept the hover under the menu, and the row lingered from the pointer's return onto the glyph).
 #[gpui::test]
-fn a_right_click_beside_a_copied_line_opens_the_sketch_menu(cx: &mut TestAppContext) {
+fn a_right_click_where_a_copied_lines_glyphs_were_opens_the_sketch_menu(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     RENDERING.set(true);
     let (window, view) = sketch_with(cx, "sketch-hover-copy-paste-menu", Tool::Line);
@@ -1183,12 +1184,13 @@ fn a_right_click_beside_a_copied_line_opens_the_sketch_menu(cx: &mut TestAppCont
     gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("escape escape");
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let pointer = Pointer::new(cx, window, &view);
-    let on_line = screen(cx, 7.5, 0.);
+    // Near the line's end, so the way from the menu to its glyph row crosses no line.
+    let on_line = screen(cx, 27., 0.);
     pointer.move_to(cx, &view, on_line);
     pointer.right_click(cx, &view, on_line);
+    let glyph = cx.update(|cx| view.read(cx).ui.glyph_boxes.first().map(|b| DVec2::new(f64::from(b.2) + 10.0, f64::from(b.3) + 10.0))).expect("the line's glyph row");
+    let target = pointer.window_point(cx, glyph);
     let item = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("menu:Copy sketch entities").expect("Copy sketch entities").center();
-    let beside = screen(cx, 15., 20.);
-    let target = pointer.window_point(cx, beside);
     // As the scenario runner: three moves to each target, a rest, then the click.
     let mut from = pointer.window_point(cx, on_line);
     for to in [item, target] {
@@ -1199,6 +1201,7 @@ fn a_right_click_beside_a_copied_line_opens_the_sketch_menu(cx: &mut TestAppCont
             pointer.frames(cx, &view);
         }
         if to == item {
+            cx.executor().advance_clock(std::time::Duration::from_millis(700));
             gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(item, Modifiers::default());
             pointer.settle(cx, &view);
         }
@@ -1206,7 +1209,8 @@ fn a_right_click_beside_a_copied_line_opens_the_sketch_menu(cx: &mut TestAppCont
     }
     let held = cx.update(|cx| {
         let v = view.read(cx);
-        format!("{:?}; glyphs {:?} for the pointer at {beside:?}", v.sketch.as_ref().and_then(|ed| ed.hover_constraint), v.ui.glyph_boxes)
+        let ed = v.sketch.as_ref();
+        format!("{:?}; glyphs {:?} for the pointer at {glyph:?}; hover {:?} / {:?}, linger {:?} at {:?}, row entity {:?}", ed.and_then(|ed| ed.hover_constraint), v.ui.glyph_boxes, ed.and_then(|ed| ed.hover), v.hover, v.ui.glyph_linger, cx.background_executor().now(), ed.and_then(|ed| ed.glyph_entity))
     });
     let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
     vcx.simulate_mouse_down(target, gpui_kit::MouseButton::Right, Modifiers::default());

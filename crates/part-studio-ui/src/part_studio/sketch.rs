@@ -1390,6 +1390,9 @@ impl PartStudioView {
                 }
                 true
             }
+            // An open context menu's layer covers the graphics: nothing under it hovers (live: the canvas cursor
+            // default, no row tooltips under it; sketch-entity-copy-paste: the way to Copy crosses the line, unlit).
+            ViewportEvent::Hover(_) | ViewportEvent::PointerMove { .. } if self.context_menu.is_some() => false,
             ViewportEvent::Hover(gpu_id) => self.sketch_hover(*gpu_id, vp, window, cx),
             ViewportEvent::PointerMove { position, modifiers } => {
                 let released = self.ui.sketch_hover_held_at.is_some_and(|h| h.distance(*position) > 0.5);
@@ -6569,6 +6572,11 @@ impl PartStudioView {
         self.context_menu = Some((position, menu, sub));
         // The right-clicked model edge or face stays lit while the menu is open (live workflow 05 step 4).
         self.ui.menu_target = lit_plane.or(lit_model);
+        // The menu ends the sketch hover: its glyph row lingers from now, gone before the menu's next click (live
+        // sketch-entity-copy-paste: no glyph under the next right-click 45 px off the line).
+        if let Some(e) = self.sketch.as_mut().and_then(|ed| ed.hover.take()) {
+            self.linger_glyphs(e, cx);
+        }
         self.refresh_scene(false, cx);
         cx.notify();
     }
