@@ -3204,14 +3204,19 @@ fn an_edited_mate_down_to_one_connector_says_it_needs_two(cx: &mut TestAppContex
         let d = dialog.read(cx);
         assert_eq!(d.regen_error(cx).as_deref(), Some("Fastened 1 did not regenerate properly: Mate needs two mate connectors."));
         assert!(!d.accept_pale(cx), "✓ stays enabled");
+        assert_eq!(d.pick_history(), (true, false), "the removal is an Undo step");
         let state = view.read(cx).ui_state(cx);
         let dlg = &state["dialog"];
         assert_eq!((dlg["titleState"].clone(), dlg["ok"].clone()), (json!("error"), json!("enabled")), "{dlg}");
         let field = dlg["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Mate connectors").cloned().expect("the connectors field");
         assert_eq!((field["items"].as_array().map(Vec::len), field["state"].clone()), (Some(1), json!("ok")), "one chip left, not red: {field}");
+        let flip = dlg["fields"].as_array().unwrap().iter().find(|f| f["kind"] == "toggle").cloned().expect("the flip");
+        assert_eq!(flip["checked"], json!(false), "the flip keeps its icon: {flip}");
         // Its row red at once (live mistake-asm-mate-one-connector s8).
         let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Fastened 1").cloned().expect("the mate's row");
         assert_eq!(row["state"], json!("error"), "{row}");
+        // Its REST status is the committed mate's: OK.
+        assert_eq!(state["assembly"]["mates"][0]["status"], json!("OK"), "{}", state["assembly"]["mates"]);
     });
 }
 

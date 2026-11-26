@@ -410,11 +410,13 @@ impl MateDialog {
     /// then `-opposite` while the connectors' Z axes agree (live ui-parity
     /// asm-fastened-two-faces: two top faces, nothing turned). Both on one
     /// instance aligns nothing: as before the picks (live
-    /// mistake-asm-fastened-same-instance). Tangent shows its flag alone.
+    /// mistake-asm-fastened-same-instance). An edited mate keeps its icon
+    /// when a connector is removed (live mistake-asm-mate-one-connector).
+    /// Tangent shows its flag alone.
     fn flip_icon_on(&self) -> bool {
         match self.mate_type {
             MateType::Tangent => self.flip_primary,
-            _ => self.a.is_none() || self.b.is_none() || self.same_instance() || !self.flip_primary,
+            _ => (self.is_new && (self.a.is_none() || self.b.is_none())) || self.same_instance() || !self.flip_primary,
         }
     }
 
@@ -866,6 +868,10 @@ impl MateDialog {
     /// A chip's ×: live rule 6 makes that field the active one, its refill not advancing. On an edited mate it is an
     /// edit: ✓ stays enabled, the title red "Mate needs two mate connectors." (live qa/mistakes-1125).
     pub fn clear_slot(&mut self, field: usize, cx: &mut Context<Self>) {
+        // An Undo step too (live mistake-asm-mate-one-connector s8).
+        let before = self.pick_state();
+        self.picks_undo.push(before);
+        self.picks_redo.clear();
         *self.slot_mut(field) = None;
         self.active = Some(field);
         self.advance_disarmed = Some(self.field_of(field));

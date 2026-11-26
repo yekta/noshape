@@ -286,8 +286,10 @@ impl AssemblyView {
         let instances: Vec<Value> = asm.instances.iter().filter(|i| !pending(i.id)).map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
         // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK"; a suppressed mate's
         // too, asm-mate-menu-suppress).
+        // (The mate being edited is committed as it was: OK while its dialog is red, live mistake-asm-mate-one-connector s8.)
         let rest_status = |m: &Mate| match mate_state(m) {
             "suppressed" => "OK".to_string(),
+            "error" if edit_failing && editing == Some(m.id) => "OK".to_string(),
             s => s.to_uppercase(),
         };
         // Occurrences inside subassemblies, as live's REST lists them ("Sub <1> > Part 2 <1>"), placed in the world.
