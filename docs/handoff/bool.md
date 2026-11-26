@@ -19,13 +19,26 @@ Knurls: /root/bool-scratch/kn-run.sh <host> <dir> (systemd unit) with k-main / k
 all-96c035059fc28abb copied to ~/tmp/bool/<dir>; OCCT side ~/agents/bool-keep/knocc; delete the copies after.
 Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 15c2c6406).
 
-## NEXT (state 11-26 11:58 UTC)
-- QUEUED 11-26 11:58 as one stack from bool-sf (branch bool-loft, rebased on main 158ab4c25): screws coverage 402be8f80,
-  WRAP-TEXT a7a17af18 (tilted arcs on a cylinder -> C2::Conic with Map::Cyl; ours 68/88 ms vs OCCT 298/135), gate-host.py
-  ignoring "a gap" timing hints 5e07cd824, LOFT-PATHS 063eb6fea (lies_on also needs parallel normals; b076c08c ours 33 ms vs OCCT
-  151). ac1aac8d had FAILED 10:52 on a handoff rebase conflict. Gate chain-063eb6fea.out clean (differing 3 -> 3, to the end
-  132 -> 132, crate tests pass), knurls 5x 0. chain-063eb6fea.sh's suite check was wrong ($5 of "to the end a -> b" is "->"):
-  chain scripts must read fields 4 and 6.
+## NEXT (state 11-26 14:22 UTC)
+- LANDED 12:44 304e6ca4 (screws, wrap-text, gate "a gap" fix, loft-paths). QUEUED 6ac2fd63 13:40: SEED fix (seeded_sections
+  stops once 5 steps come no closer; impeller Fillet 4's cut 1662 -> 189 ms). Gate/knurls clean (its 17-doc CHECK = gap hints).
+- MARCHER (lead 11-26 decision, DECISIONS): own free x free sections, staged: (1) standalone intersector + replay-pair check
+  vs OCCT, landed unused (time-box ~2 days from 11-26 13:45, then report whether to go on); (2) on per pair family only at 0
+  differences in gate + parity56 + knurls; (3) numbers each stage: pairs matched, time vs OCCT, documents moved.
+  Worktree bool-march, branch bool-ffm (WIP commits, squash before land). crates/brep/src/march.rs: face_domain(body, face),
+  branches/sections(Domain a, Domain b): seeds from overlapping cell boxes (to 1/16 of each box) + 4-unknown Newton; walk
+  along na x nb, corrector in the plane across the tangent, box exit solved on the side; cubic Hermite fit (triple knots).
+  T1: march::tests (sphere x plane circle, two crossing cylinders). Harness brep_replay::free_sections_vs_occt
+  (NOSHAPE_BOOL_CORPORA, NOSHAPE_BREP_DIFF=1 for piece ends/sines/kinds). Build: bool-mf detached at bool-march's merge-base, `git diff $mb HEAD -- crates` + `git diff -- crates` applied
+  (warm vibex8 target), kt-mf-run.sh -> vibex8 ~/tmp/bool/kt-slow; run on rec-imp:rec-lp (197 pairs).
+  Numbers 14:20 vs face_pair_sections (vibex8 ~/tmp/bool/ff2.out): 197 pairs, 103 both none, 35 matched (worst 3.9e-8;
+  ours 85 ms vs OCCT 589 ms), 28 differ, 30 Tangent, 1 Lost. Breakdown: 22 "ours Tangent, OCCT 0" (OCCT's off_shared_edges
+  drops curves along a shared edge: NEXT skip tangent seeds on both boxes' sides, keep Tangent for interior/walk hits);
+  8 "ours 0, OCCT 1" (some = C1 joints of one profile: tangent, ours finds no seed: report Tangent); 7 "ours 1, OCCT 0";
+  7 + 3 extent differences (sections along both box sides fragment: exit slack 1e-7 in, re-check e49bd/e74bf/9040230e;
+  offset faces' fitted range, ae73 a3 b0). Uncommitted-then-committed: normal() fallback at degenerate points (pole,
+  collapsed side). After those: run all gate corpora (~/agents/bool-corpora: bool-corpus corpus2-6 direct-corpus sh-new2
+  parity56 ...) with NOSHAPE_BOOL_CORPORA, and the stage-1 report to the lead (pairs matched, time vs OCCT).
 - Coverage ranking DONE: every decline >= 100 ms parked: partial-fillet 7340044b (pf-secant-order-probes.patch; 57 um micro edge),
   tangent family beb5d239, setback df44fb85, loft-paths e74bf29d (tb-probe.patch), body-draft e13ba873 (tool B-spline index 2
   lies on target plane y 14.58 mm along a straight stretch of its profile, then leaves it C2 past a knot: the overlap's edge is a
