@@ -1078,6 +1078,28 @@ def same_fieldless_focus(a, b):
     return b
 
 
+def button_focused(a, b, after_button):
+    """After a click on a dialog's button live's Chrome focuses the button (no field); ours keeps its query field active
+    (a selection box: no text). Ours takes live's (README "Focus"; qa EXTRUDE-OPEN-SKETCH-FOCUS: ✓ on a failing Extrude)."""
+    if not (after_button and isinstance(a, dict) and isinstance(b, dict) and no_field_focus(a.get("focus"))):
+        return
+    f = b.get("focus")
+    if isinstance(f, dict) and f.get("kind") == "field" and f.get("tag") not in TEXT_TAGS and f.get("text") is None and f.get("selection") is None:
+        b["focus"] = a.get("focus")
+
+
+def created_feature_owner(a, b):
+    """A feature picked in the list that the take created: live's reader names no owner for it (its names come from the
+    document as opened: mistake-extrude-open-sketch s12, mistake-sketch-gap-profile-extrude s13; features there before
+    the take have theirs). Ours' owner isn't compared where live's is null."""
+    ia, ib = (((x or {}).get("selection") or {}).get("items") if isinstance(x, dict) else None for x in (a, b))
+    if not (isinstance(ia, list) and isinstance(ib, list) and len(ia) == len(ib)):
+        return
+    for x, y in zip(ia, ib):
+        if isinstance(x, dict) and isinstance(y, dict) and x.get("kind") == "FEATURE" == y.get("kind") and x.get("owner") is None:
+            y["owner"] = None
+
+
 def sorted_child_rows(fields):
     out, run = [], []
     for f in fields + [None]:
@@ -1421,6 +1443,14 @@ def compare(live, ours, whole_document=True):
             clicked = None
         if clicked:
             frame_late[f"step {s.get('step')}"] = clicked
+    # The steps since a click on a dialog's button, until the pointer acts again (button_focused).
+    button_late, on_button = set(), False
+    for s in steps:
+        do = s.get("do") if isinstance(s.get("do"), dict) else {}
+        if do.get("do") not in ("wait",):
+            on_button = do.get("do") == "click" and isinstance(do.get("on"), dict) and "button" in do["on"]
+        if on_button:
+            button_late.add(f"step {s.get('step')}")
     free_clicks = any(isinstance((st.get("do") or {}).get("on"), dict) and "sketch_point" in st["do"]["on"] for st in steps)
     plane_normal = sketch_plane_normal(steps)
     native_open = native_esc = False
@@ -1519,6 +1549,8 @@ def compare(live, ours, whole_document=True):
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
         b = drawn_rows_only(a, b)
         b = same_fieldless_focus(a, b)
+        button_focused(a, b, name in button_late)
+        created_feature_owner(a, b)
         # A native <select> picked from: live's pointer stays on it and its title (the picked value) shows as a
         # tooltip; ours' pointer is on the list's row it picked (ver-filter-tab).
         pick = ((step or {}).get("on") or {}).get("pick") if isinstance(step, dict) else None
