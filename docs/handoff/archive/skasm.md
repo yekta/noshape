@@ -2742,3 +2742,31 @@ Sketch keys (shortcuts-sk-1118, 6 rows) landed a4b5d946; live confirmed all six 
 - Open note: labels stored absolute; live labelDistance/labelRatio; whether a label follows a dragged line unchecked.
 - NEXT: ask the lead.
 
+## (was NOW) (11-25 21:5x) — read first
+- LANDED f0822ca5 (3e25fe40): 34 commits incl. 69415bd6 / 5af8d24a / 1db32be0. Scissor 97ad5f P0 answered (no regions
+  change; differs from live at Delete face 1; lead to assign). Tail Fin plane section -> bool (lead), leave it.
+- UNCOMMITTED in the worktree (run bcihsrlre: log ~/tmp/skasm/tall2.log; script skasm-scratch/bin/tall2.sh via rb.sh vibex6):
+  1. Speed T2s for live/qa/speed-1125 rows:
+     - part-studio-ui latency_tests.rs live_speed_1125_sketch_rows (speed_grid / sketch_on_top: S50 12 rects 4 cols +
+       circle + line, S200 50 rects 10 cols; drag the (10, 6) corner +60/-40 px at 60 Hz, release->!ui_busy; width
+       12<->10 typed; Insert DXF tests/perf/gear-logo.dxf (new file, copied from live's kit, our own drawing) x5).
+       Status: the corner point isn't found after finish+reopen (ids change?); tall2 prints the sketch's points on that
+       failure. Before reopen was added, hover at the corner was None (origin hit at (0,0) first; then unknown).
+     - assembly-ui assembly_feel_tests.rs live_speed_1125_assembly_rows (NOSHAPE_SPEED_SCISSOR=vibex6
+       ~/agents/skasm-keep/scissor.noshape, tab "Sub 6ed9b2" = Drive, view Front; Bearing Mount <1> drag 20 moves,
+       per-move placement-changed lag + release settled_ms (900 ms quiet, live's "settled"); Fastened 608 <2> -> T8
+       leadscrew, Revolute 608 <2> -> "6mm to 8mm <1>" via planar_face_connector + deliver_connector, ✓ timed, doc undo).
+       open_from_top_on now calls open_tab_from_top(tab name). Not yet run past hook registration (fixed).
+     - Prior evidence: S300 T2 drag step 15 ms, dim 55 ms vs live 654-1049 / 667-758: sketch rows can't be >=2x.
+  2. HINGE-LIMITS-EDIT-KEEPS-ANGLE fix (live/asm/hinge-limits-1125: any real edit -> 0 then clamp into limits; ✓ unchanged
+     keeps the angle, no undo entry; Ctrl+Z restores): assembly_view.rs accept_mate: editing && mate changed vs
+     effective_mate (new fn, configuration applied) && not Fastened/Tangent/Width -> prepared.solve(locks (id,
+     held_in_limits(m, ix, 0))) + apply_solved before the edit. T1 assembly_ui_tests an_edited_revolute_goes_home_into_its_limits
+     (40 deg; unchanged ✓ keeps; 10/110 -> 10; undo 40; -120/110 -> 0). First compile failed on SolveOptions path (fixed).
+  3. qa extraAssemblies (lead): crates/ops/tests/parity.rs parity_assemblies builds cases = each dir + each source.json
+     extraAssemblies entry as "<doc>+<name lowercased, '-'>" (asm-scissor-lift+assembly-3) from <dir>/<entry.dir>
+     (assembly.json, bom.json, mate-messages.json or mate-statuses.json), studios limited to entry.studios;
+     NOSHAPE_PARITY_ONLY=<name>[,..] filters. Not run yet: skasm-scratch/bin/pa3.sh (saves to vibex6
+     ~/agents/skasm-keep/pa3/). Then land and tell qa the case name + saved file (cells 91-93).
+- Next after those: commit (tests + fix + parity), land; report speed table (ours vs live, same host) to lead; GLYPH-CIRCLE.
+
