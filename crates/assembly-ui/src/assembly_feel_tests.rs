@@ -76,8 +76,13 @@ fn open_from_top_when(cx: &mut TestAppContext, path: &std::path::Path, ready: im
 
 /// [`open_from_top_when`], with the front layer (the left dialogs and the mate toolbar) drawn over the view when `front`.
 fn open_from_top_on(cx: &mut TestAppContext, path: &std::path::Path, front: bool, ready: impl Fn(&AssemblyView) -> bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    open_tab_from_top(cx, path, "Assembly 1", front, ready)
+}
+
+/// [`open_from_top_on`] for assembly tab `tab_name`.
+fn open_tab_from_top(cx: &mut TestAppContext, path: &std::path::Path, tab_name: &str, front: bool, ready: impl Fn(&AssemblyView) -> bool) -> (AnyWindowHandle, Entity<AssemblyView>) {
     let session = crate::session::Session::open(path).unwrap();
-    let tab = session.doc.tabs.iter().find(|t| t.name == "Assembly 1").unwrap().id;
+    let tab = session.doc.tabs.iter().find(|t| t.name == tab_name).unwrap().id;
     let gpu = Gpu::headless_rendering().unwrap();
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
@@ -2311,4 +2316,137 @@ fn a_face_clicks_triad_stays_unlit_until_the_pointer_moves(cx: &mut TestAppConte
     move_to(cx, window, &view, on + DVec2::new(1.0, 0.0));
     wait_until(cx, window, &view, |v, _| v.manip_click.is_none());
     assert!(cx.update(|cx| view.read(cx).manip_click.is_none() && view.read(cx).manip_hover.is_some()), "lit once the pointer moves");
+}
+
+/// Runs `go`, then frames until the view has been quiet for 900 ms (live speed-1125's "settled": the last draw before
+/// 900 ms without one): the time to its last change, ms.
+fn settled_ms(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, go: impl FnOnce(&mut TestAppContext)) -> f64 {
+    let last = std::rc::Rc::new(std::cell::Cell::new(std::time::Instant::now()));
+    let _watch = cx.update(|cx| {
+        let last = last.clone();
+        cx.observe(view, move |_, _| last.set(std::time::Instant::now()))
+    });
+    let t0 = std::time::Instant::now();
+    last.set(t0);
+    go(cx);
+    while last.get().elapsed() < std::time::Duration::from_millis(900) && t0.elapsed() < std::time::Duration::from_secs(30) {
+        quick_frame(cx, window, view);
+    }
+    (last.get() - t0).as_secs_f64() * 1000.0
+}
+
+/// One frame of real time: GPU results in, tasks run, the clock kept with the real one, the window drawn.
+fn quick_frame(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
+    let t = std::time::Instant::now();
+    cx.update(|cx| view.read(cx).gpu.deliver_frames());
+    cx.run_until_parked();
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(8).saturating_sub(t.elapsed()));
+    cx.executor().advance_clock(t.elapsed());
+}
+
+/// An implicit connector at the centroid of instance `name`'s first planar face.
+fn planar_face_connector(v: &AssemblyView, name: &str, cx: &gpui_kit::App) -> noshape_model::assembly::MateConnectorRef {
+    use noshape_model::reference::{Inference, Reference};
+    let id = v.assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == name)).unwrap_or_else(|| panic!("no {name}")).id;
+    let occ = v.result.occurrences.iter().find(|o| o.top() == id).unwrap_or_else(|| panic!("{name} not evaluated"));
+    let body = occ.context.body(&occ.body).unwrap();
+    let k = body.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some()).unwrap();
+    noshape_model::assembly::MateConnectorRef::on(id, Vec::new(), Reference::Implicit { on: Box::new(occ.face_refs[k].clone()), inference: Inference::Centroid })
+}
+
+/// Live's assembly rows (qa/speed-1125, software GL, medians of 5) on the scissor lift's Drive (19 instances, 19
+/// mates): Bearing Mount <1> dragged 58 px (each move drawn ~280 ms later, release to settled 1305 ms), a Fastened
+/// 608 <2> to the leadscrew ✓ (settled 1048 ms) and a Revolute 608 <2> to the coupler ✓ (1291 ms). The document is a
+/// parity build of asm-scissor-lift (NOSHAPE_SPEED_SCISSOR, its Drive tab "Sub 6ed9b2").
+#[gpui::test]
+#[ignore = "T2: wall-clock timing; a release build and a parity document (NOSHAPE_SPEED_SCISSOR)"]
+fn live_speed_1125_assembly_rows(cx: &mut TestAppContext) {
+    use noshape_model::assembly::MateType;
+    let Ok(src) = std::env::var("NOSHAPE_SPEED_SCISSOR") else { return eprintln!("NOSHAPE_SPEED_SCISSOR unset: skipped") };
+    let Some(_gpu) = gpu_pointer() else { return };
+    cx.update(gpui_kit::init);
+    crate::assembly_hooks::register_for_tests();
+    let path = std::env::temp_dir().join(format!("noshape-speed-scissor-{}.noshape", std::process::id()));
+    std::fs::copy(&src, &path).unwrap();
+    let (window, view) = open_tab_from_top(cx, &path, "Sub 6ed9b2", false, |v| v.result.occurrences.len() >= 19);
+    cx.update_window(window, |_, _, cx| view.update(cx, |v, cx| {
+        let (lo, hi) = v.result.bounds().unwrap();
+        v.viewport.update(cx, |vp, cx| {
+            let s = vp.size();
+            vp.camera.set_view(noshape_render::StandardView::Front);
+            vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+            vp.request_frame(cx);
+        });
+    }))
+    .unwrap();
+    settle(cx, window, &view);
+    let id_of = |cx: &mut TestAppContext, name: &str| cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == name)).unwrap().id);
+    let mount = id_of(cx, "Bearing Mount <1>");
+    let placed = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).result.solved.placement(mount).map(|p| p.to_dmat4()));
+    // A point of the mount's screen box that hovers the mount itself.
+    let (lo, hi) = screen_box(cx, &view, "Bearing Mount <1>");
+    let grab = (1..10).flat_map(|i| (1..10).map(move |j| lo + (hi - lo) * DVec2::new(i as f64 / 10.0, j as f64 / 10.0))).find(|p| {
+        move_to(cx, window, &view, *p);
+        cx.update(|cx| view.read(cx).hover.as_ref().is_some_and(|h| h.path.first() == Some(&mount)))
+    });
+    let grab = grab.expect("a point of Bearing Mount <1> under the pointer");
+    let mut ms: [Vec<f64>; 4] = Default::default();
+    let mut unmoved = 0;
+    for run in 0..5 {
+        let dir = if run % 2 == 0 { DVec2::new(50.0, -30.0) / 20.0 } else { DVec2::new(-50.0, 30.0) / 20.0 };
+        let from = if run % 2 == 0 { grab } else { grab - dir * 20.0 };
+        move_to(cx, window, &view, from);
+        let p0 = placed(cx);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(at_window(cx, &view, from), MouseButton::Left, Modifiers::default());
+        for k in 1..=20 {
+            let before = placed(cx);
+            let t0 = std::time::Instant::now();
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(at_window(cx, &view, from + dir * k as f64), Some(MouseButton::Left), Modifiers::default());
+            while placed(cx) == before && t0.elapsed() < std::time::Duration::from_secs(3) {
+                quick_frame(cx, window, &view);
+            }
+            if placed(cx) == before {
+                unmoved += 1;
+            } else {
+                ms[0].push(t0.elapsed().as_secs_f64() * 1000.0);
+            }
+            while t0.elapsed() < std::time::Duration::from_millis(16) {
+                quick_frame(cx, window, &view);
+            }
+        }
+        let up = at_window(cx, &view, from + dir * 20.0);
+        ms[1].push(settled_ms(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(up, MouseButton::Left, Modifiers::default())));
+        assert!(placed(cx) != p0, "run {run}: Bearing Mount <1> moved");
+    }
+    for (row, (t, other)) in [(MateType::Fastened, "T8 x 8mm Leadscrew <1>"), (MateType::Revolute, "6mm to 8mm <1>")].into_iter().enumerate() {
+        for _ in 0..5 {
+            let mates = cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates.len());
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+                v.start_mate(t, w, cx);
+                let (a, b) = (planar_face_connector(v, "608 <2>", cx), planar_face_connector(v, other, cx));
+                v.deliver_connector(a, w, cx);
+                v.deliver_connector(b, w, cx);
+            }))
+            .unwrap();
+            let _ = settled_ms(cx, window, &view, |_| {});
+            ms[2 + row].push(settled_ms(cx, window, &view, |cx| {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_mate(w, cx))).unwrap();
+            }));
+            assert_eq!(cx.update(|cx| view.read(cx).assembly(cx).unwrap().mates.len()), mates + 1, "{t:?} added");
+            let doc = cx.update(|cx| view.read(cx).doc.clone());
+            cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+            let _ = settled_ms(cx, window, &view, |_| {});
+        }
+    }
+    let rows = [("drag: a move drawn", "~280 (286 first)"), ("drag: release, settled", "1305"), ("Fastened ✓, settled", "1048"), ("Revolute ✓, settled", "1291")];
+    let mut report = vec![format!("{:<28} {:>9} {:>9}  live", "", "median", "worst")];
+    for ((what, live), runs) in rows.iter().zip(&ms) {
+        let mut v = runs.clone();
+        v.sort_by(f64::total_cmp);
+        report.push(format!("{what:<28} {:>6.1} ms {:>6.1} ms  {live}", v[v.len() / 2], v[v.len() - 1]));
+    }
+    report.push(format!("(moves that left the mount where it was within 3 s: {unmoved} of 100)"));
+    eprintln!("{}", report.join("\n"));
+    let _ = std::fs::remove_file(&path);
 }

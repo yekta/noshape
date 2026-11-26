@@ -655,3 +655,164 @@ fn a_slow_sketch_drags_off_the_ui_thread(cx: &mut TestAppContext) {
     let want = plane(to) + (start - plane(from));
     assert!((at - want).length() < 1e-9, "the point under the pointer, grab offset kept: {at} vs {want}");
 }
+
+/// A sketch on Top laid out as live's speed-1125 grid (qa/speed-1125 raw/ts1.b.js): `rects` rectangles 10 x 6 mm at a
+/// 15 mm pitch in `cols` columns, each with its 10 mm width; S50 adds a circle and a line. Open for edit, zoomed to
+/// live's 0.188 mm/px about the first rectangle; its lower left corner and width dimension.
+fn speed_grid(cx: &mut TestAppContext, rects: usize, cols: usize, extras: bool) -> (AnyWindowHandle, Entity<PartStudioView>, noshape_sketch::EntityId, noshape_sketch::ConstraintId) {
+    let (window, view) = sketch_on_top(cx);
+    let (corner_before, width_before) = cx
+        .update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| {
+            use noshape_sketch::ConstraintKind;
+            let (mut corner, mut width) = (None, None);
+            for i in 0..rects {
+                let p0 = DVec2::new(0.015 * (i % cols) as f64, 0.015 * (i / cols) as f64);
+                let s = data.sketch.corner_rectangle(p0, p0 + DVec2::new(0.01, 0.006));
+                // Live's q0 corner (10, 6) (its (0, 0) corner is on the Origin).
+                let far = s.points.iter().copied().find(|q| data.sketch.point(*q).is_some_and(|q| (q - p0 - DVec2::new(0.01, 0.006)).length() < 1e-9));
+                corner = corner.or(far);
+                let w = crate::sketch_mode::add_dimension(data, ConstraintKind::Length { curve: s.curves[0], value: 0.0 }, Some(p0 + DVec2::new(0.005, -0.003)), None);
+                width = width.or(w);
+            }
+            if extras {
+                data.sketch.add_circle(DVec2::new(-0.015, 0.003), 0.003);
+                let a = data.sketch.add_point(DVec2::new(-0.02, 0.01));
+                let b = data.sketch.add_point(DVec2::new(-0.01, 0.015));
+                data.sketch.add_line_between(a, b).unwrap();
+            }
+            (corner.unwrap(), width.unwrap())
+        })))
+        .unwrap();
+    // Closed and opened again, as a user's saved sketch.
+    let s0 = cx.update(|cx| view.read(cx).display_seq);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { let _ = v.finish_sketch(w, cx); })).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && view.read(cx).display_seq > s0 && !view.read(cx).ui_busy());
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    // (Its ids as read back.)
+    let (corner, width) = cx.update(|cx| {
+        let d = view.read(cx).sketch_data(cx).unwrap();
+        let at = DVec2::new(0.01, 0.006);
+        let corner = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| e.id).find(|q| d.sketch.point(*q).is_some_and(|q| (q - at).length() < 1e-9));
+        let width = d.sketch.constraints().find(|c| matches!(c.kind, noshape_sketch::ConstraintKind::Length { .. })).map(|c| c.id);
+        let points: Vec<_> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).take(8).map(|e| (e.id, d.sketch.point(e.id))).collect();
+        assert!(corner.is_some(), "no point at (10, 6) mm after reopening (was {corner_before:?}, {} entities): {points:?}", d.sketch.entities().count());
+        (corner.unwrap(), width.unwrap_or(width_before))
+    });
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    // 0.188 mm/px over a ~1000 px wide viewport: ~190 mm across, about the first rectangle.
+    vp.update(cx, |vp, cx| vp.zoom_to_bounds(glam::DVec3::new(-0.08, -0.05, 0.0), glam::DVec3::new(0.11, 0.06, 0.0), cx));
+    (window, view, corner, width)
+}
+
+/// Live's user-action rows (qa/speed-1125, software GL, medians of 5): a rectangle corner dragged in a 50- and a
+/// 200-entity sketch (release to settled 654 / 1049 ms, each move drawn in <= 54 ms), its width typed + Enter
+/// (667 / 758 ms), and Insert DXF's ✓ of a 72-entity gear (802 ms). Ours on the same kind of host, printed with live's.
+#[gpui::test]
+#[ignore = "T2: wall-clock timing; a release build, compared with live's software-GL rows"]
+fn live_speed_1125_sketch_rows(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let mut report = vec![format!("{:<40} {:>9} {:>9}  live", "", "median", "worst")];
+    let mut notes = vec![];
+    let mut row = |what: &str, runs: &[f64], live: &str| {
+        if runs.is_empty() {
+            return;
+        }
+        let worst = runs.iter().cloned().fold(0.0, f64::max);
+        report.push(format!("{what:<40} {:>6.1} ms {:>6.1} ms  {live}", median(runs.to_vec()), worst));
+    };
+    for (name, rects, cols, extras, live) in [("S50", 12, 4, true, ["654", "<= 54", "667"]), ("S200", 50, 10, false, ["1049", "continuous", "758"])] {
+        let (window, view, mut corner, width) = speed_grid(cx, rects, cols, extras);
+        pump(cx, window, &view, Duration::from_millis(1500));
+        let pointer = Pointer::new(cx, window, &view);
+        let mut ms: [Vec<f64>; 3] = Default::default();
+        let mut jumps = vec![];
+        let mut home = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.point(corner)).unwrap_or(DVec2::new(0.01, 0.006));
+        for run in 0..5 {
+            // The point nearest where the corner was (its id as the sketch now reads back).
+            let nearest = |cx: &mut TestAppContext, home: DVec2, within: f64| cx.update(|cx| {
+                let d = view.read(cx).sketch_data(cx).unwrap();
+                let near = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).filter_map(|e| Some((e.id, (d.sketch.point(e.id)? - home).length())));
+                let (id, off) = near.min_by(|a, b| a.1.total_cmp(&b.1)).unwrap();
+                assert!(off < within, "{name} run {run}: no point within {within} m of {home:?} ({off})");
+                (id, off)
+            });
+            // (Moved up to 2 mm since by the width typed.)
+            corner = nearest(cx, home, if run == 0 { 1e-4 } else { 5e-3 }).0;
+            let at = |cx: &mut TestAppContext| cx.update(|cx| {
+                let p = view.read(cx).sketch_data(cx).unwrap().sketch.point(corner).unwrap();
+                (p, view.read(cx).viewport.read(cx).project(glam::DVec3::new(p.x, p.y, 0.0)).unwrap())
+            });
+            let (p0, s0px) = at(cx);
+            move_to(cx, window, &pointer, s0px);
+            pump(cx, window, &view, Duration::from_millis(900));
+            let hovered = cx.update(|cx| view.read(cx).sketch.as_ref().and_then(|e| e.hover));
+            assert_eq!(hovered, Some(corner), "{name}: the corner lit under the pointer");
+            let left = gpui_kit::MouseButton::Left;
+            gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_down(pointer.window_point(cx, s0px), left, Modifiers::default());
+            // +60/-40 px and back on the next run, 20 moves 16 ms apart.
+            let dir = if run % 2 == 0 { DVec2::new(3.0, 2.0) } else { DVec2::new(-3.0, -2.0) };
+            for k in 1..=20 {
+                let to = pointer.window_point(cx, s0px + dir * k as f64);
+                let t0 = Instant::now();
+                ms[1].push(timed(cx, window, &view, |cx| {
+                    gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_move(to, Some(left), Modifiers::default());
+                }, |_| true));
+                if let Some(rest) = Duration::from_millis(16).checked_sub(t0.elapsed()) {
+                    pump(cx, window, &view, rest);
+                }
+            }
+            let up = pointer.window_point(cx, s0px + dir * 20.0);
+            let (dragged, _) = at(cx);
+            ms[0].push(timed(cx, window, &view, |cx| gpui_kit::VisualTestContext::from_window(window, cx).simulate_mouse_up(up, left, Modifiers::default()), |cx| !view.read(cx).ui_busy()));
+            // (The released sketch reads back with new ids.)
+            let (released, jump) = nearest(cx, dragged, 5e-3);
+            jumps.push(jump * 1000.0);
+            let p1 = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.point(released)).unwrap();
+            if (p1 - p0).length() < 1e-3 {
+                notes.push(format!("{name} run {run}: the corner did not follow the drag (at {p0:?})"));
+            }
+            home = p1;
+            let text = if run % 2 == 0 { "12 mm" } else { "10 mm" };
+            if std::env::var_os("NOSHAPE_SPEED_NO_DIM").is_some() {
+                continue;
+            }
+            ms[2].push(timed(cx, window, &view, |cx| {
+                cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.commit_dimension(width, text, w, cx))).unwrap();
+            }, |cx| !view.read(cx).ui_busy()));
+            pump(cx, window, &view, Duration::from_millis(300));
+        }
+        row(&format!("{name} drag: release, settled"), &ms[0], live[0]);
+        row(&format!("{name} drag: a move drawn"), &ms[1], live[1]);
+        row(&format!("{name} width typed + Enter, settled"), &ms[2], live[2]);
+        notes.push(format!("{name}: the corner from its last drawn drag place to its released one: {jumps:.3?} mm"));
+    }
+    let dxf = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/perf/gear-logo.dxf")).unwrap();
+    let mut ms = vec![];
+    for _ in 0..5 {
+        let (window, view) = sketch_on_top(cx);
+        ms.push(timed(cx, window, &view, |cx| {
+            cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.insert_dxf_bytes(&dxf, w, cx))).unwrap();
+        }, |cx| !view.read(cx).ui_busy()));
+        let n = cx.update(|cx| view.read(cx).sketch_data(cx).unwrap().sketch.entities().filter(|e| e.kind() != noshape_sketch::EntityKind::Point).count());
+        assert!(n >= 72, "the gear's 72 entities: {n}");
+    }
+    row("Insert DXF (gear, 72 entities) ✓, settled", &ms, "802");
+    report.extend(notes);
+    eprintln!("{}", report.join("\n"));
+}
+
+/// An empty sketch on Top of a new document, open for edit.
+fn sketch_on_top(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = part_studio_with(cx, "speed-grid", |path| crate::session::Session::create(path, crate::user_units::new_document()).unwrap());
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        v.selection = vec![Reference::Plane(DatumPlane::Top)];
+        v.start_feature("sketch", w, cx);
+    }))
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    (window, view)
+}
