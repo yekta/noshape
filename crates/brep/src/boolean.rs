@@ -557,7 +557,17 @@ impl GFace {
                         let q1 = DVec2::new(q0.x, qb.y);
                         Ok(C2::Seg { a: q0, b: q1 })
                     }
-                    Geo::Arc { k, sweep, .. } => {
+                    Geo::Arc { k, a0, sweep } => {
+                        // (A circle at an angle to the axis, on the face only along its stretch (wrap-text-cylinders'
+                        // letters' rims, 1.3 mm up a 30 mm cylinder): mapped point by point, as a cone's ellipse.)
+                        let h = |t: f64| (k.at(t) - *o).dot(*a) - (k.c - *o).dot(*a);
+                        let end = self.to2(p1).x;
+                        let clear = !(at0 || at1) && (end - r * th0).abs().min((end - r * (th0 + TAU)).abs()) > near;
+                        if clear && (k.at(*a0) - p0).length() <= 1e-6 && [*a0, a0 + 0.5 * sweep, a0 + sweep].iter().any(|&t| h(t).abs() > 1e-5) {
+                            let Surf::Cyl { x, y, flip, .. } = self.s else { unreachable!() };
+                            let m = Map::Cyl { o: *o, a: *a, x, y, r: *r, flip, th0: *th0, mid: self.to2(k.at(a0 + 0.5 * sweep)).x, eps: self.seam_eps() };
+                            return Ok(C2::Conic { c: k.c, u: k.x * k.r, v: k.y * k.r, t0: *a0, sweep: *sweep, m, par: false, hyp: false });
+                        }
                         let along = if k.n.dot(*a) > 0.0 { 1.0 } else { -1.0 };
                         let ds = along * sweep * r;
                         if ds < 0.0 && (at0 || at1) {
@@ -568,7 +578,6 @@ impl GFace {
                         // hole rims 5 um off a pin's axis, 10 um past its seam).)
                         let off_axis = (k.c - *o - *a * (k.c - *o).dot(*a)).length() + (k.r - r).abs();
                         let (lo, hi) = (r * th0, r * (th0 + TAU));
-                        let end = self.to2(p1).x;
                         let side = if ds < 0.0 { lo } else { hi };
                         let at_seam = (end - lo).abs().min((end - hi).abs()) <= near.max(reach) && (q0.x + ds - side).abs() <= 2.0 * off_axis + slack;
                         let Some(x1) = onto(q0.x + ds).or(at_seam.then_some(side)) else { return Err(Decline("an arc across a cylinder's seam")) };

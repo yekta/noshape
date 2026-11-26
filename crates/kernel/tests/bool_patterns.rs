@@ -3739,3 +3739,20 @@ fn a_threads_run_out_face_with_a_notch_ruling_goes_round() {
         assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces, "{case}");
     }
 }
+
+/// wrap-text-cylinders: letters wrapped on a cylinder fused to it, their rims on the cylinder arcs of circles at an
+/// angle to its axis (on it along their stretch): ours, as OCCT's fuse.
+#[test]
+fn letters_wrapped_on_a_cylinder_with_rims_at_an_angle_fuse() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "4ff762870978a9d2").expect("the recorded Boolean");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    let v = r.shape.volume().unwrap();
+    assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-7 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces);
+}
