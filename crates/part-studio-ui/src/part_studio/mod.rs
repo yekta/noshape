@@ -417,6 +417,10 @@ pub struct PartStudioView {
     repair_view: Option<Entity<repair_view::RepairView>>,
     pub viewport: Entity<Viewport>,
     display: Arc<StudioDisplay>,
+    /// A failed blend's picks that fail alone, asked for by its open dialog ([`noshape_model::regen::blame`]): the
+    /// feature, the display it was asked under and the picks (none when the cap ran out). Off regeneration.
+    blend_blame: Option<(FeatureId, Arc<StudioDisplay>, Vec<Reference>)>,
+    blend_blame_task: Option<(FeatureId, Arc<StudioDisplay>, Task<()>)>,
     built: Option<BuiltScene>,
     /// While a feature dialog previews: the model before the feature, the
     /// preview blend's base (`preview_mix_base`).
@@ -624,6 +628,8 @@ impl PartStudioView {
             repair_view: None,
             viewport,
             display: Arc::new(StudioDisplay::defaults()),
+            blend_blame: None,
+            blend_blame_task: None,
             built: None,
             built_base: None,
             cache: Default::default(),
@@ -1029,6 +1035,62 @@ impl PartStudioView {
     }
 
     /// Configuration values to evaluate: defaults overridden by the user's choice.
+    /// The blend blame computed for this display ([`Self::blend_blame`]), if any.
+    fn blend_blame_shown(&self, id: FeatureId) -> Vec<Reference> {
+        self.blend_blame.as_ref().filter(|(f, d, _)| *f == id && Arc::ptr_eq(d, &self.display)).map(|b| b.2.clone()).unwrap_or_default()
+    }
+
+    /// The picks of the open dialog's failed Fillet or Chamfer that fail alone (live errors-1123: their entries red):
+    /// computed once per regeneration result, off the UI thread, each pick rerun on the last run's cache, at most
+    /// 10 s; none until then. Regeneration itself never pays for it (P0 11-26: c2-impeller-loft 52 s).
+    fn blend_blame(&mut self, id: FeatureId, cx: &mut Context<Self>) -> Vec<Reference> {
+        const CAP: Duration = Duration::from_secs(10);
+        let failed_blend = self.display.feature_state(id).is_some_and(|s| s.status == FeatureStatus::Error);
+        if !failed_blend {
+            return Vec::new();
+        }
+        if self.blend_blame.as_ref().is_some_and(|(f, d, _)| *f == id && Arc::ptr_eq(d, &self.display)) {
+            return self.blend_blame_shown(id);
+        }
+        if self.blend_blame_task.as_ref().is_some_and(|(f, d, _)| *f == id && Arc::ptr_eq(d, &self.display)) {
+            return Vec::new();
+        }
+        let Some((studio, _)) = self.effective_studio(cx) else { return Vec::new() };
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let config = self.current_config(&studio);
+        let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
+        let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
+        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features_lazy();
+        let mut reg = self.regen_seed.lock().as_ref().map(Regenerator::snapshot).unwrap_or_default();
+        let display = self.display.clone();
+        let work = cx.background_spawn(async move {
+            noshape_render::threads::lower_priority();
+            let opts = RegenOptions { document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
+            noshape_model::regen::blame::failing_alone(&mut reg, &studio, &config, &units, &opts, id, CAP)
+        });
+        let task = cx.spawn(async move |this, cx| {
+            let refs = work.await.unwrap_or_default();
+            let _ = this.update(cx, |this, cx| {
+                let Some((f, d, _)) = this.blend_blame_task.take() else { return };
+                let current = Arc::ptr_eq(&d, &this.display);
+                this.blend_blame = Some((f, d, refs.clone()));
+                if !current {
+                    return;
+                }
+                if let Some(e) = this.edit.as_ref().filter(|e| e.dialog.read(cx).feature.id == f) {
+                    e.dialog.update(cx, |d, cx| {
+                        let (faulty, invalid_input) = (d.faulty.clone(), d.invalid_input);
+                        d.set_faulty(faulty, invalid_input, refs, cx);
+                    });
+                }
+                this.rebuild_scene(cx);
+                cx.notify();
+            });
+        });
+        self.blend_blame_task = Some((id, display, task));
+        Vec::new()
+    }
+
     pub(super) fn current_config(&self, studio: &PartStudio) -> noshape_model::configuration::ConfigValues {
         let mut v = studio.configuration.defaults();
         for (k, val) in &self.config_values.0 {
@@ -1257,6 +1319,9 @@ impl PartStudioView {
         drop_off_thread(old_pivot, cx);
         // The notices panel lists the open dialog's feature too (a new one isn't in the document yet).
         noshape_model::custom::run::set_draft(self.tab, self.edit.as_ref().map(|e| e.dialog.read(cx).row_feature()));
+        // A failed blend's blame its regeneration left out, asked for now (off the UI thread).
+        let edited = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.id);
+        let lazy_blame = edited.filter(|id| self.display.feature_state(*id).is_some_and(|s| s.error_refs.is_empty())).map(|id| self.blend_blame(id, cx)).unwrap_or_default();
         // Update dialog status from the edited feature's state.
         if let Some(e) = &self.edit {
             let id = e.dialog.read(cx).feature.id;
@@ -1269,6 +1334,7 @@ impl PartStudioView {
             // with ✓ enabled.
             let st = st.filter(|(_, m)| !m.starts_with("Creating multiple Derived features from the same source"));
             let (faulty, invalid_input, blamed) = self.display.feature_state(id).map(|s| (s.faulty.clone(), s.invalid_input, s.error_refs.clone())).unwrap_or_default();
+            let blamed = if blamed.is_empty() { lazy_blame } else { blamed };
             // Live (sketch/00-sketch-dialog-empty.png): a sketch without a
             // plane asks for one in a blue bubble over the graphics.
             const NO_PLANE: &str = NO_SKETCH_PLANE_BUBBLE;
@@ -1596,7 +1662,7 @@ impl PartStudioView {
         let error_parts = failed_state.map(|s| s.error_parts.clone()).unwrap_or_default();
         // Only the inputs its error blames go red, the rest stay orange (live errors-1123); none where it draws what it
         // couldn't make.
-        let blamed: Vec<Reference> = failed_state.filter(|_| failing && error_mesh.is_none() && !attempt).map(|s| s.error_refs.clone()).unwrap_or_default();
+        let blamed: Vec<Reference> = failed_state.filter(|_| failing && error_mesh.is_none() && !attempt).map(|s| if s.error_refs.is_empty() { self.blend_blame_shown(s.id) } else { s.error_refs.clone() }).unwrap_or_default();
         for b in self.display.bodies.iter().filter(|b| !b.hidden && error_parts.contains(&b.id)) {
             extra.extend(scene_builder::error_geometry(&b.mesh, false, self.gpu.uploader()));
         }

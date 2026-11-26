@@ -12580,3 +12580,34 @@ fn first_hour_assembly_mistakes_as_live() {
     let list = call(&mut ctx, "assembly_list", json!({}));
     assert_eq!((list["instances"].as_array().unwrap().len(), list["mates"].as_array().unwrap().len()), (3, 1), "one undo brings both back: {list}");
 }
+
+/// A failed Fillet's blame on request: `feature_get` with `blame` lists the edge that fails alone (a hole's rim on an R8
+/// fillet), not the vertical one that builds alone, as its dialog reds them; without `blame` none is tried.
+#[test]
+fn feature_get_blames_a_failed_fillets_edge_on_request() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "fillet-blame.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [60, 40]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "20 mm" } }));
+    let at = |ctx: &mut Ctx, p: [f64; 3]| -> String {
+        let e = call(ctx, "query_entities", json!({ "kind": "edges", "at": [p] }));
+        e["edges"][0]["id"].as_str().unwrap_or_else(|| panic!("an edge at {p:?}: {e}")).to_string()
+    };
+    let front = at(&mut ctx, [30.0, 0.0, 20.0]);
+    call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [front], "radius": "8 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "circle", "points": [[30, 4], [33, 4]] }));
+    let hole = call(&mut ctx, "sketch_get", json!({ "sketch": s2 }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [hole], "endBound": "THROUGH_ALL", "symmetric": true, "operationType": "REMOVE" } }));
+    let (rim, back) = (at(&mut ctx, [30.0, 7.0, 19.93725]), at(&mut ctx, [60.0, 40.0, 10.0]));
+    let fi = call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [rim, back], "radius": "1 mm" } }));
+    assert_eq!(fi["feature_status"]["status"], "Error", "{fi}");
+    let name = fi["name"].as_str().unwrap().to_string();
+    let g = call(&mut ctx, "feature_get", json!({ "feature": name }));
+    assert!(g.get("red_selections").is_none(), "{g}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": name, "blame": true }));
+    assert_eq!(g["red_selections"], json!([rim]), "{g}");
+    let g = call(&mut ctx, "feature_get", json!({ "feature": "Extrude 1", "blame": true }));
+    assert!(g.get("red_selections").is_none(), "{g}");
+}

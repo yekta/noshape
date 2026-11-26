@@ -495,6 +495,32 @@ fn first_hour_mistakes_dialogs_as_live(cx: &mut TestAppContext) {
     assert!(diffs.is_empty(), "{}", diffs.join("\n"));
 }
 
+/// Live errors-1123 too-big: a Fillet of two edges, one failing alone (a hole's rim on an R8 fillet, picked off its seam), opened: its entry
+/// red, the other's not. The blame comes after the dialog opens, off regeneration (P0 11-26: a rerun per edge cost
+/// c2-impeller-loft's failed Fillet 52 s); regeneration alone blames neither.
+#[gpui::test]
+fn a_failed_fillets_dialog_reds_the_edge_that_fails_alone(cx: &mut TestAppContext) {
+    let features = serde_json::json!([
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [60, 40]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+        { "type": "fillet", "name": "Fillet 1", "params": { "entities": ["edge through [30, 0, 20]"], "radius": "8 mm" } },
+        { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[30, 4], [33, 4]] }] },
+        { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "40 mm", "symmetric": true, "operationType": "REMOVE" } },
+        { "type": "fillet", "name": "Fillet 2", "params": { "entities": ["edge through [30, 7, 19.93725]", "edge through [60, 40, 10]"], "radius": "1 mm" } },
+    ]);
+    let (window, view) = start(cx, "mistake-blame", serde_json::json!({ "units": "mm", "features": features }));
+    let id = feature_id(cx, &view, "Fillet 2");
+    let at_regen = cx.update(|cx| view.read(cx).display.feature_state(id).map(|s| (s.status, s.error_refs.len())));
+    assert_eq!(at_regen, Some((noshape_model::display::FeatureStatus::Error, 0)), "the failed Fillet, no blame at regeneration");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).blend_blame.is_some());
+    draw(cx, window);
+    let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let field = st["dialog"]["fields"].as_array().into_iter().flatten().find(|f| f["kind"] == "query").cloned().unwrap_or_default();
+    let blamed = cx.update(|cx| view.read(cx).blend_blame.as_ref().map(|b| b.2.len()));
+    assert!(field["redItems"].as_array().map(Vec::len) == Some(1) && blamed == Some(1), "one entry red: {field}; blamed {blamed:?}");
+}
+
 /// Live mistakes-1125 batch 2: the failing Fillet (12 edges R12) fixed in its dialog (Radius 2 mm, Enter: the dialog stays
 /// open, its title black; ✓) is OK; Ctrl+Z brings the error back with the dialog closed, Ctrl+Y the fix, Ctrl+Z the error.
 #[gpui::test]

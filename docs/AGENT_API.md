@@ -1217,6 +1217,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `feature` | string | required | Feature id or name. |
+| `blame` | boolean |  | A failed Fillet or Chamfer: list in `red_selections` the selections that fail on their own, as its dialog shows them red (each is tried alone: up to 24 selections, 10 s). |
 
 #### feature_list
 

@@ -962,13 +962,13 @@ fn gyro_chamfer_probe() {
 fn a_failed_fillet_regenerates_without_blaming_each_edge() {
     let home = std::env::var("HOME").map(|h| std::path::PathBuf::from(h).join("parity/models")).unwrap_or_default();
     let root = std::env::var("NOSHAPE_PARITY_MODELS").map(std::path::PathBuf::from).unwrap_or_else(|_| if std::path::Path::new("/root/parity/models").is_dir() { std::path::PathBuf::from("/root/parity/models") } else { home });
-    let Some((features, _, refs)) = super::parity::read_model(&root.join("c2-impeller-loft")) else {
+    let Some((features, live, refs)) = super::parity::read_model(&root.join("c2-impeller-loft")) else {
         eprintln!("c2-impeller-loft: not in {}", root.display());
         return;
     };
     let mut ctx = noshape_ops::Ctx::new();
     let path = std::env::temp_dir().join(format!("noshape-failed-fillet-{}.noshape", std::process::id()));
-    let mut t = noshape_ops::parity::Translator::open(&mut ctx, &path, &features, noshape_ops::parity::parse_refs(&refs)).expect("translated");
+    let mut t = noshape_ops::parity::Translator::open(&mut ctx, &path, &features, noshape_ops::parity::live_refs(&live, &refs)).expect("translated");
     for k in 0..t.len() {
         let _ = t.step(k);
     }
@@ -983,5 +983,7 @@ fn a_failed_fillet_regenerates_without_blaming_each_edge() {
     let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &doc.settings.units, &RegenOptions::default());
     let (f, s) = ps.features.iter().zip(&r.display.features).find(|(f, _)| f.name == NAME).expect("its state");
     eprintln!("{} {:?} {:?}: {:.0} ms", f.name, s.status, s.message, s.time_ms);
+    // (It fails as in live, with its edges: not refused for want of picks.)
+    assert!(s.status == noshape_model::display::FeatureStatus::Error && s.message.as_deref() != Some("Select edges or faces to fillet."), "{NAME}: {:?} {:?}", s.status, s.message);
     assert!(s.time_ms < 10_000.0, "{NAME}: {:.0} ms ({:?} {:?}; 1.1 s without per-edge blame)", s.time_ms, s.status, s.message);
 }

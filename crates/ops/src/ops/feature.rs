@@ -84,7 +84,7 @@ pub fn ops() -> Vec<Op> {
             verb: "get",
             summary: "A feature's type, parameters and regeneration state",
             description: "Parameters in the same JSON forms `feature_add` takes; `visible` lists the ones its dialog currently shows. A custom (FeatureScript) feature also has the `notices` of its last run (message, severity, stack of `at` line:col and `in` module (function), as the FeatureScript notices panel's Monitor shows them) and its `println` `output`.",
-            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name.")],
+            fields: vec![doc_field(), tab_field(), req("feature", s(), "Feature id or name."), opt("blame", json!({ "type": "boolean", "default": false }), "A failed Fillet or Chamfer: list in `red_selections` the selections that fail on their own, as its dialog shows them red (each is tried alone: up to 24 selections, 10 s).")],
             mutates: false,
             destructive: false,
             run: get,
@@ -806,6 +806,13 @@ fn get(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let f = ps.feature(id).expect("found");
     let mut v = feature_json(f);
     v["status"] = this_feature_status(&report, &id.to_string());
+    if a.bool_or("blame", false)?
+        && let Some(red) = od.blend_blame(tab, id)?
+    {
+        v["red_selections"] = json!(red.iter().map(crate::refs::to_id).collect::<Vec<_>>());
+    }
+    let ps = doc::studio(od.doc(), tab)?;
+    let f = ps.feature(id).expect("found");
     let tab_name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
     if let Some(o) = super::custom_output(od.doc(), &tab_name, f) {
         v["notices"] = o["notices"].clone();

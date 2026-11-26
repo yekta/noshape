@@ -8,6 +8,7 @@
 //! features see the context before it), like Onshape. Tessellations are
 //! cached per shape, so unchanged bodies are never re-meshed.
 
+pub mod blame;
 pub mod context;
 pub mod custom_features;
 pub mod crash_guard;

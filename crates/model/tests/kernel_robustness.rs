@@ -3104,6 +3104,29 @@ fn fillet_options_on_the_start_block_as_live_3028() {
     check("R2 partial", &mut t, f);
 }
 
+/// A failed Fillet's blame on request (its dialog): the hole's rim on an R8 fillet, which fails alone (case 2 above), not
+/// the vertical edge that builds alone (live errors-1123: one entry red); regeneration itself blames neither.
+#[test]
+fn a_failed_fillets_blame_is_the_edge_that_fails_alone() {
+    let mm = |v: f64| v * 1e-3;
+    let near = |a: f64, b: f64| (a - b).abs() < 1e-9;
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let e8 = t.edges_where(|i| near(i.start.z, mm(20.0)) && near(i.end.z, mm(20.0)) && near(i.start.y, 0.0) && near(i.end.y, 0.0));
+    t.fillet(e8, "8 mm");
+    t.holes(&[((30.0, 4.0), 3.0)]);
+    let rim = t.edges_where(|i| i.start.z > mm(12.0) && i.end.z > mm(12.0) && ((i.start.x - mm(30.0)).hypot(i.start.y - mm(4.0)) - mm(3.0)).abs() < 1e-7 && ((i.end.x - mm(30.0)).hypot(i.end.y - mm(4.0)) - mm(3.0)).abs() < 1e-7);
+    let back = t.edges_where(|i| vertical(i) && near(i.start.x, mm(60.0)) && near(i.start.y, mm(40.0)));
+    assert_eq!((rim.len(), back.len()), (1, 1));
+    let f = t.fillet(vec![rim[0].clone(), back[0].clone()], "1 mm");
+    let (st, msg, _) = status(&mut t, f);
+    assert_eq!(st, FeatureStatus::Error, "{msg:?}");
+    assert!(t.regen().display.feature_state(f).is_some_and(|s| s.error_refs.is_empty()), "no blame at regeneration");
+    let mut reg = t.reg.snapshot();
+    let blamed = noshape_model::regen::blame::failing_alone(&mut reg, &t.ps, &ConfigValues::default(), &t.units, &RegenOptions::default(), f, std::time::Duration::from_secs(30));
+    assert_eq!(blamed, Some(rim), "the rim alone fails");
+}
+
 /// Chamfers (Equal distance) on the same 40 × 20 × 10 block as live (behaviours
 /// "spec: kernel FILLET-OVERSIZE-OK chamfer cases and fillet thresholds"):
 /// two or three vertical edges fail past the 20-wide end face ("End boundary

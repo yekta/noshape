@@ -143,6 +143,22 @@ impl OpenDoc {
         }
         Ok(r)
     }
+
+    /// A failed Fillet's or Chamfer's picks that fail alone, as its dialog reds them (`blame::failing_alone`, on a
+    /// snapshot of the cached results: the cache keeps the full picks' run). None: not a failed blend, too many picks
+    /// or out of time.
+    pub fn blend_blame(&mut self, tab: TabId, feature: noshape_model::reference::FeatureId) -> Result<Option<Vec<noshape_model::reference::Reference>>, OpError> {
+        let failed = self.regenerate(tab, None)?.display.feature_state(feature).is_some_and(|s| s.status == noshape_model::display::FeatureStatus::Error);
+        if !failed {
+            return Ok(None);
+        }
+        let opts = self.regen_options(tab);
+        let units = self.session.doc.settings.units;
+        let values = self.current_config(tab)?;
+        let studio = studio(&self.session.doc, tab)?;
+        let cap = std::time::Duration::from_secs(10);
+        Ok(self.with_regen(tab, |reg| noshape_model::regen::blame::failing_alone(&mut reg.snapshot(), studio, &values, &units, &opts, feature, cap)))
+    }
 }
 
 impl OpenDoc {
