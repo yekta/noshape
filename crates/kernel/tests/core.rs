@@ -1776,3 +1776,27 @@ fn a_face_moved_between_square_neighbours_is_the_part_and_its_slab() {
     let s = cut(&rounded, &hole).unwrap().shape;
     check(&s, &at_z(&s, 20.0), -3.0);
 }
+
+/// Two prisms side by side whose slanted tops differ by `tilt` (radians) about the middle of their shared edge, fused:
+/// the result's face count.
+fn fused_slanted_prisms(tilt: f64) -> usize {
+    let mm = 1e-3;
+    let prism = |y0: f64, slope: f64| {
+        let top = |x: f64| 2.0 * mm + 2.5 * mm * 10f64.to_radians().tan() + (x - 2.5 * mm) * slope;
+        let pts = [DVec3::new(0.0, y0, 0.0), DVec3::new(5.0 * mm, y0, 0.0), DVec3::new(5.0 * mm, y0, top(5.0 * mm)), DVec3::new(0.0, y0, top(0.0))];
+        let face = make_face_from_wire(&make_polyline(&pts, true).unwrap(), true).unwrap();
+        extrude(&face, DVec3::new(0.0, 5.0 * mm, 0.0)).unwrap().shape
+    };
+    let (a, b) = (prism(0.0, 10f64.to_radians().tan()), prism(5.0 * mm, (10f64.to_radians() + tilt).tan()));
+    let opts = BooleanOptions { unify: true, ..BooleanOptions::default() };
+    boolean(BooleanOp::Fuse, &[a], &[b], &opts).unwrap().shape.count(ShapeType::Face)
+}
+
+#[test]
+fn coplanar_faces_within_live_zero_length_merge_in_a_union() {
+    // (asm-scissor-lift 264eb3's Linear pattern 1: tab tops through STL Mesh points 3e-7 rad off WAGO's face, one
+    // face in live.) Exact, and 3e-7 rad off (3e-9 m across the faces): one top; 5e-6 rad (5e-8 m) stays two.
+    assert_eq!(fused_slanted_prisms(0.0), 6);
+    assert_eq!(fused_slanted_prisms(3e-7), 6);
+    assert_eq!(fused_slanted_prisms(5e-6), 7);
+}

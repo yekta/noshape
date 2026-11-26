@@ -714,6 +714,22 @@ bool poles_off_plane(const occ::handle<Geom_Surface>& g)
   return false;
 }
 
+// Two planar faces sharing an edge whose normals differ by more than 1e-9 rad still lie on one plane when, across
+// both, they part by no more than live's zero length (1e-8 m): a face through STL Mesh points (float coordinates)
+// beside its exact copy (asm-scissor-lift 264eb3's Linear pattern 1: three tab tops 3e-7 rad off WAGO's face).
+bool planes_meet_within_zero_length(const TopoDS_Face& a, const gp_Pln& pa, const TopoDS_Face& b, const gp_Pln& pb, bool either_way)
+{
+  double ang = pa.Axis().Direction().Angle(pb.Axis().Direction());
+  if (either_way)
+    ang = std::min(ang, M_PI - ang);
+  if (ang > 1e-5)
+    return false;
+  Bnd_Box box;
+  BRepBndLib::Add(a, box, false);
+  BRepBndLib::Add(b, box, false);
+  return !box.IsVoid() && ang * std::sqrt(box.SquareExtent()) <= 1e-8;
+}
+
 bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullptr)
 {
   const TopoDS_Shape& where = sc != nullptr ? TopoDS_Shape(sc->faces) : s;
@@ -750,7 +766,8 @@ bool same_domain_candidates(const TopoDS_Shape& s, const UnifyScope* sc = nullpt
     const bool planar_a = plane_of(a, pa), planar_b = plane_of(b, pb);
     if (planar_a && planar_b)
     {
-      if (pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) < 1e-7)
+      if ((pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) < 1e-7) ||
+          planes_meet_within_zero_length(a, pa, b, pb, true))
         return true;
       continue;
     }
@@ -879,7 +896,8 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
     if (a == b || !planar[(size_t)a] || !planar[(size_t)b])
       continue;
     const gp_Pln &pa = pl[(size_t)a], &pb = pl[(size_t)b];
-    if (pa.Axis().Direction().IsEqual(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) < 1e-7)
+    if ((pa.Axis().Direction().IsEqual(pb.Axis().Direction(), 1e-9) && pa.Distance(pb.Location()) < 1e-7) ||
+        planes_meet_within_zero_length(TopoDS::Face(faces(a)), pa, TopoDS::Face(faces(b)), pb, false))
       up[(size_t)root(a)] = root(b);
   }
   std::map<int, std::vector<int>> groups;
