@@ -5,7 +5,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Setup
 
 - Worktree /root/projects/noshape-wt/psui, branch agent/psui. Commit as yekta (AGENTS.md), subject "psui: …".
-- Builds and crate tests on vibe2 or vibex8 (lead 11-22: no waiting on vibe2's one slot): `NOSHAPE_RB_HOST=… tools/tiers/rb.sh bash -c "$(cat script)"`,
+- Builds, crate tests and scenario runs on vibex7 (lead 11-26 02:0x: vibex8 is bool's; never vibex8): `NOSHAPE_RB_HOST=… tools/tiers/rb.sh bash -c "$(cat script)"`,
   CARGO_INCREMENTAL=0; `git diff --name-only origin/main | xargs touch -c` first. ~/bin/slot
   only for suites, gates, timing pairs (DECISIONS 9e5b481d4). Scripts in /root/psui-scratch/run*.sh. The GPUI dialog matrix is
   `dialogs::the_dialogs_matrix_matches_live` (rows filter: DIALOG_ROW=…).
@@ -25,7 +25,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 ## Tools (/root/psui-scratch)
 
 - `uip-some.sh <out> <names…>`: release build on the rb host, then the named ui-parity scenarios on one Xvfb (:392).
-  Run: `NOSHAPE_RB_HOST=vibex6 tools/tiers/rb.sh bash -c "$(cat /root/psui-scratch/uip-some.sh)" uip-some <out> <names…>`
+  Run: `NOSHAPE_RB_HOST=vibex7 tools/tiers/rb.sh bash -c "$(cat /root/psui-scratch/uip-some.sh)" uip-some <out> <names…>`
   (`~` in remote paths expands locally: pass /home/ngyekta/… paths). Output buffered: the log fills at the end.
 - `psui-shards.sh <out> <names file>`: the same in 3 shards, then one `--compare-only` score. The names file must be on
   the host (scp it first). psui-names.txt: the 1021 psui-area scenarios with live takes.
@@ -45,35 +45,41 @@ docs/DECISIONS.md (read first; it wins over anything here).
   a_page_step_finds_the_graphics_of_a_document_the_page_opened. Tell qa after landing: flow 91 had no perf lines
   because milestones need NOSHAPE_PERF=1; "no assembly frames" maybe the inactive new window (now activated).
 
+## P0 (lead 11-26, from bool): failed-blend blame off regeneration
+- QUEUED d027ad72: detail.rs `blamed_at_regen` (a lone pick, else none; no per-edge reruns: 8a62f4834 cost
+  c2-impeller-loft's "Fillet Ansaugflansch zum Gehaeuse" 52-60 s vs 1.1).
+- Step 2 (lazy blame + ops) committed after it: model-core regen/blame.rs `failing_alone` (fillet/chamfer, ≤24 picks,
+  cap, a pick is blamed when it fails alone with any error); PartStudioView `blend_blame` (dialog sync, background,
+  10 s, keyed by display Arc) + `blend_blame_shown` (viewport red); ops `feature_get {blame:true}` -> `red_selections`
+  (OpenDoc::blend_blame on a snapshot). T2 fixed (live_refs; c2's fillet fails "Unfilleted edge overlapped by
+  fillet." in 5.0 s on vibe2 release, guard < 10 s). Tests: kernel_robustness::a_failed_fillets_blame_is_the_edge_
+  that_fails_alone, feedback_feel_tests::a_failed_fillets_dialog_reds_the_edge_that_fails_alone, e2e::feature_get_
+  blames_a_failed_fillets_edge_on_request (geometry: 60x40x20, R8 front-top, Ø6 hole at (30,4) symmetric cut, R1 on
+  the rim (picked at (30,7,19.937), off the seam) + the back vertical edge; our kernel builds every single block edge
+  even at R41, so a plain block blames none).
+- Copy-paste (sketch.rs menu-open hover guard + hover end; sketch_hover_feel_tests T1): a full part-studio-ui lib run
+  passed 646/0 (b2gomioo0) after the guard; land it separately after P0 (stash tag psui-copypaste).
+
 ## QUEUE (11-25 19:5x, lead + live)
-1. LOOK-OUTLINE-WEIGHT (qa row l.63): cause = a solid's curved outline drew BOTH the backface band and a centred
-   opaque silhouette line (ours 808080 + 27343C: half the face px dark; live ~0.7 px all outside). DONE d9c41793c,
-   QUEUED eaa44314 20:2x (with b976bdb5's stack): Instance::backed (params.z bit 1) on silhouette lines of bodies with the band
-   (builder.rs `backed`); silhouette_vertex drops them unless face-lit / query / error, pick pass keeps them.
-   Now 808080 + 3B4E59. T1 edge_looks::a_curved_outline_at_rest_is_the_band_outside_the_face; back_face_cull test
-   allows <= 3 outline px (kept back faces beside the band). hover_matrix 125/125 green with it. Then commit + TICKETS.
+1. LOOK-OUTLINE-WEIGHT CLOSED = live (lead 11-26 01:5x; TICKETS row has the numbers): band = live's
+   vs-backfacesil-faces exactly (push 0.5*1.2*lw*(1-|ndv|), black, 4x MSAA); left 0.58 vs live 0.73 px ink, right
+   0.61 vs 0.59; 151a1e = fillet tangent edge (live 263035). No more time on it.
 2. DONE (fe39cfd77) combined hover P0: 3 tests at the end of hover_matrix_tests.rs (combined_hover_*); fixed: a
    sketch click took the edge under a lit model vertex (sketch.rs lit_vertex_at); harness: Matrix::reset now clears
    SketchEditor::model_selection. interaction-feel.md rows filled; left "? (qa)": Extrude region picked hovered,
    face-selected + sketch line, Extrude New/Remove preview cells (no harness: start sketches only on planes).
    Known: Shell's wall inner edge lights nothing (live: the removed face) with equal pixels (preview_hides by design).
 3. DONE (730f1acd3) EXPORT-MULTI-ROW-INDIVIDUAL: open_part_export parts_only = one row only.
-4. IN FLIGHT 11-26 00:56: interaction-suite triage (lead). Before 20 failing. r18 (vibex8 ~/tmp/psui/r18, copy in
-   /root/psui-scratch/r18): 6/9 rerun scenarios match (offset, ver-protection, coincident, refusals, routing, rclick-menu);
-   so 12 of the lead's 15 (gusset x2 skipped) match. Then fixed (commit "psui: interaction suite: ..." after e7fae29e2):
-   sketch-fully-defined (the outline pick also runs over no face: sketch.rs sketch_hover `None | Some(plane)`; T1
-   a_click_just_outside_the_right_planes_outline...), mate-connector (an edge-end origin reads as the edge, not its
-   secondary: feature_dialog.rs query_rows point_of only on a Face; T1 a_shift_click_6_px_inside_an_edge...).
-   LEFT: sketch-entity-copy-paste step index 9 (rclick at window (1165,501) = sketch (15,20)): ours opens a CONSTRAINT
-   glyph's menu (rows ... "Show all" ... "Delete sketch entity"; Some(cid) from the glyph div's right mouse-down,
-   sketch.rs ~5370, or LabelDown/dim_line_hover, both impossible: no dimensions), live the Front plane menu (hover JCC).
-   T1 a_right_click_beside_a_copied_line_opens_the_sketch_menu replays it at the scenario's scale and PASSES (one glyph
-   box, Horizontal, at origin+(25,-41) px, 20 px square; pointer at origin+(83,-18)): the scenario differs. Next: run
-   uipx/run19.sh (copy-paste only) with an eprintln of glyph_boxes / dim at open_sketch_context_menu and the glyph
-   right-press, read the run's .stderr (killed once at a compaction).
-   NEXT after this step (lead 11-26 00:5x): LOOK-OUTLINE-WEIGHT partly fixed (qa, green 23e5d26f7): vertical
-   silhouettes 1 px as live but lighter/greyer (616569 vs live 484c4f, 5a5e60 vs 637783), and a new 1 px 151a1e run
-   over 63 rows.
+4. IN FLIGHT 11-26 01:5x: interaction-suite triage (lead). QUEUED 2ffe9497 (6 commits: 3a08ed5ef, e7fae29e2 had not
+   landed; workspace_tests.rs conflict = keep both tests): coincident, refusals, routing x5, offset, ver-protection,
+   mate-connector, fully-defined. Told lead (qa >200k): before 20, after 14/15 expected.
+   copy-paste FIXED (uncommitted, testing on vibex7 r21 + lib/clippy): cause = the line's glyph row (Show
+   constraints off, placed ~40 px off the line where the hover started) was still up under the second right-click: our
+   graphics kept hovering under the open menu (the approach to Copy crosses the line) and the hover only ended on the
+   pointer's return, so the row lingered onto the glyph. Fix sketch.rs: Hover/PointerMove ignored while context_menu is
+   open (live #context-menu-layer covers the page), and open_sketch_context_menu ends ed.hover (linger from open).
+   T1 a_right_click_where_a_copied_lines_glyphs_were_opens_the_sketch_menu (fails without the hover end). Then land,
+   tell the lead (qa id: roster, qa moved to a new thread).
    Original item (lead 23:1x): use live's triage (live/REQUESTS.md "11-25 23:09"). 5 plane-* recordings
    were stale (being re-recorded, abaedadb). The other 17 match live today, so they're OUR fixes, most-used first, each with a T1:
    sketch-entity x4 (Hide rows done in b00920fe; check the rest), sketch-coincident-constraint, sketch-constraint-refusals,
