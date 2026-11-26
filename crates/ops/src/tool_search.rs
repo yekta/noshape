@@ -238,6 +238,14 @@ mod tests {
             ("t", &["Trim", "Tangent", "Text", "Transform", "Tangent arc", "Point", "Fillet", "Extend", "Offset", "Extrude"]),
             ("me", &["Dimension", "Midpoint line", "Chamfer", "Symmetric", "Insert image", "Circumscribed polygon"]),
             ("pa", &["Parallel", "3 point arc", "Center point arc", "Center point rectangle", "Linear pattern", "Circular pattern", "Perpendicular", "Elliptical arc"]),
+            // Live 2025 (Search tools in a sketch, typed or pasted alike).
+            ("li", &["Line", "Linear pattern", "Midpoint line", "Split", "Spline", "Aligned rectangle", "Spline control point", "Ellipse", "Elliptical arc"]),
+            ("ar", &["3 point arc", "Aligned rectangle", "Parallel", "Center point arc", "Perpendicular", "Linear pattern", "Circular pattern", "Chamfer", "Transform", "Curvature"]),
+            ("po", &["Point", "3 point arc", "Center point circle", "Center point rectangle", "3 point circle", "Center point arc", "Inscribed polygon", "Circumscribed polygon", "Midpoint", "Midpoint line"]),
+            ("tr", &["Trim", "Transform", "Extrude", "Construction", "Tangent arc", "3 point arc", "Center point circle", "Center point rectangle", "Symmetric", "Concentric"]),
+            ("re", &["Revolve", "Aligned rectangle", "Extrude", "Parallel", "Corner rectangle", "Center point circle", "Center point rectangle", "Pierce", "Curvature", "Intersection"]),
+            ("pt", &["Point", "3 point arc", "Center point circle", "Center point rectangle", "3 point circle", "Linear pattern", "Center point arc", "Circular pattern", "Elliptical arc", "Split"]),
+            ("tangent", &["Tangent", "Tangent arc"]),
         ];
         for (q, want) in lists {
             assert_eq!(sketch_rank(q).iter().map(|t| t.name()).collect::<Vec<_>>(), *want, "{q}");
