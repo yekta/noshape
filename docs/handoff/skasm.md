@@ -9,27 +9,20 @@ Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /r
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
 > ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &).
 
-QUEUED ada3263b (land queue checking since 05:15; 3 commits): label drag (T1 a_lit_point_under_a_dimension_label_drags);
-IGES export of c2-rings-loft (io.cpp step_bsurfaces shifts p-curves by Segment's periods; T2
-rings_iges_bsurfaces_run_forward_inside_their_knots); assembly UI-script waits (ui_busy/ui_frame_pending; T1s a_cold_*;
-qa told to rerun asm-face-menu*, asm-fastened-offset/-two-faces once landed). Old WIP: branch skasm-wip2 (not for landing).
+LANDED ada3263b as a476fa14 (label drag, IGES export of c2-rings-loft, assembly UI-script waits).
+QUEUED 8efe6acf (07:10, 6 commits): Parasolid Cadenas (30a11b8f8, T2 export::cadenas_misumi_vendor_parts_read with
+NOSHAPE_XT_VENDOR=~/agents/skasm-keep/xt on vibex7); REPLICATE-INSTANCE-ORDER (bb80b7ad2: matched_targets sorts copies
+by distance from the seed's target, then code); IGES reader (02c05864d: io.rs merged_faces styles only faces whose colour
+differs from the part's; boolean.cpp same_torus + share_bspline_surfaces groups trimmed tori, bool told). exchange
+round trip on vibex7: all 22 live.igs match live (were 16 diffs); STEP/x_t 49/50, c2-rings-loft STEP 762 vs 767 edges
+predates this (same with the colour rule off). Lead told 07:10. Main RED 78dea5ae7 = ops parity a_face_* (flaky, not mine).
 
-Committed after ada3263b, NOT landed (land.sh once ada3263b's result is in; the lead reports it):
-- c049e26ed, 4f6d33a17 handoffs; 30a11b8f8 Parasolid (xt_read.cpp chart_points: a closed curve's end terminator at the
-  start's point; Cadenas FXBA3 files as live) + T2 export::cadenas_misumi_vendor_parts_read (NOSHAPE_XT_VENDOR=
-  ~/agents/skasm-keep/xt on vibex7).
-- bb80b7ad2 REPLICATE-INSTANCE-ORDER: analysis.rs matched_targets sorts copies by distance from the seed's target
-  (quantised 1e-7 m), then code; assertion in tests.rs replicate_on_matching_holes. noshape-assembly lib 178/178.
-- 02c05864d IGES reader: io.rs merged_faces counts a face as styled only if its colour differs from the part's
-  (pulley02's IGES gives all 16 faces the part colour, which kept every edge); boolean.cpp (bool told 11-26) same_torus +
-  share_bspline_surfaces groups trimmed tori too (the group's first face's whole-surface copy shared). pulley 16 -> 9
-  faces as live. T2 export::an_iges_torus_in_pieces_reads_as_one_face (NOSHAPE_IGES_PULLEY=
-  ~/parity/exchange/pulley02-maxwell/live.igs). Kernel all 607 + export T2s 33, ops import 45, e2e 312 pass.
-  In flight: parity::exchange_round_trip on vibex7 (xrt.sh -> ~/tmp/skasm/xrt-full.log) for the other 15 IGES docs.
+GLYPH-CIRCLE parked: no rule fits gl5 (centre point, aspect-scaled centre: 10-30° off; a bilinear cot fit 5° off with
+no meaning: fit scripts /root/skasm-scratch/glyph/). Capture asked in live/REQUESTS.md "skasm 11-26 07:12" (pan, zoom,
+window size, right edge, cursor park).
 
-Next: rest of IGES reader docs (housing-draft 36/93/61 vs live 36/79/44, knob-jason 90/182/95 vs 81/164/88, motor-mount
-25/59/41 vs 20/52/40) -> GLYPH-CIRCLE (live's angle rule unknown: gl5 table in live/skasm/glyph-taken-1125; no single
-centre fits) -> speed T2 rerun (tsk9.sh) -> sketch + sheet-metal feel-coverage audit.
+Next: speed T2 rerun (tsk9.sh, timeout 5400; may need skasm-wip2's speed traces) -> sketch feel-coverage audit
+(behaviours.md sketch specs without tests -> feel test + fix; report counts; sheet metal parked by the user 11-24).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
