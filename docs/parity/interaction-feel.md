@@ -1068,17 +1068,17 @@ Combined states in an assembly (lead 11-26 06:5x, USER P0; live where behaviours
 
 | Cell | Live | Ours | Status |
 |---|---|---|---|
-| an instance selected (filled #F2B648), a face of it hovered | to capture (REQUESTS 07:02 (1)) | to check | ? |
-| an instance selected, a face of another instance hovered | to capture (1) | to check | ? |
-| mate dialog, a face already in its Mate connectors field hovered again | to capture (2): the dots / connector, the picked face's amber | to check | ? |
+| an instance selected (filled #F2B648), a face of it hovered | to capture (REQUESTS 07:02 (1)) | the hover look over the selected fill (`combined_hover_on_a_selected_instance`) | ? |
+| an instance selected, a face of another instance hovered | to capture (1) | that face lit alone, the selected instance unchanged (same test) | ? |
+| mate dialog, a face already in its Mate connectors field hovered again | to capture (2): the dots / connector, the picked face's amber | the face infers again (dots, connector preview) over its picked look | ? |
 | mate dialog open, an existing mate connector (feature) hovered | to capture (3); a face hovered shows its white dots and the connector preview at the nearest point (behaviours "asm 11-17" / "audit 1943 (1)") | the dots and preview (mates rows above) | ? (the connector cell) |
 | an instance being dragged, any face under the pointer | the hover look goes; nothing lights till the release (asm/drag-feel-1122) | the same (`a_dragged_part_shows_no_hover_until_released`) | = |
 | a mate's preview shown (2nd connector picked: the moved part drawn mated, its old place a thin ghost), a face of the moved part / of the part under it hovered | to capture (4) (behaviours A2 has the preview, not its hover) | to check | ? |
-| Isolate: a faded instance hovered | nothing: faded instances take no hover unless "Select transparent geometry" (behaviours "Shift+I (Isolate)"; Part Studio isolate: hover goes through to the part behind) | faded instances pick only with Select transparent geometry (`pick_dimmed`) | = |
-| Isolate, Alt held over a faded instance (Select transparent geometry off) | Part Studio: Alt changes nothing, the ghost stays unpickable (behaviours "(c) Plate made transparent by Isolate"); assembly to capture (5) | Alt makes faded instances pickable (`pick_dimmed = select_transparent \|\| alt_through`) | ? (likely ≠) |
-| an instance made transparent (Make transparent…), hovered; Alt over it | to capture (5): appearance-transparent parts are pickable, Alt picks the one behind (Part Studio) | to check | ? |
-| a hidden instance: its list row hovered; the place it was hovered | to capture (6) | to check | ? |
-| exploded view being edited (Editing Explode 1 banner, triad), a face hovered; a selected component's face hovered | to capture (7) | to check | ? |
+| Isolate: a faded instance hovered | nothing: faded instances take no hover unless "Select transparent geometry" (behaviours "Shift+I (Isolate)"; Part Studio isolate: hover goes through to the part behind) | faded instances pick only with Select transparent geometry; the instance behind lights through (`combined_hover_through_faded_and_hidden_instances`) | = |
+| Isolate, Alt held over a faded instance (Select transparent geometry off) | Part Studio: Alt changes nothing, the ghost stays unpickable (behaviours "(c) Plate made transparent by Isolate"); assembly to capture (5) | Alt over a ghost with an instance behind it lights that instance (as live PS); over a ghost alone, Alt lights the ghost (`pick_dimmed = select_transparent \|\| alt_through`) | ? (likely ≠ over a ghost alone) |
+| an instance made transparent (Make transparent…), hovered; Alt over it | to capture (5): appearance-transparent parts are pickable, Alt picks the one behind (Part Studio) | no hover on it, the instance behind lights through (`combined_hover_through_faded_and_hidden_instances`); Alt as Isolate's | ? |
+| a hidden instance: its list row hovered; the place it was hovered | to capture (6) | nothing lit for the row; the instance behind (or nothing) where it was (same test) | ? |
+| exploded view being edited (Editing Explode 1 banner, triad), a face hovered; a selected component's face hovered | to capture (7) | faces light as outside it; a clicked instance's triad at the click takes the hover there (`combined_hover_while_editing_an_exploded_view`) | ? |
 
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 

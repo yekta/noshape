@@ -2518,3 +2518,148 @@ fn a_cold_second_face_click_under_fastened_reads_busy_until_its_connector_is_in(
     assert!(complete(cx), "both connectors in once the view is idle");
     let _ = std::fs::remove_file(&path);
 }
+
+/// Part 1 (x 0..40, y 0..20, z 0..10) and Part 2 moved onto it (x 20..80, z 10..20), seen from the top: Part 1's top
+/// shows at x 0..20, Part 2's top covers it from x 20.
+fn stacked_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
+    let path = document(cx, name, |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+        call(ctx, "assembly_transform", json!({ "instance": "Part 2 <1>", "translation": ["-80 mm", 0, "10 mm"] }));
+    });
+    open_from_top(cx, &path, 2)
+}
+
+fn instance(cx: &mut TestAppContext, view: &Entity<AssemblyView>, name: &str) -> noshape_model::assembly::InstanceId {
+    cx.update(|cx| view.read(cx).assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == name)).unwrap().id)
+}
+
+/// A model point (mm) on screen.
+fn screen(cx: &mut TestAppContext, view: &Entity<AssemblyView>, mm: [f64; 3]) -> DVec2 {
+    cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::from(mm) * 1e-3).unwrap())
+}
+
+/// The top view fitted to the instances in the graphics as they are now (a panel narrows them).
+fn fit_top(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let (lo, hi) = v.result.bounds().unwrap();
+        v.viewport.update(cx, |vp, cx| {
+            let s = vp.size();
+            vp.camera.set_view(noshape_render::StandardView::Top);
+            vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+            vp.request_frame(cx);
+        });
+    }));
+    settle(cx, window, view);
+}
+
+/// The hovered instance's name, if a face of it is hovered.
+fn hovered_face(cx: &mut TestAppContext, view: &Entity<AssemblyView>) -> Option<String> {
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let t = v.hover.as_ref().filter(|t| t.kind == crate::scene_builder::PickKind::Face)?;
+        let top = v.result.occurrences[t.occ].top();
+        v.assembly(cx)?.instances.iter().find(|i| i.id == top).map(|i| i.name.clone())
+    })
+}
+
+/// The render states of an instance's faces, or-ed.
+fn face_states(cx: &mut TestAppContext, view: &Entity<AssemblyView>, name: &str) -> u32 {
+    let id = instance(cx, view, name);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+        (1..scene.states.len() as u32)
+            .filter(|i| built.picks.get(*i).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face && v.result.occurrences[t.occ].top() == id))
+            .fold(0, |s, i| s | scene.states[i as usize])
+    })
+}
+
+/// Interaction-feel "Combined states in an assembly" (user P0 11-21; live REQUESTS 07:02 (1) to confirm): with Part 1
+/// selected, its own face hovered takes the hover look over the selected fill; another instance's face lights alone.
+#[gpui::test]
+fn combined_hover_on_a_selected_instance(cx: &mut TestAppContext) {
+    use noshape_render::state::{HOVER, SELECTED};
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = stacked_blocks(cx, "combined-selected");
+    let p1 = instance(cx, &view, "Part 1 <1>");
+    let (a, c) = (screen(cx, &view, [10., 10., 10.]), screen(cx, &view, [60., 10., 20.]));
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.selected = vec![p1];
+        v.refresh_scene(false, cx);
+    }));
+    move_to(cx, window, &view, c);
+    assert_eq!(hovered_face(cx, &view).as_deref(), Some("Part 2 <1>"));
+    assert_eq!(face_states(cx, &view, "Part 2 <1>") & (HOVER | SELECTED), HOVER, "the other instance's face: hover only");
+    assert_eq!(face_states(cx, &view, "Part 1 <1>") & (HOVER | SELECTED), SELECTED, "the selected instance unlit by it");
+    move_to(cx, window, &view, a);
+    assert_eq!(hovered_face(cx, &view).as_deref(), Some("Part 1 <1>"));
+    assert_eq!(face_states(cx, &view, "Part 1 <1>") & (HOVER | SELECTED), HOVER | SELECTED, "its own face: hover over selected");
+}
+
+/// Live behaviours "Shift+I (Isolate)" and psui 10-28 (c): an isolated assembly's faded instances take no hover while
+/// "Select transparent geometry" is off; the instance behind one lights through it. Make transparent's part alike
+/// (live REQUESTS 07:02 (5) to confirm), and a hidden instance: nothing where it was, its list row lights nothing.
+#[gpui::test]
+fn combined_hover_through_faded_and_hidden_instances(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = stacked_blocks(cx, "combined-faded");
+    let (p1, p2) = (instance(cx, &view, "Part 1 <1>"), instance(cx, &view, "Part 2 <1>"));
+    let (a, b, c) = (screen(cx, &view, [10., 10., 10.]), screen(cx, &view, [30., 10., 20.]), screen(cx, &view, [60., 10., 20.]));
+    let at = |cx: &mut TestAppContext, p: DVec2| {
+        move_to(cx, window, &view, p);
+        hovered_face(cx, &view)
+    };
+    cx.update(|cx| view.update(cx, |v, cx| v.isolate_cmd(false, vec![p1], cx)));
+    settle(cx, window, &view);
+    assert_eq!(at(cx, c), None, "Isolate: the faded Part 2 takes no hover");
+    assert_eq!(at(cx, b).as_deref(), Some("Part 1 <1>"), "Isolate: Part 1 lights through the faded Part 2");
+    move_to(cx, window, &view, a);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.isolate = None;
+        v.isolate_cmd(true, vec![p2], cx);
+    }));
+    settle(cx, window, &view);
+    assert_eq!(at(cx, c), None, "Make transparent: Part 2 takes no hover");
+    assert_eq!(at(cx, b).as_deref(), Some("Part 1 <1>"), "Make transparent: Part 1 lights through Part 2");
+    move_to(cx, window, &view, a);
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.transparent = None;
+        v.refresh_scene(true, cx);
+        v.set_hidden(vec![p2], true, cx);
+    }));
+    settle(cx, window, &view);
+    assert_eq!(at(cx, b).as_deref(), Some("Part 1 <1>"), "Part 2 hidden: Part 1 lights where it was");
+    assert_eq!(at(cx, c), None, "Part 2 hidden: nothing where it was over nothing");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.list_hover = Some(p2);
+        v.refresh_scene(false, cx);
+    }));
+    settle(cx, window, &view);
+    assert_eq!(face_states(cx, &view, "Part 2 <1>") & noshape_render::state::HOVER, 0, "the hidden instance's row lights nothing");
+}
+
+/// Live REQUESTS 07:02 (7) to confirm: while Explode 1 is edited, faces light as outside it; a clicked instance shows
+/// the triad at the click, which takes the hover there, and another instance's face still lights.
+#[gpui::test]
+fn combined_hover_while_editing_an_exploded_view(cx: &mut TestAppContext) {
+    use noshape_render::state::{HOVER, SELECTED};
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = stacked_blocks(cx, "combined-explode");
+    cx.update(|cx| view.update(cx, |v, cx| v.add_exploded_view(cx)));
+    settle(cx, window, &view);
+    fit_top(cx, window, &view);
+    let (a, c) = (screen(cx, &view, [10., 10., 10.]), screen(cx, &view, [60., 10., 20.]));
+    move_to(cx, window, &view, a);
+    assert_eq!(hovered_face(cx, &view).as_deref(), Some("Part 1 <1>"));
+    move_to(cx, window, &view, c);
+    assert_eq!(hovered_face(cx, &view).as_deref(), Some("Part 2 <1>"));
+    let w = at_window(cx, &view, c);
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(w, Modifiers::default());
+    settle(cx, window, &view);
+    move_to(cx, window, &view, c + DVec2::new(3.0, 0.0));
+    assert!(cx.update(|cx| view.read(cx).manip_hover.is_some()), "the triad at the click takes the hover");
+    assert_eq!(face_states(cx, &view, "Part 2 <1>") & (HOVER | SELECTED), SELECTED);
+    move_to(cx, window, &view, a);
+    assert_eq!(hovered_face(cx, &view).as_deref(), Some("Part 1 <1>"), "another instance's face lights");
+}
