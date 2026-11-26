@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 11:42 UTC) — read first
+## RESUME HERE (11-26 12:00 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -14,14 +14,16 @@ Landed/queued: 93a23c55, 94a0764c (label hover fix, pattern line orange, drag-on
 First-drag P0 (lead 11-26): the 712 / 377 ms "first moves" were the test's own wait for the hover pick readback (120-260
 ms on the software renderer, off the UI thread), not the drag. Traced begin_drag (refresh_analysis + drag_graph): 0.25 ms
 cold on the first press, <= 0.28 ms at 399 entities, so no background warm-up was added. latency_tests now times a move
-to its first drawn frame (timed_frame) and asserts the first move <= 54 ms: S50 move 11.2 median / 35.1 worst, S200 11.7 /
-24.1. Watch: one run showed S200 "width typed + Enter" 168 ms median (earlier runs 20-26 ms); rerun before calling it.
+to its first drawn frame (timed_frame) and asserts the first move <= 54 ms. 11:58 run: S50 move 7.7 / 15.0 ms, S200
+11.5 / 24.5, S1200 (new, 2400 entities vs live 1119's 2402-entity Part grid) release 51 ms (live 2.9-3.7 s), move 27.7 /
+47.2, typed 70.7 (live 8.4-13 s). The one-off S200 typed 168 ms median was host noise (19.7 again).
 
 Sketch feel-coverage audit: 221 sketch sections in behaviours.md, 126 cited by code (/root/skasm-scratch/audit-sections.txt),
-95 not. Checked 13: gaps fixed/tested: inference-1866 (f469d778b), drag onto a line 7/9 px, pattern construction line
-orange (e41979117), polygon side count radial/Enter/Esc (071c6853f; Esc with clicks ends the tool, as every tool).
-Next: "which click is a vertex", "polygon commits, exact constraint sets", "Copy/paste inside a sketch", "len-2022",
-"search-2025", "Extend in Top view (2992)", "big-sketch-1119". psui-owned rows skipped.
+95 not. Checked 24: gaps tested: inference-1866, drag onto a line 7/9 px, pattern line orange, polygon side count
+(071c6853f), len-2022 typed box never scales (0a5791a36), search-2025 lists (0ec9cb9a2), big-sketch-1119 (S1200 row).
+Covered already: polygon vertex / constraint sets, copy/paste (R6 supersedes 10-26), snaps-1118, 7.22, qa5 dim conflict,
+Hide other sketches; 2992 psui's. Next: "Sketch dimension display + Enter/Esc", "qa5 sketch refs", "skb Text font list",
+"qa5 sketch tools", "skb fillet/chamfer default", "Copy/paste" done, "sketch row 2.8 constraint buttons", SKETCH-* rows.
 
 qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
 lora-enclosure-ribs 46/46 MATCH); Assembly 3 numbers pending (qa-tr4). Driver fix ada3263b: asm-face-menu/fastened 9/10;
