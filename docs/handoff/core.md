@@ -62,8 +62,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   Per edge (probe core-scratch/f18-probe.patch on vibex7 ~/tmp/core/rt/fillet-18.brep+txt, output
   core-scratch/f18-per-edge.out): the y +-8 chains OK alone (100 faces, -4.754), y +-11 edge 11/39 OK (98, -1.84),
   31/33 OK (+3.49); the y +-11 chain through Fillet 17's round (x -78..-15, edges 7,8,9,10,12-17 / -11 side 1,6,20-24,
-  35,40) FAILS ("fillet failed" / "invalid solid" on the -11 side). Next: find where on that chain OCCT fails (its
-  corners at (-78,-31) and (-73,-21) by edge 11; the arc 9 over Fillet 17's round), then Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
+  35,40) FAILS. Probe 2 (core-scratch/f18b-probe.patch): all 42 edges are 90 deg, walls y +-11 = faces 49/80
+  (planes), the chains on them split at sharp corners: -11 side {1,6,35,40} "fillet failed", {20,21,22,24}
+  "invalid solid", 39 OK. Edge 40/9 = short arc (x -15..-17, z -28) on cylinders 81/52 (y -8.25..-11 / 7.75..11,
+  Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there. Next: fillet those sub-chains
+  on their own (OCCT ChFi3d's fault, or a corner there), then Fillet 19/23, MF7, Chamfer 11. (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
   b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **BOOL's SLOW ROWS (lead 11-26; vibex7 ~/tmp/bool/sel-main.jsonl; kit ~/tmp/core/spd pft.py, cli-new)**: DONE be8307ce4:
   surf-intro Derived 1 x5 (505 vs 65) = the source studio (tab "Derived source b7635b...") Fillet 1 ~540 ms: OCCT's
