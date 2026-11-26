@@ -782,9 +782,44 @@ pub enum MateGlyphState {
 /// Overlay pick ids of mate indicators start here (after any number of connectors).
 const MATE_PICK_BASE: u32 = 1 << 20;
 
-/// The first overlay pick id: the scene's own geometry picks lie under it.
+/// The first overlay pick id: the scene's own geometry picks and [`hidden_outline_id`] lie under it.
 pub fn overlay_base(built: &AsmBuilt) -> u32 {
+    built.picks.len() as u32 + 2
+}
+
+/// The state slot of [`outline_hidden`]'s meshes (never picked).
+fn hidden_outline_id(built: &AsmBuilt) -> u32 {
     built.picks.len() as u32 + 1
+}
+
+/// Per mesh: its triangles under the one pick id 1, for [`outline_hidden`].
+#[derive(Default)]
+pub struct OutlineMeshes(HashMap<usize, (Weak<MeshBuffers>, MeshHandle)>);
+
+/// A hidden instance whose list row is hovered: its silhouette outlined in the hover colour at its place, no fill, no
+/// pick (live asm-hover-combined-1126 (6)).
+pub fn outline_hidden(scene: &mut Scene, built: &AsmBuilt, result: &AssemblyResult, top: noshape_model::assembly::InstanceId, meshes: &mut OutlineMeshes, up: &Uploader) {
+    let occs: Vec<&PartOccurrence> = result.occurrences.iter().filter(|o| o.top() == top).collect();
+    if occs.is_empty() || !occs.iter().all(|o| o.hidden) {
+        return;
+    }
+    meshes.0.retain(|_, (w, _)| w.strong_count() > 0);
+    let id = hidden_outline_id(built);
+    for o in occs.into_iter().filter(|o| o.kind != BodyKind::Wire && !o.mesh.indices.is_empty()) {
+        let key = Arc::as_ptr(&o.mesh) as usize;
+        let mesh = match meshes.0.get(&key) {
+            Some((_, h)) => h.clone(),
+            None => {
+                let m = &o.mesh;
+                let h = up.upload_mesh_parts(&m.positions, &m.normals, &vec![1; m.positions.len()], &m.indices);
+                meshes.0.insert(key, (Arc::downgrade(&o.mesh), h.clone()));
+                h
+            }
+        };
+        scene.instances.push(Instance::new(Drawable::Mesh(mesh)).with_transform(to_mat4(&o.transform)).pick_base(id - 1).unpickable());
+    }
+    scene.set_state(id, state::HIDDEN | state::HOVER | state::OUTLINE);
+    scene.hover_outline = true;
 }
 
 /// Pick id of an overlay item.

@@ -143,6 +143,9 @@ const FACE_PICKED: vec3<f32> = vec3<f32>(0.887, 0.534, 0.021);
 // Its boundary (state PICKED | OUTLINE on the edges): live #FFC20E (qa asm-mate-preview-0bc7: (255,194,14)).
 const PICKED_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.5395, 0.0044);
 const BODY_OUTLINE: vec3<f32> = vec3<f32>(1.0, 0.527, 0.073);
+// A hovered face's boundary on a whole selected part (state BODY | HOVER | OUTLINE on its edges): live #ffc368, solid
+// (asm-hover-combined-1126 (1) d1a: the dark amber edges become #ffc368, the fill kept).
+const BODY_HOVER_EDGE: vec3<f32> = vec3<f32>(1.0, 0.5457, 0.1384);
 
 // ---------------------------------------------------------------- background
 
@@ -549,11 +552,12 @@ fn hover_outlined(st: u32) -> bool {
 }
 
 /// The mask of a hovered outlined part's whole image (depth ignored: its outline shows through the parts in front).
+/// HIDDEN faces too: a hidden instance's hovered list row outlines it, its faces not drawn (live asm-hover-combined-1126).
 @fragment
 fn fs_hover_mask(i: MeshOut) -> @location(0) vec4<f32> {
     load_inst(i.slot);
     let st = state_of(i.pick);
-    if (!hover_outlined(st) || (st & HIDDEN) != 0u || clipped(i.world)) { discard; }
+    if (!hover_outlined(st) || clipped(i.world)) { discard; }
     return vec4(1.0);
 }
 
@@ -1177,6 +1181,7 @@ fn line_vertex(index: u32, l: LineIn, state_mask: u32, state_add: u32) -> LineOu
     // Hovering a selected part edge or face keeps the selection's look (live).
     let keep_selected = (own_edge || face_band) && (st & SELECTED) != 0u;
     o.color = vec4(select(highlight_stroke(base, st), g.select.rgb, keep_selected), alpha);
+    if ((st & (BODY | HOVER | OUTLINE | SELECTED)) == (BODY | HOVER | OUTLINE)) { o.color = vec4(BODY_HOVER_EDGE, alpha); }
     o.pick = pick;
     // Patterns run on from the polyline's earlier segments (`dash_from`, at this segment's scale on screen).
     let seg = length(l.b - l.a);

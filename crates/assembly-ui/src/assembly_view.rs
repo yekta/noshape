@@ -525,6 +525,8 @@ pub struct AssemblyView {
     /// What `built` was built from: its occurrences' signature and the options.
     built_key: Option<(Vec<u64>, AsmSceneOptions)>,
     cache: Arc<Mutex<AsmGpuCache>>,
+    /// The meshes of hidden instances outlined while their list row is hovered.
+    outline_meshes: assembly_scene::OutlineMeshes,
     /// Bumped by every scene build: a background build that finishes after a newer one is dropped.
     scene_seq: u64,
     /// A scene being built off the UI thread (an evaluation's, the cached open's); `built` is the previous one.
@@ -791,6 +793,7 @@ impl AssemblyView {
             built: None,
             built_key: None,
             cache: Default::default(),
+            outline_meshes: Default::default(),
             scene_seq: 0,
             scene_task: None,
             eval_seq: 0,
@@ -1444,7 +1447,10 @@ impl AssemblyView {
         let placing_free = (self.placing.is_some() && self.snap.is_none()) || self.ui.placed_at == Some(self.pointer);
         // Live (behaviours "feel (3D): assembly", FEEL-ASM-DRAG-LIT): nothing lit while an instance is dragged.
         let dragging = self.drag.as_ref().is_some_and(|d| d.started && d.handle.is_none());
-        if let Some(t) = self.hover.as_ref().filter(|_| !placing_free && !dragging)
+        // Editing an exploded view, the selected instance lights nothing under the pointer (live asm-hover-combined-1126
+        // (7) j7b: 0 px after its step).
+        let explode_selected = |t: &AsmPickTarget| self.explode_edit && t.path.first().is_some_and(|top| self.selected.contains(top));
+        if let Some(t) = self.hover.as_ref().filter(|t| !placing_free && !dragging && !explode_selected(t))
             && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex)
             && self.pick_mode(cx) != Some(PickMode::Inference)
         {
@@ -1798,7 +1804,9 @@ impl AssemblyView {
         // Part 1's top): Part 1's top as hovered all the same, the moved part's face under the pointer lit as hovered.
         let still = self.mate.as_ref().is_some_and(|s| s.hud.is_some() && self.manip_click.is_some_and(|(at, _)| s.hud == Some(at)));
         let hovered = self.hover.as_ref().filter(|t| matches!(t.reference, Reference::Face(_))).map(|t| (t.path.clone(), t.reference.clone()));
-        let under = hovered.filter(|k| self.manip_click.is_some() && h.hover_outline.as_ref().is_none_or(|o| o == k) && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
+        // Once both picks are in, a re-hovered pick drops its yellow too (live asm-hover-combined-1126 (2): plain, its
+        // edges #f0d090).
+        let under = hovered.filter(|k| (self.manip_click.is_some() || moving.is_some()) && h.hover_outline.as_ref().is_none_or(|o| o == k) && h.picked_entities.contains(k)).or_else(|| still.then(|| h.picked_entities.iter().find(|(_, r)| matches!(r, Reference::Face(_))).cloned()).flatten());
         if self.mate.is_some()
             && let Some((path, face)) = under
         {
@@ -1913,6 +1921,9 @@ impl AssemblyView {
             std::sync::Arc::new(assembly_scene::ScreenTriads { items }) as std::sync::Arc<dyn noshape_render::camera_geometry::CameraGeometry>
         });
         let mut scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
+        if let Some(top) = self.ui.list_hover {
+            assembly_scene::outline_hidden(&mut scene, built, &self.result, top, &mut self.outline_meshes, self.gpu.uploader());
+        }
         if let Some(slot) = self.ui.cap_hover.filter(|_| self.ui.section.is_some()).and_then(|k| scene.clip_hovered.get_mut(k)) {
             *slot = true;
         }
@@ -4249,6 +4260,8 @@ impl AssemblyView {
                 // Mass properties shows the selection as its chips; an empty
                 // click keeps a dialog's chips (live qa5 pass 7).
                 None if self.ui.mass.is_some() => {}
+                // Editing an exploded view, an empty click keeps the selection (live asm-hover-combined-1126 (7)).
+                None if self.explode_edit => {}
                 None if !additive => self.clear_selection(),
                 target => self.select_target(target, additive, false, cx),
             }

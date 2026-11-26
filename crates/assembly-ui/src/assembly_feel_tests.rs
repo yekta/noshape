@@ -1574,6 +1574,71 @@ fn the_second_pick_shows_plain_while_the_pointer_stays_on_it(cx: &mut TestAppCon
     assert_eq!((filled, picked_faces(cx, &view)), (0, 1), "the second pick plain under the still pointer (live s07), filled once it moves (s08)");
 }
 
+/// Live asm-hover-combined-1126 (2), (4): once both picks are in, the second pick's face re-hovered (where the moved part
+/// leaves it bare) shows plain, its boundary lit, not the picks' yellow.
+#[gpui::test]
+fn a_re_hovered_second_pick_shows_plain(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "mate-second-rehover", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let (lo, hi) = v.result.bounds().unwrap();
+            v.viewport.update(cx, |vp, cx| {
+                let s = vp.size();
+                vp.camera.set_view(noshape_render::StandardView::Isometric);
+                vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+                vp.request_frame(cx);
+            });
+            v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx);
+        })
+    })
+    .unwrap();
+    settle(cx, window, &view);
+    let hover_from_away = |cx: &mut TestAppContext, at: DVec2| {
+        move_to(cx, window, &view, at + DVec2::new(300.0, 300.0));
+        settle(cx, window, &view);
+        move_to(cx, window, &view, at);
+        wait_until(cx, window, &view, |v, _| v.hover.is_some());
+        settle(cx, window, &view);
+    };
+    // Live's order: the later inserted part first (it moves), off its centre, then Part 1's top: the moved part covers
+    // one end of it.
+    for mm in [[150., 10., 10.], [20., 10., 10.]] {
+        let at = screen(cx, &view, mm);
+        hover_from_away(cx, at);
+        wait_until(cx, window, &view, |v, _| v.infer.is_some());
+        let click = at_window(cx, &view, at);
+        gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(click, Modifiers::default());
+        settle(cx, window, &view);
+    }
+    assert!(cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors_complete())), "both connectors picked");
+    let edge_lit = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+            (1..scene.states.len() as u32).filter(|id| scene.states[*id as usize] & (noshape_render::state::HOVER | noshape_render::state::PICKED) == noshape_render::state::HOVER && built.picks.get(*id).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Edge)).count()
+        })
+    };
+    // A spot of Part 1's top the moved part leaves bare.
+    let mut seen = Vec::new();
+    for x in [34., 38., 30., 2., 6.] {
+        let p = screen(cx, &view, [x, 10., 10.]);
+        hover_from_away(cx, p);
+        seen.push((p, hovered_face(cx, &view)));
+    }
+    let bare = seen.iter().find(|(_, h)| h.as_deref() == Some("Part 1 <1>")).map(|(p, _)| *p).unwrap_or_else(|| panic!("no bare spot on Part 1's top: {seen:?}"));
+    move_to(cx, window, &view, bare + DVec2::new(300.0, 300.0));
+    settle(cx, window, &view);
+    assert_eq!(picked_faces(cx, &view), 1, "Part 1's top filled the picks' yellow, the pointer away");
+    hover_from_away(cx, bare);
+    assert_eq!(picked_faces(cx, &view), 0, "re-hovered, the second pick plain (live (2) d2b)");
+    assert!(edge_lit(cx) >= 4, "its boundary lit ({})", edge_lit(cx));
+}
+
 /// Interaction-feel "Toolbar's place" and "Toolbar's grip" (live2 REQUESTS 18:20, place-1118): the mate toolbar's top
 /// left stands 12 px right of and 14 px below the second pick, near the graphics' left edge too; a drag on its grip
 /// moves it with the pointer, it stays where released, and Escape twice still cancels the mate.
@@ -2265,6 +2330,97 @@ fn an_explode_drag_opens_its_step_dialog_with_the_arrow_on_the_moved_part(cx: &m
     });
 }
 
+/// Live asm-hover-combined-1126 (7) j7b-j7f: after an explode step is made and ✓, its instance stays selected; its own face
+/// hovered lights nothing, a click on the background keeps it selected, and another instance's face still lights.
+#[gpui::test]
+fn after_an_explode_step_its_instance_stays_selected_and_unlit_under_the_pointer(cx: &mut TestAppContext) {
+    use noshape_render::state;
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "explode-stepped", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    let part = instance(cx, &view, "Part 2 <1>");
+    let (lo, hi) = cx.update(|cx| view.read(cx).result.instance_bounds(part).unwrap());
+    let top = glam::DVec3::new((lo.x + hi.x) * 0.5, (lo.y + hi.y) * 0.5, hi.z);
+    cx.update(|cx| view.update(cx, |v, cx| v.add_exploded_view(cx)));
+    settle(cx, window, &view);
+    // (Fitted once the Exploded views panel has narrowed the graphics.)
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let (blo, bhi) = v.result.bounds().unwrap();
+        v.viewport.update(cx, |vp, cx| {
+            let s = vp.size();
+            vp.camera.set_view(noshape_render::StandardView::Isometric);
+            vp.camera.fit_sphere((blo + bhi) * 0.5, (bhi - blo).length() * 0.9, s.x / s.y);
+            vp.request_frame(cx);
+        });
+        v.refresh_scene(false, cx);
+    }));
+    settle(cx, window, &view);
+    let c = cx.update(|cx| view.read(cx).viewport.read(cx).project(top).unwrap());
+    move_to(cx, window, &view, c);
+    wait_until(cx, window, &view, |v, _| v.hover.is_some());
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, c), Modifiers::default());
+    wait_until(cx, window, &view, |v, _| !v.selected.is_empty());
+    settle(cx, window, &view);
+    let (f, size) = cx.update(|cx| (view.read(cx).manipulator(cx).expect("a triad"), view.read(cx).manip_size(cx)));
+    let shaft = cx.update(|cx| view.read(cx).viewport.read(cx).project(f.origin + f.z() * size * 0.4).unwrap());
+    move_to(cx, window, &view, shaft);
+    wait_until(cx, window, &view, |v, _| v.manip_hover.is_some());
+    let up = cx.update(|cx| view.read(cx).viewport.read(cx).project(f.origin + f.z() * size).unwrap() - shaft).normalize();
+    drag(cx, window, &view, shaft, shaft + up * 40.0);
+    cx.update(|cx| view.update(cx, |v, cx| v.accept_step_edit(cx)));
+    settle(cx, window, &view);
+    let moved = cx.update(|cx| glam::DVec3::from(view.read(cx).assembly(cx).unwrap().exploded_views[0].steps[0].translation));
+    assert!(cx.update(|cx| view.read(cx).step_edit.is_none() && view.read(cx).explode_edit), "the step made, still editing");
+    assert_eq!(cx.update(|cx| view.read(cx).selected.clone()), vec![part], "the stepped instance stays selected");
+    let own = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(lo.x + (hi.x - lo.x) * 0.15, top.y, top.z) + moved).unwrap());
+    move_to(cx, window, &view, own + DVec2::new(300.0, 300.0));
+    settle(cx, window, &view);
+    move_to(cx, window, &view, own);
+    settle(cx, window, &view);
+    let lit = |cx: &mut TestAppContext, name: &str| {
+        let id = instance(cx, &view, name);
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
+            let edges = built.picks.edges_of(id).into_iter().filter(|e| scene.states.get(*e as usize).is_some_and(|s| s & state::HOVER != 0)).count();
+            (face_states_of(scene, built, &v.result, id) & state::HOVER, edges, scene.hover_outline)
+        })
+    };
+    let what = cx.update(|cx| format!("hover {:?}, manip {:?}", view.read(cx).hover.as_ref().map(|t| &t.reference), view.read(cx).manip_hover));
+    assert_eq!(lit(cx, "Part 2 <1>"), (0, 0, false), "its own face hovered: nothing lit (live j7b: 0 px; {what})");
+    let other = cx.update(|cx| {
+        let v = view.read(cx);
+        let (a, b) = v.result.instance_bounds(instance_of(v, cx, "Part 1 <1>")).unwrap();
+        v.viewport.read(cx).project(glam::DVec3::new((a.x + b.x) * 0.5, (a.y + b.y) * 0.5, b.z)).unwrap()
+    });
+    move_to(cx, window, &view, other);
+    settle(cx, window, &view);
+    let what = cx.update(|cx| format!("hover {:?} at {other:?}", view.read(cx).hover.as_ref().map(|t| (&t.path, &t.reference))));
+    let p1 = instance(cx, &view, "Part 1 <1>");
+    let on_p1 = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).hover.as_ref().is_some_and(|t| t.path.first() == Some(&p1)));
+    assert!(on_p1(cx), "Part 1 under the pointer ({what})");
+    assert_ne!(lit(cx, "Part 1 <1>"), (0, 0, false), "another instance lights under the pointer (live j7d)");
+    let empty = cx.update(|cx| view.read(cx).viewport.read(cx).size()) * DVec2::new(0.5, 0.85);
+    move_to(cx, window, &view, empty);
+    settle(cx, window, &view);
+    assert!(cx.update(|cx| view.read(cx).hover.is_none()), "empty background under the pointer");
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at_window(cx, &view, empty), Modifiers::default());
+    settle(cx, window, &view);
+    assert_eq!(cx.update(|cx| view.read(cx).selected.clone()), vec![part], "a background click keeps it selected (live j7_cleared)");
+    assert!(cx.update(|cx| view.read(cx).explode_edit), "still editing");
+    move_to(cx, window, &view, other);
+    settle(cx, window, &view);
+    let what = cx.update(|cx| {
+        let v = view.read(cx);
+        format!("hover {:?}, drag {:?}, manip {:?}, overlay {:?}, click {:?}, placed {:?}", v.hover.as_ref().map(|t| (&t.path, t.kind)), v.drag.as_ref().map(|d| (d.started, d.handle)), v.manip_hover, v.hover_overlay, v.manip_click.map(|c| c.0), v.ui.placed_at)
+    });
+    assert!(on_p1(cx), "after it, Part 1 under the pointer ({what})");
+    assert_ne!(lit(cx, "Part 1 <1>"), (0, 0, false), "after it, Part 1 still lights ({what})");
+}
+
 /// Lead's ruling on qa MATE-GEAR-DRAG-TURNS-NOTHING (live workflow 25): where two instances' faces lie flush in one
 /// plane, the pick goes to the free, later inserted one (live's press took the flush Part 2 there), whichever is drawn.
 #[gpui::test]
@@ -2519,6 +2675,62 @@ fn a_cold_second_face_click_under_fastened_reads_busy_until_its_connector_is_in(
     let _ = std::fs::remove_file(&path);
 }
 
+/// Live asm-hover-combined-1126 (1) d1a: an instance selected by its row, its top face hovered: that face's boundary
+/// turns from the dark amber edges to a solid #ffc368, the amber fill kept.
+#[gpui::test]
+fn a_selected_instances_hovered_face_lights_its_boundary(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "selected-hover-look", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 1);
+    let p1 = instance(cx, &view, "Part 1 <1>");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        let (lo, hi) = v.result.bounds().unwrap();
+        v.viewport.update(cx, |vp, cx| {
+            let s = vp.size();
+            vp.camera.set_view(noshape_render::StandardView::Isometric);
+            vp.camera.fit_sphere((lo + hi) * 0.5, (hi - lo).length() * 0.6, s.x / s.y);
+            vp.request_frame(cx);
+        });
+        v.selected = vec![p1];
+        v.refresh_scene(false, cx);
+    }));
+    settle(cx, window, &view);
+    let scale = cx.update_window(window, |_, w, _| f64::from(w.scale_factor())).unwrap();
+    let centre = screen(cx, &view, [20., 10., 10.]);
+    let fill_at = screen(cx, &view, [8., 15., 10.]);
+    // The top face's four edges, sampled across from inside the face.
+    let edges: Vec<(DVec2, DVec2)> = [[20., 0., 10.], [40., 10., 10.], [20., 20., 10.], [0., 10., 10.]].into_iter().map(|m| {
+        let a = screen(cx, &view, m);
+        (a, (a - centre).normalize())
+    }).collect();
+    let near = |c: [u8; 3], rgb: u32, tol: i16| (0..3).all(|k| (i16::from(c[k]) - ((rgb >> (16 - 8 * k)) & 0xff) as i16).abs() <= tol);
+    let look = |cx: &mut TestAppContext| {
+        let (px, w) = frame_pixels(cx, window, &view);
+        let rgb = |p: DVec2| {
+            let i = ((p.y * scale).round() as usize * w + (p.x * scale).round() as usize) * 4;
+            [px[i + 2], px[i + 1], px[i]]
+        };
+        let across: Vec<Vec<[u8; 3]>> = edges.iter().map(|(a, d)| (-6..=6).map(|k| rgb(*a + *d * (f64::from(k) / scale))).collect()).collect();
+        (across, rgb(fill_at))
+    };
+    let (rest, fill) = look(cx);
+    assert!(near(fill, 0xf3b648, 8), "the selected fill as live's #f3b648: {fill:?}");
+    assert!(rest.iter().all(|e| !e.iter().any(|c| near(*c, 0xffc368, 6))), "at rest no edge #ffc368: {rest:?}");
+    let face = screen(cx, &view, [8., 5., 10.]);
+    move_to(cx, window, &view, face + DVec2::new(300.0, 300.0));
+    settle(cx, window, &view);
+    move_to(cx, window, &view, face);
+    settle(cx, window, &view);
+    assert_eq!(hovered_face(cx, &view).as_deref(), Some("Part 1 <1>"), "its top under the pointer");
+    let (lit, hovered_fill) = look(cx);
+    for (k, e) in lit.iter().enumerate() {
+        assert!(e.iter().any(|c| near(*c, 0xffc368, 6)) && !e.iter().any(|c| near(*c, 0xffc685, 3)), "edge {k} solid #ffc368 (live d1a), not the hover #ffc685: {e:?}");
+    }
+    assert_eq!(hovered_fill, fill, "the fill kept");
+}
+
 /// Part 1 (x 0..40, y 0..20, z 0..10) and Part 2 moved onto it (x 20..80, z 10..20), seen from the top: Part 1's top
 /// shows at x 0..20, Part 2's top covers it from x 20.
 fn stacked_blocks(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<AssemblyView>) {
@@ -2563,15 +2775,23 @@ fn hovered_face(cx: &mut TestAppContext, view: &Entity<AssemblyView>) -> Option<
     })
 }
 
+fn instance_of(v: &AssemblyView, cx: &gpui_kit::App, name: &str) -> noshape_model::assembly::InstanceId {
+    v.assembly(cx).and_then(|a| a.instances.iter().find(|i| i.name == name)).unwrap().id
+}
+
+/// [`face_states`] from a scene.
+fn face_states_of(scene: &noshape_render::Scene, built: &crate::assembly_scene::AsmBuilt, result: &noshape_model::assembly::eval::AssemblyResult, id: noshape_model::assembly::InstanceId) -> u32 {
+    (1..scene.states.len() as u32)
+        .filter(|i| built.picks.get(*i).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face && result.occurrences[t.occ].top() == id))
+        .fold(0, |s, i| s | scene.states[i as usize])
+}
+
 /// The render states of an instance's faces, or-ed.
 fn face_states(cx: &mut TestAppContext, view: &Entity<AssemblyView>, name: &str) -> u32 {
     let id = instance(cx, view, name);
     cx.update(|cx| {
         let v = view.read(cx);
-        let (scene, built) = (v.viewport.read(cx).scene(), v.built.as_ref().unwrap());
-        (1..scene.states.len() as u32)
-            .filter(|i| built.picks.get(*i).is_some_and(|t| t.kind == crate::scene_builder::PickKind::Face && v.result.occurrences[t.occ].top() == id))
-            .fold(0, |s, i| s | scene.states[i as usize])
+        face_states_of(v.viewport.read(cx).scene(), v.built.as_ref().unwrap(), &v.result, id)
     })
 }
 
@@ -2599,7 +2819,7 @@ fn combined_hover_on_a_selected_instance(cx: &mut TestAppContext) {
 
 /// Live asm-hover-combined-1126 (5), (6): an isolated assembly's faded instances take no hover while "Select transparent
 /// geometry" is off, Alt held or not; the instance behind one lights through it. Make transparent's part alike. A
-/// hidden instance: nothing where it was (its hovered row's outline there: TICKETS ASM-HIDDEN-ROW-HOVER-OUTLINE).
+/// hidden instance: nothing where it was.
 #[gpui::test]
 fn combined_hover_through_faded_and_hidden_instances(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
@@ -2640,6 +2860,41 @@ fn combined_hover_through_faded_and_hidden_instances(cx: &mut TestAppContext) {
     settle(cx, window, &view);
     assert_eq!(at(cx, b).as_deref(), Some("Part 1 <1>"), "Part 2 hidden: Part 1 lights where it was");
     assert_eq!(at(cx, c), None, "Part 2 hidden: nothing where it was over nothing");
+}
+
+/// Live asm-hover-combined-1126 (6): a hidden instance's hovered list row outlines it at its place in the hover colour
+/// (#f0d090), its faces not drawn and not picked.
+#[gpui::test]
+fn a_hidden_instances_hovered_row_outlines_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let (window, view) = stacked_blocks(cx, "hidden-row");
+    let p2 = instance(cx, &view, "Part 2 <1>");
+    cx.update(|cx| view.update(cx, |v, cx| v.set_hidden(vec![p2], true, cx)));
+    settle(cx, window, &view);
+    let (edge, c) = (screen(cx, &view, [80., 10., 20.]), screen(cx, &view, [60., 10., 20.]));
+    let scale = cx.update_window(window, |_, w, _| f64::from(w.scale_factor())).unwrap();
+    let hover = |c: &[u8; 3]| c[0] >= 200 && (150..=215).contains(&c[1]) && i16::from(c[0]) - i16::from(c[2]) >= 50;
+    let look = |cx: &mut TestAppContext| {
+        let (px, w) = frame_pixels(cx, window, &view);
+        let rgb = |p: DVec2| {
+            let i = ((p.y * scale).round() as usize * w + (p.x * scale).round() as usize) * 4;
+            [px[i + 2], px[i + 1], px[i]]
+        };
+        let across: Vec<[u8; 3]> = (-8..=8).map(|k| rgb(edge + DVec2::new(f64::from(k) / scale, 0.0))).collect();
+        (across, rgb(c))
+    };
+    let (across, centre) = look(cx);
+    assert!(!across.iter().any(hover), "hidden, its row not hovered: no outline {across:?}");
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.list_hover = Some(p2);
+        v.refresh_scene(false, cx);
+    }));
+    settle(cx, window, &view);
+    let (lit, inside) = look(cx);
+    assert!(lit.iter().any(hover), "its row hovered: its right side outlined in the hover colour {lit:?}");
+    assert_eq!(inside, centre, "no fill inside the outline");
+    move_to(cx, window, &view, c);
+    assert_eq!(hovered_face(cx, &view), None, "the outlined hidden instance takes no hover");
 }
 
 /// Live REQUESTS 07:02 (7) to confirm: while Explode 1 is edited, faces light as outside it; a clicked instance shows
