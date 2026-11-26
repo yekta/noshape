@@ -2450,3 +2450,71 @@ fn live_speed_1125_assembly_rows(cx: &mut TestAppContext) {
     eprintln!("{}", report.join("\n"));
     let _ = std::fs::remove_file(&path);
 }
+
+/// A face pressed with no hover before it (the ui-parity driver on a loaded host): its pick goes to the GPU, and a
+/// state read until it lands sees the view busy, never the press undone.
+fn press_cold(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>, name: &str, button: MouseButton) {
+    let (lo, hi) = screen_box(cx, view, name);
+    let w = at_window(cx, view, (lo + hi) * 0.5 - DVec2::new(0.0, (hi.y - lo.y) * 0.2));
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_mouse_down(w, button, Modifiers::default());
+    vcx.simulate_mouse_up(w, button, Modifiers::default());
+}
+
+/// Draws until the view is idle, nothing evaluating, picking or on its way to the GPU, as the UI-script driver waits
+/// before a step (without asking for frames of its own).
+fn idle(cx: &mut TestAppContext, window: AnyWindowHandle, view: &Entity<AssemblyView>) {
+    let t = std::time::Instant::now();
+    while cx.update(|cx| view.read(cx).ui_busy(cx) || view.read(cx).ui_frame_pending(cx)) {
+        assert!(t.elapsed() < std::time::Duration::from_secs(60), "the view goes idle");
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        draw(cx, window);
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
+/// Live asm-face-menu (qa run 1125-1501: ours showed no menu on a loaded host): a right-click on Part 2's face opens
+/// its graphics menu once the pick is back, and until then the view reads busy.
+#[gpui::test]
+fn a_cold_right_click_on_a_face_reads_busy_until_its_menu_opens(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "face-menu-cold", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    idle(cx, window, &view);
+    press_cold(cx, window, &view, "Part 2 <1>", MouseButton::Right);
+    let open = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.ctx_menu.is_some());
+    assert!(cx.update(|cx| view.read(cx).ui_busy(cx)) || open(cx), "right after the press: busy or the menu open");
+    wait_until(cx, window, &view, |v, cx| !v.ui_busy(cx));
+    let state = cx.update(|cx| view.read(cx).ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))).expect("the face menu open");
+    let rows: Vec<&str> = state["rows"].as_array().map(|r| r.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+    for row in ["Hide", "Select other…", "View normal to", "Delete Part 2 <1>"] {
+        assert!(rows.contains(&row), "the face menu has {row}: {rows:?}");
+    }
+    let _ = std::fs::remove_file(&path);
+}
+
+/// Live asm-fastened-two-faces step 3 (qa run 1125-1501: ours read one connector and the dialog red): the second
+/// face's click under Fastened reads busy until its connector is in, then the dialog is complete.
+#[gpui::test]
+fn a_cold_second_face_click_under_fastened_reads_busy_until_its_connector_is_in(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    let path = document(cx, "fastened-cold", |ctx| {
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+        call(ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2" }));
+    });
+    let (window, view) = open_from_top(cx, &path, 2);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_mate(noshape_model::assembly::MateType::Fastened, w, cx))).unwrap();
+    idle(cx, window, &view);
+    let complete = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).mate.as_ref().is_some_and(|m| m.dialog.read(cx).connectors_complete()));
+    press_cold(cx, window, &view, "Part 2 <1>", MouseButton::Left);
+    wait_until(cx, window, &view, |v, cx| !v.ui_busy(cx));
+    press_cold(cx, window, &view, "Part 1 <1>", MouseButton::Left);
+    assert!(cx.update(|cx| view.read(cx).ui_busy(cx)) || complete(cx), "right after the second press: busy or both connectors in");
+    wait_until(cx, window, &view, |v, cx| !v.ui_busy(cx));
+    assert!(complete(cx), "both connectors in once the view is idle");
+    let _ = std::fs::remove_file(&path);
+}

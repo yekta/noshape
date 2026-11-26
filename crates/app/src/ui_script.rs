@@ -503,14 +503,7 @@ async fn document_opened(before: &[AnyWindowHandle], cx: &mut AsyncApp) -> Optio
             cx.background_executor().timer(Duration::from_millis(10)).await;
             continue;
         };
-        let busy = cx.update(|cx| {
-            let w = ws.read(cx);
-            match (w.active_part_studio(), w.active_drawing()) {
-                (Some(ps), _) => ps.read(cx).ui_busy(),
-                (None, Some(d)) => d.read(cx).ui_busy(),
-                (None, None) => w.ui_view_pending(cx),
-            }
-        });
+        let busy = cx.update(|cx| ws.read(cx).ui_busy(cx));
         if !busy {
             return Some(Instant::now());
         }
@@ -559,8 +552,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         let frame_shown = async |cx: &mut AsyncWindowContext| {
             let t = Instant::now();
             while t.elapsed() < Duration::from_secs(5) {
-                let Some(ps) = studio(cx) else { return };
-                if !cx.update(|_, cx| ps.read(cx).ui_frame_pending(cx)).unwrap_or(false) {
+                if !ws.update(cx, |w, cx| w.ui_frame_pending(cx)).unwrap_or(false) {
                     return;
                 }
                 sleep(cx, 10).await;
@@ -572,12 +564,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let idle;
             loop {
                 sleep(cx, if timing_on() { 10 } else { 120 }).await;
-                let drawing = ws.update(cx, |w, _| w.active_drawing()).ok().flatten();
-                let busy = match (studio(cx), drawing) {
-                    (Some(ps), _) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
-                    (None, Some(d)) => cx.update(|_, cx| d.read(cx).ui_busy()).unwrap_or(false),
-                    (None, None) => ws.update(cx, |w, cx| w.ui_view_pending(cx)).unwrap_or(false),
-                };
+                let busy = ws.update(cx, |w, cx| w.ui_busy(cx)).unwrap_or(false);
                 if !busy || t.elapsed() > Duration::from_secs(30) {
                     idle = Instant::now();
                     break;
@@ -920,10 +907,13 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             let limit = Duration::from_millis(step["ms"].as_u64().unwrap_or(20_000));
                             let mut quiet = Instant::now();
                             while t.elapsed() < limit {
-                                let busy = match studio(cx) {
-                                    Some(ps) => cx.update(|_, cx| ps.read(cx).ui_busy() || ps.read(cx).ui_frame_pending(cx)).unwrap_or(false),
-                                    None => false,
-                                };
+                                let busy = ws
+                                    .update(cx, |w, cx| match (w.active_part_studio(), w.active_assembly()) {
+                                        (Some(ps), _) => ps.read(cx).ui_busy() || ps.read(cx).ui_frame_pending(cx),
+                                        (None, Some(a)) => a.read(cx).ui_busy(cx) || a.read(cx).ui_frame_pending(cx),
+                                        (None, None) => false,
+                                    })
+                                    .unwrap_or(false);
                                 if busy {
                                     quiet = Instant::now();
                                 } else if quiet.elapsed() >= Duration::from_millis(300) {
@@ -1348,20 +1338,13 @@ async fn settle_doc(ws: &Entity<Workspace>, cx: &mut AsyncApp) {
     let t = Instant::now();
     loop {
         cx.background_executor().timer(Duration::from_millis(120)).await;
-        let busy = cx.update(|cx| {
-            let w = ws.read(cx);
-            match (w.active_part_studio(), w.active_drawing()) {
-                (Some(ps), _) => ps.read(cx).ui_busy(),
-                (None, Some(d)) => d.read(cx).ui_busy(),
-                (None, None) => w.ui_view_pending(cx),
-            }
-        });
+        let busy = cx.update(|cx| ws.read(cx).ui_busy(cx));
         if !busy || t.elapsed() > Duration::from_secs(30) {
             break;
         }
     }
     let t = Instant::now();
-    while t.elapsed() < Duration::from_secs(5) && cx.update(|cx| ws.read(cx).active_part_studio().is_some_and(|ps| ps.read(cx).ui_frame_pending(cx))) {
+    while t.elapsed() < Duration::from_secs(5) && cx.update(|cx| ws.read(cx).ui_frame_pending(cx)) {
         cx.background_executor().timer(Duration::from_millis(10)).await;
     }
 }

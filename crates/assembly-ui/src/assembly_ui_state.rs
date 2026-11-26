@@ -19,6 +19,17 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Work a step's state waits for (the ui-parity driver): an evaluation or a scene build in flight, or a click's or
+    /// menu's pick not back from the GPU yet (a loaded host answered a face's right-click after the state was read).
+    pub fn ui_busy(&self, cx: &App) -> bool {
+        self.eval_task.is_some() || self.scene_task.is_some() || self.viewport.read(cx).pick_pending()
+    }
+
+    /// The viewport's last change isn't presented yet.
+    pub fn ui_frame_pending(&self, cx: &App) -> bool {
+        self.viewport.read(cx).frame_pending()
+    }
+
     /// Where target `t` shows now, in window coordinates: `face` / `edge` /
     /// `vertex` [x, y, z] (mm; with `instance`, in that part's coordinates
     /// through its current placement, as live's runner reads it; else

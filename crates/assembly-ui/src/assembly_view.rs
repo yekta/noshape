@@ -1092,6 +1092,7 @@ impl AssemblyView {
                 if seq != this.eval_seq {
                     return;
                 }
+                this.eval_task = None;
                 this.catalog = catalog;
                 // The parts' exact boxes (live qa5 A18: a repeat insert lands at exactly bbox/8; the display box has
                 // OCCT's gap) after the assembly is up: before it they were 3 s of asm-xdev-subs' cold open.

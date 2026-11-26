@@ -675,6 +675,21 @@ impl Workspace {
 
     /// The active tab is a Part Studio, Assembly or Drawing whose view isn't made yet, or a Feature Studio still saving or
     /// compiling what was typed (the ui-parity driver waits).
+    /// The active tab's work a ui-parity step waits for (its view not built yet, a regeneration, an assembly's pick).
+    pub(crate) fn ui_busy(&self, cx: &App) -> bool {
+        match (self.active_part_studio(), self.active_drawing(), self.active_assembly()) {
+            (Some(ps), ..) => ps.read(cx).ui_busy(),
+            (None, Some(d), _) => d.read(cx).ui_busy(),
+            (None, None, Some(a)) => a.read(cx).ui_busy(cx),
+            (None, None, None) => self.ui_view_pending(cx),
+        }
+    }
+
+    /// The active studio's last change isn't presented yet.
+    pub(crate) fn ui_frame_pending(&self, cx: &App) -> bool {
+        self.active_part_studio().is_some_and(|ps| ps.read(cx).ui_frame_pending(cx)) || self.active_assembly().is_some_and(|a| a.read(cx).ui_frame_pending(cx))
+    }
+
     pub(crate) fn ui_view_pending(&self, cx: &App) -> bool {
         let Some(id) = self.active else { return false };
         if let Some(TabView::FeatureStudio(v)) = self.views.get(&id) {
