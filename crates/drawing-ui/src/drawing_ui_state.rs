@@ -106,14 +106,17 @@ impl DrawingEditor {
                 return Ok(self.sheet_to_window(x.pos));
             }
             let a = self.ui_annotations().into_iter().find(|(_, k, s)| s == text && kind.is_none_or(|x| x == *k)).ok_or_else(|| format!("no annotation {text}"))?;
-            // Its text where it is drawn (a dimension's dragged text is not at its `position`: UIP-ANNOTATION-STALE-POS):
-            // the middle, a note's top-left corner (where live's recorder presses one: drw-copy-annotation-drag 6).
+            // A note at its insertion point, where live's recorder presses one (live drw-triage-1126 (2)).
+            let placed = || self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position);
+            if a.1 == "note"
+                && let Some(at) = placed()
+            {
+                return self.window_point_on_sheet(at, t);
+            }
+            // Its text where it is drawn (a dimension's dragged text is not at its `position`: UIP-ANNOTATION-STALE-POS).
             let picks = self.picks_of(Sel::Annotation(a.0));
             let drawn = self.built.as_ref().and_then(|b| b.geometry.texts.iter().find(|x| picks.contains(&x.pick))).map(|x| {
                 let q = noshape_model::drawing::font::text_box(x);
-                if a.1 == "note" {
-                    return [q.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min), q.iter().map(|p| p[1]).fold(f64::NEG_INFINITY, f64::max)];
-                }
                 [q.iter().map(|p| p[0]).sum::<f64>() / 4.0, q.iter().map(|p| p[1]).sum::<f64>() / 4.0]
             });
             match drawn {
@@ -123,6 +126,10 @@ impl DrawingEditor {
         } else {
             return Err(format!("not a drawing target: {t}"));
         };
+        self.window_point_on_sheet(at, t)
+    }
+
+    fn window_point_on_sheet(&self, at: [f64; 2], t: &Value) -> Result<Point<Pixels>, String> {
         let w = self.sheet_to_window(at);
         if !self.bounds.contains(&w) {
             return Err(format!("{t} is outside the sheet's area"));

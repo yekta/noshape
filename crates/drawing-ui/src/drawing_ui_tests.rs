@@ -1861,10 +1861,10 @@ fn a_hole_size_cell_lights_its_holes_and_tags(cx: &mut TestAppContext) {
 /// Live behaviours "feel coverage (11-20)" D2: a dimension dragged by its text from unselected ends unselected (tan
 /// hover with grips while the pointer is on it), its move one edit; a selected one stays selected and its palette
 /// opens (live drwm-2 d5).
-/// Live drw-copy-annotation-drag 6, drw-note-hover-matrix 20: the runner grabs a note where live's recorder presses one,
-/// its top-left corner (the point it was placed at), and a drag from there moves it by the drag.
+/// Live drw-triage-1126 (2): the runner grabs a note where live's recorder presses one, its insertion point (the
+/// placing click), and a drag from there moves it by the drag.
 #[gpui::test]
-fn the_runner_grabs_a_note_at_its_corner(cx: &mut TestAppContext) {
+fn the_runner_grabs_a_note_at_its_insertion_point(cx: &mut TestAppContext) {
     use gpui_kit::{MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent};
     let (window, editor) = drawing(cx, "note-grab");
     real_sheet(cx, window, &editor);
@@ -2432,38 +2432,30 @@ fn with_styles_open_a_clicked_dimension_reads(cx: &mut TestAppContext) {
     assert_ne!(read, json!([]), "selection {sel:?}, hover {hover:?}");
 }
 
-/// Live drw-dims-1123 (linear.md): Esc in a dimension tool drops a pending pick, the tool stays on (3 Escs: its button
-/// still active); nothing gets selected.
+/// Live drw-triage-1126 (1; drw-dimension-pick-esc-thrice, drw-dimension-esc-then-pick): one Esc ends a dimension tool,
+/// a pick pending or not, and Ordinate, Datum and Surface finish alike (their panels close); nothing gets selected.
 #[gpui::test]
-fn esc_keeps_a_dimension_tool_on(cx: &mut TestAppContext) {
+fn one_esc_ends_a_dimension_tool(cx: &mut TestAppContext) {
     use noshape_scene::drawing_tools::{DimTool, Tool};
     SUGGESTED.set(true);
     DIMENSIONED.set(true);
     let (window, editor) = drawing(cx, "dim-esc-hover");
     DIMENSIONED.set(false);
     real_sheet(cx, window, &editor);
-    cx.update(|cx| editor.update(cx, |e, cx| {
-        e.tool = Tool::Dimension { kind: DimTool::Diameter, picks: Vec::new() };
-        for _ in 0..3 {
-            e.cancel(cx);
-        }
-    }));
-    cx.update(|cx| {
-        let e = editor.read(cx);
-        assert!(matches!(e.tool, Tool::Dimension { kind: DimTool::Diameter, ref picks } if picks.is_empty()), "{:?}", e.tool);
-        assert!(e.selection.is_empty(), "nothing selected: {:?}", e.selection);
-    });
-    // Datum, Ordinate and Surface finish alike: their panels stay (datum.md, ordinate-baseline-chain.md,
-    // surface-finish.md).
-    for tool in [Tool::Datum { anchor: None }, Tool::Ordinate { origin: None, horizontal: None, group: None }, Tool::SurfaceFinish] {
+    for tool in [
+        Tool::Dimension { kind: DimTool::Diameter, picks: Vec::new() },
+        Tool::Dimension { kind: DimTool::Radius, picks: Vec::new() },
+        Tool::Ordinate { origin: None, horizontal: None, group: None },
+        Tool::Datum { anchor: None },
+        Tool::SurfaceFinish,
+    ] {
         let name = tool.name();
         cx.update(|cx| editor.update(cx, |e, cx| {
             e.set_tool(tool, cx);
-            let panel = e.panel.is_some();
             e.cancel(cx);
-            e.cancel(cx);
-            assert_eq!(e.tool.name(), name);
-            assert_eq!(e.panel.is_some(), panel, "{name}: the panel stays");
+            assert!(matches!(e.tool, Tool::Select), "{name}: ended by one Esc ({:?})", e.tool);
+            assert!(e.panel.is_none(), "{name}: its panel closed");
+            assert!(e.selection.is_empty(), "{name}: nothing selected: {:?}", e.selection);
         }));
     }
 }

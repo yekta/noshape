@@ -111,8 +111,8 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Dimension, ordinate, datum and surface finish tools stay on through Esc (live drw-dims-1123).
-    fn keeps_tool_on_esc(&self) -> bool {
+    /// Dimension, ordinate, datum and surface finish tools: a right-click on empty sheet keeps them (live drw-dims-1123).
+    fn dimension_type_tool(&self) -> bool {
         match self.tool {
             Tool::Dimension { .. } | Tool::Datum { .. } | Tool::Ordinate { .. } => true,
             // Editing a placed symbol's panel is not the tool.
@@ -248,6 +248,14 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
+        // The Surface finish tool: Esc ends it, the symbols placed stay (live drw-surface-finish).
+        if matches!(self.tool, Tool::SurfaceFinish) && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) {
+            self.panel = None;
+            self.note_leader = None;
+            self.tool = Tool::Select;
+            cx.notify();
+            return;
+        }
         // The note editor: Esc closes it and ends the Note tool (live2 drw-note-editor).
         if matches!(self.tool, Tool::Note) && matches!(self.panel, Some(Panel::Note { .. })) {
             self.panel = None;
@@ -360,21 +368,6 @@ impl DrawingEditor {
         // Esc ends a spline being drawn (keeping it) and stays in the Spline tool; the next Esc ends the tool (live2
         // drw-sketch-spline).
         if self.finish_sketch(cx) {
-            self.redraw(cx);
-            return;
-        }
-        // Esc never ends a dimension, ordinate, datum or surface finish tool: it drops a pending pick or leader, the tool
-        // and its panel stay; an ordinate group goes on (live drw-dims-1123: linear, ordinate, datum, surface finish).
-        if self.keeps_tool_on_esc() {
-            match &mut self.tool {
-                Tool::Dimension { picks, .. } => picks.clear(),
-                Tool::Datum { anchor } => *anchor = None,
-                _ => {}
-            }
-            self.note_leader = None;
-            self.overlay = Overlay::default();
-            self.set_preview(None, cx);
-            self.update_hover(cx);
             self.redraw(cx);
             return;
         }
@@ -2609,7 +2602,7 @@ impl DrawingEditor {
         // A dimension-type tool: a right-click on empty sheet does nothing; on a placed annotation the tool ends and that
         // annotation's menu opens (live drw-dims-1123 linear.md).
         let mut pick = pick;
-        if self.keeps_tool_on_esc() {
+        if self.dimension_type_tool() {
             // The tool's hover takes model geometry only: look for an annotation under the pointer.
             let tol = self.pk().tol_mm(noshape_scene::drawing_tools::PICKBOX_PX);
             let Some(on) = self.built.as_ref().and_then(|b| b.hit_where(self.cursor, tol, &|t| matches!(t, PickTarget::Annotation(_)))) else { return };
