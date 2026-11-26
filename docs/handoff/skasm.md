@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 05:50 UTC) — read first
+## RESUME HERE (11-26 08:10 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -17,12 +17,15 @@ differs from the part's; boolean.cpp same_torus + share_bspline_surfaces groups 
 round trip on vibex7: all 22 live.igs match live (were 16 diffs); STEP/x_t 49/50, c2-rings-loft STEP 762 vs 767 edges
 predates this (same with the colour rule off). Lead told 07:10. Main RED 78dea5ae7 = ops parity a_face_* (flaky, not mine).
 
-GLYPH-CIRCLE parked: no rule fits gl5 (centre point, aspect-scaled centre: 10-30° off; a bilinear cot fit 5° off with
-no meaning: fit scripts /root/skasm-scratch/glyph/). Capture asked in live/REQUESTS.md "skasm 11-26 07:12" (pan, zoom,
-window size, right edge, cursor park).
+GLYPH-CIRCLE lone glyph DONE e674ed802 (08:03, not queued: waits for 8efe6acf on main, then land.sh with 4fee2452a):
+the glyph sits 38.5 px from the point at right angles to the line to the pointer, upper side (gl5's pointer was parked
+at (1700,950): all 17 within 5°). REQUESTS row withdrawn. Taken-spot case keeps the old left row (ticket still open).
+Assembly diffs (Fastened step 3, asm face menu) were a476fa14f (landed).
 
-Next: speed T2 rerun (tsk9.sh, timeout 5400; may need skasm-wip2's speed traces) -> sketch feel-coverage audit
-(behaviours.md sketch specs without tests -> feel test + fix; report counts; sheet metal parked by the user 11-24).
+Speed T2 (sp.sh, vibex7, ~/tmp/skasm/sp-full.log there) FAILS: S50 run 3 "the corner lit under the pointer": hover
+None. Uncommitted diagnostic in latency_tests.rs:752 prints view hover / hover_constraint / gpu pick / tile / held /
+selection. Suspect: the width's label over the corner takes hover (sketch_hover's "glyph/label hovered" early return).
+Then -> sketch feel-coverage audit (behaviours.md sketch specs without tests -> feel test + fix; report counts).
 
 ## In flight (11-22 17:45 UTC)
 - CHECKING 2c5bffa7 (17:29, carries ab6987cc + the BEND-FACE-RECLICK fix): corner breaks in the flat (sm_flat.rs Break::
