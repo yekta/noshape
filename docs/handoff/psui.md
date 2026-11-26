@@ -182,15 +182,18 @@ docs/DECISIONS.md (read first; it wins over anything here).
   App: drw-geometric-tolerance 6/6, -edge-then-escape 9/9 (with the takes of live's 6b1c85cd4, not on main yet).
   Our listed position (82.9, 93.0) vs live (84.5, 94.1) is within the comparison's tolerance.
 
-## Platform check (lead 11-26 20:5x): IN FLIGHT
+## Platform check (lead 11-26 20:5x): DONE (22:5x)
 - Sample: 100 fixed scenarios (25 drw / asm / sketch, 8 shortcut, 17 ps; /root/psui-scratch/resp/os-sample.txt, seed
   1126), release v0.4.72 on each OS. Linux (vibe2, os-lin.sh): 94/100 (6 drw "tool stays after Esc", fixed after the
   release). Mac (gated: idle >= 600 s, load < 6, one app at a time, <= 175 s; os-mac.sh in ~/noshape-host/psui-keep):
   91/100, the same 6 + 3 Mac-only, all runner artefacts, fixed (commit "ui-parity on a Mac"): redo mod+y -> Shift+Cmd+Z
   (Cmd+Y redoes only in a drawing in live), asm-circular-pattern-angle-count's ctrl+a -> mod+a, run.py's stderr pipe
   filled and stopped the app (now a file). App behaviour: no Mac-only difference found.
-- Windows: qa-os.yml gets an input `uiparity` (names) in 345ca399; once it is on main:
-  gh workflow run qa-os.yml -f tag=v0.4.72 -f uiparity="$(tr '\n' ' ' < os-sample.txt)"; artefact qa-Windows/uip.log.
+- CI (qa-os.yml input `uiparity`, run 45901651578): Windows 78/100, macOS runner 84/100. The 17 differences not on Linux
+  all came from the runners' 1024 x 768 screens squeezing live's 1919 x 992 window (drawing toolbar overflow, menus
+  and camera moved). At 1920 x 1080 (Set-DisplayResolution / displayplacer; probe runs 45905022971, 45906424638 on
+  agent/psui-osci) every one matches: no Windows-only difference. Workflow step landed ("1920 x 1080 screen").
+  Rerun: gh workflow run qa-os.yml -f tag=<tag> -f uiparity="$(tr '\n' ' ' < os-sample.txt)"; artefacts qa-<OS>/uip.log.
 
 ## NEXT
 - 19:50 interaction-feel sweep (lead order 2): rows 964-966, 987-990, 1003, 1031, 1749 marked = with their tests; 1071 /
