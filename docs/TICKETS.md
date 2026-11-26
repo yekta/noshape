@@ -5,6 +5,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## qa 11-26 11:4x: ui-parity reruns on green f393d8ee4
+
+- [ ] P2 **EXPORT-PARASOLID-VERSION-DEFAULT (dx)** (qa 11-26, asm-menu-export re-taken by live 121421f29): Export with Format PARASOLID and ☐ Use latest version: live's Version select shows the newest, 38.1 (list 38.1 … 25.0); ours shows 25.0, the oldest. Step 2 .dialog.fields[5].value. dx is parked, so this goes to the lead.
+- [ ] P2 **ASM-SELECT-OTHER-POPUP (asm)** (qa 11-26, asm-face-menu-select-other, also before skasm's driver fix ada3263b): an assembly face's context menu › Select other… opens no popup. Live lists "Face of Part 2 <1>", "Part 2 <1>" (.list kind select-other). asm is parked, so this goes to the lead.
+
 ## qa 11-26 04:0x: ASM-FIRST-WEEK replays (live qa/asm-audit-1126) by ops on green 349379a41 (qa-scratch/tmp/asmaud/a3.py)
 Measure, Interference, Replicate's placement, Group (both parts move by the same vector) and Change configuration ([Size=Large]) match live. Their dialogs and menus are scored by the asm-* ui-parity takes (qa-uipasm run).
 - [ ] P2 **REPLICATE-INSTANCE-ORDER (asm)**: a plate with 3 equal holes, pin Revolute in hole 1 (x 20), Replicate › Match edges on face, the plate's top face, ✓: live numbers the copies outwards from the seed, Part 2 <2> at x 40 and <3> at x 60 (raw/mb11.json occ3); ours puts <2> at x 60 and <3> at x 40.
