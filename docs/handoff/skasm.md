@@ -3,6 +3,11 @@
 Updated 2026-11-26 18:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
+## NEXT (lead 11-26 23:5x): PATTERN-AFTER-INSERTED-CHAMFER (P1 maker flow, interaction-feel row 1900, taken from core)
+Roll back to Extrude 2, insert a 1 mm Chamfer on the hole's top edge, roll to the end: live rebuilds all; ours fails
+Linear pattern 1 (feature pattern of Extrude 2, 3 x 20 mm) "Could not create all instances as entered...". Fix with
+a T1 and an ops e2e (crates/ops/tests/e2e.rs). Find the row: grep -n PATTERN-AFTER-INSERTED-CHAMFER docs/.
+
 ## NOW (11-26 23:35 UTC)
 - 09cb32fd's failure was the land slot's link (mold undefined hashbrown symbol in noshape-ops), not ours; the Split 4
   fix had landed (bf81ed84), handoffs landed docs-only (db5d67ef1).
