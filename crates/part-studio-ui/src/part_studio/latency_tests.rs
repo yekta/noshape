@@ -719,7 +719,8 @@ fn speed_grid(cx: &mut TestAppContext, rects: usize, cols: usize, extras: bool) 
 
 /// Live's user-action rows (qa/speed-1125, software GL, medians of 5): a rectangle corner dragged in a 50- and a
 /// 200-entity sketch (release to settled 654 / 1049 ms, each move drawn in <= 54 ms), its width typed + Enter
-/// (667 / 758 ms), and Insert DXF's ✓ of a 72-entity gear (802 ms). Ours on the same kind of host, printed with live's.
+/// (667 / 758 ms), and Insert DXF's ✓ of a 72-entity gear (802 ms); a 1200-line (2400-entity) one against live's 2402-entity
+/// "Part grid" (big-sketch-1119). Ours on the same kind of host, printed with live's.
 #[gpui::test]
 #[ignore = "T2: wall-clock timing; a release build, compared with live's software-GL rows"]
 fn live_speed_1125_sketch_rows(cx: &mut TestAppContext) {
@@ -734,7 +735,7 @@ fn live_speed_1125_sketch_rows(cx: &mut TestAppContext) {
         let worst = runs.iter().cloned().fold(0.0, f64::max);
         report.push(format!("{what:<40} {:>6.1} ms {:>6.1} ms  {live}", median(runs.to_vec()), worst));
     };
-    for (name, rects, cols, extras, live) in [("S50", 12, 4, true, ["654", "<= 54", "667"]), ("S200", 50, 10, false, ["1049", "continuous", "758"])] {
+    for (name, rects, cols, extras, live) in [("S50", 12, 4, true, ["654", "<= 54", "667"]), ("S200", 50, 10, false, ["1049", "continuous", "758"]), ("S1200", 300, 20, false, ["2900-3700 (1119)", "median 40-45 (1119)", "8400-13000 (1119)"])] {
         let (window, view, mut corner, width) = speed_grid(cx, rects, cols, extras);
         pump(cx, window, &view, Duration::from_millis(1500));
         let pointer = Pointer::new(cx, window, &view);
