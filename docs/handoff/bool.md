@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-25 23:40 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-26 02:08 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -30,23 +30,21 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
   obround shells (2194 mm3); test + ticket note QUEUED 64255e03 (worktree bool-sf), lead told.
   0037 LANDED ebc674fc (lead installed libs everywhere). Corner decline PARKED again (lead 11-25; probe result: 25/30
   other late declines, 5 differ; worktree bool-corner has the uncommitted probe, delete it).
-  P0 IN FLIGHT (qa, TICKETS 5f3abc963 BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX): worktree noshape-wt/bool-flush (origin/main
-  5f3abc963). Repro /root/bool-scratch/p0/iso.py (vibex8 ~/tmp/bool/p0, cli-rel = release 0.4.68 CLI). Not "flush":
-  ANY Add cylinder (R3, axis y40 z30 along x, seam at z=27 lying on the back wall y=40) starting at x<5 (crossing the
-  R5 fillet's tangent edge x=5) fails; x5..20 / x5.1.. fine. OCCT wrong: flush cases return both solids (vol = sum),
-  x1-20 / x4.9-20 LOSE the cylinder (box volume); OCCT fuzzy 1e-7..1e-5 doesn't help (probe_fuzz). Ours declined:
-  (1) "two edges leave a vertex in one direction": the tool's seam pieces x<5 both copies at u=1.8e-7 (vertex where
-  OCCT's fillet x tool section meets the seam is 0.18 um off it; the curve touches the seam to 4th order at x=5 and
-  OCCT stops it 43 um short). FIXED (uncommitted, keep): of_face, "A cylinder's seam piece is on its seam" (snap
-  within GREY*tol to th0 / th0+2pi by copy). (2) now "a non-manifold result": NOSHAPE_PROBE_NM output in
-  /root/bool-scratch/p0/rep4.out (seg 54 = seam/section line z=27 on y=40 x5..20 uses [1,2]; many edges used once).
-  Next: read rep4.out, find why the line z=27 on face 9 (back wall) is used 3 times (likely the 43 um seam piece
-  x4.957..5 lying within 0.185 um of the fillet: treat it as the section's continuation to x=5, or extend OCCT's
-  curve end to the x=5 vertex). Recordings: vibex8 ~/tmp/bool/p0/rec (5 cases; b4ea5d37 = x10-20 taken, fine) and
-  local /root/bool-scratch/p0/rec; scripts rep3.sh (build + brep replay, PROBE env), fuzz.sh. UNCOMMITTED PROBES in
-  bool-flush (never commit): NOSHAPE_PROBE_ARR + NOSHAPE_PROBE_NM blocks in crates/brep/src/boolean.rs, probe_fuzz in
-  crates/kernel/tests/bool_replay.rs. When ours takes all 4: check volumes (x5-20 is 15465.83 mm3; x0-20 should be
-  ~15580-15600), add a kernel test from 7bf937bee39bc4a9 + 1582a3d770492550, bool's gate, land, tell qa + lead.
+  P0 (lead 11-26 01:00, qa TICKETS BOOL-ADD-FLUSH-CYLINDER-SHELLED-BOX): FIXED 8b52d16a6 (worktree bool-flush, branch
+  bool-flush-p0 on origin/main 11-26 01:45). Causes: (a) OCCT's section of the shell's inner corner round (R3,
+  vertical) and the tool cylinder (R3, horizontal, axes 5 mm apart) is EMPTY, even seeded: occt_sections now asks
+  edges_piercing when the boundaries meet 0 times too (was == 1), and seeded_sections' midpoint projection runs 400
+  steps (50 left it > 1e-7 off: no seed) -> the widened retry gives the loop; (b) OCCT's outer-round section has a
+  43 um curve along the tool's seam (0.18 um off): a curve along a straight edge of ONE face is now that edge's
+  piece InFace on the other face (else two edges between the same vertices, a sliver); (c) C++ chord_pcurve allows
+  tol + the edge's vertex tolerance (0.18 um > 0.15); (d) the earlier seam-piece snap (of_face). All 5 recorded cases
+  (vibex8 ~/tmp/bool/p0/rec) taken; volumes = slice integration (x0-20 15587.68099, x1-20 15559.81505, x4.9-20
+  15468.10594 mm3; x5-20 check 15465.83). T1 bool_patterns::a_cylinder_along_a_shelled_boxs_wall_fuses_through_its_corner_rounds
+  (data/booleans 7bf937 / 1582a3 / b81914). T1 PASSES, small cases 78/78 0 differ (t1.sh, vibex8 ~/tmp/bool/p0/kt).
+  GATE: unit bool-chain-p0 (/root/bool-scratch/chainp0.sh) starts gate-chain-own.sh 8b52d16a6 when chain-2c051fbee.out
+  says CHAIN DONE -> /root/bool-hat-scratch/chain-8b52d16a6.out. Then knurls (chainf16.sh pattern: copy both gate
+  trees' all-96c035059fc28abb to vibex7 ~/tmp/bool/<dir>, kn-run.sh), land from bool-flush
+  (NOSHAPE_LAND_QUEUE_HOST=vibe2 land.sh), tell qa + lead. OCCT stays wrong on these (fallback only).
   SLOW-FEATURE LIST (lead 11-25; re-measured 11-25 12:55 on main 47b49528b, vibex8 ~/tmp/bool: cli-main,
   fl-main.jsonl all features, sel-main.jsonl 60 rows >= 100 ms and >= 2x live, prof-main.jsonl their kernel profiles;
   scripts /root/bool-scratch/featlist.py profsel.py fl-main.sh, prof1.sh <cli> <doc> <feature> one profile,
@@ -145,10 +143,14 @@ Daily report: share as "ours N/M (general, direct), OCCT, differing" (DECISIONS 
    ComputePCurveOn1/On2 -> 24 ms; sampled section points within 3 um (fin-fill doc: vibex8 ~/tmp/bool/models/fin-fill,
    copy of skasm's vibex6 ~/tmp/skasm/fin). Tell skasm via the lead when landed.
    ITEM 1 after at-once (cli 21:35, loaded): Bohrungssitz feature 878 ms (op_boolean 609: TWO brep runs, the checked
-   fuse declines "pattern instances overlapping" only at classification (5575's early vertex test needs clear(),
-   false by NURBS faces), then the plain one; unify 258). PARKED idea NOSHAPE_PROBE_NOCHECK (skip the checked run
-   for < 16 tools): ~150 ms less brep, but touching_only also changes NURBS edge-only pairs (5769), so touching
-   patterns could differ: needs a corpus run before any use.
+   fuse declines "pattern instances overlapping" only at classification, then the plain one; unify 258). No vertex of
+   a seat is inside the impeller or back (probe): the early vertex test can't see it. DONE 2c051fbee (bool-slow,
+   on the ea3241c8 stack rebased to main 11-25 23:48): flag 8 / with_plain_if_overlapping: for < 16 tools the checked
+   run goes on as the plain fuse where they overlap (only if no free-form edge_only pair was taken), a later decline
+   reported as "overlapping" so C++ runs the plain one as before. Replay a80ba: one brep run, op_boolean 380/280 vs
+   551/392 ms, same 82 faces. GATE running (unit bool-gate-2c051, /root/bool-hat-scratch/chain-2c051fbee.out), then
+   knurls (chainf16.sh pattern). Next: the feature's unify 258 (check 81, patches 66, bands 65): scope? (rust path
+   scopes only if the target is myUnifyClean).
    SP3 USD (NOSHAPE_PROBE_USD): op_boolean's WHOLE unify (no scope) rejects 129 -> 116 three times (change 1.4e-6 of
    v0), then op_unify runs the same whole unify again (137 ms loaded). TRY (uncommitted in bool-slow): op_boolean's
    whole unify leaving the shape IsSame -> myUnifyClean: DONE f16a4b4ea (A/B loaded 2250/2361 -> 1977/1682 ms).
