@@ -101,12 +101,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
   slot at picks.len()+1, overlay ids moved up by one; fs_hover_mask keeps HIDDEN), a re-hovered second mate pick plain,
   a selected part's hovered face boundary #ffc368 (BODY_HOVER_EDGE), explode edit: the selected instance unlit under the
   pointer and an empty click keeps the selection.
+- Rows 1-4 QUEUED 73236c4a (11-26 08:30, full assembly-ui/scene/render + clippy green). 08:44: mate preview (4) fixed:
+  the part a mate's preview moves lights nothing under an arriving pointer (`previewed` in the hover filter and
+  `moving` in the inference block; `still` = the pointer still at the second pick's click keeps the old look);
+  a_re_hovered_second_pick_shows_plain compares all states away vs over it (fails without the fix). Landing.
 - Open: ASM-SELECTED-HOVER-LOOK's arrow (ours: whole triad, hovered handle flat #3e94ff; live c1a shaded #638abf):
-  live REQUESTS psui 11-26 08:20. Mate preview cell (4) (moved part's face / the part under it): ours still to check;
-  in a_re_hovered_second_pick_shows_plain the moved part covered Part 1's top and the pointer there found nothing or
-  its edge. Explode before a step: live's hover outline #ffc685 vs ours to compare.
-- NEXT: full run (assembly-ui + scene + render tests, clippy) was in flight at 08:25: /root/psui-scratch/asmhover/p4.out
-  (rerun: rb.sh with p4.sh). Green: land (commits ready); red: fix first. Then report rows 1-4 to the lead.
+  live REQUESTS psui 11-26 08:20. Mate preview (4): the part under it (Part 1's front darkens #4e6876 > #14374c, amber
+  #dbad20 > #e5b826) not compared. Explode before a step: #ffc685 = our standard hover (`combined_hover_while_editing_an_
+  exploded_view`), done.
 - 11-26 07:2x the psui worktree directory was gone (branch agent/psui intact at 54dbd7bc0); recreated with
   `git worktree add /root/projects/noshape-wt/psui agent/psui`.
 
