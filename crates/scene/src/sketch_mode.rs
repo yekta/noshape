@@ -7650,9 +7650,21 @@ impl SketchEditor {
             }
         }
         // A hovered pattern glyph (live sketch/2222): every instance's curves
-        // secondary yellow, the seed's included; their centre points orange.
+        // secondary yellow, the seed's included; their centre points and the construction line through them orange.
         if let Some(pat) = self.hover_pattern.and_then(|id| data.patterns.iter().find(|p| p.id == id)) {
             let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+            let centres: Vec<DVec2> = pat.seeds.iter().chain(pat.instances.iter().flatten()).filter_map(|e| match data.sketch.curve(EntityId(*e)) {
+                Some(Curve2::Circle { center, .. } | Curve2::Arc { center, .. }) => Some(center),
+                _ => data.sketch.point(EntityId(*e)),
+            }).collect();
+            let at_centre = |p: Option<DVec2>| p.is_some_and(|p| centres.iter().any(|c| (*c - p).length() < 1e-9));
+            for line in data.sketch.entities().filter(|e| e.construction && e.kind() == EntityKind::Line) {
+                let Some((a, b)) = data.sketch.endpoints(line.id) else { continue };
+                if at_centre(data.sketch.point(a)) && at_centre(data.sketch.point(b)) {
+                    let pts3: Vec<[f32; 3]> = data.sketch.tessellate(line.id, self.world_per_px * 0.5).iter().map(|p| w(*p)).collect();
+                    lines.push_polyline(&pts3, orange, 0, 3.0, on_top);
+                }
+            }
             for e in pat.seeds.iter().chain(pat.instances.iter().flatten()).map(|e| EntityId(*e)) {
                 let Some(ent) = data.sketch.entity(e) else { continue };
                 let centre = match ent.geometry {
@@ -11532,6 +11544,22 @@ mod tests {
         assert!(data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == q && b == l)));
     }
 
+    /// Live (user P1 snapping, 11-12): a point dragged onto a line lands on it with a COINCIDENT at 7 px off, not at 9 px.
+    #[test]
+    fn a_point_dragged_onto_a_line_lands_within_7_px() {
+        for (off, lands) in [(7.0, true), (9.0, false)] {
+            let (mut ed, mut data) = editor(Tool::Select);
+            let l = data.sketch.add_line(v(0.0, 0.0), v(0.04, 0.0));
+            let p = data.sketch.add_point(v(0.013, 0.01));
+            drag(&mut ed, &mut data, v(0.013, 0.01), v(0.013, off * PX));
+            let on = data.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == p && b == l));
+            assert_eq!(on, lands, "{off} px off: coincident");
+            let Some(Curve2::Line { a, b }) = data.sketch.curve(l) else { panic!("the line") };
+            let gap = (data.sketch.point(p).unwrap() - a).perp_dot((b - a).normalize()).abs() / PX;
+            assert!(if lands { gap < 1e-6 } else { (gap - off).abs() < 1e-6 }, "{off} px off: {gap} px from the line");
+        }
+    }
+
     #[test]
     fn shift_suppresses_inference_and_drop_snap_without_pointer_movement() {
         let (mut ed, mut data) = editor(Tool::Line);
@@ -13407,6 +13435,29 @@ mod tests {
         assert!(d.sketch.solve().is_solved());
         let radii: Vec<f64> = d.sketch.entities().filter_map(|e| match d.sketch.curve(e.id) { Some(Curve2::Circle { radius, .. }) => Some(radius), _ => None }).collect();
         assert!(radii.iter().all(|r| (r - radii[0]).abs() < 1e-9), "{radii:?}");
+    }
+
+    /// Live sketch/2222 (icons2): a hovered linear pattern glyph lights every circle secondary yellow, the seed's
+    /// included, and their centres and the construction line through them orange.
+    #[test]
+    fn a_hovered_pattern_glyph_lights_its_circles_yellow_and_its_line_orange() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let c = d.sketch.add_circle(v(0.01, 0.01), 0.002);
+        ed.selection = vec![c];
+        ed.set_tool(Tool::LinearPattern);
+        ed.pattern_count = 3;
+        ed.pattern_distance = 0.01;
+        ed.pattern_angle = 0.0;
+        click(&mut ed, &mut d, v(0.04, 0.04));
+        assert!(d.sketch.solve().is_solved());
+        ed.hover_pattern = Some(d.patterns[0].id);
+        let (lines, points) = ed.overlay(&d, &noshape_units::UnitPrefs::default());
+        let orange = crate::palette::rgb8(crate::palette::viewport::PREHIGHLIGHT);
+        let yellow = [0xf2, 0xff, 0x80, 255];
+        let circles = lines.segments.iter().filter(|s| s.color == yellow).count();
+        assert!(circles >= 3 * 8, "3 yellow circles: {circles} segments");
+        assert!(points.points.iter().filter(|p| p.color == orange).count() >= 3, "3 orange centres");
+        assert!(lines.segments.iter().any(|s| s.color == orange && s.width >= 3.0), "the construction line orange");
     }
 
     #[test]
