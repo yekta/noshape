@@ -1,0 +1,48 @@
+{
+ "name": "asm-display-states-create",
+ "about": "Display states panel, a name typed in (New display state name), Enter",
+ "area": "skasm",
+ "source": "coverage batch 2 (lead 11-26: finished flows for dialog-only commands)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Display states"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "(New display state name)"
+   }
+  },
+  {
+   "do": "type",
+   "text": "State A"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 1500
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  }
+ ]
+}

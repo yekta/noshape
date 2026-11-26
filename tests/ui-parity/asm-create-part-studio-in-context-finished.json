@@ -1,0 +1,42 @@
+{
+ "name": "asm-create-part-studio-in-context-finished",
+ "about": "Create Part Studio in context, the assembly Origin picked, \u2713",
+ "area": "skasm",
+ "source": "coverage batch 2 (lead 11-26: finished flows for dialog-only commands)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Create Part Studio in context"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "origin": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 4000
+  }
+ ]
+}
