@@ -9253,3 +9253,7 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
 ## qa 11-26 16:3x: compat for the v0.4.72 cut (vs 0.4.71)
 - P0 core SPLIT-NUMBERING-DUCT-MIRROR (open): from green 4dd73153 (not 0be76619; likely da680a50a, Split numbers its pieces by first-made faces), c2-duct-multipart's Split 2 gives Info 'Selected entity does not split selected parts.' and Mirror 1 Error 'Select parts to mirror.'; live and 0.4.71 are OK on both. a2961e2c0 HOLD for v0.4.72 on it (8fe0407e5 GO). c2-bottle-split's swapped parts are da680a50a's intended live naming.
 - P0 core IMPELLER-LOFT-REGEN-TIME (open): c2-impeller-loft regenerates in 46.6 s on 4dd73153 vs 26.2 s on 0.4.71 (compat, vibex7; nightly 23e5d26f 27.9 -> 48 s; live 2.5 s). Move face 2 now Ok as live (1f3b27100), so its later features now do real work; measure which feature takes the time.
+
+## qa 11-26 17:3x: hole/thread callout rerun (suites/uipcall-1126, green 4dd73153a)
+- 4/6, 38/46. Verified: tapped thread callout, blind depth, diameter on the tapped hole (one Esc ends the tool, psui 480d4233e), Tangent edges submenu greys the current style (psui e230bec20).
+- P2 **DRW-HOLE-CALLOUT-X (dx parked -> lead)** (open): drw-hole-callout-counterbore s5-8, the callout's x is 23.5 mm against live's 20.2 (+3.3); drw-hole-callout-countersink s5-8, 139.5 against 141.6 (-2.1). Down from 6.6 / 4.2 before the M6x1 retake; y and text match.
