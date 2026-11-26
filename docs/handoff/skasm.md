@@ -12,7 +12,12 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 - Remaining on Fillet 8 (parked): our fillet 2 faces split at y=0 (live 1); live's loft rail split at the loft's
   C1 knots s 1.05/3.70/31.77 mm per side, not at 38.69: rule unknown.
 - bool took /root/skasm-scratch/nuts-helical-cyl.patch into its gate: never land it separately.
-- Next: c2-surf-workshop-knifehandle Mutual trim 1 (feature 29): live Handle 1/1/1, Surface 2 1/1/0.
+- knifehandle Mutual trim 1 (Surface 2 1485.338 vs live 1485.680 mm², counts match): our split is exact (trim curve
+  within 1e-8 m of both surfaces, 140.7525 vs live 140.7601 mm). The cause is upstream, hidden by the freeform area
+  band: Sweep 1's Surface 2 ends are moved copies of the r 19.8535 half circle (62.3717, live 62.346), rails 53.51256
+  (live 53.51052); Handle's edge 69.13068 (live 69.1459: Loft 1, core's KNIFEHANDLE-LOFT1). Asked live:
+  KNIFEHANDLE-SWEEP1-ENDS (REQUESTS 23:49). Probes: /root/skasm-scratch/kh-probes.patch (sk_split_probe,
+  sk_sweep_probe in crash_inputs.rs; bin/sp.sh, bin/swp.sh: sweep-1 is Sweep 1, split-12/13 the trim).
 - Scripts: bin/ab8.sh (suite A/B with/without ~/tmp/skasm/corp/f8.patch on vibex7), bin/kt8.sh; after a remote
   patch -R, touch the local file before the next rb.sh (sync restores the older mtime: stale C++ object).
 
