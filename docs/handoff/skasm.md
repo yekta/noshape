@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 12:43 UTC) — read first
+## RESUME HERE (11-26 13:00 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -22,10 +22,11 @@ ASM-DRAG-REVOLUTE-ANGLE waits on live (REQUESTS "psui 11-26 11:33"): live's take
 (-39.3 deg CW), no pointer-following rule gives that (+21..24 CCW; ours +27.9 CCW). Drag code: assembly_view.rs ~3838.
 
 Sketch feel-coverage audit (lead): 95 uncited sketch sections in /root/skasm-scratch/audit-sections.txt; rows checked are
-listed in /root/skasm-scratch/audit-checked.txt (about 47 of 95). This session: dimension labels / reopened box mm + inch,
-Mirror box mirrors nothing, one-pick dimension kinds, aligned rectangle + 3 point arc constraint sets: tests, no diffs.
-Next unchecked rows in file order: 3 (Sketch mode, 102 lines), 10, 12, 31-55, 58, 59, 64-67, 69-78,
-80, 82-88, 93-95 (skip dx / psui / core-owned ones: note them in audit-checked.txt).
+listed in /root/skasm-scratch/audit-checked.txt (94 of 95 checked). 11-26 13:00 batch (landing): mate chain parent change
+(live 1768), spline handle arm takes every line constraint + default tip = live tx2 g0 (spline.md's "/9" is d*h0/3 with
+h0 = 1/3), Pierce with a circle's centre. Live fuzz T2 (live_matches, probes) 29/29 green. Diffs found: Pierce with a
+curve (ticket SKETCH-PIERCE-CURVE-RIGID: live moves the circle / line rigidly; a radius weight only approximates it);
+inference-1866 (d) asked live (REQUESTS skasm 11-26 12:51). Left: row 3 (the general "Sketch mode" section, 102 lines).
 
 qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
 lora-enclosure-ribs 46/46 MATCH); Assembly 3 numbers pending (qa-tr4). Driver fix ada3263b: asm-face-menu/fastened 9/10;
@@ -108,6 +109,7 @@ only asm-face-menu-select-other differs (no Select other popup in assemblies; as
 - Form speed P0 binaries /root/skasm-scratch/apps: delete (done).
 
 ## Waiting on live (REQUESTS)
+- skasm 11-26 12:51: a Line started ON a held line off its midpoint, PERPENDICULAR (1866 d) or VERTICAL (ours, 11-19)?
 - skasm 11-24 20:15: sketch dimension text in iso, in the plane or upright (the Offset's "5" is in-plane; ours all upright).
 - REQUESTS 6628 (glyph row moved off a taken spot, wf13 s14): live tried 3 runs, no clean boxes yet.
 - Answered 11-18 13:xx: wave-washer sketches.json (Sketch 4 / 3 solved inward) and surf-intro Derived 1 sources
