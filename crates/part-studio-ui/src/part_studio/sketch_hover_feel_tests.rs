@@ -1114,13 +1114,21 @@ fn a_line_picked_for_a_dimension_lights_a_plane_only_on_its_outline(cx: &mut Tes
 }
 
 /// Live ui-parity sketch-fully-defined (11-25 retake; behaviours "psui plane while dimensioning" (3)): a 30 x 20
-/// rectangle's right side picked at (30, 10), the click at (38, 10) is on the Right plane's outline and picks it (the
-/// line and the plane selected, no dimension placed, no value box).
+/// rectangle's bottom dimensioned 30 mm, its right side picked at (30, 10), the click at (38, 10) is on the Right plane's
+/// outline and picks it (the line and the plane selected, no dimension placed, no value box), the pointer coming from
+/// 2 mm short of it (the GPU's pick stands: ours placed the dimension).
 #[gpui::test]
 fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestAppContext) {
     let Some(_gpu) = gpu_pointer() else { return };
     RENDERING.set(true);
     let (window, view) = sketch_with(cx, "sketch-hover-dim-outline-pick", Tool::CornerRect);
+    // The scenario's scale: 0.275 mm a px.
+    cx.update(|cx| view.read(cx).viewport.clone()).update(cx, |vp, cx| {
+        let h = vp.size().y;
+        vp.camera.distance = 0.275365e-3 * h * 0.5 / (vp.camera.fov_y * 0.5).tan();
+        vp.request_frame(cx);
+    });
+    draw(cx, window);
     let screen = |cx: &mut TestAppContext, x: f64, y: f64| {
         cx.update(|cx| {
             let v = view.read(cx);
@@ -1128,7 +1136,7 @@ fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestA
             v.viewport.read(cx).project(ed.frame.to_world(DVec2::new(x, y) * 1e-3)).unwrap()
         })
     };
-    for (x, y) in [(0., 0.), (30., 20.)] {
+    for (x, y) in [(0., 0.), (30., 20.18)] {
         let a = screen(cx, x, y);
         click(cx, window, &view, (a.x, a.y));
     }
@@ -1136,6 +1144,14 @@ fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestA
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Dimension, w, cx))).unwrap();
     wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let pointer = Pointer::new(cx, window, &view);
+    // The scenario first dimensions the bottom side 30 mm.
+    for (x, y) in [(15., 0.), (15., -8.)] {
+        let a = screen(cx, x, y);
+        pointer.move_to(cx, &view, a);
+        pointer.click(cx, &view, a);
+    }
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_keystrokes("3 0 enter");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
     let side = screen(cx, 30., 10.);
     pointer.move_to(cx, &view, side);
     pointer.click(cx, &view, side);
@@ -1144,6 +1160,9 @@ fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestA
         let v = view.read(cx);
         v.display.planes.iter().find(|q| q.reference == Reference::Plane(DatumPlane::Right)).map(|q| crate::part_studio::sketch::plane_outline_px(q, at, v.viewport.read(cx)))
     });
+    // The pointer comes from the side: the GPU's pick (the sketch's own plane) stands from 2 mm short of the outline.
+    let short = screen(cx, 36., 10.);
+    pointer.move_to(cx, &view, short);
     pointer.move_to(cx, &view, at);
     let lit = cx.update(|cx| view.read(cx).highlighted_hover(cx));
     pointer.click(cx, &view, at);
@@ -1152,7 +1171,7 @@ fn a_click_on_the_right_planes_outline_picks_it_for_the_dimension(cx: &mut TestA
         let d = v.sketch_data(cx).unwrap();
         (v.sketch.as_ref().unwrap().tool_picks().len(), d.sketch.constraints().filter(|c| c.kind.is_dimension()).count(), v.dim_input.is_some())
     });
-    assert!(got == (2, 0, false), "(model picks, dimensions, box) {got:?}; lit {lit:?}, {outline:?} px off the outline");
+    assert!(got == (2, 1, false), "(model picks, dimensions, box) {got:?}; lit {lit:?}, {outline:?} px off the outline");
 }
 
 /// Live sketch-entity-copy-paste: a line right-clicked and copied from its menu, a right-click where its glyph row was

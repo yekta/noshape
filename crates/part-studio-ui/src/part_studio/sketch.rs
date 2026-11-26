@@ -1488,10 +1488,15 @@ impl PartStudioView {
                 }
                 // The GPU's pick stands until it changes (the plane behind a line it still reports as the pointer
                 // comes onto the line): resolved again here, so what lights is what is under the pointer now.
-                // So is a plane lit by its outline only (it moves on and off the outline over one face).
+                // So is a plane lit by its outline only, as the pointer comes onto or leaves the outline over one face
+                // or over none (live sketch-fully-defined: Right's outline 1.5 px beside the sketch's own plane).
                 let by_outline = |this: &Self, id: Option<u32>| {
-                    matches!(id.and_then(|i| this.built.as_ref()?.picks.get(i)).map(|t| &t.reference), Some(Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }))
-                        && this.sketch_data(cx).is_some_and(|d| this.sketch.as_ref().is_some_and(|ed| !ed.takes_plane_faces(&d)))
+                    let Some(reach) = this.dimension_plane_reach(cx) else { return false };
+                    let plane = |r: &Reference| matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. });
+                    if id.and_then(|i| this.built.as_ref()?.picks.get(i)).is_some_and(|t| !plane(&t.reference)) {
+                        return false;
+                    }
+                    this.plane_by_outline(vp.read(cx).pointer_position(), reach, vp, cx).map(|(r, _)| r) != this.hover.clone().filter(plane)
                 };
                 if let Some((gpu, resolved)) = self.ui.sketch_gpu_hover
                     && (released || self.sketch_hover_id(gpu, cx) != resolved || by_outline(self, resolved))
