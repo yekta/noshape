@@ -1063,6 +1063,23 @@ else REQUESTS "psui 11-25 18:41: hover in combined states"; qa to score ours onc
 | Extrude (Remove) preview: a face inside the cut hovered | 0 px: the region under it stays the hover, drawn as nothing new (live psui/hover-combined-1125 6) | to score | ? (qa) |
 | Shell / Fillet preview: an edge of the previewed part hovered | Shell: the face under the edge (it takes faces); the wall's inner edge: 0 px. Fillet: its tangent edge lights the top face, never a preview edge (live psui/hover-combined-1125 7) | the same (on the inner edge ours lights nothing new where live's hover is the removed face: equal pixels) | = (psui test combined_hover_in_shell_and_fillet_previews_takes_the_model_before_them) |
 
+Combined states in an assembly (lead 11-26 06:5x, USER P0; live where behaviours.md has the cell, else REQUESTS
+"psui 11-26 07:02: assembly hover in combined states"; T1s as live's numbers arrive):
+
+| Cell | Live | Ours | Status |
+|---|---|---|---|
+| an instance selected (filled #F2B648), a face of it hovered | to capture (REQUESTS 07:02 (1)) | to check | ? |
+| an instance selected, a face of another instance hovered | to capture (1) | to check | ? |
+| mate dialog, a face already in its Mate connectors field hovered again | to capture (2): the dots / connector, the picked face's amber | to check | ? |
+| mate dialog open, an existing mate connector (feature) hovered | to capture (3); a face hovered shows its white dots and the connector preview at the nearest point (behaviours "asm 11-17" / "audit 1943 (1)") | the dots and preview (mates rows above) | ? (the connector cell) |
+| an instance being dragged, any face under the pointer | the hover look goes; nothing lights till the release (asm/drag-feel-1122) | the same (`a_dragged_part_shows_no_hover_until_released`) | = |
+| a mate's preview shown (2nd connector picked: the moved part drawn mated, its old place a thin ghost), a face of the moved part / of the part under it hovered | to capture (4) (behaviours A2 has the preview, not its hover) | to check | ? |
+| Isolate: a faded instance hovered | nothing: faded instances take no hover unless "Select transparent geometry" (behaviours "Shift+I (Isolate)"; Part Studio isolate: hover goes through to the part behind) | faded instances pick only with Select transparent geometry (`pick_dimmed`) | = |
+| Isolate, Alt held over a faded instance (Select transparent geometry off) | Part Studio: Alt changes nothing, the ghost stays unpickable (behaviours "(c) Plate made transparent by Isolate"); assembly to capture (5) | Alt makes faded instances pickable (`pick_dimmed = select_transparent \|\| alt_through`) | ? (likely ≠) |
+| an instance made transparent (Make transparent…), hovered; Alt over it | to capture (5): appearance-transparent parts are pickable, Alt picks the one behind (Part Studio) | to check | ? |
+| a hidden instance: its list row hovered; the place it was hovered | to capture (6) | to check | ? |
+| exploded view being edited (Editing Explode 1 banner, triad), a face hovered; a selected component's face hovered | to capture (7) | to check | ? |
+
 ## Captures 11-17 / 11-18 (audit: one row per feel finding)
 
 Every feel finding recorded in onshape-research/live/behaviours.md on 11-17 and 11-18 for the Part Studio, with the
