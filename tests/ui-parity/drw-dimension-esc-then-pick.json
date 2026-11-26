@@ -1,0 +1,76 @@
+{
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "live drawing triage 11-26 (psui REQUESTS 09:40, item 1)",
+ "start": "block-drawing",
+ "name": "drw-dimension-esc-then-pick",
+ "about": "Dimension placed, one Escape, then a click on the Front view's left edge and one beside it: does the tool still make a second dimension?",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      25
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      0,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -15,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,47 @@
+{
+ "name": "drw-dimension-radius-place-inside-right",
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "live drawing triage 11-26 (psui REQUESTS 09:40, item 3)",
+ "start": "hole-plate-drawing",
+ "about": "Radial dimension of the hole placed by a click inside it at (3, 0): where the text lands",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension",
+    "menu": "Radial dimension (shift+r)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Top",
+     "at": [
+      -3.5355,
+      3.5355,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Top",
+     "at": [
+      3,
+      0,
+      20
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

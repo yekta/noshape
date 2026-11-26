@@ -1,23 +1,23 @@
 {
  "scenario": "drw-dimension-foreshorten",
- "recorded": "2026-11-15T18:42:55.470Z",
+ "recorded": "2026-11-26T10:31:49.573Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
   "viewport": [
    1919,
-   1079
+   992
   ],
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-15.3"
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "3220967a8c2afc7923ef9a4a",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "06eb74f5356a23ee34ce597c",
   "start": "hole-plate-drawing",
-  "startElement": "1532a5517d526c1726ec8cde",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "906fcbd34e71cf14d3489c36",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (3)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -98,7 +98,20 @@
     }
    ],
    "annotations": [],
-   "selection": []
+   "selection": [],
+   "viewport": {
+    "sheet_px": [
+     432,
+     110,
+     1526,
+     955
+    ],
+    "sheet_mm": [
+     279.4,
+     215.9
+    ],
+    "mmPerPixel": 0.25539
+   }
   }
  },
  "steps": [
@@ -112,6 +125,10 @@
     }
    },
    "ok": true,
+   "ti": 205085,
+   "tdown": 205122,
+   "tmove": 206360,
+   "moves": 2,
    "at": [
     631,
     325
@@ -142,7 +159,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -195,10 +212,24 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 232693
+   "t": 233966,
+   "te": 233966
   },
   {
    "step": 2,
@@ -216,9 +247,13 @@
     }
    },
    "ok": true,
+   "ti": 233966,
+   "tmove": 235269,
+   "moves": 1,
+   "tdown": 235581,
    "at": [
-    711,
-    335
+    735,
+    312
    ],
    "state": {
     "focus": {
@@ -246,7 +281,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -304,10 +339,24 @@
        "kind": "EDGE",
        "owner": "Top"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 258713
+   "t": 261927,
+   "te": 261927
   },
   {
    "step": 3,
@@ -325,9 +374,13 @@
     }
    },
    "ok": true,
+   "ti": 261927,
+   "tmove": 263051,
+   "moves": 1,
+   "tdown": 263367,
    "at": [
-    722,
-    346
+    745,
+    322
    ],
    "state": {
     "focus": {
@@ -355,7 +408,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -417,10 +470,24 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 284670
+   "t": 290879,
+   "te": 290879
   },
   {
    "step": 4,
@@ -429,11 +496,13 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 290879,
    "pointer": {
     "at": null,
     "hover": [],
     "element": null
    },
+   "tdown": 290884,
    "state": {
     "focus": {
      "kind": "other",
@@ -460,7 +529,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -527,10 +596,24 @@
        "kind": "EDGE",
        "owner": "Top"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 309885
+   "t": 318317,
+   "te": 318317
   },
   {
    "step": 5,
@@ -541,9 +624,13 @@
     }
    },
    "ok": true,
+   "ti": 318317,
+   "tmove": 332609,
+   "moves": 1,
+   "tdown": 332910,
    "at": [
-    737,
-    350
+    759,
+    326
    ],
    "state": {
     "focus": {
@@ -611,7 +698,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -678,10 +765,24 @@
        "kind": "EDGE",
        "owner": "Top"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 347155
+   "t": 359646,
+   "te": 359646
   },
   {
    "step": 6,
@@ -692,9 +793,13 @@
     }
    },
    "ok": true,
+   "ti": 359646,
+   "tmove": 359764,
+   "moves": 2,
+   "tdown": 360883,
    "at": [
-    805,
-    376
+    827,
+    351
    ],
    "state": {
     "focus": {
@@ -722,7 +827,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -784,10 +889,24 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 373810
+   "t": 386980,
+   "te": 386980
   },
   {
    "step": 7,
@@ -806,9 +925,12 @@
     "ms": 500
    },
    "ok": true,
+   "ti": 386980,
+   "tmove": 388270,
+   "moves": 1,
    "at": [
-    770,
-    376
+    788,
+    349
    ],
    "state": {
     "focus": {
@@ -836,7 +958,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -898,10 +1020,24 @@
        ]
       }
      ],
-     "selection": []
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 399598
+   "t": 414838,
+   "te": 414838
   },
   {
    "step": 8,
@@ -919,9 +1055,13 @@
     }
    },
    "ok": true,
+   "ti": 414838,
+   "tmove": 415931,
+   "moves": 1,
+   "tdown": 416231,
    "at": [
-    770,
-    376
+    788,
+    349
    ],
    "state": {
     "focus": {
@@ -949,7 +1089,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1001,11 +1141,34 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
-     "selection": []
+     "annotations": [
+      {
+       "kind": "dimension",
+       "text": "0.197",
+       "position": [
+        82.5,
+        160.8
+       ]
+      }
+     ],
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 425782
+   "t": 442889,
+   "te": 442889
   },
   {
    "step": 9,
@@ -1023,9 +1186,13 @@
     }
    },
    "ok": true,
+   "ti": 442889,
+   "tmove": 444228,
+   "moves": 1,
+   "tdown": 444544,
    "at": [
-    722,
-    346
+    745,
+    322
    ],
    "state": {
     "focus": {
@@ -1090,7 +1257,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1142,16 +1309,39 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "dimension",
+       "text": "0.197",
+       "position": [
+        82.5,
+        160.8
+       ]
+      }
+     ],
      "selection": [
       {
        "kind": "EDGE",
        "owner": "Top"
       }
-     ]
+     ],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 451488
+   "t": 470687,
+   "te": 470687
   },
   {
    "step": 10,
@@ -1162,9 +1352,13 @@
     }
    },
    "ok": true,
+   "ti": 470687,
+   "tmove": 470751,
+   "moves": 2,
+   "tdown": 471862,
    "at": [
-    793,
-    347
+    816,
+    323
    ],
    "state": {
     "focus": {
@@ -1192,7 +1386,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1254,15 +1448,24 @@
        ]
       }
      ],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ]
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 477212
+   "t": 497632,
+   "te": 497632
   },
   {
    "step": 11,
@@ -1272,6 +1475,7 @@
     "ms": 500
    },
    "ok": true,
+   "ti": 497632,
    "state": {
     "focus": {
      "kind": "other",
@@ -1298,7 +1502,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (3)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1360,15 +1564,25 @@
        ]
       }
      ],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ]
+     "selection": [],
+     "viewport": {
+      "sheet_px": [
+       432,
+       110,
+       1526,
+       955
+      ],
+      "sheet_mm": [
+       279.4,
+       215.9
+      ],
+      "mmPerPixel": 0.25539
+     }
     }
    },
-   "t": 502174
+   "t": 523877,
+   "te": 523877
   }
- ]
+ ],
+ "t0_epoch_ms": 1795688919904
 }

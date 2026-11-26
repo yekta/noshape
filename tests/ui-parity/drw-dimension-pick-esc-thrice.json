@@ -1,0 +1,71 @@
+{
+ "area": "dx",
+ "ticket": "DRAWING-UI-PARITY",
+ "source": "live drawing triage 11-26 (psui REQUESTS 09:40, item 1)",
+ "start": "block-drawing",
+ "name": "drw-dimension-pick-esc-thrice",
+ "about": "Dimension, one pick on the Front view's top edge, Escape three times, then the left edge and a point beside it",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Dimension"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      20,
+      0,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_edge": {
+     "view": "Front",
+     "at": [
+      0,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "view_point": {
+     "view": "Front",
+     "at": [
+      -15,
+      0,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
