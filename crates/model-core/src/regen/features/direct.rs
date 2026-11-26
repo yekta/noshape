@@ -11,6 +11,7 @@ use glam::{DMat4, DVec3};
 use noshape_kernel as k;
 use noshape_kernel::{Shape, ShapeType};
 use std::collections::{BTreeMap, BTreeSet};
+use std::ops::RangeInclusive;
 use std::sync::Arc;
 
 // ------------------------------------------------------------------ delete face
@@ -268,9 +269,10 @@ fn tweak(ev: &mut EvalCtx, bi: usize, faces: &[usize], m: &DMat4) -> bool {
 
 /// Planes offset as translations along their outward normals, the planes facing one way at a time, their neighbours
 /// re-trimmed in place: each step's way, points on its faces, and result. None unless every face is a
-/// plane and every step makes one valid solid (asm-scissor-lift Studio b58244's Move face 6: two notches' floors
-/// tilted apart; OCCT's offset was invalid and the booleans' slabs fell short of the tilted walls).
-fn tweak_planes_in_turn(shape: &Shape, faces: &[usize], dist: f64) -> Option<Vec<(DVec3, Vec<DVec3>, k::OpResult)>> {
+/// plane, they face a number of `ways`, and every step makes one valid solid (asm-scissor-lift Studio b58244's Move
+/// face 6: two notches' floors tilted apart; OCCT's offset was invalid and the booleans' slabs fell short of the tilted
+/// walls).
+fn tweak_planes_in_turn(shape: &Shape, faces: &[usize], dist: f64, ways: RangeInclusive<usize>) -> Option<Vec<(DVec3, Vec<DVec3>, k::OpResult)>> {
     let all = shape.faces();
     // Each face's outward normal and a point inside it (to find it again after the steps before its own).
     let mut groups: Vec<(DVec3, Vec<DVec3>)> = Vec::new();
@@ -283,6 +285,9 @@ fn tweak_planes_in_turn(shape: &Shape, faces: &[usize], dist: f64) -> Option<Vec
             Some(g) => g.1.push(p),
             None => groups.push((n, vec![p])),
         }
+    }
+    if !ways.contains(&groups.len()) {
+        return None;
     }
     // Planes facing several ways only among planes (a curved neighbour's crossings left to OCCT's offset).
     if groups.len() > 1 {
@@ -305,10 +310,32 @@ fn tweak_planes_in_turn(shape: &Shape, faces: &[usize], dist: f64) -> Option<Vec
     Some(steps)
 }
 
+/// The bodies [`tweak_planes_in_turn`]'s steps make, named: a moved face the Offset of the one it was, the others
+/// keeping their names.
+fn name_tweaks(ev: &mut EvalCtx, bi: usize, steps: Vec<(DVec3, Vec<DVec3>, k::OpResult)>, failed_msg: &str) -> FResult<()> {
+    for (n, points, r) in steps {
+        let body = ev.ctx.bodies[bi].clone();
+        let fs = planes_at(&body.shape, n, &points).ok_or_else(|| fe(failed_msg))?;
+        // A moved face the Offset of the one it was, the others keeping their names, as the booleans named them
+        // (v0.4.58's c2-impeller-loft Flansch (vorne) verbreitern, OCCT's offset invalid: a fillet's edges); the
+        // booleans' piece of the moved face (Move face 2's faces) and OCCT's offset names (every face the Offset of
+        // the one it was) still find them.
+        let kept = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &BTreeMap::new(), None);
+        let moved: BTreeSet<&Name> = fs.iter().map(|&fi| &body.faces[fi]).collect();
+        let feature = ev.feature;
+        let offset = |k: &Name| -> Name { Arc::new(TopoName::face(feature, Role::Offset(k.clone()))) };
+        let names: Vec<Name> = kept.iter().map(|k| if moved.contains(k) { offset(k) } else { k.clone() }).collect();
+        let old = kept.iter().zip(&names).map(|(k, n)| if moved.contains(k) { (Arc::new(TopoName::Split { parent: n.clone(), by: feature, ordinal: 0 }), n.clone()) } else { (offset(k), n.clone()) });
+        ev.ctx.bodies.add_aliases(old.collect::<Vec<_>>());
+        ev.replace_body(bi, r.shape, names);
+    }
+    Ok(())
+}
+
 /// [`tweak_planes_in_turn`] as one operation, its steps' histories followed through.
 fn tweak_planes(shape: &Shape, faces: &[Shape], dist: f64) -> Option<k::OpResult> {
     let idx: Vec<usize> = faces.iter().map(|f| shape.index_of(f, ShapeType::Face)).collect::<Option<_>>()?;
-    let mut steps = tweak_planes_in_turn(shape, &idx, dist)?.into_iter().map(|(_, _, r)| r);
+    let mut steps = tweak_planes_in_turn(shape, &idx, dist, 1..=usize::MAX)?.into_iter().map(|(_, _, r)| r);
     let first = steps.next()?;
     Some(steps.fold(first, |acc, r| k::OpResult { history: acc.history.then(&r.history), shape: r.shape }))
 }
@@ -487,24 +514,11 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
         }
         // Planes facing one way: their offset is a translation along that way, the neighbours re-trimmed in place
         // (c2-impeller-loft's Flansch (vorne) verbreitern: OCCT's offset 0.8 s and invalid, then the booleans).
-        let tweaked = if translate_dir.is_none() { tweak_planes_in_turn(&body.shape, &faces, dist) } else { None };
+        // (Several ways only where OCCT's offset fails: its names are the ones c2-sm-hem-plus's derived Move face 1
+        // gave the vertices Transform 1 picks.)
+        let tweaked = if translate_dir.is_none() { tweak_planes_in_turn(&body.shape, &faces, dist, 1..=1) } else { None };
         if let Some(steps) = tweaked {
-            for (n, points, r) in steps {
-                let body = ev.ctx.bodies[bi].clone();
-                let fs = planes_at(&body.shape, n, &points).ok_or_else(|| fe(failed_msg))?;
-                // A moved face the Offset of the one it was, the others keeping their names, as the booleans named them
-                // (v0.4.58's c2-impeller-loft Flansch (vorne) verbreitern, OCCT's offset invalid: a fillet's edges); the
-                // booleans' piece of the moved face (Move face 2's faces) and OCCT's offset names (every face the Offset of
-                // the one it was) still find them.
-                let kept = ev.name_result(&[&body.shape_names()], &r.history, &r.shape, &BTreeMap::new(), None);
-                let moved: BTreeSet<&Name> = fs.iter().map(|&fi| &body.faces[fi]).collect();
-                let feature = ev.feature;
-                let offset = |k: &Name| -> Name { Arc::new(TopoName::face(feature, Role::Offset(k.clone()))) };
-                let names: Vec<Name> = kept.iter().map(|k| if moved.contains(k) { offset(k) } else { k.clone() }).collect();
-                let old = kept.iter().zip(&names).map(|(k, n)| if moved.contains(k) { (Arc::new(TopoName::Split { parent: n.clone(), by: feature, ordinal: 0 }), n.clone()) } else { (offset(k), n.clone()) });
-                ev.ctx.bodies.add_aliases(old.collect::<Vec<_>>());
-                ev.replace_body(bi, r.shape, names);
-            }
+            name_tweaks(ev, bi, steps, failed_msg)?;
             continue;
         }
         // Else, faces on or beside the moved ones that aren't planes, cylinders, cones, spheres or tori (a flange's walls
@@ -526,6 +540,10 @@ pub fn move_face(ev: &mut EvalCtx) -> FResult<()> {
                 other => {
                     if let Err(e) = &other {
                         log::debug!("move face: offset failed ({e}), trying booleans");
+                    }
+                    if let Some(steps) = tweak_planes_in_turn(&body.shape, &faces, dist, 2..=usize::MAX) {
+                        name_tweaks(ev, bi, steps, failed_msg)?;
+                        continue;
                     }
                     offset_by_booleans(ev, bi, &faces, dist).map_err(|e| {
                         log::debug!("move face: booleans failed ({})", e.message);

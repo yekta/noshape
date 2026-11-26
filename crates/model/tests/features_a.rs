@@ -2459,6 +2459,35 @@ fn move_face_offset_keeps_references_by_occts_offset_names() {
     assert_eq!((&f.status, f.message.as_deref()), (&FeatureStatus::Ok, None));
 }
 
+/// References saved when OCCT's offset made a Move face Offset of planes facing two ways (v0.4.71: every face the
+/// Offset of the one it was) still find their vertices (c2-sm-hem-plus's Transform 1 by two vertices failed once those
+/// planes were moved one way at a time, their neighbours keeping their names).
+#[test]
+fn move_face_offset_of_planes_facing_two_ways_keeps_occts_vertex_names() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    let res = t.ok();
+    let b = &res.context.bodies[0];
+    let id = b.id.clone();
+    let vertices: Vec<TopoName> = b.vertices.iter().map(|n| (**n).clone()).collect();
+    let (top, side) = (face_with_normal(b, DVec3::Z), face_with_normal(b, DVec3::X));
+    let m = t.add("moveFace", &[("moveFaces", q(vec![top, side])), ("offsetDistance", e("1 mm"))]);
+    let offset = |f: &std::sync::Arc<TopoName>| std::sync::Arc::new(TopoName::face(m, Role::Offset(f.clone())));
+    let picked: Vec<Reference> = vertices
+        .iter()
+        .take(2)
+        .map(|v| match v {
+            TopoName::Vertex { faces, ordinal } => Reference::Vertex(TopoName::vertex(faces.iter().map(offset).collect(), *ordinal)),
+            other => panic!("a vertex name: {other:?}"),
+        })
+        .collect();
+    t.add("transform", &[("entities", q(vec![body_ref(&id)])), ("transformType", en("TRANSLATION_DISTANCE")), ("transformDirection", q(picked)), ("distance", e("5 mm"))]);
+    let res = t.regen();
+    let f = &res.display.features[3];
+    assert_eq!((&f.status, f.message.as_deref()), (&FeatureStatus::Ok, None));
+    assert!(near(total_volume(&res.context), 0.021 * 0.02 * 0.011, 1e-9));
+}
+
 /// References saved when the booleans made a Move face Offset (OCCT's offset failed: v0.4.58's c2-impeller-loft
 /// Flansch (vorne) verbreitern) named the moved face's neighbours as they were: a fillet on the edge between two of them
 /// still finds it (it lost 2 of its edges: "2 missing selections").
