@@ -3,13 +3,13 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 12:00 UTC) — read first
+## RESUME HERE (11-26 12:32 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
 > ~/tmp/skasm/<x>.log 2>&1` (run_in_background, no &). Speed T2: sp3.sh (sp4.sh = same with SKTRACE, trace code removed).
 
-Landed/queued: 93a23c55, 94a0764c (label hover fix, pattern line orange, drag-onto-line test). Landing now: 071c6853f.
+Landed/queued: 93a23c55, 94a0764c (label hover fix, pattern line orange, drag-onto-line test). Queued: b0dac177, 7be86e3c, ae8cd42fd batch; landing d5413798a with this handoff.
 
 First-drag P0 (lead 11-26): the 712 / 377 ms "first moves" were the test's own wait for the hover pick readback (120-260
 ms on the software renderer, off the UI thread), not the drag. Traced begin_drag (refresh_analysis + drag_graph): 0.25 ms
@@ -19,11 +19,13 @@ to its first drawn frame (timed_frame) and asserts the first move <= 54 ms. 11:5
 47.2, typed 70.7 (live 8.4-13 s). The one-off S200 typed 168 ms median was host noise (19.7 again).
 
 Sketch feel-coverage audit: 221 sketch sections in behaviours.md, 126 cited by code (/root/skasm-scratch/audit-sections.txt),
-95 not. Checked 24: gaps tested: inference-1866, drag onto a line 7/9 px, pattern line orange, polygon side count
-(071c6853f), len-2022 typed box never scales (0a5791a36), search-2025 lists (0ec9cb9a2), big-sketch-1119 (S1200 row).
-Covered already: polygon vertex / constraint sets, copy/paste (R6 supersedes 10-26), snaps-1118, 7.22, qa5 dim conflict,
-Hide other sketches; 2992 psui's. Next: "Sketch dimension display + Enter/Esc", "qa5 sketch refs", "skb Text font list",
-"qa5 sketch tools", "skb fillet/chamfer default", "Copy/paste" done, "sketch row 2.8 constraint buttons", SKETCH-* rows.
+95 not. Checked 27: gaps tested: inference-1866, drag onto a line 7/9 px, pattern line orange, polygon side count
+(071c6853f), len-2022 typed box never scales (0a5791a36), search-2025 lists (0ec9cb9a2), big-sketch-1119 (S1200 row),
+Text font list + B/I sets (d5413798a). Fixed: the sketch fillet radius now sticks per DOCUMENT (DocModel / ops OpenDoc),
+not per Part Studio (skb fdef (c), ae8cd42fd, e2e). Covered already: polygon vertex / constraint sets, copy/paste (R6
+supersedes 10-26), snaps-1118, 7.22, qa5 dim conflict, Hide other sketches, sketch row 2.8 (collapse at 1648 px = live
+1641-1650; psui's). 2992 psui's. Next in /root/skasm-scratch/audit-sections.txt: "Sketch dimension display + Enter/Esc",
+"qa5 sketch refs", "qa5 sketch tools", "Drawing sketch dimensions drive geometry", SKETCH-* rows (60-63), 68, 81, 90, 91.
 
 qa notes (no action): translator 423d6b45 on 57033e1c9: 34 gap docs, 5 better, 0 worse (cf-surface-pattern 9->36/39,
 lora-enclosure-ribs 46/46 MATCH); Assembly 3 numbers pending (qa-tr4). Driver fix ada3263b: asm-face-menu/fastened 9/10;
