@@ -87,7 +87,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
 3. DL-IMPORT-MIXED-STEP-STL-OPTIONS fixed: import_dialog.rs mesh_options (any STL/OBJ: Units, no Join); unit test.
 4. EXPORT-ASM-STEP-MBD-FIELDS was already fixed (0207b943d). 5. SKETCH-DRAG-FILLS-HOVER (skasm 50ba91aca),
    IMP-TOAST-QUEUE (1567cf00a): marked fixed, to verify; duplicate union rows dropped.
-Next: none queued: ask the lead.
+
+## P0 (lead 11-26 06:5x): assembly hover in combined states
+- Cells in interaction-feel.md "Combined states in an assembly" (11 rows): drag = live; Isolate faded hover = live
+  (pick_dimmed only with Select transparent geometry). Open: selected instance, face already in a mate field, MC
+  while a mate dialog is open, under a mate preview, Alt over an isolated ghost (ours: alt_through makes ghosts
+  pickable, assembly_view.rs ~1279; live PS: Alt changes nothing -> likely a diff), Make transparent, hidden, exploded.
+- REQUESTS "psui 11-26 07:02" (7 items) filed. Next: as live answers, write T1s in assembly-ui (look at the existing
+  asm hover tests first) and fix the diffs; meanwhile check ours for each cell with a T1 that records what lights.
 
 ## Agents
 
