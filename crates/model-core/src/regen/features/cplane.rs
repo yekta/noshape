@@ -105,7 +105,7 @@ enum Kind {
 
 fn kind(ctx: &Context, r: &Reference) -> Kind {
     match r {
-        Reference::Vertex(_) | Reference::Origin => Kind::Vertex,
+        Reference::Vertex(_) | Reference::Origin | Reference::MeshPoint { .. } => Kind::Vertex,
         Reference::MateConnector { .. } | Reference::Implicit { .. } => Kind::Connector,
         Reference::Edge(_) => Kind::Edge,
         Reference::Face(_) | Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } | Reference::SketchRegion { .. } => Kind::Face,

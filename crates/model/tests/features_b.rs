@@ -1149,6 +1149,17 @@ fn move_face_offsets_a_mesh_part_and_delete_face_removes_it() {
     let (mut s, face, _) = imported();
     s.add("deleteFace", move |p| p.set("deleteFaces", ParamValue::Query(vec![face])));
     assert!(s.ok().context.bodies.is_empty());
+    // A Point-Plane through one of its Mesh points (asm-scissor-lift 264eb3 Plane 2: "Point-Plane requires a point and
+    // a plane." for a Mesh point).
+    let (mut s, _, _) = imported();
+    let body = s.ok().context.bodies[0].id.clone();
+    s.add("cPlane", move |p| {
+        p.set("cplaneType", ParamValue::Enum("PLANE_POINT".into()));
+        p.set("entities", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top), Reference::mesh_point(body, [0.01, 0.02, 0.03])]));
+    });
+    let r = s.ok();
+    let plane = r.context.planes.iter().find(|p| matches!(p.reference, Reference::FeaturePlane(_))).unwrap();
+    assert!((plane.frame.origin.z - 0.03).abs() < 1e-9 && plane.frame.normal.z.abs() > 1.0 - 1e-12, "{:?}", plane.frame);
 }
 
 /// Live qa mistakes-1125 batch 3: Extrude Up to face on a mesh part's face stops at the mesh where it covers the
