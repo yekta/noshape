@@ -138,11 +138,34 @@ def live_clicks(live):
     return at, str(d.get("recorded") or "") >= WHOLE_PIXEL_CLICKS_SINCE
 
 
+def live_pointer_from(live):
+    """Where live's pointer rested before each scenario step (steps numbered from 1): the last place the take records it,
+    a key step's `pointer.at` (where the recorder left it, e.g. parked at the canvas corner) or a click's `at`. Each
+    click's approach starts there (lead 11-26, SKETCH-ISO-ORIGIN-ALIGN: the moves on the way acquire inferences)."""
+    try:
+        d = json.loads(Path(live).read_text())
+    except (OSError, ValueError, TypeError):
+        return None
+    xy = lambda a: a if isinstance(a, list) and len(a) == 2 and all(isinstance(x, (int, float)) for x in a) else None
+    out, last = [], None
+    for s in d.get("steps") or []:
+        n = s.get("step")
+        if not isinstance(n, int) or n < 1:
+            continue
+        out += [last] * (n - len(out))
+        out[n - 1] = last
+        last = xy((s.get("pointer") or {}).get("at") if isinstance(s.get("pointer"), dict) else None) or xy(s.get("at")) or last
+    return out
+
+
 def run_one(app, scenario, out, display, timeout, height=None, live=None):
     env = dict(os.environ)
     if height:
         env["NOSHAPE_UI_WINDOW_HEIGHT"] = str(height)
     at, whole = live_clicks(live) if live else (None, False)
+    start = live_pointer_from(live) if live else None
+    if start and any(start):
+        env["NOSHAPE_UI_LIVE_FROM"] = json.dumps(start)
     if whole:
         env["NOSHAPE_UI_CLICKS_ROUND"] = "1"
         env["NOSHAPE_UI_LIVE_AT"] = json.dumps(at)

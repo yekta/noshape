@@ -33,4 +33,8 @@ assert run.live_clicks(f.name) == ([[155, 58], None, None, [1083, 562]], True), 
 with open(f.name, "w") as g:
     json.dump({"recorded": "2026-11-26T13:56:18.350Z", "steps": [{"step": 1, "at": [155, 58]}]}, g)
 assert run.live_clicks(f.name) == ([[155, 58]], False)
+# Where live's pointer rested before each step: a click's `at`, then a key step's parked `pointer.at` (lead 11-26).
+with open(f.name, "w") as g:
+    json.dump({"steps": [{"step": 1, "at": [155, 58]}, {"step": 2, "at": [1083, 568]}, {"step": 3, "pointer": {"at": [1889, 932]}}, {"step": 4, "at": [1107, 516]}, {"step": 5, "do": "wait"}]}, g)
+assert run.live_pointer_from(f.name) == [None, [155, 58], [1083, 568], [1889, 932], [1107, 516]], run.live_pointer_from(f.name)
 Path(f.name).unlink()

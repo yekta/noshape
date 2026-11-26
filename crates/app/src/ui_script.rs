@@ -33,6 +33,13 @@ fn clicks_round() -> bool {
 
 /// The window pixel live's recorder clicked on the current step (NOSHAPE_UI_LIVE_AT, the take's `at` per step) when it
 /// is the pixel of `p`'s own: the same layout, at most a pixel apart.
+/// Where live's pointer rested before this step (run.py `live_pointer_from`): a click's approach starts there.
+fn live_from() -> Option<Point<Pixels>> {
+    static FROM: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
+    let from = FROM.get_or_init(|| std::env::var("NOSHAPE_UI_LIVE_FROM").ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default());
+    let a = from.get(STEP.load(std::sync::atomic::Ordering::Relaxed))?;
+    Some(point(px(a.get(0)?.as_f64()? as f32), px(a.get(1)?.as_f64()? as f32)))
+}
 fn live_click(p: Point<Pixels>) -> Option<Point<Pixels>> {
     static AT: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
     let at = AT.get_or_init(|| std::env::var("NOSHAPE_UI_LIVE_AT").ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default());
@@ -719,15 +726,27 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                             }
                         }
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
-                        let from = pointer.unwrap_or(at);
+                        // The approach starts where live's pointer rested (a parked pointer jumps there first) and
+                        // takes live's moves: 8 to a sketch point, else 3 (run.mjs; lead 11-26: the moves on the way
+                        // acquire inferences, mistake-sketch-drag-fixed-line s4). A menu row is reached from our own pointer:
+                        // our rows sit elsewhere than live's, and the jump would cross other rows and swap the open submenu
+                        // (folder-menu-collapse-then-expand-all s10).
+                        let start = live_from().filter(|_| target.get("menu").is_none());
+                        if let Some(s) = start.filter(|s| Some(*s) != pointer && *s != at) {
+                            let mv = PlatformInput::MouseMove(MouseMoveEvent { position: s, pressed_button: None, modifiers: Modifiers::default() });
+                            let _ = cx.update(|window, cx| window.dispatch_event(mv, cx));
+                            sleep(cx, 20).await;
+                        }
+                        let from = start.or(pointer).unwrap_or(at);
                         // A hover where the pointer already rests (an earlier click there, which hid its tooltip)
                         // comes from just outside, so the target sees the pointer arrive (vs-value-decimals).
                         let from = if what == "hover" && from == at { at - point(px(0.), px(40.)) } else { from };
-                        for k in 1..=3 {
-                            let p = from + (at - from) * (k as f32 / 3.0);
+                        let moves = if target.get("sketch_point").is_some() { 8 } else { 3 };
+                        for k in 1..=moves {
+                            let p = from + (at - from) * (k as f32 / moves as f32);
                             let mv = PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: Modifiers::default() });
                             let _ = cx.update(|window, cx| {
-                                if k == 3 && what == "hover" {
+                                if k == moves && what == "hover" {
                                     timed(window, cx, |window, cx| {
                                         let _ = window.dispatch_event(mv, cx);
                                     });
@@ -735,7 +754,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                     let _ = window.dispatch_event(mv, cx);
                                 }
                             });
-                            if k < 3 {
+                            if k < moves {
                                 sleep(cx, 20).await;
                             }
                         }
