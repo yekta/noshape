@@ -10878,7 +10878,8 @@ fn a_moved_instance_brings_its_mated_followers() {
 
 /// Replicate on a mate to a mate connector matches through the face the connector stands on (live workflow 18,
 /// REPLICATE-CONNECTOR-SEED: a Fastened to Mate connector 1 at Part 1's 40x40 top adds one copy, on the identical
-/// bottom; ours refused "The seed mate must reference geometry (not a mate connector) to be matched").
+/// bottom; ours refused "The seed mate must reference geometry (not a mate connector) to be matched"). The copy's mate
+/// is listed under Replicate 1, not among the top-level mates.
 #[test]
 fn a_replicate_seeded_on_a_mate_connector_matches_its_face() {
     let mut ctx = Ctx::new();
@@ -10900,6 +10901,11 @@ fn a_replicate_seeded_on_a_mate_connector_matches_its_face() {
     let l = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
     let z = |n: &str| num(&l["instances"].as_array().unwrap().iter().find(|i| i["name"] == n).unwrap_or_else(|| panic!("no {n}: {l}"))["translation"][2]);
     assert!(z("Part 2 <2>") < z("Part 2 <1>") - 1.0, "the copy under Part 1, the seed on its top: {l}");
+    // Live asm-audit-1126 mb11: the Mate features list shows the seed's mate and "Replicate 1", whose mates are under it.
+    let names = |v: &Value| v.as_array().unwrap().iter().map(|m| m["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    assert_eq!(names(&l["mates"]), ["Fastened 1"], "{l}");
+    let rep = &l["patterns"][0];
+    assert_eq!((rep["name"].as_str(), rep["mates"].as_array().map(Vec::len), rep["mates"][0]["ok"].as_bool()), (Some("Replicate 1"), Some(1), Some(true)), "{rep}");
 }
 
 /// Flexible subassemblies inside a flexible subassembly join the top solve (live: asm-bjr-config's Sub 8c440a in each

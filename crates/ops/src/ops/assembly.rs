@@ -54,7 +54,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "list",
             summary: "An assembly's instances, mates and degrees of freedom",
-            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF, `error` when its row is red, e.g. \"Failed to resolve instance.\"), every part occurrence with nested ones (path \"Sub <1> > Part 1 <1>\", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
+            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF, `error` when its row is red, e.g. \"Failed to resolve instance.\"), every part occurrence with nested ones (path \"Sub <1> > Part 1 <1>\", where its Part Studio coordinates are in the assembly), the Mate features list's mates (id, name, type, ok, error message; a Replicate's or part pattern's mates are its `patterns` entry's `mates`) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
             fields: vec![doc_field(), asm_field()],
             mutates: false,
             destructive: false,
@@ -335,36 +335,42 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             v
         })
         .collect();
-    let mates: Vec<Value> = a
-        .mates
-        .iter()
-        .map(|m| {
-            let st = r.mates.iter().find(|s| s.id == m.id);
-            let mut v = json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed, "hidden": m.hidden });
-            // The dialog's settings (as assembly_mate takes them).
-            v["flip_primary"] = json!(m.flip_primary == (m.mate_type == MateType::Tangent));
-            if m.reorient_secondary != 0 {
-                v["reorient_secondary"] = json!(m.reorient_secondary);
+    let mate_json = |m: &Mate| {
+        let st = r.mates.iter().find(|s| s.id == m.id);
+        let mut v = json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed, "hidden": m.hidden });
+        // The dialog's settings (as assembly_mate takes them).
+        v["flip_primary"] = json!(m.flip_primary == (m.mate_type == MateType::Tangent));
+        if m.reorient_secondary != 0 {
+            v["reorient_secondary"] = json!(m.reorient_secondary);
+        }
+        let mut off = serde_json::Map::new();
+        for (k, e) in [("x", &m.offset_x), ("y", &m.offset_y), ("z", &m.offset_z), ("rotation", &m.rotation)] {
+            if let Some(e) = e {
+                off.insert(k.into(), json!(e.text));
             }
-            let mut off = serde_json::Map::new();
-            for (k, e) in [("x", &m.offset_x), ("y", &m.offset_y), ("z", &m.offset_z), ("rotation", &m.rotation)] {
-                if let Some(e) = e {
-                    off.insert(k.into(), json!(e.text));
-                }
-            }
-            if !off.is_empty() {
-                v["offset"] = Value::Object(off);
-                v["rotation_axis"] = json!(["x", "y", "z"].get(m.rotation_axis as usize).copied().unwrap_or("z"));
-            }
-            if !m.limits.is_empty() {
-                v["limits"] = m.limits.iter().map(|(k, l)| (k.clone(), json!({ "min": l.min.as_ref().map(|e| e.text.clone()), "max": l.max.as_ref().map(|e| e.text.clone()) }))).collect::<serde_json::Map<_, _>>().into();
-            }
-            if m.mate_type == MateType::Tangent {
-                v["tangent_propagation"] = json!(m.tangent_propagation);
-            }
-            v
-        })
-        .collect();
+        }
+        if !off.is_empty() {
+            v["offset"] = Value::Object(off);
+            v["rotation_axis"] = json!(["x", "y", "z"].get(m.rotation_axis as usize).copied().unwrap_or("z"));
+        }
+        if !m.limits.is_empty() {
+            v["limits"] = m.limits.iter().map(|(k, l)| (k.clone(), json!({ "min": l.min.as_ref().map(|e| e.text.clone()), "max": l.max.as_ref().map(|e| e.text.clone()) }))).collect::<serde_json::Map<_, _>>().into();
+        }
+        if m.mate_type == MateType::Tangent {
+            v["tangent_propagation"] = json!(m.tangent_propagation);
+        }
+        v
+    };
+    // As the Mate features list (live asm-audit-1126 mb11): a Replicate's or part pattern's mates are listed under it,
+    // not at the top.
+    let mates: Vec<Value> = a.mates.iter().filter(|m| a.mate_generated_by(m.id).is_none()).map(mate_json).collect();
+    let mut patterns = more::patterns_json(a);
+    for (v, p) in patterns.iter_mut().zip(&a.patterns) {
+        let made: Vec<Value> = a.pattern_mates(p).map(mate_json).collect();
+        if !made.is_empty() {
+            v["mates"] = json!(made);
+        }
+    }
     let (named_positions, exploded_views) = positions::json(a);
     // Every part occurrence, nested ones too, where it is in the assembly (Onshape's occurrences): its path's names
     // ("Sub <1> > Part 1 <1>"), its Part Studio coordinates' place.
@@ -379,7 +385,7 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
             json!({ "path": names.join(" > "), "translation": pt(t, k), "rotation": [rot.x, rot.y, rot.z, rot.w], "hidden": o.hidden })
         })
         .collect();
-    Ok(json!({ "units": units_json(&units), "instances": instances, "occurrences": occurrences, "mates": mates, "relations": features::relations_json(a, &r), "folders": structure::folders_json(a), "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
+    Ok(json!({ "units": units_json(&units), "instances": instances, "occurrences": occurrences, "mates": mates, "relations": features::relations_json(a, &r), "folders": structure::folders_json(a), "patterns": patterns, "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
 }
 
 /// An instance's menu settings, when not the defaults.

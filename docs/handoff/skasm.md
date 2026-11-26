@@ -3,7 +3,7 @@
 Updated 2026-11-26 02:06 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## RESUME HERE (11-26 13:10 UTC) — read first
+## RESUME HERE (11-26 13:27 UTC) — read first
 
 Host: every build and test on **vibex7** (`NOSHAPE_RB_HOST=vibex7`). Run: `cd /root/projects/noshape-wt/skasm && git diff
 --name-only | xargs touch -c && NOSHAPE_RB_HOST=vibex7 timeout N tools/tiers/rb.sh bash -c "$(cat /root/skasm-scratch/bin/<s>.sh)"
@@ -20,6 +20,12 @@ qa 11-26 12:3x assembly tickets: ASM-MEASURE-BRACKET-KEY (state didn't report th
 (no target scope = incomplete), ASM-FASTENED-SAME-INSTANCE-FLIP (one instance: icon unturned) fixed + tests.
 ASM-DRAG-REVOLUTE-ANGLE waits on live (REQUESTS "psui 11-26 11:33"): live's take turns the grabbed point AGAINST the pointer
 (-39.3 deg CW), no pointer-following rule gives that (+21..24 CCW; ours +27.9 CCW). Drag code: assembly_view.rs ~3838.
+
+Lead 11-26 13:15 order: (1) qa's 4 asm rows: 3 fixed + T1s (59b79d850, 92fca7922, in land 4ef66cf5), DRAG-REVOLUTE-ANGLE
+waits on live. (2) first-week rows: Replicate's mate list fixed (assembly_list `mates` = the Mate features list, a
+pattern's mates under its `patterns` entry; ASM-REPLICATE-MATE-LIST); REPLICATE-INSTANCE-ORDER was db75ab510 (landed, row
+ticked); MEASURE-MAX-TIE (P3) needs a second live tie take (noted in its row). (3) then the 1866 (d) retake when live
+answers.
 
 Sketch feel-coverage audit (lead): DONE 11-26 13:10, all 95 sections of /root/skasm-scratch/audit-sections.txt
 checked (notes per row in /root/skasm-scratch/audit-checked.txt). Last batch: SKETCH-PIERCE-CURVE-RIGID fixed (a curve
