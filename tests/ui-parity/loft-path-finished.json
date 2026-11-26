@@ -1,0 +1,83 @@
+{
+ "name": "loft-path-finished",
+ "about": "loft-guides: Loft, Path on, Sketch 4's line (the Z axis), the Profiles box, Sketch 1's and Sketch 2's circles, OK: the loft along a path, its row and part",
+ "area": "psui",
+ "source": "live 11-26 second-month gap audit (Loft along a path completed)",
+ "start": "loft-guides",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Loft"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Path"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     0,
+     0,
+     30
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Profiles"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10.6,
+     -10.6,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     7.1,
+     -7.1,
+     60
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

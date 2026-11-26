@@ -11861,6 +11861,23 @@ fn a_start_sketch_is_not_tied_to_the_origin() {
     assert_eq!((got["status"].as_str(), got["dof"].as_u64()), (Some("under defined"), Some(4)), "{got}");
 }
 
+/// A start sketch on a Plane feature ("plane": "Plane 1") is on that plane: the loft's second profile 60 mm above
+/// Top, the wrap's tool on Front offset 10 mm, tangent to the cylinder at y -10 as in live's start.
+#[test]
+fn a_start_sketch_on_a_plane_feature() {
+    let starts: Value = serde_json::from_str(include_str!("../../../tests/ui-parity/starts.json")).unwrap();
+    for (start, origin) in [("loft-guides", [0.0, 0.0, 60.0]), ("wrap-cylinder", [0.0, -10.0, 0.0])] {
+        let mut ctx = Ctx::new();
+        let path = scratch(&format!("start-{start}.noshape"));
+        noshape_ops::ui_parity::build_start(&mut ctx, &path, &starts[start]).unwrap();
+        call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+        let got = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 2" }));
+        let o: Vec<f64> = got["frame"]["origin"].as_array().unwrap_or_else(|| panic!("{got}")).iter().map(num).collect();
+        assert!(o.iter().zip(origin).all(|(a, b)| (a - b).abs() < 1e-6), "{start}: {got}");
+        assert_eq!(got["regions"].as_array().map(Vec::len), Some(1), "{start}: {got}");
+    }
+}
+
 /// An Import whose part doesn't read as a valid body (a solid inside out) fails, and import_files says which feature
 /// and why rather than returning no parts in silence (our SAT of cf-sheet-metal-model-plus read back as 0 parts).
 #[test]

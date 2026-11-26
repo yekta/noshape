@@ -74,6 +74,11 @@ fn feature_index(ctx: &mut Ctx, name: &str) -> Result<usize, String> {
     list["features"].as_array().and_then(|fs| fs.iter().position(|f| f["name"] == name)).ok_or_else(|| format!("no feature {name}"))
 }
 
+fn feature_id(ctx: &mut Ctx, name: &str) -> Result<String, String> {
+    let list = call(ctx, "feature_list", json!({}))?;
+    list["features"].as_array().and_then(|fs| fs.iter().find(|f| f["name"] == name)).and_then(|f| f["id"].as_str()).map(str::to_string).ok_or_else(|| format!("no feature {name}"))
+}
+
 /// Build start `start` (a `starts.json` value) into a new document at `path`.
 /// A start sketch's constraints as live's runner posts them over REST (live-pw uip/starts.js): a rectangle's corners
 /// coincident (ours: shared points) and its sides horizontal / vertical, a line or circle with none, nothing tied to
@@ -325,7 +330,11 @@ fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
         let ty = f["type"].as_str().ok_or_else(|| what("no type".into()))?;
         // Named as it is made: a default name stays a default one, as in live's start documents (a paste's next name).
         if ty == "newSketch" {
-            let plane = format!("plane:{}", f["plane"].as_str().unwrap_or("Top").to_lowercase());
+            // A default plane by name, else a Plane feature's ("Plane 1").
+            let plane = match f["plane"].as_str().unwrap_or("Top") {
+                p @ ("Top" | "Front" | "Right") => format!("plane:{}", p.to_lowercase()),
+                p => format!("fplane:{}", feature_id(ctx, p).map_err(what)?),
+            };
             let mut args = json!({ "plane": plane });
             if let Some(n) = f["name"].as_str() {
                 args["name"] = json!(n);

@@ -1,0 +1,99 @@
+{
+ "name": "loft-guides-finished",
+ "about": "loft-guides: Loft, Guides and continuity on, the Guides box, Sketch 3's two guide lines, the Profiles box, Sketch 1's and Sketch 2's circles, OK: the guided loft's row and part",
+ "area": "psui",
+ "source": "live 11-26 second-month gap audit (guided Loft completed)",
+ "start": "loft-guides",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Loft"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Guides and continuity"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Guides"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     25,
+     0,
+     30
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     -25,
+     0,
+     30
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Profiles"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10.6,
+     -10.6,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     7.1,
+     -7.1,
+     60
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

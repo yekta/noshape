@@ -1,0 +1,64 @@
+{
+ "name": "wrap-region-onto-cylinder",
+ "about": "wrap-cylinder: Transform > Wrap (Surface), Sketch 2's rectangle on the tangent Plane 1 as Tools, the Target box, the cylinder's face, OK: the wrapped surface's row and the Surfaces list",
+ "area": "psui",
+ "source": "live 11-26 second-month gap audit (Wrap completed)",
+ "start": "wrap-cylinder",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Transform",
+    "menu": "Wrap"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     -3,
+     -10,
+     15
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Target"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     0,
+     25
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
