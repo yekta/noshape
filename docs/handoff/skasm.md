@@ -5,10 +5,9 @@ first; history is in docs/handoff/archive/skasm.md (read it only when a line her
 
 ## RESUME HERE (11-26 13:27 UTC) — read first
 
-P0 (lead 11-26 13:4x): asm-scissor-lift studios fddd23/92138f/bdddaf/97ad5f regressed since 11-25 18:45 (core's d-b22 ok,
-d-now bad, vibex7 ~/tmp/core/sc). Bisect worktree /root/skasm-scratch/bis/skasm (detached main 461eff9e1, rb name skasm),
-run sc.sh. Suspects: 0356fe4fb datum_plane_of (fires for any face whose part we can't match), ae279ee59 Derived-source refs.
-After the P0, qa 11-26 14:0x sketch tickets: SKETCH-MIRROR-PRESELECTED-CLICK, SKETCH-OFFSET-NEGATIVE-DIMENSION,
+P0 scissor closed (11-26 15:36 UTC): no code regression; studios fetched 11-25 21:23 for Assembly 3, parity_assemblies
+didn't read imports/ (ac4efa6a queued; fddd23 0 diffs, bdddaf 1). 92138f/97ad5f leftovers told to core; qa told.
+Next: qa 11-26 14:0x sketch tickets: SKETCH-MIRROR-PRESELECTED-CLICK, SKETCH-OFFSET-NEGATIVE-DIMENSION,
 SKETCH-Q-THEN-D-TOOL (P3).
 Then (lead, second-month audit, takes 0853f43d5): Tangent mate after its first pick keeps field focus and lists one
 FACE (ours: focus dropped, 2 owner-less FEATURE items); T1.
