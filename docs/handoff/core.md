@@ -5,23 +5,20 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 
 ## P0s (lead 11-26; block v0.4.72)
-- **9cbb0e FILLET 18 (lead 19:2x; IN PROGRESS 19:5x, uncommitted in core-rf)**: live's geometry IS in the corpus
-  (studios/9cbb0e….live.jsonl line 71, faces with surface+box, edges with curve+mid). Face 0 is a TOP face (normal +z),
-  wall 80 normal +y: edge 1 (0/80) CONVEX, 40/24 (80/81, 80/58) CONCAVE. Live: concave rounds 24/40 run to the tip
-  (STBCC cyl, STBqB torus); edge 1's convex round STBKE ends at x -19.12 (wall height = 2r); from there the convex
-  ball rolls between face 0 and the concave round: 2 OTHER faces (STBSE over the cyl, STBOE over the torus, ellipse
-  edges); wall 80 trimmed to x -19.21. Mirror at y +11 (wall 49). Probe zz_probe_f18f (kernel crash_inputs, not to
-  commit): stage 1 fuse a box above face 0 on the wall's material side (wall raised) + OCCT concave rounds: valid;
-  stage 2 cut a box above face 0 over wall+round: valid (108 faces); stage 3 OCCT on edge 1 + creases FAILS (crease
-  face0/torus vanishes tangentially at the tip (-15.09,-10.2)). Code: new model-core features/cusp_blend.rs
-  (cusp_wall_round, hooked in detail.rs fillet Err chain before fillet_deferred_overflows; mod.rs) doing stages 1-2
-  then OCCT, then rolling_ball_blend on the rest; build+run .bdc.sh (core-rf, prints Foot volume/faces after Fillet 18
-  with NOSHAPE_BLEND_DEBUG) 19:54: STILL 'Failed to fillet selections.', 95 faces, NO 'cusp round' line: the hook isn't
-  reached or cusps() finds none -> check first (that message may come before the Err chain: round_overrun?). If rolling balls fail too: own tool = cut
-  box from J (ball touching face 0, wall and the concave round's wall contact line) to past the tip so OCCT ends edge
-  1's round on a square plane; fill back common(S2, box) less a loft of exact ball sections (offset plane ∩ offset
-  cyl r 2r / torus minor 2r), 2 lofts (cyl part, torus part), stop just short of the tip; fuse + unify. Target 141
-  faces, 64650.834. Then Fillet 19/23, MF7, Chamfer 11.
+- **9cbb0e FILLET 18 (lead 19:2x; uncommitted in core-rf, 20:2x)**: live's line 71 (corpus) read: at the x -15.09
+  cusps (wall y +-11 thinning to 0 between convex edge 1 and the concave arc of a round tangent to the plate) live runs
+  the concave rounds to the tip and the convex ball rolls onto them (2 OTHER faces). Code: features/cusp_blend.rs
+  cusp_wall_round (hooked in detail.rs' fillet Err chain): raise the wall (fuse box), OCCT concave rounds, cut the
+  plate's top back, OCCT the rest; on the OLD translation (16:20, pre-Fillet 17 fix) it built 147 faces / 64653.24
+  (live 141 / 64650.83), cusp faces within ~4% of live's. Found: (1) the fresh/ doc was stale: its Fillet 18 refs
+  SHBFB/SHBBB (lines 6.571 on y 7.75/-8.25, x -20.14) were "2 missing selections"; (2) propagate_tangent ran over
+  FOLDS (edges leaving a vertex the same way, |dot| test): at x -73.8 it added the concave arcs RFBF/RFBp (4 tori)
+  live leaves sharp. Fix in detail.rs TangentLinks::neighbours: leaving directions; a fold is skipped only between a
+  convex and a concave edge of one face (sliver()); first try (all folds) regressed fed22d Fillet 2/24, Extrude 32/35,
+  bdddaf Fillet 1/5, 665cf3 Fillet 1/2... (.pa2.sh; d-fold), narrowed version rerunning 20:2x (pa3.out). Re-translated
+  (all folds skipped): 9cbb0e Fillet 18 no longer a difference. Next: pa3 result, faces vs live (.f18cmp.sh +
+  .f18diff.py), corpus A/B .f18ab.sh, a T1 (synthetic cusp: plate + wall + tangent round), drop debug prints, land.
+  Then Fillet 19/23, MF7, Chamfer 11.
 - **TRANSFORM-TRANSLATE-DISTANCE (lead 11-26 19:0x): QUEUED 01c87462 19:16** (core-rf, carries Fillet 17; qa + lead told): my a5e0075bb sent Move faces
   of planes facing several ways down the one-way-at-a-time tweak (neighbours keep names) instead of OCCT's offset
   (every face Offset(old)): the derived source's Move face 1 vertices renamed, Part Studio 1's Transform 1 by two
