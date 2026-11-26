@@ -2691,3 +2691,35 @@ fn a_holes_unlabelled_boxes_go_by_their_order(cx: &mut TestAppContext) {
     let index = cx.update(|cx| ["holeDiameterV3", "holeDepthV3"].map(|id| dialog.read(cx).icon_field_index(id)));
     assert_eq!(index, [0, 1], "(diameter, depth)");
 }
+
+/// Live hole-tapped-through-ok / hole-clearance-through-ok: a Hole type picked from its dropdown leaves nothing with
+/// the keyboard (live redraws the table).
+#[gpui::test]
+fn a_hole_type_picked_leaves_no_focus(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-hole-type-focus");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    let at = gpui_kit::VisualTestContext::from_window(window, cx).debug_bounds("os-select:sel-ansiHoleTableEx#0").expect("the Hole type dropdown").center();
+    gpui_kit::VisualTestContext::from_window(window, cx).simulate_click(at, Modifiers::default());
+    draw(cx, window);
+    keys(cx, window, &["down", "enter"]);
+    draw(cx, window);
+    let kind = cx.update(|cx| dialog.read(cx).feature.params.lookup("ansiHoleTableEx").first().cloned());
+    let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert_ne!(kind.as_deref(), Some("Drilled"), "a Hole type other than Drilled picked");
+    assert_eq!(st["focus"]["kind"], "none", "{}", st["focus"]);
+}
+
+/// Live hole-simple-blind-5-ok: a box drawn with an icon instead of its label reads no label when focused.
+#[gpui::test]
+fn a_holes_focused_depth_box_has_no_label(cx: &mut TestAppContext) {
+    let (window, view) = block(cx, "dlg-hole-focus-label");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("hole", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Hole dialog").dialog.clone());
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| d.focus_field_selected("holeDepthV3", w, cx))).unwrap();
+    draw(cx, window);
+    let st = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    assert_eq!((st["focus"]["kind"].as_str(), st["focus"]["label"].clone()), (Some("field"), serde_json::Value::Null), "{}", st["focus"]);
+}

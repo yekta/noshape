@@ -52,8 +52,14 @@ impl FeatureDialog {
             let label = self.spec_for_path(q).map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| q.to_string());
             return Some(json!({ "kind": "field", "label": label, "text": null, "selection": null, "all": false }));
         };
-        let label = self.spec_for_path(path).map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| path.clone());
-        Some(field_focus(&label, self.inputs[path].read(cx)))
+        let spec = self.spec_for_path(path);
+        let label = spec.map(|s| crate::i18n::spec(s.label)).unwrap_or_else(|| path.clone());
+        let mut f = field_focus(&label, self.inputs[path].read(cx));
+        // A box drawn with an icon instead of its label has none (live hole-simple-blind-5-ok: the Hole's depth).
+        if spec.is_some_and(|s| param_icon(self.ty.id, s.id).is_some()) {
+            f["label"] = Value::Null;
+        }
+        Some(f)
     }
 
     /// The open Create variable popup's inputs, in order: label, input, whether its value is a quantity.

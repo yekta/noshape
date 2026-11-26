@@ -271,6 +271,8 @@ pub struct FeatureDialog {
     auto_activated: Option<(String, Option<String>, String, bool)>,
     /// A select takes the keyboard back at the next render.
     focus_select_pending: Option<String>,
+    /// Nothing keeps the keyboard at the next draw (a Hole type picked).
+    blur_pending: bool,
     /// A pick filled the active field and moved on: the next field takes the keyboard at the next render (Onshape's
     /// autoAdvanceToNextControl focuses it; live ui-parity draft-on-side-face).
     focus_active_pending: bool,
@@ -522,6 +524,7 @@ impl FeatureDialog {
             enter_applied_at: None,
             auto_activated: None,
             focus_select_pending: None,
+            blur_pending: false,
             focus_active_pending: false,
             mc_mode: None,
             keyboard_left: false,
@@ -4129,6 +4132,11 @@ impl FeatureDialog {
                             let mut np = base_path.clone();
                             np.truncate(lvl);
                             np.push(id.to_string());
+                            // A Hole type picked redraws the table: nothing has the keyboard (live hole-tapped-through-ok).
+                            if lvl == 0 && this.feature.type_id == "hole" {
+                                this.keyboard_left = true;
+                                this.blur_pending = true;
+                            }
                             this.set_lookup(&ps2, np, cx);
                         },
                         cx,
@@ -4609,6 +4617,9 @@ impl Render for FeatureDialog {
         if let Some(s) = self.focus_select_pending.take().and_then(|p| self.selects.get(&p).cloned()) {
             let h = s.update(cx, |s, cx| s.focus_handle(cx));
             window.focus(&h, cx);
+        }
+        if std::mem::take(&mut self.blur_pending) {
+            window.blur(cx);
         }
         if std::mem::take(&mut self.focus_active_pending)
             && let Some(q) = self.active_query.clone()
