@@ -1312,6 +1312,24 @@ fn the_surface_tab_hands_the_keyboard_to_the_twin_field(cx: &mut TestAppContext)
     assert_eq!((f1["kind"].as_str(), f1["label"].as_str()), (Some("field"), Some("Profiles")), "{f1}");
 }
 
+/// Live sweep-thin-edge-no-trim-ok s3 (core, uipdep3): Sweep's Thin tab swaps its profiles for the thin wall's
+/// same-named field, which keeps the keyboard.
+#[gpui::test]
+fn the_sweep_thin_tab_keeps_the_keyboard_on_its_profiles_field(cx: &mut TestAppContext) {
+    let (window, view, _, _) = block_part(cx, "zz-sweep-thin");
+    view.update(cx, |v, _| v.selection.clear());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("sweep", w, cx))).unwrap();
+    let dialog = view.update(cx, |v, _| v.edit.as_ref().expect("Sweep").dialog.clone());
+    draw(cx, window);
+    let f0 = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)["focus"].clone()).unwrap();
+    cx.update_window(window, |_, w, cx| dialog.update(cx, |d, cx| { let fh = gpui::Focusable::focus_handle(d, cx); w.focus(&fh, cx); d.set_value("bodyType", noshape_model::ParamValue::Enum("THIN".into()), cx); })).unwrap();
+    draw(cx, window);
+    let f1 = cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)["focus"].clone()).unwrap();
+    let profiles = (Some("field"), Some("Faces and sketch regions to sweep"));
+    assert_eq!((f0["kind"].as_str(), f0["label"].as_str()), profiles, "{f0}");
+    assert_eq!((f1["kind"].as_str(), f1["label"].as_str()), profiles, "{f1}");
+}
+
 /// Live analysis-zebra / -reflection / -connection: a preselected face stays selected while the tool is open; Esc
 /// leaves it selected after Zebra stripes and Reflection, clears it after Connection.
 #[gpui::test]
