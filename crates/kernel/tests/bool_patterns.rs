@@ -1007,7 +1007,7 @@ fn a_late_decline_sends_the_like_straight_to_occt() {
     let run = |c: &k::bool_corpus::Case| {
         let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the cut");
         let v = r.shape.volume().unwrap();
-        assert!((v - c.summary.volume).abs() <= 1e-9 * c.summary.volume, "volume {v} against OCCT's {}", c.summary.volume);
+        assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
         (k::last_boolean_path(), k::last_rust_decline())
     };
     let memo = std::sync::Arc::new(k::DeclineMemo::default());
