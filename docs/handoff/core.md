@@ -9,14 +9,29 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   1 QUEUED 76bdd135: evAxis of a cylinder face follows the face's sense (eval.rs faces_axis; live cpax-1121); corpus
     ALL-SAME, model 664/0. 2 QUEUED fefa2000: harness (LIVE_SCATTER + LIVE_LINES_AS_OTHER; live's asym fillet is a
     B-spline fit). 3b QUEUED 49995530: parity translator reads variableStudios (3 passes; vars retried). Lead told.
-  3 NEXT c2-body-draft-naming: Fillet 1 = lines-as-OTHER only (curvature fillet, its 4 straight tangent edges; add a
-    LIVE_LINES_AS_OTHER row for Part 2 from Fillet 1). Fillet 2 (curvature 9 mm, magnitude 0.5; chain JRl + Fillet 1's
-    end curve JRJ + JRd): every face matches live but the corner piece over JRJ: ours 120.3469 mm2, live JSi 121.9466
-    (also back 1810.1985/1810.2008, bottom 848.8589/848.8613); volume -6.46 mm3. Our faces: vibex7 ~/tmp/core/bdn
-    "q-Fillet 2.jsonl" (query_entities faces); saved doc save/c2-body-draft-naming.noshape (+ -wal/-shm: copy all 3).
-    Look at blend_section's ball/curvature section over a B-spline support (Fillet 1's face) along JRJ.
-    Scripts: .bdn.sh (parity + save + cli faces), .vst.sh, .pt.sh (ops parity:: tests).
-  4 c2-curve-pattern-composite Fillet 2: 28/58/32 vs live 26/52/28. 5 c2-impeller-loft Fillet 3: edges 93 vs 95.
+  3 IN FLIGHT c2-body-draft-naming (UNCOMMITTED in core-uip3: features.cpp, kernel tests/surfacing.rs, ops tests/parity.rs):
+    (a) parity.rs LIVE_LINES_AS_OTHER row Part 2 from Fillet 1 (curvature fillet's 4 straight edges OTHER).
+    (b) Fillet 2's corner = fill_pinched_corner's G2 fill (live's Fill 1 of the same 3 edges = JSi exactly, 121.9466):
+    ours fell back to G1 (G2 went to OCCT's plate, which declines) = 120.3469, vol -6.46. FIX: fair_g1_fill(..., curvature)
+    solves G2 too (after the G1 pass, 3 passes of N.S_dd = k_support |S_d|^2, wg2 1e3); op_fill sends orders 0..2 to it.
+    Result 121.2141 mm2, vol 38236.654 (live 38239.534): half the gap; NOT a match. Spans/outside-weight sweeps jump
+    (spans 7/8/9/10 out 1: 121.37/121.944/~/122.66) = tuning, rejected; Parasolid's fill-hole surface is the rest (park).
+    Only other corpus G2 fill (c2-surf-intro-fill Fill 1) doesn't take this path (unchanged). T1 kernel
+    surfacing::a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere (G2 < 0.002 r off the sphere, G1 > 5x that).
+    RUNNING 12:0x: .ab17.sh on vibex7 (kernel test, doc, corpus A/B userdocs A=G2 off via sed, kernel+model tests) ->
+    /root/core-scratch/ab17.out. FIRST: the sphere T1 FAILS (fair path returned nullopt -> MakeFilling 'continuity is not G0
+    G1 or G2'): find why the fair fill declines on the sphere hole (pole? tangency check?), fix, rerun. If ALL-SAME but body-draft (and tests ok): commit "core: a G2 fill matches its supports'
+    curvature across each edge (...)", g++-13 check, land, report (half the gap; rest parked: live's fill-hole surface).
+  4 c2-curve-pattern-composite Fillet 2 (R10 on JIa/JIW/JHS edges; 28/58/32 vs live 26/52/28): our rolling balls'
+    direct build declines ("a blend piece with no point inside", blend 2 of tool 2: 3 curves, 7 pieces) -> OCCT fillet
+    leaves 2 extra bspline 64.39 mm2 patches where the ball along the slanted face x R20 cylinder (Fillet 1) meets the
+    bottom/top plane at y=20 (cylinder tangent to plane there); live: JJi OTHER 326.6444 + JJ6 cyl 1220.5154 (ours
+    335.766 + 1144.84). Tiny cut (-216.769,20,0)->(-216.626,20.308,0) on the planes (0.043 mm2 piece) = tool 1's side off
+    the cylinder by 2.66e-3 mm. Debug: vibex7 ~/tmp/core/bdn/cpc (q.jsonl; NOSHAPE_BLEND_DIRECT_DEBUG=1 NOSHAPE_BLEND_DEBUG=1
+    ../cli batch q.jsonl). Next: why blend 2's piece has no inside point (blend_direct.cpp 1854).
+  5 c2-impeller-loft Fillet 3: edges 93 vs 95.
+    part/face." (Trim to face boundaries, tool partly across); keep ours if valid + what was asked ("ours does the work"),
+    live's error only for non-manifold or a slit. Lead FYI: check qa's ~13:xx verdict clears impeller "Select a sketch plane.".
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
@@ -71,36 +86,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
 - **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity_impeller_loft_regenerates_in_time < 40 s).
-## Now (11-25)
-- **Fresh scissor run 15:3x** (.pa2.sh compares d-prev = 14:37 with d-now): only change b58244 MF6 fixed; NO new rows,
-  so the downstream rows are real (the import matches refs against our build). Tab ids now: 404ddb 544d4be22b1974ab,
-  9cbb0e ba43fd52006aef05, b58244 ef415f8715d2b8a5, 2d82a0 0e42b5e59678dc59, 92138f c945c4d3bdad506d, b7e381
-  f44c9b9bedd247e3 (st.sh / mfq.sh / dmp.sh; ~/tmp/core/fb/cli = cli-new 15:40). 404ddb Fillet 2 = live now
-  (73853.40 vs .06; lead item 1 done). Sorted:
-  (a) b58244: Plane 1's ref KZGB: live's Extrude 4 cap has a 0.5 mm recess ours lacks; look at Move face 2/3/4/6,
-  Fillet 1/2 (idx 8-13) (full notes in the archive, 11-27).
-  (b) 404ddb Hole 2 (then Mirror 1, Split 1, Extrude 5-8, Booleans): Ø8.2 x 42 blind coaxial with the r14 bar from its
-  x 59 end face; the input = live (73840.04 vs .83). Ours "Hole creates invalid geometry": the profile shows only the ray
-  common (boolean.rust) and op_revol, no cut recorded or OCCT build: looks like the own Boolean's cut errors with no
-  fallback. Handed to bool: vibex7 ~/agents/core-keep/hole2-bool (README, mode 600 copy).
-  (c) 9cbb0e: Foot = live through Fillet 7 (64907.55); Fillet 8 -0.017, Fillet 12 -0.017; FILLET 17 is the first real
-  diff: r 8 on ONE line edge (x -15.54, z -27.68 mm, along y, 16 mm), live 79 -> 80 faces / -154.8 mm3, ours 79 -> 83 /
-  -250.7 (vibex7 ~/tmp/core/sc/foot-live.txt; dump ~/agents/core-keep/f17-9cbb0e/fillet-16.brep+txt = edge 177 r 0.008).
-  FILLET 17 LANDING 11-26 18:5x (fillet_over_smooth_faces in features.cpp, after square_corner/rust_blend in the
-  checked chain): ball on the kept face's plane EXTENDED + the next face, prism of the corner cut + unify touched:
-  80 faces, 64593.2110 (live .228). T1 kernel blend::a_round_running_off_a_nose_onto_its_tangent_hollow_rolls_on_it
-  (main: 210.6 mm3 taken vs 164.5). Corpus 127 ALL-SAME.
-  9cbb0e now (cli 18:42, tab 53427fa107a5c69d): Fillet 17 = live, Fillet 16 = live (64528.94 vs .96), input of
-  FILLET 18 = live (95 faces, 64657.748 vs .765). FILLET 18 (r 0.8, 42 edges; live 95 -> 141 faces, -6.93 mm3) fails.
-  Per edge (probe core-scratch/f18-probe.patch on vibex7 ~/tmp/core/rt/fillet-18.brep+txt, output
-  core-scratch/f18-per-edge.out): the y +-8 chains OK alone (100 faces, -4.754), y +-11 edge 11/39 OK (98, -1.84),
-  31/33 OK (+3.49); the y +-11 chain through Fillet 17's round (x -78..-15, edges 7,8,9,10,12-17 / -11 side 1,6,20-24,
-  35,40) FAILS. Probe 2 (core-scratch/f18b-probe.patch): all 42 edges are 90 deg, walls y +-11 = faces 49/80
-  (planes), the chains on them split at sharp corners: -11 side {1,6,35,40} "fillet failed", {20,21,22,24}
-  "invalid solid", 39 OK. Edge 40/9 = short arc (x -15..-17, z -28) on cylinders 81/52 (y -8.25..-11 / 7.75..11,
-  Mirror 6/3's copies of the Fillet 17 region), meeting line 1/10 and line 24/8 there.
-  19:2x probes: core-scratch/f18cde-probe.patch (f18c/d/e.out); state in the P0 entry above.  (d) 92138f MF1 / Replace face 1 (skasm 15:4x: geometric, mine). (e) Drafts 2d82a0 D1,
-  b7e381 D2. skasm 15:4x: 2d82a0 "Position" was missing imports (ac4efa6a), not a regression.
 - **LEAD LIST 11-26 06:4x**: (1) bracket03 Chamfer 1: QUEUED 43ad3cc4 (core-spd; Chamfer 1 ~40 ms = 0.4.68; was 87-170;
   7 op_chamfers = 1 + 6 trials; c927 landed 15cff2b3f): chains_overlap takes `together`'s OpResult and
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
@@ -219,8 +204,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 5. Live specs not implemented: revolved cones framed at their apex, tori / spheres at their centre (`reframe_cylinder`
    covers cylinders only); extruded circle edges on the sketch circle's frame vs our seam at u = 0; extrude side faces'
    x along their bottom edge (check).
-## Parked
-
 ## How to run
 - Agent ids: /root/lead-scratch/roster.md only (read it before every message_agent; never copy ids into notes).
 - Builds / tests: `NOSHAPE_RB_HOST=<host> tools/tiers/rb.sh bash <script>` from the worktree (env prefixes don't
@@ -237,8 +220,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - Dumps: `NOSHAPE_DUMP_OPS=<dir>` (fillet, draft, shell, prism_until, defeature, project_along, unify ...); replay one
   with `NOSHAPE_REPLAY=<dir>/<name> [NOSHAPE_REPLAY_REPEAT=n] <kernel test bin> crash_inputs::replay_one --ignored
   --nocapture`; probes in kernel tests: features::defeature_dump_probe (NOSHAPE_PROBE_DEFEATURE), unify_apart_probe.
-- Traces: NOSHAPE_FS_TRACE=1 (FS ops and their errors), NOSHAPE_PATTERN_TRACE=1, NOSHAPE_WORK_TRACE (draft work
-  steps), NOSHAPE_SHELL_DEBUG=1 (shell path chosen), NOSHAPE_DEFEATURE_DEBUG=1, NOSHAPE_GUARD_TRACE=1.
+- Traces: NOSHAPE_FS_TRACE, _PATTERN_TRACE, _WORK_TRACE, _SHELL_DEBUG, _DEFEATURE_DEBUG, _GUARD_TRACE, _BLEND_DEBUG.
 - Private user documents (hats, dock, qa's tickets): only mode-700 copies in ~/tmp/core, deleted after;
   /root/qa-scratch/bin/userdocs.py compares two CLIs on them.
 - C++: g++-13 build of noshape-kernel on vibe5 (down 11-17) before landing (`CC='ccache gcc-13' CXX='ccache g++-13' cargo build
