@@ -40,6 +40,12 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   removed again): /root/bool-scratch/nf/dump1234/decl7-{0..68}.brep, a fuse of 69 args (op 0) at step 79's delete
   (arrange.rs inside_of finds no ray hit for a region). NEXT: make it a corpus case (objects/tools split unknown:
   try 1 + 68), find the region.
+- LEAD 23:5x NEXT (after compaction): (1) gate 8eae4ef17c + knurls: background wait printed chain + kn out; clean ->
+  land from bool-fb (stack: 8eae4ef17c apex fix + handoff commits on queued 3e1a04dd), report. (2) work the 4 STILL
+  (1846 fixed; 1247 left to OCCT, reason above; 1256 not reached; 1234 dumped). (3) re-run the 21 OTHER-OP on the
+  current green: fetch /root/green/SHA's CLI (build noshape-cli at that sha on vibex8 -> ~/tmp/bool/cmp/cli-green,
+  scp to /root/bool-scratch/nf/), NSCLI=it, python3 bin/nfrecheck.py TICKETS.md green (rows filter OTHER-OP only:
+  grep OTHER-OP nfrecheck-0473.out for seeds). Cleanup: nf/cli-0473, nf/cli-nf, vibex8 cmp/cli-{0473,g,nf}.
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
   uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
   dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
