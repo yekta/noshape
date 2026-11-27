@@ -1906,7 +1906,7 @@ fn hole_standard_sets_the_table_sizes() {
     let h = call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pt, "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "endStyleV2": "BLIND", "holeDepthV3": "8 mm", "tappedDepthV3": "8 mm" } }));
     assert_eq!(h["feature_status"]["status"], "Ok", "{h}");
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
-    assert_eq!((g["params"]["unitsSystem"].as_str(), g["params"]["holeDiameterV3"].as_str(), g["params"]["majorDiameter"].as_str()), (Some("METRIC"), Some("5 mm"), Some("6 mm")), "{g}");
+    assert_eq!((g["params"]["unitsSystem"].as_str(), g["params"]["holeDiameterV3"].as_str(), g["params"]["majorDiameter"].as_str()), (Some("METRIC"), Some("5.000 mm"), Some("6 mm")), "{g}");
     // The whole path, each level's default below the size, as the dialog stores it.
     assert_eq!(g["params"]["isoHoleTableEx"], json!(["Tapped", "Straight tap", "M6", "1.00 mm (Coarse)", "None"]), "{g}");
     // The 5 mm drill, 8 mm deep, with its 118° tip.
