@@ -586,18 +586,27 @@ pub fn apply_table_to_params(params: &mut ParamValues) -> bool {
     let Some(spec) = table_values(table, &path) else { return false };
     let inch = params.is("unitsSystem", "INCH");
     let len = |m: f64| ParamValue::Expr(ExprValue::new(if inch { format!("{} in", fmt_num(m / IN, 5)) } else { format!("{} mm", fmt_num(m * 1000.0, 4)) }));
-    params.set("holeDiameterV3", len(spec.hole_diameter));
+    // The table's own text where it is in the units system and applied unchanged (live: "1/4 in", not "0.25 in").
+    let texts = match walk(table, &path) {
+        Some((Entry::Values(v), _)) => v.as_slice(),
+        _ => &[],
+    };
+    let from_table = |key: &str, m: f64| {
+        let text = texts.iter().find(|(n, _)| n == key).map(|(_, t)| t.trim()).filter(|t| t.ends_with(if inch { " in" } else { " mm" }) && quantity(t).is_some_and(|q| (q - m).abs() < 1e-12));
+        text.map_or_else(|| len(m), |t| ParamValue::Expr(ExprValue::new(t)))
+    };
+    params.set("holeDiameterV3", from_table("holeDiameter", spec.hole_diameter));
     if let Some(td) = spec.tap_drill_diameter {
-        params.set("tapDrillDiameterV3", len(td));
+        params.set("tapDrillDiameterV3", from_table("tapDrillDiameter", td));
     }
     if let Some(v) = spec.cbore_diameter {
-        params.set("cBoreDiameterV3", len(v));
+        params.set("cBoreDiameterV3", from_table("cBoreDiameter", v));
     }
     if let Some(v) = spec.cbore_depth {
-        params.set("cBoreDepthV3", len(v));
+        params.set("cBoreDepthV3", from_table("cBoreDepth", v));
     }
     if let Some(v) = spec.csink_diameter {
-        params.set("cSinkDiameterV3", len(v));
+        params.set("cSinkDiameterV3", from_table("cSinkDiameter", v));
     }
     if let Some(a) = spec.csink_angle {
         params.set("cSinkAngleV3", ParamValue::Expr(ExprValue::new(format!("{} deg", fmt_num(a.to_degrees(), 4)))));
