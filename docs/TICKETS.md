@@ -5,6 +5,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## live 11-27 18:5x: the depth batch 7 start spline-fillet-asm
+
+- [ ] P2 **SPLINE-FILLET-ASM-R2-END (core)** (live 11-27, start "spline-fillet-asm" in tests/ui-parity/starts.json, e2e `the_depth_batch_starts_are_lives`): Part 1 is a 40x30 profile closed by a 3-point fit spline (40,0) (52,15) (40,30), extruded 20, Fillet 1 R4 on the two left vertical edges, Fillet 2 R2 on the spline's top edge (through 52,15,20). Our Part 1 is 28328.537 mm³, live 28329.612: the R2 fillet along the spline ends 1.08 mm³ short of live. The e2e compares it within 1.5 mm³ under this ticket; tighten it back to 1e-3 when fixed.
+
 ## qa 11-27 17:5x: live's depth batch 6, sketching (d90d82973, 71 takes) on green 8c1284bc: 25/71 as scored, 35/71 with a 0.6 mm (2 px) geometry tolerance
 (suites/uipdep6-1127; GTOL=0.6 qa-scratch/bin/uipsteps.py; per-step view bin/d6sel.py / d6show.py. Not filed, runner precision: live's
 and ours' clicks still land ~1 px apart (live (20,0) -> 19.84, ours 20.12), which moves derived arc centres by 1-1.5 mm in 3pt-arc-typed-radius,
