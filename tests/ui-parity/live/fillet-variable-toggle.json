@@ -1,6 +1,6 @@
 {
  "scenario": "fillet-variable-toggle",
- "recorded": "2026-11-27T02:17:35.402Z",
+ "recorded": "2026-11-27T17:28:46.412Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "bb518f6f695529c2f70928f8",
+  "element": "f2933f2340cebb7581423b17",
   "start": "block",
   "startElement": "d0643b8ab31b96fd21acb45e",
   "runner": "live2 .nstate-uip-4.json"
@@ -108,13 +108,13 @@
     }
    },
    "ok": true,
-   "ti": 25694,
-   "tmove": 25767,
+   "ti": 26823,
+   "tmove": 26906,
    "moves": 1,
    "hover": [
     "JHV"
    ],
-   "tdown": 27091,
+   "tdown": 28216,
    "at": [
     1304,
     497
@@ -209,8 +209,8 @@
      "panel": null
     }
    },
-   "t": 29159,
-   "te": 29160
+   "t": 30191,
+   "te": 30192
   },
   {
    "step": 2,
@@ -219,7 +219,7 @@
     "key": "shift+f"
    },
    "ok": true,
-   "ti": 29160,
+   "ti": 30192,
    "pointer": {
     "at": [
      1304,
@@ -228,7 +228,7 @@
     "hover": [],
     "element": "canvas#canvas"
    },
-   "tdown": 29167,
+   "tdown": 30205,
    "state": {
     "focus": {
      "kind": "field",
@@ -488,8 +488,8 @@
     },
     "measure": null
    },
-   "t": 32474,
-   "te": 32474
+   "t": 33532,
+   "te": 33532
   },
   {
    "step": 3,
@@ -500,10 +500,10 @@
     }
    },
    "ok": true,
-   "ti": 32474,
-   "tmove": 32534,
+   "ti": 33532,
+   "tmove": 33572,
    "moves": 1,
-   "tdown": 32899,
+   "tdown": 33940,
    "at": [
     708,
     366
@@ -797,9 +797,9 @@
     },
     "measure": null
    },
-   "t": 34824,
-   "te": 34824
+   "t": 35854,
+   "te": 35854
   }
  ],
- "t0_epoch_ms": 1795745835599
+ "t0_epoch_ms": 1795800505509
 }

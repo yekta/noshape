@@ -1,19 +1,23 @@
 {
  "scenario": "frame-corner-coped-limit",
- "recorded": "2026-11-14T22:21:46.161Z",
+ "recorded": "2026-11-27T17:28:00.931Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.11"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "df5c17fe40e6fa4bd8d8924e",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "d09ba2de412023b02673f710",
   "start": "frame-l",
-  "startElement": "7d64a832cc847ff5304ddb43",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "3b3fbb1595f8a05348e11e28",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -101,6 +105,10 @@
     }
    },
    "ok": true,
+   "ti": 26344,
+   "tmove": 26744,
+   "moves": 1,
+   "tdown": 27059,
    "at": [
     70,
     313
@@ -347,7 +355,8 @@
     },
     "measure": null
    },
-   "t": 39324
+   "t": 31090,
+   "te": 31091
   },
   {
    "step": 2,
@@ -356,6 +365,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 31091,
    "state": {
     "focus": {
      "kind": "field",
@@ -598,7 +608,8 @@
     },
     "measure": null
    },
-   "t": 45590
+   "t": 35559,
+   "te": 35559
   },
   {
    "step": 3,
@@ -610,6 +621,10 @@
     }
    },
    "ok": true,
+   "ti": 35559,
+   "tmove": 35623,
+   "moves": 2,
+   "tdown": 35998,
    "at": [
     399,
     368
@@ -874,7 +889,8 @@
     },
     "measure": null
    },
-   "t": 54344
+   "t": 40093,
+   "te": 40093
   },
   {
    "step": 4,
@@ -883,6 +899,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 40093,
    "state": {
     "focus": {
      "kind": "field",
@@ -1143,7 +1160,8 @@
     },
     "measure": null
    },
-   "t": 59433
+   "t": 44449,
+   "te": 44449
   },
   {
    "step": 5,
@@ -1154,6 +1172,10 @@
     }
    },
    "ok": true,
+   "ti": 44449,
+   "tmove": 44483,
+   "moves": 1,
+   "tdown": 44852,
    "at": [
     338,
     454
@@ -1161,14 +1183,8 @@
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Limit frame ends",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Faces to trim to",
      "dialog": "Frame 1"
     },
     "dialog": {
@@ -1435,7 +1451,8 @@
     },
     "measure": null
    },
-   "t": 65521
+   "t": 47413,
+   "te": 47413
   },
   {
    "step": 6,
@@ -1444,17 +1461,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 47413,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Limit frame ends",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Faces to trim to",
      "dialog": "Frame 1"
     },
     "dialog": {
@@ -1721,7 +1733,8 @@
     },
     "measure": null
    },
-   "t": 70712
+   "t": 51823,
+   "te": 51823
   },
   {
    "step": 7,
@@ -1730,6 +1743,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 51823,
    "pointer": {
     "at": [
      337,
@@ -1740,6 +1754,7 @@
     ],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 51830,
    "state": {
     "focus": {
      "kind": "none"
@@ -1816,7 +1831,8 @@
     },
     "measure": null
    },
-   "t": 75228
+   "t": 55439,
+   "te": 55439
   },
   {
    "step": 8,
@@ -1825,6 +1841,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 55439,
    "state": {
     "focus": {
      "kind": "none"
@@ -1901,7 +1918,9 @@
     },
     "measure": null
    },
-   "t": 80512
+   "t": 59965,
+   "te": 59965
   }
- ]
+ ],
+ "t0_epoch_ms": 1795800461113
 }

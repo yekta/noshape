@@ -1,6 +1,6 @@
 {
  "scenario": "mistake-sweep-add-no-change",
- "recorded": "2026-11-26T22:56:01.354Z",
+ "recorded": "2026-11-27T17:34:18.735Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -12,12 +12,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "954b53af2e604f59536a108b",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "ccdc71a430a83c026717facf",
   "start": "block",
-  "startElement": "d0643b8ab31b96fd21acb45e",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -87,7 +87,7 @@
     -116.913,
     77.942
    ],
-   "width_mm": 355.772,
+   "width_mm": 460.686,
    "height_mm": 243.974,
    "mmPerPixel": 0.275365,
    "orthographic": true
@@ -104,12 +104,12 @@
     }
    },
    "ok": true,
-   "ti": 26116,
-   "tmove": 26218,
+   "ti": 29004,
+   "tmove": 29071,
    "moves": 1,
-   "tdown": 26570,
+   "tdown": 29382,
    "at": [
-    668,
+    287,
     58
    ],
    "state": {
@@ -358,15 +358,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 29574,
-   "te": 29575
+   "t": 32305,
+   "te": 32306
   },
   {
    "step": 2,
@@ -375,7 +375,7 @@
     "until": "dialog"
    },
    "ok": true,
-   "ti": 29575,
+   "ti": 32306,
    "state": {
     "focus": {
      "kind": "field",
@@ -622,15 +622,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 34029,
-   "te": 34029
+   "t": 36755,
+   "te": 36755
   },
   {
    "step": 3,
@@ -645,15 +645,15 @@
     }
    },
    "ok": true,
-   "ti": 34029,
-   "tmove": 34076,
+   "ti": 36755,
+   "tmove": 36801,
    "moves": 1,
    "hover": [
     "JHC"
    ],
-   "tdown": 35423,
+   "tdown": 38161,
    "at": [
-    1336,
+    1145,
     521
    ],
    "state": {
@@ -909,15 +909,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 37633,
-   "te": 37633
+   "t": 40205,
+   "te": 40205
   },
   {
    "step": 4,
@@ -928,12 +928,12 @@
     }
    },
    "ok": true,
-   "ti": 37633,
-   "tmove": 37700,
+   "ti": 40205,
+   "tmove": 40252,
    "moves": 1,
-   "tdown": 38125,
+   "tdown": 40728,
    "at": [
-    724,
+    343,
     229
    ],
    "state": {
@@ -1186,15 +1186,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 40250,
-   "te": 40250
+   "t": 42642,
+   "te": 42642
   },
   {
    "step": 5,
@@ -1209,15 +1209,15 @@
     }
    },
    "ok": true,
-   "ti": 40250,
-   "tmove": 40359,
+   "ti": 42642,
+   "tmove": 42677,
    "moves": 1,
    "hover": [
     "JHd"
    ],
-   "tdown": 41751,
+   "tdown": 44004,
    "at": [
-    1417,
+    1226,
     508
    ],
    "state": {
@@ -1507,15 +1507,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 43934,
-   "te": 43934
+   "t": 46014,
+   "te": 46014
   },
   {
    "step": 6,
@@ -1524,7 +1524,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 43934,
+   "ti": 46015,
    "state": {
     "focus": {
      "kind": "none"
@@ -1812,18 +1812,579 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 48542,
-   "te": 48542
+   "t": 50357,
+   "te": 50357
   },
   {
    "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "tab": "New"
+    }
+   },
+   "ok": true,
+   "ti": 50357,
+   "tmove": 50394,
+   "moves": 1,
+   "tdown": 50693,
+   "at": [
+    268,
+    149
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sweep 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Solid",
+       "selected": true
+      },
+      {
+       "label": "Surface",
+       "selected": false
+      },
+      {
+       "label": "Thin",
+       "selected": false
+      },
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces and sketch regions to sweep",
+       "kind": "query",
+       "items": [
+        "Face of Extrude 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Sweep path",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Extend to full path",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Profile control",
+       "kind": "enum",
+       "text": "None",
+       "state": "ok"
+      },
+      {
+       "label": "Twist",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Scale",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sweep 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to sweep",
+        "kind": "query",
+        "items": [
+         "Face of Extrude 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Sweep path",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Extend to full path",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Profile control",
+        "kind": "enum",
+        "text": "None",
+        "state": "ok"
+       },
+       {
+        "label": "Twist",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Scale",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHd"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sweep 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sweep 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 52757,
+   "te": 52757
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 52758,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sweep 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Solid",
+       "selected": true
+      },
+      {
+       "label": "Surface",
+       "selected": false
+      },
+      {
+       "label": "Thin",
+       "selected": false
+      },
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces and sketch regions to sweep",
+       "kind": "query",
+       "items": [
+        "Face of Extrude 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Sweep path",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Extend to full path",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Profile control",
+       "kind": "enum",
+       "text": "None",
+       "state": "ok"
+      },
+      {
+       "label": "Twist",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Scale",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sweep 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Solid",
+        "selected": true
+       },
+       {
+        "label": "Surface",
+        "selected": false
+       },
+       {
+        "label": "Thin",
+        "selected": false
+       },
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces and sketch regions to sweep",
+        "kind": "query",
+        "items": [
+         "Face of Extrude 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Sweep path",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Extend to full path",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Profile control",
+        "kind": "enum",
+        "text": "None",
+        "state": "ok"
+       },
+       {
+        "label": "Twist",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Scale",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHd"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sweep 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sweep 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 57097,
+   "te": 57097
+  },
+  {
+   "step": 9,
    "do": {
     "do": "click",
     "on": {
@@ -1831,12 +2392,12 @@
     }
    },
    "ok": true,
-   "ti": 48542,
-   "tmove": 48586,
+   "ti": 57097,
+   "tmove": 57129,
    "moves": 1,
-   "tdown": 48934,
+   "tdown": 57537,
    "at": [
-    665,
+    284,
     360
    ],
    "state": {
@@ -1871,11 +2432,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -1941,21 +2502,6 @@
        "text": "1",
        "focused": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -1981,11 +2527,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -2051,21 +2597,6 @@
         "text": "1",
         "focused": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -2117,14 +2648,15 @@
      "rollbackAfter": "Sweep 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. \u00d7 Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2149,24 +2681,24 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 50984,
-   "te": 50984
+   "t": 59444,
+   "te": 59444
   },
   {
-   "step": 8,
+   "step": 10,
    "do": {
     "do": "wait",
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 50984,
+   "ti": 59444,
    "state": {
     "focus": {
      "kind": "field",
@@ -2199,11 +2731,11 @@
       },
       {
        "label": "New",
-       "selected": false
+       "selected": true
       },
       {
        "label": "Add",
-       "selected": true
+       "selected": false
       },
       {
        "label": "Remove",
@@ -2269,21 +2801,6 @@
        "text": "1",
        "focused": false,
        "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
       }
      ],
      "error": null,
@@ -2309,11 +2826,11 @@
        },
        {
         "label": "New",
-        "selected": false
+        "selected": true
        },
        {
         "label": "Add",
-        "selected": true
+        "selected": false
        },
        {
         "label": "Remove",
@@ -2379,21 +2896,6 @@
         "text": "1",
         "focused": false,
         "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
        }
       ],
       "error": null,
@@ -2445,14 +2947,15 @@
      "rollbackAfter": "Sweep 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. \u00d7 Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2477,18 +2980,18 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 55500,
-   "te": 55500
+   "t": 63855,
+   "te": 63855
   },
   {
-   "step": 9,
+   "step": 11,
    "do": {
     "do": "click",
     "on": {
@@ -2496,249 +2999,25 @@
     }
    },
    "ok": true,
-   "ti": 55500,
-   "tmove": 55558,
+   "ti": 63855,
+   "tmove": 63897,
    "moves": 1,
-   "tdown": 56003,
+   "tdown": 64376,
    "at": [
-    805,
+    424,
     93
    ],
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Sweep 1",
-     "titleState": "ok",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Solid",
-       "selected": true
-      },
-      {
-       "label": "Surface",
-       "selected": false
-      },
-      {
-       "label": "Thin",
-       "selected": false
-      },
-      {
-       "label": "New",
-       "selected": false
-      },
-      {
-       "label": "Add",
-       "selected": true
-      },
-      {
-       "label": "Remove",
-       "selected": false
-      },
-      {
-       "label": "Intersect",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Faces and sketch regions to sweep",
-       "kind": "query",
-       "items": [
-        "Face of Extrude 1"
-       ],
-       "active": false,
-       "state": "ok"
-      },
-      {
-       "label": "Sweep path",
-       "kind": "query",
-       "items": [
-        "Edge of Extrude 1"
-       ],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "icon:svg-icon-flip-direction-opposite",
-       "kind": "toggle",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Extend to full path",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Profile control",
-       "kind": "enum",
-       "text": "None",
-       "state": "ok"
-      },
-      {
-       "label": "Twist",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Scale",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": null,
-       "kind": "number",
-       "text": "1",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "enabled"
-    },
-    "dialogs": [
-     {
-      "title": "Sweep 1",
-      "titleState": "ok",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Solid",
-        "selected": true
-       },
-       {
-        "label": "Surface",
-        "selected": false
-       },
-       {
-        "label": "Thin",
-        "selected": false
-       },
-       {
-        "label": "New",
-        "selected": false
-       },
-       {
-        "label": "Add",
-        "selected": true
-       },
-       {
-        "label": "Remove",
-        "selected": false
-       },
-       {
-        "label": "Intersect",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Faces and sketch regions to sweep",
-        "kind": "query",
-        "items": [
-         "Face of Extrude 1"
-        ],
-        "active": false,
-        "state": "ok"
-       },
-       {
-        "label": "Sweep path",
-        "kind": "query",
-        "items": [
-         "Edge of Extrude 1"
-        ],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "icon:svg-icon-flip-direction-opposite",
-        "kind": "toggle",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Extend to full path",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Profile control",
-        "kind": "enum",
-        "text": "None",
-        "state": "ok"
-       },
-       {
-        "label": "Twist",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Scale",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": null,
-        "kind": "number",
-        "text": "1",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "enabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "panels": null,
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "EDGE",
-       "owner": "Part 1",
-       "id": "JHd"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -2756,31 +3035,32 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight"
+       "cls": ""
       },
       {
        "name": "Sweep 1",
        "state": "ok",
-       "selected": true,
-       "editing": true,
+       "selected": false,
+       "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Sweep 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. \u00d7 Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -2805,259 +3085,35 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 57961,
-   "te": 57961
+   "t": 66615,
+   "te": 66615
   },
   {
-   "step": 10,
+   "step": 12,
    "do": {
     "do": "wait",
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 57962,
+   "ti": 66616,
    "state": {
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "title": "Sweep 1",
-     "titleState": "ok",
-     "kind": "feature",
-     "tabs": [
-      {
-       "label": "Solid",
-       "selected": true
-      },
-      {
-       "label": "Surface",
-       "selected": false
-      },
-      {
-       "label": "Thin",
-       "selected": false
-      },
-      {
-       "label": "New",
-       "selected": false
-      },
-      {
-       "label": "Add",
-       "selected": true
-      },
-      {
-       "label": "Remove",
-       "selected": false
-      },
-      {
-       "label": "Intersect",
-       "selected": false
-      }
-     ],
-     "fields": [
-      {
-       "label": "Faces and sketch regions to sweep",
-       "kind": "query",
-       "items": [
-        "Face of Extrude 1"
-       ],
-       "active": false,
-       "state": "ok"
-      },
-      {
-       "label": "Sweep path",
-       "kind": "query",
-       "items": [
-        "Edge of Extrude 1"
-       ],
-       "active": true,
-       "state": "ok"
-      },
-      {
-       "label": "icon:svg-icon-flip-direction-opposite",
-       "kind": "toggle",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Extend to full path",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Profile control",
-       "kind": "enum",
-       "text": "None",
-       "state": "ok"
-      },
-      {
-       "label": "Twist",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Scale",
-       "kind": "boolean",
-       "checked": true,
-       "state": "ok"
-      },
-      {
-       "label": null,
-       "kind": "number",
-       "text": "1",
-       "focused": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge with all",
-       "kind": "boolean",
-       "checked": false,
-       "state": "ok"
-      },
-      {
-       "label": "Merge scope",
-       "kind": "query",
-       "items": [
-        "Part 1"
-       ],
-       "active": false,
-       "state": "ok"
-      }
-     ],
-     "error": null,
-     "ok": "enabled"
-    },
-    "dialogs": [
-     {
-      "title": "Sweep 1",
-      "titleState": "ok",
-      "kind": "feature",
-      "tabs": [
-       {
-        "label": "Solid",
-        "selected": true
-       },
-       {
-        "label": "Surface",
-        "selected": false
-       },
-       {
-        "label": "Thin",
-        "selected": false
-       },
-       {
-        "label": "New",
-        "selected": false
-       },
-       {
-        "label": "Add",
-        "selected": true
-       },
-       {
-        "label": "Remove",
-        "selected": false
-       },
-       {
-        "label": "Intersect",
-        "selected": false
-       }
-      ],
-      "fields": [
-       {
-        "label": "Faces and sketch regions to sweep",
-        "kind": "query",
-        "items": [
-         "Face of Extrude 1"
-        ],
-        "active": false,
-        "state": "ok"
-       },
-       {
-        "label": "Sweep path",
-        "kind": "query",
-        "items": [
-         "Edge of Extrude 1"
-        ],
-        "active": true,
-        "state": "ok"
-       },
-       {
-        "label": "icon:svg-icon-flip-direction-opposite",
-        "kind": "toggle",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Extend to full path",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Profile control",
-        "kind": "enum",
-        "text": "None",
-        "state": "ok"
-       },
-       {
-        "label": "Twist",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Scale",
-        "kind": "boolean",
-        "checked": true,
-        "state": "ok"
-       },
-       {
-        "label": null,
-        "kind": "number",
-        "text": "1",
-        "focused": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge with all",
-        "kind": "boolean",
-        "checked": false,
-        "state": "ok"
-       },
-       {
-        "label": "Merge scope",
-        "kind": "query",
-        "items": [
-         "Part 1"
-        ],
-        "active": false,
-        "state": "ok"
-       }
-      ],
-      "error": null,
-      "ok": "enabled"
-     }
-    ],
+    "dialog": null,
+    "dialogs": [],
     "panels": null,
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "EDGE",
-       "owner": "Part 1",
-       "id": "JHd"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -3075,31 +3131,32 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
+       "related": false,
        "hidden": false,
-       "cls": "related-highlight"
+       "cls": ""
       },
       {
        "name": "Sweep 1",
        "state": "ok",
-       "selected": true,
-       "editing": true,
+       "selected": false,
+       "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Sweep 1"
     },
     "parts": [
-     "Part 1"
+     "Part 1",
+     "Part 2"
     ],
-    "partsHeading": "Parts (1)",
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": true,
      "redo": false
     },
-    "message": "Boolean resulted in no geometry change. The parts either do not intersect or are totally contained. \u00d7 Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -3124,16 +3181,16 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 62412,
-   "te": 62412
+   "t": 71072,
+   "te": 71072
   }
  ],
- "t0_epoch_ms": 1795733741403
+ "t0_epoch_ms": 1795800835795
 }

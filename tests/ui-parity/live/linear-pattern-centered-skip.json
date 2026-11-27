@@ -1,19 +1,23 @@
 {
  "scenario": "linear-pattern-centered-skip",
- "recorded": "2026-11-14T02:25:12.241Z",
+ "recorded": "2026-11-27T17:30:40.718Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.2"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "f0bc6701459545b7c2b76475",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "90306b21647ec7e5c4bd03fb",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -83,7 +87,7 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 355.772,
    "height_mm": 243.974,
    "mmPerPixel": 0.275365,
    "orthographic": true
@@ -100,8 +104,12 @@
     }
    },
    "ok": true,
+   "ti": 28417,
+   "tmove": 28466,
+   "moves": 1,
+   "tdown": 28774,
    "at": [
-    689,
+    1070,
     58
    ],
    "state": {
@@ -354,14 +362,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 39167
+   "t": 31982,
+   "te": 31982
   },
   {
    "step": 2,
@@ -370,6 +379,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 31982,
    "state": {
     "focus": {
      "kind": "field",
@@ -620,14 +630,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 43930
+   "t": 36381,
+   "te": 36381
   },
   {
    "step": 3,
@@ -642,11 +653,15 @@
     }
    },
    "ok": true,
+   "ti": 36381,
+   "tmove": 36428,
+   "moves": 1,
    "hover": [
     "JHD"
    ],
+   "tdown": 37782,
    "at": [
-    1173,
+    1363,
     482
    ],
    "state": {
@@ -906,14 +921,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 48810
+   "t": 39815,
+   "te": 39815
   },
   {
    "step": 4,
@@ -924,8 +940,12 @@
     }
    },
    "ok": true,
+   "ti": 39816,
+   "tmove": 39852,
+   "moves": 1,
+   "tdown": 40215,
    "at": [
-    356,
+    737,
     229
    ],
    "state": {
@@ -1182,14 +1202,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 51385
+   "t": 42246,
+   "te": 42246
   },
   {
    "step": 5,
@@ -1204,11 +1225,15 @@
     }
    },
    "ok": true,
+   "ti": 42246,
+   "tmove": 42356,
+   "moves": 1,
    "hover": [
     "JHR"
    ],
+   "tdown": 43681,
    "at": [
-    1114,
+    1304,
     528
    ],
    "state": {
@@ -1473,14 +1498,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 56140
+   "t": 46308,
+   "te": 46308
   },
   {
    "step": 6,
@@ -1491,8 +1517,12 @@
     }
    },
    "ok": true,
+   "ti": 46308,
+   "tmove": 46351,
+   "moves": 1,
+   "tdown": 46900,
    "at": [
-    371,
+    752,
     277
    ],
    "state": {
@@ -1766,14 +1796,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 59351
+   "t": 48895,
+   "te": 48895
   },
   {
    "step": 7,
@@ -1782,6 +1813,8 @@
     "text": "50"
    },
    "ok": true,
+   "ti": 48895,
+   "tdown": 48895,
    "state": {
     "focus": {
      "kind": "field",
@@ -2053,14 +2086,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 61934
+   "t": 51025,
+   "te": 51025
   },
   {
    "step": 8,
@@ -2069,14 +2103,16 @@
     "key": "Enter"
    },
    "ok": true,
+   "ti": 51025,
    "pointer": {
     "at": [
-     371,
+     752,
      276
     ],
     "hover": [],
     "element": "input.os-param-number.dropdown-source"
    },
+   "tdown": 51052,
    "state": {
     "focus": {
      "kind": "field",
@@ -2348,14 +2384,15 @@
       -123.372,
       82.248
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 65592
+   "t": 52954,
+   "te": 52955
   },
   {
    "step": 9,
@@ -2364,6 +2401,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 52955,
    "state": {
     "focus": {
      "kind": "field",
@@ -2635,14 +2673,15 @@
       -123.372,
       82.248
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 70209
+   "t": 57322,
+   "te": 57322
   },
   {
    "step": 10,
@@ -2653,8 +2692,12 @@
     }
    },
    "ok": true,
+   "ti": 57322,
+   "tmove": 57366,
+   "moves": 1,
+   "tdown": 57779,
    "at": [
-    295,
+    676,
     329
    ],
    "state": {
@@ -2929,14 +2972,15 @@
       -123.372,
       82.248
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 73959
+   "t": 59691,
+   "te": 59691
   },
   {
    "step": 11,
@@ -2945,6 +2989,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 59691,
    "state": {
     "focus": {
      "kind": "field",
@@ -3217,14 +3262,15 @@
       -123.372,
       82.248
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 78757
+   "t": 64039,
+   "te": 64039
   },
   {
    "step": 12,
@@ -3235,21 +3281,19 @@
     }
    },
    "ok": true,
+   "ti": 64039,
+   "tmove": 64076,
+   "moves": 1,
+   "tdown": 64435,
    "at": [
-    330,
+    711,
     384
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Skip instances",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Instances to skip",
      "dialog": "Linear pattern 1"
     },
     "dialog": {
@@ -3517,14 +3561,15 @@
       -123.372,
       82.248
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 83130
+   "t": 66318,
+   "te": 66318
   },
   {
    "step": 13,
@@ -3533,17 +3578,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 66318,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Skip instances",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Instances to skip",
      "dialog": "Linear pattern 1"
     },
     "dialog": {
@@ -3811,14 +3851,15 @@
       -123.372,
       82.248
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 87834
+   "t": 70696,
+   "te": 70696
   },
   {
    "step": 14,
@@ -3827,14 +3868,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 70696,
    "pointer": {
     "at": [
-     330,
+     711,
      383
     ],
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 70702,
    "state": {
     "focus": {
      "kind": "none"
@@ -3903,14 +3946,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 91622
+   "t": 74220,
+   "te": 74220
   },
   {
    "step": 15,
@@ -3919,6 +3963,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 74220,
    "state": {
     "focus": {
      "kind": "none"
@@ -3987,14 +4032,16 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 96357
+   "t": 78599,
+   "te": 78599
   }
- ]
+ ],
+ "t0_epoch_ms": 1795800618639
 }

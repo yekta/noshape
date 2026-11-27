@@ -1,6 +1,6 @@
 {
  "scenario": "linear-pattern-two-directions",
- "recorded": "2026-11-27T02:19:57.019Z",
+ "recorded": "2026-11-27T17:27:03.861Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -14,7 +14,7 @@
  "live": {
   "document": "060c0461ca301a2c112f155e",
   "workspace": "96663039d748842f7c25efc6",
-  "element": "1ee77a13c8f8ec37827e2385",
+  "element": "1c0417854e93553565621e70",
   "start": "block",
   "startElement": "d0643b8ab31b96fd21acb45e",
   "runner": "live2 .nstate-uip-4.json"
@@ -104,10 +104,10 @@
     }
    },
    "ok": true,
-   "ti": 26773,
-   "tmove": 26891,
+   "ti": 31864,
+   "tmove": 31916,
    "moves": 1,
-   "tdown": 27231,
+   "tdown": 32249,
    "at": [
     1070,
     58
@@ -369,8 +369,8 @@
     },
     "measure": null
    },
-   "t": 30750,
-   "te": 30751
+   "t": 35727,
+   "te": 35727
   },
   {
    "step": 2,
@@ -381,10 +381,10 @@
     }
    },
    "ok": true,
-   "ti": 30751,
-   "tmove": 31104,
+   "ti": 35727,
+   "tmove": 36102,
    "moves": 1,
-   "tdown": 31431,
+   "tdown": 36585,
    "at": [
     493,
     690
@@ -656,8 +656,8 @@
     },
     "measure": null
    },
-   "t": 33453,
-   "te": 33453
+   "t": 39431,
+   "te": 39431
   },
   {
    "step": 3,
@@ -668,10 +668,10 @@
     }
    },
    "ok": true,
-   "ti": 33453,
-   "tmove": 33507,
+   "ti": 39431,
+   "tmove": 39494,
    "moves": 1,
-   "tdown": 33994,
+   "tdown": 40018,
    "at": [
     718,
     340
@@ -1003,9 +1003,9 @@
     },
     "measure": null
    },
-   "t": 35971,
-   "te": 35971
+   "t": 41977,
+   "te": 41977
   }
  ],
- "t0_epoch_ms": 1795745976415
+ "t0_epoch_ms": 1795800398657
 }

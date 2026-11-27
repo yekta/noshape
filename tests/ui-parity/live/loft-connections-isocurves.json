@@ -1,19 +1,23 @@
 {
  "scenario": "loft-connections-isocurves",
- "recorded": "2026-11-14T07:08:38.256Z",
+ "recorded": "2026-11-27T17:26:59.567Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-14.6"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "38e54affc51d506498f8ecd2",
-  "workspace": "24db5f467e1ccbd8d405a2a9",
-  "element": "4e8e0840b64f8d9aac40ee70",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "1267b48ffb338e37012c1658",
   "start": "block",
-  "startElement": "ff2245ce846878221ff975e1",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -100,6 +104,10 @@
     }
    },
    "ok": true,
+   "ti": 29302,
+   "tmove": 29394,
+   "moves": 1,
+   "tdown": 29754,
    "at": [
     321,
     58
@@ -353,7 +361,8 @@
     },
     "measure": null
    },
-   "t": 46885
+   "t": 32761,
+   "te": 32761
   },
   {
    "step": 2,
@@ -362,6 +371,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 32761,
    "state": {
     "focus": {
      "kind": "field",
@@ -611,7 +621,8 @@
     },
     "measure": null
    },
-   "t": 53173
+   "t": 37471,
+   "te": 37471
   },
   {
    "step": 3,
@@ -622,6 +633,10 @@
     }
    },
    "ok": true,
+   "ti": 37471,
+   "tmove": 37557,
+   "moves": 1,
+   "tdown": 38091,
    "at": [
     324,
     394
@@ -629,14 +644,8 @@
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Connections",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Match connections",
      "dialog": "Loft 1"
     },
     "dialog": {
@@ -893,7 +902,8 @@
     },
     "measure": null
    },
-   "t": 58877
+   "t": 40893,
+   "te": 40893
   },
   {
    "step": 4,
@@ -902,17 +912,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 40893,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Connections",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Match connections",
      "dialog": "Loft 1"
     },
     "dialog": {
@@ -1169,7 +1174,8 @@
     },
     "measure": null
    },
-   "t": 64017
+   "t": 45264,
+   "te": 45264
   },
   {
    "step": 5,
@@ -1180,6 +1186,10 @@
     }
    },
    "ok": true,
+   "ti": 45264,
+   "tmove": 45300,
+   "moves": 1,
+   "tdown": 45678,
    "at": [
     314,
     458
@@ -1465,7 +1475,8 @@
     },
     "measure": null
    },
-   "t": 69586
+   "t": 47616,
+   "te": 47616
   },
   {
    "step": 6,
@@ -1474,6 +1485,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 47616,
    "state": {
     "focus": {
      "kind": "field",
@@ -1755,7 +1767,8 @@
     },
     "measure": null
    },
-   "t": 75960
+   "t": 51935,
+   "te": 51935
   },
   {
    "step": 7,
@@ -1764,6 +1777,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 51935,
    "pointer": {
     "at": [
      313,
@@ -1772,6 +1786,7 @@
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 51943,
    "state": {
     "focus": {
      "kind": "none"
@@ -1847,7 +1862,8 @@
     },
     "measure": null
    },
-   "t": 80770
+   "t": 55502,
+   "te": 55502
   },
   {
    "step": 8,
@@ -1856,6 +1872,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 55502,
    "state": {
     "focus": {
      "kind": "none"
@@ -1931,7 +1948,9 @@
     },
     "measure": null
    },
-   "t": 85791
+   "t": 59874,
+   "te": 59874
   }
- ]
+ ],
+ "t0_epoch_ms": 1795800396940
 }

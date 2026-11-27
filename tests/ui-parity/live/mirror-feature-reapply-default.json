@@ -1,6 +1,6 @@
 {
  "scenario": "mirror-feature-reapply-default",
- "recorded": "2026-11-27T02:24:41.943Z",
+ "recorded": "2026-11-27T17:29:04.368Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -12,12 +12,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "6617f25684d6aeb4afa27893",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "e97b30e12724ce4256bf1949",
   "start": "boss-block",
-  "startElement": "05adbaa80819df3d011a24c3",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "4519ccc5638b06216f266a2d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -105,7 +105,7 @@
     -116.913,
     77.942
    ],
-   "width_mm": 355.772,
+   "width_mm": 460.686,
    "height_mm": 243.974,
    "mmPerPixel": 0.275365,
    "orthographic": true
@@ -122,12 +122,12 @@
     }
    },
    "ok": true,
-   "ti": 27650,
-   "tmove": 27737,
+   "ti": 24511,
+   "tmove": 24555,
    "moves": 1,
-   "tdown": 28096,
+   "tdown": 24869,
    "at": [
-    1122,
+    741,
     58
    ],
    "state": {
@@ -322,15 +322,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 31054,
-   "te": 31055
+   "t": 28338,
+   "te": 28339
   },
   {
    "step": 2,
@@ -342,12 +342,12 @@
     }
    },
    "ok": true,
-   "ti": 31055,
-   "tmove": 31140,
+   "ti": 28339,
+   "tmove": 28409,
    "moves": 2,
-   "tdown": 31511,
+   "tdown": 28756,
    "at": [
-    724,
+    343,
     121
    ],
    "state": {
@@ -520,15 +520,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 35291,
-   "te": 35291
+   "t": 32257,
+   "te": 32257
   },
   {
    "step": 3,
@@ -539,12 +539,12 @@
     }
    },
    "ok": true,
-   "ti": 35292,
-   "tmove": 35650,
+   "ti": 32257,
+   "tmove": 32599,
    "moves": 1,
-   "tdown": 35995,
+   "tdown": 32937,
    "at": [
-    451,
+    70,
     365
    ],
    "state": {
@@ -727,15 +727,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 38010,
-   "te": 38010
+   "t": 35315,
+   "te": 35315
   },
   {
    "step": 4,
@@ -746,12 +746,12 @@
     }
    },
    "ok": true,
-   "ti": 38010,
-   "tmove": 38057,
+   "ti": 35315,
+   "tmove": 35368,
    "moves": 1,
-   "tdown": 38439,
+   "tdown": 35748,
    "at": [
-    724,
+    343,
     201
    ],
    "state": {
@@ -928,15 +928,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 40581,
-   "te": 40581
+   "t": 37729,
+   "te": 37729
   },
   {
    "step": 5,
@@ -947,12 +947,12 @@
     }
    },
    "ok": true,
-   "ti": 40581,
-   "tmove": 40653,
-   "moves": 4,
-   "tdown": 42988,
+   "ti": 37729,
+   "tmove": 37783,
+   "moves": 6,
+   "tdown": 40659,
    "at": [
-    1165,
+    1222,
     568
    ],
    "state": {
@@ -1136,15 +1136,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 45817,
-   "te": 45817
+   "t": 42933,
+   "te": 42933
   },
   {
    "step": 6,
@@ -1153,7 +1153,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 45817,
+   "ti": 42933,
    "state": {
     "focus": {
      "kind": "none"
@@ -1335,15 +1335,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 50469,
-   "te": 50469
+   "t": 47333,
+   "te": 47333
   },
   {
    "step": 7,
@@ -1354,12 +1354,12 @@
     }
    },
    "ok": true,
-   "ti": 50469,
-   "tmove": 50572,
+   "ti": 47333,
+   "tmove": 47390,
    "moves": 1,
-   "tdown": 51134,
+   "tdown": 47741,
    "at": [
-    805,
+    424,
     93
    ],
    "state": {
@@ -1457,15 +1457,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 53360,
-   "te": 53360
+   "t": 50399,
+   "te": 50399
   },
   {
    "step": 8,
@@ -1474,7 +1474,7 @@
     "until": "regenerated"
    },
    "ok": true,
-   "ti": 53360,
+   "ti": 50399,
    "state": {
     "focus": {
      "kind": "none"
@@ -1570,16 +1570,16 @@
       -116.913,
       77.942
      ],
-     "width_mm": 355.772,
+     "width_mm": 460.686,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 57742,
-   "te": 57742
+   "t": 54764,
+   "te": 54764
   }
  ],
- "t0_epoch_ms": 1795746260397
+ "t0_epoch_ms": 1795800525568
 }

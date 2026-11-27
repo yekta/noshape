@@ -1,19 +1,23 @@
 {
  "scenario": "wrap-surface-split-tabs",
- "recorded": "2026-11-14T04:30:08.881Z",
+ "recorded": "2026-11-27T17:31:15.807Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.5"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "680dbcebf65aa47ba4a5771c",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "2f0e9425838d546f2f4c664e",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -101,6 +105,10 @@
     }
    },
    "ok": true,
+   "ti": 25963,
+   "tmove": 26033,
+   "moves": 3,
+   "tdown": 27158,
    "at": [
     869,
     58
@@ -302,7 +310,8 @@
     },
     "measure": null
    },
-   "t": 34759
+   "t": 31494,
+   "te": 31494
   },
   {
    "step": 2,
@@ -311,6 +320,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 31494,
    "state": {
     "focus": {
      "kind": "field",
@@ -508,7 +518,8 @@
     },
     "measure": null
    },
-   "t": 39393
+   "t": 35903,
+   "te": 35903
   },
   {
    "step": 3,
@@ -519,6 +530,10 @@
     }
    },
    "ok": true,
+   "ti": 35903,
+   "tmove": 35957,
+   "moves": 1,
+   "tdown": 36260,
    "at": [
     357,
     121
@@ -717,7 +732,8 @@
     },
     "measure": null
    },
-   "t": 41795
+   "t": 38193,
+   "te": 38193
   },
   {
    "step": 4,
@@ -726,6 +742,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 38193,
    "state": {
     "focus": {
      "kind": "none"
@@ -920,7 +937,8 @@
     },
     "measure": null
    },
-   "t": 46368
+   "t": 42579,
+   "te": 42579
   },
   {
    "step": 5,
@@ -931,6 +949,10 @@
     }
    },
    "ok": true,
+   "ti": 42579,
+   "tmove": 42618,
+   "moves": 1,
+   "tdown": 42943,
    "at": [
     433,
     121
@@ -1117,7 +1139,8 @@
     },
     "measure": null
    },
-   "t": 49704
+   "t": 44913,
+   "te": 44913
   },
   {
    "step": 6,
@@ -1126,6 +1149,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 44913,
    "state": {
     "focus": {
      "kind": "none"
@@ -1308,7 +1332,8 @@
     },
     "measure": null
    },
-   "t": 54317
+   "t": 49314,
+   "te": 49314
   },
   {
    "step": 7,
@@ -1317,6 +1342,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 49314,
    "pointer": {
     "at": [
      432,
@@ -1325,6 +1351,7 @@
     "hover": [],
     "element": "span"
    },
+   "tdown": 49321,
    "state": {
     "focus": {
      "kind": "none"
@@ -1400,7 +1427,8 @@
     },
     "measure": null
    },
-   "t": 57999
+   "t": 52876,
+   "te": 52876
   },
   {
    "step": 8,
@@ -1409,6 +1437,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 52876,
    "state": {
     "focus": {
      "kind": "none"
@@ -1484,7 +1513,9 @@
     },
     "measure": null
    },
-   "t": 62539
+   "t": 57274,
+   "te": 57274
   }
- ]
+ ],
+ "t0_epoch_ms": 1795800655888
 }

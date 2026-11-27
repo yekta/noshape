@@ -1,19 +1,23 @@
 {
  "scenario": "fillet-overflow-smooth-toggles",
- "recorded": "2026-11-14T02:08:04.988Z",
+ "recorded": "2026-11-27T17:29:27.558Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.2"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "f89a2e2ed0b99c65b3de888e",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "57aa9abd6342503507c90b88",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -83,7 +87,7 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 355.772,
    "height_mm": 243.974,
    "mmPerPixel": 0.275365,
    "orthographic": true
@@ -100,8 +104,12 @@
     }
    },
    "ok": true,
+   "ti": 26211,
+   "tmove": 26284,
+   "moves": 1,
+   "tdown": 26625,
    "at": [
-    411,
+    792,
     58
    ],
    "state": {
@@ -154,7 +162,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -236,7 +244,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -346,14 +354,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 32609
+   "t": 29441,
+   "te": 29442
   },
   {
    "step": 2,
@@ -362,6 +371,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 29442,
    "state": {
     "focus": {
      "kind": "field",
@@ -412,7 +422,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -494,7 +504,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -604,14 +614,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 37345
+   "t": 33830,
+   "te": 33830
   },
   {
    "step": 3,
@@ -626,11 +637,15 @@
     }
    },
    "ok": true,
+   "ti": 33830,
+   "tmove": 33880,
+   "moves": 1,
    "hover": [
     "JHV"
    ],
+   "tdown": 35189,
    "at": [
-    1114,
+    1304,
     497
    ],
    "state": {
@@ -682,7 +697,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -766,7 +781,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -882,14 +897,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 43025
+   "t": 37278,
+   "te": 37278
   },
   {
    "step": 4,
@@ -898,6 +914,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 37278,
    "state": {
     "focus": {
      "kind": "none"
@@ -947,7 +964,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1031,7 +1048,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1147,14 +1164,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 47590
+   "t": 41665,
+   "te": 41665
   },
   {
    "step": 5,
@@ -1165,8 +1183,12 @@
     }
    },
    "ok": true,
+   "ti": 41666,
+   "tmove": 41720,
+   "moves": 1,
+   "tdown": 42119,
    "at": [
-    348,
+    729,
     393
    ],
    "state": {
@@ -1227,7 +1249,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1311,7 +1333,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1427,14 +1449,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 51261
+   "t": 44079,
+   "te": 44079
   },
   {
    "step": 6,
@@ -1443,6 +1466,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 44079,
    "state": {
     "focus": {
      "kind": "field",
@@ -1501,7 +1525,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1585,7 +1609,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1701,14 +1725,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 55898
+   "t": 48524,
+   "te": 48524
   },
   {
    "step": 7,
@@ -1719,21 +1744,19 @@
     }
    },
    "ok": true,
+   "ti": 48524,
+   "tmove": 48557,
+   "moves": 1,
+   "tdown": 48905,
    "at": [
-    350,
+    731,
     421
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Smooth fillet corners",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Corners to exclude",
      "dialog": "Fillet 1"
     },
     "dialog": {
@@ -1781,7 +1804,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -1872,7 +1895,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -1989,14 +2012,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 59830
+   "t": 50854,
+   "te": 50854
   },
   {
    "step": 8,
@@ -2005,17 +2029,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 50855,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": "Smooth fillet corners",
-     "text": "on",
-     "selection": [
-      null,
-      null
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Corners to exclude",
      "dialog": "Fillet 1"
     },
     "dialog": {
@@ -2063,7 +2082,7 @@
       {
        "label": "Radius",
        "kind": "number",
-       "text": "1 mm",
+       "text": "5 mm",
        "focused": false,
        "state": "ok"
       },
@@ -2154,7 +2173,7 @@
        {
         "label": "Radius",
         "kind": "number",
-        "text": "1 mm",
+        "text": "5 mm",
         "focused": false,
         "state": "ok"
        },
@@ -2271,14 +2290,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 64448
+   "t": 55514,
+   "te": 55514
   },
   {
    "step": 9,
@@ -2287,14 +2307,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 55514,
    "pointer": {
     "at": [
-     349,
+     730,
      420
     ],
     "hover": [],
     "element": "span.os-param-checkbox-label.ng-star-inserted"
    },
+   "tdown": 55523,
    "state": {
     "focus": {
      "kind": "none"
@@ -2363,14 +2385,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 68096
+   "t": 59130,
+   "te": 59130
   },
   {
    "step": 10,
@@ -2379,6 +2402,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 59130,
    "state": {
     "focus": {
      "kind": "none"
@@ -2447,14 +2471,16 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 72621
+   "t": 63545,
+   "te": 63545
   }
- ]
+ ],
+ "t0_epoch_ms": 1795800547149
 }

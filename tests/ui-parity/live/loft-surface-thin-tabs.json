@@ -1,19 +1,23 @@
 {
  "scenario": "loft-surface-thin-tabs",
- "recorded": "2026-11-14T02:47:17.989Z",
+ "recorded": "2026-11-27T17:32:17.944Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.3"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "40b370688ced1f583a2c8ea3",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "1d832a10031c148065feccb9",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -100,6 +104,10 @@
     }
    },
    "ok": true,
+   "ti": 25021,
+   "tmove": 25087,
+   "moves": 1,
+   "tdown": 25416,
    "at": [
     321,
     58
@@ -353,7 +361,8 @@
     },
     "measure": null
    },
-   "t": 30363
+   "t": 28591,
+   "te": 28591
   },
   {
    "step": 2,
@@ -362,6 +371,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 28591,
    "state": {
     "focus": {
      "kind": "field",
@@ -611,7 +621,8 @@
     },
     "measure": null
    },
-   "t": 35105
+   "t": 33042,
+   "te": 33042
   },
   {
    "step": 3,
@@ -622,13 +633,20 @@
     }
    },
    "ok": true,
+   "ti": 33042,
+   "tmove": 33134,
+   "moves": 1,
+   "tdown": 33506,
    "at": [
     358,
     121
    ],
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "field",
+     "tag": "div",
+     "label": "Profiles",
+     "dialog": "Loft 1"
     },
     "dialog": {
      "title": "Loft 1",
@@ -868,7 +886,8 @@
     },
     "measure": null
    },
-   "t": 38304
+   "t": 35467,
+   "te": 35467
   },
   {
    "step": 4,
@@ -877,9 +896,13 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 35467,
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "field",
+     "tag": "div",
+     "label": "Profiles",
+     "dialog": "Loft 1"
     },
     "dialog": {
      "title": "Loft 1",
@@ -1119,7 +1142,8 @@
     },
     "measure": null
    },
-   "t": 42903
+   "t": 39823,
+   "te": 39823
   },
   {
    "step": 5,
@@ -1130,6 +1154,10 @@
     }
    },
    "ok": true,
+   "ti": 39823,
+   "tmove": 39864,
+   "moves": 1,
+   "tdown": 40152,
    "at": [
     433,
     121
@@ -1456,7 +1484,8 @@
     },
     "measure": null
    },
-   "t": 46325
+   "t": 42030,
+   "te": 42030
   },
   {
    "step": 6,
@@ -1465,6 +1494,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 42030,
    "state": {
     "focus": {
      "kind": "none"
@@ -1787,7 +1817,8 @@
     },
     "measure": null
    },
-   "t": 50974
+   "t": 46361,
+   "te": 46361
   },
   {
    "step": 7,
@@ -1796,6 +1827,7 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 46361,
    "pointer": {
     "at": [
      433,
@@ -1804,6 +1836,7 @@
     "hover": [],
     "element": "span"
    },
+   "tdown": 46368,
    "state": {
     "focus": {
      "kind": "none"
@@ -1879,7 +1912,8 @@
     },
     "measure": null
    },
-   "t": 54662
+   "t": 49856,
+   "te": 49856
   },
   {
    "step": 8,
@@ -1888,6 +1922,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 49856,
    "state": {
     "focus": {
      "kind": "none"
@@ -1963,7 +1998,9 @@
     },
     "measure": null
    },
-   "t": 59251
+   "t": 54253,
+   "te": 54253
   }
- ]
+ ],
+ "t0_epoch_ms": 1795800718468
 }
