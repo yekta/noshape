@@ -1,0 +1,61 @@
+{
+ "name": "asm-revolute-reorient-secondary-ok",
+ "about": "Revolute, Reorient secondary axis, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 4 (11-27)",
+ "start": "pin-block-apart",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Revolute mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     63.54,
+     -3.54,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     -3.54,
+     3.54,
+     18
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Reorient secondary axis"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

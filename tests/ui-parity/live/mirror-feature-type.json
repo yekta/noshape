@@ -1,18 +1,23 @@
 {
  "scenario": "mirror-feature-type",
- "recorded": "2026-11-04T00:18:25.138Z",
+ "recorded": "2026-11-27T02:26:58.558Z",
  "app": {
   "name": "live",
-  "version": "web runtime ca5abdc1f92d5fa41125",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "ae24799cd49ddd3067cd7cbf",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "6d5f9758edd9ca4eca4a5496",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -20,6 +25,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -58,7 +64,35 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
  },
  "steps": [
   {
@@ -70,8 +104,12 @@
     }
    },
    "ok": true,
+   "ti": 27785,
+   "tmove": 27863,
+   "moves": 1,
+   "tdown": 28210,
    "at": [
-    741,
+    1122,
     58
    ],
    "state": {
@@ -115,7 +153,7 @@
        "kind": "query",
        "items": [],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": "Mirror plane",
@@ -163,7 +201,7 @@
         "kind": "query",
         "items": [],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": "Mirror plane",
@@ -177,6 +215,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -224,9 +263,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 27954
+   "t": 31518,
+   "te": 31519
   },
   {
    "step": 2,
@@ -238,21 +306,19 @@
     }
    },
    "ok": true,
+   "ti": 31519,
+   "tmove": 31623,
+   "moves": 2,
+   "tdown": 31990,
    "at": [
-    343,
+    724,
     121
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": null,
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Features to mirror",
      "dialog": "Mirror 1"
     },
     "dialog": {
@@ -272,7 +338,7 @@
        "kind": "query",
        "items": [],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": "Mirror plane",
@@ -309,7 +375,7 @@
         "kind": "query",
         "items": [],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": "Mirror plane",
@@ -329,6 +395,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -376,9 +443,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 38421
+   "t": 35526,
+   "te": 35526
   },
   {
    "step": 3,
@@ -389,8 +485,12 @@
     }
    },
    "ok": true,
+   "ti": 35526,
+   "tmove": 35874,
+   "moves": 1,
+   "tdown": 36293,
    "at": [
-    70,
+    451,
     313
    ],
    "state": {
@@ -426,7 +526,7 @@
        "kind": "query",
        "items": [],
        "active": false,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": "Reapply features",
@@ -465,7 +565,7 @@
         "kind": "query",
         "items": [],
         "active": false,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": "Reapply features",
@@ -478,6 +578,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -531,9 +632,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 46403
+   "t": 38426,
+   "te": 38426
   },
   {
    "step": 4,
@@ -544,8 +674,12 @@
     }
    },
    "ok": true,
+   "ti": 38426,
+   "tmove": 38495,
+   "moves": 1,
+   "tdown": 38974,
    "at": [
-    343,
+    724,
     201
    ],
    "state": {
@@ -581,7 +715,7 @@
        "kind": "query",
        "items": [],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": "Reapply features",
@@ -620,7 +754,7 @@
         "kind": "query",
         "items": [],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": "Reapply features",
@@ -633,6 +767,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -680,9 +815,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 52444
+   "t": 41016,
+   "te": 41016
   },
   {
    "step": 5,
@@ -693,8 +857,12 @@
     }
    },
    "ok": true,
+   "ti": 41016,
+   "tmove": 41074,
+   "moves": 4,
+   "tdown": 43078,
    "at": [
-    1222,
+    1165,
     568
    ],
    "state": {
@@ -783,6 +951,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -837,9 +1006,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 73093
+   "t": 45414,
+   "te": 45414
   },
   {
    "step": 6,
@@ -848,12 +1046,25 @@
     "key": "Enter"
    },
    "ok": true,
+   "ti": 45414,
+   "pointer": {
+    "at": [
+     1165,
+     568
+    ],
+    "hover": [
+     "JEC"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 45422,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -902,9 +1113,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 76056
+   "t": 47450,
+   "te": 47450
   },
   {
    "step": 7,
@@ -913,12 +1153,14 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 47450,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -967,9 +1209,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 80229
+   "t": 51844,
+   "te": 51844
   },
   {
    "step": 8,
@@ -978,12 +1249,25 @@
     "key": "Enter"
    },
    "ok": true,
+   "ti": 51844,
+   "pointer": {
+    "at": [
+     1165,
+     568
+    ],
+    "hover": [
+     "JEC"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 51853,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1032,9 +1316,38 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 81941
+   "t": 53783,
+   "te": 53783
   },
   {
    "step": 9,
@@ -1043,12 +1356,14 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 53783,
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1097,9 +1412,39 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
    },
-   "t": 86119
+   "t": 58170,
+   "te": 58170
   }
- ]
+ ],
+ "t0_epoch_ms": 1795746397370
 }

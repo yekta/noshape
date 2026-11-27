@@ -1,0 +1,40 @@
+{
+ "name": "asm-mate-connector-on-edge-ok",
+ "about": "Mate connector on Part 2's front top edge, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 4 (11-27)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     70,
+     0,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

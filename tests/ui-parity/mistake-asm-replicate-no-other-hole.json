@@ -1,0 +1,72 @@
+{
+ "name": "mistake-asm-replicate-no-other-hole",
+ "about": "Replicate the mated pin, Parts to find match in = the block (its only hole is the mated one), \u2713",
+ "area": "assembly",
+ "source": "live depth batch 4 (11-27)",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Replicate"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     60,
+     0,
+     30
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Parts to find match in"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "mate": "Replicate 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

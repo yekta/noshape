@@ -1,0 +1,46 @@
+{
+ "name": "asm-insert-config-large-ok",
+ "about": "config-blocks Insert of Part 2 (configuration as the dialog shows it), one click, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 4 (11-27)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 4000
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

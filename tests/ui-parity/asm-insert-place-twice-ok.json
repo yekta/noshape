@@ -1,0 +1,54 @@
+{
+ "name": "asm-insert-place-twice-ok",
+ "about": "Insert: Part 2 placed with two clicks in the view, \u2713",
+ "area": "assembly",
+ "source": "live depth batch 4 (11-27)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "key",
+   "key": "i"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 4000
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

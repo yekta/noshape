@@ -11879,11 +11879,12 @@ fn a_start_sketch_on_a_plane_feature() {
 }
 
 /// The ridge start's four lines close one trapezoid region and its symmetric extrude is live's 5.52 cm3; the
-/// up-to-next start is the 12 cm3 block with a one-region circle on Plane 1 (live, lane 4, 11-26).
+/// up-to-next start is the 12 cm3 block with a one-region circle on Plane 1 (live, lane 4, 11-26); pin-block-holes'
+/// block is 64 cm3 less its three Ø10 holes, as live's (61643.806 mm3 with the pin, lane 4, 11-27).
 #[test]
-fn the_ridge_and_up_to_next_starts_are_lives() {
+fn the_depth_batch_starts_are_lives() {
     let starts: Value = serde_json::from_str(include_str!("../../../tests/ui-parity/starts.json")).unwrap();
-    for (start, sketch, volume) in [("ridge", "Sketch 1", 5520.0), ("up-to-next", "Sketch 2", 12000.0)] {
+    for (start, sketch, volume) in [("ridge", "Sketch 1", 5520.0), ("up-to-next", "Sketch 2", 12000.0), ("pin-block-holes", "Sketch 3", 59287.611)] {
         let mut ctx = Ctx::new();
         let path = scratch(&format!("start-{start}.noshape"));
         noshape_ops::ui_parity::build_start(&mut ctx, &path, &starts[start]).unwrap();

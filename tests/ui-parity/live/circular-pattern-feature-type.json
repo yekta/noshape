@@ -1,19 +1,23 @@
 {
  "scenario": "circular-pattern-feature-type",
- "recorded": "2026-11-14T02:40:46.876Z",
+ "recorded": "2026-11-27T02:22:30.847Z",
  "app": {
   "name": "live",
-  "version": "web runtime 303901ce5388bd1d8370",
+  "version": "web runtime 0adacf98979b8345c542",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-14.1 82b3ead3 + live2 2026-11-14.2"
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "262c03f0ee6cfb09ecf0771a",
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "c0501c7887de9254d4b1dd7a",
   "start": "block",
-  "startElement": "392bca590892e6ffb484a34b",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "d0643b8ab31b96fd21acb45e",
+  "runner": "live2 .nstate-uip-4.json"
  },
  "start": {
   "focus": {
@@ -83,7 +87,7 @@
     -116.913,
     77.942
    ],
-   "width_mm": 460.686,
+   "width_mm": 355.772,
    "height_mm": 243.974,
    "mmPerPixel": 0.275365,
    "orthographic": true
@@ -101,8 +105,12 @@
     }
    },
    "ok": true,
+   "ti": 26996,
+   "tmove": 27079,
+   "moves": 3,
+   "tdown": 28228,
    "at": [
-    711,
+    1092,
     58
    ],
    "state": {
@@ -355,14 +363,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 34735
+   "t": 33212,
+   "te": 33212
   },
   {
    "step": 2,
@@ -371,6 +380,7 @@
     "until": "dialog"
    },
    "ok": true,
+   "ti": 33212,
    "state": {
     "focus": {
      "kind": "field",
@@ -621,14 +631,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 39379
+   "t": 37653,
+   "te": 37653
   },
   {
    "step": 3,
@@ -640,21 +651,19 @@
     }
    },
    "ok": true,
+   "ti": 37653,
+   "tmove": 37719,
+   "moves": 2,
+   "tdown": 38046,
    "at": [
-    343,
+    724,
     121
    ],
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": null,
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Features to pattern",
      "dialog": "Circular pattern 1"
     },
     "dialog": {
@@ -878,14 +887,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 43885
+   "t": 41547,
+   "te": 41547
   },
   {
    "step": 4,
@@ -894,17 +904,12 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 41547,
    "state": {
     "focus": {
      "kind": "field",
-     "tag": "input",
-     "label": null,
-     "text": "",
-     "selection": [
-      0,
-      0
-     ],
-     "all": false,
+     "tag": "div",
+     "label": "Features to pattern",
      "dialog": "Circular pattern 1"
     },
     "dialog": {
@@ -1128,14 +1133,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 48556
+   "t": 45914,
+   "te": 45914
   },
   {
    "step": 5,
@@ -1144,14 +1150,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "ti": 45914,
    "pointer": {
     "at": [
-     343,
+     724,
      178
     ],
     "hover": [],
     "element": "label.os-param-query-list-label.os-grow"
    },
+   "tdown": 45924,
    "state": {
     "focus": {
      "kind": "none"
@@ -1220,14 +1228,15 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 52284
+   "t": 49470,
+   "te": 49470
   },
   {
    "step": 6,
@@ -1236,6 +1245,7 @@
     "until": "regenerated"
    },
    "ok": true,
+   "ti": 49470,
    "state": {
     "focus": {
      "kind": "none"
@@ -1304,14 +1314,16 @@
       -116.913,
       77.942
      ],
-     "width_mm": 460.686,
+     "width_mm": 355.772,
      "height_mm": 243.974,
      "mmPerPixel": 0.275365,
      "orthographic": true
     },
     "measure": null
    },
-   "t": 56819
+   "t": 53948,
+   "te": 53948
   }
- ]
+ ],
+ "t0_epoch_ms": 1795746130449
 }
