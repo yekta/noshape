@@ -773,8 +773,8 @@ pub fn hole(ev: &mut EvalCtx) -> FResult<()> {
         ev.infos.push(TAP_TOO_DEEP.into());
     }
     // hole.fs HOLE_INCONSISTENT_TAP_INFO: Depth isn't Tapped depth + Tap clearance × pitch (live
-    // mistake-hole-tapped-blind-5-inconsistent: Depth 5 mm under a 5.6 mm tapped depth); a readjusted tapped depth only informs.
-    if !tap_too_deep && end == "BLIND" && !ev.bool("blindInLast") && let Some(tapped) = tapped_input {
+    // mistake-hole-tapped-blind-5-inconsistent: Depth 5 mm under a 5.6 mm tapped depth), with or without HOLE_TAP_TOO_DEEP.
+    if end == "BLIND" && let Some(tapped) = tapped_input {
         let (pid, table) = ht::hole_table_param(ev.params);
         let pitch = ht::table_values(table, &ht::complete_path(table, ev.params.lookup(pid))).and_then(|s| s.pitch).filter(|p| *p > 0.0);
         if let (Some(pitch), Ok(depth), Ok(clear)) = (pitch, ev.length("holeDepthV3"), ev.real("tapClearance"))

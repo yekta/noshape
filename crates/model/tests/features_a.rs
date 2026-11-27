@@ -3374,11 +3374,11 @@ fn curve_pattern_distance_on_closed_path_as_fs() {
     assert_eq!(st.faulty, vec!["distance".to_string()]);
 }
 
-/// hole.fs HOLE_TAP_TOO_DEEP: a tapped depth past the hole's depth in the
-/// part is an info.
+/// hole.fs HOLE_TAP_TOO_DEEP: a tapped depth past the hole's depth in the part is an info (the hole leaves the 10 mm
+/// block; Depth = Tapped depth + Tap clearance × pitch, or HOLE_INCONSISTENT_TAP_INFO warns instead).
 #[test]
 fn hole_tapped_depth_readjusted_info() {
-    let msg = |tapped: &str| -> Option<String> {
+    let msg = |depth: &str, tapped: &str| -> Option<String> {
         let mut t = T::new();
         let (s, p) = hole_block(&mut t);
         t.add(
@@ -3388,16 +3388,17 @@ fn hole_tapped_depth_readjusted_info() {
                 ("unitsSystem", en("METRIC")),
                 ("isoHoleTableEx", ParamValue::Lookup(vec!["Tapped".into(), "Straight tap".into(), "M6".into(), "1.00 mm (Coarse)".into(), "None".into()])),
                 ("showTappedDepth", b(true)),
-                ("holeDepthV3", e("8 mm")),
+                ("holeDepthV3", e(depth)),
                 ("tappedDepthV3", e(tapped)),
+                ("tapClearance", e("1")),
             ],
         );
         let r = t.regen();
         let st = r.display.features.last().unwrap();
         (st.status == FeatureStatus::Info).then(|| st.message.clone().unwrap_or_default())
     };
-    assert_eq!(msg("6 mm"), None);
-    assert_eq!(msg("9 mm").as_deref(), Some("Tapped depth readjusted. Tapped depth input is greater than minimum computed Hole depth. Learn more"));
+    assert_eq!(msg("7 mm", "6 mm"), None);
+    assert_eq!(msg("12 mm", "11 mm").as_deref(), Some("Tapped depth readjusted. Tapped depth input is greater than minimum computed Hole depth. Learn more"));
 }
 
 /// draft.fs: a parting edge along the pull direction fails on the field.
