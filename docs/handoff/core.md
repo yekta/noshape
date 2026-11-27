@@ -40,7 +40,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     Draft 2 12/27/17 vs live 13/28/17: face for face as live except live's 0.1 mm sliver face at the Fill corner (its
     11.778 edge split 11.678 + 0.1, two 0.1 OTHER edges at (50.634,14.575,63.93)): Parasolid artefact, not matched. The
     doc's only real difference left: Fill 1's 2.88 mm3 (#3, parked).
-  LEAD NOT YET TOLD (lead 236k at 13:49): #3 queued 65e8a5e8 (half the gap + bridging Warning->Ok), #4 + #5 parked with the
+  LEAD NOT YET TOLD (lead 245k at 14:2x): #3 queued 65e8a5e8 (half the gap + bridging Warning->Ok), #4 + #5 parked with the
   findings above, #6 status. Lead FYI still open: qa's ~13:xx verdict on impeller "Select a sketch plane." (69eae144).
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
@@ -187,8 +187,10 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    one of its parts" (both modes); unify can't merge a fuse slab's walls with rounded-corner cylinders / hole walls
    (slab path refuses, OCCT fallback runs); Delete face 2 (op_defeature 1.15 s). Probes: core-scratch/sc fn.py/fn2.py,
    dec.py (face ids: urlsafe-b64 raw deflate JSON).
-0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
-   "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
+0. ERRORS-1123 CLOSED 14:4x: every audit case now matches live or ours does the work (probes, not kept: steep draft
+   60/80/89 deg both pulls all Ok and valid (live's crossing faces trimmed: 5 faces); sweep profile in the path's
+   plane = live's "Could not create valid swept body, check input."; revolve axis-through, angle0, move-face collapse,
+   loft guides, boolean targets/intersect, hole texts already in).
 00. (KNIFEHANDLE-LOFT1: skasm took it, lead 11-27.) KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
