@@ -1734,8 +1734,9 @@ impl SketchEditor {
         // skasm/hm-sk-1122 c5a: D too, no dimension started).
         // Leaving a pattern tool leaves its seed unselected, drawn normal blue (live sketch-tools-1123 mp2: Esc, the
         // tool's button, the menu's Escape).
+        // Insert spline points too (live sketch-spline-insert-points s14: the right-clicked spline unselected).
         let left_pattern = self.tool != previous && matches!(previous, Tool::LinearPattern | Tool::CircularPattern);
-        if self.tool.draws() || self.tool == Tool::Dimension || left_pattern {
+        if self.tool.draws() || matches!(self.tool, Tool::Dimension | Tool::SplinePoint) || left_pattern {
             self.selection.clear();
             self.selected_constraints.clear();
         }
@@ -11920,6 +11921,11 @@ mod tests {
         assert!(ed.confirm_spline(&mut d).changed);
         assert_eq!(count(&d, EntityKind::FitSpline), 2);
         assert_eq!(ed.tool, Tool::Select, "Confirm spline turns the tool off");
+        // Live sketch-spline-insert-points s14: the spline right-clicked for Insert spline points is unselected.
+        let s = d.sketch.entities().find(|e| e.kind() == EntityKind::FitSpline).unwrap().id;
+        ed.selection = vec![s];
+        ed.set_tool(Tool::SplinePoint);
+        assert!(ed.selection.is_empty());
     }
 
     /// Live 2175: the closing click makes one periodic spline with no closure constraint and no handles; the tool
