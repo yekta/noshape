@@ -544,11 +544,15 @@ impl PartStudioView {
         }
         constraints.extend(std::iter::repeat_n("CIRCULAR_PATTERN".to_string(), 2 * circular.len()));
         constraints.extend(std::iter::repeat_n("LINEAR_PATTERN".to_string(), 2 * linear.len()));
+        // An image's box is horizontal at its top and bottom in live's model (ours: the bottom, the top parallel to it), one
+        // entity of its own (live sketch-image-place s11: HORIZONTAL, HORIZONTAL; geometry "other").
+        constraints.extend(std::iter::repeat_n("HORIZONTAL".to_string(), data.images.len()));
         constraints.sort();
         dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
         let mut dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();
         dimensions.extend(driven.into_iter().map(|kind| json!({ "kind": kind, "expression": null })));
-        let geometry = sketch_geometry(sk, &owned, &text_box);
+        let mut geometry = sketch_geometry(sk, &owned, &text_box);
+        geometry.extend(data.images.iter().map(|_| json!({ "kind": "other", "points": [] })));
         json!({ "tool": tool, "entities": entities, "constraints": constraints, "dimensions": dimensions, "geometry": geometry })
     }
 
