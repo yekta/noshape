@@ -29,7 +29,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   translate_by_booleans (each face's prism along the move, fused/cut via slab_booleans, shared with
   offset_by_booleans); pieces_of_neighbours skips move_rigid's 6 s OCCT try. c2-config-parts-screws 63/63 to the end
   (was 33/63). New T1 features_a::move_face_translate_slides_split_pieces_along_a_bore; run `.kt2.sh` (move_face
-  tests, task bvgi014h0 was running at the cap). Then commit, clippy, land. Note for bool: MF3 406 ms = one boolean on
+  tests: 15 pass, the new T1 FAILS at its line 2468 `pieces.len() == 6`: the test's split/pick, not the fix, to check). Then commit, clippy, land. Note for bool: MF3 406 ms = one boolean on
   the threaded body (brep try 70 ms + OCCT 190). Scripts: .mf.sh (trace/faces), .mfp.sh (profile), .pmi3.sh (parity,
   saves vibex7 ~/tmp/core/scr/fresh).
 - psui's two TICKETS items (Up to part overlap, Remove pattern of only part): skasm's (lead 11-27).
