@@ -110,6 +110,12 @@ pub struct McPicks {
 }
 
 impl McSession {
+    /// The dialog's own error before any evaluation: Between entities with the second entity still empty (live
+    /// asm-mate-connector-between-faces-ok s5, title red, no field flagged).
+    pub fn pending_error(&self) -> Option<&'static str> {
+        (self.between && self.on.is_some() && self.extra[0].is_none()).then_some("Failed to resolve mate connector coordinate system.")
+    }
+
     pub fn picks(&self) -> McPicks {
         McPicks { on: self.on.clone(), extra: self.extra.clone(), slot: self.slot, between: self.between }
     }
@@ -712,7 +718,7 @@ impl AssemblyView {
         };
         // The connector's regeneration error (live E16: the title and only
         // the secondary axis chip turn red).
-        let mc_error = self.result.connectors.iter().find(|c| c.id == s.id).and_then(|c| c.message.clone());
+        let mc_error = s.pending_error().map(str::to_string).or_else(|| self.result.connectors.iter().find(|c| c.id == s.id).and_then(|c| c.message.clone()));
         let secondary_conflict = mc_error.as_deref().is_some_and(|m| m.contains("Secondary axis conflicts"));
         let field = |this: &Self, slot: usize, id: &'static str, label: &'static str, cx: &mut Context<Self>| -> AnyElement {
             let Some(s) = this.mc.as_ref() else { return div().into_any_element() };
@@ -1069,6 +1075,10 @@ impl AssemblyView {
         let failed = message.is_some();
         let row = h_flex()
             .id(SharedString::from(format!("amc-{}", id.0)))
+            .debug_selector({
+                let name = c.name.clone();
+                move || format!("amc-row {name}")
+            })
             .h(px(24.))
             .px_2()
             .gap_2()
@@ -1079,8 +1089,16 @@ impl AssemblyView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(svg().path(icon_path("mate-connector-assembly")).size_3p5().text_color(if failed { pal.error } else { pal.text_muted }))
             .child(div().flex_1().truncate().child(crate::ui::user_text(c.name.clone())))
-            // Live E15: "Mate connector 2 has error: Failed to resolve mate connector origin."
-            .when_some(message.map(|m| format!("{} has error: {m}", c.name)), |d, m| d.child(div().size(px(6.)).rounded_full().bg(pal.error)).tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(m.clone()).build(w, cx)))
+            // Live E15: "Mate connector 2 has error: Failed to resolve mate connector origin." / "On entity" / "Realign" /
+            // "Move", the flyout of a mate's row (mistake-asm-mate-connector-realign-edge s11).
+            .when_some(message.map(|m| format!("{} has error: {m}", c.name)), |d, head| {
+                use crate::assembly_flyout::FlyRow;
+                let placement = if c.between.is_some() { "Between entities" } else { "On entity" };
+                let moved = !c.move_off && (c.translation.iter().any(Option::is_some) || c.rotation.is_some());
+                let rows = vec![FlyRow::Text(placement.into()), FlyRow::Check("Realign".into(), c.primary_axis.is_some()), FlyRow::Check("Move".into(), moved)];
+                let note = format!("{head} {placement} Realign Move");
+                crate::assembly_flyout::with_mate_flyout(d.child(div().size(px(6.)).rounded_full().bg(pal.error)), head, rows, note)
+            })
             .child(
                 Button::new(SharedString::from(format!("amc-eye-{}", id.0)))
                     .icon(Icon::empty().path(icon_path(if hidden { "eye-off" } else { "eye" })))
@@ -1137,10 +1155,13 @@ impl AssemblyView {
         let s = self.pattern.as_ref().filter(|s| s.editing.is_none())?;
         // Live: the row tooltip is the dialog title's, "<name> did not
         // regenerate properly: <message>".
-        let err = self.pattern_from_session(s, cx).err().map(|e| match self.pattern_regen_error(s, cx) {
-            Some(m) => format!("{} did not regenerate properly: {m}", s.name),
-            None => e.to_string(),
-        });
+        // (A scope with no match too: live mistake-asm-replicate-no-other-hole s6.)
+        let titled = |m: String| format!("{} did not regenerate properly: {m}", s.name);
+        let err = match self.pattern_from_session(s, cx) {
+            Err(e) => Some(self.pattern_regen_error(s, cx).map(titled).unwrap_or_else(|| e.to_string())),
+            Ok(_) if s.kind.matched() && matches!(s.preview, Some(Err(_))) => self.pattern_regen_error(s, cx).map(titled),
+            Ok(_) => None,
+        };
         // (A Derived copy not created yet: red too, live 68.)
         let failing = err.is_some() || mirror_pending(s);
         let pal = p();
@@ -1166,7 +1187,7 @@ impl AssemblyView {
                 .child(div().w(px(12.)))
                 .child(pattern_icon(icon, failing, cx))
                 .child(div().flex_1().truncate().child(crate::ui::user_text(s.name.clone())))
-                .when_some(err, |d, e| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
+                .when_some(err, crate::assembly_flyout::with_row_tip)
                 .into_any_element(),
         )
     }
@@ -1187,6 +1208,10 @@ impl AssemblyView {
         let suppressed = pat.suppressed;
         let row = h_flex()
             .id(SharedString::from(format!("pat-{}", id.0)))
+            .debug_selector({
+                let name = pat.name.clone();
+                move || format!("pattern-row {name}")
+            })
             .w_full()
             .when(edited, |d| d.font_weight(FontWeight::BOLD))
             .h(px(24.))
@@ -1214,7 +1239,8 @@ impl AssemblyView {
             )
             .child(pattern_icon(icon, error.is_some() && !suppressed, cx))
             .child(crate::assembly_view::suppressed_text(div().flex_1().truncate(), suppressed).child(crate::ui::user_text(pat.name.clone())))
-            .when_some(error, |d, e| d.tooltip(move |w, cx| gpui_kit::component::tooltip::Tooltip::new(e.clone()).build(w, cx)))
+            // Live: "Replicate 1 has error: A target scope must be selected." (mistake-asm-replicate-features-nothing s9).
+            .when_some(error.map(|e| format!("{} has error: {e}", pat.name)), crate::assembly_flyout::with_row_tip)
             .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                 let new = if *h { Some(id) } else { None };
                 if this.list_hover_mate != new {
@@ -1542,6 +1568,11 @@ impl AssemblyView {
             PatternDialogKind::Replicate if s.mate.is_none() => return Some("Missing mate to be matched.".into()),
             _ if s.seeds.is_empty() => return Some("Select one or more instances.".into()),
             _ => {}
+        }
+        // A scope with no match (live mistake-asm-replicate-no-other-hole s6: "Selected target did not contain identical
+        // geometry.").
+        if let Some(Err(e)) = s.preview.as_ref().filter(|_| s.kind.matched()) {
+            return Some(e.clone());
         }
         let counts: &[&Entity<crate::quantity_field::QuantityInput>] = match s.kind {
             PatternDialogKind::Linear if s.second && s.third => &[&s.count, &s.count2, &s.count3],

@@ -738,8 +738,14 @@ impl AssemblyView {
                 }
                 p.scope = Some(o);
             }
-            // The scope box keeps the keyboard (its unlabelled input).
-            this.ui.checkbox_focus = Some("");
+            // The scope box keeps the keyboard (its unlabelled input, live asm-replicate-match-features); with the
+            // instances picked, the scope's field takes it (live mistake-asm-replicate-features-nothing s5).
+            if this.pattern.as_ref().is_some_and(|p| !p.seeds.is_empty() && p.active == Some(2)) {
+                this.ui.checkbox_focus = None;
+                this.ui.keyboard_away = false;
+            } else {
+                this.ui.checkbox_focus = Some("");
+            }
             this.update_pattern_preview(cx);
             cx.notify();
         }));
@@ -5916,7 +5922,7 @@ impl AssemblyView {
         }
         // Live (asm-mate-connector-on-face): a new mate connector's row ("Mate connector 1", selected, red until its
         // origin is picked) is in the list while its dialog is open (not one opened from a mate's chip).
-        let new_mc = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)).map(|s| (s.id, s.name.clone(), s.on.is_some()));
+        let new_mc = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)).map(|s| (s.id, s.name.clone(), s.on.is_some() && s.pending_error().is_none()));
         if let Some((id, name, ok)) = new_mc.clone() {
             let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly"), name, ok, inactive: false, suppressed: false, message: None, has_limits: false, hidden: None, tooltip: None, flyout: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());

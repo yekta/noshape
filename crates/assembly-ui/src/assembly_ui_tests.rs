@@ -1170,10 +1170,18 @@ fn a_replicate_without_its_target_scope_keeps_its_row_red(cx: &mut TestAppContex
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::panels::PatternDialogKind::Replicate, w, cx))).unwrap();
     cx.update(|cx| {
         view.update(cx, |v, cx| {
+            use noshape_model::assembly::{Mate, MateId};
+            let (a, b) = (face_connector(v, "Part 1 <1>", false, cx), face_connector(v, "Part 2 <1>", true, cx));
+            let mut seed = None;
+            v.edit("Fastened", cx, |asm| {
+                let id = MateId(asm.next_id());
+                asm.mates.push(Mate::new(id, "Fastened 1".into(), MateType::Fastened, a, b));
+                seed = Some(id);
+            });
             let pin = instance(v, "Part 1 <1>", cx);
             let s = v.pattern.as_mut().unwrap();
             s.seeds = vec![pin];
-            s.mate = Some(noshape_model::assembly::MateId(9_000));
+            s.mate = seed;
         })
     });
     draw(cx, window);
@@ -1201,6 +1209,15 @@ fn a_replicate_without_its_target_scope_keeps_its_row_red(cx: &mut TestAppContex
     let state = cx.update(|cx| view.read(cx).ui_state(cx));
     let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Replicate 1").cloned();
     assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "{}", state["features"]);
+    // Its tooltip, as live's (s9).
+    draw(cx, window);
+    crate::ui_script::clear_tooltip();
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("pattern-row Replicate 1").expect("Replicate 1's row");
+    vcx.simulate_mouse_move(b.center(), None, gpui_kit::Modifiers::default());
+    cx.executor().advance_clock(std::time::Duration::from_millis(1500));
+    draw(cx, window);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Replicate 1 has error: A target scope must be selected."));
 }
 
 /// Live asm-replicate-parts-block-ok (ASM-REPLICATE-ADDS-MATES): a Replicate's copies are mated inside it, so the
@@ -1255,6 +1272,94 @@ fn an_open_replicate_dialog_stops_evaluating_once_its_preview_is_in(cx: &mut Tes
     assert!(!busy, "settled");
     assert!((1..=3).contains(&evals), "{evals} evaluations over 3 s, preview {preview:?}");
     assert_eq!(preview, Some(Ok(1)), "the preview's match");
+}
+
+/// Live mistake-asm-mate-connector-realign-edge s11 (ASM-MISTAKE-ERRORS): a connector realigned onto another instance
+/// is red, and its row's tooltip is live's flyout: the error, then "On entity", "Realign", "Move".
+#[gpui::test]
+fn a_connector_realigned_onto_another_instance_shows_its_error_flyout(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "mc-realign-tip", |ctx| {
+        let face = call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": "Part 1 <1>", "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+        call(ctx, "assembly_mate_connector", json!({ "tab": "Assembly 1", "on": { "instance": "Part 1 <1>", "entity": face } }));
+    });
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let other = instance(v, "Part 2 <1>", cx);
+            let face = v.result.occurrences.iter().find(|o| o.top() == other).unwrap().face_refs[0].clone();
+            v.edit("Realign : Mate connector 1", cx, |a| a.connectors[0].primary_axis = Some(noshape_model::assembly::MateConnectorRef::on(other, Vec::new(), face)));
+        })
+    });
+    for _ in 0..600 {
+        if cx.update(|cx| view.read(cx).result.connectors.iter().any(|c| c.message.is_some())) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    draw(cx, window);
+    crate::ui_script::clear_tooltip();
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("amc-row Mate connector 1").expect("Mate connector 1's row");
+    vcx.simulate_mouse_move(b.center(), None, gpui_kit::Modifiers::default());
+    cx.executor().advance_clock(std::time::Duration::from_millis(1500));
+    draw(cx, window);
+    assert_eq!(crate::ui_script::shown_tooltip().as_deref(), Some("Mate connector 1 has error: Mate connector cannot be defined on multiple instances. On entity Realign Move"));
+}
+
+/// Live mistake-asm-replicate-features-nothing s5: with the instances picked, Match faces in features gives the scope's
+/// field the keyboard (with none picked it stays on the dropdown: live asm-replicate-match-features).
+#[gpui::test]
+fn a_replicate_scope_change_after_the_seed_focuses_the_scope_field(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "replicate-scope-focus", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::panels::PatternDialogKind::Replicate, w, cx))).unwrap();
+    let pick = |cx: &mut TestAppContext| {
+        cx.update(|cx| view.update(cx, |v, cx| v.replicate_select.update(cx, |_, cx| cx.emit(crate::os_select::OsSelectEvent::Picked("Match faces in features".into())))));
+        draw(cx, window);
+        cx.update(|cx| view.read(cx).ui_state(cx)["focus"]["label"].clone())
+    };
+    assert_eq!(pick(cx), Value::Null, "no instances: the dropdown keeps it");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 1 <1>", cx);
+            let s = v.pattern.as_mut().unwrap();
+            s.seeds = vec![pin];
+            s.mate = Some(noshape_model::assembly::MateId(9_000));
+            s.scope = None;
+        })
+    });
+    assert_eq!(pick(cx), json!("Features to find match in"));
+}
+
+/// Live mistake-asm-replicate-no-other-hole s6: a target scope with no match turns the dialog's title red (its tooltip
+/// "Replicate 1 did not regenerate properly: Selected target did not contain identical geometry."), not the field.
+#[gpui::test]
+fn a_replicate_scope_with_no_match_turns_the_title_red(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "replicate-no-match", |_| {});
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_pattern(super::panels::PatternDialogKind::Replicate, w, cx))).unwrap();
+    let state = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let (pin, block) = (instance(v, "Part 1 <1>", cx), instance(v, "Part 2 <1>", cx));
+            let s = v.pattern.as_mut().unwrap();
+            s.seeds = vec![pin];
+            s.mate = Some(noshape_model::assembly::MateId(9_000));
+            s.scope_refs = vec![noshape_model::assembly::ScopeEntity { instance: block, path: Vec::new(), entity: None }];
+            s.preview = Some(Err("Selected target did not contain identical geometry.".into()));
+            let s = v.pattern.as_ref().unwrap();
+            (v.pattern_regen_error(s, cx), v.ui_state(cx))
+        })
+    });
+    assert_eq!(state.0.as_deref(), Some("Selected target did not contain identical geometry."));
+    let dialog = &state.1["dialog"];
+    assert_eq!(dialog["titleState"], json!("error"), "{dialog}");
+    let field = dialog["fields"].as_array().unwrap().iter().find(|f| f["label"] == "Parts to find match in").cloned();
+    assert_eq!(field.map(|f| f["state"].clone()), Some(json!("ok")), "{dialog}");
+    // Its row in the list is red too.
+    let row = state.1["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Replicate 1").cloned();
+    assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "{}", state.1["features"]);
 }
 
 /// Live asm-measure-face-cylinder-panel (ASM-MEASURE-BRACKET-KEY): two faces picked, `[` opens Measure with both and
@@ -2491,6 +2596,39 @@ fn a_triad_plane_square_drags_with_no_value_box(cx: &mut TestAppContext) {
 
 /// Live (behaviours "mate limits per type … Keys in the open connector dialog", 11-18): in an open Mate connector
 /// dialog `a` flips its Z axis and `q` turns X / Y 90° about Z (four turns come back round).
+/// Live asm-mate-connector-between-faces-ok s5: Between entities with the origin entity picked and the second still
+/// empty turns the title red ("… Failed to resolve mate connector coordinate system."), no field flagged; the second
+/// pick clears it.
+#[gpui::test]
+fn a_between_entities_connector_without_its_second_entity_has_a_red_title(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mc-between-empty");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.mc_at_instance_origin(pin, w, cx);
+            v.mc.as_mut().unwrap().between = true;
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let dialog = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui_state(cx)["dialog"].clone());
+    let d = dialog(cx);
+    assert_eq!(d["titleState"], json!("error"), "{d}");
+    assert!(d["fields"].as_array().unwrap().iter().all(|f| f["state"] == "ok"), "no field flagged: {d}");
+    assert_eq!(cx.update(|cx| view.read(cx).mc.as_ref().unwrap().pending_error()), Some("Failed to resolve mate connector coordinate system."));
+    let rows = cx.update(|cx| view.read(cx).ui_state(cx)["features"]["rows"].clone());
+    let row = rows.as_array().unwrap().iter().find(|r| r["name"] == "Mate connector 1").cloned();
+    assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "its row red too: {rows}");
+    cx.update(|cx| {
+        view.update(cx, |v, _| {
+            let m = v.mc.as_mut().unwrap();
+            m.extra[0] = m.on.clone();
+        })
+    });
+    draw(cx, window);
+    assert_eq!(cx.update(|cx| view.read(cx).mc.as_ref().unwrap().pending_error()), None);
+}
+
 #[gpui::test]
 fn a_and_q_flip_and_turn_an_open_mate_connector(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "mc-keys");

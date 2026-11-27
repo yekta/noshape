@@ -200,7 +200,7 @@ impl AssemblyView {
             rows.push(row(&p.name, if p.suppressed { "suppressed" } else { pattern_state(p.id) }, false, false, false, false));
         }
         if let Some(p) = self.pattern.as_ref().filter(|p| p.editing.is_none()) {
-            let ok = self.pattern_from_session(p, cx).is_ok() && !super::panels::mirror_pending(p);
+            let ok = self.pattern_from_session(p, cx).is_ok() && !super::panels::mirror_pending(p) && !matches!(p.preview, Some(Err(_)));
             rows.push(row(&p.name, if ok { "ok" } else { "error" }, true, true, false, false));
         }
         // The mate whose dialog is open too (live asm-mate-menu-edit, asm-mate-edit-escape).
@@ -228,7 +228,7 @@ impl AssemblyView {
             items.push((MateId(u64::MAX), row(&self.relation_name(cx), if r.a.is_some() && (r.b.is_some() || r.kind == RelationType::Screw) { "ok" } else { "error" }, true, true, false, false)));
         }
         if let Some(m) = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)) {
-            items.push((m.id, row(&m.name, if m.on.is_some() && !connector_failed(m.id) { "ok" } else { "error" }, true, true, false, false)));
+            items.push((m.id, row(&m.name, if m.on.is_some() && m.pending_error().is_none() && !connector_failed(m.id) { "ok" } else { "error" }, true, true, false, false)));
         }
         if let Some((_, members)) = self.ui.group.as_ref().filter(|g| g.0.is_none()) {
             let ok = !members.is_empty() || !self.ui.group_patterns.is_empty();
@@ -705,7 +705,7 @@ impl AssemblyView {
             }
             fields.push(toggle(s.flip));
             fields.push(other(""));
-            let failed = self.result.connectors.iter().any(|c| c.id == s.id && c.message.is_some());
+            let failed = s.pending_error().is_some() || self.result.connectors.iter().any(|c| c.id == s.id && c.message.is_some());
             let title = if s.implicit { "Mate connector".to_string() } else { s.name.clone() };
             out.push(dialog(title, s.on.is_some() && !failed, s.on.is_some() || s.touched, fields));
         }
@@ -785,7 +785,9 @@ impl AssemblyView {
                     PatternDialogKind::Linear | PatternDialogKind::Circular | PatternDialogKind::Mirror => s.axis.is_some(),
                     PatternDialogKind::PartPattern => s.mate.is_some(),
                     PatternDialogKind::Replicate => s.mate.is_some() && !s.scope_refs.is_empty(),
-                };
+                }
+                // A scope with no match: the title red, the field not (live mistake-asm-replicate-no-other-hole s6).
+                && !matches!(s.preview, Some(Err(_)));
             // ✓ turns on once the dialog has been changed, complete or not (live asm-linear-pattern-third-direction).
             out.push(dialog(s.name.clone(), complete, complete || s.touched, fields));
         }
