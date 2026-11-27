@@ -275,7 +275,8 @@ fn control_name(t: &Value) -> Option<String> {
     // One of a dialog's unlabelled fields by its order (`"index"`, from 0: a mate's X / Y / Z offset boxes, live
     // asm-fastened-offset).
     if let (Some(f), Some(i), None) = (t.get("field").and_then(Value::as_str), t.get("index").and_then(Value::as_u64), t.get("chip")) {
-        return Some(format!("field:{f}#{i}"));
+        // (A labelled field's first is its plain name: a dialog suffixes the later ones that share its label.)
+        return Some(if i == 0 && !f.is_empty() { format!("field:{f}") } else { format!("field:{f}#{i}") });
     }
     // A pick's chip in a selection field (`"chip"`: its row, from 0).
     if let (Some(row), Some(field)) = (t.get("chip").and_then(Value::as_u64), t.get("field").and_then(Value::as_str)) {
@@ -741,8 +742,12 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                         // acquire inferences, mistake-sketch-drag-fixed-line s4). A menu row is reached from our own pointer:
                         // our rows sit elsewhere than live's, and the jump would cross other rows and swap the open submenu
                         // (folder-menu-collapse-then-expand-all s10).
-                        let start = live_from().filter(|_| target.get("menu").is_none());
-                        if let Some(s) = start.filter(|s| Some(*s) != pointer && *s != at) {
+                        // Where live's pointer rests on ours (the last click, our pixel a little off live's), the moves
+                        // start from ours: from live's pixel the first lands a pixel nearer the point just clicked, inside
+                        // its snap square, and wakes it for the restarted tool (sketch-parallel s9).
+                        let rests = |s: Point<Pixels>| pointer.is_some_and(|p| (f32::from(p.x) - f32::from(s.x)).abs() <= 3. && (f32::from(p.y) - f32::from(s.y)).abs() <= 3.);
+                        let start = live_from().filter(|s| target.get("menu").is_none() && !rests(*s));
+                        if let Some(s) = start.filter(|s| *s != at) {
                             let mv = PlatformInput::MouseMove(MouseMoveEvent { position: s, pressed_button: None, modifiers: Modifiers::default() });
                             let _ = cx.update(|window, cx| window.dispatch_event(mv, cx));
                             sleep(cx, 20).await;

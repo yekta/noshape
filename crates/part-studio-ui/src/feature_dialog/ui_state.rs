@@ -83,6 +83,18 @@ impl FeatureDialog {
         self.shown_params().into_iter().filter(|p| boxed(p)).position(|p| p.id == id).unwrap_or(0)
     }
 
+    /// `s`'s name for scripts: its label, and after a field shown above with the same label, its order among them
+    /// (the runner's `{"field": "Direction", "index": 1}`: Linear pattern's second direction).
+    pub(crate) fn script_field_name(&self, s: &ParamSpec) -> String {
+        let label = crate::i18n::spec(s.label);
+        let shown = self.shown_params();
+        let Some(at) = shown.iter().position(|p| p.id == s.id) else { return format!("field:{label}") };
+        match shown[..at].iter().filter(|p| crate::i18n::spec(p.label) == label).count() {
+            0 => format!("field:{label}"),
+            n => format!("field:{label}#{n}"),
+        }
+    }
+
     /// The top-level parameters the dialog draws, in order: visible ones outside folded groups (as
     /// `render_params`: a group holds the parameters its header hides when off).
     fn shown_params(&self) -> Vec<&'static ParamSpec> {

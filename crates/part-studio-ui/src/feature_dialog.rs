@@ -689,37 +689,19 @@ impl FeatureDialog {
         self.set_value_auto(path, v, cx);
         self.focus_new_empty_field(&shown);
         self.auto_activated = self.active_query.clone().filter(|q| active.as_ref() != Some(q) && !shown.contains(&q.as_str())).map(|q| (q, active.clone(), path.to_string(), left));
-        // A selection field the edit brought up and activated takes the keyboard from the control clicked (live 1983,
-        // by hand, per control): from a tab always (Remove: Merge scope focused); from a checkbox when the field
-        // active before went away (Hollow: "Parts to hollow" focused; Second direction: the checkbox keeps it); from
-        // a dropdown when that field stays (Chamfer's Two distances: Direction overrides focused; Feature mirror,
-        // replacing Entities to mirror: the select keeps it).
-        let kind = self.spec_for_path(path).map(|s| (matches!(s.kind, ParamKind::Enum { .. }), s.hints.has(Hints::HORIZONTAL_ENUM)));
+        // A selection field the edit brought up and activated takes the keyboard from whatever control was clicked (live's
+        // runtime since 11-21, retaken 11-27: Second direction › Direction, Variable fillet › Vertices, Feature pattern ›
+        // Features to pattern, Feature mirror › Features to mirror; older takes kept it on a checkbox or a select).
         let before_gone = active.as_deref().is_none_or(|a| !self.visible_selection_fields().contains(&a));
-        // (A dropdown replacing the active field with one that picks geometry passes it on: Face mirror's "Faces to
-        // mirror", live mirror-face-type; a feature list leaves it on the select: Feature mirror.)
-        let picks_geometry = self.active_query.as_deref().and_then(|q| self.spec_for_path(q)).is_some_and(|s| matches!(s.kind, ParamKind::Query { filter, .. } if filter.0 & !QueryFilter::FEATURE.0 != 0));
-        // A FOCUS_ON_VISIBLE query takes it whatever brought it up (live loft-guides-checkbox: Path's query; Guides'
-        // array leaves it on the checkbox).
-        let eager = self.active_query.as_deref().and_then(|q| self.spec_for_path(q)).is_some_and(|s| s.hints.has(Hints::FOCUS_ON_VISIBLE) && matches!(s.kind, ParamKind::Query { .. }));
-        // Per control (live 1983: nothing visible decides it): Mate connector's Realign hands the keyboard to Primary
-        // axis entity (live mate-connector-realign-move).
-        let follows = matches!((self.feature.type_id.as_str(), path), ("mateConnector", "realign"));
-        let takes = eager
-            || follows
-            || match kind {
-                Some((true, true)) => true,
-                Some((true, false)) => !before_gone || picks_geometry,
-                _ => before_gone,
-            };
+        let tab = self.spec_for_path(path).is_some_and(|s| matches!(s.kind, ParamKind::Enum { .. }) && s.hints.has(Hints::HORIZONTAL_ENUM));
         // From a tab, a field the edit swapped for its same-named twin isn't one it brought up (live
         // loft-surface-thin-tabs: Surface trades Profiles for the wire profiles' Profiles; the keyboard stays off it);
         // from a dropdown the twin takes it (live delete-part-ignore-composite: Entities to delete focused).
         let label = |q: &Option<String>| q.as_deref().and_then(|q| self.spec_for_path(q)).map(|s| s.label);
-        let twin = kind == Some((true, true)) && active.is_some() && label(&active) == label(&self.active_query);
+        let twin = tab && active.is_some() && label(&active) == label(&self.active_query);
         // (A field shown before takes it too when the active one went away: live routing-curve-multiple-csv, CSV file
         // hides Vertices and Curve reference gets the keyboard.)
-        if takes && !twin && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str()) || before_gone) {
+        if !twin && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str()) || before_gone) {
             self.focus_dialog_pending = true;
             // (A tab that brings the field up doesn't leave the keyboard outside: live extrude-surface-tab.)
             self.keyboard_left = false;
@@ -1923,6 +1905,11 @@ impl FeatureDialog {
     fn converted_text(&self, path: &str, n: noshape_model::params::NumSpec, text: &str) -> Option<String> {
         // An out-of-range value shows as typed (live DEPTH-RANGE: "1e6 mm").
         if self.completion.is_some() || self.out_of_range(path, text) {
+            return None;
+        }
+        // A Hole's table-filled value the error blames shows the table's text (live mistake-hole-counterbore-diameter-5:
+        // "1/4 in"; a typed one converts, as Fillet's Radius: live expr-in-error-1127).
+        if self.feature.type_id == "hole" && !self.user_set.contains(path) && self.field_error(path).is_some() {
             return None;
         }
         let q = noshape_units::evaluate_as(text, n.kind.dim(), &self.units, &self.variables).ok()?;
@@ -3633,7 +3620,7 @@ impl FeatureDialog {
                     .child(
                         div()
                             .id(SharedString::from(format!("q-{path}")))
-                            .map(|d| crate::ui_script::mark(d, || format!("field:{}", crate::i18n::spec(s.label))))
+                            .map(|d| crate::ui_script::mark(d, || self.script_field_name(s)))
                             .track_focus(&q_focus)
                             .flex_1()
                             .min_w_0()
@@ -3782,7 +3769,7 @@ impl FeatureDialog {
                     let mut field = v_flex()
                         .id(SharedString::from(format!("q-{path}")))
                         // qa UIS-FIELD-NOT-SHOWN (wf12 step 23): Loft's Guides named for scripts as a plain query field.
-                        .map(|d| crate::ui_script::mark(d, || format!("field:{}", crate::i18n::spec(s.label))))
+                        .map(|d| crate::ui_script::mark(d, || self.script_field_name(s)))
                         .flex_1()
                         .min_h(px({
                             let h = self.live_h(LIVE_EMPTY_FIELD);
@@ -4425,7 +4412,7 @@ impl FeatureDialog {
                         // Named as shown: a row drawn with an icon instead of its label has no name (live 1991), only its order.
                         .map(|d| crate::ui_script::mark(d, || match param_icon(self.ty.id, s.id) {
                             Some(_) => format!("field:#{}", self.icon_field_index(s.id)),
-                            None => format!("field:{}", crate::i18n::spec(s.label)),
+                            None => self.script_field_name(s),
                         }))
                         .border_b_1()
                         .border_color(if invalid { pal.error } else { pal.border })
