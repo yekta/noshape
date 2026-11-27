@@ -271,7 +271,8 @@ impl PartStudioView {
             focus = json!({ "kind": "field", "label": "Faces to measure", "dialog": "Mass and section properties" });
         }
         if in_dialog.is_some() {
-            focus["dialog"] = dialog_state.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
+            // (The Appearance editor's as its older reading titles it: `feature`.)
+            focus["dialog"] = dialog_state.as_ref().map(|d| d.get("feature").unwrap_or(d)["title"].clone()).unwrap_or(Value::Null);
         }
         json!({
             "focus": focus,
@@ -285,6 +286,8 @@ impl PartStudioView {
             "message": message,
             "tooltip": null,
             "undo": self.ui_undo_state(cx),
+            "part_data": self.ui_part_data(cx),
+            "panels": self.ui_panels(),
             "sketch": self.ui_sketch_state(cx),
             "camera": self.ui_camera_state(cx),
             // (No readout while a feature dialog is open: the readout isn't rebuilt then.)
@@ -294,6 +297,44 @@ impl PartStudioView {
                 None => json!({ "readout": self.ui.measure_readout, "panel": null }),
             },
         })
+    }
+
+    /// `part_data` (README "part_data", live 11-27): each part, surface and composite in the parts list's order, with
+    /// what the document holds for it; the colour is sRGB hex, the opacity 0..255, `default` while no colour is set.
+    fn ui_part_data(&self, cx: &App) -> Value {
+        let props = self.studio(cx).map(|s| &s.part_properties);
+        let text = |t: Option<&String>| t.filter(|t| !t.is_empty()).cloned();
+        let rows: Vec<Value> = ["parts", "composites", "surfaces"]
+            .iter()
+            .flat_map(|key| self.display.bodies.iter().filter(move |b| super::part_section(b) == *key))
+            .map(|b| {
+                let p = props.and_then(|ps| ps.get(&b.id));
+                let set = p.and_then(|p| p.appearance).map(|a| a.color);
+                let c = set.unwrap_or(b.color);
+                let hex: String = c[..3].iter().map(|v| format!("{:02X}", super::appearance::lin_to_srgb(*v))).collect();
+                let opacity = (c[3].clamp(0.0, 1.0) * 255.0 + 1e-3).floor() as u8;
+                json!({
+                    "name": b.name,
+                    "part_number": text(p.and_then(|p| p.part_number.as_ref())),
+                    "description": text(p.and_then(|p| p.description.as_ref())),
+                    "material": text(p.and_then(|p| p.material.as_ref())),
+                    "appearance": { "hex": hex, "opacity": opacity, "default": set.is_none() },
+                    "hidden": b.hidden,
+                })
+            })
+            .collect();
+        Value::Array(rows)
+    }
+
+    /// `panels`: the open Appearances panel as live's recorder reads it (README "Part Studio panels"): its tabs and the
+    /// texts of its rows; `fields` stays empty (live's reads none with the colour editor open over it).
+    fn ui_panels(&self) -> Value {
+        if self.right_panel != Some(super::config_panel::RightPanel::Appearance) {
+            return json!([]);
+        }
+        let sketches = self.ui.appearance_sketches;
+        let tabs = [("Parts and surfaces", !sketches), ("Sketches and curves", sketches)].map(|(label, selected)| json!({ "label": label, "selected": selected }));
+        json!([{ "id": "appearances", "title": "Appearances", "tabs": tabs, "rows": self.ui.appearance_rows, "fields": [] }])
     }
 
     /// In a sketch, its selection's readout as live's recorder reads it ("Length", "26.987", "mm"; a point "Point" with

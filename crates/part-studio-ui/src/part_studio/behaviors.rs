@@ -317,6 +317,8 @@ pub struct UiState {
     pub palette_sel: usize,
     /// Appearances panel: the "Sketches and curves" tab is open.
     pub appearance_sketches: bool,
+    /// The Appearances panel's row texts as last drawn, top to bottom (a ui-parity state's `panels`).
+    pub appearance_rows: Vec<String>,
     /// The open Graphics preferences dialog.
     pub graphics_dialog: Option<(Entity<crate::graphics_prefs_dialog::GraphicsPrefsDialog>, Subscription)>,
     pub palette_no_highlight: bool,
@@ -925,6 +927,7 @@ impl UiState {
             toolbar_faces: Default::default(),
             palette_sel: 0,
             appearance_sketches: false,
+            appearance_rows: Vec::new(),
             graphics_dialog: None,
             palette_no_highlight: false,
             palette_top: std::rc::Rc::new(std::cell::Cell::new(px(76.))),

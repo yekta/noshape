@@ -644,7 +644,17 @@ impl PartStudioView {
         };
         let fields: Vec<serde_json::Value> = faces.map(|_| serde_json::json!({ "label": "Faces or features", "kind": "query", "items": items, "active": true, "state": "ok" })).into_iter().collect();
         let ok = if e.acceptable() { "enabled" } else { "disabled" };
-        Some(serde_json::json!({ "title": title.to_string(), "titleState": "ok", "kind": "feature", "tabs": [], "fields": fields, "error": null, "ok": ok }))
+        let feature = serde_json::json!({ "title": title.to_string(), "titleState": "ok", "kind": "feature", "tabs": [], "fields": fields, "error": null, "ok": ok });
+        // Live's recorder from 2026-11-27.4 reads the colour editor itself (README "The Appearance editor"); run.py
+        // compares the older takes with `feature`.
+        let text = |s: &Entity<InputState>| s.read(cx).value().to_string();
+        let number = |label: &str, s: &Entity<InputState>| serde_json::json!({ "label": label, "kind": "number", "text": text(s) });
+        let mut colour = vec![number("A", &e.alpha), number("#", &e.hex), number("R", &e.channels[0]), number("G", &e.channels[1]), number("B", &e.channels[2])];
+        if matches!(e.target, EditTarget::Parts(..)) {
+            colour.push(serde_json::json!({ "label": "Tessellation quality", "kind": "select", "value": e.tessellation.label() }));
+        }
+        let tabs = [("Palette", !e.mixer), ("Mixer", e.mixer)].map(|(label, selected)| serde_json::json!({ "label": label, "selected": selected }));
+        Some(serde_json::json!({ "title": "Appearance", "kind": "appearance", "tabs": tabs, "fields": colour, "error": null, "ok": null, "feature": feature }))
     }
 
     pub(super) fn render_appearance_editor(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -698,8 +708,7 @@ impl PartStudioView {
             col
         };
         let tab = |id: &'static str, label: &'static str, on: bool, to_mixer: bool, w: f32, cx: &mut Context<Self>| {
-            div()
-                .id(id)
+            crate::ui_script::mark(div().id(id), move || format!("tab:{label}"))
                 .w(px(w))
                 .h(px(26.))
                 .relative()
@@ -1066,7 +1075,7 @@ impl PartStudioView {
                         .border_r_1()
                         .border_b_1()
                         .border_color(grid)
-                        .child(struck(div().w(px(228.)).h(px(27.)).flex().items_center().pl(px(4.)).border_1().border_color(rgb_u32(0xd7d7d7)).text_size(px(13.33))).when(off, |d| d.opacity(0.5)).child(if count == 1 { "1 selection".to_string() } else { format!("{count} selections") }))
+                        .child(struck(div().w(px(228.)).h(px(27.)).flex().items_center().pl(px(4.)).border_1().border_color(rgb_u32(0xd7d7d7)).text_size(px(13.33))).when(off, |d| d.opacity(0.5)).child(selections(count)))
                         .child(
                             div().w(px(111.)).h(px(27.)).rounded(px(4.)).border_1().border_color(grid).bg(rgb_u32(0xffffff)).when(off, |d| d.opacity(0.5)).child(div().size_full().rounded(px(3.)).bg(c)).when(off, |d| {
                                 d.relative().child(
@@ -1088,7 +1097,7 @@ impl PartStudioView {
                         ),
                 )
         };
-        let mut rows: Vec<AnyElement> = Vec::new();
+        let mut rows: Vec<(Vec<String>, AnyElement)> = Vec::new();
         // Configured properties exist once the studio has an input.
         let configurable = !studio.configuration.inputs.is_empty();
         // The part being renamed from its row, and its popup.
@@ -1100,7 +1109,8 @@ impl PartStudioView {
         // Face appearances are numbered in order, as their editor's title (live batch 15: "Face appearance 1").
         // A feature's is one too ("6 selections"); each goes under the part its first face is on (live appearance-1123).
         let mut face_n = 0;
-        let mut face_rows: Vec<(Option<BodyId>, AnyElement)> = Vec::new();
+        // Each row with the texts it shows (`panels` in a ui-parity state).
+        let mut face_rows: Vec<(Option<BodyId>, Vec<String>, AnyElement)> = Vec::new();
         for (i, a) in studio.appearances.iter().enumerate() {
             let is_sketch = matches!(&a.target, AppearanceTarget::Feature(f) if self.display.sketches.iter().any(|s| s.feature == *f));
             if !is_sketch {
@@ -1130,9 +1140,11 @@ impl PartStudioView {
             let view = cx.entity();
             let edit_target = target.clone();
             let rename_popup_here = if matches!(&self.folder_prompt, Some((_, super::FolderTarget::Appearance(k), _)) if *k == i) { self.name_prompt(cx) } else { None };
+            let texts = if is_sketch { vec![label.clone()] } else { vec![label.clone(), selections(count)] };
             let shown = if is_sketch { row(SharedString::from(format!("ap-face-{i}")), a.color, label, false, suppressed) } else { face_row(SharedString::from(format!("ap-face-{i}")), a.color, label, count, suppressed) };
             face_rows.push((
                 owner,
+                texts,
                 shown
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         // Hovering a face appearance highlights its faces.
@@ -1171,7 +1183,8 @@ impl PartStudioView {
                 let (b1, b2) = (body.id.clone(), body.id.clone());
                 let view = cx.entity();
                 let rename_popup = if rename_part.as_ref() == Some(&body.id) { rename_popup.take() } else { None };
-                rows.push(
+                rows.push((
+                    vec![body.name.clone()],
                     row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), self.selection.contains(&Reference::Body(body.id.clone())), false)
                         // Live: a click selects the part (row and part
                         // highlighted), a double click edits its appearance.
@@ -1198,21 +1211,22 @@ impl PartStudioView {
                         // The popup beside the row, left of the panel.
                         .when_some(rename_popup, |d, popup| d.relative().child(div().absolute().top_0().left_0().size_0().child(deferred(anchored().anchor(Anchor::TopRight).snap_to_window().child(popup)).with_priority(5))))
                         .into_any_element(),
-                );
-                let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut face_rows).into_iter().partition(|(o, _)| o.as_ref() == Some(&body.id));
+                ));
+                let (mine, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut face_rows).into_iter().partition(|(o, ..)| o.as_ref() == Some(&body.id));
                 face_rows = rest;
-                rows.extend(mine.into_iter().map(|(_, e)| e));
+                rows.extend(mine.into_iter().map(|(_, t, e)| (t, e)));
                 rows.extend(self.imported_face_rows(body, &face_row, &names, cx));
             }
         }
-        rows.extend(face_rows.into_iter().map(|(_, e)| e));
+        rows.extend(face_rows.into_iter().map(|(_, t, e)| (t, e)));
         if sketches_tab {
             // Sketches without their own appearance, in the inactive sketch color.
             let with_own: Vec<FeatureId> = studio.appearances.iter().filter_map(|a| if let AppearanceTarget::Feature(f) = a.target { Some(f) } else { None }).collect();
             for sk in self.display.sketches.iter().filter(|s| !with_own.contains(&s.feature)) {
                 let f = sk.feature;
                 let color = sk.color.unwrap_or_else(|| crate::theme::lin(crate::theme::viewport::INACTIVE));
-                rows.push(
+                rows.push((
+                    vec![sk.name.clone()],
                     row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false, false)
                         .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
                             if ev.click_count() >= 2 {
@@ -1220,12 +1234,16 @@ impl PartStudioView {
                             }
                         }))
                         .into_any_element(),
-                );
+                ));
             }
         }
+        if cfg!(test) || crate::ui_script::active() {
+            self.ui.appearance_rows = rows.iter().flat_map(|(t, _)| t.iter().cloned()).collect();
+        }
+        let rows: Vec<AnyElement> = rows.into_iter().map(|(_, e)| e).collect();
+        // (Live's takes click a tab as a `panel_row`: appearance-panel-sketches-tab.)
         let tab = |id: &'static str, label: &'static str, on: bool, sketches: bool, cx: &mut Context<Self>| {
-            div()
-                .id(id)
+            crate::ui_script::mark(div().id(id), move || format!("panel_row:{label}"))
                 .flex_1()
                 .h(px(26.))
                 .flex()
@@ -1267,7 +1285,7 @@ impl PartStudioView {
     /// An import's face colours under their part, one row per import and colour (live dx/face-appearance-1125: "Face of
     /// Import 1", 1 selection, its swatch): a click selects the faces, a double click opens nothing, and the only menu
     /// item is "Disable imported appearances".
-    fn imported_face_rows(&self, body: &noshape_model::display::BodyDisplay, face_row: &impl Fn(SharedString, [f32; 4], String, usize, bool) -> Stateful<Div>, names: &crate::feature_dialog::RefLabeler, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn imported_face_rows(&self, body: &noshape_model::display::BodyDisplay, face_row: &impl Fn(SharedString, [f32; 4], String, usize, bool) -> Stateful<Div>, names: &crate::feature_dialog::RefLabeler, cx: &mut Context<Self>) -> Vec<(Vec<String>, AnyElement)> {
         let mut groups: Vec<(FeatureId, [f32; 4], Vec<Reference>)> = Vec::new();
         for (r, c) in body.face_refs.iter().zip(&body.face_colors) {
             let (Some(c), Reference::Face(n)) = (c, r) else { continue };
@@ -1282,7 +1300,9 @@ impl PartStudioView {
             .enumerate()
             .map(|(k, (f, color, faces))| {
                 let (hover, pick, view) = (faces.clone(), faces.clone(), cx.entity());
-                face_row(SharedString::from(format!("ap-import-{}-{k}", body.id)), color, format!("Face of {}", names(&Reference::Feature(f))), faces.len(), false)
+                let label = format!("Face of {}", names(&Reference::Feature(f)));
+                let texts = vec![label.clone(), selections(faces.len())];
+                let row = face_row(SharedString::from(format!("ap-import-{}-{k}", body.id)), color, label, faces.len(), false)
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         this.ui.appearance_hover = if *h { hover.clone() } else { Vec::new() };
                         this.refresh_scene(false, cx);
@@ -1296,7 +1316,8 @@ impl PartStudioView {
                         let v = view.clone();
                         m.item(crate::os_menu::OsMenuItem::new("Disable imported appearances").on_click(move |_, _, cx| v.update(cx, |this, cx| this.disable_imported_appearances(f, cx))))
                     })
-                    .into_any_element()
+                    .into_any_element();
+                (texts, row)
             })
             .collect()
     }
@@ -1332,6 +1353,11 @@ impl PartStudioView {
             }))
             .into_any_element()
     }
+}
+
+/// A face appearance row's count box: "1 selection", "6 selections".
+fn selections(count: usize) -> String {
+    if count == 1 { "1 selection".into() } else { format!("{count} selections") }
 }
 
 fn rgb_u32(hex: u32) -> gpui_kit::Rgba {

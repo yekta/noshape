@@ -4829,6 +4829,51 @@ fn face_appearances_sit_under_their_parts(cx: &mut TestAppContext) {
     assert!(order.iter().all(Option::is_some) && order.windows(2).all(|w| w[0] < w[1]), "Part 1, its face appearance, Part 2, Extrude 2's: {order:?}");
 }
 
+/// Live depth batch 9 (ui-parity README "part_data", "The Appearance editor", the Appearances panel): a ui-parity state
+/// reads each part's data from the document, the Appearances panel's rows and the colour editor's fields.
+#[gpui::test]
+fn the_state_reads_part_data_the_appearances_panel_and_the_colour_editor(cx: &mut TestAppContext) {
+    use super::super::appearance::EditTarget;
+    use noshape_model::partstudio::{AppearanceTarget, FaceAppearance};
+    let start = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "10 mm", "operationType": "NEW" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "part-data", Some(start));
+    wait_until(cx, window, |cx| !view.read(cx).display.bodies.is_empty());
+    let (body, face) = cx.update(|cx| {
+        let b = &view.read(cx).display.bodies[0];
+        (b.id.clone(), b.face_refs[0].clone())
+    });
+    view.update(cx, |v, cx| {
+        let (tab, b) = (v.tab, body.clone());
+        v.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Part data", cx, |ps| {
+                let p = ps.part_properties.entry(b).or_default();
+                (p.part_number, p.material) = (Some("P-100".into()), Some("ABS".into()));
+                p.appearance = Some(noshape_model::partstudio::Appearance { color: [1.0, 0.0, 0.0, 0.5] });
+                ps.appearances.push(FaceAppearance::new(AppearanceTarget::Faces(vec![face]), [0.0, 0.0, 1.0, 1.0]));
+            })
+        });
+        v.right_panel = Some(super::super::config_panel::RightPanel::Appearance);
+        cx.notify();
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let state = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.read(cx).ui_state(w, cx)).unwrap();
+    let s = state(cx);
+    let part = serde_json::json!({ "name": "Part 1", "part_number": "P-100", "description": null, "material": "ABS", "appearance": { "hex": "FF0000", "opacity": 127, "default": false }, "hidden": false });
+    assert_eq!(s["part_data"], serde_json::json!([part]));
+    assert_eq!(s["panels"][0]["rows"], serde_json::json!(["Part 1", "Face appearance 1", "1 selection"]));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(EditTarget::Parts(vec![body.clone()]), w, cx))).unwrap();
+    draw(cx, window);
+    let d = state(cx)["dialog"].clone();
+    let fields: Vec<String> = d["fields"].as_array().unwrap().iter().map(|f| format!("{} {}", f["label"].as_str().unwrap(), f.get("text").or(f.get("value")).and_then(|t| t.as_str()).unwrap_or("?"))).collect();
+    assert_eq!((d["kind"].as_str(), d["title"].as_str(), d["ok"].is_null()), (Some("appearance"), Some("Appearance"), true));
+    assert_eq!(fields, ["A 0.50", "# FF0000", "R 255", "G 0", "B 0", "Tessellation quality Auto"]);
+    assert_eq!(d["tabs"], serde_json::json!([{ "label": "Palette", "selected": true }, { "label": "Mixer", "selected": false }]));
+}
+
 /// Live core/appear-subtract-1124: a Subtract uses up the tool body whose Extrude has a feature appearance; the panel
 /// lists only Part 1, no row for the appearance (its faces are gone; the cut faces are the Boolean's).
 #[gpui::test]

@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
 # Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
-LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio", "camera", "measure"]
+LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio", "camera", "measure", "part_data"]
 # Read from the main page, which a drawing's iframe leaves alone (README "### Drawings"): not compared there.
 NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
 
@@ -956,6 +956,13 @@ def recorder_form(b, live):
                 return False
             return not (n and not new) and not (o and new)
         sel[:] = [x for x in sel if kept(x)]
+    # The Appearance editor: read as its colour fields since live2 2026-11-27.4 (README "The Appearance editor"), as a
+    # feature dialog before (ours' `feature`).
+    d = (b or {}).get("dialog")
+    if isinstance(d, dict) and d.get("kind") == "appearance" and "feature" in d:
+        feature = d.pop("feature")
+        if not (m is not None and (m.group(1), int(m.group(2))) >= ("2026-11-27", 4)):
+            b["dialog"] = feature
     d = (b or {}).get("dialog")
     if not isinstance(d, dict):
         return
@@ -1596,8 +1603,15 @@ def compare(live, ours, whole_document=True):
         # (Also where live's drawing read failed and was dropped: ours' drawing says it is one.)
         if (a or {}).get("drawing") or (b or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
+        # A take with `part_data` (live2 2026-11-27.4 on) reads the open Appearances panel too (README "Part Studio
+        # panels"); its other panels aren't compared.
+        if "part_data" in (a or {}):
+            keys = keys + ["panels"]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
+        if "panels" in keys:
+            for side in (a, b):
+                side["panels"] = [pn for pn in side.get("panels") or [] if isinstance(pn, dict) and pn.get("id") == "appearances"]
         if str(live.get("recorded", "")) < PANEL_DIALOGS_SINCE and a.get("dialog") is None and is_panel_dialog(b.get("dialog")):
             b["dialog"] = None
         if str(live.get("recorded", "")) < POPOVER_PANELS_SINCE and a.get("dialog") is None and is_popover_panel(b.get("dialog")):
