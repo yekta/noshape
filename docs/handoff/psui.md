@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-27 15:0x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-27 16:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,16 +33,14 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## IN FLIGHT 15:0x (after compaction: start here)
-- LANDED 17c3189f as 7ce32dc540 (Replicate, fillet Vertices, Insert image, image report, TICKETS). sketch-image-edit
-  s17 .dialog.fields[1].checked live false / ours true: not looked into yet.
-- B-spline selection audit (lead 13:2x, P0, skasm has the sketch side): DONE, queued 15:0x (see land log) with a TICKETS
-  dedupe (ERR-HOLE-INVALID-COMMIT x3). Test bspline_pick_tests.rs on kernel test STEPs g25-b and fan-blade-thread:
-  (1) T2 (~4 min, GPU): every face/edge with a clear spot, 7 views x 2 zooms, lights/clicks with nothing / another /
-  itself selected, click adds, Shift toggles: all pass (g25-b 18/18 faces 19/36 edges, thread 4/6 + 4/12);
-  (2) T1: window box, crossing box per edge, Tangent connected faces/edges = geometry oracle, every Select > item keeps
-  its seed and only drawn entities. FIX: select.rs leaves degenerated edges out of Select > results. Lead told.
-  Full part-studio-ui lib 665 ok, model select 10 ok (resp/ps27.log).
+## IN FLIGHT 16:2x (after compaction: start here)
+- LANDED: B-spline selection audit as d62170db (lead told 15:0x); 17c3189f as 7ce32dc540.
+- QUEUED 16:2x (see land log): Edit image's picker on Current document with nothing picked (sketch-image-edit and
+  -place match, resp/ps29.log); qa batch 5's two rows, not code: drw-export-format-dwg/-dxf/-dwg-then-pdf seed live's
+  remembered export (export_drawing.json: DWG 2018, DXF Explode all), part-menu-release-all-configurations /
+  -configured-release-items turn managed workflows on; all 5 match (resp/ps30.log). TICKETS: those two + core's
+  SPLIT-TRIMMED-PARTIAL-ERRORS (04b6d11a4) marked fixed, to verify.
+- sketch-tool-insert-image s3: its 11-07 take predates the picker reading; retake asked (REQUESTS "psui 11-27 15:42").
 - Edge reach (PICK-FACE-OVER-NEAR-EDGE), held, uncommitted (stash psui-reach while landing): renderer.rs pick_reaching
   `body`, builder.rs body_fn, viewport.rs pick_body, behaviors.rs, offscreen.rs, feel_tests.rs (2 edge tests). TEMP
   trace in renderer.rs (NOSHAPE_PICK_TRACE, never commit). Land only when split-face-ok s7 matches AND live answers
@@ -56,7 +54,6 @@ docs/DECISIONS.md (read first; it wins over anything here).
   is the Appearances panel row's item (needs recorder work: not asked for).
 
 ## NEXT
-- core queued bf790398 (SPLIT-TRIMMED-PARTIAL-ERRORS fixed): once it is on main, mark that TICKETS row fixed.
 - qa's diffs from live's option-combination batches as filed; interaction-feel rows to verify (archive 11-27).
 
 ## Agents
