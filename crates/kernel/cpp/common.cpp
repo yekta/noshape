@@ -1710,6 +1710,38 @@ Moments inner(const BRepAdaptor_Surface& s, double a, double b, double v, double
   return out;
 }
 
+// ∫ g(u, v) dv over [a, b] at `u`, as inner along u.
+Moments inner_v(const BRepAdaptor_Surface& s, double a, double b, double u, double step, bool volume, const gp_XYZ& o,
+                const std::vector<double>& breaks)
+{
+  Moments             out{};
+  std::vector<double> pts{a};
+  for (double k : breaks)
+    if (k > std::min(a, b) + 1e-12 && k < std::max(a, b) - 1e-12)
+      pts.push_back(k);
+  pts.push_back(b);
+  std::sort(pts.begin() + 1, pts.end() - 1);
+  if (b < a)
+    std::reverse(pts.begin() + 1, pts.end() - 1);
+  for (size_t piece = 0; piece + 1 < pts.size(); ++piece)
+  {
+    const double pa = pts[piece], pb = pts[piece + 1];
+    const int    n  = segments(pb - pa, step);
+    for (int k = 0; k < n; ++k)
+    {
+      const double s0 = pa + (pb - pa) * k / n, h = (pb - pa) / n;
+      for (int i = 0; i < 8; ++i)
+      {
+        Moments g;
+        integrand(s, u, s0 + h * (kGaussX[i] + 1) / 2, volume, o, g);
+        for (int j = 0; j < 10; ++j)
+          out[(size_t)j] += g[(size_t)j] * kGaussW[i] * h / 2;
+      }
+    }
+  }
+  return out;
+}
+
 // The surface's parameter values where it's less than C2 along u (`along_u`)
 // or v (B-spline knots, a sweep's section knots), repeated a period either
 // side on a periodic surface.
@@ -1936,6 +1968,10 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
         m = -m;
     return box;
   }
+  // A cylinder's or cone's face: ∬ g du dv = -∮ H du, H(u, v) = ∫ g dv from the face's lowest v, a polynomial along the
+  // axis: 8 points a point of the boundary, not the arc round it (a thread's crest going round 7 times: whole turns).
+  const bool along_v = uper && !vper && (s.GetType() == GeomAbs_Cylinder || s.GetType() == GeomAbs_Cone) &&
+                       uv_gaps(f).empty();
   Moments total{};
   for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
   {
@@ -2018,6 +2054,16 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
           gp_Vec2d     d;
           const double t = t0 + h * (kGaussX[i] + 1) / 2;
           c->D1(t, q, d);
+          if (along_v)
+          {
+            if (d.X() == 0)
+              continue;
+            // (One segment: along the axis the integrand is a polynomial of degree 4 at most, which 8 points take exactly.)
+            const Moments g = inner_v(s, v0, q.Y(), q.X(), std::numeric_limits<double>::infinity(), volume, o, vbreaks);
+            for (int j = 0; j < 10; ++j)
+              total[(size_t)j] -= g[(size_t)j] * d.X() * kGaussW[i] * h / 2;
+            continue;
+          }
           // (Nothing along a u-isoline: its G would cost a whole inner integral for a zero term.)
           if (d.Y() == 0)
             continue;

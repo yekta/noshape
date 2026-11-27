@@ -10121,6 +10121,201 @@ double face_area(const TopoDS_Shape& f)
   return p.Mass();
 }
 
+// Where a line along a cylinder face's axis crosses its boundary: at `v` on the face, `t` on edge `e`.
+struct TurnCut
+{
+  double      v;
+  TopoDS_Edge e;
+  double      t;
+};
+
+// A line on face `f` at `u` from `a` to `b` (a.v < b.v).
+struct TurnChord
+{
+  TopoDS_Face f;
+  double      u;
+  TurnCut     a, b;
+};
+
+// `x` with `chords` cutting their faces, built directly: the crossed edges in pieces at the crossings, each cut face
+// the regions its boundary and lines enclose, `hist` the pieces; null where a face isn't one loop or a crossing falls
+// on a vertex (BRepFeat's then).
+TopoDS_Shape turns_cut(const TopoDS_Shape& x, const std::vector<TurnChord>& chords, occ::handle<BRepTools_History>& hist)
+{
+  BRep_Builder B;
+  using EdgeCuts = std::vector<std::pair<double, TopoDS_Vertex>>;
+  NCollection_DataMap<TopoDS_Shape, EdgeCuts, TopTools_ShapeMapHasher> cuts;
+  // Each line's ends a new vertex on the crossed edge (one where two faces' lines cross an edge at one point).
+  const auto vertex_at = [&](const TurnCut& c, const TopoDS_Face& f, double u) -> TopoDS_Vertex {
+    double a = 0, b = 0;
+    BRep_Tool::Range(c.e, a, b);
+    const BRepAdaptor_Curve curve(c.e);
+    const gp_Pnt            p   = curve.Value(c.t);
+    const double            tol = BRep_Tool::Tolerance(c.e);
+    if (p.Distance(curve.Value(a)) <= 4 * tol || p.Distance(curve.Value(b)) <= 4 * tol)
+      return TopoDS_Vertex();
+    if (!cuts.IsBound(c.e))
+      cuts.Bind(c.e, EdgeCuts());
+    EdgeCuts& on = cuts.ChangeFind(c.e);
+    for (const auto& [t, v] : on)
+      if (std::abs(t - c.t) <= 1e-9 * std::max(1.0, std::abs(b - a)))
+        return v;
+    TopoDS_Vertex   v;
+    TopLoc_Location loc;
+    const gp_Pnt    q = BRep_Tool::Surface(f, loc)->Value(u, c.v).Transformed(loc.Transformation());
+    B.MakeVertex(v, p, std::max(tol, 2 * p.Distance(q)));
+    on.emplace_back(c.t, v);
+    return v;
+  };
+  std::vector<std::pair<TopoDS_Vertex, TopoDS_Vertex>> ends;
+  for (const TurnChord& c : chords)
+  {
+    const TopoDS_Vertex va = vertex_at(c.a, c.f, c.u), vb = vertex_at(c.b, c.f, c.u);
+    if (va.IsNull() || vb.IsNull() || va.IsSame(vb))
+      return TopoDS_Shape();
+    ends.emplace_back(va, vb);
+  }
+  BRepTools_ReShape                    rs;
+  const occ::handle<BRepTools_History> h = new BRepTools_History();
+  // Each crossed edge's pieces, in order along it.
+  NCollection_DataMap<TopoDS_Shape, std::vector<TopoDS_Edge>, TopTools_ShapeMapHasher> pieces;
+  for (NCollection_DataMap<TopoDS_Shape, EdgeCuts, TopTools_ShapeMapHasher>::Iterator it(cuts); it.More(); it.Next())
+  {
+    const TopoDS_Edge e = TopoDS::Edge(it.Key().Oriented(TopAbs_FORWARD));
+    EdgeCuts          on = it.Value();
+    std::sort(on.begin(), on.end(), [](const auto& p, const auto& q) { return p.first < q.first; });
+    double a = 0, b = 0;
+    BRep_Tool::Range(e, a, b);
+    std::vector<std::pair<double, TopoDS_Vertex>> stops{{a, TopExp::FirstVertex(e)}};
+    stops.insert(stops.end(), on.begin(), on.end());
+    stops.emplace_back(b, TopExp::LastVertex(e));
+    std::vector<TopoDS_Edge> es;
+    TopoDS_Compound          all;
+    B.MakeCompound(all);
+    for (size_t k = 0; k + 1 < stops.size(); ++k)
+    {
+      TopoDS_Edge p = TopoDS::Edge(e.EmptyCopied());
+      p.Orientation(TopAbs_FORWARD);
+      B.Add(p, stops[k].second.Oriented(TopAbs_FORWARD));
+      B.Add(p, stops[k + 1].second.Oriented(TopAbs_REVERSED));
+      B.Range(p, stops[k].first, stops[k + 1].first);
+      es.push_back(p);
+      B.Add(all, p);
+      h->AddModified(e, p);
+    }
+    rs.Replace(e, all);
+    pieces.Bind(e, es);
+  }
+  // Each cut face's regions: along its loop, at a line's end across the line to its other end, until back.
+  std::map<int, std::vector<size_t>> by_face;
+  ShapeIMap                          faces;
+  for (size_t i = 0; i < chords.size(); ++i)
+    by_face[faces.Add(chords[i].f.Oriented(TopAbs_FORWARD))].push_back(i);
+  for (const auto& [fi, mine] : by_face)
+  {
+    const TopoDS_Face f = TopoDS::Face(faces(fi));
+    int               wires = 0;
+    TopoDS_Wire       w;
+    for (TopoDS_Iterator it(f); it.More(); it.Next(), ++wires)
+      w = TopoDS::Wire(it.Value());
+    if (wires != 1)
+      return TopoDS_Shape();
+    std::vector<TopoDS_Edge> loop;
+    for (BRepTools_WireExplorer we(w, f); we.More(); we.Next())
+    {
+      const TopoDS_Edge& e = we.Current();
+      if (BRep_Tool::IsClosed(e, f))
+        return TopoDS_Shape();
+      const std::vector<TopoDS_Edge>* ps = pieces.Seek(e);
+      if (ps == nullptr)
+      {
+        loop.push_back(e);
+        continue;
+      }
+      if (e.Orientation() == TopAbs_REVERSED)
+        for (auto p = ps->rbegin(); p != ps->rend(); ++p)
+          loop.push_back(TopoDS::Edge(p->Reversed()));
+      else
+        loop.insert(loop.end(), ps->begin(), ps->end());
+    }
+    // The lines, and at each end the other end and the line from this end.
+    const double                    tol = std::max(BRep_Tool::Tolerance(f), Precision::Confusion());
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f, loc);
+    NCollection_DataMap<TopoDS_Shape, std::pair<TopoDS_Vertex, TopoDS_Edge>, TopTools_ShapeMapHasher> across;
+    for (size_t i : mine)
+    {
+      const TurnChord& c = chords[i];
+      const auto& [va, vb] = ends[i];
+      TopoDS_Edge      e;
+      const gp_Pnt p0 = surf->Value(c.u, c.a.v).Transformed(loc.Transformation());
+      const gp_Pnt p1 = surf->Value(c.u, c.a.v + 1).Transformed(loc.Transformation());
+      B.MakeEdge(e, new Geom_Line(p0, gp_Dir(gp_Vec(p0, p1))), tol);
+      B.Add(e, va.Oriented(TopAbs_FORWARD));
+      B.Add(e, vb.Oriented(TopAbs_REVERSED));
+      B.UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(c.u, c.a.v), gp_Dir2d(0, 1)), f, tol);
+      B.Range(e, 0, c.b.v - c.a.v);
+      if (across.IsBound(va) || across.IsBound(vb))
+        return TopoDS_Shape();
+      across.Bind(va, {vb, e});
+      across.Bind(vb, {va, TopoDS::Edge(e.Reversed())});
+    }
+    // The loop's runs from one line's end to the next.
+    std::vector<size_t> starts;
+    for (size_t k = 0; k < loop.size(); ++k)
+      if (across.IsBound(TopExp::FirstVertex(loop[k], true)))
+        starts.push_back(k);
+    if (starts.size() != 2 * mine.size())
+      return TopoDS_Shape();
+    NCollection_DataMap<TopoDS_Shape, size_t, TopTools_ShapeMapHasher> run_from;
+    for (size_t r = 0; r < starts.size(); ++r)
+      run_from.Bind(TopExp::FirstVertex(loop[starts[r]], true), r);
+    std::vector<bool> used(starts.size(), false);
+    TopoDS_Compound   regions;
+    B.MakeCompound(regions);
+    size_t            count = 0;
+    for (size_t r0 = 0; r0 < starts.size(); ++r0)
+    {
+      if (used[r0])
+        continue;
+      TopoDS_Wire rw;
+      B.MakeWire(rw);
+      for (size_t r = r0; !used[r];)
+      {
+        used[r]          = true;
+        const size_t end = starts[(r + 1) % starts.size()];
+        for (size_t k = starts[r]; k != end; k = (k + 1) % loop.size())
+          B.Add(rw, loop[k]);
+        const auto& [to, line] = across.Find(TopExp::FirstVertex(loop[end], true));
+        B.Add(rw, line);
+        r = run_from.Find(to);
+        if (r != r0 && used[r])
+          return TopoDS_Shape();
+      }
+      rw.Closed(true);
+      TopoDS_Face region;
+      B.MakeFace(region, surf, loc, BRep_Tool::Tolerance(f));
+      B.Add(region, rw);
+      B.Add(regions, region);
+      h->AddModified(f, region);
+      ++count;
+    }
+    // (One loop cut by lines that don't cross: a region more than lines.)
+    if (count != mine.size() + 1)
+      return TopoDS_Shape();
+    rs.Replace(f, regions);
+  }
+  const TopoDS_Shape out = rs.Apply(x);
+  if (out.IsNull())
+    return TopoDS_Shape();
+  for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_SHELL})
+    for (TopExp_Explorer e(x, k); e.More(); e.Next())
+      if (const TopoDS_Shape now = rs.Value(e.Current()); !now.IsNull() && !now.IsSame(e.Current()))
+        h->AddModified(e.Current(), now);
+  hist = h;
+  return out;
+}
+
 // `x` with its cylinder faces going round the axis more than once (a thread's flat crest swept round it 7 times on the
 // exact cylinder, nuts Sweep 1) divided into pieces under a turn by lines along the axis, `hist` its history; `x`
 // itself (`hist` null) where it has none or the division fails. OCCT's Booleans lose same-domain parts of such a face
@@ -10128,7 +10323,7 @@ double face_area(const TopoDS_Shape& f)
 TopoDS_Shape divided_turns(const TopoDS_Shape& x, occ::handle<BRepTools_History>& hist)
 {
   hist.Nullify();
-  std::vector<std::pair<TopoDS_Face, TopoDS_Edge>> lines;
+  std::vector<TurnChord> chords;
   for (TopExp_Explorer fe(x, TopAbs_FACE); fe.More(); fe.Next())
   {
     const TopoDS_Face& f = TopoDS::Face(fe.Current());
@@ -10139,14 +10334,13 @@ TopoDS_Shape divided_turns(const TopoDS_Shape& x, occ::handle<BRepTools_History>
     BRepTools::UVBounds(f, u0, u1, v0, v1);
     if (u1 - u0 <= 2 * M_PI + 1e-9)
       continue;
-    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
     BRepTopAdaptor_FClass2d         inside(f, Precision::PConfusion());
     const int                       n = static_cast<int>(std::ceil((u1 - u0) / (2 * M_PI))) + 1;
     for (int k = 1; k < n; ++k)
     {
       // (Where the line u crosses the face's boundary: each edge's curve on it sampled, its crossings bisected.)
       const double        u = u0 + (u1 - u0) * k / n;
-      std::vector<double> vs;
+      std::vector<TurnCut> vs;
       for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
       {
         const TopoDS_Edge&               e = TopoDS::Edge(ee.Current());
@@ -10170,28 +10364,33 @@ TopoDS_Shape divided_turns(const TopoDS_Shape& x, occ::handle<BRepTools_History>
               if ((dm < 0) == (dlo < 0))
                 dlo = dm;
             }
-            vs.push_back(pc->Value(0.5 * (lo + hi)).Y());
+            vs.push_back({pc->Value(0.5 * (lo + hi)).Y(), e, 0.5 * (lo + hi)});
           }
           ta = tb;
           da = db;
         }
       }
-      std::sort(vs.begin(), vs.end());
+      std::sort(vs.begin(), vs.end(), [](const TurnCut& p, const TurnCut& q) { return p.v < q.v; });
       if (vs.size() % 2 != 0)
         return x;
       for (size_t i = 0; i + 1 < vs.size(); ++i)
-      {
-        if (inside.Perform(gp_Pnt2d(u, 0.5 * (vs[i] + vs[i + 1]))) != TopAbs_IN)
-          continue;
-        // (Its curve on the face the line itself: the face's own parameters, never a projection's other period.)
-        const TopoDS_Edge e = BRepBuilderAPI_MakeEdge(s->Value(u, vs[i]), s->Value(u, vs[i + 1]));
-        BRep_Builder().UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(u, vs[i]), gp_Dir2d(0, 1)), f, std::max(BRep_Tool::Tolerance(f), Precision::Confusion()));
-        lines.emplace_back(f, e);
-      }
+        if (inside.Perform(gp_Pnt2d(u, 0.5 * (vs[i].v + vs[i + 1].v))) == TopAbs_IN)
+          chords.push_back({f, u, vs[i], vs[i + 1]});
     }
   }
-  if (lines.empty())
+  if (chords.empty())
     return x;
+  if (const TopoDS_Shape out = turns_cut(x, chords, hist); !out.IsNull())
+    return out;
+  std::vector<std::pair<TopoDS_Face, TopoDS_Edge>> lines;
+  for (const TurnChord& c : chords)
+  {
+    // (Its curve on the face the line itself: the face's own parameters, never a projection's other period.)
+    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(c.f);
+    const TopoDS_Edge e = BRepBuilderAPI_MakeEdge(s->Value(c.u, c.a.v), s->Value(c.u, c.b.v));
+    BRep_Builder().UpdateEdge(e, new Geom2d_Line(gp_Pnt2d(c.u, c.a.v), gp_Dir2d(0, 1)), c.f, std::max(BRep_Tool::Tolerance(c.f), Precision::Confusion()));
+    lines.emplace_back(c.f, e);
+  }
   try
   {
     BRepFeat_SplitShape split(x);
@@ -10568,7 +10767,23 @@ struct TurnsDivided
           joined.Bind(rf(i + 1).Oriented(TopAbs_FORWARD), f);
       }
       const TopoDS_Shape out = rs.Apply(res.shape);
-      if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
+      if (out.IsNull())
+        return r;
+      // (Valid where it changed: the joined faces and those with a joined edge.)
+      ShapeIMap made;
+      for (NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher>::Iterator it(joined); it.More(); it.Next())
+        made.Add(it.Value());
+      TopoDS_Compound touched;
+      B.MakeCompound(touched);
+      for (TopExp_Explorer fe(out, TopAbs_FACE); fe.More(); fe.Next())
+      {
+        bool mine = made.Contains(fe.Current());
+        for (TopExp_Explorer ee(fe.Current(), TopAbs_EDGE); ee.More() && !mine; ee.Next())
+          mine = made.Contains(ee.Current());
+        if (mine)
+          B.Add(touched, fe.Current());
+      }
+      if (!BRepCheck_Analyzer(touched).IsValid())
         return r;
       // (Each joined face its pieces' area, as divided_turns checks.)
       for (const auto& [top, group] : groups)
