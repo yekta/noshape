@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-27 14:20 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-27 15:30 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -12,29 +12,28 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 BOOL-TURN-SPLIT-SLOWER (state 11-27 14:40 UTC; lead: land before ~00:00 so the 00:17 main CI carries it)
+## P0 BOOL-TURN-SPLIT-SLOWER (state 11-27 15:30 UTC; lead: land before ~00:00 so the 00:17 main CI carries it)
 - 58e4cdbf QUEUED (area checks instead of volume integrals in the split/rejoin). Keep it.
-- ec60ab700 (bool-fb, committed, gating): turns_cut() builds the turn split directly (edge pieces by EmptyCopied +
-  Range, chords with a (u, v) line pcurve, regions by walking the face's loop and crossing at each chord end;
-  BRepFeat only for >1 wire / seam / crossing at a vertex): 1.5 s -> 4 ms on standoffs; rejoined() checks only the
-  changed faces; face_moments integrates every cylinder/cone face along v (inner_v, one 8-point segment: the
-  integrand is a polynomial of degree <= 4 along the axis). Volumes vs the old path: <= 2e-7 relative (nuts),
-  2e-8 (standoffs). Same-run vibex8 CLI A/B: standoffs kernel totals 0.4.73 1574 ms vs fix 1152 (op_boolean 554/346,
-  props_volume 391/145, op_unify 348/436); wall 1.2-1.6 s both (load noise); nuts/helical same; all SAME.
-- Ruled out: faces_volume via our integral (OCCT's Vinert 28 ms vs ours 176 on those faces); ShapeDivideAngle
-  (doesn't split); split off (OCCT 7.5 s, Revolve 2 wrong); same-domain trigger.
-- Left (not needed for the bar): op_unify +90 ms (usd vchange ~230 ms, new_faces_valid ~90 ms on helix faces).
-- Probe build kept: /root/bool-scratch/p0-direct-probes.diff (VOLCMP, VTYPES, ALONGV, DCHECK, BREPFEAT toggles).
-- 2120ccaae (on top): bool_patterns late-decline test now volume within area*1e-7 (was 1e-9 rel: new integral moved
-  it 1.5e-9). Kernel tests 619/620 before that fix (only that one); model 663/663 + model-core ok; GCC 13 ok.
-- RUNNING (14:40 UTC): gate unit bool-gate-ec60ab70-x8 -> /root/bool-hat-scratch/chain-ec60ab700c.out (started
-  14:17, ~80 min; gate is on ec60ab700, the test-only commit doesn't change it); ops/assembly/drawing tests ->
-  /root/bool-scratch/ot-ec60.log (script ot.sh, ends OT-DONE).
-- To land (before ~00:00, lead: so the 00:17 main CI carries it): gate 0 diff incl. parity56, ot-ec60 green, knurls
-  (kn-run.sh vibex8 <dir> with k-main = merge-base kernel test binary, k-br = ~/agents/bool-fb/target/release/deps/
-  all-96c035059fc28abb copied), then git diff --stat merge-base, touch -c, NOSHAPE_LAND_QUEUE_HOST=vibe2
-  tools/tiers/land.sh; report to the lead (<=5 lines: standoffs kernel 1574 -> 1152 ms vs 0.4.73, wall within noise,
-  17/17 kept). vibex8 files: ~/tmp/bool/ops-turns, cmp/, tp/, rec-stand/, kt-gam, gam/: delete after the land.
+- ec60ab700 (bool-fb): turns_cut() builds the turn split directly (edge pieces by EmptyCopied + Range, chords with a
+  (u, v) line pcurve, regions by walking the face's loop and crossing at each chord end; BRepFeat only for >1 wire /
+  seam / crossing at a vertex): 1.5 s -> 4 ms on standoffs; rejoined() checks only the changed faces; face_moments
+  integrates every cylinder/cone face along v (inner_v, one 8-point segment, polynomial of degree <= 4 along the axis).
+- 73c26f0c2 (on top, = HEAD to land): along v every uv gap of the boundary closed, under 1e-9 m too. Before it, cone
+  faces of f901b748 with pcurves 2e-8 rad apart at two corners read +1.27e-13 m3 each (7e-8 rel); the old integrator
+  and OCCT adaptive 1e-13 agree to 1e-21 (probe /root/bool-scratch/p0-gaps-probes.diff, never commit). 2120ccaae had
+  loosened the late-decline test over it: reverted (805598536, lead told 15:25; DECISIONS 6420d7fb27: loosen a test
+  only when the old value was wrong against live or an independent check).
+- Checks on 73c26f0c2: kernel 620/620 + lib 11 at the 1e-9 bound; ops/assembly/drawing green (ot-ec60.log, on ec60;
+  the fix only changes volumes); GCC 13 ok on ec60 (common.cpp re-check before land). Same-run vibex8 CLI A/B (gate
+  load on host): standoffs kernel ~1.50 s (0.4.73) vs ~1.09 s (props_volume 364/106, op_boolean 479/358, op_unify
+  342/373); wall 1.91/1.68, 1.19/1.27, 1.54/1.15; standoffs/nuts/helical all SAME.
+- RUNNING: gate unit bool-gate-73c26f0c-x7 on vibex7 (lead 15:28: vibex8's slot held by qa's ui-parity; must end
+  before qa's 02:00 window there) -> /root/bool-hat-scratch/chain-73c26f0c26.out (started 15:28, ~80 min).
+- To land: gate 0 diff incl. parity56, knurls (kn-run.sh <host> <dir>, k-main = merge-base kernel test binary,
+  k-br = the gate tree's all-* copied), GCC 13 on common.cpp, then git diff --stat merge-base, touch -c,
+  NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh; report (<=5 lines). Clean vibex8 ~/tmp/bool/ops-turns, cmp/,
+  tp/, rec-stand/, kt-gam, gam/ after.
+- Left (not needed for the bar): op_unify +30..90 ms (usd vchange, new_faces_valid on helix faces).
 
 ## GAMMA (next)
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
