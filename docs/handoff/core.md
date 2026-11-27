@@ -16,15 +16,19 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     Fillet 1 row LIVE_LINES_AS_OTHER. bridging Boundary surface 1 Warning -> Ok, 20866 -> 17289 mm2 (live 17559, row
     open). Corpus A/B: only bridging; kernel 621 ok, model 664 ok, g++-13 ok. T1 surfacing::a_g2_fill_of_a_hole_in_a_
     sphere_follows_the_sphere (G2 0.3 um off at r 10 mm, G1 3x). LEAD NOT YET TOLD (lead at 215k at 13:04): report.
-  4 IN FLIGHT c2-curve-pattern-composite Fillet 2 (R10; 28/58/32 vs live 26/52/28, vol +10.3 mm3; live JJi OTHER
-    326.6444 + JJ6 cyl 1220.5154). UNCOMMITTED blend_direct.cpp (patch also /root/core-scratch/cpc-sliver.patch): a piece
-    with no inside point narrower than sew_tol (2 area < sew_tol x boundary) is dropped (were two 0.87 um cuts along one
-    curve). The direct build then fails "an invalid solid": the R20 cylinder piece's wire self-intersects (uv u runs to
-    1.586 > pi/2: the R10 ball's contact crosses the cylinder/plane tangent line at y=20 onto the bottom/top plane,
-    2.66e-3 mm) + BadOrientationOfSubshape. Next: make the contact curve stop at / switch at the tangent line (cut on the
-    cylinder must end at u = pi/2, the rest on the plane). Debug: vibex7 ~/tmp/core/bdn/cpc (.cpc.sh: parity + q.err,
-    NOSHAPE_BLEND_DIRECT_DEBUG=1).
-  5 c2-impeller-loft Fillet 3: edges 93 vs 95; "Adjoining edge not filleted." on Fillet Stevenrohr zum Halter.
+  4 PARKED 13:1x c2-curve-pattern-composite Fillet 2 (R10; 28/58/32 vs live 26/52/28, vol +10.3 mm3; live JJi OTHER
+    326.6444 + JJ6 cyl 1220.5154, ours 335.766 + 1144.84 + 2 OCCT corner patches 64.39). Direct build declines on a
+    0.87 um zero-width piece (two cuts along one curve); dropping it (patch /root/core-scratch/cpc-sliver.patch: 2 area <
+    sew_tol x boundary) only moves the decline to "an invalid solid": tool 1's side runs the R20 cylinder 0.33 mm past its
+    tangent line with the y=20 plane (uv u to 1.586 > pi/2; sag 0.33^2/40 = 2.66 um = "lies on part face 4"), so the
+    cylinder piece's wire self-intersects. Needs the ball's contact to switch from cylinder to plane at the tangent line
+    (blend-surface work, not a trim fix). Debug: vibex7 ~/tmp/core/bdn/cpc (.cpc.sh, NOSHAPE_BLEND_DIRECT_DEBUG=1).
+  5 PARKED 13:4x c2-impeller-loft (parity 13:2x on 30439ec5e: 27/48; Fillet 3 34/93/60 vs live 34/95/62, faces and volume
+    as live; then zum Halter ERROR "Failed to fillet selections." and the cascade to 47). Fillet 3 edges by type+length
+    (.imp3.sh, vibex7 ~/tmp/core/imp3): (a) vertex splits along the y=+-27 run-ons and label kinds (live LINE/SPLINE vs
+    our OTHER): 11-16 known-difference class; (b) the conic end at x=5: live 0.19+0.56 each side + a 0.36 edge across
+    (5,-0.144,-44.007), ours 2 x 0.75 meeting at y 0, plus live's 0.05 edge at (0.023,4.132,-63.209). (b) is the layout
+    zum Halter's 4th reference needs (archive 11-25 note; crease-turn WIP core-scratch/imp/crease-turn-wip3.patch, parked).
   6 psui SPLIT-TRIMMED-PARTIAL-ERRORS (live "Tool entity cannot split the selected part/face." with Trim to face
     boundaries, tool partly across); keep ours if valid + what was asked ("ours does the work"), live's error only for
     non-manifold or a slit. Lead FYI: check qa's ~13:xx verdict clears impeller "Select a sketch plane." (69eae144).
