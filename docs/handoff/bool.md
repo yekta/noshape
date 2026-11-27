@@ -37,10 +37,14 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   17/17 kept). vibex8 files: ~/tmp/bool/ops-turns, cmp/, tp/, rec-stand/, kt-gam, gam/: delete after the land.
 
 ## GAMMA (next)
-- 11-27 14:40: lens drop-both invalid = hole cylinder face (x 114.78, 7.54 mm2) wire NotClosed (BRepCheck 28) +
-  face 27. Fix in bool-uv (uncommitted): after FixAddPCurve(ne, f2) shift the new pcurve by whole periods onto the
-  dropped edge's pcurve start (same ? da : db). Rerun running -> /root/bool-scratch/gamma-lens3.log (gamma-lens.sh,
-  prints PROBE lensp / bad* / strips valid). bool-uv also has a BRepCheck status probe (// PROBE lines + include).
+- 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
+  uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
+  dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
+  dropped edge's cylinder moved by whole periods onto the dropped edge's. Boolean 2: 884 faces (live 884), area +0.083
+  mm2 (was +0.103), 7 unmatched (5 = plates band below). T1 boolean_groups::crescents_where_two_holes_meet_five_
+  microns_off_centre_are_gone (fails with KEEP_STRIPS and without the period move); clips_a_few_micrometres_apart and
+  precise_parts_fused_with_a_far_tolerant_pin -2 faces/-2 edges (the crescents). GCC 13 ok, bool_patterns 176/176, lib
+  ok, all kernel otherwise 619 + those 2. NEXT: gate it after ec60's (one gate at a time), knurls, land, report.
 - Worktree bool-uv (branch bool-gamma on origin/main bbb452fe6): probes probe_case_args/probe_case_topo (+PROBE_FUZZY) in
   brep_replay.rs (never commit), lens change in drop_strip_faces (boolean.cpp: `lens` = face of 2 vertices, 2 edges
   within 1e-5; lensv map shares joined vertices) + PROBE fprintf lines. Recording kept at vibex8
