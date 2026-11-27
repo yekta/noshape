@@ -12,20 +12,18 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 SPEED vs 0.4.73 (state 11-27 20:30 UTC; green needed by ~03:30 for the 05:00 cut)
-- QUEUED 4fb00f61 (20:28, reported): marcher opt-in NOSHAPE_BOOL_MARCH=1; one unify pass (input vertices between two
-  edges kept from the start) + slit fill checks only changed faces (changed_faces_valid); rejoined() joins pieces with
-  several input faces. Gate caf7a2dbc1 clean (replay +0 -0, suite 138->138, shells 7=7, crates pass), knurls 5/5 0
-  diff-lines. vibex8 vs 0.4.73: valve 0.81 (0.78), standoffs 1.23-1.42 (1.46-1.59), gamma 2.70 (2.45), wire-clip
-  2.62 (2.42). Left: gamma/wire-clip ~+0.2 s = the slit fill's own fuse (live's topology): inherent. Pulleys' +63 ms
-  is core's 39141bac63.
-- A/B scripts: /root/bool-scratch/m2.sh, g3.sh, u3.sh; binaries vibex8 ~/tmp/bool/cmp/cli-{0473,fix,m,g} (delete
-  after the lands), kt-fb; vibex7 ~/tmp/bool/kn, kn2.
+## P0 SPEED vs 0.4.73 (state 11-27 22:20 UTC)
+- LANDED ccf1a1ed4d marcher opt-in (NOSHAPE_BOOL_MARCH=1; also qa's impeller Fillet row 12.4 s: MARCH=0 5.9 s),
+  f06939ddf6 one unify pass + slit fill checks only changed faces, fd7f64569e rejoin (21:16; told lead + qa). vibex8 vs
+  0.4.73: valve 0.81 (0.78), standoffs 1.23-1.42 (1.46-1.59), gamma 2.70 (2.45), wire-clip 2.62 (2.42). Left:
+  gamma/wire-clip ~+0.2 s = the slit fill's own fuse (live's topology): inherent. Pulleys' +63 ms is core's 39141bac63.
+- Cleanup left: vibex8 ~/tmp/bool/cmp/cli-{0473,g}; vibex7 ~/tmp/bool/kn3; local /root/bool-scratch/nf/cli-0473.
 
 ## GAMMA (next)
-- 20:29 GATING 6efdffdcaf = 394c39327e cherry-picked onto 4fb00f61 (bool-fb, detached) on vibex7, unit
-  bool-gate-6efdffdcaf, /root/bool-hat-scratch/chain-6efdffdcaf.out; GCC 13 ok. NEXT: knurls (kn-run.sh, k-main =
-  caf7a2dbc1's all- binary, kept in vibex7 ~/tmp/bool/kn2/k-br), land, report.
+- 22:20 LANDING 6efdffdcaf (= 394c39327e on the P0 fixes): gate clean (replay +0 -0, suite 138->138 with gamma and
+  wire-clip Boolean 2 886 -> 884 faces as live, shells 6=6, crates pass), knurls 5/5 0 diff-lines, GCC 13 ok.
+- DECLINES (lead 21:40, while gates run): 42 open P2 BOOL-DECLINE tickets rechecked on 0.4.73 (unit bool-nfrecheck,
+  /root/bool-scratch/nf: own copies of qa's nfrecheck.py / clifuzz_nf.py, NSCLI=cli-0473 -> nfrecheck-0473.out).
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
   uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
   dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
