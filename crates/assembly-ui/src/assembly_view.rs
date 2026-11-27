@@ -3399,6 +3399,8 @@ impl AssemblyView {
                 && let Some(next) = shown.into_iter().flatten().find(|s| *s > m.slot)
             {
                 m.slot = next;
+                // The next box takes the keyboard too (live asm-mate-connector-between-faces-ok s5, realign-edge s7).
+                m.picked = false;
             }
             self.schedule_eval(window, cx);
             return;
@@ -3418,6 +3420,8 @@ impl AssemblyView {
                         None => p.scope_refs.push(e),
                     }
                 }
+                // The pick takes the keyboard from the field (live asm-replicate-parts-block-ok s6).
+                self.ui.keyboard_away = true;
                 self.update_pattern_preview(cx);
                 cx.notify();
                 return;

@@ -447,10 +447,12 @@ impl AssemblyView {
         let focus = focus.or_else(|| {
             let title = dialog.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
             // (A mate connector's Move boxes too: live asm-mate-connector-move-offset.)
-            let mc_box = self.mc.as_ref().and_then(|m| m.inputs.iter().find(|q| q.read(cx).is_focused()).map(|q| q.read(cx).state().clone()));
-            let mut f = if let Some(st) = self.mate.as_ref().and_then(|m| m.dialog.read(cx).focused_offset(cx)).or(mc_box) {
+            // (Its Rotation angle by name: live asm-mate-connector-rotate-x-45-ok s8.)
+            let mc_box = self.mc.as_ref().and_then(|m| m.inputs.iter().position(|q| q.read(cx).is_focused()).map(|i| (m.inputs[i].read(cx).state().clone(), (i == 3).then_some("Rotation angle"))));
+            let offset = self.mate.as_ref().and_then(|m| m.dialog.read(cx).focused_offset(cx).map(|st| (st, m.dialog.read(cx).focused_offset_label(cx))));
+            let mut f = if let Some((st, label)) = offset.or(mc_box) {
                 let mut f = input(None, &st);
-                f["label"] = Value::Null;
+                f["label"] = json!(label);
                 f
             } else {
                 let r = self.relation.as_ref().filter(|r| r.ratio_focused)?;

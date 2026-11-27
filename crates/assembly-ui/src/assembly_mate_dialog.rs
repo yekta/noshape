@@ -129,6 +129,8 @@ pub struct MateDialog {
     /// Each limit field's text as last applied (Enter or leaving it): an
     /// Enter that brings nothing new accepts the mate.
     limit_applied: HashMap<EntityId, String>,
+    /// The limit box with the keyboard (live asm-ball-limits-value-ok s7: the box, unlabelled).
+    limit_focus: Option<Entity<InputState>>,
     labeler: ConnectorLabeler,
     /// The mate's regeneration error (the red title's tooltip).
     pub status: Option<String>,
@@ -337,6 +339,7 @@ impl MateDialog {
             offsets,
             limits,
             limit_applied,
+            limit_focus: None,
             labeler,
             status: None,
             lost: HashMap::new(),
@@ -476,7 +479,7 @@ impl MateDialog {
         if self.use_limits {
             let number = |st: &Entity<InputState>, unset: &str| {
                 let t = st.read(cx).value().to_string();
-                json!({ "label": "", "kind": "number", "text": if t.trim().is_empty() { unset.to_string() } else { t }, "focused": false, "state": "ok" })
+                json!({ "label": "", "kind": "number", "text": if t.trim().is_empty() { unset.to_string() } else { t }, "focused": self.limit_focus.as_ref() == Some(st), "state": "ok" })
             };
             for key in limit_keys(t) {
                 let (lo, hi) = &self.limits[key];
@@ -781,8 +784,12 @@ impl MateDialog {
     /// (feel3-1118; behaviours "While typing (before Enter) there is no live solve").
     fn limit_event(&mut self, st: &Entity<InputState>, dim: noshape_units::Dim, ev: &InputEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev {
+            InputEvent::Focus => self.limit_focus = Some(st.clone()),
             InputEvent::Change => (self.touched, self.limits_typed) = (true, true),
             InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                if matches!(ev, InputEvent::Blur) && self.limit_focus.as_ref() == Some(st) {
+                    self.limit_focus = None;
+                }
                 let text = st.read(cx).value().to_string();
                 let rewritten = commit_limit_text(&text, dim, &self.units, &self.variables);
                 let committed = rewritten.clone().unwrap_or_else(|| text.clone());
@@ -804,7 +811,6 @@ impl MateDialog {
                     }
                 }
             }
-            _ => {}
         }
     }
 
@@ -922,9 +928,15 @@ impl MateDialog {
         }
     }
 
-    /// The offset box with the keyboard, if one has it (for the dialog's state).
+    /// The offset or limit box with the keyboard, if one has it (for the dialog's state).
+    /// The focused offset box's label: live names only the rotation's (asm-planar-rotate-45-ok s7 "Rotation angle"; the
+    /// distances unlabelled, asm-fastened-offset).
+    pub fn focused_offset_label(&self, cx: &App) -> Option<&'static str> {
+        self.offsets[3].read(cx).is_focused().then_some("Rotation angle")
+    }
+
     pub fn focused_offset(&self, cx: &App) -> Option<Entity<InputState>> {
-        self.offsets.iter().find(|o| o.read(cx).is_focused()).map(|o| o.read(cx).state().clone())
+        self.offsets.iter().find(|o| o.read(cx).is_focused()).map(|o| o.read(cx).state().clone()).or_else(|| self.limit_focus.clone().filter(|_| self.use_limits))
     }
 
     /// A selection box over these slots looks active: one of them takes the next pick, or, all picked, the first box
@@ -1123,6 +1135,8 @@ impl Render for MateDialog {
                             menu = menu.item(OsMenuItem::new(l).on_click(move |_, _, cx| {
                                 v.update(cx, |this, cx| {
                                     this.rotation_axis = k as u8;
+                                    // The dropdown keeps the keyboard (live asm-fastened-rotate-z-90-ok s7: its unlabelled input).
+                                    cx.emit(MateDialogEvent::CheckboxFocused(""));
                                     cx.emit(MateDialogEvent::Changed);
                                     cx.notify();
                                 })

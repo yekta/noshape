@@ -546,6 +546,8 @@ impl AssemblyView {
                     _ => 2,
                 };
             }
+            // The axis box keeps the keyboard (live asm-mate-connector-rotate-x-45-ok s6: its unlabelled input).
+            this.ui.checkbox_focus = Some("");
             this.schedule_eval(window, cx);
             cx.notify();
         }));
@@ -751,10 +753,8 @@ impl AssemblyView {
                 })
                 .into_iter()
                 .collect();
-            div()
-                .debug_selector(move || id.into())
-                .px(px(3.))
-                .pt(px(5.))
+            // Marked by its label for the UI script (live mistake-asm-mate-connector-realign-edge s6 clicks "Primary axis entity").
+            crate::ui_script::mark(div().debug_selector(move || id.into()).px(px(3.)).pt(px(5.)), move || format!("field:{label}"))
                 .child(os::query_box(SharedString::from(id.to_string()), label, active, rows).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(m) = &mut this.mc {
                         if !(m.active && m.slot == slot) {
@@ -780,11 +780,18 @@ impl AssemblyView {
         s.axis_sel.update(cx, |sel, _| sel.set_items(vec![("ABOUT_X".into(), "Rotate about X".into()), ("ABOUT_Y".into(), "Rotate about Y".into()), ("ABOUT_Z".into(), "Rotate about Z".into())], axis_id));
         let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut McSession, bool)| {
             os::checkbox(id, label, on).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                if let Some(m) = &mut this.mc {
+                // The clicked checkbox keeps the keyboard (live asm-mate-connector-move-offset), unless it brought up a
+                // box that takes the picks: that one has it (live mistake-asm-mate-connector-realign-edge s4).
+                let took = this.mc.as_mut().is_some_and(|m| {
+                    let before = (m.active, m.slot);
                     f(m, !on);
-                }
-                // The clicked checkbox keeps the keyboard (live asm-mate-connector-realign, -move-offset).
-                this.ui.checkbox_focus = Some(label);
+                    let moved = m.active && (m.active, m.slot) != before;
+                    if moved {
+                        m.picked = false;
+                    }
+                    moved
+                });
+                this.ui.checkbox_focus = (!took).then_some(label);
                 this.update_capture(cx);
                 this.schedule_eval(window, cx);
                 cx.notify();
@@ -874,6 +881,8 @@ impl AssemblyView {
                                 if let Some(m) = &mut this.mc {
                                     m.flip = !m.flip;
                                 }
+                                // Clicked, the flip keeps the keyboard (live asm-mate-connector-flip-ok s4: an osc-svg-icon).
+                                this.ui.checkbox_focus = Some("");
                                 this.schedule_eval(window, cx);
                                 cx.notify();
                             })), || "button:Opposite direction".into())
@@ -1857,8 +1866,13 @@ impl AssemblyView {
                 .when(on, |d| d.bg(pal.panel_active))
                 // Live (dom/dialog-asm-*-pattern-*): 20 x 19 flip svgs in a 26 px cell.
                 .child(crate::assets::icon(icon, 19., cx))
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     f(this);
+                    // Clicked, the flip keeps the keyboard (live asm-circular-pattern-flipped-ok s16: an osc-svg-icon).
+                    if let Some(n) = ["pat-opp", "pat-opp2", "pat-opp3"].iter().position(|f| *f == id) {
+                        this.ui.checkbox_focus = Some("");
+                        window.focus(&this.pattern_flip_focus[n], cx);
+                    }
                     this.update_pattern_preview(cx);
                     cx.notify();
                 }));
@@ -2018,7 +2032,11 @@ impl AssemblyView {
                                 p.activate_new_direction(1);
                             }
                         }
-                        this.ui.checkbox_focus = Some("Second direction");
+                        // Its Direction box, made the active one, takes the keyboard (live asm-linear-pattern-two-directions-ok s16);
+                        // else the checkbox keeps it (asm-linear-pattern-second-direction, nothing picked yet).
+                        let took = this.pattern.as_ref().is_some_and(|p| p.active == Some(1));
+                        this.ui.checkbox_focus = (!took).then_some("Second direction");
+                        this.ui.keyboard_away &= !took;
                         this.update_capture(cx);
                         this.update_pattern_preview(cx);
                         cx.notify();
@@ -2034,7 +2052,11 @@ impl AssemblyView {
                                     p.activate_new_direction(2);
                                 }
                             }
-                            this.ui.checkbox_focus = Some("Third direction");
+                            // Its Direction box, made the active one, takes the keyboard (live asm-linear-pattern-two-directions-ok s16);
+                            // else the checkbox keeps it (asm-linear-pattern-second-direction, nothing picked yet).
+                            let took = this.pattern.as_ref().is_some_and(|p| p.active == Some(2));
+                            this.ui.checkbox_focus = (!took).then_some("Third direction");
+                            this.ui.keyboard_away &= !took;
                             this.update_capture(cx);
                             this.update_pattern_preview(cx);
                             cx.notify();
@@ -2123,6 +2145,8 @@ impl AssemblyView {
                         if let Some(p) = &mut this.pattern {
                             p.active = Some(2);
                         }
+                        // The click brings the keyboard back (live asm-replicate-parts-block-ok s5).
+                        this.ui.keyboard_away = false;
                         this.update_capture(cx);
                         this.refresh_scene(false, cx);
                         cx.notify();
