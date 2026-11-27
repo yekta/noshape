@@ -1183,7 +1183,7 @@ impl AssemblyView {
                 self.drop_when_placed(cx);
             }
         }
-        self.update_pattern_preview(cx);
+        self.refresh_pattern_matches(cx);
         // Only placements changed (a mate dialog's preview, a solve): the
         // built scene follows them (pins-assembly-1000: a rebuild was ~17 ms
         // on the UI thread).

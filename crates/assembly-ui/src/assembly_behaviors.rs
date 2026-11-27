@@ -421,6 +421,9 @@ pub struct AsmUi {
     /// Re-evaluate at the next render (a change with no Window at hand,
     /// e.g. the Replace instance preview).
     pub eval_requested: bool,
+    /// The matches an open part pattern / Replicate dialog's preview was last evaluated with: a result that matches
+    /// others evaluates once more.
+    pub preview_targets: Option<Vec<(u32, MateConnectorRef, Option<Placement>)>>,
     pub insert_tab: u8,
     /// Part Studios tab type filters (Onshape's filter icons): show parts,
     /// show surfaces (both off: everything).

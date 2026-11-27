@@ -1568,19 +1568,37 @@ impl AssemblyView {
 
     /// Matches for part pattern / replicate dialogs (shown before accepting).
     pub(super) fn update_pattern_preview(&mut self, cx: &mut Context<Self>) {
-        let Some(s) = &self.pattern else { return };
+        if self.pattern.is_none() {
+            return;
+        }
         // The graphics preview the pattern (`effective`).
         self.ui.eval_requested = true;
+        self.refresh_pattern_matches(cx);
+    }
+
+    /// The match count from the current result. A matched pattern's preview is evaluated with the last result's matches
+    /// (`effective`): only a result that changes them asks for another evaluation (an open dialog re-evaluated 10 times
+    /// a second).
+    pub(super) fn refresh_pattern_matches(&mut self, cx: &mut Context<Self>) {
+        let Some(s) = &self.pattern else {
+            self.ui.preview_targets = None;
+            return;
+        };
         if !s.kind.matched() {
             return;
         }
-        let preview = match (self.pattern_from_session(s, cx), self.assembly(cx)) {
-            (Ok(pat), Some(asm)) => analysis::matched_targets(&self.result, asm, &pat, &self.units(cx)).map(|t| t.len()),
+        let targets = match (self.pattern_from_session(s, cx), self.assembly(cx)) {
+            (Ok(pat), Some(asm)) => analysis::matched_targets(&self.result, asm, &pat, &self.units(cx)),
             (Err(e), _) => Err(e),
             _ => Err("No assembly".into()),
         };
+        let found = targets.as_ref().ok().cloned();
+        if found != self.ui.preview_targets {
+            self.ui.preview_targets = found;
+            self.ui.eval_requested = true;
+        }
         if let Some(s) = &mut self.pattern {
-            s.preview = Some(preview);
+            s.preview = Some(targets.map(|t| t.len()));
         }
     }
 

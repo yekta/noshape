@@ -1222,6 +1222,41 @@ fn a_replicates_own_mates_are_not_among_the_assemblys_mates(cx: &mut TestAppCont
     assert_eq!(state["assembly"]["instances"].as_array().map(Vec::len), Some(3), "the copy is there: {}", state["assembly"]);
 }
 
+/// An open Replicate dialog settles: its preview is evaluated again only while its matches change (every result asked
+/// for another evaluation: 10 a second for as long as a pattern dialog stayed open).
+#[gpui::test]
+fn an_open_replicate_dialog_stops_evaluating_once_its_preview_is_in(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "replicate-settles", |ctx| {
+        let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+        let (top, bottom) = (face(ctx, "Part 1 <1>", 1.0), face(ctx, "Part 2 <1>", -1.0));
+        call(ctx, "assembly_mate_connector", json!({ "tab": "Assembly 1", "on": { "instance": "Part 1 <1>", "entity": top } }));
+        call(ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 2 <1>", "entity": bottom }, "b": { "connector": "Mate connector 1" } }));
+        call(ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "replicate", "seeds": ["Part 2 <1>"], "scope_refs": [{ "instance": "Part 1 <1>" }] }));
+    });
+    let (window, view) = open_assembly_with_front(cx, &path);
+    let start = cx.update(|cx| view.read(cx).eval_seq);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pat = v.assembly(cx).unwrap().patterns[0].clone();
+            v.open_pattern_edit(pat, w, cx);
+        })
+    })
+    .unwrap();
+    for _ in 0..60 {
+        draw(cx, window);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    let (evals, busy, preview) = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.eval_seq - start, v.eval_task.is_some(), v.pattern.as_ref().and_then(|p| p.preview.clone()))
+    });
+    assert!(!busy, "settled");
+    assert!((1..=3).contains(&evals), "{evals} evaluations over 3 s, preview {preview:?}");
+    assert_eq!(preview, Some(Ok(1)), "the preview's match");
+}
+
 /// Live asm-measure-face-cylinder-panel (ASM-MEASURE-BRACKET-KEY): two faces picked, `[` opens Measure with both and
 /// its "Select entities to measure" field focused; Escape closes it.
 #[gpui::test]
