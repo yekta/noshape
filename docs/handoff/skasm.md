@@ -3,7 +3,10 @@
 Updated 2026-11-27 03:08 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
-## NOW (11-27 04:20 UTC): Up to part correction queued (A/B 132/190 same, suites green); next: re-apply /root/skasm-scratch/extend-straight.patch, make Fillet 1 OK across the C1 joint, land with Mutual trim 1; Fillet 8 parked (below)
+## NOW (11-27 05:5x UTC): Up to part queued e49be382; extend-straight landing (A/B: only knifehandle 30 -> 31, 2198 -> 2199). Fillet 1 fails on MAIN too (hidden behind Mutual trim): section blend rolling balls "jump" (steps up to 6.9 mm vs median 1.1 round the tip; 4x rule) and the 64-section loft boolean is invalid; debug prints /root/skasm-scratch/f1dbg.patch, bin/khblend.sh. Next: Fillet 1
+- queued (qa 11-27): P2 SKETCH-LINE-ON-LINE-INFERENCE (TICKETS acbf0b6b4): Line started on a line off its midpoint, drawn perpendicular: 1 mm off live VERTICAL (ours PERPENDICULAR); 3/12 mm off live COINCIDENT+PERPENDICULAR only (ours adds VERTICAL). tools/ui-parity/run.py sketch-line-started-on-line-off-midpoint-{1,3,12}mm
+- queued: ASM-DRAG-REVOLUTE-ANGLE answered (REQUESTS ~7090, live/skasm/rev-drag-1127): no path dependence (150->40 = straight +40 = -21.95; 150->80 -33.96); r60 -29.23, r100 -37.04, r150 -41.26; up u30 +6.24 u40 +7.84 u60 +10.56 u80 +12.81; down 40 -79.18; left flank +40 -22.71, -40 +20.61. r10-r30 read 0.00 (recorder artefact?; 2 px retakes to come in the same answer)
+- queued (qa 11-27, TICKETS 22f824cc5, P2): SKETCH-CHAMFER-KEEPS-CORNER-POINT (live 8 ent/17 cons, ours 7/15), ASM-DISPLAY-STATE-CREATE (typed name not in field, Enter creates nothing), ASM-PART-STUDIO-IN-CONTEXT-ORIGIN (origin click not filling the field; check mark does not open the new Part Studio). run.py sketch-chamfer-finished asm-display-states-create asm-create-part-studio-in-context-finished
 - 0b33ec60 (pattern "No merge scope selected." + a WRONG Up to part far-side rule) was CHECKING 02:06. Fix forward in
   the worktree: features.cpp op_prism_until leaves out pieces reaching the long prism's end while one stops at the part
   (Part 3 500 mm³; gap case fails); extrude.rs far_side reverted; T1s + e2e pass (vibex8 02:4x). Corpus A/B queued on

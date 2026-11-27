@@ -1319,10 +1319,8 @@ fn the_knifehandle_loft_through_six_profiles_has_lives_area() {
     assert!(close(area, 21477.23, 2e-3), "{area} mm², live 21,477.23");
 }
 
-/// That loft's first circle (its two edges) moved 5 mm on along the face (c2-surf-workshop-knifehandle's Extend handle):
-/// still two edges there, their ends carried along with them, 1/2/3 as live, where ours made the new end one edge.
-#[test]
-fn a_moved_boundary_keeps_its_edges_ends() {
+/// A loft through three circles to an apex (guides at x ±r), its face and the first circle's two edges.
+fn loft_to_an_apex() -> (Shape, Vec<Shape>) {
     let stations = [(0.0, 10.0), (10.0, 9.0), (20.0, 6.0)];
     let mut profiles: Vec<Shape> = stations.iter().map(|&(z, r)| make_wire(&[make_circle(DVec3::new(0.0, 0.0, z), DVec3::Z, r).unwrap()]).unwrap()).collect();
     let apex = DVec3::new(0.0, 0.0, 30.0);
@@ -1337,11 +1335,44 @@ fn a_moved_boundary_keeps_its_edges_ends() {
     let on_rim = |e: &Shape| e.edge_info().is_ok_and(|i| i.length > 1.0 && e.point_at(0.5 * (i.first_param + i.last_param)).is_ok_and(|p| p.z.abs() < 1e-6));
     let rim: Vec<Shape> = face.edges().into_iter().filter(on_rim).collect();
     assert_eq!(rim.len(), 2, "the first circle's two edges");
+    (face, rim)
+}
+
+/// That loft's first circle (its two edges) moved 5 mm on along the face (c2-surf-workshop-knifehandle's Extend handle):
+/// still two edges there, their ends carried along with them, 1/2/3 as live, where ours made the new end one edge.
+#[test]
+fn a_moved_boundary_keeps_its_edges_ends() {
+    let (face, rim) = loft_to_an_apex();
     let moved = extend_face_at(&face, &rim, 5.0).unwrap();
     assert!(moved.is_valid());
     let shown = moved.shown_topology().unwrap();
     assert_eq!((shown.face_count(), shown.edge_count(), shown.vertex_count()), (1, 2, 3), "faces / edges / vertices shown");
     assert!(moved.area().unwrap() > face.area().unwrap() + 5.0 * 2.0 * PI * 10.0 * 0.9, "moved on about 5 mm round the rim");
+}
+
+/// That circle moved 5 mm on runs straight on along the face's cross direction there, its new edges 5 mm down each of
+/// those lines (live's Move boundary without Maintain curvature: knifehandle's Extend handle edges 69.1459 mm, where a
+/// curved extension cut at one parameter made 69.1307).
+#[test]
+fn a_moved_boundary_runs_straight_on() {
+    let (face, rim) = loft_to_an_apex();
+    let moved = extend_face_at(&face, &rim, 5.0).unwrap();
+    let [u0, u1, v0, v1] = face.uv_bounds().unwrap();
+    let v = if face.point_at_uv(0.5 * (u0 + u1), v0).unwrap().z.abs() < 1e-6 { v0 } else { v1 };
+    let ends = moved.edges();
+    for i in 0..12 {
+        let u = u0 + (u1 - u0) * (i as f64 + 0.5) / 12.0;
+        let sv = face.d2_at_uvs(&[DVec2::new(u, v)]).unwrap()[0][1];
+        let out = if v == v0 { -sv } else { sv }.normalize();
+        let p = face.point_at_uv(u, v).unwrap();
+        for t in [1.0, 2.5, 4.0] {
+            let d = moved.project_point(p + out * t).unwrap().distance;
+            assert!(d < 1e-7, "{t} mm on the straight line at u {u}: {d} off the face");
+        }
+        let q = make_vertex(p + out * 5.0).unwrap();
+        let d = ends.iter().map(|e| distance(&q, e).unwrap().distance).fold(f64::MAX, f64::min);
+        assert!(d < 1e-6, "the new edge 5 mm on at u {u}: {d} away");
+    }
 }
 
 /// A circle of two arcs (R12, at z 30) with straight guides at y ±10 → ±12 from the profile below, all times `k`
