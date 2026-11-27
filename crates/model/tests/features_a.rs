@@ -4404,6 +4404,17 @@ fn subtract_with_offset_moves_a_tools_spline_face() {
     assert!(((plain - moved) - want).abs() < 0.05 * want, "{} mm3 more cut, about {}", (plain - moved) * 1e9, want * 1e9);
 }
 
+/// A sketch region picked in the Part Studio measures as its face (live extrude-up-to-next-ok s1: "Area").
+#[test]
+fn a_sketch_region_measures_its_area() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.02, 0.01));
+    let region = t.regions(s)[0].clone();
+    let r = t.regen();
+    let m = noshape_model::regen::measure::measure(&r.context, &[region]);
+    assert!(m.iter().any(|(l, x)| l == "Area" && matches!(x, noshape_model::regen::measure::Measurement::Area(a) if (a - 2e-4).abs() < 1e-12)), "{m:?}");
+}
+
 /// Subtract with Offset on and no faces picked fails as boolean.fs BOOLEAN_OFFSET_NO_FACES (live
 /// boolean-subtract-offset-ok s8); Offset all offsets every face instead.
 #[test]

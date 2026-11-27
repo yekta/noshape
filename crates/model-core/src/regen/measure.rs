@@ -118,6 +118,16 @@ pub fn resolve_shapes(ctx: &Context, r: &Reference) -> Vec<Shape> {
                 }
             }
         }
+        // A sketch region measures as its face (live extrude-up-to-next-ok s1: "Area").
+        Reference::SketchRegion { sketch, key } => {
+            if let Some(s) = ctx.sketch(*sketch)
+                && let Some(id) = super::eval::decode_region_key(key)
+                && let Some(region) = noshape_sketch::regions::find_region_in(&s.regions, &id).or_else(|| s.split.iter().find(|r| r.id == id).cloned())
+                && let Ok(p) = super::eval::region_profile(s, &region, crate::reference::Source::Region { sketch: *sketch, key: key.clone() })
+            {
+                out.push(p.shape);
+            }
+        }
         // Edge midpoints (Onshape lets you pick them to measure from).
         Reference::Implicit { on, inference: crate::reference::Inference::Midpoint } => {
             for e in resolve_shapes(ctx, on) {
