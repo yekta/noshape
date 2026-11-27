@@ -12,31 +12,19 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 BOOL-TURN-SPLIT-SLOWER (state 11-27 15:30 UTC; lead: land before ~00:00 so the 00:17 main CI carries it)
-- 58e4cdbf QUEUED (area checks instead of volume integrals in the split/rejoin). Keep it.
-- ec60ab700 (bool-fb): turns_cut() builds the turn split directly (edge pieces by EmptyCopied + Range, chords with a
-  (u, v) line pcurve, regions by walking the face's loop and crossing at each chord end; BRepFeat only for >1 wire /
-  seam / crossing at a vertex): 1.5 s -> 4 ms on standoffs; rejoined() checks only the changed faces; face_moments
-  integrates every cylinder/cone face along v (inner_v, one 8-point segment, polynomial of degree <= 4 along the axis).
-- 73c26f0c2 (on top, = HEAD to land): along v every uv gap of the boundary closed, under 1e-9 m too. Before it, cone
-  faces of f901b748 with pcurves 2e-8 rad apart at two corners read +1.27e-13 m3 each (7e-8 rel); the old integrator
-  and OCCT adaptive 1e-13 agree to 1e-21 (probe /root/bool-scratch/p0-gaps-probes.diff, never commit). 2120ccaae had
-  loosened the late-decline test over it: reverted (805598536, lead told 15:25; DECISIONS 6420d7fb27: loosen a test
-  only when the old value was wrong against live or an independent check).
-- Checks on 73c26f0c2: kernel 620/620 + lib 11 at the 1e-9 bound; ops/assembly/drawing green (ot-ec60.log, on ec60;
-  the fix only changes volumes); GCC 13 ok on ec60 (common.cpp re-check before land). Same-run vibex8 CLI A/B (gate
-  load on host): standoffs kernel ~1.50 s (0.4.73) vs ~1.09 s (props_volume 364/106, op_boolean 479/358, op_unify
-  342/373); wall 1.91/1.68, 1.19/1.27, 1.54/1.15; standoffs/nuts/helical all SAME.
-- RUNNING: gate unit bool-gate-73c26f0c-x7 on vibex7 (lead 15:28: vibex8's slot held by qa's ui-parity; must end
-  before qa's 02:00 window there) -> /root/bool-hat-scratch/chain-73c26f0c26.out (started 15:28, ~80 min).
-- To land: gate 0 diff incl. parity56, knurls (kn-run.sh <host> <dir>, k-main = merge-base kernel test binary,
-  k-br = the gate tree's all-* copied), GCC 13 on common.cpp, then git diff --stat merge-base, touch -c,
-  NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh; report (<=5 lines). Clean vibex8 ~/tmp/bool/ops-turns, cmp/,
-  tp/, rec-stand/, kt-gam, gam/ after.
-- AFTER COMPACTION (lead 15:3x): gate result (chain-73c26f0c26.out ends "== CHAIN DONE rc N"; a local wait task
-  watches it) -> knurls -> land before 00:00 and tell the lead the land time -> gamma's gate (394c39327 in bool-uv /
-  branch bool-gamma, one gate at a time) -> gamma land. GCC 13 on common.cpp done (ok).
-- Left (not needed for the bar): op_unify +30..90 ms (usd vchange, new_faces_valid on helix faces).
+## P0 SPEED vs 0.4.73 (state 11-27 18:10 UTC; qa: the 05:00 cut held unless fixes are green by ~03:30)
+- LANDING 210544940b (bool-fb): ec60ab700 turn split built directly + cylinder/cone volumes along the axis (inner_v);
+  73c26f0c2 closes the boundary's small uv gaps along v; 210544940 along v only where every gap closes within a quarter
+  turn (whole turns off), else the old integral (c2-cov2-sm-hem-jog's open half-turn face read 0 for -30.6 mm3: the
+  73c26f0c2 gate's one changed document). Gate on 210544940 clean (replay 0, parity56 0, suite unchanged, shells 6/6,
+  crates pass); knurls same verdicts (2 equivalent knurls' volume vs OCCT +-6e-17 m3); kernel 620/620; GCC 13 ok.
+- NEXT 1, valve-config (qa P0 BOOL-FREEFORM-SECTIONS-SLOWER, 2a4ab01fd): the marcher's sections slow its Booleans and
+  unify (0.75 s 0.4.73, 1.20 s fix, 0.74 s NOSHAPE_BOOL_MARCH=0). Fix: marcher opt-in (=1), diff
+  /root/bool-scratch/march-off.diff (brep_bridge.rs); kernel tests + A/B running (m1.log); then gate + land.
+- NEXT 2, standoffs unify (~+45 ms over 0.4.73 left after 210544940): rejoined() leaves Revolve 2's 51 turn pieces
+  (each face's history from two inputs -> "amb", lines 0) for op_unify (usd.check 127 ms); probes
+  /root/bool-scratch/rejoin-probes.diff (never commit). unify_keeping_inputs' second pass is not it (tried).
+- Pulleys' +63 ms is core's 39141bac63 (min_distance in a Face pattern), not bool's. Gamma/wire-clip: not yet looked.
 
 ## GAMMA (next)
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
