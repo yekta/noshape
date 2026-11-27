@@ -1917,7 +1917,7 @@ fn hole_standard_sets_the_table_sizes() {
     // Edit to M8: its 6.8 mm drill; a size given with it wins.
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M8"] } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
-    assert_eq!(g["params"]["holeDiameterV3"], "6.8 mm", "{g}");
+    assert_eq!(g["params"]["holeDiameterV3"], "6.800 mm", "{g}");
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "holeDiameterV3": "5.2 mm" } }));
     let g = call(&mut ctx, "feature_get", json!({ "feature": "Hole 1" }));
     assert_eq!(g["params"]["holeDiameterV3"], "5.2 mm", "{g}");

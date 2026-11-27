@@ -3954,6 +3954,23 @@ fn the_touched_parts_probe_runs_only_when_asked() {
     assert_eq!(touched(&mut t, Some(bx)), vec![a]);
 }
 
+/// A block's front face swept along its own edge fills the block: the probe reports the block (live
+/// mistake-sweep-add-no-change: the dialog turns to Add).
+#[test]
+fn a_part_face_swept_through_its_part_touches_it() {
+    let mut t = T::new();
+    let (_, a) = t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+    let res = t.ok();
+    let front = face_with_normal(&res.context.bodies[0], -DVec3::Y);
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.04, 0.01, 0.01));
+    let sw = t.add("sweep", &[("profiles", q(vec![front])), ("path", q(vec![edge]))]);
+    let opts = RegenOptions { touch_probe: Some(sw), ..RegenOptions::default() };
+    let r = t.reg.regenerate(&t.ps, &ConfigValues::default(), &t.units, &opts);
+    let st = r.display.features.iter().find(|f| f.id == sw).unwrap();
+    assert_eq!(st.status, noshape_model::display::FeatureStatus::Ok, "{:?}", st.message);
+    assert_eq!(st.touched.iter().map(|b| b.feature).collect::<Vec<_>>(), vec![a]);
+}
+
 /// c2-rings-loft's Fillet 1: a ring with sides slanted 5.4° (3.35 mm of bore at its bottom, 1 mm of side) rounded
 /// R2 on both rims, where OCCT's chain fails: each rim's round as if alone, the two meeting at the bottom and running
 /// out onto its bottom face, the bore left above where they meet (live's topology there, 7/14/8 to 9/21/14).
