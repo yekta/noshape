@@ -547,6 +547,11 @@ impl SelectItemPanel {
         self.pick_library_image(select, v, cx);
     }
 
+    /// Opens on Current document rather than Libraries, with nothing picked (the sketch's Edit image).
+    pub fn show_current_document(&mut self) {
+        self.in_libraries = false;
+    }
+
     pub fn has_keyboard(&self, window: &Window) -> bool {
         self.focus.is_focused(window)
     }

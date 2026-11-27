@@ -6665,9 +6665,10 @@ fn spline_and_image_menus_as_lives(cx: &mut TestAppContext) {
     let on_libraries = cx.update(|cx| {
         let v = view.read(cx);
         assert!(v.insert_dialog_open());
-        v.ui_ref().and_then(|u| u.insert_panel.as_ref()).map(|(p, _)| p.read(cx).in_libraries())
+        v.ui_ref().and_then(|u| u.insert_panel.as_ref()).map(|(p, _)| (p.read(cx).in_libraries(), p.read(cx).value.clone()))
     });
-    assert_eq!(on_libraries, Some(false));
+    // No row picked, not even the image's own file (live sketch-image-edit s17).
+    assert_eq!(on_libraries, Some((false, String::new())));
     let (name, aspect, tool) = cx
         .update_window(window, |_, w, cx| {
             view.update(cx, |v, cx| {

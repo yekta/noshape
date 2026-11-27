@@ -3854,10 +3854,8 @@ impl PartStudioView {
             return None;
         }
         if self.ui_ref().is_some_and(|u| u.insert_panel.is_none()) {
-            // Edit image opens on Current document, at the image's file tab (live spline-image-1125 (9)).
-            let editing = self.sketch.as_ref().and_then(|e| e.editing_image).and_then(|id| Some(self.sketch_data(cx)?.images.iter().find(|i| i.id == id)?.name.clone()));
+            let editing = self.sketch.as_ref().is_some_and(|e| e.editing_image.is_some());
             let doc = self.doc.read(cx);
-            let value = editing.and_then(|name| doc.session.doc.tabs.iter().find(|t| matches!(&t.content, noshape_model::document::TabContent::File(f) if f.file_name == name)).map(|t| t.id.to_string())).unwrap_or_default();
             let setup = crate::select_item::PanelSetup {
                 mode: crate::select_item::PanelMode::Reference(if image { noshape_model::params::ReferenceKind::Image } else { noshape_model::params::ReferenceKind::Drawing2d }),
                 sources: crate::fs_reference::sources(&doc.session.doc, "", |_| Vec::new()),
@@ -3865,7 +3863,7 @@ impl PartStudioView {
                 doc_path: Some(doc.session.path.clone()),
                 except: String::new(),
                 gpu: None,
-                value,
+                value: String::new(),
                 // Live 1726: Insert image's Libraries (Onshape images ›
                 // Environment maps).
                 libraries: image,
@@ -3873,6 +3871,11 @@ impl PartStudioView {
             };
             let panel = cx.new(|cx| {
                 let mut p = crate::select_item::SelectItemPanel::new(setup, window, cx);
+                // Edit image opens on Current document with no row picked, not even the image's own file (live
+                // spline-image-1125 (9), sketch-image-edit s17).
+                if editing {
+                    p.show_current_document();
+                }
                 if image {
                     p.title = Some("Insert an image");
                 } else {
