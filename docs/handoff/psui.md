@@ -215,7 +215,11 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - GPU-only red assembly-ui a_re_hovered_second_pick_shows_plain FIXED (11-27 01:0x, b9b194fcf): the test's own point was
   wrong since 3e5156291: previewed, Part 2 spans x -40..20, y 10..30, so [5,3,10] is bare Part 1; now [10,15,10] (on
   Part 1's top), asserting Part 2's face is hovered. No app change (a depth-rank tweak for the moved part was not needed:
-  A/B passes without it). assembly-ui 233 + scene 268 green on vibe2. Landing.
+  A/B passes without it). assembly-ui 233 + scene 268 green on vibe2. 39026a6c failed only on this test (01:18);
+  re-landed with the fix on top, plus coverage.py name matches (Part Studio menus 129/131; 2 real gaps for live).
+- 11-27 lead order: rerun the Part Studio ui-parity shard (1126) on newest green, triage ours / stale / remembered seed,
+  fix ours, skip the focus rule's. Running on vibe2 (~/tmp/psui/ps, scratch ps-shard.sh); 11-26 run's 25 failures listed
+  in qa-scratch/suites/1126-1417-111a6633/uip.log (18 sketch click offsets at step 5).
 - Open, mine: linear-pattern-second-direction-ok s16 field Distance#1 (after the focus rule); mirror s8 focus text.
 - qa verified RUNNER-UNLABELLED-FIELD-INDEX on c444ac1d5 (flow 70, 0 runner errors).
 
