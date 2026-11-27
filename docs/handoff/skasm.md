@@ -3,6 +3,22 @@
 Updated 2026-11-27 18:20 UTC. Read docs/DECISIONS.md
 first; history is in docs/handoff/archive/skasm.md (read it only when a line here points there).
 
+## P0 NOW (11-27 22:55 UTC): SKETCH-USED-CURVES-NOT-SELECTABLE (lead: ahead of everything, land by ~03:00 for the 05:00 cut)
+- Branch skasm-used-pick in worktree skasm-main (from origin/main 9cdbb9e85c): new GPU test a_used_edges_line_is_clicked_and_boxed_in_its_sketch in
+  part_studio/sketch_ui_tests.rs (before sketch_on_top_face): sketch on block top face, Use an edge (Hover(Some(edge pick)) + press), Escape -> Select,
+  click the edge middle with Hover(Some(edge pick)) then Hover(None), expect ed.selection == [used] and no model edge; then a window box via drag().
+  The SAME test is copied into worktree skasm (warm vibex8 target ~/agents/skasm; skasm-main's target is cold): REMOVE it from skasm before committing there.
+- Result (bd5mx83u2, 22:5x): Hover(Some(edge pick)) case PASSES; Hover(None) case FAILS: "GPU pick None: ... [] []" (nothing selected, sketch or model).
+  The editor's own click (DragState::Pending) and box (DragState::Box, includes external entities) would select it; the part studio's ToolDown
+  (sketch.rs ~1632: hovered_sketch_entity / sketch_pick_at(hit)) finds no sketch entity under the pointer when the GPU hover is None. Suspects:
+  sketch_hover_id(None) -> sketch_pick_at -> in_sketch_reach (Select tool, outside region: screen_box_distance_to <= 4.9 px) or the pick filter;
+  qa's live take hovers 700 ms before the click (live hover ['IO']). Box: in-app the box selected 6 Part EDGEs (viewport BoxSelect / box_select.rs
+  path, not the editor's DragState::Box?): check which path a press on the part face takes in sketch mode.
+- Run: NOSHAPE_RB_HOST=vibex8 rb.sh bash -c "$(cat /root/skasm-scratch/bin/tdbg.sh)" _ <scene filter> <ps-ui filter> (one slot hold; part-studio-ui with -A3).
+- Also open in skasm: a_lines_length_takes_zero still "Sketch could not be solved." after the solver.rs patch (redundant_rows skip for collapsed curves:
+  not the path; look at analyze's first branch / conflicting / redundant_nearby); a_zero_size_rectangle_click_keeps_the_first_corner: the FIRST
+  CornerRect click already makes a lone Point (find which path: not place()'s CornerRect arm).
+
 ## NOW (11-27 19:50 UTC)
 - QUEUED (lead reports): 1748d8ca (skasm-base, ASM-MISTAKE-ERRORS), fdd7c592 (spline Horizontal). Landed: f06aa0b2.
 - A/B NOT RUN: the abrun.sh task hit the 2 h background limit at 20:2x still waiting for vibex8's slot (qa's 17:48 suite held it). Restart it step by step after the tests (each abb.sh / abs2.sh call its own background run; skasm-main is on branch skasm-snap-wake2 or detached main, check before building): ~/tmp/skasm/ab-base/score.log vs ab-new/score.log on vibex8; land skasm-snap-wake2 only if new >= base; then rm ~/tmp/skasm/ns-base ns-new.
