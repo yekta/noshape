@@ -1761,10 +1761,11 @@ fn fill_solver_mate(m: &super::Mate, sm: &mut SolverMate, units: &UnitPrefs) {
     );
     let rot = if orot { eval_angle(&m.rotation, units) } else { 0.0 };
     if m.rotation_axis < 2 && rot != 0.0 {
-        // Rotation about the first connector's X or Y axis: the offset
-        // moves its whole coordinate system (translation, then rotation).
+        // Rotation about X or Y: the first connector sits on the second's
+        // frame moved by the offset, then turned (live: 45° about X turns
+        // Part 2 to rows [0, 0.7071, -0.7071 | 0, 0.7071, 0.7071]).
         let axis = if m.rotation_axis == 0 { DVec3::X } else { DVec3::Y };
-        sm.a_local = sm.a_local.mul(&Frame::new(sm.offset, DQuat::from_axis_angle(axis, rot)));
+        sm.a_local = sm.a_local.mul(&Frame::new(sm.offset, DQuat::from_axis_angle(axis, rot)).inverse());
         sm.offset = DVec3::ZERO;
         sm.rotation = 0.0;
     } else {
@@ -2704,6 +2705,14 @@ impl AssemblyEvaluator {
         let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0, explode_trails: Vec::new(), external_docs: Arc::new(external_docs) };
         let ev = explode.and_then(|i| assembly.exploded_views.get(i));
         result.apply_placements(solved, ev);
+        // A Replicate or part pattern that made no copies says why (live mistake-asm-replicate-no-other-hole: its row red).
+        for p in assembly.patterns.iter().filter(|p| !p.suppressed && p.generated.is_empty() && matches!(p.kind, PatternKind::Replicate { .. } | PatternKind::PartPattern { .. })) {
+            if let Err(e) = super::analysis::matched_targets(&result, assembly, p, &UnitPrefs::default())
+                && !result.pattern_errors.iter().any(|(id, _)| *id == p.id)
+            {
+                result.pattern_errors.push((p.id, e));
+            }
+        }
         result.eval_ms = t0.elapsed().as_secs_f32() * 1000.0;
         result
     }
@@ -3276,7 +3285,7 @@ impl AssemblyEvaluator {
                 let other = |r: &MateConnectorRef| -> Result<Frame, String> {
                     let (o, g) = resolve_entity(r)?;
                     if o != owner {
-                        return Err("Select entities of the same instance".into());
+                        return Err("Mate connector cannot be defined on multiple instances.".into());
                     }
                     Ok(g)
                 };
@@ -3442,7 +3451,7 @@ impl AssemblyEvaluator {
                         // Lower Control Arm, halfway between its slot's faces, 47.5 mm off without.)
                         let mut f = connector_picks(mc, f, |r| match entity(r)? {
                             (o, g) if o == b => Ok(g),
-                            _ => Err("Select entities of the same instance".into()),
+                            _ => Err("Mate connector cannot be defined on multiple instances.".into()),
                         })?;
                         if mc.on.flip {
                             f = f.mul(&Frame::new(DVec3::ZERO, DQuat::from_rotation_x(std::f64::consts::PI)));

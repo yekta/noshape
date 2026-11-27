@@ -307,7 +307,10 @@ impl QuantityInput {
         let sub = cx.subscribe_in(&state, window, |this: &mut Self, state, ev: &InputEvent, window, cx| match ev {
             InputEvent::Change => cx.emit(QuantityEvent::Changed),
             InputEvent::PressEnter { .. } => {
-                let changed = this.commit(CommitVia::Enter, window, cx);
+                // Typed over, even to the same value ("25" over "25 mm"), the Enter applies it and the dialog stays
+                // (live asm-linear-pattern-two-directions-ok s23).
+                let typed = state.read(cx).value() != this.committed;
+                let changed = this.commit(CommitVia::Enter, window, cx) || typed;
                 state.update(cx, |s, cx| s.select_all(window, cx));
                 if !changed {
                     cx.emit(QuantityEvent::Enter);

@@ -337,7 +337,7 @@ fn scoped_candidates(result: &AssemblyResult, target: &MateConnectorRef, seed_pa
     }
     .ok_or("Replicate needs a seed mate on a face or edge with analytic geometry")?;
     if refs.is_empty() {
-        return Err(if scope.takes_parts() { "Select parts to find match in" } else { "Select the geometry to find match in" }.into());
+        return Err("A target scope must be selected.".into());
     }
     let mut out: Vec<(MateConnectorRef, u32, Reference)> = Vec::new();
     for r in refs {

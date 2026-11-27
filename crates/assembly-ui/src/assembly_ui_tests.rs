@@ -1162,7 +1162,7 @@ fn the_measure_panel_hangs_from_a_fixed_top(cx: &mut TestAppContext) {
 }
 
 /// Live asm-replicate-pick-mated-pin (ASM-REPLICATE-MATED-PIN-ROW): the mated pin picked fills Instances and Mate to be
-/// matched, and the new Replicate's row stays red until a target scope is picked, as its title.
+/// matched, and the new Replicate's row stays red until a target scope is picked, as its title; ✓ adds it red.
 #[gpui::test]
 fn a_replicate_without_its_target_scope_keeps_its_row_red(cx: &mut TestAppContext) {
     let path = two_parts_document(cx, "replicate-row", |_| {});
@@ -1184,6 +1184,42 @@ fn a_replicate_without_its_target_scope_keeps_its_row_red(cx: &mut TestAppContex
     assert_eq!(err.as_deref(), Some("A target scope must be selected."));
     let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Replicate 1").cloned();
     assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "{}", state["features"]);
+    // ✓ adds it in error, the dialog closed (live mistake-asm-replicate-features-nothing, ASM-MISTAKE-ERRORS).
+    cx.update(|cx| view.update(cx, |v, cx| v.accept_pattern(cx)));
+    draw(cx, window);
+    let open = cx.update(|cx| view.read(cx).pattern.is_some());
+    assert!(!open, "the dialog closes");
+    // (Red once its evaluation is in.)
+    for _ in 0..600 {
+        if cx.update(|cx| !view.read(cx).result.pattern_errors.is_empty()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    let state = cx.update(|cx| view.read(cx).ui_state(cx));
+    let row = state["features"]["rows"].as_array().unwrap().iter().find(|r| r["name"] == "Replicate 1").cloned();
+    assert_eq!(row.map(|r| r["state"].clone()), Some(json!("error")), "{}", state["features"]);
+}
+
+/// Live asm-replicate-parts-block-ok (ASM-REPLICATE-ADDS-MATES): a Replicate's copies are mated inside it, so the
+/// assembly's mates are the seed's alone (live: Revolute 1 only; ours listed Revolute 2 and 3 too).
+#[gpui::test]
+fn a_replicates_own_mates_are_not_among_the_assemblys_mates(cx: &mut TestAppContext) {
+    let path = two_parts_document(cx, "replicate-mates", |ctx| {
+        let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+        let (top, bottom) = (face(ctx, "Part 1 <1>", 1.0), face(ctx, "Part 2 <1>", -1.0));
+        call(ctx, "assembly_mate_connector", json!({ "tab": "Assembly 1", "on": { "instance": "Part 1 <1>", "entity": top } }));
+        call(ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 2 <1>", "entity": bottom }, "b": { "connector": "Mate connector 1" } }));
+        let r = call(ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "replicate", "seeds": ["Part 2 <1>"], "scope_refs": [{ "instance": "Part 1 <1>" }] }));
+        assert_eq!(r["created"].as_array().map(Vec::len), Some(1), "{r}");
+    });
+    let (_window, view) = open_assembly_with_front(cx, &path);
+    let state = cx.update(|cx| view.read(cx).ui_state(cx));
+    let names: Vec<&str> = state["assembly"]["mates"].as_array().unwrap().iter().filter_map(|m| m["name"].as_str()).collect();
+    assert_eq!(names, ["Fastened 1"], "{}", state["assembly"]);
+    assert_eq!(state["assembly"]["instances"].as_array().map(Vec::len), Some(3), "the copy is there: {}", state["assembly"]);
 }
 
 /// Live asm-measure-face-cylinder-panel (ASM-MEASURE-BRACKET-KEY): two faces picked, `[` opens Measure with both and
@@ -2010,6 +2046,48 @@ fn a_zero_pattern_distance_is_marked_invalid(cx: &mut TestAppContext) {
     assert!(!marked(cx, "Instance count"), "the count stays plain");
     set(cx, "10 mm");
     assert!(!marked(cx, "Distance"), "10 mm clears it");
+}
+
+/// Live asm-linear-pattern-two-directions-ok s20-s23 (ASM-PATTERN-SECOND-DIRECTION-COUNT): the second direction's
+/// Distance typed over with its own value ("25" over "25 mm") and Enter applies it, the dialog stays open; the next
+/// Enter accepts.
+#[gpui::test]
+fn enter_after_typing_the_same_value_applies_it_and_keeps_the_pattern_open(cx: &mut TestAppContext) {
+    use gpui_kit::Focusable as _;
+    cx.update(|cx| {
+        cx.bind_keys(crate::actions::default_key_bindings());
+        super::bind_keys(cx);
+    });
+    let path = pattern_document(cx, "pattern-enter-same");
+    let (window, view) = open_assembly_with_front(cx, &path);
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.open_pattern(super::PatternDialogKind::Linear, w, cx);
+            v.pattern.as_mut().unwrap().second = true;
+            cx.notify();
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let text = cx.update(|cx| view.read(cx).pattern.as_ref().unwrap().distance2.read(cx).text().to_string());
+    assert_eq!(text, "25 mm");
+    cx.update_window(window, |_, w, cx| {
+        let d = view.read(cx).pattern.as_ref().unwrap().distance2.read(cx).state().read(cx).focus_handle(cx);
+        w.focus(&d, cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("secondary-a");
+    vcx.simulate_input("25");
+    vcx.simulate_keystrokes("enter");
+    draw(cx, window);
+    // (Nothing picked: an accept tried says so in the message.)
+    assert!(cx.update(|cx| view.read(cx).pattern.is_some() && view.read(cx).message.is_none()), "the first Enter only applies the typed value");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    vcx.simulate_keystrokes("enter");
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).message.is_some()), "the next Enter accepts");
 }
 
 /// FEEL-TAB-TO-FLIP-FOCUS (live workflows-1123 04 s9, 05 s18): Tab from a linear / circular pattern's Instance count

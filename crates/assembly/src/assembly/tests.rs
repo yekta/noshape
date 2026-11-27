@@ -1164,9 +1164,9 @@ fn centered_linear_pattern_goes_both_ways() {
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
     assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
     let seed = origin_of(&res, 2);
-    let mut xs: Vec<f64> = created.iter().map(|id| (DVec3::from(res.solved.placement(*id).unwrap().translation) - seed).x).collect();
-    xs.sort_by(f64::total_cmp);
-    for (x, want) in xs.iter().zip([-0.05, -0.025, 0.025, 0.05]) {
+    let xs: Vec<f64> = created.iter().map(|id| (DVec3::from(res.solved.placement(*id).unwrap().translation) - seed).x).collect();
+    // Numbered as live: along it, then back from the far end (asm-linear-pattern-centered-ok).
+    for (x, want) in xs.iter().zip([0.025, 0.05, -0.05, -0.025]) {
         assert!((x - want).abs() < 1e-6, "{xs:?}");
     }
 }
@@ -2637,7 +2637,7 @@ fn mate_rotation_offset_about_any_axis() {
     let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
     let top = face_with(&r, "CapEnd");
     let bottom = face_with(&r, "CapStart");
-    let mut m = mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid));
+    let mut m = mate(10, MateType::Fastened, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid));
     m.rotation = Some(ExprValue::new("90 deg"));
     let mk = |m: Mate| Assembly {
         instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.03), false)],
@@ -2660,6 +2660,14 @@ fn mate_rotation_offset_about_any_axis() {
     let res = ev.evaluate(&f.doc, &mk(m), &SolveOptions::default(), None);
     assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
     assert!((rot(&res) * DVec3::Z).z.abs() < 1e-6, "{:?}", rot(&res) * DVec3::Z);
+    // Picked moving block first, 45° about X: it turns +45° about world X (live asm-fastened-rotate-x-45-offset-ok s17,
+    // ASM-MATE-ROTATION-SIGN), not the inverse.
+    let mut m = mate(11, MateType::Fastened, conn(2, bottom, Inference::Centroid), conn(1, top, Inference::Centroid));
+    m.rotation = Some(ExprValue::new("45 deg"));
+    let res = ev.evaluate(&f.doc, &mk(m), &SolveOptions::default(), None);
+    assert!(res.mates[0].ok, "{:?}", res.mates[0].message);
+    let y = rot(&res) * DVec3::Y;
+    assert!((y - DVec3::new(0.0, 0.5f64.sqrt(), 0.5f64.sqrt())).length() < 1e-6, "{y:?}");
 }
 
 #[test]
@@ -3386,8 +3394,16 @@ fn mate_connector_between_entities_and_realign() {
     assert!(fr.z().z.abs() < 1e-9 && (fr.z().length() - 1.0).abs() < 1e-9, "{:?}", fr.z());
     // A secondary axis parallel to the primary one is an error.
     c.secondary_axis = Some(on(&side));
-    let res = ev.evaluate(&f.doc, &asm_with(c), &SolveOptions::default(), None);
+    let res = ev.evaluate(&f.doc, &asm_with(c.clone()), &SolveOptions::default(), None);
     assert!(res.connector_frame(MateId(5)).is_none());
+    // Realigned to another instance's face: live's error (mistake-asm-mate-connector-realign-edge).
+    c.secondary_axis = None;
+    c.primary_axis = Some(MateConnectorRef::on(InstanceId(2), vec![], side.clone()));
+    let mut asm = asm_with(c);
+    asm.instances.push(part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), false));
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let msg = res.connectors.iter().find(|c| c.id == MateId(5)).and_then(|c| c.message.clone());
+    assert_eq!(msg.as_deref(), Some("Mate connector cannot be defined on multiple instances."));
 }
 
 /// A flexible subassembly's Between entities connector solved from the parent: halfway, as in the subassembly

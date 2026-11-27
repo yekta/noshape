@@ -161,10 +161,11 @@ impl AssemblyView {
         let origin_picked = self.ui.ps_in_context == Some(behaviors::PsOrigin::Origin);
         let mut rows: Vec<Value> = vec![row(&tab, "ok", root, false, false, false), row("Origin", "ok", origin_picked, false, false, false)];
         let mut placed_groups: HashSet<MateId> = HashSet::new();
+        let pattern_state = |id: MateId| if self.result.pattern_errors.iter().any(|(p, _)| *p == id) { "error" } else { "ok" };
         for i in &asm.instances {
             if let Some(p) = asm.generated_by(i.id) {
                 if placed_groups.insert(p.id) {
-                    rows.push(row(&p.name, "ok", false, false, false, false));
+                    rows.push(row(&p.name, pattern_state(p.id), false, false, false, false));
                 }
                 continue;
             }
@@ -194,13 +195,20 @@ impl AssemblyView {
                 self.nested_state_rows(n, &mut rows, cx);
             }
         }
+        // Patterns with no copies go last, as the list draws them (live mistake-asm-replicate-no-other-hole).
+        for p in asm.patterns.iter().filter(|p| !placed_groups.contains(&p.id)) {
+            rows.push(row(&p.name, if p.suppressed { "suppressed" } else { pattern_state(p.id) }, false, false, false, false));
+        }
         if let Some(p) = self.pattern.as_ref().filter(|p| p.editing.is_none()) {
             let ok = self.pattern_from_session(p, cx).is_ok() && !super::panels::mirror_pending(p);
             rows.push(row(&p.name, if ok { "ok" } else { "error" }, true, true, false, false));
         }
         // The mate whose dialog is open too (live asm-mate-menu-edit, asm-mate-edit-escape).
         let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id)) || self.ui.np_driver.as_ref().is_some_and(|d| d.mates.contains(&id)) || editing == Some(id);
-        let mut items: Vec<(MateId, Value)> = asm.connectors.iter().map(|c| (c.id, row(&c.name, "ok", mate_selected(c.id), false, mate_selected(c.id), c.hidden))).collect();
+        // A connector that failed to resolve is red (live mistake-asm-mate-connector-realign-edge: realigned to another
+        // instance's edge).
+        let connector_failed = |id: MateId| self.result.connectors.iter().any(|c| c.id == id && c.message.is_some());
+        let mut items: Vec<(MateId, Value)> = asm.connectors.iter().map(|c| (c.id, row(&c.name, if connector_failed(c.id) { "error" } else { "ok" }, mate_selected(c.id), false, mate_selected(c.id), c.hidden))).collect();
         items.extend(asm.mates.iter().filter(|m| asm.mate_generated_by(m.id).is_none()).map(|m| (m.id, row(&m.name, mate_state(m), mate_selected(m.id), editing == Some(m.id), mate_selected(m.id), m.hidden || !self.show_mates))));
         items.extend(asm.relations.iter().map(|r| (r.id, row(&r.name, "ok", mate_selected(r.id), false, mate_selected(r.id), false))));
         items.extend(asm.groups.iter().map(|g| (g.id, row(&g.name, "ok", mate_selected(g.id), false, mate_selected(g.id), g.hidden || !self.show_mates))));
@@ -220,7 +228,7 @@ impl AssemblyView {
             items.push((MateId(u64::MAX), row(&self.relation_name(cx), if r.a.is_some() && (r.b.is_some() || r.kind == RelationType::Screw) { "ok" } else { "error" }, true, true, false, false)));
         }
         if let Some(m) = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)) {
-            items.push((m.id, row(&m.name, if m.on.is_some() { "ok" } else { "error" }, true, true, false, false)));
+            items.push((m.id, row(&m.name, if m.on.is_some() && !connector_failed(m.id) { "ok" } else { "error" }, true, true, false, false)));
         }
         if let Some((_, members)) = self.ui.group.as_ref().filter(|g| g.0.is_none()) {
             let ok = !members.is_empty() || !self.ui.group_patterns.is_empty();

@@ -1584,21 +1584,36 @@ impl AssemblyView {
         }
     }
 
+    /// A Replicate with its seed and mate but no target scope: ✓ adds it in error (live mistake-asm-replicate-features-nothing,
+    /// "A target scope must be selected.").
+    fn unscoped_replicate(&self, s: &PatternSession, cx: &App) -> Option<InstancePattern> {
+        let asm = self.assembly(cx)?;
+        let mate = s.mate.filter(|_| s.kind == PatternDialogKind::Replicate && s.scope_refs.is_empty() && !s.seeds.is_empty())?;
+        let generated = s.editing.and_then(|id| asm.pattern(id)).map(|p| p.generated.clone()).unwrap_or_default();
+        let kind = PatternKind::Replicate { mate, all_instances: false, scope: Some(self.replicate_scope(s, cx)), scope_refs: Vec::new() };
+        Some(InstancePattern { id: s.editing.unwrap_or_else(|| MateId(asm.next_id())), name: s.name.clone(), kind, seeds: s.seeds.clone(), generated, suppressed: false })
+    }
+
     pub(super) fn accept_pattern(&mut self, cx: &mut Context<Self>) {
         let Some(s) = &self.pattern else { return };
         let pat = match self.pattern_from_session(s, cx) {
             Ok(p) => p,
-            Err(e) => {
-                self.message = Some((false, e));
-                cx.notify();
-                return;
-            }
+            Err(e) => match self.unscoped_replicate(s, cx) {
+                Some(p) => p,
+                None => {
+                    self.message = Some((false, e));
+                    cx.notify();
+                    return;
+                }
+            },
         };
         let matched = s.kind.matched();
         let targets = if matched {
             let Some(asm) = self.assembly(cx) else { return };
             match analysis::matched_targets(&self.result, asm, &pat, &self.units(cx)) {
                 Ok(t) => Some(t),
+                // A Replicate that matches nothing is added in error, its row red (live mistake-asm-replicate-no-other-hole).
+                Err(_) if s.kind == PatternDialogKind::Replicate => Some(Vec::new()),
                 Err(e) => {
                     self.message = Some((false, e));
                     cx.notify();

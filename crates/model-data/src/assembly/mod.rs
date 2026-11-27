@@ -897,8 +897,13 @@ impl InstancePattern {
         match &self.kind {
             // Copy indices: [`grid_index`], the centered bits marking the copies on the far side of a centered direction.
             PatternKind::Linear { count, second, centered, third, .. } => {
-                // Each direction's steps: 0, then 1.. along it, and against it when centered.
-                let steps = |n: u32, c: bool| -> Vec<(u32, bool)> { std::iter::once((0, false)).chain((1..n.max(1)).flat_map(|i| std::iter::once((i, false)).chain(c.then_some((i, true))))).collect() };
+                // Each direction's steps: 0, 1.. along it, then, centered, back from the far end (live
+                // asm-linear-pattern-centered-ok: <2> 30, <3> 60, <4> -60, <5> -30).
+                let steps = |n: u32, c: bool| -> Vec<(u32, bool)> {
+                    let n = n.max(1);
+                    let back = (1..n).rev().filter(|_| c).map(|i| (i, true));
+                    (0..n).map(|i| (i, false)).chain(back).collect()
+                };
                 let s1 = steps(*count, *centered);
                 let s2 = second.as_ref().map_or(vec![(0, false)], |d| steps(d.count, d.centered));
                 let s3 = third.as_ref().filter(|_| second.is_some()).map_or(vec![(0, false)], |d| steps(d.count, d.centered));
