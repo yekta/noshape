@@ -1,0 +1,59 @@
+{
+ "name": "split-part-front-face-ok",
+ "about": "overlap: Split Part 1 with Part 2's front face (y 10), \u2713",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Split"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Entity to split with"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     40,
+     10,
+     12
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

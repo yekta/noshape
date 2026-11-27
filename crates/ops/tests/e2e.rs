@@ -11878,6 +11878,23 @@ fn a_start_sketch_on_a_plane_feature() {
     }
 }
 
+/// The ridge start's four lines close one trapezoid region and its symmetric extrude is live's 5.52 cm3; the
+/// up-to-next start is the 12 cm3 block with a one-region circle on Plane 1 (live, lane 4, 11-26).
+#[test]
+fn the_ridge_and_up_to_next_starts_are_lives() {
+    let starts: Value = serde_json::from_str(include_str!("../../../tests/ui-parity/starts.json")).unwrap();
+    for (start, sketch, volume) in [("ridge", "Sketch 1", 5520.0), ("up-to-next", "Sketch 2", 12000.0)] {
+        let mut ctx = Ctx::new();
+        let path = scratch(&format!("start-{start}.noshape"));
+        noshape_ops::ui_parity::build_start(&mut ctx, &path, &starts[start]).unwrap();
+        call(&mut ctx, "document_open", json!({ "path": path.to_str().unwrap() }));
+        let got = call(&mut ctx, "sketch_get", json!({ "sketch": sketch }));
+        assert_eq!(got["regions"].as_array().map(Vec::len), Some(1), "{start}: {got}");
+        let parts = call(&mut ctx, "query_parts", json!({}));
+        assert!((num(&parts["parts"][0]["volume"]) - volume).abs() < 1e-3, "{start}: {parts}");
+    }
+}
+
 /// An Import whose part doesn't read as a valid body (a solid inside out) fails, and import_files says which feature
 /// and why rather than returning no parts in silence (our SAT of cf-sheet-metal-model-plus read back as 0 parts).
 #[test]

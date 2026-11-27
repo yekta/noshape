@@ -1,0 +1,75 @@
+{
+ "name": "loft-end-conditions-normal-ok",
+ "about": "loft-guides: Loft the two regions, Start profile condition \u25be Normal to profile, then End \u25be Normal to profile, \u2713",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "loft-guides",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Loft"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10.6,
+     -10.6,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     7.1,
+     -7.1,
+     60
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "None",
+    "pick": "Normal to profile"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "None",
+    "pick": "Normal to profile"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

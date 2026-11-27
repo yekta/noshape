@@ -1,0 +1,76 @@
+{
+ "name": "mistake-split-trim-to-face-partial",
+ "about": "overlap: Split Part 1 with Part 2's front face (y 10, x 30..50), \u2611 Trim to face boundaries, \u2713: the face doesn't cross Part 1: Split 1 in error; hovering its row: \"Split 1 did not regenerate properly: Tool entity cannot split the selected part/face.\"",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Split"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Entity to split with"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     40,
+     10,
+     12
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Trim to face boundaries"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Split 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

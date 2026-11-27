@@ -1,0 +1,53 @@
+{
+ "name": "rib-extend-to-part-ok",
+ "about": "bracket: Rib from Sketch 3's line, \u2611 Extend profiles to part, \u2713",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "bracket",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Rib"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     0,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Extend profiles to part"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

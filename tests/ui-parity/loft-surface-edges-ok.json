@@ -1,0 +1,63 @@
+{
+ "name": "loft-surface-edges-ok",
+ "about": "loft-guides: Loft, Surface tab, profiles the two circles (edges at 45 deg toward the view), \u2713",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "loft-guides",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Loft"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Surface"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     21.21,
+     -21.21,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     14.14,
+     -14.14,
+     60
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

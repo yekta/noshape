@@ -1,0 +1,102 @@
+{
+ "name": "fillet-full-round-tangent-off-ok",
+ "about": "ridge: Fillet, Full round (left slope, right slope, top), \u2610 Tangent propagation, \u2713",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "ridge",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Full round"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "First side face"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     -11.5,
+     -5,
+     4
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Second side face"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     11.5,
+     -5,
+     4
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Faces to round"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     0,
+     -5,
+     8
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Tangent propagation",
+    "set": false
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,60 @@
+{
+ "name": "mistake-rib-flipped-misses",
+ "about": "bracket: Rib from Sketch 3's line, flip the direction, \u2713: Rib 1 in error; hovering its row: \"Rib 1 did not regenerate properly: None of the ribs intersected a part.\"",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "bracket",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Rib"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     0,
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Opposite direction"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Rib 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

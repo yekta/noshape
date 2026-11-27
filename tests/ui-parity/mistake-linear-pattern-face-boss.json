@@ -1,0 +1,101 @@
+{
+ "name": "mistake-linear-pattern-face-boss",
+ "about": "boss-block, Linear pattern \u25be Face pattern, the boss side and top faces, along y, distance 8, \u2713: Linear pattern 1 in error; hovering its row: \"Linear pattern 1 did not regenerate properly: Failed to create pattern, check input.\"",
+ "area": "psui",
+ "source": "depth batch 2 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "boss-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part pattern",
+    "pick": "Face pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     14,
+     0,
+     15
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10,
+     0,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Direction"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     20,
+     -7,
+     0
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Distance"
+   }
+  },
+  {
+   "do": "type",
+   "text": "8"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "Linear pattern 1"
+   },
+   "ms": 1500
+  }
+ ]
+}

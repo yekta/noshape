@@ -1,0 +1,63 @@
+{
+ "name": "loft-thin-ok",
+ "about": "loft-guides: Loft, Thin tab, profiles the two circle regions, \u2713",
+ "area": "psui",
+ "source": "depth batch 3 (lead 11-26: option combinations of the most-used features, finished)",
+ "start": "loft-guides",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Loft"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Thin"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     10.6,
+     -10.6,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     7.1,
+     -7.1,
+     60
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
