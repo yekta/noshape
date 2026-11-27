@@ -732,7 +732,7 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         let size = glam::DVec2::new(dw as f64, dh as f64);
         let screen = |p: [f32; 3]| cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), size, 0.05).unwrap();
         let radius = (5.0 * dpr) as i32;
-        let at = |q: glam::DVec2| pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, radius, 6.0 * f64::from(dpr) + 0.5, |id| if id == 50 { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, prio);
+        let at = |q: glam::DVec2| pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, radius, 6.0 * f64::from(dpr) + 0.5, |id| if id == 50 { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, |_| 0, prio);
         // CSS px off the edge's middle, straight across it (outward over the background, inward over the top face).
         let mid = screen([0.0, lo[1], hi[2]]);
         let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
@@ -762,7 +762,7 @@ fn our_3d_pick_reach_for_edges_and_vertices() {
         let size = glam::DVec2::new(dw as f64, dh as f64);
         let screen = |p: [f32; 3]| cam.project(glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64), size, 0.05).unwrap();
         let radius = (5.0 * dpr) as i32;
-        let at = |q: glam::DVec2| pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, radius, 6.0 * f64::from(dpr) + 0.5, |id| if id == 50 { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, prio);
+        let at = |q: glam::DVec2| pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, radius, 6.0 * f64::from(dpr) + 0.5, |id| if id == 50 { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, |_| 0, prio);
         let mid = screen([0.0, lo[1], hi[2]]);
         let inward = (screen([0.0, 0.0, hi[2]]) - mid).normalize();
         let reach = |dir: glam::DVec2| (0..40).take_while(|k| at(mid + dir * (*k as f64 * dpr as f64)) == Some(50)).count() as i32 - 1;
@@ -3156,7 +3156,7 @@ fn the_3d_pick_matrix_matches_live() {
             let dir = glam::DVec2::new(dir.0, dir.1);
             let at = |k: f64| {
                 let q = at0 + dir * (k * dpr as f64);
-                pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, (5.0 * dpr) as i32, 6.0 * f64::from(dpr) + 0.5, |id| if [edge, 51, asm_edge].contains(&id) { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, prio)
+                pick.pick_reaching(q.x.round() as i32, q.y.round() as i32, (5.0 * dpr) as i32, 6.0 * f64::from(dpr) + 0.5, |id| if [edge, 51, asm_edge].contains(&id) { noshape_render::PickClass::Edge } else { noshape_render::PickClass::Face }, |_| 0, prio)
             };
             let at_dir = |at: &dyn Fn(f64) -> Option<u32>, k: i32, s: f64| at(k as f64 * s);
             let side = |s: f64| (0..40).take_while(|k| at_dir(&at, *k, s) == Some(*id)).count() as i32 - 1;

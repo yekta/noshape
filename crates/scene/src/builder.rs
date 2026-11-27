@@ -79,8 +79,8 @@ pub struct PickMap {
     /// named from earlier faces, recursively; cloning and hashing every name whole took most of a scene build).
     by_ref: HashMap<u64, IdGroups, std::hash::BuildHasherDefault<KeyHasher>>,
     /// Per pickable body, ascending: (its first face id − 1, face count, its first edge id − 1, its index in the
-    /// display's bodies).
-    bodies: Vec<(u32, u32, u32, usize)>,
+    /// display's bodies, edge count).
+    bodies: Vec<(u32, u32, u32, usize, u32)>,
     /// Ids that win over others of their kind under the cursor (a spline's handle arm over the spline it runs
     /// along), ascending.
     boosted: Vec<u32>,
@@ -303,8 +303,18 @@ impl PickMap {
     /// The body (index in the display's bodies), face index and edge id base of face pick `id`.
     pub fn face_at(&self, id: u32) -> Option<(usize, usize, u32)> {
         let k = self.bodies.partition_point(|b| b.0 < id).checked_sub(1)?;
-        let (base, count, edge_base, body) = self.bodies[k];
+        let (base, count, edge_base, body, _) = self.bodies[k];
         (id > base && id - base <= count).then(|| (body, (id - base - 1) as usize, edge_base))
+    }
+    /// Each face and edge pick id's body (its slot + 1, 0 for other ids), for [`noshape_render::PickBuffer::pick_reaching`].
+    pub fn body_fn(&self) -> Arc<dyn Fn(u32) -> u32 + Send + Sync> {
+        let bodies: Vec<(u32, u32, u32, u32)> = self.bodies.iter().map(|b| (b.0, b.1, b.2, b.4)).collect();
+        Arc::new(move |id| {
+            let Some(k) = bodies.partition_point(|b| b.0 < id).checked_sub(1) else { return 0 };
+            let (base, count, edge_base, edges) = bodies[k];
+            let own = (id > base && id - base <= count) || (id > edge_base && id - edge_base <= edges);
+            if own { k as u32 + 1 } else { 0 }
+        })
     }
     pub fn ids_for(&self, r: &Reference) -> &[u32] {
         let same = |a: u32| self.get(a).is_some_and(|t| t.reference == *r);
@@ -652,7 +662,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             (picks.extend(&bp.faces, &bp.hashes[0]), picks.extend(&bp.edges, &bp.hashes[1]), picks.extend(&bp.vertices, &bp.hashes[2]))
         };
         if !display_only {
-            picks.bodies.push((face_base, b.face_refs.len() as u32, edge_base, part_index));
+            picks.bodies.push((face_base, b.face_refs.len() as u32, edge_base, part_index, b.edge_refs.len() as u32));
         }
         let mut color = b.color;
         if opts.neutral_bodies && b.kind == BodyKind::Solid {

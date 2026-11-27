@@ -1798,9 +1798,11 @@ impl PartStudioView {
         self.ui.pick_unhovered = own_plane;
         self.ui.pick_muted = muted;
         let class = built.picks.class_fn(self.opts.editing_sketch);
+        let body = built.picks.body_fn();
         self.viewport.update(cx, |vp, _| {
             vp.pick_priority = prio;
             vp.pick_class = class;
+            vp.pick_body = body;
         });
     }
 

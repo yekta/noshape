@@ -1316,3 +1316,74 @@ fn a_click_on_a_boss_tops_middle_picks_the_face(cx: &mut TestAppContext) {
     let selection = cx.update(|cx| view.read(cx).selection.clone());
     assert!(matches!(selection.as_slice(), [Reference::Face(_)]), "the boss's top face, got {selection:?}");
 }
+
+/// live depth batch 3 split-face-ok step 7 (start overlap, 0.275 mm a px): at (40, 10, 12) on Part 2's front face, Part
+/// 1's top edge x 40 ends where it goes into Part 2, 6.3 px off: out of reach, the face lights.
+#[gpui::test]
+fn an_edge_ending_in_another_part_does_not_reach_past_its_end(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "edge-end-reach", Some(starts["overlap"].clone()));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2 && !view.read(cx).ui_busy());
+    cx.update(|cx| view.read(cx).viewport.clone()).update(cx, |vp, cx| {
+        let h = vp.size().y;
+        vp.camera.distance = 0.275365e-3 * h * 0.5 / (vp.camera.fov_y * 0.5).tan();
+        vp.request_frame(cx);
+    });
+    draw(cx, window);
+    let forward = cx.update(|cx| view.read(cx).viewport.read(cx).camera.forward());
+    assert!(forward.distance(glam::DVec3::new(-0.433013, 0.75, -0.5)) < 1e-3, "live's camera, got {forward:?}");
+    let pointer = Pointer::new(cx, window, &view);
+    let (at, end) = cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        (vp.project(glam::DVec3::new(0.040, 0.010, 0.012)).unwrap(), vp.project(glam::DVec3::new(0.040, 0.010, 0.010)).unwrap())
+    });
+    println!("edge end {:.2} px off", at.distance(end));
+    pointer.move_to(cx, &view, at);
+    let hover = cx.update(|cx| view.read(cx).hover.clone());
+    assert!(matches!(hover, Some(Reference::Face(_))), "Part 2's face, got {hover:?}");
+}
+
+/// The same in live split-face-ok's Split dialog: Face tab, Part 1's face at x 40 to split, the tool field focused: the
+/// click at (40, 10, 12) takes Part 2's face.
+#[gpui::test]
+fn an_edge_ending_in_another_part_stays_out_of_reach_in_a_split_dialog(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "edge-end-reach-split", Some(starts["overlap"].clone()));
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count() == 2 && !view.read(cx).ui_busy());
+    cx.update(|cx| view.read(cx).viewport.clone()).update(cx, |vp, cx| {
+        let h = vp.size().y;
+        vp.camera.distance = 0.275365e-3 * h * 0.5 / (vp.camera.fov_y * 0.5).tan();
+        vp.request_frame(cx);
+    });
+    let side = cx.update(|cx| {
+        let v = view.read(cx);
+        v.display.bodies.iter().find_map(|b| {
+            let at_x = |i: usize| {
+                let Some(&(first, count)) = b.mesh.face_ranges.get(i) else { return false };
+                b.mesh.indices[first as usize..(first + count) as usize].iter().all(|&k| (b.mesh.positions[k as usize][0] - 0.04).abs() < 1e-6)
+            };
+            b.face_refs.iter().enumerate().find(|(i, _)| at_x(*i)).map(|(_, r)| r.clone())
+        }).expect("Part 1's face at x = 40 mm")
+    });
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("splitPart", w, cx))).unwrap();
+    draw(cx, window);
+    let dialog = cx.update(|cx| view.read(cx).edit.as_ref().expect("the Split dialog").dialog.clone());
+    cx.update(|cx| dialog.update(cx, |d, cx| d.set_value("splitType", noshape_model::ParamValue::Enum("FACE".into()), cx)));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update(|cx| dialog.update(cx, |d, cx| {
+        d.user_focus_query("faceTargets");
+        d.add_pick(side, cx);
+        d.user_focus_query("faceTools");
+    }));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let pointer = Pointer::new(cx, window, &view);
+    let at = cx.update(|cx| view.read(cx).viewport.read(cx).project(glam::DVec3::new(0.040, 0.010, 0.012)).unwrap());
+    pointer.move_to(cx, &view, at);
+    let hover = cx.update(|cx| view.read(cx).hover.clone());
+    assert!(matches!(hover, Some(Reference::Face(_))), "Part 2's face, got {hover:?}");
+}
