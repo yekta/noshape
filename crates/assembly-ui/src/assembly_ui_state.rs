@@ -182,6 +182,8 @@ impl AssemblyView {
                 // (Its pick's instance instead: Direction on an edge of Part 1 selects Part 1's row.)
                 // (Not a Mirror plane's: a mate connector, live 64.)
                 || self.pattern.as_ref().filter(|p| p.kind != PatternDialogKind::Mirror).and_then(|p| p.active.and_then(|k| [&p.axis, &p.axis2, &p.axis3].get(k).and_then(|a| a.as_ref()))).is_some_and(|c| c.instance == i.id)
+                // (Replicate's scope field: the instances picked into it, live asm-replicate-parts-block-ok s6.)
+                || self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Replicate && p.active == Some(2)).is_some_and(|p| p.scope_refs.iter().any(|r| r.instance == i.id))
                 || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id))
                 || matches!(&self.ui.dynamic_suppression, Some((super::props::DynTarget::Instance(x), _, _)) if *x == i.id)
                 || self.mc_picks().iter().any(|c| c.instance == i.id);
@@ -307,7 +309,8 @@ impl AssemblyView {
         for n in self.result.nodes.iter().filter(|n| n.path.len() == 1 && !n.children.is_empty()) {
             walk(&self.result, n, &n.name, &mut nested, &transform);
         }
-        let mates: Vec<Value> = asm.mates.iter().map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": rest_status(m) })).collect();
+        // A pattern's generated mates are its own, not features (live asm-replicate-parts-block-ok s8: Revolute 1 only).
+        let mates: Vec<Value> = asm.mates.iter().filter(|m| asm.mate_generated_by(m.id).is_none()).map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": rest_status(m) })).collect();
         // A mate selected in the list is a FEATURE (live), listed before the instances.
         let mates_selected = self.selected_mate.into_iter().chain(self.ui.more_mates.iter().copied().filter(|_| self.selected_mate.is_some()));
         // A mate held by Animate mate's or the Driving mate selector's field reads without an owner (live asm-mate-menu-animate,
@@ -347,7 +350,19 @@ impl AssemblyView {
             1 => p.axis2.is_some(),
             _ => p.axis3.is_some(),
         }));
-        if pattern_field == Some(true) {
+        // Replicate's scope field: its picks (live asm-replicate-parts-block-ok s6: the part picked into it).
+        let scope = self.pattern.as_ref().filter(|p| p.kind == PatternDialogKind::Replicate && p.active == Some(2)).map(|p| p.scope_refs.as_slice());
+        if let Some(refs) = scope {
+            items.extend(refs.iter().map(|r| {
+                let kind = match &r.entity {
+                    None => "INSTANCE",
+                    Some(Reference::Edge(_)) => "EDGE",
+                    Some(Reference::Vertex(_)) => "VERTEX",
+                    Some(_) => "FACE",
+                };
+                json!({ "kind": kind, "owner": asm.instance(r.instance).map(|i| i.name.clone()) })
+            }));
+        } else if pattern_field == Some(true) {
             items.push(json!({ "kind": null, "owner": null }));
         }
         items.extend(asm.instances.iter().filter(|i| pattern_field.is_none() && (self.selected.contains(&i.id) || group.contains(&i.id)) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
