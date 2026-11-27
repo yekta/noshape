@@ -1,0 +1,77 @@
+{
+ "name": "sketch-center-rect-typed",
+ "about": "Center point rectangle at (0,0), 40 typed + Enter while sizing, then a click at (15,10)",
+ "area": "psui",
+ "source": "live depth batch 6: sketching (11-27)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Corner rectangle",
+    "menu": "Center point rectangle"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     15,
+     10
+    ]
+   },
+   "ms": 600
+  },
+  {
+   "do": "type",
+   "text": "40"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "shot",
+   "name": "end"
+  }
+ ]
+}

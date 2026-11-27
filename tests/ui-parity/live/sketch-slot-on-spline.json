@@ -1,0 +1,4140 @@
+{
+ "scenario": "sketch-slot-on-spline",
+ "recorded": "2026-11-27T12:49:32.082Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "66815e3ca9f708a7990bd355",
+  "start": "empty",
+  "startElement": "4eec9edd3fdbccf544498d1e",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 355.772,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Sketch"
+    }
+   },
+   "ok": true,
+   "ti": 26494,
+   "tmove": 26594,
+   "moves": 2,
+   "tdown": 26952,
+   "at": [
+    536,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "error",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "error",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "Select a sketch plane \u00d7 Close",
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 30976,
+   "te": 30976
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "plane": "Top"
+    }
+   },
+   "ok": true,
+   "ti": 30976,
+   "tmove": 31112,
+   "moves": 3,
+   "tdown": 32387,
+   "at": [
+    1273,
+    568
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": null,
+     "constraints": null,
+     "dimensions": null,
+     "error": "sketch model not reached"
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 35228,
+   "te": 35228
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Spline"
+    }
+   },
+   "ok": true,
+   "ti": 35228,
+   "tmove": 35333,
+   "moves": 2,
+   "tdown": 35717,
+   "at": [
+    843,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Spline",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 38498,
+   "te": 38498
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      0,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 38498,
+   "tmove": 38568,
+   "moves": 2,
+   "hover": [
+    "IB"
+   ],
+   "tdown": 42773,
+   "tup": 42938,
+   "at": [
+    1273,
+    519
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Spline",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 45163,
+   "te": 45163
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      30,
+      20
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 45163,
+   "tmove": 45239,
+   "moves": 2,
+   "hover": [],
+   "tdown": 52165,
+   "tup": 52405,
+   "at": [
+    1404,
+    515
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Spline",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 55021,
+   "te": 55021
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      60,
+      0
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 55021,
+   "tmove": 55177,
+   "moves": 2,
+   "hover": [
+    "IB"
+   ],
+   "tdown": 59679,
+   "tup": 59825,
+   "at": [
+    1462,
+    573
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Spline",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 62107,
+   "te": 62107
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "ti": 62107,
+   "pointer": {
+    "at": [
+     1462,
+     573
+    ],
+    "hover": [
+     "IB"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 62129,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Spline",
+     "entities": [],
+     "constraints": [],
+     "dimensions": [],
+     "geometry": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 64253,
+   "te": 64253
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 64253,
+   "pointer": {
+    "at": [
+     1462,
+     573
+    ],
+    "hover": [
+     "IB"
+    ],
+    "element": "canvas#canvas"
+   },
+   "tdown": 64261,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Spline",
+     "entities": [
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 67801,
+   "te": 67801
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 67801,
+   "pointer": {
+    "at": [
+     1462,
+     573
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 67808,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 71458,
+   "te": 71458
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Slot"
+    }
+   },
+   "ok": true,
+   "ti": 71458,
+   "tdown": 71609,
+   "via": "search tools",
+   "at": [
+    1516,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Slot",
+     "entities": [
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 76774,
+   "te": 76774
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      30,
+      20
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 76774,
+   "tmove": 76837,
+   "moves": 2,
+   "hover": [
+    "JFJ"
+   ],
+   "tdown": 79235,
+   "tup": 79349,
+   "at": [
+    1404,
+    515
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFJ"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Slot",
+     "entities": [
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL"
+     ],
+     "dimensions": [],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": {
+     "readout": [
+      {
+       "name": "Length",
+       "value": "74.038",
+       "units": "mm"
+      }
+     ],
+     "panel": null
+    }
+   },
+   "t": 81585,
+   "te": 81585
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "click",
+    "on": {
+     "sketch_point": [
+      30,
+      24
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 81585,
+   "tmove": 81677,
+   "moves": 2,
+   "hover": [],
+   "tdown": 86719,
+   "tup": 86828,
+   "at": [
+    1411,
+    508
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": "Slot",
+     "entities": [
+      "arc",
+      "arc",
+      "spline",
+      "spline",
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "OFFSET",
+      "OFFSET",
+      "OFFSET",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT"
+     ],
+     "dimensions": [
+      {
+       "kind": "DIAMETER",
+       "value": 20,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         -7.0992,
+         7.0428
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         59.9227,
+         0
+        ],
+        [
+         67.0628,
+         7.0013
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         -7.0992,
+         7.0428
+        ],
+        [
+         -5.8443,
+         8.3078
+        ],
+        [
+         -3.2985,
+         10.8743
+        ],
+        [
+         -0.0203,
+         14.0774
+        ],
+        [
+         2.6724,
+         16.5814
+        ],
+        [
+         4.7324,
+         18.4165
+        ],
+        [
+         6.8399,
+         20.1949
+        ],
+        [
+         9.0038,
+         21.9024
+        ],
+        [
+         11.2357,
+         23.5238
+        ],
+        [
+         13.5497,
+         25.0417
+        ],
+        [
+         15.9626,
+         26.4355
+        ],
+        [
+         18.4934,
+         27.679
+        ],
+        [
+         20.7158,
+         28.5615
+        ],
+        [
+         22.5683,
+         29.153
+        ],
+        [
+         23.9953,
+         29.5327
+        ],
+        [
+         25.4597,
+         29.8415
+        ],
+        [
+         26.7095,
+         30.0335
+        ],
+        [
+         27.7253,
+         30.1442
+        ],
+        [
+         28.4946,
+         30.2049
+        ],
+        [
+         29.1413,
+         30.2361
+        ],
+        [
+         29.6615,
+         30.249
+        ],
+        [
+         30.0532,
+         30.2526
+        ],
+        [
+         30.4457,
+         30.2499
+        ],
+        [
+         30.9667,
+         30.2382
+        ],
+        [
+         31.6145,
+         30.2085
+        ],
+        [
+         32.3851,
+         30.1493
+        ],
+        [
+         33.4028,
+         30.0404
+        ],
+        [
+         34.655,
+         29.8501
+        ],
+        [
+         36.1219,
+         29.5426
+        ],
+        [
+         37.5512,
+         29.1634
+        ],
+        [
+         39.4059,
+         28.5716
+        ],
+        [
+         41.6295,
+         27.6873
+        ],
+        [
+         44.1584,
+         26.4401
+        ],
+        [
+         46.5664,
+         25.0417
+        ],
+        [
+         48.8726,
+         23.5187
+        ],
+        [
+         51.0942,
+         21.8922
+        ],
+        [
+         53.2456,
+         20.1796
+        ],
+        [
+         55.3388,
+         18.3964
+        ],
+        [
+         57.3832,
+         16.5568
+        ],
+        [
+         60.0533,
+         14.0473
+        ],
+        [
+         63.3009,
+         10.8381
+        ],
+        [
+         65.821,
+         8.2678
+        ],
+        [
+         67.0628,
+         7.0013
+        ]
+       ]
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         8.3541,
+         -5.7778
+        ],
+        [
+         10.8279,
+         -3.2845
+        ],
+        [
+         13.8232,
+         -0.3603
+        ],
+        [
+         16.1481,
+         1.8008
+        ],
+        [
+         17.8504,
+         3.3164
+        ],
+        [
+         19.5045,
+         4.711
+        ],
+        [
+         21.101,
+         5.9692
+        ],
+        [
+         22.6284,
+         7.0767
+        ],
+        [
+         24.0722,
+         8.0211
+        ],
+        [
+         25.4156,
+         8.7935
+        ],
+        [
+         26.6395,
+         9.3906
+        ],
+        [
+         27.5444,
+         9.7457
+        ],
+        [
+         28.1928,
+         9.9518
+        ],
+        [
+         28.6409,
+         10.0704
+        ],
+        [
+         29.0512,
+         10.1562
+        ],
+        [
+         29.3631,
+         10.2036
+        ],
+        [
+         29.5963,
+         10.229
+        ],
+        [
+         29.7637,
+         10.2421
+        ],
+        [
+         29.8975,
+         10.2485
+        ],
+        [
+         30.0015,
+         10.2511
+        ],
+        [
+         30.078,
+         10.2518
+        ],
+        [
+         30.1536,
+         10.2513
+        ],
+        [
+         30.2568,
+         10.2489
+        ],
+        [
+         30.389,
+         10.2429
+        ],
+        [
+         30.5543,
+         10.2303
+        ],
+        [
+         30.7843,
+         10.2058
+        ],
+        [
+         31.0914,
+         10.1596
+        ],
+        [
+         31.4951,
+         10.0757
+        ],
+        [
+         31.9358,
+         9.9594
+        ],
+        [
+         32.5738,
+         9.7568
+        ],
+        [
+         33.4649,
+         9.4066
+        ],
+        [
+         34.6717,
+         8.8158
+        ],
+        [
+         35.9976,
+         8.0494
+        ],
+        [
+         37.4239,
+         7.1102
+        ],
+        [
+         38.9335,
+         6.0072
+        ],
+        [
+         40.512,
+         4.7524
+        ],
+        [
+         42.1476,
+         3.3602
+        ],
+        [
+         43.8311,
+         1.8461
+        ],
+        [
+         46.1305,
+         -0.314
+        ],
+        [
+         49.0933,
+         -3.2391
+        ],
+        [
+         51.5407,
+         -5.7348
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 89622,
+   "te": 89622
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 89622,
+   "pointer": {
+    "at": [
+     1411,
+     508
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 89635,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "arc",
+      "arc",
+      "spline",
+      "spline",
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "OFFSET",
+      "OFFSET",
+      "OFFSET",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT"
+     ],
+     "dimensions": [
+      {
+       "kind": "DIAMETER",
+       "value": 20,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         -7.0992,
+         7.0428
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         59.9227,
+         0
+        ],
+        [
+         67.0628,
+         7.0013
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         -7.0992,
+         7.0428
+        ],
+        [
+         -5.8443,
+         8.3078
+        ],
+        [
+         -3.2985,
+         10.8743
+        ],
+        [
+         -0.0203,
+         14.0774
+        ],
+        [
+         2.6724,
+         16.5814
+        ],
+        [
+         4.7324,
+         18.4165
+        ],
+        [
+         6.8399,
+         20.1949
+        ],
+        [
+         9.0038,
+         21.9024
+        ],
+        [
+         11.2357,
+         23.5238
+        ],
+        [
+         13.5497,
+         25.0417
+        ],
+        [
+         15.9626,
+         26.4355
+        ],
+        [
+         18.4934,
+         27.679
+        ],
+        [
+         20.7158,
+         28.5615
+        ],
+        [
+         22.5683,
+         29.153
+        ],
+        [
+         23.9953,
+         29.5327
+        ],
+        [
+         25.4597,
+         29.8415
+        ],
+        [
+         26.7095,
+         30.0335
+        ],
+        [
+         27.7253,
+         30.1442
+        ],
+        [
+         28.4946,
+         30.2049
+        ],
+        [
+         29.1413,
+         30.2361
+        ],
+        [
+         29.6615,
+         30.249
+        ],
+        [
+         30.0532,
+         30.2526
+        ],
+        [
+         30.4457,
+         30.2499
+        ],
+        [
+         30.9667,
+         30.2382
+        ],
+        [
+         31.6145,
+         30.2085
+        ],
+        [
+         32.3851,
+         30.1493
+        ],
+        [
+         33.4028,
+         30.0404
+        ],
+        [
+         34.655,
+         29.8501
+        ],
+        [
+         36.1219,
+         29.5426
+        ],
+        [
+         37.5512,
+         29.1634
+        ],
+        [
+         39.4059,
+         28.5716
+        ],
+        [
+         41.6295,
+         27.6873
+        ],
+        [
+         44.1584,
+         26.4401
+        ],
+        [
+         46.5664,
+         25.0417
+        ],
+        [
+         48.8726,
+         23.5187
+        ],
+        [
+         51.0942,
+         21.8922
+        ],
+        [
+         53.2456,
+         20.1796
+        ],
+        [
+         55.3388,
+         18.3964
+        ],
+        [
+         57.3832,
+         16.5568
+        ],
+        [
+         60.0533,
+         14.0473
+        ],
+        [
+         63.3009,
+         10.8381
+        ],
+        [
+         65.821,
+         8.2678
+        ],
+        [
+         67.0628,
+         7.0013
+        ]
+       ]
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         8.3541,
+         -5.7778
+        ],
+        [
+         10.8279,
+         -3.2845
+        ],
+        [
+         13.8232,
+         -0.3603
+        ],
+        [
+         16.1481,
+         1.8008
+        ],
+        [
+         17.8504,
+         3.3164
+        ],
+        [
+         19.5045,
+         4.711
+        ],
+        [
+         21.101,
+         5.9692
+        ],
+        [
+         22.6284,
+         7.0767
+        ],
+        [
+         24.0722,
+         8.0211
+        ],
+        [
+         25.4156,
+         8.7935
+        ],
+        [
+         26.6395,
+         9.3906
+        ],
+        [
+         27.5444,
+         9.7457
+        ],
+        [
+         28.1928,
+         9.9518
+        ],
+        [
+         28.6409,
+         10.0704
+        ],
+        [
+         29.0512,
+         10.1562
+        ],
+        [
+         29.3631,
+         10.2036
+        ],
+        [
+         29.5963,
+         10.229
+        ],
+        [
+         29.7637,
+         10.2421
+        ],
+        [
+         29.8975,
+         10.2485
+        ],
+        [
+         30.0015,
+         10.2511
+        ],
+        [
+         30.078,
+         10.2518
+        ],
+        [
+         30.1536,
+         10.2513
+        ],
+        [
+         30.2568,
+         10.2489
+        ],
+        [
+         30.389,
+         10.2429
+        ],
+        [
+         30.5543,
+         10.2303
+        ],
+        [
+         30.7843,
+         10.2058
+        ],
+        [
+         31.0914,
+         10.1596
+        ],
+        [
+         31.4951,
+         10.0757
+        ],
+        [
+         31.9358,
+         9.9594
+        ],
+        [
+         32.5738,
+         9.7568
+        ],
+        [
+         33.4649,
+         9.4066
+        ],
+        [
+         34.6717,
+         8.8158
+        ],
+        [
+         35.9976,
+         8.0494
+        ],
+        [
+         37.4239,
+         7.1102
+        ],
+        [
+         38.9335,
+         6.0072
+        ],
+        [
+         40.512,
+         4.7524
+        ],
+        [
+         42.1476,
+         3.3602
+        ],
+        [
+         43.8311,
+         1.8461
+        ],
+        [
+         46.1305,
+         -0.314
+        ],
+        [
+         49.0933,
+         -3.2391
+        ],
+        [
+         51.5407,
+         -5.7348
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 93238,
+   "te": 93239
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 93239,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "arc",
+      "arc",
+      "spline",
+      "spline",
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "OFFSET",
+      "OFFSET",
+      "OFFSET",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT"
+     ],
+     "dimensions": [
+      {
+       "kind": "DIAMETER",
+       "value": 20,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         -7.0992,
+         7.0428
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         59.9227,
+         0
+        ],
+        [
+         67.0628,
+         7.0013
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         -7.0992,
+         7.0428
+        ],
+        [
+         -5.8443,
+         8.3078
+        ],
+        [
+         -3.2985,
+         10.8743
+        ],
+        [
+         -0.0203,
+         14.0774
+        ],
+        [
+         2.6724,
+         16.5814
+        ],
+        [
+         4.7324,
+         18.4165
+        ],
+        [
+         6.8399,
+         20.1949
+        ],
+        [
+         9.0038,
+         21.9024
+        ],
+        [
+         11.2357,
+         23.5238
+        ],
+        [
+         13.5497,
+         25.0417
+        ],
+        [
+         15.9626,
+         26.4355
+        ],
+        [
+         18.4934,
+         27.679
+        ],
+        [
+         20.7158,
+         28.5615
+        ],
+        [
+         22.5683,
+         29.153
+        ],
+        [
+         23.9953,
+         29.5327
+        ],
+        [
+         25.4597,
+         29.8415
+        ],
+        [
+         26.7095,
+         30.0335
+        ],
+        [
+         27.7253,
+         30.1442
+        ],
+        [
+         28.4946,
+         30.2049
+        ],
+        [
+         29.1413,
+         30.2361
+        ],
+        [
+         29.6615,
+         30.249
+        ],
+        [
+         30.0532,
+         30.2526
+        ],
+        [
+         30.4457,
+         30.2499
+        ],
+        [
+         30.9667,
+         30.2382
+        ],
+        [
+         31.6145,
+         30.2085
+        ],
+        [
+         32.3851,
+         30.1493
+        ],
+        [
+         33.4028,
+         30.0404
+        ],
+        [
+         34.655,
+         29.8501
+        ],
+        [
+         36.1219,
+         29.5426
+        ],
+        [
+         37.5512,
+         29.1634
+        ],
+        [
+         39.4059,
+         28.5716
+        ],
+        [
+         41.6295,
+         27.6873
+        ],
+        [
+         44.1584,
+         26.4401
+        ],
+        [
+         46.5664,
+         25.0417
+        ],
+        [
+         48.8726,
+         23.5187
+        ],
+        [
+         51.0942,
+         21.8922
+        ],
+        [
+         53.2456,
+         20.1796
+        ],
+        [
+         55.3388,
+         18.3964
+        ],
+        [
+         57.3832,
+         16.5568
+        ],
+        [
+         60.0533,
+         14.0473
+        ],
+        [
+         63.3009,
+         10.8381
+        ],
+        [
+         65.821,
+         8.2678
+        ],
+        [
+         67.0628,
+         7.0013
+        ]
+       ]
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         8.3541,
+         -5.7778
+        ],
+        [
+         10.8279,
+         -3.2845
+        ],
+        [
+         13.8232,
+         -0.3603
+        ],
+        [
+         16.1481,
+         1.8008
+        ],
+        [
+         17.8504,
+         3.3164
+        ],
+        [
+         19.5045,
+         4.711
+        ],
+        [
+         21.101,
+         5.9692
+        ],
+        [
+         22.6284,
+         7.0767
+        ],
+        [
+         24.0722,
+         8.0211
+        ],
+        [
+         25.4156,
+         8.7935
+        ],
+        [
+         26.6395,
+         9.3906
+        ],
+        [
+         27.5444,
+         9.7457
+        ],
+        [
+         28.1928,
+         9.9518
+        ],
+        [
+         28.6409,
+         10.0704
+        ],
+        [
+         29.0512,
+         10.1562
+        ],
+        [
+         29.3631,
+         10.2036
+        ],
+        [
+         29.5963,
+         10.229
+        ],
+        [
+         29.7637,
+         10.2421
+        ],
+        [
+         29.8975,
+         10.2485
+        ],
+        [
+         30.0015,
+         10.2511
+        ],
+        [
+         30.078,
+         10.2518
+        ],
+        [
+         30.1536,
+         10.2513
+        ],
+        [
+         30.2568,
+         10.2489
+        ],
+        [
+         30.389,
+         10.2429
+        ],
+        [
+         30.5543,
+         10.2303
+        ],
+        [
+         30.7843,
+         10.2058
+        ],
+        [
+         31.0914,
+         10.1596
+        ],
+        [
+         31.4951,
+         10.0757
+        ],
+        [
+         31.9358,
+         9.9594
+        ],
+        [
+         32.5738,
+         9.7568
+        ],
+        [
+         33.4649,
+         9.4066
+        ],
+        [
+         34.6717,
+         8.8158
+        ],
+        [
+         35.9976,
+         8.0494
+        ],
+        [
+         37.4239,
+         7.1102
+        ],
+        [
+         38.9335,
+         6.0072
+        ],
+        [
+         40.512,
+         4.7524
+        ],
+        [
+         42.1476,
+         3.3602
+        ],
+        [
+         43.8311,
+         1.8461
+        ],
+        [
+         46.1305,
+         -0.314
+        ],
+        [
+         49.0933,
+         -3.2391
+        ],
+        [
+         51.5407,
+         -5.7348
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 96116,
+   "te": 96116
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "shot",
+    "name": "end"
+   },
+   "ok": true,
+   "ti": 96116,
+   "shot": "/root/live-scratch/uipshots/sketch-slot-on-spline-end.png",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Sketch 1",
+     "titleState": "ok",
+     "kind": "sketch",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Sketch plane",
+       "kind": "query",
+       "items": [
+        "Top plane"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Disable imprinting",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sketch 1",
+      "titleState": "ok",
+      "kind": "sketch",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Sketch plane",
+        "kind": "query",
+        "items": [
+         "Top plane"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Disable imprinting",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sketch 1"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": {
+     "tool": null,
+     "entities": [
+      "arc",
+      "arc",
+      "spline",
+      "spline",
+      "spline"
+     ],
+     "constraints": [
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "COINCIDENT",
+      "HORIZONTAL",
+      "OFFSET",
+      "OFFSET",
+      "OFFSET",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT",
+      "TANGENT"
+     ],
+     "dimensions": [
+      {
+       "kind": "DIAMETER",
+       "value": 20,
+       "expression": null
+      }
+     ],
+     "geometry": [
+      {
+       "kind": "spline",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         30.1201,
+         20.2515
+        ],
+        [
+         59.9227,
+         0
+        ]
+       ],
+       "derivatives": [
+        [
+         60.2353,
+         60.7179
+        ],
+        [
+         59.6098,
+         -60.7916
+        ]
+       ]
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         0,
+         0
+        ],
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         -7.0992,
+         7.0428
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "arc",
+       "points": [
+        [
+         59.9227,
+         0
+        ],
+        [
+         67.0628,
+         7.0013
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ],
+       "radius": 10
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         -7.0992,
+         7.0428
+        ],
+        [
+         -5.8443,
+         8.3078
+        ],
+        [
+         -3.2985,
+         10.8743
+        ],
+        [
+         -0.0203,
+         14.0774
+        ],
+        [
+         2.6724,
+         16.5814
+        ],
+        [
+         4.7324,
+         18.4165
+        ],
+        [
+         6.8399,
+         20.1949
+        ],
+        [
+         9.0038,
+         21.9024
+        ],
+        [
+         11.2357,
+         23.5238
+        ],
+        [
+         13.5497,
+         25.0417
+        ],
+        [
+         15.9626,
+         26.4355
+        ],
+        [
+         18.4934,
+         27.679
+        ],
+        [
+         20.7158,
+         28.5615
+        ],
+        [
+         22.5683,
+         29.153
+        ],
+        [
+         23.9953,
+         29.5327
+        ],
+        [
+         25.4597,
+         29.8415
+        ],
+        [
+         26.7095,
+         30.0335
+        ],
+        [
+         27.7253,
+         30.1442
+        ],
+        [
+         28.4946,
+         30.2049
+        ],
+        [
+         29.1413,
+         30.2361
+        ],
+        [
+         29.6615,
+         30.249
+        ],
+        [
+         30.0532,
+         30.2526
+        ],
+        [
+         30.4457,
+         30.2499
+        ],
+        [
+         30.9667,
+         30.2382
+        ],
+        [
+         31.6145,
+         30.2085
+        ],
+        [
+         32.3851,
+         30.1493
+        ],
+        [
+         33.4028,
+         30.0404
+        ],
+        [
+         34.655,
+         29.8501
+        ],
+        [
+         36.1219,
+         29.5426
+        ],
+        [
+         37.5512,
+         29.1634
+        ],
+        [
+         39.4059,
+         28.5716
+        ],
+        [
+         41.6295,
+         27.6873
+        ],
+        [
+         44.1584,
+         26.4401
+        ],
+        [
+         46.5664,
+         25.0417
+        ],
+        [
+         48.8726,
+         23.5187
+        ],
+        [
+         51.0942,
+         21.8922
+        ],
+        [
+         53.2456,
+         20.1796
+        ],
+        [
+         55.3388,
+         18.3964
+        ],
+        [
+         57.3832,
+         16.5568
+        ],
+        [
+         60.0533,
+         14.0473
+        ],
+        [
+         63.3009,
+         10.8381
+        ],
+        [
+         65.821,
+         8.2678
+        ],
+        [
+         67.0628,
+         7.0013
+        ]
+       ]
+      },
+      {
+       "kind": "spline",
+       "points": [
+        [
+         7.0992,
+         -7.0428
+        ],
+        [
+         8.3541,
+         -5.7778
+        ],
+        [
+         10.8279,
+         -3.2845
+        ],
+        [
+         13.8232,
+         -0.3603
+        ],
+        [
+         16.1481,
+         1.8008
+        ],
+        [
+         17.8504,
+         3.3164
+        ],
+        [
+         19.5045,
+         4.711
+        ],
+        [
+         21.101,
+         5.9692
+        ],
+        [
+         22.6284,
+         7.0767
+        ],
+        [
+         24.0722,
+         8.0211
+        ],
+        [
+         25.4156,
+         8.7935
+        ],
+        [
+         26.6395,
+         9.3906
+        ],
+        [
+         27.5444,
+         9.7457
+        ],
+        [
+         28.1928,
+         9.9518
+        ],
+        [
+         28.6409,
+         10.0704
+        ],
+        [
+         29.0512,
+         10.1562
+        ],
+        [
+         29.3631,
+         10.2036
+        ],
+        [
+         29.5963,
+         10.229
+        ],
+        [
+         29.7637,
+         10.2421
+        ],
+        [
+         29.8975,
+         10.2485
+        ],
+        [
+         30.0015,
+         10.2511
+        ],
+        [
+         30.078,
+         10.2518
+        ],
+        [
+         30.1536,
+         10.2513
+        ],
+        [
+         30.2568,
+         10.2489
+        ],
+        [
+         30.389,
+         10.2429
+        ],
+        [
+         30.5543,
+         10.2303
+        ],
+        [
+         30.7843,
+         10.2058
+        ],
+        [
+         31.0914,
+         10.1596
+        ],
+        [
+         31.4951,
+         10.0757
+        ],
+        [
+         31.9358,
+         9.9594
+        ],
+        [
+         32.5738,
+         9.7568
+        ],
+        [
+         33.4649,
+         9.4066
+        ],
+        [
+         34.6717,
+         8.8158
+        ],
+        [
+         35.9976,
+         8.0494
+        ],
+        [
+         37.4239,
+         7.1102
+        ],
+        [
+         38.9335,
+         6.0072
+        ],
+        [
+         40.512,
+         4.7524
+        ],
+        [
+         42.1476,
+         3.3602
+        ],
+        [
+         43.8311,
+         1.8461
+        ],
+        [
+         46.1305,
+         -0.314
+        ],
+        [
+         49.0933,
+         -3.2391
+        ],
+        [
+         51.5407,
+         -5.7348
+        ],
+        [
+         52.7826,
+         -7.0013
+        ]
+       ]
+      }
+     ]
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      98.537,
+      -170.671,
+      113.781
+     ],
+     "width_mm": 355.772,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 98453,
+   "te": 98453
+  }
+ ],
+ "t0_epoch_ms": 1795783752277
+}
