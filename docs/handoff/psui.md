@@ -217,9 +217,35 @@ docs/DECISIONS.md (read first; it wins over anything here).
   Part 1's top), asserting Part 2's face is hovered. No app change (a depth-rank tweak for the moved part was not needed:
   A/B passes without it). assembly-ui 233 + scene 268 green on vibe2. 39026a6c failed only on this test (01:18);
   re-landed with the fix on top, plus coverage.py name matches (Part Studio menus 129/131; 2 real gaps for live).
-- 11-27 lead order: rerun the Part Studio ui-parity shard (1126) on newest green, triage ours / stale / remembered seed,
-  fix ours, skip the focus rule's. Running on vibe2 (~/tmp/psui/ps, scratch ps-shard.sh); 11-26 run's 25 failures listed
-  in qa-scratch/suites/1126-1417-111a6633/uip.log (18 sketch click offsets at step 5).
+- 11-27 lead order: Part Studio shard (1126) rerun, triage, fix ours. QUEUED 6264e254 (01:25: boss-top + asm test +
+  coverage.py). Shard on 80c80a0a-ish build (green 7c9124aac + 26): 1084/1126, 9496/9842 (was 95.8; click offsets gone).
+  42 failing, triaged:
+  * Focus rule (8): boolean-subtract-offset(-keep-tools)-ok, circular-pattern-feature-sketch-axis-ok,
+    fillet-variable-two-vertices-ok, linear-pattern-second-direction-ok, loft-guides-finished, mirror-feature-reapply-on-ok,
+    mistake-linear-pattern-feature-boss-no-reapply. UNCOMMITTED in feature_dialog.rs set_value: `takes` per control kind
+    removed; any field the edit brought up and activated takes the keyboard, except a tab's same-label twin (live 11-27:
+    Onshape changed; 5 retakes in /root/live2-scratch/l24/ar/out/psfk-*.json, land with live's depth batch 4; staged
+    copies vibe2 ~/tmp/psui/psfk).
+  * Remembered seeds (11): UNCOMMITTED "remembered" blocks added to chamfer-distance-angle-ok (width 16), fillet-conic-ok
+    (radius 2), hole cbore x3 (cBoreDiameterV3 9.75), csink x2 (cSinkDiameterV3 11.2), tapped x3 (tappedDepthV3 5.6),
+    hole-metric-counterbore-through-ok (isoHoleTableEx Tapped M5 0.80 + 5.6). Live's "(3) done" was other takes.
+  * Ours, UNCOMMITTED fix: part-menu-edit-material x2: a selected face/edge/vertex no longer hides Copy Part 1 / Where
+    used… (mod.rs `others`; features/sketches still do, featurelist capture). T1 row "menu / a face selected, on its
+    part" in list_feel_tests.rs.
+  * Ours?, sketch cluster (new since 11-26, likely my e3ffb4cef approach replay acquiring inferences): sketch-parallel(-key),
+    sketch-constraint-refusals (extra VERTICAL), sketch-mirror-escape-after-line / -undo-midway (extra HORIZONTAL+MIDPOINT),
+    sketch-mirror-construction-line, sketch-dim-parallel-lines, sketch-line-started-on-line-off-midpoint-1mm,
+    revolve-dialog-axis, sketch-chamfer-finished. A/B with the approach off running (below).
+  * Waiting on live (REQUESTS "psui 11-27 02:5x"): mistake-extrude-remove-flipped-out (✓ stays open 3/3 today vs 2979's
+    commit on 11-14; guard tried in accept_edit and reverted), camera-menu-perspective-view-off (recorder's orthographic
+    always true: artefact), coverage gaps Disable imported appearances / Release all configurations….
+  * Not mine: extrude-up-to-part-overlap-ok, mistake-linear-pattern-remove-own-part (core tickets), gusset x2 (ours error,
+    live ok: core), mistake-asm-fastened-same-instance (skasm), sketch-image-edit/-place (dialog "Insert an image": skasm),
+    sketch-spline-insert-points(-escape) (skasm).
+  * RUNNING (background, local log /root/psui-scratch/resp/focus.log; script resp/focus.sh): part-studio-ui lib with the
+    focus rule (expect old-rule T1s to fail: update them to the new rule), retakes 5 via --live psfk, 27 old focus
+    scenarios (pre-11-21 takes may now differ = stale), the 11 seeds, sketch cluster with the approach off (run.py sed,
+    restored after). Started before the part-menu change: rerun part-studio-ui lib after. Then commit, handoff, land.
 - Open, mine: linear-pattern-second-direction-ok s16 field Distance#1 (after the focus rule); mirror s8 focus text.
 - qa verified RUNNER-UNLABELLED-FIELD-INDEX on c444ac1d5 (flow 70, 0 runner errors).
 
