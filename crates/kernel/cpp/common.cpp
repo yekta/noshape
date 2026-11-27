@@ -1791,9 +1791,8 @@ std::vector<double> surface_breaks(const BRepAdaptor_Surface& s, bool along_u)
 // get a result that depends on where u is measured from (F18 of g50:
 // -0.0617 mm², live 82.8478429). Each gap: from the end (u, v) of one edge
 // to the start of the next, in the face's forward orientation. Gaps that
-// are no gap in space (ends a period apart) are not counted, nor those of at
-// most `least` m (-1: every one).
-std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face, double least = 1e-9)
+// are no gap in space (ends a period apart) are not counted.
+std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face)
 {
   std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> out;
   const TopoDS_Face f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
@@ -1823,11 +1822,51 @@ std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face, doub
       if ((uper > 0 && du > uper / 4) || (vper > 0 && dv > vper / 4))
         continue;
       const double gap = S->Value(p.X(), p.Y()).Distance(S->Value(q.X(), q.Y()));
-      if (gap > least && gap < 1e-3)
+      if (gap > 1e-9 && gap < 1e-3)
         out.emplace_back(p, q);
     }
   }
   return out;
+}
+
+// A cylinder's or cone's face: the gaps between its curves' ends as `face_moments` closes them along its axis, each
+// end's u a whole number of turns from the other's taken off (H repeats over a turn), those under 1e-9 m too (a
+// pattern cut's cone faces 2e-8 rad apart at two corners read 7e-8 of their volume over). False when one is no small
+// gap: an open wire (a sheet metal hem's half-turn cylinder face, its far edge missing, read 0 for -30.6 mm³).
+bool turn_gaps(const TopoDS_Face& face, std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>>& out)
+{
+  const TopoDS_Face f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
+  TopLoc_Location   loc;
+  const occ::handle<Geom_Surface> S = BRep_Tool::Surface(f, loc);
+  if (S.IsNull() || !S->IsUPeriodic())
+    return false;
+  const double uper = S->UPeriod();
+  for (TopExp_Explorer w(f, TopAbs_WIRE); w.More(); w.Next())
+  {
+    std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> ends;
+    for (BRepTools_WireExplorer we(TopoDS::Wire(w.Current()), f); we.More(); we.Next())
+    {
+      const TopoDS_Edge& e = we.Current();
+      double             a, b;
+      const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
+      if (c.IsNull())
+        return false;
+      if (e.Orientation() == TopAbs_REVERSED)
+        std::swap(a, b);
+      ends.emplace_back(c->Value(a), c->Value(b));
+    }
+    for (size_t i = 0; i < ends.size(); ++i)
+    {
+      const gp_Pnt2d p = ends[i].second;
+      gp_Pnt2d       q = ends[(i + 1) % ends.size()].first;
+      q.SetX(q.X() - std::round((q.X() - p.X()) / uper) * uper);
+      if (std::abs(q.X() - p.X()) > uper / 4 || S->Value(p.X(), p.Y()).Distance(S->Value(q.X(), q.Y())) >= 1e-3)
+        return false;
+      if (q.X() != p.X())
+        out.emplace_back(p, q);
+    }
+  }
+  return true;
 }
 
 // The face's moments by Green's formula: ∬ g du dv = ∮ G dv, G(u, v) = ∫ g du
@@ -1971,8 +2010,9 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
   }
   // A cylinder's or cone's face: ∬ g du dv = -∮ H du, H(u, v) = ∫ g dv from the face's lowest v, a polynomial along the
   // axis: 8 points a point of the boundary, not the arc round it (a thread's crest going round 7 times: whole turns).
+  std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> vgaps;
   const bool along_v = uper && !vper && (s.GetType() == GeomAbs_Cylinder || s.GetType() == GeomAbs_Cone) &&
-                       uv_gaps(f).empty();
+                       uv_gaps(f).empty() && turn_gaps(f, vgaps);
   Moments total{};
   for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
   {
@@ -2075,18 +2115,16 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
       }
     }
   }
-  // Along v every gap closed, those under 1e-9 m too: H is far from 0 away from v0 (a pattern cut's cone faces, their
-  // curves 2e-8 rad apart at two corners: each 7e-8 of its volume off).
-  if (along_v)
-    for (const auto& [p, q] : uv_gaps(f, -1))
-      for (int i = 0; i < 8 && q.X() != p.X(); ++i)
-      {
-        const double  t = (kGaussX[i] + 1) / 2;
-        const Moments g = inner_v(s, v0, p.Y() + (q.Y() - p.Y()) * t, p.X() + (q.X() - p.X()) * t,
-                                  std::numeric_limits<double>::infinity(), volume, o, vbreaks);
-        for (int j = 0; j < 10; ++j)
-          total[(size_t)j] -= g[(size_t)j] * (q.X() - p.X()) * kGaussW[i] / 2;
-      }
+  // Along v every gap closed: H is far from 0 away from v0.
+  for (const auto& [p, q] : vgaps)
+    for (int i = 0; i < 8; ++i)
+    {
+      const double  t = (kGaussX[i] + 1) / 2;
+      const Moments g = inner_v(s, v0, p.Y() + (q.Y() - p.Y()) * t, p.X() + (q.X() - p.X()) * t,
+                                std::numeric_limits<double>::infinity(), volume, o, vbreaks);
+      for (int j = 0; j < 10; ++j)
+        total[(size_t)j] -= g[(size_t)j] * (q.X() - p.X()) * kGaussW[i] / 2;
+    }
   // The boundary's gaps, closed with straight (u, v) segments.
   for (const auto& [p, q] : uv_gaps(f))
     for (int i = 0; i < 8 && q.Y() != p.Y(); ++i)
