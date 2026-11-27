@@ -3731,6 +3731,38 @@ fn variable_studio_variables_are_rebuilt() {
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// Live's `variableStudios` (a studio referencing another, a configured one) and the Part Studio's
+/// `variableStudioReferences` (c2-dm-vs's fetch): "#h + #th - 20 mm" is 20 mm, #h = #w * 2 through Derived's reference
+/// to Dims, #th = #t * 2 with Cfg's input t at the reference's 10 mm (its default 1 mm).
+#[test]
+fn referenced_variable_studios_are_rebuilt() {
+    let (mut features, mut live, refs) = block_model();
+    let entire = |e: &str, config: Value| json!({ "referenceElementId": e, "entireVariableStudio": true, "variableNames": [], "configurationIdToValue": config });
+    let table = |rows: Value| json!([{ "variables": rows, "variableStudioReference": null }]);
+    let t = json!({ "btType": "BTMConfigurationParameterQuantity-1826", "parameterId": "t", "quantityType": "LENGTH", "rangeAndDefault": { "defaultValue": 1, "units": "millimeter", "minValue": 0, "maxValue": 100 } });
+    features["variables"] = table(json!([]));
+    features["variableStudios"] = json!({
+        "e1": { "name": "Dims", "variables": table(json!([{ "name": "w", "type": "LENGTH", "expression": "10 mm" }])), "references": { "references": [] } },
+        "e2": { "name": "Derived", "variables": table(json!([{ "name": "h", "type": "LENGTH", "expression": "#w * 2" }])), "references": { "references": [entire("e1", json!({}))] } },
+        "e3": { "name": "Cfg", "variables": table(json!([{ "name": "th", "type": "LENGTH", "expression": "#t * 2" }])), "references": { "references": [] }, "configuration": { "configurationParameters": [t] } },
+    });
+    features["variableStudioReferences"] = json!({ "references": [entire("e2", json!({})), entire("e3", json!({ "t": { "configuredValue": null, "value": "10 mm" } }))] });
+    for f in features["features"].as_array_mut().unwrap() {
+        for p in f["parameters"].as_array_mut().into_iter().flatten() {
+            if p["parameterId"] == "depth" {
+                p["expression"] = json!("#h + #th - 20 mm");
+            }
+        }
+    }
+    for l in &mut live {
+        for p in l["parts"].as_array_mut().into_iter().flatten() {
+            p.as_object_mut().unwrap().remove("area");
+        }
+    }
+    let r = run_model("block-vs-refs", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// A custom feature: its Feature Studio's source (features.json
 /// `featureStudios`) becomes ours, and the feature (namespace "e<element>::m…")
 /// runs from it: a 10 mm cube.

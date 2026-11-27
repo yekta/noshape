@@ -447,8 +447,13 @@ impl<'a> Translator<'a> {
         {
             self.notes.push(format!("current configuration: {e}"));
         }
-        for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
-            self.variable_studio(table);
+        match doc["variableStudios"].as_object() {
+            Some(studios) => self.variable_studios(studios, &doc["variableStudioReferences"]),
+            None => {
+                for table in doc["variables"].as_array().into_iter().flatten().filter(|v| v["variableStudioReference"].is_object()) {
+                    self.variable_studio(table);
+                }
+            }
         }
         // Files the studios import (icons, CSVs), as file tabs under their names.
         for (element, file) in doc["fileElements"].as_object().into_iter().flatten() {
@@ -663,6 +668,82 @@ impl<'a> Translator<'a> {
             if let Err(e) = self.call("variable_create", args) {
                 self.notes.push(format!("Variable Studio variable {name}: {e}"));
             }
+        }
+    }
+
+    /// Live's Variable Studios by element id (`variableStudios`: name, table, configuration and the studios each
+    /// references) and the Part Studio's own references (`variableStudioReferences`): ours referencing as live's do,
+    /// none inserted into all (c2-dm-vs: Derived's #h = #w * 2 from Dims, Cfg's #th from its input t at 7 mm).
+    fn variable_studios(&mut self, studios: &serde_json::Map<String, Value>, own: &Value) {
+        let mut ours: HashMap<String, String> = HashMap::new();
+        for (eid, s) in studios {
+            let Some(id) = self.call("variable_create_studio", json!({})).ok().and_then(|r| r["created"]["id"].as_str().map(str::to_string)) else {
+                self.notes.push(format!("Variable Studio {eid}: not created"));
+                continue;
+            };
+            for (tool, args) in [("variable_studio_settings", json!({ "tab": id, "insert_into_all": false })), ("variable_remove_studio", json!({ "studio": id }))] {
+                let _ = self.call(tool, args);
+            }
+            if let Some(name) = s["name"].as_str()
+                && let Err(e) = self.call("tab_rename", json!({ "tab": id, "name": name }))
+            {
+                self.notes.push(format!("Variable Studio {name}: {e}"));
+            }
+            for c in s["configuration"]["configurationParameters"].as_array().into_iter().flatten() {
+                let tab = self.tab.replace(id.clone());
+                self.config_input(c);
+                self.tab = tab;
+            }
+            ours.insert(eid.clone(), id);
+        }
+        let mut refs: Vec<(Option<String>, &Value)> = studios.iter().flat_map(|(eid, s)| s["references"]["references"].as_array().into_iter().flatten().map(|r| (ours.get(eid).cloned(), r))).collect();
+        refs.extend(own["references"].as_array().into_iter().flatten().map(|r| (self.tab.clone(), r)));
+        for (tab, r) in refs {
+            let Some(studio) = r["referenceElementId"].as_str().and_then(|e| ours.get(e)) else {
+                self.notes.push(format!("Variable Studio reference {}: not in this document", r["referenceElementId"]));
+                continue;
+            };
+            let mut args = json!({ "tab": tab, "studio": studio });
+            if r["entireVariableStudio"] == false {
+                args["variables"] = r["variableNames"].clone();
+            }
+            let config: serde_json::Map<String, Value> =
+                r["configurationIdToValue"].as_object().into_iter().flatten().filter_map(|(k, v)| Some((k.clone(), json!(v["configuredValue"].as_str().or(v["value"].as_str())?)))).collect();
+            if !config.is_empty() {
+                args["configuration"] = Value::Object(config);
+            }
+            if let Err(e) = self.call("variable_insert_studio", args) {
+                self.notes.push(format!("Variable Studio reference: {e}"));
+            }
+        }
+        // The variables once every reference is in, those using another studio's variables after it.
+        let mut rows: Vec<(String, Value)> = Vec::new();
+        for (eid, s) in studios {
+            let Some(id) = ours.get(eid) else { continue };
+            for v in s["variables"].as_array().into_iter().flatten().flat_map(|t| t["variables"].as_array().into_iter().flatten()) {
+                let (Some(name), Some(value)) = (v["name"].as_str(), v["expression"].as_str().or(v["value"].as_str())) else { continue };
+                let mut args = json!({ "tab": id, "name": name.trim_start_matches('#'), "value": value });
+                if let Some(kind) = v["type"].as_str() {
+                    args["kind"] = json!(kind);
+                }
+                rows.push((name.to_string(), args));
+            }
+        }
+        loop {
+            let before = rows.len();
+            let mut failed = Vec::new();
+            for (name, args) in std::mem::take(&mut rows) {
+                if let Err(e) = self.call("variable_create", args.clone()) {
+                    failed.push((name, args, e));
+                }
+            }
+            if failed.is_empty() || failed.len() == before {
+                for (name, _, e) in failed {
+                    self.notes.push(format!("Variable Studio variable {name}: {e}"));
+                }
+                break;
+            }
+            rows = failed.into_iter().map(|(n, a, _)| (n, a)).collect();
         }
     }
 
