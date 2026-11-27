@@ -10114,6 +10114,13 @@ static TopoDS_Shape without_strips(const TopoDS_Shape& s, HHist& hist)
 
 namespace
 {
+double face_area(const TopoDS_Shape& f)
+{
+  GProp_GProps p;
+  BRepGProp::SurfaceProperties(f, p);
+  return p.Mass();
+}
+
 // `x` with its cylinder faces going round the axis more than once (a thread's flat crest swept round it 7 times on the
 // exact cylinder, nuts Sweep 1) divided into pieces under a turn by lines along the axis, `hist` its history; `x`
 // itself (`hist` null) where it has none or the division fails. OCCT's Booleans lose same-domain parts of such a face
@@ -10201,10 +10208,20 @@ TopoDS_Shape divided_turns(const TopoDS_Shape& x, occ::handle<BRepTools_History>
       ++after;
     if (after != before + static_cast<int>(lines.size()) || !BRepCheck_Analyzer(out).IsValid())
       return x;
-    // (Precise integrals: OCCT's plain ones of the face going round 7 times were 1e-6 off.)
-    const GProp_GProps was = volume_props_precise(x), now = volume_props_precise(out);
-    if (std::abs(was.Mass() - now.Mass()) > 1e-9 * std::max(std::abs(was.Mass()), 1e-18))
-      return x;
+    // (Each divided face's pieces its area: the solid's volume, whose integrals over a thread take a second, can't
+    // change, only a piece go missing or be the wrong side of its lines.)
+    ShapeIMap divided;
+    for (const auto& [f, e] : lines)
+      divided.Add(f);
+    for (int i = 1; i <= divided.Extent(); ++i)
+    {
+      double sum = 0;
+      for (const TopoDS_Shape& p : split.Modified(divided(i)))
+        sum += face_area(p);
+      const double was = face_area(divided(i));
+      if (std::abs(sum - was) > 1e-4 * was)
+        return x;
+    }
     hist = new BRepTools_History();
     for (TopAbs_ShapeEnum k : {TopAbs_SOLID, TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
     {
@@ -10344,7 +10361,7 @@ struct TurnsDivided
 
   // `r` with the pieces of one divided face it has side by side one face again, the lines between them gone and the
   // pieces of one edge those leave one edge (nuts Sweep 1's thread root: live's one face, its flanks' edges one each).
-  // `r` itself where it has none or the joined part isn't valid with its volume.
+  // `r` itself where it has none or the joined part isn't valid with its faces' areas.
   OpOut rejoined(OpOut r) const
   {
     if (!r.shape || r.shape->shape.IsNull())
@@ -10553,10 +10570,19 @@ struct TurnsDivided
       const TopoDS_Shape out = rs.Apply(res.shape);
       if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
         return r;
-      const GProp_GProps was = volume_props_precise(res.shape), now = volume_props_precise(out);
-      // (The same surfaces and curves: only the integrals differ, over the face going round 6 times 2e-7 of the nut's.)
-      if (std::abs(was.Mass() - now.Mass()) > 1e-6 * std::max(std::abs(was.Mass()), 1e-18))
-        return r;
+      // (Each joined face its pieces' area, as divided_turns checks.)
+      for (const auto& [top, group] : groups)
+      {
+        const TopoDS_Shape* f = group.size() < 2 ? nullptr : joined.Seek(rf(group.front() + 1).Oriented(TopAbs_FORWARD));
+        if (f == nullptr)
+          continue;
+        double sum = 0;
+        for (int i : group)
+          sum += face_area(rf(i + 1));
+        const double now = face_area(*f);
+        if (std::abs(sum - now) > 1e-4 * sum)
+          return r;
+      }
       // The records onto the joined part: a piece's onto its face or edge, a line's and its ends' gone.
       OpOut                                     j{std::make_unique<OcShape>(out), {}};
       const occ::handle<BRepTools_History>      h = rs.History();

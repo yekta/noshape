@@ -12,6 +12,25 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
+## P0 BOOL-TURN-SPLIT-SLOWER (11-27; landing for the 17:00 cut)
+- Cause: 5e42155d5's divided_turns() and TurnsDivided::rejoined() each computed volume_props_precise twice on the
+  whole threaded solid (~0.5 s each, 4 per Boolean). Fix: face_area() checks on only the divided / joined faces
+  (pieces sum to the face, 1e-4 rel); face count + BRepCheck kept. The split must stay (off: standoffs Revolve 2
+  2 parts vs live 3, nuts Sweep 1 "non-manifold").
+- vibex8: standoffs 8417 -> 2180 ms, nuts 2151 -> 609 ms, helical 679 -> 253 ms; all still match (32/32, 17/17,
+  5/5). qa's 0.4.73 (vibex7): 1.6 / 0.7 / 0.2 s: standoffs may still be ~0.6 s over; compare on one host next.
+## GAMMA (next)
+- Worktree bool-uv (branch bool-gamma on origin/main bbb452fe6): probes probe_case_args/probe_case_topo (+PROBE_FUZZY) in
+  brep_replay.rs (never commit), lens change in drop_strip_faces (boolean.cpp: `lens` = face of 2 vertices, 2 edges
+  within 1e-5; lensv map shares joined vertices) + PROBE fprintf lines. Recording kept at vibex8
+  ~/agents/bool-keep/gam-rec/317bec683037fff1.*; script /root/bool-scratch/gamma-lens.sh, score gamma-score.py.
+- Findings: 2 extra faces = 5 um crescents (lens) where args 2/3's r=1 holes meet off-centre at x 114.18; dropping
+  one works (885 faces), dropping both -> BRepCheck invalid (suspect FixAddPCurve pcurve period on the 2nd cylinder:
+  find the check's error next). 5 of 7 unmatched = plates arg 5 (upper) / arg 10 (lower) overlap 50 um in z, front
+  faces + notch cylinders 2.5 um apart in y: live gives the band to arg 5 (lower arg index). Rib 243.6 mm2 pair
+  (0.0226 mm2): ours exactly input minus arg 3: not the Boolean. OCCT fuzzy 3e-6..1.1e-5: Boolean ok, unify segfaults.
+- Impeller early decline QUEUED 45eafc5f (ab9ee9b3f + handoff, reported 11:25).
+
 ## Order (lead 11-21)
 P0 impeller speed (c2-impeller-loft, blend measures per feature); P1 asm's SPEED-ASM-OPEN (infento). Gates + knurls
 for every brep / Boolean / Shell land; list the corpora each gate ran. End a turn after each land.
