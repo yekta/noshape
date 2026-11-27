@@ -788,6 +788,9 @@ impl SelectItemPanel {
                     }))
                     .into_any_element()
             });
+            if self.mode == PanelMode::Reference(ReferenceKind::Image) {
+                crate::ui_script::note_field(|| serde_json::json!({ "label": s.name, "kind": "boolean", "checked": current == s.tab, "child": false }));
+            }
             let mut r = row(SharedString::from(format!("sel-src-{}", s.tab)), 0., expander, &s.tab, icon, s.name.clone(), current == s.tab, cx);
             // Configured studios: "Set to last viewed configuration" ▾ on the row.
             if s.configuration.is_some() {
@@ -2463,6 +2466,24 @@ impl Render for SelectItemPanel {
                     serde_json::json!({ "title": null, "kind": "feature", "tabs": tabs, "fields": fields, "error": null, "ok": null, "titleState": "ok" })
                 });
             }
+        }
+        // The sketch's Insert an image as live's recorder reads it (sketch-image-place s3-6): a feature dialog, titled on
+        // Libraries; on a document, its search box and the image rows noted as they were built.
+        if let Some(title) = self.title.filter(|_| mode == PanelMode::Reference(ReferenceKind::Image)) {
+            let rows = crate::ui_script::take_fields();
+            let fields: Vec<serde_json::Value> = if in_libraries {
+                Vec::new()
+            } else {
+                std::iter::once(serde_json::json!({ "label": search_placeholder, "kind": "string", "text": self.search.read(cx).value().to_string() })).chain(rows).collect()
+            };
+            let libraries = self.libraries;
+            crate::ui_script::note_dialog(|| {
+                let mut tabs = vec![serde_json::json!({ "label": "Current document", "selected": !other && !in_libraries }), serde_json::json!({ "label": "Other documents", "selected": other && !in_libraries })];
+                if libraries {
+                    tabs.push(serde_json::json!({ "label": "Libraries", "selected": in_libraries }));
+                }
+                serde_json::json!({ "title": in_libraries.then_some(title), "kind": "feature", "tabs": tabs, "fields": fields, "error": null, "ok": null, "titleState": "ok" })
+            });
         }
         v_flex()
             .id("select-item-panel")

@@ -504,6 +504,11 @@ impl PartStudioView {
         [&ui.otf_input, &ui.offset_input].into_iter().flatten().map(|b| b.0.read(cx)).find(|s| s.focus_handle(cx).is_focused(window))
     }
 
+    /// The sketch's Insert an image picker is open (the one with a title of its own).
+    pub(super) fn image_picker_open(&self, cx: &App) -> bool {
+        self.ui_ref().and_then(|u| u.insert_panel.as_ref()).is_some_and(|(p, _)| p.read(cx).title.is_some())
+    }
+
     fn ui_ref(&self) -> Option<&SketchUi> {
         self.sketch.as_ref()?.ui.as_ref()?.downcast_ref::<SketchUi>()
     }
