@@ -5157,3 +5157,13 @@ skasm meanwhile; I'll list what I change here before landing.
   live 11-27 (live/core/body-draft-self-1127): Body draft with Draft on self: Faces scope -> ERROR
   BODY_DRAFT_INVALID_FACE_REFERENCE, Edges scope -> BODY_DRAFT_INVALID_EDGE_REFERENCE, part unchanged; with a parting
   plane both OK (8043.7443 mm3 on 40x20x10, pull Top, 5 deg, z5). An edge in Faces -> BODY_DRAFT_SELECT_FACES.
+
+- **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
+  to "blends touching removed blends" skips a LARGER cylinder met along a line (the round's support): 9cbb0e MF2 now
+  live's 44 faces, 109400.892 (live .89). (b) direct.rs tweak_planes_in_turn: planes facing several ways (all
+  neighbours planar) tweaked one way at a time; also the fallback in move_face's reblend closure when OCCT's offset is
+  invalid (tweak_planes composes histories with new kernel History::then): b58244 MF6 OK (was Error). (c) features.cpp
+  FaceTweak::prepare: a staying edge with a moving end on a TRIMMED unbounded/periodic curve (an earlier tweak's
+  edge) gets its basis curve back -> re-trimmed (box top then side: 1440 vs 1560 mm3 before). Tests: features_a
+  move_face_offset_rolls_a_round_again_on_the_arc_wall_it_runs_along (fails on old code), move_face_offset_of_floors_
+  facing_two_ways (guard only: synthetic OCCT offset stays valid), kernel offset::histories_followed_through_two_tweaks.

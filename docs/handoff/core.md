@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 08:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 09:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## P0s (lead 11-26; block v0.4.72)
@@ -46,8 +46,12 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   08:1x). FACE-PATTERN-BOSS-LIVE-FAILS (lead 08:4x: match live's error):
   pattern.rs copies_touch after a face pattern (copies vs the part's faces: no common vertex closer than 1e-7, or two
   common vertices, no edge, their midpoint on both); T1 features_a::a_face_pattern_whose_copy_touches_the_part_along_
-  a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh vibex8 (core-scratch/p0imp/ab13.out),
-  then land.
+  a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh ALL-SAME. QUEUED 0d26da5f 09:0x (with
+  the P0 fix 931a66b5's commits).
+- **KNIFEHANDLE -0.02 MM3: CHECKED 09:1x, no fix**: 664abc017 moves the blade's faces <= 0.013 mm2 from Move face 2 on
+  (Chamfer 1 318.598/318.920 -> 318.591/318.908); live is 0.2-7 mm2 away from both. Own gap to live starts at Split 1:
+  its two big faces 5150.53 x2 vs live 5157.15 / 5157.31 (Sweep 2 8368.73 vs .61; Fillet 2 236.45 x2 vs 239.93/241.98).
+  Probe: feature_rollback + query_entities on a corpus copy (vibex8 ~/tmp/core/ab/kh/r-{A,B,e}.jsonl).
 - **ZUM HALTER CORNER: PARKED (lead 11-27 07:4x; Error as in 0.4.72 and main): native-blend-faces candidate.** WIP
   core-scratch/imp/crease-turn-wip3.patch (notes core-scratch/imp/corner-notes.md; the full STATE text in the archive):
   crease junctions, both crease edges untrimmed, >= 32 stations at creases (0.06 um on the bevel), fuzzy Fuse retry
@@ -66,15 +70,6 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   part NAMES still differ from live (later).
 - **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity_impeller_loft_regenerates_in_time < 40 s).
 ## Now (11-25)
-- **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
-  to "blends touching removed blends" skips a LARGER cylinder met along a line (the round's support): 9cbb0e MF2 now
-  live's 44 faces, 109400.892 (live .89). (b) direct.rs tweak_planes_in_turn: planes facing several ways (all
-  neighbours planar) tweaked one way at a time; also the fallback in move_face's reblend closure when OCCT's offset is
-  invalid (tweak_planes composes histories with new kernel History::then): b58244 MF6 OK (was Error). (c) features.cpp
-  FaceTweak::prepare: a staying edge with a moving end on a TRIMMED unbounded/periodic curve (an earlier tweak's
-  edge) gets its basis curve back -> re-trimmed (box top then side: 1440 vs 1560 mm3 before). Tests: features_a
-  move_face_offset_rolls_a_round_again_on_the_arc_wall_it_runs_along (fails on old code), move_face_offset_of_floors_
-  facing_two_ways (guard only: synthetic OCCT offset stays valid), kernel offset::histories_followed_through_two_tweaks.
 - **Fresh scissor run 15:3x** (.pa2.sh compares d-prev = 14:37 with d-now): only change b58244 MF6 fixed; NO new rows,
   so the downstream rows are real (the import matches refs against our build). Tab ids now: 404ddb 544d4be22b1974ab,
   9cbb0e ba43fd52006aef05, b58244 ef415f8715d2b8a5, 2d82a0 0e42b5e59678dc59, 92138f c945c4d3bdad506d, b7e381
