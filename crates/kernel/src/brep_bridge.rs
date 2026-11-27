@@ -33,7 +33,8 @@ pub fn last_ahead() -> usize {
 }
 
 /// Turns noshape's own sections of free-form faces (`march::own`'s pairs) on or off for this thread's Booleans
-/// (`None`: as NOSHAPE_BOOL_MARCH says, on unless 0); off, OCCT's are taken for every pair.
+/// (`None`: as NOSHAPE_BOOL_MARCH says, off unless 1: its sections made c2-valve-config's Booleans and unifies slower,
+/// 0.75 -> 1.20 s); off, OCCT's are taken for every pair.
 pub fn set_boolean_march(on: Option<bool>) {
     MARCH.with(|m| m.set(on));
 }
@@ -377,7 +378,7 @@ fn occt_sections(a: (u32, u32), b: (u32, u32), ends: &[f64]) -> Result<Vec<Secti
 }
 
 /// Free-form faces' sections from OCCT (rust_boolean.cpp keeps its curves for building the result's edges), or for
-/// the pairs `march::own` takes, noshape's own (kept there as OCCT's are) unless NOSHAPE_BOOL_MARCH=0.
+/// the pairs `march::own` takes, noshape's own (kept there as OCCT's are) when marching ([`marching`]).
 struct Occt<'a> {
     args: &'a [&'a Body],
     /// Whether to march ([`marching`] on the Boolean's thread).
@@ -389,7 +390,7 @@ struct Occt<'a> {
 
 fn marching() -> bool {
     static ENV: OnceLock<bool> = OnceLock::new();
-    MARCH.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_MARCH").as_deref() != Ok("0")))
+    MARCH.with(|m| m.get()).unwrap_or_else(|| *ENV.get_or_init(|| std::env::var("NOSHAPE_BOOL_MARCH").as_deref() == Ok("1")))
 }
 
 /// The pair (`a`, `b`) with the earlier argument's face first, and whether that swapped them.
