@@ -2488,10 +2488,65 @@ TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
   return unify_in(s0, hist, nullptr, nullptr);
 }
 
+// The unify with edges joined at none of `keep`.
+static TopoDS_Shape unify_keeping(const TopoDS_Shape& s0, HHist& h, const UnifyScope* sc, bool* clean, const ShapeIMap& keep)
+{
+  const ShapeIMap* was = t_unify_keep;
+  t_unify_keep         = &keep;
+  try
+  {
+    TopoDS_Shape r = unify_in(s0, h, sc, clean);
+    t_unify_keep   = was;
+    return r;
+  }
+  catch (...)
+  {
+    t_unify_keep = was;
+    throw;
+  }
+}
+
 // (c2-parting-line-draft-parting-line's Rib 1: BOTTOM's side wall edge, in two at its own vertex far from the ribs,
 // stays two as live's; the rib's corner on the base, the Boolean's, goes.)
 TopoDS_Shape unify_keeping_inputs(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean, const ShapeIMap* inputs)
 {
+  // An input vertex the unify joins edges at without freeing it has two edges: those kept from the start, one unify
+  // (c2-gamma-imported's second whole unify, 0.7 s), unless the unify frees one of them (then the two below).
+  if (inputs != nullptr && !inputs->IsEmpty())
+  {
+    ShapeAncMap ve;
+    TopExp::MapShapesAndUniqueAncestors(s0, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    ShapeIMap two;
+    for (int i = 1; i <= ve.Extent(); ++i)
+      if (ve(i).Extent() == 2 && inputs->Contains(ve.FindKey(i)))
+        two.Add(ve.FindKey(i));
+    if (!two.IsEmpty())
+    {
+      HHist              h;
+      bool               c = false;
+      const TopoDS_Shape r = unify_keeping(s0, h, sc, clean != nullptr ? &c : nullptr, two);
+      // (One freed between its two faces merged is gone with its edges: none to join there either.)
+      ShapeIMap now;
+      TopExp::MapShapes(r, TopAbs_VERTEX, now);
+      bool freed = false;
+      for (int i = 1; i <= two.Extent() && !freed && !h.IsNull(); ++i)
+        if (now.Contains(two(i)))
+          for (const TopoDS_Shape& e : ve.FindFromKey(two(i)))
+            freed = freed || h->IsRemoved(e);
+      if (!freed)
+      {
+        if (!h.IsNull())
+        {
+          if (hist.IsNull())
+            hist = new BRepTools_History();
+          hist->Merge(h);
+        }
+        if (clean != nullptr)
+          *clean = c;
+        return r;
+      }
+    }
+  }
   HHist        h;
   bool         c = false;
   TopoDS_Shape r = unify_in(s0, h, sc, clean != nullptr ? &c : nullptr);
@@ -2516,19 +2571,8 @@ TopoDS_Shape unify_keeping_inputs(const TopoDS_Shape& s0, HHist& hist, const Uni
     }
     if (!keep.IsEmpty())
     {
-      const ShapeIMap* was = t_unify_keep;
-      t_unify_keep         = &keep;
-      try
-      {
-        h = HHist();
-        r = unify_in(s0, h, sc, clean != nullptr ? &c : nullptr);
-      }
-      catch (...)
-      {
-        t_unify_keep = was;
-        throw;
-      }
-      t_unify_keep = was;
+      h = HHist();
+      r = unify_keeping(s0, h, sc, clean != nullptr ? &c : nullptr, keep);
     }
   }
   if (!h.IsNull())
@@ -3996,7 +4040,7 @@ bool valid_whole(const TopoDS_Shape& s)
 
 // Whether `s`, `s0` with faces replaced, is valid: its faces not in `s0` (valid_whole's check of them), then its shells
 // (the whole part's check was 100 ms of c2-wire-clip-imported's unify, twice).
-bool valid_changed(const TopoDS_Shape& s0, const TopoDS_Shape& s)
+bool changed_faces_valid(const TopoDS_Shape& s0, const TopoDS_Shape& s)
 {
   ShapeIMap before;
   TopExp::MapShapes(s0, TopAbs_FACE, before);
@@ -4899,7 +4943,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
   const TopoDS_Shape fast = merge_cylinder_groups_with(s0, h, any_frame, false, &copied);
   if (fast.IsSame(s0))
     return s0;
-  if (valid_changed(copied, fast))
+  if (changed_faces_valid(copied, fast))
   {
     if (hist.IsNull())
       hist = h;
@@ -9955,7 +9999,7 @@ static TopoDS_Shape collapse_short_edges(const TopoDS_Shape& out, HHist& hist, c
   if (collapsed == 0)
     return out;
   const TopoDS_Shape out2 = r2->Apply(out);
-  if (out2.IsNull() || !BRepCheck_Analyzer(out2).IsValid())
+  if (out2.IsNull() || !changed_faces_valid(out, out2))
     return out;
   hist->Merge(r2->History());
   return out2;
@@ -10073,7 +10117,7 @@ static TopoDS_Shape without_slits(const TopoDS_Shape& s, HHist& hist)
     ++n0;
   for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
     ++n1;
-  if (out.IsNull() || n1 == 0 || n1 > n0 || !BRepCheck_Analyzer(out).IsValid())
+  if (out.IsNull() || n1 == 0 || n1 > n0 || !changed_faces_valid(s, out))
     return s;
   if (hist.IsNull())
     hist = new BRepTools_History();
