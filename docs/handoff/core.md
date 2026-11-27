@@ -6,11 +6,15 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
 - Suite 1126-2043 (190bd1b8; report vibex8 ~/tmp/qa/report.json, snapshot ~/tmp/qa/models-1126-2043-190bd1b8/<doc>/;
   copy core-scratch/suite/). blend parked: blend_direct.cpp is core's for now (note added to blend.md, acbf4dcd5).
-  1 c2-opt-pattern-skip-centred Circular pattern 1 (PART, NEW, 60 deg x 5, isCentered, skipInstances [index 1]):
-    Part 16 centroid y 10.5, live 19.5 (STARTED: params read; next: run it, check pattern.rs centred+skip indexing).
-  2 c2-opt-fillet-partial-asym-smooth Fillet 2: edges 20 line/2 other vs 18/4, -0.17 mm3.
-  3 c2-body-draft-naming Fillet 1: edges 19 line/2 other vs 15/6 (SUITE-NEW-INDEX-1120-CORE).
-  3b c2-dm-vs Extrude 1 ERROR "Variable not found..." (depth #h from a Variable Studio reference; live OK, 4 parts).
+  1 DONE 535270a6a (local): evAxis of a cylinder face follows the face's sense (eval.rs faces_axis; live cpax-1121);
+    doc 13/13; T1 features_a::a_circular_pattern_about_a_hole_turns_as_live. Corpus A/B .ab16.sh (cli-cpA/B in p0).
+  2 c2-opt-fillet-partial-asym-smooth: live's asym fillet is a B-spline fit of the ellipse (ends 7.269042/7.268265,
+    exact 7.266336; -0.168 mm3): LIVE_SCATTER + LIVE_LINES_AS_OTHER in ops/tests/parity.rs (uncommitted), no code fix.
+  3 c2-body-draft-naming: Fillet 1 = lines-as-OTHER only (curvature fillet, volume equal). Fillet 2 (curvature 9 mm,
+    chain JRl + Fillet 1's end curve JRJ + JRd): ours -6.46 mm3, area -1.6 = Fill 1's corner patch (120.35 vs 121.95):
+    the piece over JRJ differs. .bdn.sh saves ours (~/tmp/core/bdn/save, q-Fillet 2.jsonl faces).
+  3b c2-dm-vs: translator only (fetch's variableStudios / variableStudioReferences unread); ops parity.rs
+    variable_studios() + T1 parity::referenced_variable_studios_are_rebuilt (uncommitted, untested yet).
   4 c2-curve-pattern-composite Fillet 2: 28/58/32 vs live 26/52/28. 5 c2-impeller-loft Fillet 3: edges 93 vs 95.
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
