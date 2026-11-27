@@ -1,21 +1,10 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 09:10 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 10:50 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
-- **SCISSOR FILLETS + MOVE FACE 1 (QUEUED ec47e4e4 22:46; corpus A/B .ab7.sh: only impeller "Fillet Stevenrohr zum
-  Halter" Error both, message Adjoining edge -> Failed to fillet; T1 ok)**: detail.rs
-  TangentLinks: leaving directions (tangent_at + a step's sign) and sliver() (a fold between a convex and a concave edge
-  of one face) cut, cut_slivers flag; fillet_in's work list: where the cut chain fails, the part again uncut (bdddaf
-  F5, fed22d F2 back; F4/F25, 9cbb0e F18 kept: rg6.out). Every cut fold is a real sliver (rg5 probe: midpoint on the
-  face, other faces tangent) so no geometric rule separates them. features/cusp_blend.rs cusp_wall_round = F18.
-  direct.rs move_face: booleans not tried again after OCCT's offset fails where they failed first (impeller MF1
-  ~310 ms). Then: scissor parity rerun (.pa2.sh vs d-base), Fillet 19/23, MF7, Chamfer 11.
-- **SCISSOR FILLETS FIX-FORWARD: QUEUED dc73ccf7** (ec47e4e4 FAILED: kernel_robustness::a_concave_arcs_round_stops_at_
-  the_convex_rounds_and_runs_them_on; fixed by 6ce108cc4: the short-chain check runs on over folds; model tests 654 ok,
-  scissor F5/F2/F4/F25/F18 still Ok).
 - **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
   split_pieces_along_a_bore; corpus A/B .ab8.sh ALL-SAME; model tests 655 ok, clippy clean). Note for bool: MF3 406 ms =
   one boolean on the threaded body.
@@ -48,23 +37,36 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   common vertices, no edge, their midpoint on both); T1 features_a::a_face_pattern_whose_copy_touches_the_part_along_
   a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh ALL-SAME. QUEUED 0d26da5f 09:0x (with
   the P0 fix 931a66b5's commits).
-- **KNIFEHANDLE -0.02 MM3: CHECKED 09:1x, no fix**: 664abc017 moves the blade's faces <= 0.013 mm2 from Move face 2 on
-  (Chamfer 1 318.598/318.920 -> 318.591/318.908); live is 0.2-7 mm2 away from both. Own gap to live starts at Split 1:
-  its two big faces 5150.53 x2 vs live 5157.15 / 5157.31 (Sweep 2 8368.73 vs .61; Fillet 2 236.45 x2 vs 239.93/241.98).
-  Probe: feature_rollback + query_entities on a corpus copy (vibex8 ~/tmp/core/ab/kh/r-{A,B,e}.jsonl).
+- **KNIFEHANDLE SPLIT 1 -> CHAMFER 1 (lead 09:1x, half a day): IN FLIGHT, worktree core-uip3 (uncommitted).**
+  Split 1 is NOT ours: an exact integral of the sketch Beziers (core-scratch/kh/area.py) gives the kept flank 5150.5325
+  mm2 = ours 5150.533; our cut is 0.003 mm from live's edge; live's 5157.15/.31 is live's own area figure (its MF2 rebuilds
+  the face: 5150.3594 = ours). Sweep 2 / Extrude 1 / Fillet 3 / MF1 / MF2 = live within 0.1 mm2. First real difference:
+  Chamfer 1 (section blend) run-on at the blade's tip: straight past the end, it met Fillet 3's round 0.36 mm short (tip
+  round 2.045 vs live 1.847, ridge 247.94 vs 248.32). FIX blend_section.rs: a chamfer's run-on bends with its edge's end
+  turn (3 sections along the parabola; straight edges unchanged) -> 1.877 / 248.26; chamfer sections 24 -> 48 (24 left
+  the mirrored bevels 319.00 / 319.48, live 319.34 / 319.36; 48: 319.27 / 319.30). T1 features_c::an_offset_angle_chamfer
+  _of_a_blades_bottom_edges_as_live tightened (tip, bevels; volume band 1.5: our MF2 input is 0.57 mm3 under live's).
+  A/B .ab14 (chamfer only): knifehandle Fillet 2 Ok -> Error (hunting-knife +0.01 mm3 only); model 663 ok. Fillet 2's
+  tip run-on then failed twice: (1) build.cpp reface_on re-projected the bevel's edges onto its extended surface, the
+  ridge 8 um off, wire self-intersecting -> FIX: keep an edge's own pcurve where the extended surface passes through the
+  old one's points (holds()); (2) blend_direct.cpp lies_on: the tip-round ball tool's side is 1.4 um off the tip's round
+  but 0.04 rad in normal (limit 0.02) -> "a tool's side off a face of its edge" -> FIX limit 0.05 rad (blend's file:
+  tell the lead). Then Fillet 2 = 11 faces, tip 0.619/0.62/0.634 (live 0.595/0.595/0.653; old 0.653/0.653/0.737),
+  bevels 319.07/319.10 (live 319.07/319.17). T1 chamfer test extended with Fillet 2 (11/27/18, tip faces vs live).
+  Corpus A/B .ab15 (10:4x): only knifehandle (11/27/18 both, 10391.79 -> 10391.65) and hunting-knife (+0.01 mm3);
+  model 663 ok, kernel 620 ok. COMMITTED 21f359d02 (full round 784ca93c0), LANDING 10:5x.
+- **UIPDEP3 RERUN 09:4x (vibex8 ~/tmp/core/uip)**: mistake-rib-flipped-misses + mistake-linear-pattern-face-boss MATCH.
+  fillet-full-round-ok: live marks the first EMPTY selection field error (side1Face, side2Face, centerFaces in turn);
+  FIXED uncommitted detail.rs full_round err_at(first empty) + T1 features_c::a_full_round_names_its_first_empty_selection
+  (passes; 4 full-round tests ok). sweep-thin-edge-no-trim-ok: final state matches; live's Sweep 1 is "error" with Trim
+  ends ON (ours Ok + warning): qa 10:1x VERIFIED both fixes, Trim-ends-on kept under the parity rule (nothing to do). Live also
+  focuses "Faces and sketch regions to sweep" after the Thin tab click (ours none): psui's dialog focus, tell the lead.
 - **ZUM HALTER CORNER: PARKED (lead 11-27 07:4x; Error as in 0.4.72 and main): native-blend-faces candidate.** WIP
   core-scratch/imp/crease-turn-wip3.patch (notes core-scratch/imp/corner-notes.md; the full STATE text in the archive):
   crease junctions, both crease edges untrimmed, >= 32 stations at creases (0.06 um on the bevel), fuzzy Fuse retry
   (unsafe alone: fuzzy fuses returned valid shapes that lost the body). The crease TURNS break every Boolean.
-- **QA 11-27 uipdep3 rows (TICKETS 118cba619), worktree core-uip3: QUEUED 8cec2b63 08:0x**: FULL-ROUND-SPLITS-PART
-  (detail.rs full_round: the tool's top half way to where the sides meet when sooner than r; the ridge's slopes cross
-  1.4 mm over its top, r 13.4: a bowtie section, 3 parts) and SWEEP-THIN-EDGE-NO-TRIM (thin.rs line_frame: a part's
-  straight edge wall in the plane square to the path; has_planeless_part_wall -> sweep.fs's warning "Failed to find
-  planes to trim to..." with Trim ends, the wall swept untrimmed). Tests features_c::a_full_round_on_a_ridge_.. and
-  a_thin_sweep_of_an_edge_along_an_edge_square_to_it (either side: REQUESTS core 11-27 07:59 asks live which side).
-  Live's Sweep 1 "error" with Trim ends is most likely the recorder's warning (no "warning" state in 122k recorded).
-  Left: P3 RIB-FLIPPED-MESSAGE, P3 FACE-PATTERN-BOSS-LIVE-FAILS (check only). Rerun tools/ui-parity/run.py
-  fillet-full-round-ok sweep-thin-edge-no-trim-ok mistake-rib-flipped-misses mistake-linear-pattern-face-boss.
+- **QA 11-27 uipdep3 rows: FULL-ROUND-SPLITS-PART 310cb8cb7 + SWEEP-THIN-EDGE-NO-TRIM f44aeb23f VERIFIED by qa on green
+  8cec2b630 (TICKETS d9d4673a0).** Left: nothing (RIB-FLIPPED-MESSAGE and FACE-PATTERN-BOSS queued above).
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).

@@ -5167,3 +5167,16 @@ skasm meanwhile; I'll list what I change here before landing.
   edge) gets its basis curve back -> re-trimmed (box top then side: 1440 vs 1560 mm3 before). Tests: features_a
   move_face_offset_rolls_a_round_again_on_the_arc_wall_it_runs_along (fails on old code), move_face_offset_of_floors_
   facing_two_ways (guard only: synthetic OCCT offset stays valid), kernel offset::histories_followed_through_two_tweaks.
+
+- **SCISSOR FILLETS + MOVE FACE 1 (QUEUED ec47e4e4 22:46; corpus A/B .ab7.sh: only impeller "Fillet Stevenrohr zum
+  Halter" Error both, message Adjoining edge -> Failed to fillet; T1 ok)**: detail.rs
+  TangentLinks: leaving directions (tangent_at + a step's sign) and sliver() (a fold between a convex and a concave edge
+  of one face) cut, cut_slivers flag; fillet_in's work list: where the cut chain fails, the part again uncut (bdddaf
+  F5, fed22d F2 back; F4/F25, 9cbb0e F18 kept: rg6.out). Every cut fold is a real sliver (rg5 probe: midpoint on the
+  face, other faces tangent) so no geometric rule separates them. features/cusp_blend.rs cusp_wall_round = F18.
+  direct.rs move_face: booleans not tried again after OCCT's offset fails where they failed first (impeller MF1
+  ~310 ms). Then: scissor parity rerun (.pa2.sh vs d-base), Fillet 19/23, MF7, Chamfer 11.
+
+- **SCISSOR FILLETS FIX-FORWARD: QUEUED dc73ccf7** (ec47e4e4 FAILED: kernel_robustness::a_concave_arcs_round_stops_at_
+  the_convex_rounds_and_runs_them_on; fixed by 6ce108cc4: the short-chain check runs on over folds; model tests 654 ok,
+  scissor F5/F2/F4/F25/F18 still Ok).
