@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 10:56 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 13:06 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
@@ -9,29 +9,25 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   1 QUEUED 76bdd135: evAxis of a cylinder face follows the face's sense (eval.rs faces_axis; live cpax-1121); corpus
     ALL-SAME, model 664/0. 2 QUEUED fefa2000: harness (LIVE_SCATTER + LIVE_LINES_AS_OTHER; live's asym fillet is a
     B-spline fit). 3b QUEUED 49995530: parity translator reads variableStudios (3 passes; vars retried). Lead told.
-  3 IN FLIGHT c2-body-draft-naming (UNCOMMITTED in core-uip3: features.cpp, kernel tests/surfacing.rs, ops tests/parity.rs):
-    (a) parity.rs LIVE_LINES_AS_OTHER row Part 2 from Fillet 1 (curvature fillet's 4 straight edges OTHER).
-    (b) Fillet 2's corner = fill_pinched_corner's G2 fill (live's Fill 1 of the same 3 edges = JSi exactly, 121.9466):
-    ours fell back to G1 (G2 went to OCCT's plate, which declines) = 120.3469, vol -6.46. FIX: fair_g1_fill(..., curvature)
-    solves G2 too (after the G1 pass, 3 passes of N.S_dd = k_support |S_d|^2, wg2 1e3); op_fill sends orders 0..2 to it.
-    Result 121.2141 mm2, vol 38236.654 (live 38239.534): half the gap; NOT a match. Spans/outside-weight sweeps jump
-    (spans 7/8/9/10 out 1: 121.37/121.944/~/122.66) = tuning, rejected; Parasolid's fill-hole surface is the rest (park).
-    Only other corpus G2 fill (c2-surf-intro-fill Fill 1) doesn't take this path (unchanged). T1 kernel
-    surfacing::a_g2_fill_of_a_hole_in_a_sphere_follows_the_sphere (G2 < 0.002 r off the sphere, G1 > 5x that).
-    RUNNING 12:0x: .ab17.sh on vibex7 (kernel test, doc, corpus A/B userdocs A=G2 off via sed, kernel+model tests) ->
-    /root/core-scratch/ab17.out. FIRST: the sphere T1 FAILS (fair path returned nullopt -> MakeFilling 'continuity is not G0
-    G1 or G2'): find why the fair fill declines on the sphere hole (pole? tangency check?), fix, rerun. If ALL-SAME but body-draft (and tests ok): commit "core: a G2 fill matches its supports'
-    curvature across each edge (...)", g++-13 check, land, report (half the gap; rest parked: live's fill-hole surface).
-  4 c2-curve-pattern-composite Fillet 2 (R10 on JIa/JIW/JHS edges; 28/58/32 vs live 26/52/28): our rolling balls'
-    direct build declines ("a blend piece with no point inside", blend 2 of tool 2: 3 curves, 7 pieces) -> OCCT fillet
-    leaves 2 extra bspline 64.39 mm2 patches where the ball along the slanted face x R20 cylinder (Fillet 1) meets the
-    bottom/top plane at y=20 (cylinder tangent to plane there); live: JJi OTHER 326.6444 + JJ6 cyl 1220.5154 (ours
-    335.766 + 1144.84). Tiny cut (-216.769,20,0)->(-216.626,20.308,0) on the planes (0.043 mm2 piece) = tool 1's side off
-    the cylinder by 2.66e-3 mm. Debug: vibex7 ~/tmp/core/bdn/cpc (q.jsonl; NOSHAPE_BLEND_DIRECT_DEBUG=1 NOSHAPE_BLEND_DEBUG=1
-    ../cli batch q.jsonl). Next: why blend 2's piece has no inside point (blend_direct.cpp 1854).
-  5 c2-impeller-loft Fillet 3: edges 93 vs 95.
-    part/face." (Trim to face boundaries, tool partly across); keep ours if valid + what was asked ("ours does the work"),
-    live's error only for non-manifold or a slit. Lead FYI: check qa's ~13:xx verdict clears impeller "Select a sketch plane.".
+  3 QUEUED 65e8a5e8 13:0x (commit 30439ec5e): G2 fill = fair_g1_fill(..., curvature) (after the G1 pass, 3 passes of
+    N.S_dd = k_support |S_d|^2, wg2 1e3; op_fill sends orders 0..2) + rebuilt edges matched by curve (edges whose ends
+    aren't shared: ConnectEdgesToWires copies them). body-draft Fill 1 120.35 -> 121.21 (live 121.95), vol 38233.07 ->
+    38236.65 (live 38239.53): half the gap, rest PARKED (Parasolid's fill-hole surface; spans sweeps = tuning, rejected).
+    Fillet 1 row LIVE_LINES_AS_OTHER. bridging Boundary surface 1 Warning -> Ok, 20866 -> 17289 mm2 (live 17559, row
+    open). Corpus A/B: only bridging; kernel 621 ok, model 664 ok, g++-13 ok. T1 surfacing::a_g2_fill_of_a_hole_in_a_
+    sphere_follows_the_sphere (G2 0.3 um off at r 10 mm, G1 3x). LEAD NOT YET TOLD (lead at 215k at 13:04): report.
+  4 IN FLIGHT c2-curve-pattern-composite Fillet 2 (R10; 28/58/32 vs live 26/52/28, vol +10.3 mm3; live JJi OTHER
+    326.6444 + JJ6 cyl 1220.5154). UNCOMMITTED blend_direct.cpp (patch also /root/core-scratch/cpc-sliver.patch): a piece
+    with no inside point narrower than sew_tol (2 area < sew_tol x boundary) is dropped (were two 0.87 um cuts along one
+    curve). The direct build then fails "an invalid solid": the R20 cylinder piece's wire self-intersects (uv u runs to
+    1.586 > pi/2: the R10 ball's contact crosses the cylinder/plane tangent line at y=20 onto the bottom/top plane,
+    2.66e-3 mm) + BadOrientationOfSubshape. Next: make the contact curve stop at / switch at the tangent line (cut on the
+    cylinder must end at u = pi/2, the rest on the plane). Debug: vibex7 ~/tmp/core/bdn/cpc (.cpc.sh: parity + q.err,
+    NOSHAPE_BLEND_DIRECT_DEBUG=1).
+  5 c2-impeller-loft Fillet 3: edges 93 vs 95; "Adjoining edge not filleted." on Fillet Stevenrohr zum Halter.
+  6 psui SPLIT-TRIMMED-PARTIAL-ERRORS (live "Tool entity cannot split the selected part/face." with Trim to face
+    boundaries, tool partly across); keep ours if valid + what was asked ("ours does the work"), live's error only for
+    non-manifold or a slit. Lead FYI: check qa's ~13:xx verdict clears impeller "Select a sketch plane." (69eae144).
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
