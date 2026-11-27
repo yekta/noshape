@@ -23,7 +23,12 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
 - 22:20 LANDING 6efdffdcaf (= 394c39327e on the P0 fixes): gate clean (replay +0 -0, suite 138->138 with gamma and
   wire-clip Boolean 2 886 -> 884 faces as live, shells 6=6, crates pass), knurls 5/5 0 diff-lines, GCC 13 ok.
 - DECLINES (lead 21:40, while gates run): 42 open P2 BOOL-DECLINE tickets rechecked on 0.4.73 (unit bool-nfrecheck,
-  /root/bool-scratch/nf: own copies of qa's nfrecheck.py / clifuzz_nf.py, NSCLI=cli-0473 -> nfrecheck-0473.out).
+  /root/bool-scratch/nf: own copies of qa's nfrecheck.py / clifuzz_nf.py, NSCLI=cli-0473 -> nfrecheck-0473.out):
+  16 GONE, 21 OTHER-OP (replay takes another path), 4 STILL: cones meeting at an apex (1846/23 shell), an internal
+  face (1247/10 draft), no point inside a face piece (1234/79), no clean ray (1256/53). Fallback on (fon.sh): same
+  state, OCCT gives Ok (1846, 1247): users unaffected, only coverage. Declined cases aren't recorded (decline() throws
+  before the recorder): probe NOSHAPE_PROBE_DECLINE_DUMP in to_body (uncommitted, bool-fb) -> CLI vibex8
+  ~/tmp/bool/cmp/cli-nf; NEXT: dump 1247's input, see where the INTERNAL face comes from (draft).
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
   uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
   dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
