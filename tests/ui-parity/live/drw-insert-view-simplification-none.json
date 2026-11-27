@@ -1,6 +1,6 @@
 {
  "scenario": "drw-insert-view-simplification-none",
- "recorded": "2026-11-27T06:55:11.792Z",
+ "recorded": "2026-11-27T16:54:54.836Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -12,12 +12,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "42a62da113dea6e0c3bb2456",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "7749a77d6c7dd29c36d19141",
   "start": "block-drawing-empty",
-  "startElement": "d0643b8ab31b96fd21acb45e",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 2",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -56,16 +56,16 @@
    "selection": [],
    "viewport": {
     "sheet_px": [
-     623,
+     432,
      110,
-     1716,
+     1526,
      955
     ],
     "sheet_mm": [
      279.4,
      215.9
     ],
-    "mmPerPixel": 0.25563
+    "mmPerPixel": 0.25539
    }
   }
  },
@@ -79,12 +79,12 @@
     }
    },
    "ok": true,
-   "ti": 136732,
-   "tmove": 136968,
+   "ti": 140042,
+   "tmove": 140339,
    "moves": 1,
-   "tdown": 137315,
+   "tdown": 140681,
    "at": [
-    568,
+    187,
     59
    ],
    "state": {
@@ -156,7 +156,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -167,21 +167,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 163032,
-   "te": 163032
+   "t": 166327,
+   "te": 166327
   },
   {
    "step": 2,
@@ -192,12 +192,12 @@
     }
    },
    "ok": true,
-   "ti": 163032,
-   "tmove": 163347,
+   "ti": 166328,
+   "tmove": 166568,
    "moves": 1,
-   "tdown": 163653,
+   "tdown": 166879,
    "at": [
-    544,
+    163,
     121
    ],
    "state": {
@@ -261,7 +261,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -288,7 +288,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -299,21 +299,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       282,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.2246
      }
     }
    },
-   "t": 190425,
-   "te": 190425
+   "t": 193625,
+   "te": 193625
   },
   {
    "step": 3,
@@ -324,13 +324,13 @@
     }
    },
    "ok": true,
-   "ti": 190425,
+   "ti": 193626,
    "via": "live's row for the start's Part Studio: \"start block Copy 2\" (the start is a copy)",
-   "tmove": 190774,
+   "tmove": 193901,
    "moves": 1,
-   "tdown": 191237,
+   "tdown": 194322,
    "at": [
-    823,
+    442,
     463
    ],
    "state": {
@@ -388,7 +388,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -415,7 +415,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -426,21 +426,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       282,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.2246
      }
     }
    },
-   "t": 217795,
-   "te": 217795
+   "t": 221219,
+   "te": 221219
   },
   {
    "step": 4,
@@ -451,12 +451,12 @@
     }
    },
    "ok": true,
-   "ti": 217795,
-   "tmove": 218064,
+   "ti": 221219,
+   "tmove": 221468,
    "moves": 1,
-   "tdown": 218508,
+   "tdown": 221865,
    "at": [
-    869,
+    488,
     463
    ],
    "state": {
@@ -534,7 +534,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -545,21 +545,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 245660,
-   "te": 245660
+   "t": 247196,
+   "te": 247196
   },
   {
    "step": 5,
@@ -569,7 +569,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 245660,
+   "ti": 247196,
    "state": {
     "focus": {
      "kind": "other",
@@ -645,7 +645,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -656,21 +656,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 272211,
-   "te": 272211
+   "t": 272766,
+   "te": 272766
   },
   {
    "step": 6,
@@ -682,11 +682,11 @@
     }
    },
    "ok": true,
-   "ti": 272211,
-   "tmove": 272337,
+   "ti": 272766,
+   "tmove": 272848,
    "moves": 1,
    "at": [
-    599,
+    218,
     205
    ],
    "via": "native select in the drawing: option picked by its label",
@@ -765,7 +765,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -776,21 +776,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 287635,
-   "te": 287635
+   "t": 287595,
+   "te": 287595
   },
   {
    "step": 7,
@@ -800,7 +800,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 287635,
+   "ti": 287595,
    "state": {
     "focus": {
      "kind": "other",
@@ -876,7 +876,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -887,21 +887,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 314541,
-   "te": 314541
+   "t": 313573,
+   "te": 313573
   },
   {
    "step": 8,
@@ -915,13 +915,13 @@
     }
    },
    "ok": true,
-   "ti": 314541,
-   "tmove": 316410,
+   "ti": 313573,
+   "tmove": 315494,
    "moves": 1,
-   "tdown": 316751,
+   "tdown": 315853,
    "at": [
-    975,
-    524
+    784,
+    525
    ],
    "state": {
     "focus": {
@@ -949,7 +949,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -960,7 +960,7 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -977,21 +977,21 @@
      ],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 344593,
-   "te": 344593
+   "t": 343644,
+   "te": 343645
   },
   {
    "step": 9,
@@ -1001,7 +1001,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 344593,
+   "ti": 343645,
    "state": {
     "focus": {
      "kind": "other",
@@ -1028,7 +1028,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1039,7 +1039,7 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -1056,21 +1056,21 @@
      ],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 372489,
-   "te": 372489
+   "t": 371994,
+   "te": 371994
   },
   {
    "step": 10,
@@ -1079,16 +1079,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 372489,
+   "ti": 371995,
    "pointer": {
     "at": [
-     868,
+     487,
      462
     ],
     "hover": [],
     "element": "iframe.foreign-data-container"
    },
-   "tdown": 372497,
+   "tdown": 372017,
    "state": {
     "focus": {
      "kind": "other",
@@ -1115,7 +1115,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1126,7 +1126,7 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -1138,21 +1138,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 399887,
-   "te": 399887
+   "t": 401337,
+   "te": 401337
   },
   {
    "step": 11,
@@ -1162,7 +1162,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 399887,
+   "ti": 401338,
    "state": {
     "focus": {
      "kind": "other",
@@ -1189,7 +1189,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1200,7 +1200,7 @@
        "name": "Front",
        "kind": "base",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -1212,22 +1212,22 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 427829,
-   "te": 427829
+   "t": 429948,
+   "te": 429948
   }
  ],
- "t0_epoch_ms": 1795762387994
+ "t0_epoch_ms": 1795798368109
 }

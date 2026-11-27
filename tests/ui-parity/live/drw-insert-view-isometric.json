@@ -1,6 +1,6 @@
 {
  "scenario": "drw-insert-view-isometric",
- "recorded": "2026-11-27T06:34:52.613Z",
+ "recorded": "2026-11-27T16:39:38.424Z",
  "app": {
   "name": "live",
   "version": "web runtime 0adacf98979b8345c542",
@@ -12,12 +12,12 @@
   "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
  },
  "live": {
-  "document": "060c0461ca301a2c112f155e",
-  "workspace": "96663039d748842f7c25efc6",
-  "element": "624af14169aab574c5f41932",
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "089c8cfca6ad30bc4b2510a8",
   "start": "block-drawing-empty",
-  "startElement": "d0643b8ab31b96fd21acb45e",
-  "runner": "live2 .nstate-uip-4.json"
+  "startElement": "40a0ffc6dd06ae7f02cd1191",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -45,7 +45,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 2",
+   "tab": "Part 1 Drawing 1",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -56,16 +56,16 @@
    "selection": [],
    "viewport": {
     "sheet_px": [
-     623,
+     432,
      110,
-     1716,
+     1526,
      955
     ],
     "sheet_mm": [
      279.4,
      215.9
     ],
-    "mmPerPixel": 0.25563
+    "mmPerPixel": 0.25539
    }
   }
  },
@@ -79,12 +79,12 @@
     }
    },
    "ok": true,
-   "ti": 139146,
-   "tmove": 139276,
+   "ti": 137039,
+   "tmove": 137203,
    "moves": 1,
-   "tdown": 139598,
+   "tdown": 137507,
    "at": [
-    568,
+    187,
     59
    ],
    "state": {
@@ -156,7 +156,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -167,21 +167,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 164155,
-   "te": 164155
+   "t": 161783,
+   "te": 161783
   },
   {
    "step": 2,
@@ -192,12 +192,12 @@
     }
    },
    "ok": true,
-   "ti": 164155,
-   "tmove": 164362,
+   "ti": 161784,
+   "tmove": 161925,
    "moves": 1,
-   "tdown": 164669,
+   "tdown": 162223,
    "at": [
-    544,
+    163,
     121
    ],
    "state": {
@@ -261,7 +261,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -288,7 +288,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -299,21 +299,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       282,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.2246
      }
     }
    },
-   "t": 190075,
-   "te": 190075
+   "t": 186929,
+   "te": 186929
   },
   {
    "step": 3,
@@ -324,13 +324,13 @@
     }
    },
    "ok": true,
-   "ti": 190076,
+   "ti": 186929,
    "via": "live's row for the start's Part Studio: \"start block Copy 2\" (the start is a copy)",
-   "tmove": 190278,
+   "tmove": 187103,
    "moves": 1,
-   "tdown": 190615,
+   "tdown": 187439,
    "at": [
-    823,
+    442,
     463
    ],
    "state": {
@@ -388,7 +388,7 @@
      {
       "id": "_OSDRAWINGVIEW",
       "title": "Select a part or assembly",
-      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity lane2-1127 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start block / start block Co",
       "inputs": [
        {
         "placeholder": "Search parts or sketches",
@@ -415,7 +415,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -426,21 +426,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       282,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.2246
      }
     }
    },
-   "t": 215868,
-   "te": 215868
+   "t": 212953,
+   "te": 212953
   },
   {
    "step": 4,
@@ -451,12 +451,12 @@
     }
    },
    "ok": true,
-   "ti": 215868,
-   "tmove": 216040,
+   "ti": 212953,
+   "tmove": 213094,
    "moves": 1,
-   "tdown": 216470,
+   "tdown": 213422,
    "at": [
-    869,
+    488,
     463
    ],
    "state": {
@@ -534,7 +534,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -545,21 +545,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 241069,
-   "te": 241069
+   "t": 237899,
+   "te": 237899
   },
   {
    "step": 5,
@@ -569,7 +569,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 241069,
+   "ti": 237899,
    "state": {
     "focus": {
      "kind": "other",
@@ -645,7 +645,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -656,21 +656,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 266075,
-   "te": 266075
+   "t": 262566,
+   "te": 262566
   },
   {
    "step": 6,
@@ -682,11 +682,11 @@
     }
    },
    "ok": true,
-   "ti": 266075,
-   "tmove": 266102,
+   "ti": 262566,
+   "tmove": 262603,
    "moves": 1,
    "at": [
-    599,
+    218,
     149
    ],
    "via": "native select in the drawing: option picked by its label",
@@ -765,7 +765,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -776,21 +776,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 279595,
-   "te": 279595
+   "t": 276210,
+   "te": 276210
   },
   {
    "step": 7,
@@ -800,7 +800,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 279595,
+   "ti": 276210,
    "state": {
     "focus": {
      "kind": "other",
@@ -876,7 +876,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -887,21 +887,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 304154,
-   "te": 304154
+   "t": 300504,
+   "te": 300504
   },
   {
    "step": 8,
@@ -915,13 +915,13 @@
     }
    },
    "ok": true,
-   "ti": 304155,
-   "tmove": 305191,
+   "ti": 300504,
+   "tmove": 301481,
    "moves": 1,
-   "tdown": 305492,
+   "tdown": 301789,
    "at": [
-    975,
-    524
+    784,
+    525
    ],
    "state": {
     "focus": {
@@ -949,7 +949,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -960,7 +960,7 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -972,21 +972,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 332044,
-   "te": 332044
+   "t": 328740,
+   "te": 328740
   },
   {
    "step": 9,
@@ -996,7 +996,7 @@
     "ms": 1500
    },
    "ok": true,
-   "ti": 332044,
+   "ti": 328740,
    "state": {
     "focus": {
      "kind": "other",
@@ -1023,7 +1023,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1034,7 +1034,7 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -1046,21 +1046,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 358791,
-   "te": 358791
+   "t": 357603,
+   "te": 357603
   },
   {
    "step": 10,
@@ -1069,16 +1069,16 @@
     "key": "Escape"
    },
    "ok": true,
-   "ti": 358791,
+   "ti": 357603,
    "pointer": {
     "at": [
-     868,
+     487,
      462
     ],
     "hover": [],
     "element": "iframe.foreign-data-container"
    },
-   "tdown": 358799,
+   "tdown": 357615,
    "state": {
     "focus": {
      "kind": "other",
@@ -1105,7 +1105,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1116,7 +1116,7 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -1128,21 +1128,21 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 386792,
-   "te": 386792
+   "t": 385609,
+   "te": 385609
   },
   {
    "step": 11,
@@ -1152,7 +1152,7 @@
     "ms": 800
    },
    "ok": true,
-   "ti": 386792,
+   "ti": 385609,
    "state": {
     "focus": {
      "kind": "other",
@@ -1179,7 +1179,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 2",
+     "tab": "Part 1 Drawing 1",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -1190,7 +1190,7 @@
        "name": "Isometric",
        "kind": "isometric",
        "position": [
-        89.9,
+        89.7,
         110.2
        ],
        "parent": null,
@@ -1202,22 +1202,22 @@
      "selection": [],
      "viewport": {
       "sheet_px": [
-       623,
+       432,
        110,
-       1716,
+       1526,
        955
       ],
       "sheet_mm": [
        279.4,
        215.9
       ],
-      "mmPerPixel": 0.25563
+      "mmPerPixel": 0.25539
      }
     }
    },
-   "t": 413845,
-   "te": 413845
+   "t": 412651,
+   "te": 412651
   }
  ],
- "t0_epoch_ms": 1795761166199
+ "t0_epoch_ms": 1795797453636
 }
