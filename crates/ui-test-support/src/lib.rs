@@ -17,6 +17,7 @@ pub mod bench;
 static OWN_CONFIG_DIR: extern "C" fn() = own_config_dir;
 
 extern "C" fn own_config_dir() {
+    few_malloc_arenas();
     // (The documents page lists the documents folder: this binary's own, never the user's ~/Documents/noshape.)
     // A run's own directory (rb.sh, the tiers) holds one per binary: a binary's settings (release-ui's managed
     // workflows) never reach the next one.
@@ -26,6 +27,22 @@ extern "C" fn own_config_dir() {
         let _ = std::fs::create_dir_all(&dir);
         // SAFETY: before `main`: no other thread exists to read the environment.
         unsafe { std::env::set_var(var, &dir) };
+    }
+}
+
+/// Two malloc arenas for the whole binary (glibc): each of the harness's test threads otherwise took one of its own and
+/// kept what its tests freed. part-studio-ui's 16 threads held 5.4 GB a minute in, 2.4 GB with two (vibe2 11-27, at the
+/// same pace), and earlyoom killed its land runs. Before `main`: glibc fixes the limit when a second thread first
+/// allocates.
+fn few_malloc_arenas() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        unsafe extern "C" {
+            fn mallopt(param: i32, value: i32) -> i32;
+        }
+        const M_ARENA_MAX: i32 = -8;
+        // SAFETY: glibc's mallopt, called before any other thread exists.
+        unsafe { mallopt(M_ARENA_MAX, 2) };
     }
 }
 
