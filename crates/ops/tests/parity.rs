@@ -102,6 +102,15 @@ const LIVE_SCATTER: &[LiveScatter] = &[
         from_feature: "Corner break fillet conic",
         readings: &[(8974.336928, 8974.319335), (12437.724522, 12437.697394)],
     },
+    // core 11-27: live's asymmetric 3 / 6 mm fillet is a B-spline fit of the quarter ellipse: its end arcs measure
+    // 7.269042 and 7.268265 mm (exact 7.266336), the x 0 one's midpoint 0.999984 of the ellipse; Part 1 with the exact
+    // ellipse, 47,644.619359 mm³ / 8,633.316434 mm², against live's 47,644.787366 / 8,633.333335; the same 0.168 mm³ after
+    // Fillet 3 (47,417.369291, live 47,417.537298).
+    LiveScatter {
+        doc: "c2-opt-fillet-partial-asym-smooth",
+        from_feature: "Fillet 2",
+        readings: &[(47644.787366, 47644.619359), (8633.333335, 8633.316434), (47417.537298, 47417.369291)],
+    },
 ];
 
 /// Imported parts live's STEP importer refits, written next to their evidence (PARITY-SUITES.md): in `docs`, a part whose
@@ -140,6 +149,9 @@ const LIVE_LINES_AS_OTHER: &[LiveLineAsOther] = &[
     // lead 11-22: a conic / curvature / asymmetric corner break's side face is a B-spline surface in live (cb-curves-1122):
     // its two straight edges through the thickness read OTHER (Part 10: 12 line / 4 other, ours 14 / 2).
     LiveLineAsOther { doc: "c2-cov2-sm-corner-break-relief-joint", from_feature: "Corner break fillet conic", part: "Part 10" },
+    // core 11-27: the asymmetric fillet's B-spline face (above, LIVE_SCATTER) leaves its two straight tangent edges OTHER
+    // (live JJF, JJN: 18 line / 4 other, ours 20 / 2).
+    LiveLineAsOther { doc: "c2-opt-fillet-partial-asym-smooth", from_feature: "Fillet 2", part: "Part 1" },
 ];
 
 /// Edges live adds inside a near-tangent sliver, within Parasolid's tolerance, or by a vertex splitting one edge into two
