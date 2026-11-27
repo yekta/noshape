@@ -24,9 +24,16 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   /root/core-scratch/rim-chamfer-zz.diff, .sw.sh / .fl2.sh): 0.2669 (= e) gives live's chamfer vertex exactly and end
   0.049, 0.28 -> 0.102, but Fillet 3 fails at 0.25/0.4/0.5, counts never change, and "Stevenrohr zum Halter" then
   fails: grazing, not a law to land. Needs live's chamfer surface (not in live.jsonl). ZZ_PICKS probe: /root/core-scratch/zz-picks.diff.
-- THEN screws Move face 3 (21/34/17 vs live 26/45/23; moves split-imprint faces of a revolve).
-- THEN psui's two TICKETS items: Extrude "Up to part" overlap; Remove pattern of the only part.
-- PATTERN-AFTER-INSERTED-CHAMFER: taken by skasm (lead 11-26).
+- **SCREWS MOVE FACE 3 (FIX UNCOMMITTED in core-rf, 11-27 00:5x)**: direct.rs: Reapply fillet only for translations
+  of planes along their normals (it left the cone pieces in place, Ok, no change); rigid translate falls back to
+  translate_by_booleans (each face's prism along the move, fused/cut via slab_booleans, shared with
+  offset_by_booleans); pieces_of_neighbours skips move_rigid's 6 s OCCT try. c2-config-parts-screws 63/63 to the end
+  (was 33/63). New T1 features_a::move_face_translate_slides_split_pieces_along_a_bore; run `.kt2.sh` (move_face
+  tests, task bvgi014h0 was running at the cap). Then commit, clippy, land. Note for bool: MF3 406 ms = one boolean on
+  the threaded body (brep try 70 ms + OCCT 190). Scripts: .mf.sh (trace/faces), .mfp.sh (profile), .pmi3.sh (parity,
+  saves vibex7 ~/tmp/core/scr/fresh).
+- psui's two TICKETS items (Up to part overlap, Remove pattern of only part): skasm's (lead 11-27).
+- PATTERN-AFTER-INSERTED-CHAMFER: fixed by 6a8e411db, skasm added the e2e and closed it.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
