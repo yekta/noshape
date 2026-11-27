@@ -16,16 +16,18 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     Fillet 1 row LIVE_LINES_AS_OTHER. bridging Boundary surface 1 Warning -> Ok, 20866 -> 17289 mm2 (live 17559, row
     open). Corpus A/B: only bridging; kernel 621 ok, model 664 ok, g++-13 ok. T1 surfacing::a_g2_fill_of_a_hole_in_a_
     sphere_follows_the_sphere (G2 0.3 um off at r 10 mm, G1 3x). LEAD NOT YET TOLD (lead at 215k at 13:04): report.
-  4 PARKED AGAIN 14:1x c2-curve-pattern-composite Fillet 2 (R10; 28/58/32 vs live 26/52/28, vol +10.3 mm3; live JJi OTHER
-    326.6444 + JJ6 cyl 1220.5154, ours (OCCT fallback) 335.766 + 1144.84 + 2 corner patches 64.39). Direct build declines
-    on 0.87 um zero-width pieces (sliver patch core-scratch/cpc-sliver.patch skips them) then "an invalid solid": the
-    R20 cylinder's wire runs to u 1.586 > pi/2. Rerun 14:1x with the kernel change (JDBG): junction balls are right
-    (tangency_ball at x -216.552, 4.8 mm past the vertex = live's JJ6 run-on); part faces 3/4 (the R20 cylinders) are
-    cut exactly there (cut 0 from the u=0 contact to g at u=pi/2). The bad wire comes after: the arc edge 4/5 loft's side
-    (a strip "on" the cylinder within 2.7 um) runs past the tangent line to its junction section's corner (0.31 mm, u
-    1.586); the kept cylinder piece's wire picks up that strip edge (tol 0.76 mm after fit_vertex_tolerances). Tried, no
-    effect: shared junction section on the junction edge's supports; exact (spline-through-feet) cylinder sides (core-scratch/cpc-junction-wip.patch). Next idea: trim a strip at its part face's boundary, or
-    end the junction section's side where its support face ends.
+  4 IN FLIGHT 15:42 c2-curve-pattern-composite Fillet 2 (uncommitted in core-uip3 blend_section.rs; kernel at HEAD; debug
+    kernel patch core-scratch/cpc-kernel-debug.patch, not for landing). Cause found: the arc edge's loft ran its stations
+    0..1 of the edge but its junction balls (tangency_ball) lie short of the vertices (0.227 / 0.773), so the loft
+    doubled back (hook 0.17-0.31 mm). Fix 1: ball_tools' loft stations run from/to where each junction ball's plane
+    crosses the edge (`reach`, secant). Then the direct build went through but cylinders crossed at the box corners
+    (+351 mm3, no spheres). Fix 2: corners where 3 straight convex chain edges meet between 3 planes: the corner ball,
+    each round ending on the plane through it square to its edge (`corner_at` in s0/s1 + rolls_on), corner tool =
+    hexahedron (vertex, ball, 3 edge points, 3 feet) less the ball, fused into the first edge's tool; other 3+ corners
+    decline. Sphere seam/poles turned away. Parity: 3/11 -> 9/11 (Fillet 2..Fillet 3 = live; next diff Curve pattern 1
+    Part 8/9, pre-existing). Module tests added: three_rounds_at_a_box_corner_meet_in_a_sphere (FAILS: direct "a blend
+    face that wouldn't split" on a plain box, debugging with .cpt.sh), a_round_over_a_slanted_end_across_a_turn_builds_
+    directly (passes; check it fails without fix 1). Then: corpus A/B, land.
   5 PARKED 13:4x c2-impeller-loft (parity 13:2x on 30439ec5e: 27/48; Fillet 3 34/93/60 vs live 34/95/62, faces and volume
     as live; then zum Halter ERROR "Failed to fillet selections." and the cascade to 47). Fillet 3 edges by type+length
     (.imp3.sh, vibex7 ~/tmp/core/imp3): (a) vertex splits along the y=+-27 run-ons and label kinds (live LINE/SPLINE vs
