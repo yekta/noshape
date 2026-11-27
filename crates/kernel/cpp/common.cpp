@@ -1791,8 +1791,9 @@ std::vector<double> surface_breaks(const BRepAdaptor_Surface& s, bool along_u)
 // get a result that depends on where u is measured from (F18 of g50:
 // -0.0617 mm², live 82.8478429). Each gap: from the end (u, v) of one edge
 // to the start of the next, in the face's forward orientation. Gaps that
-// are no gap in space (ends a period apart) are not counted.
-std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face)
+// are no gap in space (ends a period apart) are not counted, nor those of at
+// most `least` m (-1: every one).
+std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face, double least = 1e-9)
 {
   std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> out;
   const TopoDS_Face f = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
@@ -1822,7 +1823,7 @@ std::vector<std::pair<gp_Pnt2d, gp_Pnt2d>> uv_gaps(const TopoDS_Face& face)
       if ((uper > 0 && du > uper / 4) || (vper > 0 && dv > vper / 4))
         continue;
       const double gap = S->Value(p.X(), p.Y()).Distance(S->Value(q.X(), q.Y()));
-      if (gap > 1e-9 && gap < 1e-3)
+      if (gap > least && gap < 1e-3)
         out.emplace_back(p, q);
     }
   }
@@ -2074,6 +2075,18 @@ Moments face_moments(const TopoDS_Face& face, bool volume, const gp_XYZ& o = gp_
       }
     }
   }
+  // Along v every gap closed, those under 1e-9 m too: H is far from 0 away from v0 (a pattern cut's cone faces, their
+  // curves 2e-8 rad apart at two corners: each 7e-8 of its volume off).
+  if (along_v)
+    for (const auto& [p, q] : uv_gaps(f, -1))
+      for (int i = 0; i < 8 && q.X() != p.X(); ++i)
+      {
+        const double  t = (kGaussX[i] + 1) / 2;
+        const Moments g = inner_v(s, v0, p.Y() + (q.Y() - p.Y()) * t, p.X() + (q.X() - p.X()) * t,
+                                  std::numeric_limits<double>::infinity(), volume, o, vbreaks);
+        for (int j = 0; j < 10; ++j)
+          total[(size_t)j] -= g[(size_t)j] * (q.X() - p.X()) * kGaussW[i] / 2;
+      }
   // The boundary's gaps, closed with straight (u, v) segments.
   for (const auto& [p, q] : uv_gaps(f))
     for (int i = 0; i < 8 && q.Y() != p.Y(); ++i)
