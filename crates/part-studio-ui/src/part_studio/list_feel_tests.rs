@@ -629,6 +629,16 @@ fn rows() -> Vec<Row> {
             l.right_click(cx, "part:Part 1");
             expect(l.menu(cx), names(&["Rename", "Properties…", "Assign material…", "Edit appearance…", "Copy here…", "Copy Part 1", "Create Drawing of Part 1…", "Export…", "Where used…", "Hide", "Hide other parts", "Hide all parts", "Isolate…", "Make transparent…", "Zoom to selection", "Delete…"]), "rows")
         } },
+        Row { id: "menu / a face selected, on its part", live: "part-menu-edit-material step 12 (a face of Part 1 selected): Copy Part 1 and Where used… stay", gap: false, check: |l, cx| {
+            cx.update(|cx| {
+                l.view.update(cx, |v, _| {
+                    v.selection = v.display.bodies.iter().find(|b| b.name == "Part 1").and_then(|b| b.face_refs.first().cloned()).into_iter().collect();
+                })
+            });
+            l.right_click(cx, "part:Part 1");
+            let rows = l.menu(cx);
+            expect((rows.iter().any(|r| r == "Copy Part 1"), rows.iter().any(|r| r == "Where used…")), (true, true), "(Copy Part 1, Where used…)")
+        } },
         Row { id: "menu / two parts", live: "Properties… | Assign material for 2 parts… | Edit appearance for 2 parts… | Check interference for 2 parts… | Boolean | Copy 2 items | Hide | Hide other parts | Hide all parts | Isolate… | Make transparent… | Export… | Delete", gap: false, check: |l, cx| {
             l.click(cx, "part:Part 1", NONE);
             l.click(cx, "part:Part 2", NONE);

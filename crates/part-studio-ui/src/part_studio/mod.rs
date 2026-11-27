@@ -5326,7 +5326,8 @@ impl PartStudioView {
                     crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
                 };
                 // Live (qa4 r4 s5, feel/featurelist.json): several parts selected (the right-clicked one counts) get the
-                // parts menu; a part with features or other things selected gets its own menu without Copy <part>.
+                // parts menu; a part with features or sketches selected gets its own menu without Copy <part>; a face,
+                // edge or vertex selected keeps Copy <part> and Where used… (live part-menu-edit-material).
                 // Live everyday-1125: with a material, "Edit material…" and "Show center of mass" (after Hide).
                 let (has_material, com_shown) = {
                     let this = view.read(cx);
@@ -5338,7 +5339,7 @@ impl PartStudioView {
                     if !parts.contains(&b) {
                         parts.push(b.clone());
                     }
-                    (parts, !this.selected_features.is_empty() || this.selection.iter().any(|r| !matches!(r, Reference::Body(_))))
+                    (parts, !this.selected_features.is_empty() || this.selection.iter().any(|r| !matches!(r, Reference::Body(_) | Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_))))
                 };
                 if parts.len() > 1 {
                     let left_out = view.read(cx).display.bodies.len() > parts.len();
