@@ -1,0 +1,47 @@
+{
+ "name": "asm-import-step-into-asm",
+ "about": "spline-fillet-asm with a small STEP imported straight into the assembly (+ \u203a Import\u2026 from the assembly tab: uip-blend-block.step, one solid \"Blend block\" 40 x 20 x 10 with R2 vertical corners, R4 top-edge fillets and B-spline corner blends), then Insert \u203a Current document \u203a uip-blend-block (its one part, Blend block), a click in the view, \u2713 (and f, zoom to fit, before picks on the block): the import modal from the assembly tab, Import, then Insert: the dialog lists the new Part Studio uip-blend-block",
+ "area": "assembly",
+ "source": "live depth batch 7 (STEP into an assembly, lead 11-27)",
+ "start": "spline-fillet-asm",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import\u2026"
+   }
+  },
+  {
+   "do": "pick_files",
+   "files": [
+    "uip-blend-block.step"
+   ]
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "wait"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 4000
+  }
+ ]
+}

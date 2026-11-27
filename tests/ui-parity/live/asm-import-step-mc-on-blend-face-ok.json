@@ -1,0 +1,6467 @@
+{
+ "scenario": "asm-import-step-mc-on-blend-face-ok",
+ "recorded": "2026-11-27T19:31:31.729Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-27.3"
+ },
+ "live": {
+  "document": "060c0461ca301a2c112f155e",
+  "workspace": "96663039d748842f7c25efc6",
+  "element": "78e76ab756e248d5c4bce07b",
+  "start": "spline-fillet-asm",
+  "startElement": "31d0399087613ead5fb4e013",
+  "runner": "live2 .nstate-uip-4.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start spline-fillet-asm asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 3 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 3 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    41.001,
+    28.927,
+    7.882
+   ],
+   "eye_mm": [
+    71.826,
+    -24.463,
+    43.476
+   ],
+   "width_mm": 104.939,
+   "height_mm": 71.963,
+   "mmPerPixel": 0.081222,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Insert new tab"
+    }
+   },
+   "ok": true,
+   "ti": 29772,
+   "tmove": 29865,
+   "moves": 1,
+   "tdown": 30169,
+   "at": [
+    438,
+    977
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Applications",
+      "Create Material Library",
+      "Create Feature Studio",
+      "Create CAM Studio",
+      "Create PCB Studio",
+      "Create Render Studio",
+      "Create Part Studio",
+      "Create Assembly",
+      "Create Variable Studio",
+      "Create Drawing\u2026",
+      "Create folder",
+      "Import\u2026"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 32793,
+   "te": 32793
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Import\u2026"
+    }
+   },
+   "ok": true,
+   "ti": 32793,
+   "tmove": 32903,
+   "moves": 2,
+   "tdown": 34024,
+   "at": [
+    525,
+    943
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 36508,
+   "te": 36508
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "pick_files",
+    "files": [
+     "uip-blend-block.step"
+    ]
+   },
+   "ok": true,
+   "ti": 36508,
+   "via": "file chooser answered",
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": {
+     "kind": "modal",
+     "title": "Import to Onshape",
+     "fields": [
+      {
+       "label": "Import appearances",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Orient imported models with Y Axis Up",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Create a composite part when importing multiple or non-solid bodies",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Join adjacent surfaces",
+       "kind": "checkbox",
+       "value": false
+      }
+     ],
+     "buttons": [
+      "Import",
+      "Cancel"
+     ],
+     "text": "Import to this document Combine to a single Part Studio Use with small assemblies Import appearances Orient imported models with Y Axis Up Create a composite part when importing multiple or non-solid bodies Join adjacent surfaces"
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 41403,
+   "te": 41403
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "modal-ok"
+    }
+   },
+   "ok": true,
+   "ti": 41403,
+   "tmove": 41434,
+   "moves": 1,
+   "tdown": 41724,
+   "at": [
+    1039,
+    515
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 44472,
+   "te": 44472
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait"
+   },
+   "ok": true,
+   "ti": 44472,
+   "waitedForImport": "11 s",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 61959,
+   "te": 61959
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Insert"
+    }
+   },
+   "ok": true,
+   "ti": 61959,
+   "tmove": 62003,
+   "moves": 1,
+   "tdown": 62306,
+   "at": [
+    571,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": null,
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      },
+      {
+       "label": "Standard content",
+       "selected": false
+      },
+      {
+       "label": "Part Studios",
+       "selected": true
+      },
+      {
+       "label": "Assemblies",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Part Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "audit 1943 parts",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "audit 1990",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "block 1995",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c4",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c5",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "hole 1987 A",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r6",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r10",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r50",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1 Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "q flat ops",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Sketch audit 1969",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-broken",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-fillet",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start boss-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start bracket",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start chamfer-fillet-block-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start config-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start curves",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start cylinder-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-l",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-sketch",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-types-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start maker-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start measure-ties",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block-holes",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate (ui)",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate-bend",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start ridge",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start sm-box",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start spline-fillet-asm",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start surfaces",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start two-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start up-to-next",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start vars",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start wrap-cylinder",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "uip-blend-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "assembly-insert-dialog",
+      "title": "Insert parts and assemblies",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "inserted": 0,
+      "inputs": [
+       {
+        "placeholder": "Search Part Studios",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 65514,
+   "te": 65514
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 4000
+   },
+   "ok": true,
+   "ti": 65514,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": null,
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      },
+      {
+       "label": "Standard content",
+       "selected": false
+      },
+      {
+       "label": "Part Studios",
+       "selected": true
+      },
+      {
+       "label": "Assemblies",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Part Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "audit 1943 parts",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "audit 1990",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "block 1995",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c4",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c5",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "hole 1987 A",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r6",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r10",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r50",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1 Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "q flat ops",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Sketch audit 1969",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-broken",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-fillet",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start boss-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start bracket",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start chamfer-fillet-block-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start config-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start curves",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start cylinder-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-l",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-sketch",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-types-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start maker-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start measure-ties",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block-holes",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate (ui)",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate-bend",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start ridge",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start sm-box",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start spline-fillet-asm",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start surfaces",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start two-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start up-to-next",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start vars",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start wrap-cylinder",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "uip-blend-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "assembly-insert-dialog",
+      "title": "Insert parts and assemblies",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "inserted": 0,
+      "inputs": [
+       {
+        "placeholder": "Search Part Studios",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.463,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 72064,
+   "te": 72064
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "list_row": "uip-blend-block"
+    }
+   },
+   "ok": true,
+   "ti": 72064,
+   "tmove": 72281,
+   "moves": 1,
+   "tdown": 72940,
+   "at": [
+    767,
+    595
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "audit 1943 parts",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      },
+      {
+       "label": "Standard content",
+       "selected": false
+      },
+      {
+       "label": "Part Studios",
+       "selected": true
+      },
+      {
+       "label": "Assemblies",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Part Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "audit 1943 parts",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "audit 1990",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "block 1995",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c4",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c5",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "hole 1987 A",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r6",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r10",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r50",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1 Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "q flat ops",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Sketch audit 1969",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-broken",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-fillet",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start boss-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start bracket",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start chamfer-fillet-block-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start config-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start curves",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start cylinder-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-l",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-sketch",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-types-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start maker-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start measure-ties",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block-holes",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate (ui)",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate-bend",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start ridge",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start sm-box",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start spline-fillet-asm",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start surfaces",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start two-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start up-to-next",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start vars",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start wrap-cylinder",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "uip-blend-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "assembly-insert-dialog",
+      "title": "Insert parts and assemblies",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "inserted": 1,
+      "inputs": [
+       {
+        "placeholder": "Search Part Studios",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "INSTANCE",
+       "owner": null,
+       "id": "M09i4iIJMEQDW7vCO"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.826,
+      -24.464,
+      43.476
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 75619,
+   "te": 75619
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "click",
+    "on": {
+     "empty": true
+    }
+   },
+   "ok": true,
+   "ti": 75619,
+   "tmove": 75647,
+   "moves": 1,
+   "tdown": 75976,
+   "at": [
+    1560,
+    960
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "audit 1943 parts",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      },
+      {
+       "label": "Standard content",
+       "selected": false
+      },
+      {
+       "label": "Part Studios",
+       "selected": true
+      },
+      {
+       "label": "Assemblies",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Part Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "audit 1943 parts",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "audit 1990",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "block 1995",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c4",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c5",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "hole 1987 A",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r6",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r10",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r50",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1 Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "q flat ops",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Sketch audit 1969",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-broken",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-fillet",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start boss-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start bracket",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start chamfer-fillet-block-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start config-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start curves",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start cylinder-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-l",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-sketch",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-types-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start maker-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start measure-ties",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block-holes",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate (ui)",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate-bend",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start ridge",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start sm-box",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start spline-fillet-asm",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start surfaces",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start two-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start up-to-next",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start vars",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start wrap-cylinder",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "uip-blend-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "assembly-insert-dialog",
+      "title": "Insert parts and assemblies",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "inserted": 1,
+      "inputs": [
+       {
+        "placeholder": "Search Part Studios",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.467,
+      -23.841,
+      43.061
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 78388,
+   "te": 78388
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 78388,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "audit 1943 parts",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      },
+      {
+       "label": "Standard content",
+       "selected": false
+      },
+      {
+       "label": "Part Studios",
+       "selected": true
+      },
+      {
+       "label": "Assemblies",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Part Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "audit 1943 parts",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "audit 1990",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "block 1995",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c4",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "frames 1989 c5",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "hole 1987 A",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 2",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case 3",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r6",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r10",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "live2 2233 case r50",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Part Studio 1 Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "q flat ops",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "Sketch audit 1969",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-broken",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start block-fillet",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start boss-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start bracket",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start chamfer-fillet-block-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start config-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start curves",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start cylinder-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-drawing",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start frame-l",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-sketch",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start hole-types-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start maker-plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start measure-ties",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start overlap Copy 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start pin-block-holes",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate (ui)",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start plate-bend",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start ridge",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start sm-box",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start spline-fillet-asm",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start surfaces",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start two-blocks",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start up-to-next",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start vars",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "start wrap-cylinder",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "uip-blend-block",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "assembly-insert-dialog",
+      "title": "Insert parts and assemblies",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / noshape ui parity lane4-1115 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / live2 2233 case 1 / live2 2233 case 2 / live2 2233 case 3 / live2 2233 case r6 / live2 2233 case r10 / live2 2233 case r50 / Part Studio 1 / Part Studio 1 Copy 1 / q flat ops / Sketch audit 1969 / start b",
+      "inserted": 1,
+      "inputs": [
+       {
+        "placeholder": "Search Part Studios",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.467,
+      -23.841,
+      43.061
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 83249,
+   "te": 83249
+  },
+  {
+   "step": 11,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 83249,
+   "tmove": 83287,
+   "moves": 1,
+   "tdown": 83576,
+   "at": [
+    885,
+    92
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.467,
+      -23.841,
+      43.061
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 86137,
+   "te": 86137
+  },
+  {
+   "step": 12,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 86137,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      41.001,
+      28.927,
+      7.882
+     ],
+     "eye_mm": [
+      71.467,
+      -23.841,
+      43.061
+     ],
+     "width_mm": 104.939,
+     "height_mm": 71.963,
+     "mmPerPixel": 0.081222,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 91049,
+   "te": 91049
+  },
+  {
+   "step": 13,
+   "do": {
+    "do": "key",
+    "key": "f"
+   },
+   "ok": true,
+   "ti": 91049,
+   "pointer": {
+    "at": [
+     885,
+     92
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
+   "tdown": 91058,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      74.587,
+      -29.104,
+      32.465
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 93803,
+   "te": 93803
+  },
+  {
+   "step": 14,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 1500
+   },
+   "ok": true,
+   "ti": 93803,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      74.587,
+      -29.104,
+      32.465
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 97833,
+   "te": 97833
+  },
+  {
+   "step": 15,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Mate connector"
+    }
+   },
+   "ok": true,
+   "ti": 97833,
+   "tmove": 97866,
+   "moves": 1,
+   "tdown": 98262,
+   "at": [
+    631,
+    57
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Origin entity",
+     "dialog": "Mate connector 1"
+    },
+    "dialog": {
+     "title": "Mate connector 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "On entity",
+       "state": "ok"
+      },
+      {
+       "label": "Origin entity",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Move",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mate connector 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "On entity",
+        "state": "ok"
+       },
+       {
+        "label": "Origin entity",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Move",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Mate connector 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "selected edited ns-list-item-error is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      74.587,
+      -29.104,
+      32.465
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 100897,
+   "te": 100897
+  },
+  {
+   "step": 16,
+   "do": {
+    "do": "click",
+    "on": {
+     "face": [
+      38.546,
+      1.454,
+      8.049
+     ],
+     "instance": "Blend block <1>"
+    }
+   },
+   "ok": true,
+   "ti": 100897,
+   "tmove": 101341,
+   "moves": 1,
+   "hover": [],
+   "tdown": 105227,
+   "at": [
+    1610,
+    801
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mate connector 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "On entity",
+       "state": "ok"
+      },
+      {
+       "label": "Origin entity",
+       "kind": "query",
+       "items": [
+        "Edge of Blend block <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Move",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mate connector 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "On entity",
+        "state": "ok"
+       },
+       {
+        "label": "Origin entity",
+        "kind": "query",
+        "items": [
+         "Edge of Blend block <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Move",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": null,
+       "owner": "Blend block",
+       "id": "KF9B",
+       "name": "Blend block"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Mate connector 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "selected edited is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      75.003,
+      -29.824,
+      32.945
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 107749,
+   "te": 107749
+  },
+  {
+   "step": 17,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 107749,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mate connector 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "On entity",
+       "state": "ok"
+      },
+      {
+       "label": "Origin entity",
+       "kind": "query",
+       "items": [
+        "Edge of Blend block <1>"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Realign",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Move",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "other",
+       "text": "",
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mate connector 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "On entity",
+        "state": "ok"
+       },
+       {
+        "label": "Origin entity",
+        "kind": "query",
+        "items": [
+         "Edge of Blend block <1>"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Realign",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Move",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "other",
+        "text": "",
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": null,
+       "owner": "Blend block",
+       "id": "KF9B",
+       "name": "Blend block"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Mate connector 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "selected edited is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      75.003,
+      -29.824,
+      32.945
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 112735,
+   "te": 112735
+  },
+  {
+   "step": 18,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "ti": 112735,
+   "tmove": 112780,
+   "moves": 1,
+   "tdown": 113236,
+   "at": [
+    805,
+    92
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Mate connector 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      75.003,
+      -29.824,
+      32.945
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 116155,
+   "te": 116155
+  },
+  {
+   "step": 19,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "ti": 116155,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start spline-fillet-asm asm Copy 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 3 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Blend block <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Mate connector 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-mate-item"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Blend block <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        50.163728,
+        0,
+        1,
+        0,
+        15.036818,
+        0,
+        0,
+        1,
+        -28.208712,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 3 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      44.121,
+      23.664,
+      -2.714
+     ],
+     "eye_mm": [
+      75.003,
+      -29.824,
+      32.945
+     ],
+     "width_mm": 134.242,
+     "height_mm": 92.057,
+     "mmPerPixel": 0.103902,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 120957,
+   "te": 120957
+  }
+ ],
+ "t0_epoch_ms": 1795807868860
+}
