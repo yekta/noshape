@@ -12,7 +12,7 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 BOOL-TURN-SPLIT-SLOWER (state 11-27 14:20 UTC; lead: land before ~00:00 so the 00:17 main CI carries it)
+## P0 BOOL-TURN-SPLIT-SLOWER (state 11-27 14:40 UTC; lead: land before ~00:00 so the 00:17 main CI carries it)
 - 58e4cdbf QUEUED (area checks instead of volume integrals in the split/rejoin). Keep it.
 - ec60ab700 (bool-fb, committed, gating): turns_cut() builds the turn split directly (edge pieces by EmptyCopied +
   Range, chords with a (u, v) line pcurve, regions by walking the face's loop and crossing at each chord end;
@@ -25,11 +25,22 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   (doesn't split); split off (OCCT 7.5 s, Revolve 2 wrong); same-domain trigger.
 - Left (not needed for the bar): op_unify +90 ms (usd vchange ~230 ms, new_faces_valid ~90 ms on helix faces).
 - Probe build kept: /root/bool-scratch/p0-direct-probes.diff (VOLCMP, VTYPES, ALONGV, DCHECK, BREPFEAT toggles).
-- To land: kernel tests (kt-p0.sh), GCC 13 ok, gate chain /root/bool-hat-scratch/chain-ec60ab700c.out, knurls
-  (kn-run.sh with k-main/k-br), then land.sh; report to the lead. vibex8 files: ~/tmp/bool/ops-turns, cmp/, tp/,
-  rec-stand/: delete after the land.
+- 2120ccaae (on top): bool_patterns late-decline test now volume within area*1e-7 (was 1e-9 rel: new integral moved
+  it 1.5e-9). Kernel tests 619/620 before that fix (only that one); model 663/663 + model-core ok; GCC 13 ok.
+- RUNNING (14:40 UTC): gate unit bool-gate-ec60ab70-x8 -> /root/bool-hat-scratch/chain-ec60ab700c.out (started
+  14:17, ~80 min; gate is on ec60ab700, the test-only commit doesn't change it); ops/assembly/drawing tests ->
+  /root/bool-scratch/ot-ec60.log (script ot.sh, ends OT-DONE).
+- To land (before ~00:00, lead: so the 00:17 main CI carries it): gate 0 diff incl. parity56, ot-ec60 green, knurls
+  (kn-run.sh vibex8 <dir> with k-main = merge-base kernel test binary, k-br = ~/agents/bool-fb/target/release/deps/
+  all-96c035059fc28abb copied), then git diff --stat merge-base, touch -c, NOSHAPE_LAND_QUEUE_HOST=vibe2
+  tools/tiers/land.sh; report to the lead (<=5 lines: standoffs kernel 1574 -> 1152 ms vs 0.4.73, wall within noise,
+  17/17 kept). vibex8 files: ~/tmp/bool/ops-turns, cmp/, tp/, rec-stand/, kt-gam, gam/: delete after the land.
 
 ## GAMMA (next)
+- 11-27 14:40: lens drop-both invalid = hole cylinder face (x 114.78, 7.54 mm2) wire NotClosed (BRepCheck 28) +
+  face 27. Fix in bool-uv (uncommitted): after FixAddPCurve(ne, f2) shift the new pcurve by whole periods onto the
+  dropped edge's pcurve start (same ? da : db). Rerun running -> /root/bool-scratch/gamma-lens3.log (gamma-lens.sh,
+  prints PROBE lensp / bad* / strips valid). bool-uv also has a BRepCheck status probe (// PROBE lines + include).
 - Worktree bool-uv (branch bool-gamma on origin/main bbb452fe6): probes probe_case_args/probe_case_topo (+PROBE_FUZZY) in
   brep_replay.rs (never commit), lens change in drop_strip_faces (boolean.cpp: `lens` = face of 2 vertices, 2 edges
   within 1e-5; lensv map shares joined vertices) + PROBE fprintf lines. Recording kept at vibex8
