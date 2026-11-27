@@ -603,16 +603,16 @@ feature tool counts for a scenario that clicks it, presses its shortcut or doubl
 shortcut that starts a tool counts for the tool too. Menu items labelled at run time ("Suppress Extrude 1") aren't in
 the universe. Reported with the score (docs/parity/SCORE.md).
 
-11-08, 538 Part Studio scenarios. Uncovered: Delete annotation (the Inspection panel's Datum: live's plan), Open linked
-document (a Derived of another document: no start has one), Feedback/Report a bug (a cloud feature), Ctrl+click /
-Shift+click Open in new tab / window (the browser's).
+11-27, 1126 Part Studio scenarios. Uncovered: Disable imported appearances (no start has an imported part) and Release
+all configurations… (a configured part; live coverage-gaps-1126), Feedback/Report a bug (a cloud feature), Ctrl+click /
+Shift+click Open in new tab / window (the browser's). A menu row live shows without the sheet's "…" counts for it.
 
 | kind | covered | scenarios per item (median) |
 |---|---|---|
-| toolbar | 76/76 | 1 |
-| sketch tool | 55/55 | 2 |
-| menu | 119/121 | 1 |
-| shortcut | 86/89 | 1 |
+| toolbar | 76/76 | 5 |
+| sketch tool | 55/55 | 3 |
+| menu | 129/131 | 2 |
+| shortcut | 86/89 | 2 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|

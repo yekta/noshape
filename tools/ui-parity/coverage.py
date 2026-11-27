@@ -84,6 +84,8 @@ def main():
     for area, label in coverage_rs({"partStudio", "view"}, "MENUS"):
         items[("menu", label)] = set()
         menu_of[label.lower()] = ("menu", label)
+        # Live's row may drop the ellipsis the sheet has ("Edit thickness analysis", analysis-thickness-edit).
+        menu_of.setdefault(label.rstrip("…").lower(), ("menu", label))
     # A sketch dimension's menu: coverage.rs lists its rows by id.
     for row, item in (("change to driven dimension", "sk-dim-driving"), ("change to driving dimension", "sk-dim-driving"), ("delete dimension", "sk-dim-delete"), ("unconfigure dimension", "sk-dim-unconf")):
         if ("menu", item) in items:
@@ -156,6 +158,9 @@ def main():
                     items[menu_of[on["menu"].lower()]].add(name)
                 else:
                     unmatched[f"menu {on['menu']}"] += 1
+            # The in-context bar's button is the menu item of its name (context-create-version-update).
+            if on.get("button") == "Create version and update in assembly" and on["button"].lower() in menu_of:
+                items[menu_of[on["button"].lower()]].add(name)
             # A click with a modifier held: Alt+click (Select through transparent), Shift in a sketch (Suppress
             # inferencing); not Shift / Ctrl clicks elsewhere (they add to the selection, not open windows).
             mods = step.get("mods")
