@@ -633,6 +633,7 @@ fn run_pattern_paths(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> 
 /// share): a non-manifold part, which live refuses. Faces with no vertex in common closer than the tolerance, or two
 /// vertices in common and no edge, the point half way between them on both.
 fn copies_touch(ev: &EvalCtx, body_id: &BodyId) -> FResult<bool> {
+    use rayon::prelude::*;
     const TOL: f64 = 1e-7;
     let Some(bi) = index_of_body(ev, body_id) else { return Ok(false) };
     let b = &ev.ctx.bodies[bi];
@@ -642,11 +643,18 @@ fn copies_touch(ev: &EvalCtx, body_id: &BodyId) -> FResult<bool> {
         return Ok(false);
     }
     let edged: BTreeSet<(usize, usize)> = b.shape.ancestor_map(ShapeType::Edge, ShapeType::Face)?.to_vecs().iter().flat_map(|fs| fs.iter().flat_map(|&x| fs.iter().map(move |&y| (x as usize, y as usize)))).collect();
-    let vertex_faces = b.shape.ancestor_map(ShapeType::Vertex, ShapeType::Face)?.to_vecs();
-    let shared = |i: usize, j: usize| -> Vec<usize> { (0..vertex_faces.len()).filter(|&v| vertex_faces[v].contains(&(i as u32)) && vertex_faces[v].contains(&(j as u32))).collect() };
+    let mut face_vertices = vec![BTreeSet::new(); faces.len()];
+    for (v, fs) in b.shape.ancestor_map(ShapeType::Vertex, ShapeType::Face)?.to_vecs().iter().enumerate() {
+        for &f in fs {
+            if let Some(set) = face_vertices.get_mut(f as usize) {
+                set.insert(v);
+            }
+        }
+    }
     let point = |v: usize| b.shape.sub_shape(ShapeType::Vertex, v).and_then(|s| s.vertex_point()).ok();
     let boxes: Vec<Option<k::BoundingBox>> = faces.iter().map(|f| f.bounding_box(false).ok()).collect();
     let apart = |a: &k::BoundingBox, c: &k::BoundingBox| (a.min - TOL).cmpgt(c.max + TOL).any() || (c.min - TOL).cmpgt(a.max + TOL).any();
+    let mut unshared = Vec::new();
     for &i in &copies {
         for j in 0..faces.len() {
             if i == j || (j < i && copies.contains(&j)) || edged.contains(&(i, j)) {
@@ -656,9 +664,12 @@ fn copies_touch(ev: &EvalCtx, body_id: &BodyId) -> FResult<bool> {
             if apart(a, c) {
                 continue;
             }
-            let common = shared(i, j);
+            let common: Vec<usize> = face_vertices[i].intersection(&face_vertices[j]).copied().collect();
             let touch = match common.as_slice() {
-                [] => k::distance(&faces[i], &faces[j]).is_ok_and(|d| d.distance < TOL),
+                [] => {
+                    unshared.push((i, j));
+                    false
+                }
                 [_] => false,
                 vs => vs.iter().enumerate().any(|(n, &v)| {
                     vs[n + 1..].iter().any(|&w| {
@@ -673,7 +684,10 @@ fn copies_touch(ev: &EvalCtx, body_id: &BodyId) -> FResult<bool> {
             }
         }
     }
-    Ok(false)
+    // Faces with no vertex in common take an exact distance each (~2 ms), so in parallel (c2-config-parts-pulleys'
+    // Circular pattern: 46 pairs, 90 ms one by one).
+    let legacy = k::kernel_legacy();
+    Ok(unshared.par_iter().any(|&(i, j)| k::with_kernel_legacy(legacy.clone(), || k::distance(&faces[i], &faces[j]).is_ok_and(|d| d.distance < TOL))))
 }
 
 // ------------------------------------------------------------------ part pattern

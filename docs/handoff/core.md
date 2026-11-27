@@ -1,15 +1,17 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 16:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 20:35 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## IN FLIGHT 18:00 (lead: land before ~00:00 for the 05:00 cut, then the blend debug)
-P0 c2-config-parts-pulleys 0.48 -> 0.61 s vs 0.4.73 (bool blamed 39141bac63 copies_touch). vibex7 per-feature (cli
-`feature list`, ~/tmp/core/spd): Circular pattern 1 140 -> 250 ms in qa's 8c1284bc (~/tmp/core/spd/new). Uncommitted in
-pattern.rs: copies_touch's shared vertices from per-face vertex sets (was O(V) per pair) + TEMP XDBG_TOUCH eprintlns (remove
-before landing). Probe build (.spd.sh: release cli -> ~/tmp/core/spd/probe, pulleys x2): total 227/230 ms and NO
-copies_touch call printed -> check Circular pattern 1 is a face pattern at all (filter in .spd.sh used type 'pattern',
-lower-case: fix to 'Pattern'); A/B probe vs `new` vs probe-without-fix in one run before claiming. Then land, tell lead.
+## IN FLIGHT 20:35 (lead: land before ~00:00 for the 05:00 cut, then the blend debug)
+P0 pulleys LANDING (this commit): 39141bac63's copies_touch cost 90 ms (46 face pairs with no shared vertex, one exact
+k::distance each, ~2 ms); now measured in parallel: 28-55 ms on loaded vibex7 (Circular pattern 1: no check 142-180,
+check 196-224, 0.4.73 141-208 ms in the same 5-run A/B; tight boxes filter none of the 46: hub faces go round).
+vibex7 release target was corrupt (mold undefined symbols; stale probe binaries until 19:07): cleaned.
+P0 impeller Part 1 invalid (lead 20:1x): qa suites 1126-1417 (111a6633) valid; 1127-1056 (70ab1b23) invalid from
+feature 43 on (it now adds 3 faces; before it changed nothing). Suspects 664abc01 (its msg: Fillet Flansch zum
+Stroemungskanal now builds), e9a9db4a, bool f95397a1/2a4ab01. .imp.sh: norim (code part of 664abc01 reverted:
+core-scratch/rim664.patch, `git apply -R`) vs probe, times #27-#46 + query parts --check.
 P0 #2 (qa) c2-impeller-loft 24.0 -> 33.2 s (vibex7 3-run, old=0.4.73 cli, new=qa 8c1284bc): NOSHAPE_BOOL_MARCH=0 takes
 Fillet Ansaugflansch zum Gehaeuse 10.0 -> 5.9 s (old 6.5): that part is bool's 2a4ab01fdf (tell qa/lead). Fillet Stevenrohr
 zum Halter 1.13 -> 4.08 s (Error in both) is NOT the marcher; suspect core 664abc017e (rim chamfer before it changes its
@@ -20,6 +22,8 @@ Blend #4 box-corner test: cause = part x blend section on tool 1's cylinder (u 0
 extension (run_to == nullptr branch) re-projects the 2d curve and it comes back off the 3d curve's parameter; WIP check
 "its curve strays: projected" placed before into_period still fails split; kernel WIP + XDBG prints in blend_direct.cpp
 (copy core-scratch/blend_direct.xdbg.cpp; blend_section WIP core-scratch/blend_section.wip.rs).
+Queued after blend #4: SPLINE-FILLET-ASM-R2-END (P2, live 3e464c63): R2 fillet on a fit spline's top edge ends
+1.08 mm3 short; e2e the_depth_batch_starts_are_lives accepts 1.5 mm3 under it: back to 1e-3 when fixed.
 ## REPORT PENDING (lead over 200k at 16:5x): e8d60855 re-landed docs-only as 09995eb9; 04b6d11a follows the split rule
 (errors only when pieces < 2 AND an INTERNAL face/edge remains = a slit). Both said to lead 17:3x in thread.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
