@@ -34,7 +34,12 @@ only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `syst
   bool_patterns::coaxial_cones_whose_common_apex_lies_off_both_faces fails without; brep 68, bool_patterns 178 ok;
   seed 1846 ours Ok, OCCT's volume, 0.4 s vs 1.5). GATING 8eae4ef17c on vibex7 (unit bool-gate-8eae4ef17c, from
   22:58; ~00:35); knurls after its build (kn-run.sh vibex7 kn4: k-main = bool-gate-base's, k-br = bool-tube-gate's
-  all-96c035059fc28abb). NEXT: 1256 "no clean ray", 1234 "no point inside a face piece".
+  all-96c035059fc28abb; unit bool-kn-8eae4ef17c -> /root/bool-scratch/kn-8eae4ef17c.out).
+  1256 "no clean ray": no longer reached on current main (its path changes at step 36, a fillet now Ok).
+  1234 "no point inside a face piece": dumped with a decline probe (catch(...) in rust_boolean() writing args;
+  removed again): /root/bool-scratch/nf/dump1234/decl7-{0..68}.brep, a fuse of 69 args (op 0) at step 79's delete
+  (arrange.rs inside_of finds no ray hit for a region). NEXT: make it a corpus case (objects/tools split unknown:
+  try 1 + 68), find the region.
 - 11-27 15:00: LENS FIX = 394c39327e (bool-uv, branch bool-gamma on bbb452fe6, committed; brep_replay.rs probes
   uncommitted, never commit; full diff with probes /root/bool-scratch/gamma-lens-full.diff): both 5 um crescents
   dropped (lens = face of 2 vertices, 2 edges within 1e-5; lensv shares joined vertices), the new edge's pcurve on the
