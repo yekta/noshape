@@ -529,6 +529,20 @@ fn a_sketch_circles_arcs_between_two_faces_stay_apart() {
     assert_eq!((s.faces().len(), t.edge_count(), t.vertex_count()), (4, 10, 8));
 }
 
+/// c2-parting-line-draft-parting-line's Rib 1, fused into BOTTOM and unified: BOTTOM's side walls' parting edges, each
+/// in two at BOTTOM's own vertex away from the ribs, stay two; at the rib's corner on the base (the Boolean's vertex)
+/// an 8.338 mm and a 0.224 mm line 3.2e-5 rad apart are one, as live (73/214/144; before, 73/213/143).
+#[test]
+fn a_fuses_unify_joins_edges_only_at_the_booleans_vertices() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/topology/parting-line-rib1.brep.zst");
+    let inputs = Shape::from_brep_bytes(&zstd::decode_all(std::fs::File::open(path).unwrap()).unwrap()).unwrap();
+    let [objects, tools] = inputs.children().try_into().unwrap();
+    let r = boolean(BooleanOp::Fuse, &objects.children(), &tools.children(), &BooleanOptions::default()).unwrap();
+    let u = unify_same_domain(&r.shape).unwrap().shape;
+    assert!(u.is_valid());
+    assert_eq!(counts(&u), (73, 214, 144));
+}
+
 fn counts(s: &Shape) -> (usize, usize, usize) {
     (s.count(ShapeType::Face), s.count(ShapeType::Edge), s.count(ShapeType::Vertex))
 }

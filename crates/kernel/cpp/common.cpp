@@ -3583,8 +3583,13 @@ void carry_kept_marks(const TopoDS_Shape& in, const ShapeUpgrade_UnifySameDomain
   });
 }
 
+thread_local const ShapeIMap* t_unify_keep = nullptr;
+
 void keep_marked_edges(ShapeUpgrade_UnifySameDomain& u, const TopoDS_Shape& s)
 {
+  if (t_unify_keep != nullptr)
+    for (int i = 1; i <= t_unify_keep->Extent(); ++i)
+      u.KeepShape((*t_unify_keep)(i));
   ShapeIMap edges;
   TopExp::MapShapes(s, TopAbs_EDGE, edges);
   NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> ends;

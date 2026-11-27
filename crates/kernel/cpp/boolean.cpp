@@ -1198,11 +1198,22 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   for (int i = 1; i <= ve.Extent(); ++i)
   {
     const ShapeList& es = ve(i);
-    if (es.Extent() != 2 || (sc != nullptr && !seeds2.Contains(ve.FindKey(i))))
+    if (es.Extent() != 2 || (sc != nullptr && !seeds2.Contains(ve.FindKey(i))) || (t_unify_keep != nullptr && t_unify_keep->Contains(ve.FindKey(i))))
       continue;
     const TopoDS_Edge e1 = TopoDS::Edge(es.First()), e2 = TopoDS::Edge(es.Last());
     gp_Lin l1, l2;
-    if (e1.IsSame(e2) || !line_of(e1, l1) || !line_of(e2, l2) || !l1.Direction().IsParallel(l2.Direction(), 1e-9) || l1.Distance(l2.Location()) > 1e-7)
+    if (e1.IsSame(e2) || !line_of(e1, l1) || !line_of(e2, l2))
+      continue;
+    // One line, or the vertex within 1e-7 m of the line joining the edges' far ends, between them (Rib 1's 0.224 mm
+    // piece on from a 8.338 mm one turns 3.2e-5 rad: live joins them).
+    const TopoDS_Vertex v       = TopoDS::Vertex(ve.FindKey(i));
+    const auto          far_end = [&](const TopoDS_Edge& e) {
+      const TopoDS_Vertex f = TopExp::FirstVertex(e);
+      return BRep_Tool::Pnt(f.IsSame(v) ? TopExp::LastVertex(e) : f);
+    };
+    const gp_Pnt pv = BRep_Tool::Pnt(v), pa = far_end(e1), pb = far_end(e2);
+    const bool   one_line = l1.Direction().IsParallel(l2.Direction(), 1e-9) && l1.Distance(l2.Location()) <= 1e-7;
+    if (!one_line && (pa.Distance(pb) <= 1e-7 || gp_Vec(pv, pa).Dot(gp_Vec(pv, pb)) >= 0 || gp_Lin(pa, gp_Dir(gp_Vec(pa, pb))).Distance(pv) > 1e-7))
       continue;
     const ShapeList *f1 = ef2.Seek(e1), *f2 = ef2.Seek(e2);
     if (f1 == nullptr || f2 == nullptr || f1->Extent() != 2 || f2->Extent() != 2 || !planar_faces_of(e1) || !planar_faces_of(e2))
@@ -1315,6 +1326,9 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
 // (skipped when it could change nothing; planar faces and straight edges
 // merged first by merge_planar).
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean);
+// unify_in, where it joined edges at one of `inputs` (a Boolean's inputs' vertices) that no face merge freed, again
+// keeping those: Parasolid's merge after a Boolean joins edges only at vertices the Boolean made or freed.
+TopoDS_Shape unify_keeping_inputs(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean, const ShapeIMap* inputs);
 
 // Whether two adjacent faces on one kind of periodic surface (cylinders,
 // cones, ...) could be merged: there USD's result can depend on where their
@@ -2472,6 +2486,69 @@ void check_scoped_unify(const TopoDS_Shape& s0, const TopoDS_Shape& got)
 TopoDS_Shape unify(const TopoDS_Shape& s0, HHist& hist)
 {
   return unify_in(s0, hist, nullptr, nullptr);
+}
+
+// (c2-parting-line-draft-parting-line's Rib 1: BOTTOM's side wall edge, in two at its own vertex far from the ribs,
+// stays two as live's; the rib's corner on the base, the Boolean's, goes.)
+TopoDS_Shape unify_keeping_inputs(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean, const ShapeIMap* inputs)
+{
+  HHist        h;
+  bool         c = false;
+  TopoDS_Shape r = unify_in(s0, h, sc, clean != nullptr ? &c : nullptr);
+  if (inputs != nullptr && !inputs->IsEmpty() && !r.IsSame(s0) && !h.IsNull())
+  {
+    ShapeIMap now;
+    TopExp::MapShapes(r, TopAbs_VERTEX, now);
+    ShapeAncMap ve;
+    TopExp::MapShapesAndUniqueAncestors(s0, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    ShapeIMap keep;
+    for (int i = 1; i <= ve.Extent(); ++i)
+    {
+      const TopoDS_Shape& v = ve.FindKey(i);
+      if (now.Contains(v) || !inputs->Contains(v) || !h->Modified(v).IsEmpty())
+        continue;
+      // (Freed: an edge at it gone between faces merged.)
+      bool freed = false;
+      for (const TopoDS_Shape& e : ve(i))
+        freed = freed || h->IsRemoved(e);
+      if (!freed)
+        keep.Add(v);
+    }
+    if (!keep.IsEmpty())
+    {
+      const ShapeIMap* was = t_unify_keep;
+      t_unify_keep         = &keep;
+      try
+      {
+        h = HHist();
+        r = unify_in(s0, h, sc, clean != nullptr ? &c : nullptr);
+      }
+      catch (...)
+      {
+        t_unify_keep = was;
+        throw;
+      }
+      t_unify_keep = was;
+    }
+  }
+  if (!h.IsNull())
+  {
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    hist->Merge(h);
+  }
+  if (clean != nullptr)
+    *clean = c;
+  return r;
+}
+
+ShapeIMap input_vertices(const OcShapeList& args, const OcShapeList& tools)
+{
+  ShapeIMap ins;
+  for (const OcShapeList* l : {&args, &tools})
+    for (const TopoDS_Shape& x : l->items)
+      TopExp::MapShapes(x, TopAbs_VERTEX, ins);
+  return ins;
 }
 
 // Two faces on one cylinder meeting at a full ring, each a band closed at
@@ -5703,7 +5780,7 @@ TopoDS_Shape join_loop_pieces(const TopoDS_Shape& s, HHist& hist, bool refit = f
     const TopoDS_Edge a = TopoDS::Edge(es.First()), b = TopoDS::Edge(es.Last());
     if (a.IsSame(b) || BRep_Tool::Degenerated(a) || BRep_Tool::Degenerated(b) || BRepAdaptor_Curve(a).GetType() == GeomAbs_Line || BRepAdaptor_Curve(b).GetType() == GeomAbs_Line)
       continue;
-    if (kept_ends(a) && kept_ends(b))
+    if ((kept_ends(a) && kept_ends(b)) || (t_unify_keep != nullptr && t_unify_keep->Contains(ve.FindKey(i))))
       continue;
     if (!mapped)
     {
@@ -10403,6 +10480,10 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
 {
   const TurnsDivided turns(args, tools);
   OpOut r = turns.any ? turns.rejoined(turns.back(op_boolean_built(op, turns.args, turns.tools, opts))) : op_boolean_built(op, args, tools, opts);
+  if (r.shape && !opts.unify)
+  {
+    r.shape->myInputVertices = std::make_shared<const ShapeIMap>(input_vertices(args, tools));
+  }
   if (r.shape)
   {
     ShapeIMap inputs;
@@ -10634,7 +10715,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
       // Where the unify (here or op_unify's) has to look (UnifyScope).
       bool clean = false;
       if (opts.unify)
-        out = unify_in(out, h, scope.get(), &clean);
+      {
+        const ShapeIMap ins = input_vertices(args, tools);
+        out                 = unify_keeping_inputs(out, h, scope.get(), &clean, &ins);
+      }
       std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.local_result");
       OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &srcs, opts.unify || stripped ? nullptr : &maps);
       if (opts.unify)
@@ -10751,7 +10835,10 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
         bool clean = false;
         const TopoDS_Shape pre = out;
         if (opts.unify)
-          out = scope ? unify_in(out, h, scope.get(), &clean) : unify(out, h);
+        {
+          const ShapeIMap ins = input_vertices(args, tools);
+          out                 = unify_keeping_inputs(out, h, scope.get(), scope ? &clean : nullptr, &ins);
+        }
         std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("boolean.rust.result");
         OpOut r = make_result(concat(args.items, tools.items), out, h.get(), &rs);
         lap.reset();
@@ -10921,7 +11008,12 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     {
       t_bool_path = "trimmed";
       res  = without_strips(res, hist);
-      res  = remesh_facets(opts.unify ? unify(res, hist) : res, facets, hist);
+      if (opts.unify)
+      {
+        const ShapeIMap ins = input_vertices(args, tools);
+        res                 = unify_keeping_inputs(res, hist, nullptr, nullptr, &ins);
+      }
+      res = remesh_facets(res, facets, hist);
       return make_result(concat(args.items, tools.items), res, hist.get(), &srcs);
     }
     else
@@ -11273,7 +11365,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
   if (opts.unify)
   {
     const KernelTimer timer("boolean.unify");
-    res = unify(res, hist);
+    const ShapeIMap   ins = input_vertices(args, tools);
+    res                   = unify_keeping_inputs(res, hist, nullptr, nullptr, &ins);
   }
   if (scaled)
   {
@@ -13597,7 +13690,7 @@ OpOut op_unify(const OcShape& s)
   TopoDS_Shape res;
   try
   {
-    res = unify_in(s.shape, hist, sc, &clean);
+    res = unify_keeping_inputs(s.shape, hist, sc, &clean, s.myInputVertices.get());
   }
   catch (const Standard_Failure& f)
   {

@@ -151,6 +151,8 @@ void mark_kept_ends(const TopoDS_Shape& e);
 void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<TopoDS_Shape>(const TopoDS_Shape&)>& image);
 // Every marked edge of `s`, and every vertex between two kept_ends edges, as a shape `u` keeps.
 void keep_marked_edges(ShapeUpgrade_UnifySameDomain& u, const TopoDS_Shape& s);
+// Vertices this thread's unify keeps (keep_marked_edges, merge_planar's lines), when set (unify_keeping_inputs).
+extern thread_local const ShapeIMap* t_unify_keep;
 // After `u` ran on `in`: its result's edges made from marked ones marked (USD rebuilds the edges it keeps).
 void carry_kept_marks(const TopoDS_Shape& in, const ShapeUpgrade_UnifySameDomain& u);
 

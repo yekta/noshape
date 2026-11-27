@@ -670,6 +670,8 @@ public:
   // where to look.
   mutable std::atomic<bool>         myUnifyClean{false};
   std::shared_ptr<const UnifyScope> myUnifyScope;
+  // A Boolean's result: its inputs' vertices, where a later unify joins no edges unless it merged faces across them.
+  std::shared_ptr<const ShapeIMap> myInputVertices;
 
   // noshape's own Boolean's flat form of it (rust_boolean.cpp), or why it has none, made once: a chain of
   // Booleans converts each body once.
