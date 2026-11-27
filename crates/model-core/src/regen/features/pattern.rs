@@ -598,7 +598,13 @@ fn run_pattern_paths(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> 
             // Onshape's PATTERN_FACE_FAILED / MIRROR_FACE_FAILED: the reason isn't shown.
             let failed = if verb(ev) == "mirror" { "Failed to create face mirror, check input." } else { "Failed to create pattern, check input." };
             for (id, fs) in groups {
-                let Err(e) = pattern_faces(ev, &id, &fs, &instances, true) else { continue };
+                let Err(e) = pattern_faces(ev, &id, &fs, &instances, true) else {
+                    if copies_touch(ev, &id)? {
+                        trace(ev, "face pattern: copies touch the part where no edge joins them");
+                        return err(failed);
+                    }
+                    continue;
+                };
                 if e.message == "Cancelled" {
                     return Err(e);
                 }
@@ -620,6 +626,54 @@ fn run_pattern_paths(ev: &mut EvalCtx, instances: Vec<Instance>) -> FResult<()> 
         }
         _ => part_pattern(ev, &instances),
     }
+}
+
+/// A face pattern's copies touching the part's faces where no edge joins them (live mistake-linear-pattern-face-boss:
+/// a boss copied its diameter along, the two cylinders touching along a line between the vertices their ends' circles
+/// share): a non-manifold part, which live refuses. Faces with no vertex in common closer than the tolerance, or two
+/// vertices in common and no edge, the point half way between them on both.
+fn copies_touch(ev: &EvalCtx, body_id: &BodyId) -> FResult<bool> {
+    const TOL: f64 = 1e-7;
+    let Some(bi) = index_of_body(ev, body_id) else { return Ok(false) };
+    let b = &ev.ctx.bodies[bi];
+    let faces = b.shape.faces();
+    let copies: Vec<usize> = (0..faces.len()).filter(|&i| b.faces.get(i).and_then(|n| n.creator()) == Some(ev.feature)).collect();
+    if copies.is_empty() {
+        return Ok(false);
+    }
+    let edged: BTreeSet<(usize, usize)> = b.shape.ancestor_map(ShapeType::Edge, ShapeType::Face)?.to_vecs().iter().flat_map(|fs| fs.iter().flat_map(|&x| fs.iter().map(move |&y| (x as usize, y as usize)))).collect();
+    let vertex_faces = b.shape.ancestor_map(ShapeType::Vertex, ShapeType::Face)?.to_vecs();
+    let shared = |i: usize, j: usize| -> Vec<usize> { (0..vertex_faces.len()).filter(|&v| vertex_faces[v].contains(&(i as u32)) && vertex_faces[v].contains(&(j as u32))).collect() };
+    let point = |v: usize| b.shape.sub_shape(ShapeType::Vertex, v).and_then(|s| s.vertex_point()).ok();
+    let boxes: Vec<Option<k::BoundingBox>> = faces.iter().map(|f| f.bounding_box(false).ok()).collect();
+    let apart = |a: &k::BoundingBox, c: &k::BoundingBox| (a.min - TOL).cmpgt(c.max + TOL).any() || (c.min - TOL).cmpgt(a.max + TOL).any();
+    for &i in &copies {
+        for j in 0..faces.len() {
+            if i == j || (j < i && copies.contains(&j)) || edged.contains(&(i, j)) {
+                continue;
+            }
+            let (Some(a), Some(c)) = (&boxes[i], &boxes[j]) else { continue };
+            if apart(a, c) {
+                continue;
+            }
+            let common = shared(i, j);
+            let touch = match common.as_slice() {
+                [] => k::distance(&faces[i], &faces[j]).is_ok_and(|d| d.distance < TOL),
+                [_] => false,
+                vs => vs.iter().enumerate().any(|(n, &v)| {
+                    vs[n + 1..].iter().any(|&w| {
+                        let (Some(p), Some(q)) = (point(v), point(w)) else { return false };
+                        let m = (p + q) / 2.0;
+                        faces[i].contains_point(m, TOL).unwrap_or(false) && faces[j].contains_point(m, TOL).unwrap_or(false)
+                    })
+                }),
+            };
+            if touch {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 // ------------------------------------------------------------------ part pattern

@@ -2058,6 +2058,31 @@ fn feature_and_face_pattern_of_pocket() {
     assert!(near(removed, 2.0 * pocket, 1e-3), "{removed}");
 }
 
+/// A face pattern whose copy would touch the part along a line with no edge there fails as live's (mistake-linear-
+/// pattern-face-boss: a boss of diameter 8 copied 8 along, the two cylinders touching: a non-manifold part); 10 along,
+/// the copy stands apart and the pattern works.
+#[test]
+fn a_face_pattern_whose_copy_touches_the_part_along_a_line_fails() {
+    let mut t = T::new();
+    t.block(-0.02, -0.015, 0.02, 0.015, "10 mm");
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::new(0.01, 0.0), 0.004));
+    let r = t.regions(s)[0].clone();
+    let boss = t.extrude(r, "20 mm", "ADD");
+    let res = t.ok();
+    let v0 = total_volume(&res.context);
+    let faces: Vec<Reference> = res.context.bodies[0].faces.iter().filter(|n| n.creator() == Some(boss)).map(|n| Reference::Face((**n).clone())).collect();
+    assert_eq!(faces.len(), 2, "the boss' side and top");
+    let p = t.add("linearPattern", &[("patternType", en("FACE")), ("faces", q(faces)), ("directionOne", q(vec![Reference::Plane(DatumPlane::Front)])), ("distance", e("8 mm")), ("instanceCount", e("2"))]);
+    let res = t.regen();
+    let f = res.display.features.last().unwrap();
+    assert_eq!((&f.status, f.message.as_deref()), (&FeatureStatus::Error, Some("Failed to create pattern, check input.")));
+    assert!(near(total_volume(&res.context), v0, 1e-9));
+    t.set(p, "distance", e("10 mm"));
+    let res = t.ok();
+    let added = total_volume(&res.context) - v0;
+    assert!(near(added, std::f64::consts::PI * 0.004f64.powi(2) * 0.01, 1e-6), "{added}");
+}
+
 /// A feature pattern of a Boolean subtraction repeats the pocket its tool left in the target (asm-pattern-std 36b90f's
 /// Linear pattern 1 of Boolean 1, live OK; ours "Selected features do not create any geometry that may be patterned.").
 #[test]
