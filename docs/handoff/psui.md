@@ -211,7 +211,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Boss-top pick FIXED, landing (commit "over a face an edge lights from 6 px"): over a face an edge's reach is 6 CSS px
   + half a device px to its drawn pixels (viewport.rs EDGE_OVER_FACE_REACH, was 7; live mc-reach-1122 R4: lit 6, face at
   7; the Ø8 rim is 7.26 px from the top's middle at 0.275 mm/px). T1 a_click_on_a_boss_tops_middle_picks_the_face; render
-  offscreen reach tests now 5 / 6. Scenario rerun not done yet (resp/one.sh ONE=extrude-remove-through-all-boss-ok).
+  offscreen reach tests now 5 / 6. QUEUED 39026a6c (00:16). Scenario rerun on branch: match (10 states).
 - Pre-existing red (GPU only, not from this change: same with reach 7): assembly-ui
   a_re_hovered_second_pick_shows_plain at [5,3,10] hovers Part 1 <1>'s top (occ 0), the test wants the moved part; a
   commit after 3e5156291 moved it. Mine to fix next.
