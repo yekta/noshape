@@ -1,5 +1,5 @@
 # psui (Part Studio UI): current state
-Updated 2026-11-27 13:2x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
+Updated 2026-11-27 15:0x UTC. History up to then: docs/handoff/archive/psui.md (not read by default). Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here).
 
 ## Setup
@@ -33,17 +33,16 @@ docs/DECISIONS.md (read first; it wins over anything here).
 - Runner env: NOSHAPE_UIP_LOGS=1 (app stderr), NOSHAPE_UI_SHOTS=<dir> (a screenshot per step), NOSHAPE_PERF=1,
   NOSHAPE_CACHE_DIR (fresh: cold runs).
 
-## IN FLIGHT 13:2x (after compaction: start here)
-- LANDED 1b6506ae as 6c2f0fe4d (Windows click fix, assembly focus, Sweep Thin test); qa told 13:2x (db8fa95d3,
-  1e07dfe6c; asm-mate-connector-realign retake).
-- QUEUED 13:2x: Replicate scope/mates (ps21), fillet Vertices + before_vertex_under (ps22/ps23), Insert image
-  Libraries search box, image report (2 HORIZONTAL + other geometry), TICKETS (SPLIT-TRIMMED-PARTIAL-ERRORS for core;
-  9 duplicate rows from the union merge dropped: check main again after the land). ps23: part-studio-ui 664 ok;
-  fillet-variable-two-vertices-ok, sketch-image-place, sketch-text-font-typed-ok match; sketch-image-edit s17
-  .dialog.fields[1].checked live false / ours true (not looked into yet).
-- LEAD 13:2x (P0 audit, skasm has the sketch side): Part Studio side of B-spline picking on an imported part (corpus
-  STEP): GPUI tests for click, shift/ctrl multiselect, box select, Select › Tangent connected edges/faces and the other
-  Select items, hover in each selection state; fix any missed pick or early-stopping chain. Report <= 5 lines.
+## IN FLIGHT 15:0x (after compaction: start here)
+- LANDED 17c3189f as 7ce32dc540 (Replicate, fillet Vertices, Insert image, image report, TICKETS). sketch-image-edit
+  s17 .dialog.fields[1].checked live false / ours true: not looked into yet.
+- B-spline selection audit (lead 13:2x, P0, skasm has the sketch side): DONE, queued 15:0x (see land log) with a TICKETS
+  dedupe (ERR-HOLE-INVALID-COMMIT x3). Test bspline_pick_tests.rs on kernel test STEPs g25-b and fan-blade-thread:
+  (1) T2 (~4 min, GPU): every face/edge with a clear spot, 7 views x 2 zooms, lights/clicks with nothing / another /
+  itself selected, click adds, Shift toggles: all pass (g25-b 18/18 faces 19/36 edges, thread 4/6 + 4/12);
+  (2) T1: window box, crossing box per edge, Tangent connected faces/edges = geometry oracle, every Select > item keeps
+  its seed and only drawn entities. FIX: select.rs leaves degenerated edges out of Select > results. Lead told.
+  Full part-studio-ui lib 665 ok, model select 10 ok (resp/ps27.log).
 - Edge reach (PICK-FACE-OVER-NEAR-EDGE), held, uncommitted (stash psui-reach while landing): renderer.rs pick_reaching
   `body`, builder.rs body_fn, viewport.rs pick_body, behaviors.rs, offscreen.rs, feel_tests.rs (2 edge tests). TEMP
   trace in renderer.rs (NOSHAPE_PICK_TRACE, never commit). Land only when split-face-ok s7 matches AND live answers
@@ -57,6 +56,7 @@ docs/DECISIONS.md (read first; it wins over anything here).
   is the Appearances panel row's item (needs recorder work: not asked for).
 
 ## NEXT
+- core queued bf790398 (SPLIT-TRIMMED-PARTIAL-ERRORS fixed): once it is on main, mark that TICKETS row fixed.
 - qa's diffs from live's option-combination batches as filed; interaction-feel rows to verify (archive 11-27).
 
 ## Agents
