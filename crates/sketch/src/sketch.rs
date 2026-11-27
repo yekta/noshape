@@ -199,6 +199,24 @@ impl Sketch {
         self.entity(id)?.endpoints()
     }
 
+    /// Points the sketch doesn't draw or pick: a used (projected) B-spline's poles other than an entity's end (live
+    /// 2461: it shows its two ends only).
+    pub fn hidden_poles(&self) -> std::collections::HashSet<EntityId> {
+        let mut poles = std::collections::HashSet::new();
+        let mut ends = std::collections::HashSet::new();
+        for e in self.entities() {
+            if let Some((a, b)) = e.endpoints() {
+                ends.insert(a);
+                ends.insert(b);
+            }
+            if let (true, Geometry::BSpline { control, .. }) = (e.external, &e.geometry) {
+                poles.extend(control.iter().copied());
+            }
+        }
+        poles.retain(|p| !ends.contains(p));
+        poles
+    }
+
     /// Resolves an entity to concrete curve geometry (`None` for points).
     pub fn curve(&self, id: EntityId) -> Option<Curve2> {
         let e = self.entities.get(&id)?;

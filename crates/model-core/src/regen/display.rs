@@ -635,8 +635,8 @@ pub fn sketch_display(s: &super::context::SketchResult) -> SketchDisplay {
     let mut ends = std::collections::HashSet::new();
     // Fit splines' end handle tips.
     let mut tips = std::collections::HashSet::new();
-    // Control points of used B-splines.
-    let mut used_spline_points = std::collections::HashSet::new();
+    // Used B-splines' poles but their ends.
+    let hidden = s.sketch.hidden_poles();
     let mut centers = std::collections::HashSet::new();
     // Points some other entity uses (one pass: asking per point was
     // quadratic, a third of a 300-entity sketch's drag frame).
@@ -649,10 +649,6 @@ pub fn sketch_display(s: &super::context::SketchResult) -> SketchDisplay {
         }
         if let noshape_sketch::Geometry::BSpline { control, .. } = &e.geometry {
             handles.extend(control.iter().copied());
-            // A used (projected) B-spline shows its two ends only, no points along it (live 2461).
-            if e.external {
-                used_spline_points.extend(control.iter().copied());
-            }
         }
         if let Some((h0, h1)) = e.spline_handles() {
             tips.insert(h0);
@@ -678,7 +674,7 @@ pub fn sketch_display(s: &super::context::SketchResult) -> SketchDisplay {
             }
             let Some(p) = s.sketch.point(e.id) else { continue };
             let standalone = !used.contains(&e.id);
-            if used_spline_points.contains(&e.id) && !ends.contains(&e.id) {
+            if hidden.contains(&e.id) {
                 continue;
             }
             let handle = handles.contains(&e.id) && !ends.contains(&e.id);

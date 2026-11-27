@@ -1013,3 +1013,44 @@ fn a_curve_onto_a_held_point_moves_whole_with_its_size_kept() {
     let Some(Curve2::Ellipse { center, major, minor }) = sk.curve(e) else { panic!() };
     assert!((center - mm(3.0, 0.0)).length() < 1e-9 && (major - mm(8.0, 0.0)).length() < 1e-9 && (minor - 4e-3).abs() < 1e-9, "{center} {major} {minor}");
 }
+
+/// A used rounded rectangle as the user's rack Sketch 1 (11-27): 4 lines and 4 corner B-splines of degree 2 with 29
+/// poles about 1 mm apart, all used, no constraints. Its lines and splines.
+fn used_rounded_rectangle(sk: &mut Sketch) -> (Vec<EntityId>, Vec<EntityId>) {
+    let (h, r) = (0.0635, 0.03);
+    let turn = |k: usize, p: DVec2| (0..k).fold(p, |p, _| v(-p.y, p.x));
+    let c = v(h - r, r - h);
+    let mut poles = vec![v(h - r, -h), v(h - r + 0.001, -h)];
+    poles.extend((1..=25).map(|i| {
+        let a = -std::f64::consts::FRAC_PI_2 * (1.0 - i as f64 / 26.0);
+        c + r * v(a.cos(), a.sin())
+    }));
+    poles.extend([v(h, r - h - 0.001), v(h, r - h)]);
+    let (mut lines, mut splines) = (Vec::new(), Vec::new());
+    for k in 0..4 {
+        lines.push(sk.add_line(turn(k, v(r - h, -h)), turn(k, v(h - r, -h))));
+        splines.push(sk.add_bspline(&poles.iter().map(|p| turn(k, *p)).collect::<Vec<_>>(), 2).unwrap());
+    }
+    let ids: Vec<EntityId> = sk.entities().map(|e| e.id).collect();
+    for id in ids {
+        sk.entity_mut(id).unwrap().external = true;
+    }
+    (lines, splines)
+}
+
+/// The user's rack (11-27): a click on a used corner spline takes the spline, not one of its poles (not drawn, inside
+/// the click's reach), and Tangent connected edges from it takes the whole loop, its ends met without constraints.
+#[test]
+fn a_used_rounded_rectangles_corner_spline_picks_and_chains_its_loop() {
+    let mut sk = Sketch::new();
+    let (lines, splines) = used_rounded_rectangle(&mut sk);
+    assert_eq!(sk.hidden_poles().len(), 4 * 27);
+    let Some(Geometry::BSpline { control, .. }) = sk.entity(splines[0]).map(|e| e.geometry.clone()) else { panic!("a B-spline") };
+    let on = sk.curve(splines[0]).unwrap().closest(sk.point(control[14]).unwrap()).1;
+    assert_eq!(sk.pick(on, 0.003), Some(splines[0]));
+    let mut chain = sk.select_related(&[splines[0]], RelatedSelection::TangentConnected);
+    chain.sort();
+    let mut all = [lines, splines].concat();
+    all.sort();
+    assert_eq!(chain, all);
+}

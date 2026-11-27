@@ -456,7 +456,7 @@ struct Edge {
 /// A Use'd curve's end (or a pattern copy's of one) joins the nearest other curve end closer than this, as live's
 /// regions (live 11-21 use-rule: 19.71 µm joined, 20.49 not, at any edge length, place or side; plain ends only within
 /// 0.2 µm; asm-infento a3f7a1 Sketch 1's teeth copies 9.16 µm apart close its ring).
-const USE_END_REACH: f64 = 2e-5;
+pub(crate) const USE_END_REACH: f64 = 2e-5;
 
 /// Joins Use'd ends to the ends near them ([`USE_END_REACH`]); `reach`: each curve's ends reach so. The end of a curve
 /// other than a line is kept (a line's end moves onto it), else the Use'd one.
@@ -546,7 +546,7 @@ impl Sketch {
 /// Live joins a T-end to a line within 0.01 µm, not 0.02 (sketch-gap-1121).
 const T_END_JOIN: f64 = 1.5e-8;
 /// Live closes a region over two free ends within 0.2 µm, not 0.3, at any scale (sketch-gap-1121).
-const FREE_END_JOIN: f64 = 2.5e-7;
+pub(crate) const FREE_END_JOIN: f64 = 2.5e-7;
 
 fn tolerance(boxes: &[BBox]) -> f64 {
     let bb = boxes.iter().fold(BBox::EMPTY, |a, b| a.union(b));

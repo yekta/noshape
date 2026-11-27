@@ -89,7 +89,9 @@ impl Sketch {
     fn pick_impl(&self, p: DVec2, radius: f64, report: Option<&SolveReport>, screen: Option<&ScreenMetric>) -> Option<EntityId> {
         let mut best: Option<(u8, f64, EntityId)> = None;
         let reach = screen.map_or(radius, |s| s.reach(radius));
-        for e in self.entities() {
+        // (A used spline's poles aren't drawn: a click 1 mm from one took it, not the spline lit.)
+        let hidden = self.hidden_poles();
+        for e in self.entities().filter(|e| !hidden.contains(&e.id)) {
             let Some(bb) = self.entity_bbox(e.id) else { continue };
             if !bb.expanded(reach).contains(p) {
                 continue;

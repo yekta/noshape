@@ -6,6 +6,7 @@ use crate::constraints::ConstraintKind;
 use crate::entities::EntityKind;
 use crate::geom::Curve2;
 use crate::ids::EntityId;
+use crate::regions::{FREE_END_JOIN, USE_END_REACH};
 use crate::sketch::Sketch;
 use glam::DVec2;
 use std::collections::{HashSet, VecDeque};
@@ -141,26 +142,29 @@ impl Sketch {
         c.tangent(t).try_normalize()
     }
 
-    /// Curves sharing an end with `id` at a smooth joint.
+    /// Curves sharing an end with `id` at a smooth joint: joined by Coincident constraints or meeting where the
+    /// sketch's regions join ends (used and unconstrained curves have no constraints; live: a used rounded
+    /// rectangle's whole loop).
     fn tangent_neighbours(&self, id: EntityId) -> Vec<EntityId> {
         let Some((s, e)) = self.endpoints(id) else { return Vec::new() };
+        let external = |c: EntityId| self.entity(c).is_some_and(|x| x.external);
         let mut out = Vec::new();
         for end in [s, e] {
             let Some(at) = self.point(end) else { continue };
             let Some(t) = self.end_tangent(id, at) else { continue };
-            for p in self.joint_points(end) {
-                for other in self.users_of_point(p) {
-                    if other == id || out.contains(&other) {
-                        continue;
-                    }
-                    let Some((os, oe)) = self.endpoints(other) else { continue };
-                    if p != os && p != oe {
-                        continue;
-                    }
-                    let Some(u) = self.end_tangent(other, at) else { continue };
-                    if t.perp_dot(u).abs() <= 1e-4 {
-                        out.push(other);
-                    }
+            let joint = self.joint_points(end);
+            for (other, (os, oe)) in self.entities().filter_map(|x| Some((x.id, x.endpoints()?))) {
+                if other == id || out.contains(&other) {
+                    continue;
+                }
+                let reach = if external(id) || external(other) { USE_END_REACH } else { FREE_END_JOIN };
+                let meets = |q: EntityId| joint.contains(&q) || self.point(q).is_some_and(|p| (p - at).length() <= reach);
+                if !meets(os) && !meets(oe) {
+                    continue;
+                }
+                let Some(u) = self.end_tangent(other, at) else { continue };
+                if t.perp_dot(u).abs() <= 1e-4 {
+                    out.push(other);
                 }
             }
         }

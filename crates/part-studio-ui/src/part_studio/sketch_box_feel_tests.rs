@@ -398,3 +398,67 @@ fn a_snap_glyph_sits_30_px_right_of_and_below_the_pointer(cx: &mut TestAppContex
     let off = (f32::from(glyph.center().x - at.x), f32::from(glyph.center().y - at.y));
     assert!((off.0 - 30.0).abs() <= 2.0 && (off.1 - 30.0).abs() <= 2.0, "the glyph box centred {off:?} from the pointer, live ≈ (30, 30)");
 }
+
+/// The user's rack Sketch 1 (11-27): a used rounded rectangle, its corners B-splines of degree 2 with 29 poles about
+/// 1 mm apart, no constraints. Its splines.
+fn used_rounded_rectangle(sk: &mut noshape_sketch::Sketch) -> Vec<noshape_sketch::EntityId> {
+    let (h, r) = (0.0635, 0.03);
+    let turn = |k: usize, p: DVec2| (0..k).fold(p, |p, _| DVec2::new(-p.y, p.x));
+    let c = DVec2::new(h - r, r - h);
+    let mut poles = vec![DVec2::new(h - r, -h), DVec2::new(h - r + 0.001, -h)];
+    poles.extend((1..=25).map(|i| {
+        let a = -std::f64::consts::FRAC_PI_2 * (1.0 - i as f64 / 26.0);
+        c + r * DVec2::new(a.cos(), a.sin())
+    }));
+    poles.extend([DVec2::new(h, r - h - 0.001), DVec2::new(h, r - h)]);
+    let mut splines = Vec::new();
+    for k in 0..4 {
+        sk.add_line(turn(k, DVec2::new(r - h, -h)), turn(k, DVec2::new(h - r, -h)));
+        splines.push(sk.add_bspline(&poles.iter().map(|p| turn(k, *p)).collect::<Vec<_>>(), 2).unwrap());
+    }
+    let ids: Vec<noshape_sketch::EntityId> = sk.entities().map(|e| e.id).collect();
+    for id in ids {
+        sk.entity_mut(id).unwrap().external = true;
+    }
+    splines
+}
+
+/// The user's rack (11-27): with no tool a click on a used corner spline selects it and Shift+click adds another, as
+/// live (its poles, not drawn but 1 mm apart within the click's reach, took the click: the spline lit, nothing
+/// selected).
+#[gpui::test]
+fn a_click_on_a_used_corner_spline_selects_it(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "used-spline-click", Tool::Select);
+    let splines = cx.update(|cx| view.update(cx, |v, cx| v.with_sketch(cx, |_, data| used_rounded_rectangle(&mut data.sketch)))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| { let _ = v.finish_sketch(w, cx); })).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_none() && !view.read(cx).ui_busy());
+    let sketch = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(sketch, w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).sketch.is_some() && !view.read(cx).ui_busy());
+    // On each spline next to its middle pole, on screen.
+    let at = |cx: &mut TestAppContext, s: noshape_sketch::EntityId| -> DVec2 {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().unwrap();
+            let sk = &v.sketch_data(cx).unwrap().sketch;
+            let Some(noshape_sketch::Geometry::BSpline { control, .. }) = sk.entity(s).map(|e| &e.geometry) else { panic!("a B-spline") };
+            let on = sk.curve(s).unwrap().closest(sk.point(control[14]).unwrap()).1;
+            v.viewport.read(cx).project(ed.frame.to_world(on)).unwrap()
+        })
+    };
+    let (a, b) = (at(cx, splines[0]), at(cx, splines[2]));
+    let pointer = Pointer::new(cx, window, &view);
+    let press = |cx: &mut TestAppContext, at: DVec2, modifiers: Modifiers| {
+        pointer.move_to(cx, &view, at);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_click(pointer.window_point(cx, at), modifiers);
+        draw(cx, window);
+        selected(cx, &view).0
+    };
+    assert_eq!(press(cx, a, Modifiers::default()), vec![splines[0].0]);
+    let mut both = vec![splines[0].0, splines[2].0];
+    both.sort();
+    assert_eq!(press(cx, b, Modifiers { shift: true, ..Default::default() }), both);
+}

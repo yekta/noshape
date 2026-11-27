@@ -289,8 +289,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
     }
     let mut best_h: Option<(f64, EntityId, DVec2)> = None;
     let mut best_v: Option<(f64, EntityId, DVec2)> = None;
+    // (A used spline's poles aren't drawn: nothing snaps to them.)
+    let hidden = sk.hidden_poles();
     for e in sk.entities() {
-        if excluded(sk, ctx, e.id) {
+        if excluded(sk, ctx, e.id) || hidden.contains(&e.id) {
             continue;
         }
         match &e.geometry {
