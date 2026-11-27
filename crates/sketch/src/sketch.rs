@@ -641,6 +641,17 @@ impl Sketch {
         Ok(())
     }
 
+    /// An open fit spline's end derivatives as its handles give them (the inverse of
+    /// [`Self::set_fit_spline_end_derivatives`]); `None` without handles.
+    pub fn fit_spline_end_derivatives(&self, id: EntityId) -> Option<(DVec2, DVec2)> {
+        let Some(Geometry::FitSpline { points, handles: Some((h0, h1)) }) = self.entity(id).map(|e| &e.geometry) else { return None };
+        let pts: Vec<DVec2> = points.iter().map(|p| self.point(*p)).collect::<Option<_>>()?;
+        if pts.len() < 2 {
+            return None;
+        }
+        Some(crate::nurbs::ends_for_handles(&pts, self.point(*h0)?, self.point(*h1)?))
+    }
+
     /// A control-point B-spline's degree, knots and weights set (Onshape's stored B-splines: a Use's, an offset's;
     /// the Bezier tool makes its poles' one span): clamped, as many knots as poles + degree + 1, never falling,
     /// a positive weight a pole.

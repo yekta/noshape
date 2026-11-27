@@ -1472,7 +1472,10 @@ impl PartStudioView {
         let mut taken_from: Vec<Reference> = Vec::new();
         if let Some(ed) = &self.sketch {
             let data = self.sketch_data(cx);
-            let source = |e: &noshape_sketch::EntityId| data.as_ref().and_then(|d| d.external_refs.get(&e.0).cloned());
+            // (A used curve is the sketch's own: it lights the sketch, live maker-select-used-click-shift.)
+            let source = |e: &noshape_sketch::EntityId| {
+                data.as_ref().filter(|d| d.sketch.entity(*e).is_some_and(|x| x.reference_only)).and_then(|d| d.external_refs.get(&e.0).cloned())
+            };
             taken_from = ed.selection.iter().filter_map(source).collect();
             let own = ed.selection.iter().any(|e| source(e).is_none());
             // The Dimension tool's picks, but the Origin (live sketch-dim-to-origin: it lights nothing).

@@ -7631,6 +7631,59 @@ fn use_inside_the_sketchs_own_face_uses_its_outline(cx: &mut TestAppContext) {
     assert_eq!((lines, message), (4, None), "{hovered}");
 }
 
+/// ui-parity maker-use-face-outline: a quick Use click inside the sketch's own face, before the GPU hover arrives,
+/// uses its outline too.
+#[gpui::test]
+fn a_quick_use_click_inside_the_own_face_uses_its_outline(cx: &mut TestAppContext) {
+    let (window, view, _, _, _, _) = sketch_on_top_face(cx, "use-own-face-quick", Tool::Use);
+    let c = block_centre(cx, &view);
+    let p = on_screen(cx, &view, c);
+    click(cx, window, &view, (p.x, p.y));
+    let (lines, message, turns) = cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let used: Vec<_> = d.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Line && e.external).map(|e| e.id).collect();
+        // Each line's turn about the outline's middle (live maker-*: counterclockwise along the loop, the top one leftwards).
+        let mid = used.iter().filter_map(|l| d.sketch.curve(*l)).map(|c| (c.start_point() + c.end_point()) * 0.5).sum::<glam::DVec2>() / used.len() as f64;
+        let turns: Vec<bool> = used.iter().filter_map(|l| d.sketch.curve(*l)).map(|c| (c.start_point() - mid).perp_dot(c.end_point() - mid) > 0.0).collect();
+        (used.len(), v.sketch.as_ref().unwrap().message.clone(), turns)
+    });
+    assert_eq!((lines, message), (4, None));
+    assert_eq!(turns, [true; 4], "every used line runs counterclockwise along the outline");
+}
+
+/// ui-parity maker-select-used-click-shift (live sketch-used-click-line s81, -shift-multiselect): a click on a used
+/// line selects that sketch entity, not the model edge under it nor nothing; a quick click and one with the edge lit.
+#[gpui::test]
+fn a_click_on_a_used_line_selects_the_used_curve(cx: &mut TestAppContext) {
+    let (window, view, _, edge_pick, a, b) = sketch_on_top_face(cx, "use-then-select", Tool::Use);
+    let c = block_centre(cx, &view);
+    let p = on_screen(cx, &view, c);
+    click(cx, window, &view, (p.x, p.y));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.activate_tool(Tool::Select, w, cx))).unwrap();
+    draw(cx, window);
+    let m = on_screen(cx, &view, (a + b) * 0.5);
+    let picked = |cx: &mut TestAppContext| cx.update(|cx| {
+        let v = view.read(cx);
+        let d = v.sketch_data(cx).unwrap();
+        let sel = v.sketch.as_ref().unwrap().selection.clone();
+        (sel.iter().filter(|e| d.sketch.entity(**e).is_some_and(|x| x.external && x.kind() == noshape_sketch::EntityKind::Line)).count(), sel.len(), v.selection.clone())
+    });
+    click(cx, window, &view, (m.x, m.y));
+    assert_eq!(picked(cx), (1, 1, vec![]), "quick click: (used lines selected, sketch selection, model selection)");
+    click(cx, window, &view, (p.x + 400.0, p.y + 300.0));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| {
+        let vp = v.viewport.clone();
+        vp.update(cx, |vp, _| vp.place_pointer(m));
+        v.on_viewport_event(&vp, &ViewportEvent::PointerMove { position: m, modifiers: Modifiers::default() }, w, cx);
+        v.on_viewport_event(&vp, &ViewportEvent::Hover(Some(edge_pick)), w, cx);
+    }))
+    .unwrap();
+    draw(cx, window);
+    click(cx, window, &view, (m.x, m.y));
+    assert_eq!(picked(cx), (1, 1, vec![]), "the model edge lit under it");
+}
+
 /// qa FLOW-USE-OWN-FACE-REFUSED (flow 58-encl-lip): in a sketch on a filleted, shelled box's rim, Use on the rim uses its
 /// outer loop (4 lines, 4 arcs).
 #[gpui::test]
@@ -10633,4 +10686,35 @@ fn mirror_before_its_line_passes_over_the_sketch_region(cx: &mut TestAppContext)
     let hover = cx.update(|cx| view.read(cx).hover.clone());
     assert_ne!(hover, Some(region), "the circle's region is no mirror line");
     assert!(!matches!(hover, Some(Reference::SketchEntity { .. })), "nor the circle: {hover:?}");
+}
+
+/// Live (ui-parity maker-*, sketch-used-*): N in a sketch on a face turns normal to it and pans the view's centre to the
+/// middle of the face's box, the zoom kept (the plate's 60 x 40 top face: the target over (30, 20)).
+#[gpui::test]
+fn n_in_a_sketch_on_a_face_centres_the_view_on_the_face(cx: &mut TestAppContext) {
+    let starts: serde_json::Value = serde_json::from_str(include_str!("../../../../tests/ui-parity/starts.json")).unwrap();
+    let (window, view) = part_studio_from(cx, "n-face-centre", Some(starts["maker-plate"].clone()));
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && !view.read(cx).display.bodies.is_empty());
+    let top = cx.update(|cx| {
+        let v = view.read(cx);
+        let at = v.vp().read(cx).project(glam::DVec3::new(0.03, 0.02, 0.01)).unwrap();
+        v.model_face_at(at, cx).unwrap()
+    });
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.selection = vec![top];
+            v.start_feature("sketch", w, cx);
+        });
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).sketch.is_some());
+    let before = cx.update(|cx| view.read(cx).viewport.read(cx).camera);
+    view.update(cx, |v, cx| v.view_normal(cx));
+    let to = cx.update(|cx| {
+        let vp = view.read(cx).viewport.read(cx);
+        vp.animation().map_or(vp.camera, |(to, _)| to)
+    });
+    assert!(to.forward().distance(glam::DVec3::NEG_Z) < 1e-9, "normal to the face: {:?}", to.forward());
+    assert!((to.target.x - 0.03).abs() < 1e-6 && (to.target.y - 0.02).abs() < 1e-6, "centred on the face: {:?}", to.target);
+    assert!((to.target - before.target).dot(to.forward()).abs() < 1e-9, "only panned: {:?} -> {:?}", before.target, to.target);
 }

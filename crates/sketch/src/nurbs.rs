@@ -707,6 +707,15 @@ pub(crate) fn handles_for_ends(pts: &[DVec2], d0: DVec2, d1: DVec2) -> (DVec2, D
     (pts[0] + d0 * (first / (3.0 * total)), pts[n - 1] - d1 * (last / (3.0 * total)))
 }
 
+/// The end derivatives handles `hp0`, `hp1` stand for ([`handles_for_ends`]' inverse).
+pub(crate) fn ends_for_handles(pts: &[DVec2], hp0: DVec2, hp1: DVec2) -> (DVec2, DVec2) {
+    let n = pts.len();
+    let total: f64 = pts.windows(2).map(|w| span_weight(w[1] - w[0])).sum::<f64>().max(1e-300);
+    let first = span_weight(pts[1] - pts[0]).max(total * 1e-9);
+    let last = span_weight(pts[n - 1] - pts[n - 2]).max(total * 1e-9);
+    ((hp0 - pts[0]) * (3.0 * total / first), (pts[n - 1] - hp1) * (3.0 * total / last))
+}
+
 /// The periodic cubic's seam through `pts` (the last point standing for the
 /// first; each copy its own input, so a gradient may move them apart): its
 /// second derivatives M_k (M_n = M_0) from the cyclic system

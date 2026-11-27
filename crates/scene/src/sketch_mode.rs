@@ -4552,7 +4552,17 @@ impl SketchEditor {
                     (Pick::Point(p), Pick::Round(r)) | (Pick::Round(r), Pick::Point(p)) => min_max_center(r.extremes_from(p), (p - r.center).length()),
                     (Pick::Segment(l0, l1), Pick::Round(r)) | (Pick::Round(r), Pick::Segment(l0, l1)) => {
                         let Some(d) = (l1 - l0).try_normalize() else { return Vec::new() };
-                        min_max_center(r.extremes_from_segment(l0, l1), (r.center - l0).perp_dot(d).abs())
+                        let ((min, max), center) = (r.extremes_from_segment(l0, l1), (r.center - l0).perp_dot(d).abs());
+                        // Where they meet, the angle there first and Center before Max (live maker-select-used-click-shift
+                        // s10, a used line and the arc it runs into: "Intersection angle 0.000 deg", Min, Center, Max).
+                        let Some(tangent) = r.meets_segment(l0, l1).and_then(|p| (p - r.center).perp().try_normalize()) else { return min_max_center((min, max), center) };
+                        let ang = d.dot(tangent).abs().clamp(0.0, 1.0).acos();
+                        vec![
+                            ("Intersection angle".into(), format!("{} deg", noshape_units::to_fixed(ang.to_degrees(), units.angle_precision))),
+                            ("Min dist".into(), len(min)),
+                            ("Center dist".into(), len(center)),
+                            ("Max dist".into(), len(max)),
+                        ]
                     }
                     (Pick::Round(r), Pick::Round(s)) => {
                         let (min, max) = r.extremes_from_round(&s);
@@ -4565,7 +4575,9 @@ impl SketchEditor {
                         } else {
                             let ang = u.dot(v).clamp(-1.0, 1.0).acos();
                             let ang = ang.min(PI - ang);
-                            one("Angle", format!("{} deg", noshape_units::to_fixed(ang.to_degrees(), units.angle_precision)))
+                            // Live (sketch-fillet-pick-two-lines s15): two perpendicular lines read "Perp lines angle".
+                            let name = if (ang - PI / 2.0).abs() < 1e-9 { "Perp lines angle" } else { "Angle" };
+                            one(name, format!("{} deg", noshape_units::to_fixed(ang.to_degrees(), units.angle_precision)))
                         }
                     }
                 }
@@ -10004,6 +10016,23 @@ impl Round {
         (min_max(&ds).0, e0.1.max(e1.1))
     }
 
+    /// A point where the segment `l0`–`l1` meets the curve (crosses it, touches it or ends on it), to 1e-9.
+    fn meets_segment(&self, l0: DVec2, l1: DVec2) -> Option<DVec2> {
+        const TOL: f64 = 1e-9;
+        if let Some(e) = self.ends().into_iter().find(|e| segment_distance(*e, l0, l1) <= TOL) {
+            return Some(e);
+        }
+        let line = l1 - l0;
+        let u = line.try_normalize()?;
+        let t = (self.center - l0).dot(u);
+        let h = (l0 + u * t - self.center).length();
+        if h > self.radius + TOL {
+            return None;
+        }
+        let half = (self.radius * self.radius - h * h).max(0.0).sqrt();
+        [t - half, t + half].into_iter().filter(|s| (-TOL..=line.length() + TOL).contains(s)).map(|s| l0 + u * s).find(|p| self.holds((*p - self.center).to_angle()))
+    }
+
     /// The nearest and farthest distances between two circles or arcs.
     fn extremes_from_round(&self, other: &Round) -> (f64, f64) {
         let mut ds = Vec::new();
@@ -11077,6 +11106,7 @@ mod tests {
         let p = d.sketch.add_point(v(0.01, 0.02));
         let q = d.sketch.add_point(v(0.04, 0.06));
         let c2 = d.sketch.add_circle(v(0.08, 0.09), 0.01);
+        let l4 = d.sketch.add_line(v(0.0, 0.0), v(0.0, 0.02));
         let readout = |ed: &SketchEditor, sel: &[EntityId]| {
             let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
             ed2.selection = sel.to_vec();
@@ -11087,6 +11117,7 @@ mod tests {
         assert_eq!(readout(&ed, &[c]).as_deref(), Some("Diameter: 10.000 mm"));
         assert_eq!(readout(&ed, &[l1, l2]).as_deref(), Some("Parallel dist: 10.000 mm"));
         assert!(readout(&ed, &[l1, l3]).is_some_and(|t| t.starts_with("Angle: 45") && t.ends_with(" deg")));
+        assert_eq!(readout(&ed, &[l1, l4]).as_deref(), Some("Perp lines angle: 90.000 deg"));
         assert!(readout(&ed, &[p]).is_some_and(|t| t.starts_with("Point: X 10.000 mm")), "{:?}", readout(&ed, &[p]));
         // A line and a circle (live sketch-mirror-preselected-batch): nearest, farthest, the centre to the line.
         assert_eq!(readout(&ed, &[l1, c]).as_deref(), Some("Min dist: 53.310 mm; Max dist: 75.711 mm; Center dist: 50.000 mm"));
@@ -11114,6 +11145,10 @@ mod tests {
         let a2 = d.sketch.add_arc_angles(mm(70.0, -50.0), 0.010, PI, TAU);
         let l1 = d.sketch.add_line(mm(-80.0, -40.0), mm(20.0, -40.0));
         let pt2 = d.sketch.add_point(mm(-30.0, -40.0));
+        // A line running into an arc's end along its tangent, and one crossing a circle through its centre.
+        let a3 = d.sketch.add_arc_angles(mm(8.0, 8.0), 0.008, PI, 1.5 * PI);
+        let l2 = d.sketch.add_line(mm(8.0, 0.0), mm(52.0, 0.0));
+        let l3 = d.sketch.add_line(mm(-30.0, 0.0), mm(30.0, 0.0));
         let readout = |sel: [EntityId; 2]| {
             let text = |sel: &[EntityId]| {
                 let mut ed2 = SketchEditor::new(ed.feature, ed.frame);
@@ -11127,6 +11162,8 @@ mod tests {
         assert_eq!(readout([pt1, c1]), "Min dist 64.443 | Max dist 114.443 | Center dist 89.443");
         assert_eq!(readout([pt1, a1]), "Min dist 140.242 | Max dist 169.779 | Center dist 155.242");
         assert_eq!(readout([l1, a1]), "Min dist 53.151 | Max dist 170.242 | Center dist 40.000");
+        assert_eq!(readout([l2, a3]), "Intersection angle 0.000 deg | Min dist 0.000 | Center dist 8.000 | Max dist 52.612");
+        assert_eq!(readout([l3, c1]), "Intersection angle 90.000 deg | Min dist 0.000 | Center dist 0.000 | Max dist 55.000");
         assert_eq!(readout([c1, a1]), "Center dist 70.000 | Max dist 110.000 | Min dist 30.000");
         assert_eq!(readout([a1, a2]), "Center dist 50.000 | Max dist 75.000 | Min dist 50.249");
         assert_eq!(readout([c1, c3]), "Center dist 0.000 | Max dist 31.000 | Min dist 19.000");

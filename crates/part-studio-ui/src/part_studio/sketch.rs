@@ -1601,9 +1601,10 @@ impl PartStudioView {
                     self.ui.sketch_ctrl_press = Some(*position);
                 }
                 if !overlay_pressed && tool == Some(Tool::Use) {
-                    // The GPU hover may lag a quick click: the edge under the pointer then.
+                    // The GPU hover may lag a quick click: the edge under the pointer then, else the face (ui-parity
+                    // maker-use-face-outline: a click inside the sketch's own face used nothing).
                     if self.hover.is_none() {
-                        self.hover = self.model_edge_at(*position, cx);
+                        self.hover = self.model_edge_at(*position, cx).or_else(|| self.model_face_at(*position, cx));
                     }
                     self.use_hovered(window, cx);
                     return true;
@@ -2809,6 +2810,13 @@ impl PartStudioView {
         let at = self.display.bodies.iter().find_map(|b| b.vertex_refs.iter().position(|v| *v == r).and_then(|i| b.mesh.vertices.get(i)))?;
         let p = self.vp().read(cx).project(DVec3::new(f64::from(at[0]), f64::from(at[1]), f64::from(at[2])))?;
         (p.distance(position) <= 12.0).then_some(r)
+    }
+
+    /// The nearest model face under `position`.
+    fn model_face_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
+        let (o, d) = self.vp().read(cx).ray(position);
+        let hits = noshape_model::interaction::entities_along_ray(&self.display, o, d, 0.0, &|_| false, 8);
+        hits.into_iter().find(|h| matches!(h.reference, Reference::Face(_))).map(|h| h.reference)
     }
 
     fn model_edge_at(&self, position: DVec2, cx: &App) -> Option<Reference> {
@@ -5370,6 +5378,23 @@ impl PartStudioView {
             let ring = on_curve(&g);
             let cid = g.constraint;
             let gent = g.entity;
+            // Outside Use a used curve's own glyph is only drawn: a press on it takes the curve (live sketch-used-click-line
+            // s81: a click on a used line's middle selects the line; ui-parity maker-*: Offset, Select, Dimension there).
+            if ring && ed.tool != Tool::Use {
+                out.push(
+                    div()
+                        .absolute()
+                        .left(px(x + dx))
+                        .top(px(y + dy))
+                        .size(px(20.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(div().size(px(9.)).rounded_full().border_2().border_color(rgb(0x000000)).bg(rgb(0xffffff)))
+                        .into_any_element(),
+                );
+                continue;
+            }
             boxes.push((cid, gent, x + dx, y + dy));
             let selected = ed.selected_constraints.contains(&cid);
             let hovered = ed.hover_constraint == Some(cid);

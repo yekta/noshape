@@ -228,10 +228,54 @@ pub fn use_reference(data: &mut SketchData, model: Model, world_per_px: f64, cur
         Reference::Face(_) => {
             // Live (behaviours "Use (u) on the face projected only its 4 outer edges"): the outer loop, not the holes.
             let made: Vec<EntityId> = model.outer_edge_refs(r).iter().filter_map(|er| external_entity(data, model, world_per_px, cursor, er, false, false)).collect();
+            orient_loop(data, &made);
             join_loop_ends(data, &made);
             !made.is_empty()
         }
         _ => false,
+    }
+}
+
+/// A used face's lines run along its loop, counterclockwise in the sketch (live maker-*: the top line of a plate's
+/// outline goes from (52, 40) to (8, 40), the left one down, whatever way the model's edges run).
+fn orient_loop(data: &mut SketchData, curves: &[EntityId]) {
+    let items: Vec<(EntityId, noshape_sketch::Curve2)> = curves.iter().filter_map(|c| Some((*c, data.sketch.curve(*c)?))).filter(|(_, c)| !c.is_closed()).collect();
+    let Some(first) = items.first() else { return };
+    let near = |a: DVec2, b: DVec2| (a - b).length() <= 1e-7;
+    // The loop's curves in order, each with whether it runs its own way.
+    let mut chain = vec![(0, true)];
+    let mut end = first.1.end_point();
+    while chain.len() < items.len() {
+        let next = items.iter().enumerate().filter(|(i, _)| !chain.iter().any(|(k, _)| k == i)).find_map(|(i, (_, c))| {
+            if near(c.start_point(), end) {
+                Some((i, true))
+            } else {
+                near(c.end_point(), end).then_some((i, false))
+            }
+        });
+        let Some((i, forward)) = next else { return };
+        end = if forward { items[i].1.end_point() } else { items[i].1.start_point() };
+        chain.push((i, forward));
+    }
+    let mut ring: Vec<DVec2> = Vec::new();
+    for &(i, forward) in &chain {
+        let mut pts = items[i].1.tessellate(1e-5);
+        if !forward {
+            pts.reverse();
+        }
+        ring.extend(pts);
+    }
+    let area: f64 = ring.iter().zip(ring.iter().cycle().skip(1)).map(|(a, b)| a.perp_dot(*b)).sum();
+    for (i, forward) in chain {
+        // Clockwise: every curve's way turns round.
+        let along = forward == (area > 0.0);
+        if along || !matches!(items[i].1, noshape_sketch::Curve2::Line { .. }) {
+            continue;
+        }
+        let Some((s, e)) = data.sketch.endpoints(items[i].0) else { continue };
+        let (Some(ps), Some(pe)) = (data.sketch.point(s), data.sketch.point(e)) else { continue };
+        let _ = data.sketch.set_point(s, pe);
+        let _ = data.sketch.set_point(e, ps);
     }
 }
 

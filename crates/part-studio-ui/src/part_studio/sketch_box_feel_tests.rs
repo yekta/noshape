@@ -462,3 +462,41 @@ fn a_click_on_a_used_corner_spline_selects_it(cx: &mut TestAppContext) {
     both.sort();
     assert_eq!(press(cx, b, Modifiers { shift: true, ..Default::default() }), both);
 }
+
+/// ui-parity maker-select-used-click-shift (live sketch-used-click-line s81): with no tool a click on a used line's
+/// middle, where its use glyph sits, selects the line, and Shift+click there takes it out again (the glyph took the
+/// press: nothing selected, and Offset there offset nothing).
+#[gpui::test]
+fn a_click_on_a_used_lines_middle_selects_the_line_not_its_use_glyph(cx: &mut TestAppContext) {
+    let Some(_gpu) = gpu_pointer() else { return };
+    RENDERING.set(true);
+    let (window, view) = sketch_with(cx, "used-line-middle-click", Tool::Select);
+    let line = cx
+        .update(|cx| {
+            view.update(cx, |v, cx| {
+                v.with_sketch(cx, |_, data| {
+                    let r = data.sketch.use_external(&noshape_sketch::Curve2::Line { a: DVec2::new(-0.03, 0.02), b: DVec2::new(0.03, 0.02) }).unwrap();
+                    let line = *r.created.last().unwrap();
+                    data.external_refs.insert(line.0, Reference::Plane(noshape_model::reference::DatumPlane::Top));
+                    line
+                })
+            })
+        })
+        .unwrap();
+    view.update(cx, |v, cx| v.refresh_scene(false, cx));
+    draw(cx, window);
+    let mid = cx.update(|cx| {
+        let v = view.read(cx);
+        v.viewport.read(cx).project(v.sketch.as_ref().unwrap().frame.to_world(DVec2::new(0.0, 0.02))).unwrap()
+    });
+    let pointer = Pointer::new(cx, window, &view);
+    let press = |cx: &mut TestAppContext, modifiers: Modifiers| {
+        pointer.move_to(cx, &view, mid);
+        let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+        vcx.simulate_click(pointer.window_point(cx, mid), modifiers);
+        draw(cx, window);
+        selected(cx, &view).0
+    };
+    assert_eq!(press(cx, Modifiers::default()), vec![line.0], "the used line selected");
+    assert_eq!(press(cx, Modifiers { shift: true, ..Default::default() }), Vec::<u32>::new(), "Shift+click takes it out");
+}

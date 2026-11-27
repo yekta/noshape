@@ -3707,7 +3707,18 @@ impl PartStudioView {
             .selection
             .iter()
             .find_map(|r| frame_of(self, r))
-            .or_else(|| self.sketch.as_ref().map(|s| (s.frame, None)))
+            .or_else(|| {
+                // A sketch on a face: centred on the face's box (live maker-*, sketch-used-*: N pans the target to the
+                // middle of the face's outline, x 30.045 on a spline face 60.09 mm wide).
+                let plane = self.edit.as_ref().and_then(|e| e.dialog.read(cx).feature.params.query("sketchPlane").first().cloned());
+                let centre = match plane {
+                    Some(Reference::Face(n)) => self.context.as_ref().and_then(|c| {
+                        c.bodies.iter().find_map(|b| b.shape.sub_shape(noshape_kernel::ShapeType::Face, *b.find_faces(&n).first()?).ok()?.bounding_box(true).ok())
+                    }),
+                    _ => None,
+                };
+                self.sketch.as_ref().map(|s| (s.frame, centre.map(|b| b.center())))
+            })
             .or_else(|| self.hover.as_ref().and_then(|r| frame_of(self, r)));
         if let Some((f, centre)) = frame {
             self.push_camera_history(cx);

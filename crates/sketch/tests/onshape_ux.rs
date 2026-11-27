@@ -926,9 +926,13 @@ fn a_fit_spline_takes_onshapes_end_derivatives() {
         let ends = (nb.eval_ders(a)[1] * (b - a), nb.eval_ders(b)[1] * (b - a));
         assert!((ends.0 - d0).length() < 1e-9 && (ends.1 - d1).length() < 1e-9, "{ends:?}");
         assert!((nb.eval_ders(a)[0] - pts[0]).length() < 1e-12 && (nb.eval_ders(b)[0] - pts[2]).length() < 1e-12);
+        // Read back as Onshape stores them (the ui-parity state's derivatives).
+        let (r0, r1) = sk.fit_spline_end_derivatives(s).unwrap();
+        assert!((r0 - d0).length() < 1e-12 && (r1 - d1).length() < 1e-12, "{r0:?} {r1:?}");
     }
     let mut sk = Sketch::new();
     let line = sk.add_line(v(0.0, 0.0), v(0.01, 0.0));
+    assert_eq!(sk.fit_spline_end_derivatives(line), None);
     assert!(sk.set_fit_spline_end_derivatives(line, d0, d1).is_err());
 }
 

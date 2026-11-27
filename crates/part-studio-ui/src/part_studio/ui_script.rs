@@ -133,9 +133,11 @@ impl PartStudioView {
         let in_sketch = self.sketch.as_ref().map(|ed| {
             let f = ed.feature;
             let picks = if ed.tool == crate::sketch_mode::Tool::Dimension { ed.tool_picks() } else { Vec::new() };
-            // A linked plane, edge or vertex picked into the sketch reads as itself (live: PLANE Right).
-            let linked = self.sketch_data(cx).map(|d| d.external_refs.clone()).unwrap_or_default();
-            ed.selection.iter().chain(&picks).map(|e| linked.get(&e.0).cloned().unwrap_or(Reference::SketchEntity { sketch: f, entity: e.0 })).chain(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() })).chain(ed.model_selection.iter().cloned()).collect::<Vec<_>>()
+            // A linked plane, edge or vertex picked into the sketch reads as itself (live: PLANE Right); a used curve is
+            // the sketch's own (live sketch-used-*: SKETCH_ENTITY).
+            let data = self.sketch_data(cx);
+            let linked = |e: &noshape_sketch::EntityId| data.as_ref().filter(|d| d.sketch.entity(*e).is_some_and(|x| x.reference_only)).and_then(|d| d.external_refs.get(&e.0).cloned());
+            ed.selection.iter().chain(&picks).map(|e| linked(e).unwrap_or(Reference::SketchEntity { sketch: f, entity: e.0 })).chain(ed.selected_regions.iter().map(|k| Reference::SketchRegion { sketch: f, key: k.clone() })).chain(ed.model_selection.iter().cloned()).collect::<Vec<_>>()
         });
         // An open Create selection panel: its picks are the selection (live mirror-face-create-selection).
         let cs_seeds = self.ui.create_selection.as_ref().map(|c| c.seeds.clone());
@@ -464,7 +466,8 @@ impl PartStudioView {
         let mut entities: Vec<String> = sk
             .entities()
             // (A spline's tangent handles are part of it in live's model: not listed.)
-            .filter(|e| !e.external && !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)) && !text_box.contains(&e.id))
+            // (Used curves and points too: live sketch-used-*, maker-*.)
+            .filter(|e| !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)) && !text_box.contains(&e.id))
             .map(|e| {
                 let kind = entity_kind_name(e.kind());
                 if e.construction { format!("construction {kind}") } else { kind.to_string() }
@@ -484,6 +487,18 @@ impl PartStudioView {
             }
         }
         let mut constraints: Vec<String> = users.values().filter(|n| **n > 1).flat_map(|n| std::iter::repeat_n("COINCIDENT".to_string(), n - 1)).collect();
+        // A used curve or point is Projected in live's model, and so is each model vertex a used curve ends on (maker-*:
+        // a face's outline of 8 curves, 16 PROJECTED and 8 COINCIDENT; sketch-used-*: 6 used points and a circle, 7).
+        let mut used_ends = std::collections::HashSet::new();
+        for e in sk.entities().filter(|e| e.external && !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)) && !text_box.contains(&e.id)) {
+            constraints.push("PROJECTED".into());
+            // (By position: each used curve has end points of its own, Coincident with its neighbour's.)
+            let at = |p| sk.point(p).map(|q: DVec2| ((q.x * 1e8).round() as i64, (q.y * 1e8).round() as i64));
+            if let Some((a, b)) = e.endpoints().filter(|(a, b)| a != b) {
+                used_ends.extend([at(a), at(b)].into_iter().flatten());
+            }
+        }
+        constraints.extend(std::iter::repeat_n("PROJECTED".to_string(), used_ends.len()));
         // Live's model holds an open spline's, Bezier's or conic's ends as points of their own, each Coincident with
         // it, and a Bezier's degree as a constraint (sketch-spline-menu-confirm, sketch-tool-bezier, sketch-tool-conic).
         for e in sk.entities().filter(|e| !e.external && e.handle_of.is_none() && matches!(e.kind(), EntityKind::BSpline | EntityKind::FitSpline | EntityKind::Conic)) {
@@ -834,11 +849,10 @@ fn sketch_geometry(sk: &noshape_sketch::Sketch, owned: &std::collections::HashSe
             let mut g = json!({ "kind": kind });
             let points: Vec<[f64; 2]> = match &e.geometry {
                 Geometry::Point { pos } => vec![mm(*pos)],
-                Geometry::FitSpline { points, handles } => {
-                    if let Some((a, b)) = handles {
-                        let ends = (points.first().and_then(at), points.last().and_then(at));
-                        let d = |tip: &noshape_sketch::EntityId, end: Option<[f64; 2]>| at(tip).zip(end).map(|(t, e)| [((t[0] - e[0]) * 1e4).round() / 1e4, ((t[1] - e[1]) * 1e4).round() / 1e4]);
-                        g["derivatives"] = json!([d(a, ends.0), d(b, ends.1)]);
+                Geometry::FitSpline { points, .. } => {
+                    // Live's startDerivative / endDerivative: per unit of the 0–1 parameter, not the handle's offset.
+                    if let Some((a, b)) = sk.fit_spline_end_derivatives(e.id) {
+                        g["derivatives"] = json!([mm(a), mm(b)]);
                     }
                     points.iter().filter_map(at).collect()
                 }
