@@ -1,8 +1,18 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 10:50 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 10:56 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
+## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
+- Suite 1126-2043 (190bd1b8; report vibex8 ~/tmp/qa/report.json, snapshot ~/tmp/qa/models-1126-2043-190bd1b8/<doc>/;
+  copy core-scratch/suite/). blend parked: blend_direct.cpp is core's for now (note added to blend.md, acbf4dcd5).
+  1 c2-opt-pattern-skip-centred Circular pattern 1 (PART, NEW, 60 deg x 5, isCentered, skipInstances [index 1]):
+    Part 16 centroid y 10.5, live 19.5 (STARTED: params read; next: run it, check pattern.rs centred+skip indexing).
+  2 c2-opt-fillet-partial-asym-smooth Fillet 2: edges 20 line/2 other vs 18/4, -0.17 mm3.
+  3 c2-body-draft-naming Fillet 1: edges 19 line/2 other vs 15/6 (SUITE-NEW-INDEX-1120-CORE).
+  3b c2-dm-vs Extrude 1 ERROR "Variable not found..." (depth #h from a Variable Studio reference; live OK, 4 parts).
+  4 c2-curve-pattern-composite Fillet 2: 28/58/32 vs live 26/52/28. 5 c2-impeller-loft Fillet 3: edges 93 vs 95.
+  Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
 - **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
@@ -37,24 +47,9 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   common vertices, no edge, their midpoint on both); T1 features_a::a_face_pattern_whose_copy_touches_the_part_along_
   a_line_fails (8 along Error, 10 along Ok); model 662 ok; corpus A/B .ab13.sh ALL-SAME. QUEUED 0d26da5f 09:0x (with
   the P0 fix 931a66b5's commits).
-- **KNIFEHANDLE SPLIT 1 -> CHAMFER 1 (lead 09:1x, half a day): IN FLIGHT, worktree core-uip3 (uncommitted).**
-  Split 1 is NOT ours: an exact integral of the sketch Beziers (core-scratch/kh/area.py) gives the kept flank 5150.5325
-  mm2 = ours 5150.533; our cut is 0.003 mm from live's edge; live's 5157.15/.31 is live's own area figure (its MF2 rebuilds
-  the face: 5150.3594 = ours). Sweep 2 / Extrude 1 / Fillet 3 / MF1 / MF2 = live within 0.1 mm2. First real difference:
-  Chamfer 1 (section blend) run-on at the blade's tip: straight past the end, it met Fillet 3's round 0.36 mm short (tip
-  round 2.045 vs live 1.847, ridge 247.94 vs 248.32). FIX blend_section.rs: a chamfer's run-on bends with its edge's end
-  turn (3 sections along the parabola; straight edges unchanged) -> 1.877 / 248.26; chamfer sections 24 -> 48 (24 left
-  the mirrored bevels 319.00 / 319.48, live 319.34 / 319.36; 48: 319.27 / 319.30). T1 features_c::an_offset_angle_chamfer
-  _of_a_blades_bottom_edges_as_live tightened (tip, bevels; volume band 1.5: our MF2 input is 0.57 mm3 under live's).
-  A/B .ab14 (chamfer only): knifehandle Fillet 2 Ok -> Error (hunting-knife +0.01 mm3 only); model 663 ok. Fillet 2's
-  tip run-on then failed twice: (1) build.cpp reface_on re-projected the bevel's edges onto its extended surface, the
-  ridge 8 um off, wire self-intersecting -> FIX: keep an edge's own pcurve where the extended surface passes through the
-  old one's points (holds()); (2) blend_direct.cpp lies_on: the tip-round ball tool's side is 1.4 um off the tip's round
-  but 0.04 rad in normal (limit 0.02) -> "a tool's side off a face of its edge" -> FIX limit 0.05 rad (blend's file:
-  tell the lead). Then Fillet 2 = 11 faces, tip 0.619/0.62/0.634 (live 0.595/0.595/0.653; old 0.653/0.653/0.737),
-  bevels 319.07/319.10 (live 319.07/319.17). T1 chamfer test extended with Fillet 2 (11/27/18, tip faces vs live).
-  Corpus A/B .ab15 (10:4x): only knifehandle (11/27/18 both, 10391.79 -> 10391.65) and hunting-knife (+0.01 mm3);
-  model 663 ok, kernel 620 ok. COMMITTED 21f359d02 (full round 784ca93c0), LANDING 10:5x.
+- **KNIFEHANDLE SPLIT 1 -> CHAMFER 1: DONE, QUEUED 45a536cf (21f359d02, lead told 10:5x).** Split 1 exact (live's
+  5157 = its own area figure). Chamfer 1 curved run-on + 48 sections; Fillet 2 over the tip: build.cpp reface_on keeps
+  pcurves (holds()), blend_direct lies_on normals 0.05 rad. A/B .ab15: only knifehandle/hunting-knife; model 663, kernel 620.
 - **UIPDEP3 RERUN 09:4x (vibex8 ~/tmp/core/uip)**: mistake-rib-flipped-misses + mistake-linear-pattern-face-boss MATCH.
   fillet-full-round-ok: live marks the first EMPTY selection field error (side1Face, side2Face, centerFaces in turn);
   FIXED uncommitted detail.rs full_round err_at(first empty) + T1 features_c::a_full_round_names_its_first_empty_selection
