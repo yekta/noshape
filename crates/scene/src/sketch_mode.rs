@@ -4739,6 +4739,30 @@ impl SketchEditor {
                 attach(sk, *p, Some(id), click);
             }
         }
+        // A point placed level with (or plumb over) the previous one: Horizontal (Vertical) between the two points
+        // (live sketch-used-click-spline s12: HORIZONTAL on the spline's first two points).
+        if self.tool == Tool::Spline
+            && let Some(noshape_sketch::Entity { geometry: noshape_sketch::Geometry::FitSpline { points, .. }, .. }) = sk.entity(id).cloned()
+        {
+            for (i, click) in clicks.iter().enumerate().skip(1) {
+                let (Some(&a), Some(&b)) = (points.get(i - 1), points.get(i)) else { continue };
+                for c in click.inference.iter().flat_map(|i| &i.constraints) {
+                    let kind = match c {
+                        AutoConstraint::HorizontalLine => ConstraintKind::Horizontal { a, b: Some(b) },
+                        AutoConstraint::VerticalLine => ConstraintKind::Vertical { a, b: Some(b) },
+                        _ => continue,
+                    };
+                    // (Already there when the point aligned with the previous one itself.)
+                    let same = |k: &ConstraintKind| match (k, &kind) {
+                        (ConstraintKind::Horizontal { a: x, b: Some(y) }, ConstraintKind::Horizontal { .. }) | (ConstraintKind::Vertical { a: x, b: Some(y) }, ConstraintKind::Vertical { .. }) => (*x, *y) == (a, b) || (*x, *y) == (b, a),
+                        _ => false,
+                    };
+                    if !sk.constraints().any(|k| same(&k.kind)) {
+                        let _ = sk.add_constraint(kind);
+                    }
+                }
+            }
+        }
         self.finish_create(data, &[id]);
         EditOutcome::changed()
     }
@@ -8018,6 +8042,8 @@ fn attach(sk: &mut Sketch, pt: EntityId, curve: Option<EntityId>, click: &Click)
                 }
             }
             AutoConstraint::CoincidentPoint(_) => {}
+            // A direction from the previous point binds a line; a spline's points take it between them (finish_spline).
+            AutoConstraint::HorizontalLine | AutoConstraint::VerticalLine if curve.is_some_and(|c| !matches!(sk.curve(c), Some(Curve2::Line { .. }))) => {}
             other => {
                 if let Some(kind) = other.to_constraint(out, curve) {
                     let _ = sk.add_constraint(kind);
@@ -15612,6 +15638,26 @@ mod tests {
         let fit = fit.expect("a fit spline");
         assert_eq!(fit.len(), 3);
         assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { a, b: Some(_) } if a == fit[1])), "the middle point's VERTICAL");
+    }
+
+    /// Live sketch-used-click-spline s9-s12: a spline point clicked a few px off level with the previous one lands
+    /// level and the two points take one HORIZONTAL (ours aligned it with none).
+    #[test]
+    fn a_spline_point_placed_level_with_the_previous_one_is_horizontal_to_it() {
+        let (mut ed, mut d) = editor(Tool::Spline);
+        click(&mut ed, &mut d, v(-0.02, 0.01));
+        click(&mut ed, &mut d, v(0.0, 0.01 + 2.0 * PX));
+        click(&mut ed, &mut d, v(0.01, 0.03));
+        ed.escape_commit(&mut d).expect("Esc commits the spline");
+        let fit = d.sketch.entities().find_map(|e| match &e.geometry {
+            noshape_sketch::Geometry::FitSpline { points, .. } => Some(points.clone()),
+            _ => None,
+        });
+        let fit = fit.expect("a fit spline");
+        let y = |p: EntityId| d.sketch.point(p).expect("a point").y;
+        assert!((y(fit[1]) - y(fit[0])).abs() < 1e-9, "placed level");
+        let level = d.sketch.constraints().filter(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: Some(b) } if (a, b) == (fit[0], fit[1]) || (a, b) == (fit[1], fit[0]))).count();
+        assert_eq!(level, 1, "one HORIZONTAL between the first two points: {:?}", d.sketch.constraints().map(|c| c.kind.clone()).collect::<Vec<_>>());
     }
 
     /// Live sketch-drag-1125: a point pressed a few px off keeps that offset from the pointer (no jump onto it).
