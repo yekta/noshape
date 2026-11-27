@@ -4,7 +4,7 @@ Owner: bool (bool2 merged in 11-19). noshape's own Boolean (crates/brep, kernel 
 unify), the Shell builder (by_quadrics, shell.cpp), the speed of Booleans, Shell and Split. History:
 docs/handoff/archive/bool.md (the 11-19 16:45 handoff is at its end) and archive/bool2.md. Rulings: docs/DECISIONS.md.
 
-Updated 11-26 09:40 UTC. Hosts by load (DECISIONS 11-19): read
+Updated 11-27 14:20 UTC. Hosts by load (DECISIONS 11-19): read
 `ssh <h> cut -d" " -f1 /proc/loadavg` on vibex7 / vibex8 / vibe2 / vibex6 (crate tests only there); the Mac is back
 (lead 21:36: headless, ~/noshape-host only, 2 slots): builds + probes there (NOSHAPE_RB_HOST=mac from worktree
 bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates through ~/bin/slot, one per host, as systemd-run units
@@ -12,13 +12,23 @@ bool-hat, inside an rb.sh slot, Mac paths ~/noshape-host/bool-keep); gates throu
 only vibex7 ~/lead-private. Never kill a process tree from a computed pid: `systemctl stop <unit>`. Agent ids: only
 /root/lead-scratch/roster.md (read before messaging).
 
-## P0 BOOL-TURN-SPLIT-SLOWER (11-27; landing for the 17:00 cut)
-- Cause: 5e42155d5's divided_turns() and TurnsDivided::rejoined() each computed volume_props_precise twice on the
-  whole threaded solid (~0.5 s each, 4 per Boolean). Fix: face_area() checks on only the divided / joined faces
-  (pieces sum to the face, 1e-4 rel); face count + BRepCheck kept. The split must stay (off: standoffs Revolve 2
-  2 parts vs live 3, nuts Sweep 1 "non-manifold").
-- vibex8: standoffs 8417 -> 2180 ms, nuts 2151 -> 609 ms, helical 679 -> 253 ms; all still match (32/32, 17/17,
-  5/5). qa's 0.4.73 (vibex7): 1.6 / 0.7 / 0.2 s: standoffs may still be ~0.6 s over; compare on one host next.
+## P0 BOOL-TURN-SPLIT-SLOWER (state 11-27 14:20 UTC; lead: land before ~00:00 so the 00:17 main CI carries it)
+- 58e4cdbf QUEUED (area checks instead of volume integrals in the split/rejoin). Keep it.
+- ec60ab700 (bool-fb, committed, gating): turns_cut() builds the turn split directly (edge pieces by EmptyCopied +
+  Range, chords with a (u, v) line pcurve, regions by walking the face's loop and crossing at each chord end;
+  BRepFeat only for >1 wire / seam / crossing at a vertex): 1.5 s -> 4 ms on standoffs; rejoined() checks only the
+  changed faces; face_moments integrates every cylinder/cone face along v (inner_v, one 8-point segment: the
+  integrand is a polynomial of degree <= 4 along the axis). Volumes vs the old path: <= 2e-7 relative (nuts),
+  2e-8 (standoffs). Same-run vibex8 CLI A/B: standoffs kernel totals 0.4.73 1574 ms vs fix 1152 (op_boolean 554/346,
+  props_volume 391/145, op_unify 348/436); wall 1.2-1.6 s both (load noise); nuts/helical same; all SAME.
+- Ruled out: faces_volume via our integral (OCCT's Vinert 28 ms vs ours 176 on those faces); ShapeDivideAngle
+  (doesn't split); split off (OCCT 7.5 s, Revolve 2 wrong); same-domain trigger.
+- Left (not needed for the bar): op_unify +90 ms (usd vchange ~230 ms, new_faces_valid ~90 ms on helix faces).
+- Probe build kept: /root/bool-scratch/p0-direct-probes.diff (VOLCMP, VTYPES, ALONGV, DCHECK, BREPFEAT toggles).
+- To land: kernel tests (kt-p0.sh), GCC 13 ok, gate chain /root/bool-hat-scratch/chain-ec60ab700c.out, knurls
+  (kn-run.sh with k-main/k-br), then land.sh; report to the lead. vibex8 files: ~/tmp/bool/ops-turns, cmp/, tp/,
+  rec-stand/: delete after the land.
+
 ## GAMMA (next)
 - Worktree bool-uv (branch bool-gamma on origin/main bbb452fe6): probes probe_case_args/probe_case_topo (+PROBE_FUZZY) in
   brep_replay.rs (never commit), lens change in drop_strip_faces (boolean.cpp: `lens` = face of 2 vertices, 2 edges
