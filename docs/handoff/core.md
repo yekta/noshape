@@ -1,6 +1,6 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 13:06 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 13:50 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
@@ -29,9 +29,15 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
     our OTHER): 11-16 known-difference class; (b) the conic end at x=5: live 0.19+0.56 each side + a 0.36 edge across
     (5,-0.144,-44.007), ours 2 x 0.75 meeting at y 0, plus live's 0.05 edge at (0.023,4.132,-63.209). (b) is the layout
     zum Halter's 4th reference needs (archive 11-25 note; crease-turn WIP core-scratch/imp/crease-turn-wip3.patch, parked).
-  6 psui SPLIT-TRIMMED-PARTIAL-ERRORS (live "Tool entity cannot split the selected part/face." with Trim to face
-    boundaries, tool partly across); keep ours if valid + what was asked ("ours does the work"), live's error only for
-    non-manifold or a slit. Lead FYI: check qa's ~13:xx verdict clears impeller "Select a sketch plane." (69eae144).
+  6 IN FLIGHT psui SPLIT-TRIMMED-PARTIAL-ERRORS (ui-parity mistake-split-trim-to-face-partial s7): ours kept Part 1 whole
+    with Info "Selected entity does not split selected parts." (= not doing the work) -> live's error. UNCOMMITTED in
+    core-uip3: split.rs (pieces < 2 and the split result has an INTERNAL face or edge = a slit -> err "Tool entity cannot
+    split the selected part/face.") + T1 model features_b::a_trimmed_face_part_way_through_a_part_cannot_split_it (also
+    pins the miss case's Info). Split tests 35/35 ok. RUNNING 13:4x .ab19.sh on vibex7 (corpus A/B, A = .split-main.rs,
+    + model tests) -> /root/core-scratch/ab19.out. If only expected diffs: commit "core: a split by a tool part way
+    through a part fails as live's", land, rm .split-main.rs, tell psui's row "fixed".
+  LEAD NOT YET TOLD (lead was >200k): #3 queued 65e8a5e8 (half the gap + bridging Warning->Ok), #4 + #5 parked with the
+  findings above, #6 status. Lead FYI still open: qa's ~13:xx verdict on impeller "Select a sketch plane." (69eae144).
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
