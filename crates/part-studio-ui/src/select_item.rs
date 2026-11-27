@@ -20,6 +20,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 const BLUE: u32 = 0x1651b0;
+/// The libraries' search boxes' placeholder.
+const LIBRARY_SEARCH: &str = "Search by name, folder, or configuration";
 
 /// What the panel picks: a reference parameter of this kind, or the toolbar's custom features (Add custom
 /// features: a Feature Studio's features at a document version, by type id).
@@ -186,6 +188,8 @@ pub struct SelectItemPanel {
     frame_selects: HashMap<&'static str, (Entity<crate::os_select::OsSelect>, Subscription)>,
     /// Frame's library search box, and its previews by `profileSketch` value (with their size).
     frame_search: Option<(Entity<InputState>, Subscription)>,
+    /// Insert image › Libraries' own search box.
+    lib_image_search: Option<Entity<InputState>>,
     frame_previews: HashMap<(String, u32), Arc<gpui_kit::Image>>,
     /// The user's frame profiles library (live 2530: Library ▾ "‹name› frame profiles" first), whether it is the one
     /// shown (`Some(true)`; `None` "Library not available": the value's library was unset), and the Type / Profile
@@ -448,6 +452,7 @@ impl SelectItemPanel {
             frame_pick: None,
             frame_selects: HashMap::new(),
             frame_search: None,
+            lib_image_search: None,
             frame_previews: HashMap::new(),
             frames_lib,
             frame_user,
@@ -1371,7 +1376,7 @@ impl SelectItemPanel {
     /// Insert image › Libraries (live 1726): Library [Onshape images],
     /// Type [Environment maps], Image ▾ (11, the first by default), its
     /// 240 × 136 thumbnail and an outline [Done] at the bottom centre.
-    fn render_library_images(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_library_images(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         use noshape_scene::environment_maps as env;
         let pal = p();
         let select = match &self.lib_image_select {
@@ -1425,7 +1430,18 @@ impl SelectItemPanel {
             }
             None => fixed("Onshape images"),
         };
-        let mut col = v_flex().flex_1().min_h_0().pt(px(6.)).gap(px(2.)).child(row("Library", library));
+        // The search box above Library (live insert-image-libraries-1127: 288 × 30, #aaa border, Library 10 px below).
+        let search = self.lib_image_search.get_or_insert_with(|| cx.new(|cx| InputState::new(window, cx))).clone();
+        let search_box = h_flex().h(px(42.)).flex_none().px(px(6.)).pt(px(4.)).pb(px(8.)).child(
+            div()
+                .flex_1()
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xaaaaaa))
+                .child(crate::ui::input_with_placeholder(&search, LIBRARY_SEARCH, cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
+        );
+        let mut col = v_flex().flex_1().min_h_0().gap(px(2.)).child(search_box).child(row("Library", library));
         let mut done_value: Option<String> = None;
         match user_lib.filter(|_| self.img_user) {
             Some((types, _)) => {
@@ -2373,7 +2389,7 @@ impl Render for SelectItemPanel {
         let shown = if other { self.other.as_ref() } else { self.current.as_ref() };
         let in_libraries = self.in_libraries;
         if in_libraries && mode == PanelMode::Reference(ReferenceKind::Image) {
-            body = body.child(self.render_library_images(cx));
+            body = body.child(self.render_library_images(window, cx));
         } else if in_libraries && self.frame_profiles {
             body = body.child(self.render_frame_library(window, cx));
         } else if in_libraries {
@@ -2472,7 +2488,9 @@ impl Render for SelectItemPanel {
         if let Some(title) = self.title.filter(|_| mode == PanelMode::Reference(ReferenceKind::Image)) {
             let rows = crate::ui_script::take_fields();
             let fields: Vec<serde_json::Value> = if in_libraries {
-                Vec::new()
+                // Its own search box only (live sketch-image-place s3).
+                let text = self.lib_image_search.as_ref().map(|s| s.read(cx).value().to_string()).unwrap_or_default();
+                vec![serde_json::json!({ "label": LIBRARY_SEARCH, "kind": "string", "text": text })]
             } else {
                 std::iter::once(serde_json::json!({ "label": search_placeholder, "kind": "string", "text": self.search.read(cx).value().to_string() })).chain(rows).collect()
             };
