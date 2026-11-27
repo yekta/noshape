@@ -1,11 +1,12 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 13:50 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 16:55 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-## FIRST (lead 11-27 15:4x): LAND e8d60855 FAILED in the queue at 15:13 (tests): read ~/land/results/core-uip3.log on
-vibe2, fix forward, land again; then #4 (IN FLIGHT below, uncommitted blend_section.rs; bg test run bng4vaa90 may
-be stale), #5. Lead was over 200k at 15:4x: #4 progress not yet reported.
+## REPORT PENDING (lead over 200k at 16:5x; tell it when under): e8d60855's failure was a SIGTERM of part-studio-ui's lib
+tests while the stack still carried bf790398 (landed since as 04b6d11a); re-landed docs-only 16:0x as 09995eb9 (on main).
+#1-#3 and #6 are all on main (3fd25195, 04b6d11a, 9161e809). 04b6d11a follows the split rule: it errors only when nothing
+splits (pieces < 2) AND the result holds an INTERNAL face/edge, i.e. ours would leave a slit; any valid split is kept.
 ## NOW (lead 11-27 10:5x, list approved; one land each with a corpus A/B, fix from the top)
 - Suite 1126-2043 (190bd1b8; report vibex8 ~/tmp/qa/report.json, snapshot ~/tmp/qa/models-1126-2043-190bd1b8/<doc>/;
   copy core-scratch/suite/). blend parked: blend_direct.cpp is core's for now (note added to blend.md, acbf4dcd5).
