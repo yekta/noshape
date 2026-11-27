@@ -9784,7 +9784,8 @@ struct TrimAfter
 // e54410's 2 um step). Such a face: one wire of two long edges within 1e-5 m of each other all along and short ones (at
 // most 1e-5 m long) between their ends. (A face as narrow only in part stays: a04711's 0.05 mm² wedge, 1 to 110 um
 // wide, kept by live.) Its first long edge then stands for both, its short edges go and their ends join; the result
-// kept only valid.
+// kept only valid. A lens too: one wire of two edges between the same two vertices, within 1e-5 m of each other all
+// along (c2-gamma-imported's Boolean 2: two r 1 mm holes meeting 5 um off-centre, live's circles one edge).
 static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::vector<TopoDS_Vertex>& joined)
 {
   constexpr double tol = 1e-5 * (1 + 1e-9);
@@ -9813,16 +9814,19 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
   std::vector<TopoDS_Vertex>     made;
   BRep_Builder                   bb;
   int                            dropped = 0;
+  // (Lenses side by side share their ends: the second takes the first's joined vertices.)
+  NCollection_DataMap<TopoDS_Shape, TopoDS_Vertex, TopTools_ShapeMapHasher> lensv;
   for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
   {
     const TopoDS_Face& f = TopoDS::Face(fx.Current());
     // (Cheap first: every vertex of it near another of it.)
     ShapeIMap vs;
     TopExp::MapShapes(f, TopAbs_VERTEX, vs);
-    if (vs.Extent() < 4 || vs.Extent() % 2 != 0)
+    const bool lens = vs.Extent() == 2;
+    if (!lens && (vs.Extent() < 4 || vs.Extent() % 2 != 0))
       continue;
     bool paired = true;
-    for (int i = 1; i <= vs.Extent() && paired; ++i)
+    for (int i = 1; i <= vs.Extent() && paired && !lens; ++i)
     {
       const gp_Pnt p    = BRep_Tool::Pnt(TopoDS::Vertex(vs(i)));
       bool         close = false;
@@ -9847,7 +9851,7 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
         (length(e) <= tol ? shrt : lng).push_back(e);
       ok = ok && lng.size() <= 2;
     }
-    if (!ok || lng.size() != 2 || shrt.empty() || lng[0].IsSame(lng[1]))
+    if (!ok || lng.size() != 2 || shrt.empty() != lens || lng[0].IsSame(lng[1]))
       continue;
     if (!mapped)
     {
@@ -9864,11 +9868,11 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
     if (f1.IsSame(f2) || f1.IsSame(f) || f2.IsSame(f))
       continue;
     // (Between two planes only: live keeps e54410's 2.3 um flat between two cylinders, Extrude 17.)
-    if (BRepAdaptor_Surface(f1, false).GetType() != GeomAbs_Plane || BRepAdaptor_Surface(f2, false).GetType() != GeomAbs_Plane)
+    if (!lens && (BRepAdaptor_Surface(f1, false).GetType() != GeomAbs_Plane || BRepAdaptor_Surface(f2, false).GetType() != GeomAbs_Plane))
       continue;
     // (A step between parallel planes only, as live's: the PEM S nut's 7 um flat between two of its planes
     // 138 degrees apart is one of live's 92 faces.)
-    if (!BRepAdaptor_Surface(f1, false).Plane().Axis().IsParallel(BRepAdaptor_Surface(f2, false).Plane().Axis(), 1e-6))
+    if (!lens && !BRepAdaptor_Surface(f1, false).Plane().Axis().IsParallel(BRepAdaptor_Surface(f2, false).Plane().Axis(), 1e-6))
       continue;
     const double d = std::max(apart(keep, drop), apart(drop, keep));
     if (d > tol)
@@ -9882,7 +9886,7 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
     const bool   same = pa0.Distance(BRep_Tool::Pnt(b0)) <= pa0.Distance(BRep_Tool::Pnt(b1));
     const TopoDS_Vertex m0 = same ? b0 : b1, m1 = same ? b1 : b0;
     for (const TopoDS_Shape& x : {TopoDS_Shape(a0), TopoDS_Shape(a1), TopoDS_Shape(m0), TopoDS_Shape(m1)})
-      ok = ok && !touched.Contains(x);
+      ok = ok && (!touched.Contains(x) || (lens && lensv.IsBound(x)));
     if (!ok)
       continue;
     // The joined ends: each keep's vertex where it was, wide enough for the dropped one's edges, with its parameters
@@ -9893,7 +9897,15 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
     {
       const TopoDS_Vertex &va = olds[k][0], &vb = olds[k][1];
       const double         t  = std::max(BRep_Tool::Tolerance(va), BRep_Tool::Tolerance(vb) + BRep_Tool::Pnt(va).Distance(BRep_Tool::Pnt(vb))) * (1 + 1e-9);
-      nv[k]                   = rs->CopyVertex(va, t);
+      if (lens && lensv.IsBound(va))
+      {
+        nv[k] = lensv(va);
+        bb.UpdateVertex(nv[k], std::max(t, BRep_Tool::Tolerance(nv[k])));
+      }
+      else
+        nv[k] = rs->CopyVertex(va, t);
+      if (lens)
+        lensv.Bind(va, nv[k]);
       const int iv            = ve.FindIndex(vb);
       for (const TopoDS_Shape& e : iv ? ve(iv) : ShapeList())
       {
@@ -9908,6 +9920,25 @@ static TopoDS_Shape drop_strip_faces(const TopoDS_Shape& s, HHist& hist, std::ve
     bb.UpdateEdge(ne, std::max(BRep_Tool::Tolerance(keep), BRep_Tool::Tolerance(drop) + d) * (1 + 1e-9));
     // (Its curve on the dropped edge's face too.)
     ShapeFix_Edge().FixAddPCurve(ne, f2, false, BRep_Tool::Tolerance(ne));
+    // (In the dropped edge's period on a periodic face: c2-gamma-imported's second lens, on a hole's cylinder, got one
+    // a turn away, the cylinder's wire then open.)
+    {
+      double                          da = 0, db = 0, na = 0, nb = 0;
+      const occ::handle<Geom2d_Curve> pd = BRep_Tool::CurveOnSurface(drop, f2, da, db);
+      const occ::handle<Geom2d_Curve> pn = BRep_Tool::CurveOnSurface(ne, f2, na, nb);
+      const BRepAdaptor_Surface       sf(f2, false);
+      if (!pd.IsNull() && !pn.IsNull() && (sf.IsUPeriodic() || sf.IsVPeriodic()))
+      {
+        const gp_Vec2d off(pn->Value(na), pd->Value(same ? da : db));
+        const double   ku = sf.IsUPeriodic() ? std::round(off.X() / sf.UPeriod()) : 0, kv = sf.IsVPeriodic() ? std::round(off.Y() / sf.VPeriod()) : 0;
+        if (ku != 0 || kv != 0)
+        {
+          const occ::handle<Geom2d_Curve> moved = occ::down_cast<Geom2d_Curve>(pn->Copy());
+          moved->Translate(gp_Vec2d(ku * (sf.IsUPeriodic() ? sf.UPeriod() : 0), kv * (sf.IsVPeriodic() ? sf.VPeriod() : 0)));
+          bb.UpdateEdge(ne, moved, f2, BRep_Tool::Tolerance(ne));
+        }
+      }
+    }
     made.push_back(nv[0]);
     made.push_back(nv[1]);
     rs->Replace(keep.Oriented(TopAbs_FORWARD), ne);

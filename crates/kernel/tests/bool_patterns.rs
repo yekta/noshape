@@ -711,7 +711,8 @@ fn a_cylinder_seamed_by_a_b_spline() {
 /// 9 nm into a floor (its side from the faces holding it). noshape's Boolean takes it, valid, its volume to 1e-8.
 /// Live fills the four walled-in 5 um slits between the two bodies' flats (60.7424 mm², captured 11-27), and keeps
 /// the 50 um strip by the round open: OCCT's volume and these four, OCCT's faces and edges and each fill's four sides,
-/// its four edges across the gap collapsed (live's one vertex at each step a fill's end leaves at a wall).
+/// its four edges across the gap collapsed (live's one vertex at each step a fill's end leaves at a wall), less the two
+/// 5 um crescents where two holes meet off-centre (live's one circle there).
 #[test]
 fn clips_a_few_micrometres_apart() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
@@ -724,7 +725,7 @@ fn clips_a_few_micrometres_apart() {
     let v = r.shape.volume().unwrap();
     let filled = c.summary.volume + 60.7424e-6 * 5e-6;
     assert!(r.shape.is_valid() && (v - filled).abs() <= 1e-8 * c.summary.volume, "valid {}, volume {v} against {filled} (OCCT's {} and the slits)", r.shape.is_valid(), c.summary.volume);
-    assert_eq!((r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge)), (c.summary.faces + 16, c.summary.edges + 28));
+    assert_eq!((r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge)), (c.summary.faces + 14, c.summary.edges + 26));
 }
 
 /// The B94.6 knurl's cut through noshape's Boolean (its grooves' end caps share the cylinder's end planes and each
@@ -3633,7 +3634,8 @@ fn a_section_edges_curve_off_a_free_form_face_is_projected_again() {
 /// c2-gamma-imported's precise clips (0.2 um) fused with an imported pin of 2.45 um a metre away: noshape's Boolean
 /// judges each pair by its own two tolerances, so the pin's leave the clips' own nearby edges apart (by the largest
 /// of all, two of one clip's edges a few micrometres apart were taken for one: "a non-manifold result"). Live fills
-/// its four walled-in 5 um slits (clips_a_few_micrometres_apart): OCCT's faces and each fill's four sides.
+/// its four walled-in 5 um slits (clips_a_few_micrometres_apart): OCCT's faces and each fill's four sides, less the
+/// two crescents where two holes meet.
 #[test]
 fn precise_parts_fused_with_a_far_tolerant_pin() {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
@@ -3645,7 +3647,7 @@ fn precise_parts_fused_with_a_far_tolerant_pin() {
     let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
     let v = r.shape.volume().unwrap();
     assert!(r.shape.is_valid() && (v - c.summary.volume).abs() <= 1e-6 * c.summary.volume, "valid {}, volume {v} against OCCT's {}", r.shape.is_valid(), c.summary.volume);
-    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces + 16);
+    assert_eq!(r.shape.count(k::ShapeType::Face), c.summary.faces + 14);
 }
 
 /// c2-gamma-imported's Boolean 1 with 32 of its tools (gamma's object, precise clips and tolerant pins): a precise

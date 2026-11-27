@@ -585,6 +585,29 @@ fn a_step_wider_than_ten_microns_somewhere_stays() {
     assert!(u.is_valid());
 }
 
+/// Two blocks fused, each with an r 1 mm hole, the holes' axes 5 um apart (c2-gamma-imported's Boolean 2): where they
+/// meet, the two crescents between their circles (5 um wide at most) are gone, as live's (one circle there), both
+/// together: the hole's two cylinders then meet edge to edge. (NOSHAPE_BOOL_KEEP_STRIPS=1 keeps them: 10 faces.)
+#[test]
+fn crescents_where_two_holes_meet_five_microns_off_centre_are_gone() {
+    let _ = set_working_scale(1000.0);
+    let mm = 1e-3;
+    // (Each hole's seam through a point where the circles cross: each crescent two edges between those points, the
+    // second's new edge's curve on its cylinder a turn away until moved.)
+    let (e, h) = (0.005, (1.0f64 - 0.0025 * 0.0025).sqrt());
+    let block = |z: f64, x: f64, seam: DVec3| {
+        let b = make_box_corners(DVec3::new(0.0, 0.0, z) * mm, DVec3::new(10.0, 10.0, z + 5.0) * mm).unwrap();
+        let hole = make_cylinder(&Plane::new(DVec3::new(x, 5.0, z - 1.0) * mm, DVec3::Z, seam.normalize()), 1.0 * mm, 7.0 * mm, 2.0 * PI).unwrap();
+        boolean(BooleanOp::Cut, &[b], &[hole], &BooleanOptions::default()).unwrap().shape
+    };
+    let (a, b) = (block(0.0, 5.0, DVec3::new(e / 2.0, h, 0.0)), block(5.0, 5.0 + e, DVec3::new(-e / 2.0, h, 0.0)));
+    let u = unify_same_domain(&fuse(&a, &b).unwrap().shape).unwrap().shape;
+    let keep = std::env::var_os("NOSHAPE_BOOL_KEEP_STRIPS").is_some();
+    let v = (1000.0 - 10.0 * PI) * mm * mm * mm;
+    assert_eq!(u.count(ShapeType::Face), if keep { 10 } else { 8 });
+    assert!(u.is_valid() && (u.volume().unwrap() - v).abs() < 1e-6 * v, "{}", u.volume().unwrap());
+}
+
 /// A circular pattern's tools (one shape placed at each step: group_disjoint checks the first one against the rest):
 /// overlapping neighbours stay apart, neighbours apart share a group, and the cut is the one with each tool copied.
 #[test]
