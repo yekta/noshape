@@ -1,9 +1,8 @@
 # Core modelling (agent "core"): current state
 
-Updated 11-27 01:25 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
+Updated 11-27 08:05 UTC. Mac: usable only through its ONE 4-job nice-19 slot (DECISIONS a16b39297, NOSHAPE_RB_HOST=mac waits for it), never overloaded; default builds on rb-hosts (core* -> vibex7). Agent ids: only /root/lead-scratch/roster.md, read before every message (never copy ids here). History (dated notes up to 11-15 14:48): docs/handoff/archive/core.md. Standing rulings:
 docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QUEUE_HOST=vibe2 tools/tiers/land.sh
 (vibe2 is the user's own server: only ~ngyekta and /opt/occt). Never kill a process tree from a computed pid.
-
 ## P0s (lead 11-26; block v0.4.72)
 - LEAD 22:1x ORDER: (1) Move face 1 repeated booleans try skipped; (2) sliver rule; land; (3) screws Move face 3.
 - **SCISSOR FILLETS + MOVE FACE 1 (QUEUED ec47e4e4 22:46; corpus A/B .ab7.sh: only impeller "Fillet Stevenrohr zum
@@ -29,17 +28,23 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   live face for face at Fillet Stevenrohr einnschub. Corpus (OLD 11-18 import): Sketch Bohrung Flansch "Select a sketch
   plane." + 3 downstream: its plane is Extrude 6's CapEnd, whose sides Move face 1 offsets; Move face 1 was Error in
   the import's build, now Ok, so the old name is gone (fresh import resolves it). knifehandle -0.02 mm3 (check vs live).
-- **NEXT: FILLET STEVENROHR ZUM HALTER 3-FACE CORNER BALL (follow-up)**: notes core-scratch/imp/corner-notes.md, WIP
-  core-scratch/imp/corner-ball-wip.patch (junction both orders + third-face rejection in tangency_ball; + DBGJ prints,
-  output core-scratch/imp/k14-dbgj.out). r2 concave chain 59-60-56-55; faces 15/14 tube halves (convex ridge y 0),
-  29 plane x 5, 30 bevel. Corners y+-0.279: concave trihedral -> vertex ball touching 15, 30, 29 (Newton on the 3
-  signed distances), centre x 7 (live's 4 new rounds 8.9186 x2, 2.7077 x2 all reach x 7; 39 faces). y 0: ball on x 7 at
-  r from the ridge line, in its bisector plane. Open: joining the two lofts at the vertex ball (contacts differ).
-  Run: .k14.sh on vibex8 (hd.sh + f3B), then .ab11.sh (refresh .X.old from origin/main, .X.new), .kt7.sh.
+- **ZUM HALTER CORNER: PARKED (lead 11-27 07:4x; Error as in 0.4.72 and main): native-blend-faces candidate.** WIP
+  core-scratch/imp/crease-turn-wip3.patch (notes core-scratch/imp/corner-notes.md; the full STATE text in the archive):
+  crease junctions, both crease edges untrimmed, >= 32 stations at creases (0.06 um on the bevel), fuzzy Fuse retry
+  (unsafe alone: fuzzy fuses returned valid shapes that lost the body). The crease TURNS break every Boolean.
+- **QA 11-27 uipdep3 rows (TICKETS 118cba619), worktree core-uip3: LANDING 11-27 08:0x**: FULL-ROUND-SPLITS-PART
+  (detail.rs full_round: the tool's top half way to where the sides meet when sooner than r; the ridge's slopes cross
+  1.4 mm over its top, r 13.4: a bowtie section, 3 parts) and SWEEP-THIN-EDGE-NO-TRIM (thin.rs line_frame: a part's
+  straight edge wall in the plane square to the path; has_planeless_part_wall -> sweep.fs's warning "Failed to find
+  planes to trim to..." with Trim ends, the wall swept untrimmed). Tests features_c::a_full_round_on_a_ridge_.. and
+  a_thin_sweep_of_an_edge_along_an_edge_square_to_it (either side: REQUESTS core 11-27 07:59 asks live which side).
+  Live's Sweep 1 "error" with Trim ends is most likely the recorder's warning (no "warning" state in 122k recorded).
+  Left: P3 RIB-FLIPPED-MESSAGE, P3 FACE-PATTERN-BOSS-LIVE-FAILS (check only). Rerun tools/ui-parity/run.py
+  fillet-full-round-ok sweep-thin-edge-no-trim-ok mistake-rib-flipped-misses mistake-linear-pattern-face-boss.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
-- **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity::parity_impeller_loft_regenerates_in_time < 40 s).
+- **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity_impeller_loft_regenerates_in_time < 40 s).
 ## Now (11-25)
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
@@ -60,16 +65,8 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   9cbb0e ba43fd52006aef05, b58244 ef415f8715d2b8a5, 2d82a0 0e42b5e59678dc59, 92138f c945c4d3bdad506d, b7e381
   f44c9b9bedd247e3 (st.sh / mfq.sh / dmp.sh; ~/tmp/core/fb/cli = cli-new 15:40). 404ddb Fillet 2 = live now
   (73853.40 vs .06; lead item 1 done). Sorted:
-  (a) b58244 (~70 rows): IMPORT GAP, not geometry: live Sketch 3's sketchPlane is a qCompressed query with no
-  deterministicIds and no refs.jsonl row; we fall back to Front (y 0) where live's is a face at y -2 mm, so Extrude 4
-  (+0.5 mm boss, live +61.3 mm3) is contained (Info) and Plane 1.. cascade. Ours = live through Move face 1 (21721.72).
-  Reported to the lead (capture/importer owner). live 16:0x added 24 refs rows: rerun 16:21: Extrude 4 = live now
-  (Sketch 3 on its face; ours = live through Transform 1, 56055.30); first failure now Plane 1: ref KZGB box at y = -2
-  (point (52.516,-2,25.800)) but our Extrude 4 cap at that x,z is at y = -2.5 (boss -2..-2.5, volume = live): import
-  says "no face of ours". live 17:0x: KZGB NOT stale (recaptured = 11-21): in live by Plane 1 Extrude 4's cap is a 1.6 mm
-  rim at -2.5 (JZG 314 mm2) around KZGB (1516 mm2) at -2: a 0.5 mm recess; ours one cap at -2.5 -> look at Move face
-  2/3/4/6, Fillet 1/2 (idx 8-13) for the face that moves the inner region (mine, after the P0s).
-  New b58244 tab 22490dcfa787b5a5.
+  (a) b58244: Plane 1's ref KZGB: live's Extrude 4 cap has a 0.5 mm recess ours lacks; look at Move face 2/3/4/6,
+  Fillet 1/2 (idx 8-13) (full notes in the archive, 11-27).
   (b) 404ddb Hole 2 (then Mirror 1, Split 1, Extrude 5-8, Booleans): Ø8.2 x 42 blind coaxial with the r14 bar from its
   x 59 end face; the input = live (73840.04 vs .83). Ours "Hole creates invalid geometry": the profile shows only the ray
   common (boolean.rust) and op_revol, no cut recorded or OCCT build: looks like the own Boolean's cut errors with no
@@ -97,7 +94,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   skips pairs whose chamfer faces (history generated from the chains' edges) share no edge nor end within 8 d on a face along neither chain
   (cli-hist). (2) knifehandle settle fix + T1 settle test: core-rf tip commit (land.sh after 66dba573); slow cuts
   handed to bool 06:5x: vibex7 ~/agents/core-keep/kh-bool (Fillet 3 cut 244416f8 667 ms, Fillet 1 cut 856a411e 3.2 s).
-  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands. (4) loft-guide Sweep 1: CLOSED, not a target (live's approximation; archive).
+  (3) Scissor Delete face 1 = live with 66dba573's merge; recheck 97ad5f Linear pattern 1 after it lands.
 - **KNIFEHANDLE FILLET 3**: settle fix (core-rf tip) (1380 -> 1100 ms; live 11). Left: run-on cut (bool's, above), 4 op_split
   ~225 ms (closed/trimmed run-on), 1632 projections ~360 ms. Probe: gdb -x ~/tmp/core/spd/w/k/g.gdb.
 - **LEAD 11-26 08:0x: blend FAILURES first (ranked by documents hit), native blend faces only planned, then skasm's

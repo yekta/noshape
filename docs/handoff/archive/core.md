@@ -5121,3 +5121,32 @@ skasm meanwhile; I'll list what I change here before landing.
   Left -2 mm3: live keeps the RIM; our blends_to_reapply propagates floor fillets -> spheres -> vertical fillets -> rim
   and rolls it again. Stopping at the vertical fillets needs their r 12.7 = floor r degenerate case. Probe:
   core-scratch/refillet-probe.patch (kernel crash_inputs zz_probe_refillet on NOSHAPE_DUMP_OPS fillet-3).
+- 11-27: b58244 tab 22490dcfa787b5a5 (scissor rerun). loft-guide Sweep 1 CLOSED: not a target (live's approximation).
+- 11-27 moved from the handoff (scissor rerun 11-26):
+  (a) b58244 (~70 rows): IMPORT GAP, not geometry: live Sketch 3's sketchPlane is a qCompressed query with no
+  deterministicIds and no refs.jsonl row; we fall back to Front (y 0) where live's is a face at y -2 mm, so Extrude 4
+  (+0.5 mm boss, live +61.3 mm3) is contained (Info) and Plane 1.. cascade. Ours = live through Move face 1 (21721.72).
+  Reported to the lead (capture/importer owner). live 16:0x added 24 refs rows: rerun 16:21: Extrude 4 = live now
+  (Sketch 3 on its face; ours = live through Transform 1, 56055.30); first failure now Plane 1: ref KZGB box at y = -2
+  (point (52.516,-2,25.800)) but our Extrude 4 cap at that x,z is at y = -2.5 (boss -2..-2.5, volume = live): import
+  says "no face of ours". live 17:0x: KZGB NOT stale (recaptured = 11-21): in live by Plane 1 Extrude 4's cap is a 1.6 mm
+  rim at -2.5 (JZG 314 mm2) around KZGB (1516 mm2) at -2: a 0.5 mm recess; ours one cap at -2.5 -> look at Move face
+  2/3/4/6, Fillet 1/2 (idx 8-13) for the face that moves the inner region (mine, after the P0s).
+- 11-27 zum Halter corner, parked:
+- **NEXT: FILLET STEVENROHR ZUM HALTER CORNER (follow-up; skasm takes knifehandle Fillet 1 and coordinates on
+  blend_section.rs)**: WIP uncommitted in core-rf blend_section.rs (notes core-scratch/imp/corner-notes.md). r2 concave chain 59-60-56-55; faces 15/14 tube halves (extruded
+  along x), 29 plane x 5, 30 bevel. BOTH junctions are CONVEX creases (ridge 15/14 at y 0; bevel/plane crease at
+  y +-0.279), not 3-face pockets: the ball turns over the crease (live's rounds reach x 7). WIP: junction(own, q,
+  asking) -> (ball, Crease, turn tool); tangency_ball returns the Crease (edge, t, tq, g); convex test away(i).n_qf<0;
+  each edge ends on its crease ball (60/56: crease ball mid-edge ~station 4.4/8, stations past it dropped; jump check
+  uses the shared centre) or, when its crease ball lies past its end (59/55), on its own ball at q; crease_turn lofts
+  M=6 crease sections (arc s-contact -> crease point, along the crease to q, along s back), fused into edge i's tool;
+  corner_ball (3 supports) for concave pockets (untested).
+  STATE 07:4x (WIP core-scratch/imp/crease-turn-wip3.patch, uncommitted in core-rf; probes fa/fc/tdev/sec in
+  core-scratch/chk, binaries vibex8 ~/tmp/core): all ball tools valid; both crease edges skip trim_by_walls (`creased`);
+  edges at a crease get >= 32 stations (8 strayed 1.6 um off the bevel; 32: 0.06 um) and then the 59/55 lofts fuse
+  with the body ONLY with fuzzy 5e-3 r (added 0.556 = tool, lost 0); body Fuse now retries fuzzy on error. FAILS: the
+  crease TURNS: sections along the crease (nested pieces of one curve) = a face of no width on the body's edge, every
+  Boolean errors; sections diving to d = q + (q-c)/|q-c| * r/10 (or r/2): a face 64-152 um in air, fuses lose the body.
+  Needs the turn region derived properly (what live's 2.7077 face is) or native blend faces. GProp volumes of this
+  body are noise (72199 default vs 66062 adaptive, +59 after a good fuse): judge fuses by result-body / body-result.
