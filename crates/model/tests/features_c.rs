@@ -1530,6 +1530,49 @@ fn a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top() {
     assert!(near(v0 - volume(&r, 0), mm(1.0).powi(3) * removed, 1e-6), "{} vs {}", (v0 - volume(&r, 0)) * 1e9, removed);
 }
 
+/// A full round on a low ridge whose slopes meet 1.4 mm over its 6 mm top (live depth batch 3's "ridge", 11-26): one
+/// part, the top rounded between the slopes. Section (-20, 0) (20, 0) (3, 8) (-3, 8), 30 long: r = 24 / (L - 17) mm
+/// with L = 353^0.5, centre 8 - r up.
+#[test]
+fn a_full_round_on_a_ridge_whose_slopes_meet_just_over_its_top_keeps_one_part() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(-20.0, 0.0), (20.0, 0.0), (3.0, 8.0), (-3.0, 8.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("30 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let pick = |want: DVec3| -> Reference {
+        let i = b.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.normalize().dot(want.normalize()) > 0.999)).unwrap();
+        Reference::Face((*b.faces[i]).clone())
+    };
+    let (s1, s2, top) = (pick(DVec3::new(-8.0, 0.0, 17.0)), pick(DVec3::new(8.0, 0.0, 17.0)), pick(DVec3::Z));
+    let v0 = volume(&r, 0);
+    s.add("fillet", move |p| {
+        p.set("filletType", en("FULL_ROUND"));
+        p.set("side1Face", q(s1));
+        p.set("side2Face", q(s2));
+        p.set("centerFaces", q(top));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.len(), 1);
+    let len = 353.0f64.sqrt();
+    let rr = 24.0 / (len - 17.0);
+    assert!(r.context.bodies[0].shape.faces().iter().any(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { radius, .. } if near(radius, mm(rr), 1e-9))));
+    let n = DVec2::new(8.0, 17.0) / len;
+    let t = DVec2::new(n.x * rr, 8.0 - rr + n.y * rr);
+    let half_width = |z: f64| (160.0 - 17.0 * z) / 8.0;
+    let trapezoid = (half_width(t.y) + half_width(8.0)) * (8.0 - t.y);
+    let half = n.y.acos();
+    let segment = rr * rr * (half - half.sin() * half.cos());
+    let removed = (trapezoid - segment) * 30.0;
+    assert!(near(v0 - volume(&r, 0), mm(1.0).powi(3) * removed, 1e-6), "{} vs {}", (v0 - volume(&r, 0)) * 1e9, removed);
+}
+
 /// Live 2306 E: a full round on a rib tapering along its length (Top (0,−5) (40,−3) (40,3) (0,5), 20 up; sides the two
 /// slanted long faces, center the top) is one CONE, 6,119.2357 mm³ (the drafted rib above: 6,251.0565).
 #[test]
@@ -2200,6 +2243,49 @@ fn thin_sweep_checks_the_wall_first() {
     let mut s = block();
     s.add("sweep", |_| {});
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Select entities for sweep path.".to_string()));
+}
+
+/// Live depth batch 3 (sweep-thin-edge-no-trim-ok, 11-26): a 40 x 30 x 10 block's front top edge swept Thin along its
+/// right top edge, Thickness 1 5 mm, Trim ends off, Add: the wall is the block's top swept up or down 5 mm; one part.
+/// With Trim ends on, sweep.fs finds no planes to trim to: its warning, the same wall.
+#[test]
+fn a_thin_sweep_of_an_edge_along_an_edge_square_to_it() {
+    let block = || {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 30.0), (0.0, 30.0)], true);
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+        });
+        s
+    };
+    for trim in [false, true] {
+        let mut s = block();
+        let r = s.ok();
+        let v0 = volume(&r, 0);
+        let (wall, path) = (edge_near(&r, 0, DVec3::new(0.02, 0.0, 0.01)), edge_near(&r, 0, DVec3::new(0.04, 0.01, 0.01)));
+        let part = Reference::Body(r.context.bodies[0].id.clone());
+        s.add("sweep", move |p| {
+            p.set("bodyType", en("THIN"));
+            p.set("operationType", en("ADD"));
+            p.set("booleanScope", q(part));
+            p.set("wallShape", q(wall));
+            p.set("path", q(path));
+            p.set("thickness1", expr("5 mm"));
+            p.set("thickness2", expr("0 mm"));
+            p.set("trimEnds", ParamValue::Bool(trim));
+        });
+        if trim {
+            assert_eq!(s.last_status(), (FeatureStatus::Warning, "Failed to find planes to trim to. Try deselecting \"Trim ends\" option.".to_string()));
+        }
+        let r = s.ok();
+        assert_eq!(r.context.bodies.len(), 1);
+        let added = (volume(&r, 0) - v0) * 1e9;
+        assert!(near(added, 0.0, 1e-6) || near(added, 40.0 * 30.0 * 5.0, 1e-6), "{added}");
+    }
 }
 
 fn edge_near(r: &RegenResult, bi: usize, p: DVec3) -> Reference {

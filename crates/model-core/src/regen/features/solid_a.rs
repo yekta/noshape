@@ -688,7 +688,12 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let path_open = !path.is_closed().unwrap_or(false);
     // Live "psb (10-24 c)": a wall that can't be made fails with Onshape's
     // trim text when Trim ends applies, else its thicken text.
-    let thin_fail = if path_open && ev.bool("trimEnds") { THIN_TRIM_FAILED } else { THIN_THICKEN_FAILED };
+    // (A wall of a part's straight edge: no planes to trim to, a warning and the ends left as swept, as sweep.fs.)
+    let trim = path_open && ev.bool("trimEnds") && !(thin && super::thin::has_planeless_part_wall(ev, refs)?);
+    if thin && path_open && ev.bool("trimEnds") && !trim {
+        ev.warnings.push(THIN_NO_TRIM_PLANES.into());
+    }
+    let thin_fail = if trim { THIN_TRIM_FAILED } else { THIN_THICKEN_FAILED };
     // A wall's sweep direction (live q-thin-wall-side-1119): from a free end of the path, into it; lying on the path
     // (cpcurves' Main pipe at its chain's inner junction), against the path's own direction there.
     let along_wall = |f: &crate::display::PlaneFrame, m: DVec3| wall_sweep_direction(&path, m).unwrap_or(f.normal);
@@ -711,7 +716,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
                 o.mode = k::SweepMode::Binormal(d);
             }
             let eff = if extend { path.clone() } else { half_path(&path, frame.origin, frame.normal, path_opposite, w.bounding_box(false).map_or(frame.origin, |b| b.center())) };
-            let shape = thin_sheet_sweep(&w, &frame, &eff, &o, t1, t2, path_open && ev.bool("trimEnds"), thin_fail)?;
+            let shape = thin_sheet_sweep(&w, &frame, &eff, &o, t1, t2, trim, thin_fail)?;
             let names = name_new(ev, &shape);
             tools.push(NamedShape::new(shape, names));
         }
@@ -798,6 +803,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
 /// sweep.fs THIN_SWEEP_THICKEN_FAILED / THIN_SWEEP_TRIM_FAILED.
 const THIN_THICKEN_FAILED: &str = "Failed to thicken swept body, check thickness.";
 const THIN_TRIM_FAILED: &str = "Failed to trim result body, try deselecting \"Trim ends\" option.";
+const THIN_NO_TRIM_PLANES: &str = "Failed to find planes to trim to. Try deselecting \"Trim ends\" option.";
 
 /// Whether the path leaves the wall `p` other than square to its plane.
 fn oblique_to(path: &Shape, p: &Profile) -> bool {

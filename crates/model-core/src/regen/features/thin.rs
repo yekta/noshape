@@ -116,9 +116,10 @@ pub fn thin_profiles_sided(ev: &EvalCtx, refs: &[Reference], side: WallSide, by_
         for (i, w) in wires_from(&edges)?.into_iter().enumerate() {
             let chain: Vec<SourcedEdge> = edges.iter().filter(|e| w.edges().iter().any(|x| x.is_same(&e.shape) || same_edge(x, &e.shape))).cloned().collect();
             let chain = if chain.is_empty() { edges.clone() } else { chain };
-            let frame = match sketch_frame {
-                Some(f) => f,
-                None => wire_frame(&w)?,
+            let frame = match (sketch_frame, &side) {
+                (Some(f), _) => f,
+                (None, WallSide::Along(d) | WallSide::AlongClosedToo(d)) => wire_frame(&w).or_else(|e| line_frame(&w, *d).ok_or(e))?,
+                (None, WallSide::Left) => wire_frame(&w)?,
             };
             let key = chain.first().map(|e| e.source.clone()).unwrap_or(Source::Index(i as u32));
             if w.is_closed().unwrap_or(false) || closed_chain(&w) {
@@ -193,6 +194,32 @@ pub fn wall_wires(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<(Shape, Plane
         }
     }
     Ok(out)
+}
+
+/// A straight wall (a part's edge: no plane of its own): the plane through it square to the feature's direction there,
+/// as Onshape's sweep of it into a sheet thickened (live depth batch 3's sweep-thin-edge-no-trim, 11-26).
+fn line_frame(w: &Shape, along: &dyn Fn(&PlaneFrame, DVec3) -> DVec3) -> Option<PlaneFrame> {
+    let (a, b) = ends(w)?;
+    let t = (b - a).try_normalize()?;
+    if w.vertices().iter().any(|v| v.vertex_point().map_or(true, |p| (p - a).cross(t).length() > 1e-9)) {
+        return None;
+    }
+    let m = (a + b) * 0.5;
+    let any = t.any_orthonormal_vector();
+    let d = along(&PlaneFrame { origin: m, x: t, y: any.cross(t), normal: any }, m);
+    let normal = (d - t * t.dot(d)).try_normalize()?;
+    Some(PlaneFrame { origin: m, x: t, y: normal.cross(t), normal })
+}
+
+/// Whether a Thin selection has a wall of a part's edges with no plane (a line): Onshape's sweep finds no planes to
+/// trim its ends to (sweep.fs THIN_SWEEP_FAILED_TO_FIND_TRIM_PLANES_WARNING).
+pub fn has_planeless_part_wall(ev: &EvalCtx, refs: &[Reference]) -> FResult<bool> {
+    let curve_refs: Vec<Reference> = refs.iter().filter(|r| !matches!(r, Reference::SketchRegion { .. } | Reference::Face(_) | Reference::SketchEntity { .. } | Reference::Sketch(_))).cloned().collect();
+    let edges = resolve_curves(ev, &curve_refs)?;
+    if edges.is_empty() {
+        return Ok(false);
+    }
+    Ok(wires_from(&edges)?.iter().any(|w| w.find_plane(1e-6).ok().flatten().is_none()))
 }
 
 fn wire_frame(w: &Shape) -> FResult<PlaneFrame> {
