@@ -1,0 +1,86 @@
+{
+ "name": "maker-select-tangent-connected-used",
+ "about": "The top face's outline used; right-click its front line › Select › Tangent connected edges: the whole used loop; Escape",
+ "area": "psui",
+ "source": "lead 11-27: the maker flow (the user's own: a part with filleted / spline outlines, a sketch on its face, Use, Offset, chain selection, dimensions and constraints to used geometry, Extrude, Fillet of tangent chains)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "n"
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Select"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Tangent connected edges"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

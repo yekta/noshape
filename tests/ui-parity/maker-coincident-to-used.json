@@ -1,0 +1,119 @@
+{
+ "name": "maker-coincident-to-used",
+ "about": "The top face's outline used; a line from (20, 20) to (40, 6), then its end (40, 6) and the used front line selected, Coincident: the end moves onto y 0, the used line stays",
+ "area": "psui",
+ "source": "lead 11-27: the maker flow (the user's own: a part with filleted / spline outlines, a sketch on its face, Use, Offset, chain selection, dimensions and constraints to used geometry, Extrude, Fillet of tangent chains)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "n"
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     6
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     40,
+     6
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Coincident"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,151 @@
+{
+ "name": "maker-extrude-offset-ring",
+ "about": "The top face's outline used and offset 3 mm inward (o), the sketch confirmed; Extrude of the 3 mm ring region (picked at (30, 1.5)), 5 mm, OK: a rim on the plate",
+ "area": "psui",
+ "source": "lead 11-27: the maker flow (the user's own: a part with filleted / spline outlines, a sketch on its face, Use, Offset, chain selection, dimensions and constraints to used geometry, Extrude, Fillet of tangent chains)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "n"
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "o"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     3
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated",
+   "ms": 5000
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Extrude"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "dialog"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     1.5,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "5"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated",
+   "ms": 5000
+  }
+ ]
+}

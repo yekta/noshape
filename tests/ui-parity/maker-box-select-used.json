@@ -1,0 +1,103 @@
+{
+ "name": "maker-box-select-used",
+ "about": "The top face's outline used, view normal (n); a window box round the whole outline selects the 8 used curves; a crossing box (right to left) over the front-left corner selects the arc and its two lines; Escape",
+ "area": "psui",
+ "source": "lead 11-27: the maker flow (the user's own: a part with filleted / spline outlines, a sketch on its face, Use, Offset, chain selection, dimensions and constraints to used geometry, Extrude, Fillet of tangent chains)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "n"
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     -6,
+     -6
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     66,
+     46
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "drag",
+   "from": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   },
+   "to": {
+    "sketch_point": [
+     -6,
+     -6
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 600
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

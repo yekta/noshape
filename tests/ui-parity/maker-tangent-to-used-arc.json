@@ -1,0 +1,119 @@
+{
+ "name": "maker-tangent-to-used-arc",
+ "about": "The top face's outline used; a circle at (16, 16) r 3, then its rim and the used front-left arc selected, Tangent: the circle moves onto the arc, the arc stays",
+ "area": "psui",
+ "source": "lead 11-27: the maker flow (the user's own: a part with filleted / spline outlines, a sketch on its face, Use, Offset, chain selection, dimensions and constraints to used geometry, Extrude, Fillet of tangent chains)",
+ "start": "maker-plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "n"
+  },
+  {
+   "do": "key",
+   "key": "u"
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     30,
+     20,
+     10
+    ]
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "c"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     16,
+     16
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     19,
+     16
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     19,
+     16
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     2.343,
+     2.343
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Tangent"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 800
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

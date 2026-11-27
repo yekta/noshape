@@ -1,0 +1,1974 @@
+{
+ "scenario": "maker-face-select-tangent-connected",
+ "recorded": "2026-11-27T17:51:01.393Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime 0adacf98979b8345c542",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "viewport": [
+   1919,
+   992
+  ],
+  "recorder": "2026-11-14.2 dd39e3cf + live2 2026-11-18.1"
+ },
+ "live": {
+  "document": "644517511b64134f38edd2ae",
+  "workspace": "b3f761018dee07404eee9fb0",
+  "element": "a470bffd191548b04a80adc9",
+  "start": "maker-plate",
+  "startElement": "5b88416b84453bd45ea1be49",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Fillet 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Fillet 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "camera": {
+   "direction": [
+    -0.433013,
+    0.75,
+    -0.5
+   ],
+   "up": [
+    -0.25,
+    0.433013,
+    0.866025
+   ],
+   "target_mm": [
+    0,
+    0,
+    0
+   ],
+   "eye_mm": [
+    67.5,
+    -116.913,
+    77.942
+   ],
+   "width_mm": 460.686,
+   "height_mm": 243.974,
+   "mmPerPixel": 0.275365,
+   "orthographic": true
+  },
+  "measure": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "face": [
+      30,
+      0,
+      5
+     ]
+    }
+   },
+   "ok": true,
+   "ti": 24026,
+   "tmove": 24078,
+   "moves": 1,
+   "hover": [
+    "JIS"
+   ],
+   "tdown": 25587,
+   "at": [
+    1177,
+    531
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Edit Extrude 1\u2026",
+      "Edit Sketch 1\u2026",
+      "Show dimensions",
+      "Show dependencies of Extrude 1\u2026",
+      "New sketch\u2026",
+      "Offset plane\u2026",
+      "Extrude\u2026",
+      "Revolve\u2026",
+      "Hide Part 1",
+      "Isolate\u2026",
+      "Make transparent\u2026",
+      "Section view\u2026",
+      "Copy Part 1",
+      "Create Drawing of Part 1\u2026",
+      "Export as DXF/DWG\u2026",
+      "Export\u2026",
+      "Where used for Part 1\u2026",
+      "Select",
+      "Select other\u2026",
+      "Add comment",
+      "Zoom to fit",
+      "Zoom to selection",
+      "View normal to",
+      "Delete Part 1\u2026",
+      "Delete Extrude 1",
+      "Assign material for Part 1\u2026",
+      "Edit appearance for Part 1\u2026",
+      "Add appearance to face\u2026"
+     ],
+     "highlighted": 23,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 27692,
+   "te": 27693
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "hover",
+    "on": {
+     "menu": "Select"
+    },
+    "ms": 600
+   },
+   "ok": true,
+   "ti": 27693,
+   "tmove": 27743,
+   "moves": 1,
+   "at": [
+    1289,
+    394
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Protrusion faces",
+      "Pocket faces",
+      "Hole faces",
+      "Fillet faces",
+      "Tangent connected faces",
+      "Bounded faces",
+      "Loop/chain connected edges",
+      "Create selection\u2026"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Edit Extrude 1\u2026",
+       "Edit Sketch 1\u2026",
+       "Show dimensions",
+       "Show dependencies of Extrude 1\u2026",
+       "New sketch\u2026",
+       "Offset plane\u2026",
+       "Extrude\u2026",
+       "Revolve\u2026",
+       "Hide Part 1",
+       "Isolate\u2026",
+       "Make transparent\u2026",
+       "Section view\u2026",
+       "Copy Part 1",
+       "Create Drawing of Part 1\u2026",
+       "Export as DXF/DWG\u2026",
+       "Export\u2026",
+       "Where used for Part 1\u2026",
+       "Select",
+       "Select other\u2026",
+       "Add comment",
+       "Zoom to fit",
+       "Zoom to selection",
+       "View normal to",
+       "Delete Part 1\u2026",
+       "Delete Extrude 1",
+       "Assign material for Part 1\u2026",
+       "Edit appearance for Part 1\u2026",
+       "Add appearance to face\u2026"
+      ],
+      "highlighted": 17,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Protrusion faces",
+       "Pocket faces",
+       "Hole faces",
+       "Fillet faces",
+       "Tangent connected faces",
+       "Bounded faces",
+       "Loop/chain connected edges",
+       "Create selection\u2026"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 29985,
+   "te": 29985
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "hover",
+    "on": {
+     "menu": "Protrusion faces"
+    },
+    "ms": 300
+   },
+   "ok": true,
+   "ti": 29985,
+   "tmove": 30030,
+   "moves": 1,
+   "at": [
+    1490,
+    395
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Protrusion faces",
+      "Pocket faces",
+      "Hole faces",
+      "Fillet faces",
+      "Tangent connected faces",
+      "Bounded faces",
+      "Loop/chain connected edges",
+      "Create selection\u2026"
+     ],
+     "highlighted": 0,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Edit Extrude 1\u2026",
+       "Edit Sketch 1\u2026",
+       "Show dimensions",
+       "Show dependencies of Extrude 1\u2026",
+       "New sketch\u2026",
+       "Offset plane\u2026",
+       "Extrude\u2026",
+       "Revolve\u2026",
+       "Hide Part 1",
+       "Isolate\u2026",
+       "Make transparent\u2026",
+       "Section view\u2026",
+       "Copy Part 1",
+       "Create Drawing of Part 1\u2026",
+       "Export as DXF/DWG\u2026",
+       "Export\u2026",
+       "Where used for Part 1\u2026",
+       "Select",
+       "Select other\u2026",
+       "Add comment",
+       "Zoom to fit",
+       "Zoom to selection",
+       "View normal to",
+       "Delete Part 1\u2026",
+       "Delete Extrude 1",
+       "Assign material for Part 1\u2026",
+       "Edit appearance for Part 1\u2026",
+       "Add appearance to face\u2026"
+      ],
+      "highlighted": 17,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Protrusion faces",
+       "Pocket faces",
+       "Hole faces",
+       "Fillet faces",
+       "Tangent connected faces",
+       "Bounded faces",
+       "Loop/chain connected edges",
+       "Create selection\u2026"
+      ],
+      "highlighted": 0,
+      "disabled": []
+     }
+    ],
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 31933,
+   "te": 31933
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Tangent connected faces"
+    }
+   },
+   "ok": true,
+   "ti": 31933,
+   "tmove": 31969,
+   "moves": 2,
+   "tdown": 33036,
+   "at": [
+    1490,
+    483
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 8,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIC"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIG"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIS"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIe"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIi"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIm"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 34916,
+   "te": 34916
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 34916,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 8,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIC"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIG"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIS"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIe"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIi"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIm"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 37497,
+   "te": 37497
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Fillet"
+    }
+   },
+   "ok": true,
+   "ti": 37497,
+   "tmove": 37537,
+   "moves": 1,
+   "tdown": 37833,
+   "at": [
+    411,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to fillet",
+     "dialog": "Fillet 2"
+    },
+    "dialog": {
+     "title": "Fillet 2",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Edge",
+       "selected": true
+      },
+      {
+       "label": "Full round",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Entities to fillet",
+       "kind": "query",
+       "items": [
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Measurement",
+       "kind": "enum",
+       "text": "Radius",
+       "state": "ok"
+      },
+      {
+       "label": "Control",
+       "kind": "enum",
+       "text": "Distance",
+       "state": "ok"
+      },
+      {
+       "label": "Radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Asymmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Partial fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Variable fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Allow edge overflow",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Smooth fillet corners",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Fillet 2",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Edge",
+        "selected": true
+       },
+       {
+        "label": "Full round",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Entities to fillet",
+        "kind": "query",
+        "items": [
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Measurement",
+        "kind": "enum",
+        "text": "Radius",
+        "state": "ok"
+       },
+       {
+        "label": "Control",
+        "kind": "enum",
+        "text": "Distance",
+        "state": "ok"
+       },
+       {
+        "label": "Radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Asymmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Partial fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Variable fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Allow edge overflow",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Smooth fillet corners",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 8,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIC"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIG"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIS"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIe"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIi"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIm"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Fillet 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 40477,
+   "te": 40477
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "dialog"
+   },
+   "ok": true,
+   "ti": 40477,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to fillet",
+     "dialog": "Fillet 2"
+    },
+    "dialog": {
+     "title": "Fillet 2",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Edge",
+       "selected": true
+      },
+      {
+       "label": "Full round",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Entities to fillet",
+       "kind": "query",
+       "items": [
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Measurement",
+       "kind": "enum",
+       "text": "Radius",
+       "state": "ok"
+      },
+      {
+       "label": "Control",
+       "kind": "enum",
+       "text": "Distance",
+       "state": "ok"
+      },
+      {
+       "label": "Radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Asymmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Partial fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Variable fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Allow edge overflow",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Smooth fillet corners",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Fillet 2",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Edge",
+        "selected": true
+       },
+       {
+        "label": "Full round",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Entities to fillet",
+        "kind": "query",
+        "items": [
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Measurement",
+        "kind": "enum",
+        "text": "Radius",
+        "state": "ok"
+       },
+       {
+        "label": "Control",
+        "kind": "enum",
+        "text": "Distance",
+        "state": "ok"
+       },
+       {
+        "label": "Radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Asymmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Partial fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Variable fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Allow edge overflow",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Smooth fillet corners",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 8,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIC"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIG"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIS"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIe"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIi"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIm"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Fillet 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 44823,
+   "te": 44823
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "ti": 44823,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to fillet",
+     "dialog": "Fillet 2"
+    },
+    "dialog": {
+     "title": "Fillet 2",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Edge",
+       "selected": true
+      },
+      {
+       "label": "Full round",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Entities to fillet",
+       "kind": "query",
+       "items": [
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Fillet 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1",
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Measurement",
+       "kind": "enum",
+       "text": "Radius",
+       "state": "ok"
+      },
+      {
+       "label": "Control",
+       "kind": "enum",
+       "text": "Distance",
+       "state": "ok"
+      },
+      {
+       "label": "Radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Asymmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Partial fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Variable fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Allow edge overflow",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Smooth fillet corners",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Fillet 2",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Edge",
+        "selected": true
+       },
+       {
+        "label": "Full round",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Entities to fillet",
+        "kind": "query",
+        "items": [
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Fillet 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1",
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Measurement",
+        "kind": "enum",
+        "text": "Radius",
+        "state": "ok"
+       },
+       {
+        "label": "Control",
+        "kind": "enum",
+        "text": "Distance",
+        "state": "ok"
+       },
+       {
+        "label": "Radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Asymmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Partial fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Variable fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Allow edge overflow",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Smooth fillet corners",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 8,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIC"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIG"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIK"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIO"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIS"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIe"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIi"
+      },
+      {
+       "kind": "FACE",
+       "owner": "Part 1",
+       "id": "JIm"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 2",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Fillet 2"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 47414,
+   "te": 47414
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "ti": 47415,
+   "pointer": {
+    "at": [
+     410,
+     58
+    ],
+    "hover": [],
+    "element": "use"
+   },
+   "tdown": 47420,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "camera": {
+     "direction": [
+      -0.433013,
+      0.75,
+      -0.5
+     ],
+     "up": [
+      -0.25,
+      0.433013,
+      0.866025
+     ],
+     "target_mm": [
+      0,
+      0,
+      0
+     ],
+     "eye_mm": [
+      67.5,
+      -116.913,
+      77.942
+     ],
+     "width_mm": 460.686,
+     "height_mm": 243.974,
+     "mmPerPixel": 0.275365,
+     "orthographic": true
+    },
+    "measure": null
+   },
+   "t": 50853,
+   "te": 50853
+  }
+ ],
+ "t0_epoch_ms": 1795801843229
+}
