@@ -395,7 +395,8 @@ impl DrawingEditor {
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings": a list's options too, not the scale combo's).
             let mut text = crate::drawing_panels::PanelText::default();
-            text.texts(["Insert view".to_string(), "Insert".into(), source_label.clone(), "View orientation".into()]);
+            // (The chosen source is the Insert select's value: live2's recorder reads neither it nor the options.)
+            text.texts(["Insert view", "Insert"]).options([source_label.clone()]).text("View orientation");
             text.options(orient_items.iter().map(|i| i.0.clone()));
             text.texts(["View scale", "View simplification"]);
             text.options(simp_items.iter().map(|i| i.0.clone()));
