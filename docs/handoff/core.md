@@ -35,6 +35,11 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
   6 QUEUED bf790398 13:5x psui SPLIT-TRIMMED-PARTIAL-ERRORS: split.rs pieces < 2 with an INTERNAL face/edge (a slit)
     -> err "Tool entity cannot split the selected part/face." (ours kept Part 1 whole with an Info = not doing the work).
     T1 features_b::a_trimmed_face_part_way_through_a_part_cannot_split_it. A/B .ab19: ALL-SAME, model 665 ok. Tell psui "fixed".
+  7 DONE 14:3x c2-body-draft-naming after Fill 1 (.bd3.sh/.bd4.sh): Intersection curve 1 = Fill's Surface 1 x the part
+    face made from it (one surface): live WARNING + no curve, ours their 3-edge boundary (ours does the work, kept).
+    Draft 2 12/27/17 vs live 13/28/17: face for face as live except live's 0.1 mm sliver face at the Fill corner (its
+    11.778 edge split 11.678 + 0.1, two 0.1 OTHER edges at (50.634,14.575,63.93)): Parasolid artefact, not matched. The
+    doc's only real difference left: Fill 1's 2.88 mm3 (#3, parked).
   LEAD NOT YET TOLD (lead 236k at 13:49): #3 queued 65e8a5e8 (half the gap + bridging Warning->Ok), #4 + #5 parked with the
   findings above, #6 status. Lead FYI still open: qa's ~13:xx verdict on impeller "Select a sketch plane." (69eae144).
   Not ours: c2-surf-intro-* Tail fin (skasm). QUEUED 45a536cf 10:5x (chamfer run-on + Fillet 2 + full round).
