@@ -12727,11 +12727,12 @@ OpOut op_join_edges_at(const OcShape& s, rust::Slice<const double> pts, double t
     // section's, a new far vertex's tolerance reaching where it was (a rim chamfer's tool run on along a wall,
     // c2-impeller-loft's Chamfer Stevenrohr Halterung: 6 um off over 3.5 mm; live's line runs on). The section must lie
     // within that of the line, else within its tolerance of its chord.
-    const bool    turned = turn > 1e-4;
+    // Also when its far end lies on the line's extension within tolerance: unify merges only exactly collinear lines.
     const bool    at0    = b0.IsSame(vs(i));
     const gp_Pnt  away   = at0 ? p1 : p0;
     const gp_Lin  along  = ca.Line();
     const gp_Pnt  on     = ElCLib::Value(ElCLib::Parameter(along, away), along);
+    const bool    turned = turn > 1e-4 || away.Distance(on) <= std::max(tol, BRep_Tool::Tolerance(b));
     const double  reach  = turned ? away.Distance(on) : 0.0;
     const gp_Lin  chord  = turned ? along : gp_Lin(p0, gp_Dir(gp_Vec(p0, p1)));
     const double  dev    = std::max({tol, BRep_Tool::Tolerance(b), 1.01 * reach});

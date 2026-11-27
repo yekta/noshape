@@ -1580,6 +1580,63 @@ std::unique_ptr<OcShape> extend_face_at(const OcShape& on, const OcShapeList& ed
   return wrap(out);
 }
 
+// A non-rational B-spline continued straight along its tangents past one side by at least len (null when it can't be):
+// live extends a ruled face linearly, where ExtendSurfByLength's C1 extension curls with the boundary's curvature.
+static occ::handle<Geom_BSplineSurface> extend_straight(const occ::handle<Geom_BSplineSurface>& in, double len, bool in_u, bool after)
+{
+  if (in.IsNull())
+    return {};
+  occ::handle<Geom_BSplineSurface> s = occ::down_cast<Geom_BSplineSurface>(in->Copy());
+  if (s->IsURational() || s->IsVRational())
+    return {};
+  if (in_u)
+    s->ExchangeUV();
+  if (!after)
+    s->VReverse();
+  const int p = s->VDegree(), nu = s->NbUPoles(), nv = s->NbVPoles(), nk = s->NbVKnots();
+  if (s->IsVPeriodic() || s->VMultiplicity(nk) != p + 1 || nv < 2)
+    return {};
+  NCollection_Array1<gp_Pnt> d(1, nu);
+  for (int i = 1; i <= nu; ++i)
+    d(i) = gp_Pnt(s->Pole(i, nv).XYZ() - s->Pole(i, nv - 1).XYZ());
+  NCollection_Array1<double> uk(1, s->NbUKnots());
+  NCollection_Array1<int>    um(1, s->NbUKnots());
+  s->UKnots(uk);
+  s->UMultiplicities(um);
+  // The rows' tangent along the boundary (the poles' differences blended over u): the shortest sets the reach.
+  const occ::handle<Geom_BSplineCurve> dc = new Geom_BSplineCurve(d, uk, um, s->UDegree(), s->IsUPeriodic());
+  double lo = HUGE_VAL, hi = 0;
+  for (int k = 0; k <= 64; ++k)
+  {
+    const double m = dc->Value(uk(1) + (uk(uk.Length()) - uk(1)) * k / 64).XYZ().Modulus();
+    lo = std::min(lo, m), hi = std::max(hi, m);
+  }
+  if (!(lo > 1e-3 * hi) || !(hi > 0))
+    return {};
+  const double               t = len / lo;
+  NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv + p);
+  for (int i = 1; i <= nu; ++i)
+  {
+    for (int j = 1; j <= nv; ++j)
+      poles(i, j) = s->Pole(i, j);
+    for (int k = 1; k <= p; ++k)
+      poles(i, nv + k) = gp_Pnt(s->Pole(i, nv).XYZ() + d(i).XYZ() * (t * k / p));
+  }
+  NCollection_Array1<double> vk(1, nk + 1);
+  NCollection_Array1<int>    vm(1, nk + 1);
+  for (int j = 1; j <= nk; ++j)
+    vk(j) = s->VKnot(j), vm(j) = s->VMultiplicity(j);
+  vm(nk) = p, vm(nk + 1) = p + 1;
+  // (The new span's length keeps the boundary's derivative: C1, as the end's is p / its last span times the difference.)
+  vk(nk + 1) = vk(nk) + t * (vk(nk) - vk(nk - 1)) / p;
+  occ::handle<Geom_BSplineSurface> out = new Geom_BSplineSurface(poles, uk, vk, um, vm, s->UDegree(), p, s->IsUPeriodic(), false);
+  if (!after)
+    out->VReverse();
+  if (in_u)
+    out->ExchangeUV();
+  return out;
+}
+
 std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const double> pts, double margin, bool own_part)
 {
   const TopoDS_Face& f = as_face(on.shape, "face");
@@ -1601,6 +1658,18 @@ std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const d
   fu0 = std::max(fu0, u0), fu1 = std::min(fu1, u1), fv0 = std::max(fv0, v0), fv1 = std::min(fv1, v1);
   if (own_part && !pts.empty() && fu1 > fu0 && fv1 > fv0 && (fu1 - fu0 < (1 - 1e-6) * (u1 - u0) || fv1 - fv0 < (1 - 1e-6) * (v1 - v0)))
   {
+    // (A ruled face's part runs 5% of its span on past each end along its sections, as live's chamfer surface does: the
+    // straight extension leaves from there, c2-impeller-loft's Fillet 3 vanishing on it at x 0.097 mm.)
+    if (bs->VDegree() == 1 && bs->UDegree() > 1)
+    {
+      const double m = 0.05 * (fu1 - fu0);
+      fu0 = std::max(fu0 - m, u0), fu1 = std::min(fu1 + m, u1);
+    }
+    if (bs->UDegree() == 1 && bs->VDegree() > 1)
+    {
+      const double m = 0.05 * (fv1 - fv0);
+      fv0 = std::max(fv0 - m, v0), fv1 = std::min(fv1 + m, v1);
+    }
     bs->Segment(fu0, fu1, fv0, fv1);
     bs->Bounds(u0, u1, v0, v1);
   }
@@ -1630,13 +1699,18 @@ std::unique_ptr<OcShape> extend_face_over(const OcShape& on, rust::Slice<const d
     if (uv.Y() >= v1 - ev)
       need[3] = std::max(need[3], d);
   }
-  occ::handle<Geom_BoundedSurface> b = bs;
+  occ::handle<Geom_BoundedSurface> b     = bs;
+  const bool                       ruled = bs->UDegree() == 1 || bs->VDegree() == 1;
   for (int side = 0; side < 4; ++side)
   {
     const bool in_u = side < 2, after = side % 2 == 1;
     if (need[side] <= 0 || (in_u ? (bs->IsUPeriodic() || bs->IsUClosed()) : (bs->IsVPeriodic() || bs->IsVClosed())))
       continue;
-    GeomLib::ExtendSurfByLength(b, 1.25 * need[side] + margin, 1, in_u, after);
+    const double len = 1.25 * need[side] + margin;
+    if (const auto straight = ruled ? extend_straight(occ::down_cast<Geom_BSplineSurface>(b), len, in_u, after) : occ::handle<Geom_BSplineSurface>(); !straight.IsNull())
+      b = straight;
+    else
+      GeomLib::ExtendSurfByLength(b, len, 1, in_u, after);
   }
   BRepBuilderAPI_MakeFace mk(b, 1e-7);
   if (!mk.IsDone())

@@ -478,7 +478,7 @@ fn a_tube_ends_offset_chamfer_runs_on_to_the_face_beyond_as_live() {
     assert_eq!(edges.len(), 3);
     let d = 0.0035;
     let rc = rim_chamfer::prism_rim_chamfer(&s, &edges, d, d * 20f64.to_radians().tan()).unwrap().expect("the chamfer's tool");
-    let cut = boolean(BooleanOp::Cut, std::slice::from_ref(&s), &[rc.tool], &BooleanOptions::default()).unwrap().shape;
+    let cut = boolean(BooleanOp::Cut, std::slice::from_ref(&s), std::slice::from_ref(&rc.tool), &BooleanOptions::default()).unwrap().shape;
     assert!(cut.is_valid() && cut.count(ShapeType::Solid) == 1);
     let off = (s.volume().unwrap() - cut.volume().unwrap()) * 1e9;
     assert!((off - 120.04).abs() < 0.5, "{off} mm³ off, live 120.04");
@@ -494,6 +494,65 @@ fn a_tube_ends_offset_chamfer_runs_on_to_the_face_beyond_as_live() {
         x.faces().iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { origin, .. }) if (origin.x - 0.12).abs() < 1e-9)).count()
     };
     assert_eq!((stop(&s), stop(&un)), (2, 1));
+    // The strips' bevels ruled in their edge's normal planes, e (1.2739 mm) in along the end face (live's JeG / JeK).
+    let e = d * 20f64.to_radians().tan();
+    let mut checked = 0;
+    for (k, &x) in edges.iter().enumerate() {
+        let edge = s.sub_shape(ShapeType::Edge, x).unwrap();
+        let info = edge.edge_info().unwrap();
+        if info.length > 1e-3 {
+            continue;
+        }
+        let to = |f: &Shape| distance(&make_vertex(rc.on_chamfer[k]).unwrap(), f).unwrap().distance;
+        let face = rc.tool.faces().into_iter().min_by(|a, b| to(a).total_cmp(&to(b))).expect("the strip's bevel");
+        let [u0, u1, v0, v1] = face.uv_bounds().unwrap();
+        let at = |a: f64, b: f64| face.point_at_uv(a, b).unwrap();
+        // (Whichever way it is ruled: the straight one.)
+        let along_u = (at((u0 + u1) / 2.0, v0) - (at(u0, v0) + at(u1, v0)) / 2.0).length() < 1e-12;
+        for j in 1..20 {
+            let t = j as f64 / 20.0;
+            let (a, b) = if along_u { (at(u0, v0 + (v1 - v0) * t), at(u1, v0 + (v1 - v0) * t)) } else { (at(u0 + (u1 - u0) * t, v0), at(u0 + (u1 - u0) * t, v1)) };
+            let q = a + (b - a) * ((0.005 - a.x) / (b.x - a.x));
+            let near = distance(&make_vertex(q).unwrap(), &edge).unwrap().point_b;
+            if near.distance(info.start).min(near.distance(info.end)) < 1e-7 {
+                continue;
+            }
+            let off = q - near;
+            assert!((off.length() - e).abs() < 1e-8, "ruling {t} lies {} mm in, live {}", off.length() * 1e3, e * 1e3);
+            let out_of_plane = (b - a).dot(DVec3::X.cross(off).normalize()) / (b - a).length();
+            assert!(out_of_plane.abs() < 1e-5, "ruling {t} out of the edge's normal plane by {out_of_plane}");
+            checked += 1;
+        }
+    }
+    assert!(checked >= 6, "{checked} rulings checked");
+    // Past its face's end along the rim, a strip's bevel runs on straight from 5% of the face further (its surface's end
+    // in live), through the tip of the round Fillet 3 runs on over it (live's JfO corner; from the face's end: 0.0675 mm off).
+    let tip = DVec3::new(0.097176, 0.957083, -46.774242) * 1e-3;
+    let k = edges.iter().position(|&x| s.sub_shape(ShapeType::Edge, x).unwrap().edge_info().is_ok_and(|i| i.length < 1e-3 && i.start.y > 0.0)).unwrap();
+    let near = |f: &Shape| distance(&make_vertex(rc.on_chamfer[k]).unwrap(), f).unwrap().distance;
+    let bevel = cut.faces().into_iter().min_by(|a, b| near(a).total_cmp(&near(b))).unwrap();
+    let on = extend_face_part_over(&bevel, &[tip], 0.0).unwrap();
+    let miss = distance(&make_vertex(tip).unwrap(), &on).unwrap().distance;
+    assert!(miss < 5e-6, "the run-on bevel passes {} mm from the round's tip, live 0", miss * 1e3);
+    // Where the chain stops, the line between the tube and the side face runs on through the cut as one line (live).
+    let mut ends: Vec<DVec3> = Vec::new();
+    for &x in &edges {
+        let i = s.sub_shape(ShapeType::Edge, x).unwrap().edge_info().unwrap();
+        for p in [i.start, i.end] {
+            match ends.iter().position(|q| q.distance(p) < 1e-9) {
+                Some(k) => {
+                    ends.remove(k);
+                }
+                None => ends.push(p),
+            }
+        }
+    }
+    assert_eq!(ends.len(), 2);
+    let joined = join_edges_at(&un, &ends, 1e-8, 5e-3).unwrap().shape;
+    assert!(joined.is_valid());
+    for p in ends {
+        assert!(!joined.vertices().iter().any(|v| v.vertex_point().is_ok_and(|q| q.distance(p) < 1e-7)), "the line stays split at {p}");
+    }
 }
 
 /// The impeller's Loft Gehäuse, a unit `mm` long: its sketches' circle (in two arcs) to the flange's D, Normal to

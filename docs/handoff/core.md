@@ -20,38 +20,32 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **SCREWS MOVE FACE 3: QUEUED 7f88950e (11-27 01:1x)** (commit 7211adcc2; T1 features_a::move_face_translate_slides_
   split_pieces_along_a_bore; corpus A/B .ab8.sh ALL-SAME; model tests 655 ok, clippy clean). Note for bool: MF3 406 ms =
   one boolean on the threaded body.
-- **IMPELLER CHAMFER -> FILLET 3 (UNCOMMITTED in core-rf, 11-27 02:01)**: body first diverges at Chamfer Stevenrohr
-  Halterung (bevel 6.0969 vs live 6.1849 mm2). Done, uncommitted: (1) kernel rim_chamfer.rs offset sections = C2
-  cubic_through on the EDGE'S PARAMETER (k=48; k=16 fails the ruling test): rulings in normal planes, cylinder 303.5789
-  (= live). (2) boolean.cpp op_join_edges_at: the "extend the line" path also when the section's far end is on the
-  line within tol (turn was 6.7e-8 < 1e-4 -> chord path -> unify won't merge): the x 1.5..60.9 line is ONE edge now
-  (live). bool told (c918bba0 11-27 01:3x): no collision; bool's unify-verts change would also join it. (3) T1 in
-  kernel tests/features.rs a_tube_ends_offset_chamfer_runs_on...: rulings (e within 1e-8, out of the normal plane <1e-5)
-  + one line after join_edges_at; passes; fails with either old file (.rim_chamfer.old.rs / .boolean.old.cpp, .kt6.sh).
-  join tol back to scale*1e-7 (blend_section.rs).
-  BLOCKER: Fillet 3 still Error (old code OK): blend_section.rs run-on CORNER (~line 990, faces [2,5,9] = x5 plane +
-  both bevels, extended by extend_face_part_over): split of the run-on piece by the walls = 1 cell (old 5 cells, 1
-  dropped). Per wall: plane 2 cells, each new bevel wall 1 cell (own bevel: section 1 edge = touching only?). Next: see
-  why the new bevel's extension (GeomLib ExtendSurfByLength C1) no longer crosses the piece; live extends the bevel
-  LINEARLY in u and v (bevel.json) - try a linear extension for ruled walls. DEBUG prints RODBG/RCDBG are in
-  blend_section.rs (remove before commit). Scripts: .rc4.sh (build cli-rd + bd.sh + RODBG grep), .kt5.sh (T1).
-  After: Fillet 3 vs live (93/60 vs 95/62), corpus A/B (.ab8.sh, swap the 3 files), clippy, g++-13 (boolean.cpp), land.
-- FILLET-R12-BLOCK-OVERFLOW: qa verified (3/3 scenarios, 46/46 states).
-- psui's two TICKETS items (Up to part overlap, Remove pattern of only part): skasm's (lead 11-27).
-- PATTERN-AFTER-INSERTED-CHAMFER: fixed by 6a8e411db, skasm added the e2e and closed it.
+- **IMPELLER CHAMFER -> FILLET 3: LANDING 11-27 05:3x** (lead 05:3x: zum Halter is already Error in 0.4.72 / main
+  1b395a8e per qa, so land). rim_chamfer cubic_through on the edge's parameter; boolean.cpp op_join_edges_at keeps the
+  line when its far end lies on it; build.cpp extend_straight for ruled B-splines + own_part Segment 5% past each end
+  along a ruled face's sections (live's JeG = face range +-5%); T1 kernel features::a_tube_ends_offset_chamfer_runs_on..
+  (+ round tip check). Gates 05:3x: kernel 617 ok, g++-13 ok; fresh import A 39 / B 40 Ok of 48 (Move face 1 and
+  Fillet Flansch zum Stroemungskanal Error->Ok, zum Halter Ok->Error in this import), regen 55.0 -> 43.0 s; Fillet 3 =
+  live face for face at Fillet Stevenrohr einnschub. Corpus (OLD 11-18 import): Sketch Bohrung Flansch "Select a sketch
+  plane." + 3 downstream: its plane is Extrude 6's CapEnd, whose sides Move face 1 offsets; Move face 1 was Error in
+  the import's build, now Ok, so the old name is gone (fresh import resolves it). knifehandle -0.02 mm3 (check vs live).
+- **NEXT: FILLET STEVENROHR ZUM HALTER 3-FACE CORNER BALL (follow-up)**: notes core-scratch/imp/corner-notes.md, WIP
+  core-scratch/imp/corner-ball-wip.patch (junction both orders + third-face rejection in tangency_ball; + DBGJ prints,
+  output core-scratch/imp/k14-dbgj.out). r2 concave chain 59-60-56-55; faces 15/14 tube halves (convex ridge y 0),
+  29 plane x 5, 30 bevel. Corners y+-0.279: concave trihedral -> vertex ball touching 15, 30, 29 (Newton on the 3
+  signed distances), centre x 7 (live's 4 new rounds 8.9186 x2, 2.7077 x2 all reach x 7; 39 faces). y 0: ball on x 7 at
+  r from the ridge line, in its bisector plane. Open: joining the two lofts at the vertex ball (contacts differ).
+  Run: .k14.sh on vibex8 (hd.sh + f3B), then .ab11.sh (refresh .X.old from origin/main, .X.new), .kt7.sh.
 - **SPLIT-NUMBERING-DUCT-MIRROR: QUEUED** 7774546b0 (core-p0; ids keep v0.4.71's order, names live's; test
   features_a::a_split_part_two_extrudes_made_keeps_its_pieces_ids; qa's userdocs.py duct = 0.4.71). Duct Split 1
   part NAMES still differ from live (later).
-- **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091 18:2x** (core-p0): unchanged() by volume_change_estimate first,
-  boolean.rs glued fuse volumes only for a solid (estimate then exact), face_reach probes "on" by the normal offset;
-  T2 ops parity::parity_impeller_loft_regenerates_in_time (< 40 s). vibex7 load 3: 24.2 -> 23.0 s (0.4.71 ~22 s);
-  corpus 127 ALL-SAME. A settle tol 1e-10 try changed knifehandle Fillet 2 (reverted). Left (profile 18:3x, DIST_T
-  instrumentation not committed): Gehaeuse 6.4 s = OCCT op_fillet retries + project_point_near fallbacks (267 x 4 ms,
-  blend_section Support::Face when Newton's foot leaves the face) on Move face 2's new (live) geometry; live does
-  Move face 1, Delete face 2 and both fillets OK -> the real fix is making them succeed (parity work, not speed).
+- **IMPELLER-LOFT-REGEN-TIME: QUEUED 60689091** (T2 ops parity::parity_impeller_loft_regenerates_in_time < 40 s).
 ## Now (11-25)
 - **body-draft doc now** (fresh .bd2.sh 13:2x): all 14 OK; Fillet 1 edge kinds 19/2 vs live 15/6 (vol 39073.008 vs
   39072.989); Fillet 2 -6.46 mm3 (G1 fill); Draft 2 12 faces/27 edges vs live 13/28 (one face short): next in this doc.
+  live 11-27 (live/core/body-draft-self-1127): Body draft with Draft on self: Faces scope -> ERROR
+  BODY_DRAFT_INVALID_FACE_REFERENCE, Edges scope -> BODY_DRAFT_INVALID_EDGE_REFERENCE, part unchanged; with a parting
+  plane both OK (8043.7443 mm3 on 40x20x10, pull Top, 5 deg, z5). An edge in Faces -> BODY_DRAFT_SELECT_FACES.
 - **SCISSOR 11-26 15:0x (in 56131f3c)**: (a) detail_a.rs blends_to_reapply: the spread
   to "blends touching removed blends" skips a LARGER cylinder met along a line (the round's support): 9cbb0e MF2 now
   live's 44 faces, 109400.892 (live .89). (b) direct.rs tweak_planes_in_turn: planes facing several ways (all
@@ -160,7 +154,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 - **asm-bjr-config 5d8bc1:** Sweep 1 landed 72248180. Kerf Compensation 1: live's corpus line is Manufacture=true
   (3 plain Ø2.2 holes, 3704.237 -> 3745.156 mm³, offset faces 454.835 -> 454.462 mm²); at false live leaves the part
   unchanged; ours offsets at false (dx's translation). Check our offset against the true numbers once dx has that input.
-  Shell 1 is dx's. Extrude 55 (3.8 s vs 333 ms) is bool's fuse / unify.
+  Shell 1 is dx's; Extrude 55 is bool's.
 - **c2-hunting-knife f24:** live's lines disagree (16-23 LINE, 24 OTHER); refetch 15-24 asked (REQUESTS 11-15 00:45).
 
 ## Next, in order
@@ -191,7 +185,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
    dec.py (face ids: urlsafe-b64 raw deflate JSON).
 0. ERRORS-1123 rest (live/errors-1123/*.md; audit /root/core-scratch/errors-1123-audit.md). Never add errors for live's
    "succeeds" cases (Revolve 0°, Move face through the part's top, cylinder collapse).
-00. KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
+00. (KNIFEHANDLE-LOFT1: skasm took it, lead 11-27.) KNIFEHANDLE-LOFT1 station rule when loft-stations3 (J, K: profile off its guides) is in; then Face blend 1 (on top); then projected-curve-enclose Mutual trim 1 (ours
    174 ms): speed ticket if >=100 ms and >=2x live's (lead 23:5x); then the thin wrapped-disc fuse (P2, In flight).
 0. Impeller P0 (In flight): land Extrude impellerraum's split walls after the pair, then Delete face 2 on our input and
    the local rebuild, re-timed on the Mac vs 12 ms; then the In-flight queue 1-7.
@@ -216,10 +210,7 @@ docs/DECISIONS.md (read first; it wins over anything here). Land NOSHAPE_LAND_QU
 5. Live specs not implemented: revolved cones framed at their apex, tori / spheres at their centre (`reframe_cylinder`
    covers cylinders only); extruded circle edges on the sketch circle's frame vs our seam at u = 0; extrude side faces'
    x along their bottom edge (check).
-
 ## Parked
-- Knife lofted handle: +17 mm³ smooth bulge between the guides vs live (v direction or live's section construction).
-- E1 Govde (dock) 539/304 -> 538/303 accepted by the lead (bf26f8759's 0.5 mm seam line).
 
 ## How to run
 - Agent ids: /root/lead-scratch/roster.md only (read it before every message_agent; never copy ids into notes).

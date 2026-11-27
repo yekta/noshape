@@ -121,7 +121,8 @@ pub fn prism_rim_chamfer(shape: &Shape, edges: &[usize], d: f64, e: f64) -> Resu
         let fm = 0.5 * (f0 + f1);
         let inward = if plane_face.contains_point(c.point_at(fm)? + n.cross(tangent(fm)?).normalize() * (1e-3 * e), 1e-4 * e)? { 1.0 } else { -1.0 };
         // The edge `down` below the plane, offset `by` in along it (out where negative): circles as circles, lines as
-        // lines, other curves through their offset points and tangents.
+        // lines, other curves a cubic through their offset points on the edge's own parameter, so that the ruled loft
+        // pairs each edge point's offsets (live's rulings lie in the edge's normal planes; chord-length fits drift).
         let offset = |down: f64, by: f64| -> Result<Shape> {
             let at = |t: f64| -> Result<DVec3> { Ok(c.point_at(t)? - n * down + n.cross(tangent(t)?).normalize() * (inward * by)) };
             match ci.curve {
@@ -130,9 +131,16 @@ pub fn prism_rim_chamfer(shape: &Shape, edges: &[usize], d: f64, e: f64) -> Resu
                 _ => {
                     let k = 48;
                     let ts: Vec<f64> = (0..=k).map(|j| g0 + (g1 - g0) * j as f64 / k as f64).collect();
+                    let slope = |t: f64| -> Result<DVec3> {
+                        let [_, d1, d2, _] = c.derivatives_at(t)?;
+                        let s = d1.length().max(1e-300);
+                        let tt = d1 / s;
+                        Ok(d1 + n.cross((d2 - tt * tt.dot(d2)) / s) * (inward * by))
+                    };
                     let pts = ts.iter().map(|&t| at(t)).collect::<Result<Vec<_>>>()?;
-                    let tans = ts.iter().map(|&t| tangent(t)).collect::<Result<Vec<_>>>()?;
-                    crate::construct::make_interpolated_spline(&pts, &tans, false)
+                    let poles = cubic_through(&ts, &pts, slope(g0)?, slope(g1)?);
+                    let mults: Vec<u32> = (0..=k).map(|j| if j == 0 || j == k { 4 } else { 1 }).collect();
+                    crate::construct::make_bspline(&poles, None, &ts, &mults, 3, false)
                 }
             }
         };
@@ -189,6 +197,69 @@ pub fn prism_rim_chamfer(shape: &Shape, edges: &[usize], d: f64, e: f64) -> Resu
         return Ok(None);
     }
     Ok(Some(RimChamfer { tool, on_chamfer }))
+}
+
+/// The poles of the C2 cubic through `pts` at parameters `ts` (its knots, ends clamped) leaving and arriving with
+/// derivatives `d0` and `d1`.
+fn cubic_through(ts: &[f64], pts: &[DVec3], d0: DVec3, d1: DVec3) -> Vec<DVec3> {
+    let k = ts.len() - 1;
+    let m = k + 3;
+    let mut knots = vec![ts[0]; 4];
+    knots.extend_from_slice(&ts[1..k]);
+    knots.extend(std::iter::repeat_n(ts[k], 4));
+    let mut a = vec![vec![0.0; m]; m];
+    let mut b = vec![DVec3::ZERO; m];
+    (a[0][0], b[0]) = (1.0, pts[0]);
+    (a[1][1], b[1]) = (1.0, pts[0] + d0 * ((ts[1] - ts[0]) / 3.0));
+    (a[m - 2][m - 2], b[m - 2]) = (1.0, pts[k] - d1 * ((ts[k] - ts[k - 1]) / 3.0));
+    (a[m - 1][m - 1], b[m - 1]) = (1.0, pts[k]);
+    for j in 1..k {
+        // (Span j + 2 holds ts[j]: the cubic's 4 basis values there, Cox-de Boor.)
+        let s = j + 3;
+        let t = ts[j];
+        let mut nb = [1.0, 0.0, 0.0, 0.0];
+        let (mut left, mut right) = ([0.0; 4], [0.0; 4]);
+        for d in 1..=3 {
+            left[d] = t - knots[s + 1 - d];
+            right[d] = knots[s + d] - t;
+            let mut saved = 0.0;
+            for r in 0..d {
+                let tmp = nb[r] / (right[r + 1] + left[d - r]);
+                nb[r] = saved + right[r + 1] * tmp;
+                saved = left[d - r] * tmp;
+            }
+            nb[d] = saved;
+        }
+        for (r, v) in nb.iter().enumerate() {
+            a[j + 1][s - 3 + r] = *v;
+        }
+        b[j + 1] = pts[j];
+    }
+    // Gaussian elimination with partial pivoting (a banded system of ~50).
+    for col in 0..m {
+        let piv = (col..m).max_by(|&x, &y| a[x][col].abs().total_cmp(&a[y][col].abs())).unwrap_or(col);
+        a.swap(col, piv);
+        b.swap(col, piv);
+        for row in col + 1..m {
+            let f = a[row][col] / a[col][col];
+            if f != 0.0 {
+                let (above, below) = a.split_at_mut(row);
+                for (x, y) in below[0][col..].iter_mut().zip(&above[col][col..]) {
+                    *x -= f * y;
+                }
+                b[row] = b[row] - b[col] * f;
+            }
+        }
+    }
+    let mut x = vec![DVec3::ZERO; m];
+    for row in (0..m).rev() {
+        let mut v = b[row];
+        for c2 in row + 1..m {
+            v -= x[c2] * a[row][c2];
+        }
+        x[row] = v / a[row][row];
+    }
+    x
 }
 
 /// The ends of the chain `edges` (points of one edge only), none for a closed one.

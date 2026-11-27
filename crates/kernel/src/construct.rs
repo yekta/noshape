@@ -269,7 +269,8 @@ pub fn extend_face_over(face: &Shape, points: &[DVec3], margin: f64) -> Result<S
 }
 
 /// [`extend_face_over`] of the face's own part of its surface: a wall a round runs on past its end, which the rest of
-/// a ring's surface would sweep through (c2-impeller-loft's chamfer, its other half down to z -51 mm).
+/// a ring's surface would sweep through (c2-impeller-loft's chamfer, its other half down to z -51 mm). A ruled face's
+/// part runs on 5% of it past each end along its sections, as live's surface does.
 pub fn extend_face_part_over(face: &Shape, points: &[DVec3], margin: f64) -> Result<Shape> {
     Shape::from_res(ffi::extend_face_over(face.raw(), &flat(points), margin, true))
 }
